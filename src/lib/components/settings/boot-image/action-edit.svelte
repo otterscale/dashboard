@@ -1,0 +1,178 @@
+<script lang="ts" module>
+	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
+	import Icon from '@iconify/svelte';
+	import { getContext, onMount } from 'svelte';
+	import { writable } from 'svelte/store';
+	import { toast } from 'svelte-sonner';
+
+	import {
+		type Configuration_BootImage,
+		ConfigurationService,
+		type UpdateBootImageRequest
+	} from '$lib/api/configuration/v1/configuration_pb';
+	import * as Form from '$lib/components/custom/form';
+	import { SingleStep as Modal } from '$lib/components/custom/modal';
+	import type { ReloadManager } from '$lib/components/custom/reloader';
+	import {
+		Multiple as MultipleSelect,
+		Single as SingleSelect
+	} from '$lib/components/custom/select';
+	import { m } from '$lib/paraglide/messages';
+	import { cn } from '$lib/utils';
+</script>
+
+<script lang="ts">
+	// Component props - accepts a BootImage object
+	let {
+		bootImage,
+		reloadManager,
+		closeActions
+	}: {
+		bootImage: Configuration_BootImage;
+		reloadManager: ReloadManager;
+		closeActions: () => void;
+	} = $props();
+
+	const transport: Transport = getContext('transport');
+	const client = createClient(ConfigurationService, transport);
+	const architecturesOptions = writable<SingleSelect.OptionType[]>([]);
+
+	let request = $state({} as UpdateBootImageRequest);
+	let open = $state(false);
+
+	function init() {
+		request = {
+			id: bootImage.id,
+			distroSeries: bootImage.distroSeries,
+			architectures: [...bootImage.architectures]
+		} as UpdateBootImageRequest;
+	}
+
+	function close() {
+		open = false;
+	}
+
+	// Load available architectures for the current distro series
+	onMount(async () => {
+		try {
+			const response = await client.listBootImageSelections({});
+			// Find the boot image selection for the current distro series
+			const currentBootImageSelection = response.bootImageSelections.find(
+				(bootImageSelection) => bootImageSelection.distroSeries === bootImage.distroSeries
+			);
+			if (currentBootImageSelection) {
+				architecturesOptions.set(
+					currentBootImageSelection.architectures.map((architecture) => ({
+						value: architecture,
+						label: architecture,
+						icon: 'ph:binary'
+					}))
+				);
+			}
+		} catch (error) {
+			console.error('Error during initial data load:', error);
+		}
+	});
+</script>
+
+<!-- Modal component for boot image edit -->
+<Modal.Root
+	bind:open
+	onOpenChange={(isOpen) => {
+		if (isOpen) {
+			init();
+		}
+	}}
+	onOpenChangeComplete={(isOpen) => {
+		if (!isOpen) {
+			closeActions();
+		}
+	}}
+>
+	<Modal.Trigger variant="creative">
+		<Icon icon="ph:pencil" />
+		{m.edit()}
+	</Modal.Trigger>
+
+	<!-- Modal content -->
+	<Modal.Content>
+		<Modal.Header>{m.edit_boot_image()}</Modal.Header>
+		<Form.Root>
+			<Form.Fieldset>
+				<Form.Field>
+					<Form.Label>{m.architecture()}</Form.Label>
+					<MultipleSelect.Root bind:value={request.architectures} options={architecturesOptions}>
+						<MultipleSelect.Viewer />
+						<MultipleSelect.Controller>
+							<MultipleSelect.Trigger />
+							<MultipleSelect.Content>
+								<MultipleSelect.Options>
+									<MultipleSelect.Input />
+									<MultipleSelect.List>
+										<MultipleSelect.Empty>{m.no_result()}</MultipleSelect.Empty>
+										<MultipleSelect.Group>
+											{#each $architecturesOptions as option (option.value)}
+												<MultipleSelect.Item {option}>
+													<Icon
+														icon={option.icon ? option.icon : 'ph:empty'}
+														class={cn('size-5', option.icon ? 'visible' : 'invisible')}
+													/>
+													{option.label}
+													<MultipleSelect.Check {option} />
+												</MultipleSelect.Item>
+											{/each}
+										</MultipleSelect.Group>
+									</MultipleSelect.List>
+									<MultipleSelect.Actions>
+										<MultipleSelect.ActionAll>{m.all()}</MultipleSelect.ActionAll>
+										<MultipleSelect.ActionClear>{m.clear()}</MultipleSelect.ActionClear>
+									</MultipleSelect.Actions>
+								</MultipleSelect.Options>
+							</MultipleSelect.Content>
+						</MultipleSelect.Controller>
+					</MultipleSelect.Root>
+				</Form.Field>
+			</Form.Fieldset>
+		</Form.Root>
+
+		<!-- Modal footer with action buttons -->
+		<Modal.Footer>
+			<!-- Cancel button -->
+			<Modal.Cancel>
+				{m.cancel()}
+			</Modal.Cancel>
+
+			<!-- Confirm action group -->
+			<Modal.ActionsGroup>
+				<!-- Confirm button with edit operation -->
+				<Modal.Action
+					onclick={() => {
+						const architectures = `${request.architectures.join(', ')}`;
+						// Execute edit operation with toast notifications
+						toast.promise(() => client.updateBootImage(request), {
+							loading: `Editing boot image ${request.distroSeries}...`,
+							success: () => {
+								// Force reload to refresh data
+								reloadManager.force();
+								return `Successfully edited boot image ${request.distroSeries}: ${architectures}`;
+							},
+							error: (error) => {
+								// Handle and display error
+								let message = `Failed to edit boot image ${request.distroSeries}: ${architectures}`;
+								toast.error(message, {
+									description: (error as ConnectError).message.toString(),
+									duration: Number.POSITIVE_INFINITY,
+									closeButton: true
+								});
+								return message;
+							}
+						});
+						close();
+					}}
+				>
+					{m.confirm()}
+				</Modal.Action>
+			</Modal.ActionsGroup>
+		</Modal.Footer>
+	</Modal.Content>
+</Modal.Root>

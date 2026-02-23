@@ -1,0 +1,204 @@
+<script lang="ts" module>
+	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
+	import Icon from '@iconify/svelte';
+	import { getContext, onMount } from 'svelte';
+	import { writable } from 'svelte/store';
+	import { toast } from 'svelte-sonner';
+
+	import type { Bucket, UpdateBucketRequest } from '$lib/api/storage/v1/storage_pb';
+	import { StorageService } from '$lib/api/storage/v1/storage_pb';
+	import * as Form from '$lib/components/custom/form';
+	import { Single as SingleInput } from '$lib/components/custom/input';
+	import * as Loading from '$lib/components/custom/loading';
+	import { SingleStep as Modal } from '$lib/components/custom/modal';
+	import type { ReloadManager } from '$lib/components/custom/reloader';
+	import { Single as SingleSelect } from '$lib/components/custom/select';
+	import { m } from '$lib/paraglide/messages.js';
+	import { cn } from '$lib/utils';
+
+	import { accessControlListOptions, getAccessControlList } from './utils.svelte';
+</script>
+
+<script lang="ts">
+	let {
+		bucket,
+		scope,
+		reloadManager,
+		closeActions
+	}: {
+		bucket: Bucket;
+		scope: string;
+		reloadManager: ReloadManager;
+		closeActions: () => void;
+	} = $props();
+
+	const transport: Transport = getContext('transport');
+
+	const storageClient = createClient(StorageService, transport);
+	let userOptions = $state(writable<SingleSelect.OptionType[]>([]));
+	let isMounted = $state(false);
+	let invalid = $state(false);
+
+	let request = $state({} as UpdateBucketRequest);
+	function init() {
+		request = {
+			scope: scope,
+			bucketName: bucket.name,
+			owner: bucket.owner,
+			policy: bucket.policy,
+			acl: getAccessControlList(bucket.grants)
+		} as UpdateBucketRequest;
+	}
+
+	let open = $state(false);
+	function close() {
+		open = false;
+	}
+
+	onMount(async () => {
+		try {
+			const response = await storageClient.listUsers({ scope: scope });
+			userOptions.set(
+				response.users.map(
+					(user) =>
+						({
+							value: user.id,
+							label: user.id,
+							icon: 'ph:user'
+						}) as SingleSelect.OptionType
+				)
+			);
+			isMounted = true;
+		} catch (error) {
+			console.error('Error during initial data load:', error);
+		}
+	});
+</script>
+
+<Modal.Root
+	bind:open
+	onOpenChange={(isOpen) => {
+		if (isOpen) {
+			init();
+		}
+	}}
+	onOpenChangeComplete={(isOpen) => {
+		if (!isOpen) {
+			closeActions();
+		}
+	}}
+>
+	<Modal.Trigger variant="creative">
+		<Icon icon="ph:pencil" />
+		{m.edit()}
+	</Modal.Trigger>
+	<Modal.Content>
+		<Modal.Header>{m.edit_bucket()}</Modal.Header>
+		<Form.Root>
+			<Form.Fieldset>
+				<Form.Field>
+					<Form.Label>{m.name()}</Form.Label>
+					<SingleInput.General required type="text" bind:value={request.bucketName} bind:invalid />
+				</Form.Field>
+
+				<Form.Field>
+					<Form.Label>{m.owner()}</Form.Label>
+					{#if isMounted}
+						<SingleSelect.Root bind:options={userOptions} bind:value={request.owner}>
+							<SingleSelect.Trigger />
+							<SingleSelect.Content>
+								<SingleSelect.Options>
+									<SingleSelect.Input />
+									<SingleSelect.List>
+										<SingleSelect.Empty>{m.no_result()}</SingleSelect.Empty>
+										<SingleSelect.Group>
+											{#each $userOptions as option (option.value)}
+												<SingleSelect.Item {option}>
+													<Icon
+														icon={option.icon ? option.icon : 'ph:empty'}
+														class={cn('size-5', option.icon ? 'visible' : 'invisible')}
+													/>
+													{option.label}
+													<SingleSelect.Check {option} />
+												</SingleSelect.Item>
+											{/each}
+										</SingleSelect.Group>
+									</SingleSelect.List>
+								</SingleSelect.Options>
+							</SingleSelect.Content>
+						</SingleSelect.Root>
+					{:else}
+						<Loading.Selection />
+					{/if}
+				</Form.Field>
+			</Form.Fieldset>
+
+			<Form.Fieldset>
+				<Form.Legend>{m.policies()}</Form.Legend>
+
+				<Form.Field>
+					<Form.Label>{m.policy()}</Form.Label>
+					<SingleInput.Structure preview bind:value={request.policy} language="json" />
+				</Form.Field>
+
+				<Form.Field>
+					<Form.Label>{m.access_control_list()}</Form.Label>
+					<SingleSelect.Root options={accessControlListOptions} bind:value={request.acl}>
+						<SingleSelect.Trigger />
+						<SingleSelect.Content>
+							<SingleSelect.Options>
+								<SingleSelect.Input />
+								<SingleSelect.List>
+									<SingleSelect.Empty>{m.no_result()}</SingleSelect.Empty>
+									<SingleSelect.Group>
+										{#each $accessControlListOptions as option (option.value)}
+											<SingleSelect.Item {option}>
+												<Icon
+													icon={option.icon ? option.icon : 'ph:empty'}
+													class={cn('size-5', option.icon ? 'visible' : 'invisible')}
+												/>
+												{option.label}
+												<SingleSelect.Check {option} />
+											</SingleSelect.Item>
+										{/each}
+									</SingleSelect.Group>
+								</SingleSelect.List>
+							</SingleSelect.Options>
+						</SingleSelect.Content>
+					</SingleSelect.Root>
+				</Form.Field>
+			</Form.Fieldset>
+		</Form.Root>
+		<Modal.Footer>
+			<Modal.Cancel>
+				{m.cancel()}
+			</Modal.Cancel>
+			<Modal.ActionsGroup>
+				<Modal.Action
+					disabled={invalid}
+					onclick={() => {
+						toast.promise(() => storageClient.updateBucket(request), {
+							loading: `Updating ${request.bucketName}...`,
+							success: () => {
+								reloadManager.force();
+								return `Update ${request.bucketName}`;
+							},
+							error: (error) => {
+								let message = `Fail to update ${request.bucketName}`;
+								toast.error(message, {
+									description: (error as ConnectError).message.toString(),
+									duration: Number.POSITIVE_INFINITY,
+									closeButton: true
+								});
+								return message;
+							}
+						});
+						close();
+					}}
+				>
+					{m.confirm()}
+				</Modal.Action>
+			</Modal.ActionsGroup>
+		</Modal.Footer>
+	</Modal.Content>
+</Modal.Root>

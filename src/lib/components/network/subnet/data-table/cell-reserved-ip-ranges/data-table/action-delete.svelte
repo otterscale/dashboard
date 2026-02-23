@@ -1,0 +1,118 @@
+<script lang="ts" module>
+	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
+	import Icon from '@iconify/svelte';
+	import { getContext } from 'svelte';
+	import { toast } from 'svelte-sonner';
+
+	import {
+		type DeleteIPRangeRequest,
+		type Network_IPRange,
+		NetworkService
+	} from '$lib/api/network/v1/network_pb';
+	import * as Form from '$lib/components/custom/form';
+	import { Single as SingleInput } from '$lib/components/custom/input';
+	import { SingleStep as Modal } from '$lib/components/custom/modal';
+	import type { Booleanified } from '$lib/components/custom/modal/single-step/type';
+	import type { ReloadManager } from '$lib/components/custom/reloader';
+	import { m } from '$lib/paraglide/messages';
+</script>
+
+<script lang="ts">
+	let {
+		ipRange,
+		reloadManager,
+		closeActions
+	}: { ipRange: Network_IPRange; reloadManager: ReloadManager; closeActions: () => void } =
+		$props();
+
+	const transport: Transport = getContext('transport');
+	const client = createClient(NetworkService, transport);
+
+	let request = $state({} as DeleteIPRangeRequest);
+	let open = $state(false);
+
+	function init() {
+		request = {
+			id: ipRange.id
+		} as DeleteIPRangeRequest;
+	}
+
+	function close() {
+		open = false;
+	}
+
+	let invalidity = $state({} as Booleanified<Network_IPRange>);
+	const invalid = $derived(invalidity.startIp || invalidity.endIp);
+</script>
+
+<Modal.Root
+	bind:open
+	onOpenChange={(isOpen) => {
+		if (isOpen) {
+			init();
+		}
+	}}
+	onOpenChangeComplete={(isOpen) => {
+		if (!isOpen) {
+			closeActions();
+		}
+	}}
+>
+	<Modal.Trigger variant="destructive">
+		<Icon icon="ph:trash" />
+		{m.delete()}
+	</Modal.Trigger>
+	<Modal.Content>
+		<Modal.Header>{m.delete_ip_range()}</Modal.Header>
+		<Form.Root>
+			<Form.Fieldset>
+				<Form.Field>
+					<Form.Label>{m.start_ip()}</Form.Label>
+					<SingleInput.Confirm
+						required
+						target={ipRange.startIp}
+						bind:invalid={invalidity.startIp}
+					/>
+				</Form.Field>
+				<Form.Field>
+					<Form.Label>{m.end_ip()}</Form.Label>
+					<SingleInput.Confirm required target={ipRange.endIp} bind:invalid={invalidity.endIp} />
+				</Form.Field>
+				<Form.Help>
+					{m.deletion_warning({ identifier: m.range() })}
+				</Form.Help>
+			</Form.Fieldset>
+		</Form.Root>
+		<Modal.Footer>
+			<Modal.Cancel>
+				{m.cancel()}
+			</Modal.Cancel>
+			<Modal.ActionsGroup>
+				<Modal.Action
+					disabled={invalid}
+					onclick={() => {
+						toast.promise(() => client.deleteIPRange(request), {
+							loading: 'Loading...',
+							success: () => {
+								reloadManager.force();
+								return `Delete ${ipRange.id} success`;
+							},
+							error: (error) => {
+								let message = `Fail to delete ${ipRange.id}`;
+								toast.error(message, {
+									description: (error as ConnectError).message.toString(),
+									duration: Number.POSITIVE_INFINITY,
+									closeButton: true
+								});
+								return message;
+							}
+						});
+						close();
+					}}
+				>
+					{m.confirm()}
+				</Modal.Action>
+			</Modal.ActionsGroup>
+		</Modal.Footer>
+	</Modal.Content>
+</Modal.Root>

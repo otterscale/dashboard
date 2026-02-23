@@ -1,0 +1,35 @@
+<script lang="ts" module>
+	import Icon from '@iconify/svelte';
+	import { Tooltip as TooltipPrimitive } from 'bits-ui';
+
+	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { cn } from '$lib/utils.js';
+</script>
+
+<script lang="ts">
+	let {
+		ref = $bindable(null),
+		class: className,
+		sideOffset = 4,
+		children,
+		...restProps
+	}: TooltipPrimitive.ContentProps & {} = $props();
+</script>
+
+<div data-slot="select-item-information">
+	<Tooltip.Provider>
+		<Tooltip.Root>
+			<Tooltip.Trigger>
+				<Icon icon="ph:info" />
+			</Tooltip.Trigger>
+			<Tooltip.Content
+				bind:ref
+				{sideOffset}
+				class={cn('border bg-popover p-2 text-popover-foreground shadow', className)}
+				{...restProps}
+			>
+				{@render children?.()}
+			</Tooltip.Content>
+		</Tooltip.Root>
+	</Tooltip.Provider>
+</div>

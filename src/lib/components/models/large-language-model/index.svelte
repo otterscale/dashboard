@@ -1,0 +1,100 @@
+<script lang="ts" module>
+	import { createClient, type Transport } from '@connectrpc/connect';
+	import { PrometheusDriver } from 'prometheus-query';
+	import { getContext, onDestroy, onMount } from 'svelte';
+	import { writable } from 'svelte/store';
+
+	import { EnvironmentService } from '$lib/api/environment/v1/environment_pb';
+	import { type Model, ModelService } from '$lib/api/model/v1/model_pb.ts';
+	import * as Loading from '$lib/components/custom/loading';
+	import { ReloadManager } from '$lib/components/custom/reloader';
+
+	import { DataTable } from './data-table/index';
+	import ExtensionsAlert from './extensions-alert.svelte';
+	import type { Metrics } from './types.d.ts';
+	import { getMapInstanceToMetric } from './utils.svelte.ts';
+</script>
+
+<script lang="ts">
+	let { scope }: { scope: string } = $props();
+
+	const transport: Transport = getContext('transport');
+	const modelClient = createClient(ModelService, transport);
+	const environmentService = createClient(EnvironmentService, transport);
+
+	let serviceUri = $state('');
+	const models = writable<Model[]>([]);
+	async function fetchModels() {
+		const response = await modelClient.listModels({
+			scope: scope
+		});
+		serviceUri = response.serviceUri;
+		models.set(response.models);
+	}
+
+	let prometheusDriver = $state<PrometheusDriver | null>(null);
+	let metrics = $state({} as Metrics);
+	async function fetchMetrics() {
+		if (!prometheusDriver) {
+			const response = await environmentService.getPrometheus({});
+			prometheusDriver = new PrometheusDriver({
+				endpoint: '/prometheus',
+				baseURL: response.baseUrl,
+				headers: {
+					'x-proxy-target': 'api'
+				}
+			});
+		}
+
+		const timeToFirstTokenResponse = await prometheusDriver.rangeQuery(
+			`vllm:time_to_first_token_seconds_sum{juju_model="${scope}"}`,
+			Date.now() - 24 * 60 * 60 * 1000,
+			Date.now(),
+			2 * 60
+		);
+		const timeToFirstTokenSampleVectors = getMapInstanceToMetric(timeToFirstTokenResponse.result);
+
+		const requestLatencyResponse = await prometheusDriver.rangeQuery(
+			`histogram_quantile(0.95, sum by(pod, le) (rate(vllm:e2e_request_latency_seconds_bucket{juju_model="${scope}"}[5m])))`,
+			Date.now() - 24 * 60 * 60 * 1000,
+			Date.now(),
+			2 * 60
+		);
+		const requestLatencySampleVectors = getMapInstanceToMetric(requestLatencyResponse.result);
+
+		metrics = {
+			timeToFirstToken: timeToFirstTokenSampleVectors,
+			requestLatency: requestLatencySampleVectors
+		};
+	}
+
+	async function fetch() {
+		try {
+			await Promise.all([fetchModels(), fetchMetrics()]);
+		} catch (error) {
+			console.error('Error during initial data load:', error);
+		}
+	}
+
+	const reloadManager = new ReloadManager(fetch);
+
+	let isMounted = $state(false);
+	onMount(async () => {
+		await fetch();
+		isMounted = true;
+		reloadManager.start();
+	});
+	onDestroy(() => {
+		reloadManager.stop();
+	});
+</script>
+
+<main class="space-y-4 py-4">
+	<ExtensionsAlert {scope} />
+	{#if isMounted}
+		<!-- Temporary fix the namespace to llm-d -->
+		<DataTable {serviceUri} {models} namespace="llm-d" {metrics} {scope} {reloadManager} />
+	{:else}
+		<Loading.DataTable />
+	{/if}
+</main>

@@ -1,0 +1,190 @@
+<script lang="ts">
+	import Icon from '@iconify/svelte';
+	import { PieChart, Text } from 'layerchart';
+	import { PrometheusDriver } from 'prometheus-query';
+	import { onDestroy, onMount } from 'svelte';
+
+	import { ReloadManager } from '$lib/components/custom/reloader';
+	import * as Card from '$lib/components/ui/card';
+	import * as Chart from '$lib/components/ui/chart/index.js';
+	import { m } from '$lib/paraglide/messages';
+
+	// Props
+	let {
+		client,
+		scope,
+		isReloading = $bindable()
+	}: { client: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+
+	// Constants
+	const CHART_TITLE = m.osd_type();
+	const CHART_DESCRIPTION = m.osd_type_distribution();
+	const UNKNOWN_DEVICE_CLASS = 'unknown';
+
+	// Predefined device class configurations
+	const DEVICE_CLASS_CONFIGS: Record<string, { label: string; color: string }> = {
+		hdd: { label: 'HDD', color: 'var(--chart-1)' },
+		ssd: { label: 'SSD', color: 'var(--chart-2)' },
+		nvme: { label: 'NVMe', color: 'var(--chart-3)' }
+	} as const;
+
+	// Chart colors for unknown device classes
+	const FALLBACK_CHART_COLORS = [
+		'var(--chart-4)',
+		'var(--chart-5)',
+		'var(--chart-1)',
+		'var(--chart-2)',
+		'var(--chart-3)'
+	] as const;
+
+	// Utility functions
+	function getDeviceClassConfig(deviceClass: string, index: number) {
+		if (deviceClass in DEVICE_CLASS_CONFIGS) {
+			return DEVICE_CLASS_CONFIGS[deviceClass];
+		}
+
+		return {
+			label: deviceClass.toUpperCase(),
+			color: FALLBACK_CHART_COLORS[index % FALLBACK_CHART_COLORS.length]
+		};
+	}
+
+	function generateChartConfig(deviceClasses: string[]): Chart.ChartConfig {
+		const config: Record<string, { label: string; color: string }> = {};
+
+		deviceClasses.forEach((deviceClass, index) => {
+			config[deviceClass] = getDeviceClassConfig(deviceClass, index);
+		});
+
+		return config as Chart.ChartConfig;
+	}
+
+	// Queries
+	const queries = $derived({
+		osdTypeCount: `count by (device_class) (ceph_osd_metadata{juju_model="${scope}"})`
+	});
+
+	// Auto Update
+	type ChartDataItem = {
+		deviceClass: string;
+		count: number;
+		color: string;
+		fill: string;
+		label: string;
+	};
+
+	let response = $state({
+		chartData: [] as ChartDataItem[],
+		total: 0,
+		chartConfig: {} as Chart.ChartConfig
+	});
+	let isLoading = $state(true);
+	const reloadManager = new ReloadManager(fetch);
+	async function fetch() {
+		try {
+			const prometheusResponse = await client.instantQuery(queries.osdTypeCount);
+
+			if (!prometheusResponse?.result?.length) {
+				response = { chartData: [], total: 0, chartConfig: {} as Chart.ChartConfig };
+				return;
+			}
+
+			const chartData = prometheusResponse.result.map((series, index) => {
+				const deviceClass = series.metric?.labels.device_class || UNKNOWN_DEVICE_CLASS;
+				const count = Number(series.value?.value || 0);
+				const config = getDeviceClassConfig(deviceClass, index);
+
+				return {
+					deviceClass,
+					count,
+					color: config.color,
+					fill: config.color,
+					label: config.label
+				};
+			});
+
+			const total = chartData.reduce((sum, item) => sum + item.count, 0);
+			const deviceClasses = chartData.map((item) => item.deviceClass);
+			const chartConfig = generateChartConfig(deviceClasses);
+
+			response = { chartData, total, chartConfig };
+		} catch (error) {
+			console.error('Failed to fetch OSD type data:', error);
+			response = {
+				chartData: [],
+				total: 0,
+				chartConfig: {} as Chart.ChartConfig
+			};
+		}
+	}
+
+	$effect(() => {
+		if (isReloading) {
+			reloadManager.restart();
+		} else {
+			reloadManager.stop();
+		}
+	});
+	onMount(async () => {
+		await fetch();
+		isLoading = false;
+	});
+	onDestroy(() => {
+		reloadManager.stop();
+	});
+</script>
+
+<Card.Root class="h-full gap-2">
+	<Card.Header class="h-[42px]">
+		<Card.Title>{CHART_TITLE}</Card.Title>
+		<Card.Description>{CHART_DESCRIPTION}</Card.Description>
+	</Card.Header>
+	{#if isLoading}
+		<Card.Content>
+			<div class="flex h-[200px] w-full items-center justify-center">
+				<Icon icon="svg-spinners:6-dots-rotate" class="size-12" />
+			</div>
+		</Card.Content>
+	{:else if response.chartData.length === 0}
+		<Card.Content>
+			<div class="flex h-[200px] w-full flex-col items-center justify-center">
+				<Icon icon="ph:chart-line-fill" class="size-50 animate-pulse text-muted-foreground" />
+				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
+			</div>
+		</Card.Content>
+	{:else}
+		<Card.Content>
+			<Chart.Container class="h-[200px] w-full" config={response.chartConfig}>
+				<PieChart
+					data={response.chartData}
+					key="deviceClass"
+					value="count"
+					c="color"
+					innerRadius={60}
+					padding={28}
+					props={{ pie: { motion: 'tween' } }}
+				>
+					{#snippet aboveMarks()}
+						<Text
+							value={String(response.total)}
+							textAnchor="middle"
+							verticalAnchor="middle"
+							class="fill-foreground text-3xl! font-bold"
+							dy={3}
+						/>
+						<Text
+							value="Total OSDs"
+							textAnchor="middle"
+							verticalAnchor="middle"
+							class="fill-muted-foreground! text-muted-foreground"
+							dy={22}
+						/>
+					{/snippet}
+					{#snippet tooltip()}
+						<Chart.Tooltip hideLabel />
+					{/snippet}
+				</PieChart>
+			</Chart.Container>
+		</Card.Content>
+	{/if}
+</Card.Root>

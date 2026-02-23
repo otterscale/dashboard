@@ -1,0 +1,24 @@
+<script lang="ts" module>
+	import { type WithElementRef } from 'bits-ui';
+	import type { HTMLAttributes } from 'svelte/elements';
+
+	import { cn } from '$lib/utils';
+</script>
+
+<script lang="ts">
+	let {
+		ref = $bindable(null),
+		children,
+		align,
+		class: className,
+		...restProps
+	}: WithElementRef<HTMLAttributes<HTMLDivElement>> & { align?: 'left' | 'right' } = $props();
+</script>
+
+<div
+	bind:this={ref}
+	class={cn('flex gap-2', align === 'right' && 'justify-end', className)}
+	{...restProps}
+>
+	{@render children?.()}
+</div>

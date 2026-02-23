@@ -1,0 +1,121 @@
+<script lang="ts" module>
+	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
+	import Icon from '@iconify/svelte';
+	import { getContext } from 'svelte';
+	import { toast } from 'svelte-sonner';
+
+	import type { DetachVirtualMachineDiskRequest } from '$lib/api/instance/v1/instance_pb';
+	import { InstanceService } from '$lib/api/instance/v1/instance_pb';
+	import type { EnhancedDisk } from '$lib/components/compute/virtual-machine/units/type';
+	import * as Form from '$lib/components/custom/form';
+	import { Single as SingleInput } from '$lib/components/custom/input';
+	import { SingleStep as Modal } from '$lib/components/custom/modal';
+	import type { ReloadManager } from '$lib/components/custom/reloader';
+	import { m } from '$lib/paraglide/messages';
+</script>
+
+<script lang="ts">
+	// Component props - accepts a virtual machine disk object
+	let {
+		enhancedDisk,
+		scope,
+		reloadManager,
+		closeActions
+	}: {
+		enhancedDisk: EnhancedDisk;
+		scope: string;
+		reloadManager: ReloadManager;
+		closeActions: () => void;
+	} = $props();
+
+	// Context dependencies
+	const transport: Transport = getContext('transport');
+	const virtualMachineClient = createClient(InstanceService, transport);
+
+	let request = $state({} as DetachVirtualMachineDiskRequest);
+	let invalid = $state(false);
+	let open = $state(false);
+
+	function init() {
+		request = {
+			scope: scope,
+			namespace: enhancedDisk.namespace,
+			name: enhancedDisk.vmName,
+			dataVolumeName: ''
+		} as DetachVirtualMachineDiskRequest;
+	}
+
+	function close() {
+		open = false;
+	}
+</script>
+
+<Modal.Root
+	bind:open
+	onOpenChange={(isOpen) => {
+		if (isOpen) {
+			init();
+		}
+	}}
+	onOpenChangeComplete={(isOpen) => {
+		if (!isOpen) {
+			closeActions();
+		}
+	}}
+>
+	<Modal.Trigger variant="destructive">
+		<Icon icon="ph:plugs" />
+		{m.detach()}
+	</Modal.Trigger>
+	<Modal.Content>
+		<Modal.Header>{m.detach_disk()}</Modal.Header>
+		<Form.Root>
+			<Form.Fieldset>
+				<Form.Field>
+					<Form.Label>{m.data_volume()}</Form.Label>
+					<Form.Help>
+						{m.deletion_warning({ identifier: m.data_volume_name() })}
+					</Form.Help>
+					<SingleInput.Confirm
+						required
+						target={enhancedDisk.name ?? ''}
+						bind:value={request.dataVolumeName}
+						bind:invalid
+					/>
+				</Form.Field>
+			</Form.Fieldset>
+		</Form.Root>
+		<Modal.Footer>
+			<Modal.Cancel>
+				{m.cancel()}
+			</Modal.Cancel>
+
+			<Modal.ActionsGroup>
+				<Modal.Action
+					disabled={invalid}
+					onclick={() => {
+						toast.promise(() => virtualMachineClient.detachVirtualMachineDisk(request), {
+							loading: `Detaching disk ${enhancedDisk.name}...`,
+							success: () => {
+								reloadManager.force();
+								return `Successfully detached disk ${enhancedDisk.name}`;
+							},
+							error: (error) => {
+								let message = `Failed to detach disk ${enhancedDisk.name}`;
+								toast.error(message, {
+									description: (error as ConnectError).message.toString(),
+									duration: Number.POSITIVE_INFINITY,
+									closeButton: true
+								});
+								return message;
+							}
+						});
+						close();
+					}}
+				>
+					{m.confirm()}
+				</Modal.Action>
+			</Modal.ActionsGroup>
+		</Modal.Footer>
+	</Modal.Content>
+</Modal.Root>

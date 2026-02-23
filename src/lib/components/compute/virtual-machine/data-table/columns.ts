@@ -1,0 +1,175 @@
+import type { ColumnDef } from '@tanstack/table-core';
+
+import type { VirtualMachine } from '$lib/api/instance/v1/instance_pb';
+import type { ReloadManager } from '$lib/components/custom/reloader';
+import { renderSnippet } from '$lib/components/ui/data-table/index.js';
+import { m } from '$lib/paraglide/messages';
+
+import type { Metrics } from '../types';
+import { cells } from './cells.svelte';
+import { headers } from './headers.svelte';
+
+const messages = {
+	name: m.name(),
+	status: m.status(),
+	namespace: m.namespace(),
+	machineId: m.machine(),
+	instanceType: m.instance_type(),
+	disk: m.disk(),
+	port: m.ports(),
+	cpu_metric: m.cpu(),
+	memory_metric: m.memory(),
+	storage_metric: m.storage(),
+	createTime: m.create_time()
+};
+
+function getColumns(
+	metrics: Metrics,
+	scope: string,
+	url: URL,
+	reloadManager: ReloadManager
+): ColumnDef<VirtualMachine>[] {
+	return [
+		{
+			id: 'select',
+			header: ({ table }) => {
+				return renderSnippet(headers.row_picker, table);
+			},
+			cell: ({ row }) => {
+				return renderSnippet(cells.row_picker, row);
+			},
+			enableSorting: false,
+			enableHiding: false
+		},
+		{
+			accessorKey: 'name',
+			header: ({ column }) => {
+				return renderSnippet(headers.name, column);
+			},
+			cell: ({ row }) => {
+				return renderSnippet(cells.name, row);
+			}
+		},
+		{
+			accessorKey: 'status',
+			header: ({ column }) => {
+				return renderSnippet(headers.status, column);
+			},
+			cell: ({ row }) => {
+				return renderSnippet(cells.status, row);
+			},
+			filterFn: 'arrIncludesSome'
+		},
+		{
+			accessorKey: 'namespace',
+			header: ({ column }) => {
+				return renderSnippet(headers.namespace, column);
+			},
+			cell: ({ row }) => {
+				return renderSnippet(cells.namespace, row);
+			},
+			filterFn: 'arrIncludesSome'
+		},
+		{
+			accessorKey: 'machineId',
+			header: ({ column }) => {
+				return renderSnippet(headers.machineId, column);
+			},
+			cell: ({ row }) => {
+				return renderSnippet(cells.machineId, row);
+			},
+			filterFn: 'arrIncludesSome'
+		},
+
+		{
+			accessorKey: 'instanceType',
+			header: ({ column }) => {
+				return renderSnippet(headers.instanceType, column);
+			},
+			cell: ({ row }) => {
+				return renderSnippet(cells.instanceType, row);
+			},
+			filterFn: 'arrIncludesSome'
+		},
+		{
+			accessorKey: 'disk',
+			header: ({ column }) => {
+				return renderSnippet(headers.disk, column);
+			},
+			cell: ({ row }) => {
+				return renderSnippet(cells.disk, { row, scope });
+			},
+			filterFn: 'arrIncludesSome'
+		},
+		{
+			accessorKey: 'port',
+			header: ({ column }) => {
+				return renderSnippet(headers.port, column);
+			},
+			cell: ({ row }) => {
+				return renderSnippet(cells.port, { row, scope, reloadManager });
+			},
+			filterFn: 'arrIncludesSome'
+		},
+		{
+			accessorKey: 'createTime',
+			header: ({ column }) => {
+				return renderSnippet(headers.createTime, column);
+			},
+			cell: ({ row }) => {
+				return renderSnippet(cells.createTime, row);
+			},
+			filterFn: 'arrIncludesSome'
+		},
+
+		{
+			accessorKey: 'cpu_metric',
+			header: ({ column }) => {
+				return renderSnippet(headers.cpu_metric, column);
+			},
+			cell: ({ row }) => {
+				return renderSnippet(cells.cpu_metric, { row, metrics });
+			}
+		},
+		{
+			accessorKey: 'memory_metric',
+			header: ({ column }) => {
+				return renderSnippet(headers.memory_metric, column);
+			},
+			cell: ({ row }) => {
+				return renderSnippet(cells.memory_metric, { row, metrics });
+			}
+		},
+		{
+			accessorKey: 'storage_metric',
+			header: ({ column }) => {
+				return renderSnippet(headers.storage_metric, column);
+			},
+			cell: ({ row }) => {
+				return renderSnippet(cells.storage_metric, { row, metrics });
+			}
+		},
+		{
+			accessorKey: 'vnc',
+			header: ({ column }) => {
+				return renderSnippet(headers.vnc, column);
+			},
+			cell: ({ row }) => {
+				return renderSnippet(cells.vnc, { row, scope, url });
+			},
+			enableHiding: false
+		},
+		{
+			accessorKey: 'actions',
+			header: ({ column }) => {
+				return renderSnippet(headers.actions, column);
+			},
+			cell: ({ row }) => {
+				return renderSnippet(cells.actions, { row, scope, reloadManager });
+			},
+			enableHiding: false
+		}
+	];
+}
+
+export { getColumns, messages };

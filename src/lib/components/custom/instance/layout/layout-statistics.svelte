@@ -1,0 +1,18 @@
+<script lang="ts" module>
+	import { type WithElementRef } from 'bits-ui';
+	import type { HTMLAttributes } from 'svelte/elements';
+
+	import { cn } from '$lib/utils';
+</script>
+
+<script lang="ts">
+	let {
+		ref = $bindable(null),
+		children,
+		class: className
+	}: WithElementRef<HTMLAttributes<HTMLDivElement>> & {} = $props();
+</script>
+
+<div class={cn('grid w-full gap-4 sm:grid-cols-1 md:grid-cols-3 lg:grid-cols-5', className)}>
+	{@render children?.()}
+</div>
