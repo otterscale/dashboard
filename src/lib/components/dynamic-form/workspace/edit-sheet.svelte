@@ -10,6 +10,7 @@
 	import type { K8sOpenAPISchema } from '$lib/components/custom/schema-form';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Sheet from '$lib/components/ui/sheet';
+	import { activeWorkspaceName } from '$lib/stores';
 
 	import EditWorkspaceForm from './edit-form.svelte';
 
@@ -43,7 +44,7 @@
 			group: 'tenant.otterscale.io',
 			version: 'v1alpha1',
 			resource: 'workspaces',
-			name: 'test-workspace-3'
+			name: $activeWorkspaceName
 		} as GetRequest);
 		role = (response.object as TenantOtterscaleIoV1Alpha1Workspace).spec.users.find(
 			(user) => user.subject === page.data.user.sub
