@@ -100,16 +100,13 @@
 			'spec.resourceQuota.hard.requests.cpu': { title: 'Requests CPU' },
 			'spec.resourceQuota.hard.requests.memory': { title: 'Requests Memory' },
 			'spec.resourceQuota.hard.requests.otterscale.com/vgpu': {
-				title: 'Requests GPU',
-				disabled: true
+				title: 'Requests GPU'
 			},
 			'spec.resourceQuota.hard.requests.otterscale.com/vgpumem': {
-				title: 'Requests GPU Memory',
-				disabled: true
+				title: 'Requests GPU Memory'
 			},
 			'spec.resourceQuota.hard.requests.otterscale.com/vgpumem-percentage': {
-				title: 'Requests GPU Memory Percentage',
-				disabled: true
+				title: 'Requests GPU Memory Percentage'
 			}
 		}
 	};

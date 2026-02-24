@@ -19,7 +19,7 @@
 		try {
 			const response = await prometheusDriver.instantQuery(
 				`
-				count(kube_pod_status_phase{juju_model="${scope}",namespace="${$activeNamespace}",phase="Running"})
+				count(kube_pod_status_phase{juju_model="${scope}",namespace="${$activeNamespace}",phase="Running",endpoint="http"})
 				`
 			);
 			runningPods = response.result[0]?.value?.value ?? 0;
