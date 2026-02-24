@@ -13,6 +13,7 @@
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import { m } from '$lib/paraglide/messages';
+	import { activeWorkspaceName } from '$lib/stores';
 
 	let {
 		name,
@@ -78,7 +79,7 @@
 			group: 'tenant.otterscale.io',
 			version: 'v1alpha1',
 			resource: 'workspaces',
-			name: 'test-workspace-3'
+			name: $activeWorkspaceName
 		} as GetRequest);
 		role = (response.object as TenantOtterscaleIoV1Alpha1Workspace).spec.users.find(
 			(user) => user.subject === page.data.user.sub
