@@ -50,11 +50,7 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 	}
 }
 
-function getData(
-	kind: string,
-	apiResource: APIResource,
-	object: any
-): Record<string, JsonValue | bigint> {
+function getData(kind: string, apiResource: APIResource, object: any): Record<string, JsonValue> {
 	switch (kind) {
 		case 'CronJob':
 			return getCronJobData(object);

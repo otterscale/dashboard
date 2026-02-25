@@ -1,19 +1,18 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { Trash2 } from '@lucide/svelte';
-	import { type TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
-	import { getContext, onMount } from 'svelte';
+	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { type GetRequest, ResourceService } from '$lib/api/resource/v1/resource_pb';
+	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import * as Form from '$lib/components/custom/form';
 	import { Single as SingleInput } from '$lib/components/custom/input';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import { m } from '$lib/paraglide/messages';
-	import { activeWorkspaceName } from '$lib/stores';
+	import { role } from '$lib/stores';
 
 	let {
 		name,
@@ -70,21 +69,6 @@
 			}
 		);
 	}
-
-	let role: string | undefined = $state('');
-
-	onMount(async () => {
-		const response = await resourceClient.get({
-			cluster: page.params.cluster ?? page.params.scope ?? '',
-			group: 'tenant.otterscale.io',
-			version: 'v1alpha1',
-			resource: 'workspaces',
-			name: $activeWorkspaceName
-		} as GetRequest);
-		role = (response.object as TenantOtterscaleIoV1Alpha1Workspace).spec.users.find(
-			(user) => user.subject === page.data.user.sub
-		)?.role;
-	});
 </script>
 
 <AlertDialog.Root
@@ -96,7 +80,7 @@
 	}}
 >
 	<AlertDialog.Trigger
-		disabled={role === 'view'}
+		disabled={$role === 'view'}
 		class={buttonVariants({ variant: 'outline', size: 'icon' })}
 	>
 		<Trash2 class="text-destructive" />

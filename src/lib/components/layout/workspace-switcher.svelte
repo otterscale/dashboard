@@ -46,7 +46,7 @@
 	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import type { User } from '$lib/server/session';
-	import { activeNamespace, activeWorkspaceName } from '$lib/stores';
+	import { activeNamespace, activeWorkspaceName, role } from '$lib/stores';
 
 	let {
 		cluster,
@@ -144,6 +144,7 @@
 
 		activeNamespace.set(activeWorkspace.spec.namespace);
 		activeWorkspaceName.set(activeWorkspace.metadata?.name ?? '');
+		role.set(activeWorkspace.spec.users.find((u) => u.subject === user.sub)?.role ?? '');
 	});
 </script>
 

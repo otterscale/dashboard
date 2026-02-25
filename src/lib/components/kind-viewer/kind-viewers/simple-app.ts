@@ -1,5 +1,5 @@
 import { type JsonValue } from '@bufbuild/protobuf';
-import type { Column } from '@tanstack/table-core';
+import type { Column, ColumnDef } from '@tanstack/table-core';
 import { type Row } from '@tanstack/table-core';
 
 import { resolve } from '$app/paths';
@@ -7,12 +7,8 @@ import { page } from '$app/state';
 import type { APIResource } from '$lib/api/resource/v1/resource_pb';
 import { DynamicTableCell, DynamicTableHeader } from '$lib/components/dynamic-table';
 import type { LinkMetadata } from '$lib/components/dynamic-table/dynamic-table-cells/link-cell.svelte';
-import type { NumberWithPrefixMetadata } from '$lib/components/dynamic-table/dynamic-table-cells/number-with-prefix-cell.svelte';
-import {
-	type DataSchemaType,
-	getQuantityScalar,
-	type UISchemaType
-} from '$lib/components/dynamic-table/utils';
+import type { QuantityMetadata } from '$lib/components/dynamic-table/dynamic-table-cells/quantity-cell.svelte';
+import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
 
 type SimpleAppAttribute =
@@ -33,14 +29,14 @@ function getSimpleAppDataSchemas(): Record<SimpleAppAttribute, DataSchemaType> {
 		Ready: 'boolean',
 		Image: 'text',
 		Replicas: 'number',
-		Storage: 'number',
+		Storage: 'quantity',
 		'Service Type': 'text',
 		Age: 'time',
 		raw: 'object'
 	};
 }
 
-function getSimpleAppData(object: any): Record<SimpleAppAttribute, JsonValue | bigint> {
+function getSimpleAppData(object: any): Record<SimpleAppAttribute, JsonValue> {
 	// Parse Ready status from conditions array
 	// JSONPath: .status.conditions[?(@.type=="Ready")].status
 	let ready: JsonValue = null;
@@ -59,7 +55,7 @@ function getSimpleAppData(object: any): Record<SimpleAppAttribute, JsonValue | b
 		Ready: ready ?? null,
 		Image: object?.spec?.deploymentSpec?.image ?? null,
 		Replicas: object?.spec?.deploymentSpec?.replicas ?? null,
-		Storage: getQuantityScalar(object?.spec?.pvcSpec?.resources?.requests?.storage) ?? null,
+		Storage: object?.spec?.pvcSpec?.resources?.requests?.storage ?? null,
 		'Service Type': object?.spec?.serviceSpec?.type ?? null,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: object ?? null
@@ -73,7 +69,7 @@ function getSimpleAppUISchemas(): Record<SimpleAppAttribute, UISchemaType> {
 		Ready: 'boolean',
 		Image: 'text',
 		Replicas: 'number',
-		Storage: 'number-with-prefix',
+		Storage: 'quantity',
 		'Service Type': 'text',
 		Age: 'time',
 		raw: 'object'
@@ -84,7 +80,7 @@ function getSimpleAppColumnDefinitions(
 	apiResource: APIResource,
 	uiSchemas: Record<SimpleAppAttribute, UISchemaType>,
 	dataSchemas: Record<SimpleAppAttribute, DataSchemaType>
-) {
+): ColumnDef<Record<SimpleAppAttribute, JsonValue>>[] {
 	return [
 		{
 			id: 'Name',
@@ -241,8 +237,8 @@ function getSimpleAppColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas,
 					metadata: {
-						prefix: 'binary'
-					} satisfies NumberWithPrefixMetadata
+						type: 'discrete'
+					} satisfies QuantityMetadata
 				}),
 			accessorKey: 'Storage'
 		},

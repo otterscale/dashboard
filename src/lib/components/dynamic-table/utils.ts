@@ -1,5 +1,7 @@
 import type { JsonValue } from '@bufbuild/protobuf';
 
+import type { QuantityType } from './dynamic-table-cells/quantity-cell.svelte';
+
 function findSuffix(quantity: string): string {
 	let ix = quantity.length - 1;
 	while (ix >= 0 && !/[.0-9]/.test(quantity.charAt(ix))) {
@@ -76,7 +78,7 @@ function quantityToScalar(quantity: string): number | bigint {
 	}
 }
 
-function formatWithDecimalPrefix(value: bigint): { value: number; unit: string } {
+function formatWithDecimalSuffix(value: bigint): { value: number; unit: string } {
 	const units = [
 		{ value: BigInt(1e18), symbol: 'E' },
 		{ value: BigInt(1e15), symbol: 'P' },
@@ -101,7 +103,7 @@ function formatWithDecimalPrefix(value: bigint): { value: number; unit: string }
 	};
 }
 
-function formatWithBinaryPrefix(value: bigint): { value: number; unit: string } {
+function formatWithBinarySuffix(value: bigint): { value: number; unit: string } {
 	const units = [
 		{ value: BigInt(2) ** BigInt(60), symbol: 'Ei' },
 		{ value: BigInt(2) ** BigInt(50), symbol: 'Pi' },
@@ -126,18 +128,27 @@ function formatWithBinaryPrefix(value: bigint): { value: number; unit: string } 
 	};
 }
 
-function getQuantityScalar(quantity: string | number | null): number | bigint | null {
-	if (quantity === null) return null;
-
-	return quantityToScalar(String(quantity));
-}
-
 function getRatio(
-	numerator: number | bigint | null,
-	denominator: number | bigint | null
+	numerator: number | string | null,
+	denominator: number | string | null,
+	type: QuantityType,
+	digits = 2
 ): JsonValue {
 	if (numerator === null || denominator === null) return null;
-	return Number(numerator) / Number(denominator);
+
+	const numeratorScalar = quantityToScalar(String(numerator));
+	const denominatorScalar = quantityToScalar(String(denominator));
+
+	if (type === 'continuous') {
+		return (Number(numeratorScalar) / Number(denominatorScalar)).toFixed(digits);
+	} else if (type === 'discrete') {
+		return (
+			Number((BigInt(numeratorScalar) * BigInt(10) ** BigInt(digits)) / BigInt(denominatorScalar)) /
+			10 ** digits
+		);
+	} else {
+		return null;
+	}
 }
 
 function format(value: string) {
@@ -176,7 +187,7 @@ function getRelativeTime(now: number, timestamp: number) {
 type UISchemaType =
 	| 'boolean'
 	| 'number'
-	| 'number-with-prefix'
+	| 'quantity'
 	| 'time'
 	| 'text'
 	| 'array'
@@ -209,7 +220,15 @@ function getDefaultUISchema(type: JsonValue, format?: JsonValue): UISchemaType {
 	return undefined;
 }
 
-type DataSchemaType = 'boolean' | 'number' | 'time' | 'text' | 'array' | 'object' | undefined;
+type DataSchemaType =
+	| 'boolean'
+	| 'number'
+	| 'quantity'
+	| 'time'
+	| 'text'
+	| 'array'
+	| 'object'
+	| undefined;
 function getDefaultDataSchema(type: JsonValue | undefined, format?: JsonValue): DataSchemaType {
 	if (type === 'boolean') {
 		return 'boolean';
@@ -234,11 +253,10 @@ function getDefaultDataSchema(type: JsonValue | undefined, format?: JsonValue): 
 
 export {
 	format,
-	formatWithBinaryPrefix,
-	formatWithDecimalPrefix,
+	formatWithBinarySuffix,
+	formatWithDecimalSuffix,
 	getDefaultDataSchema,
 	getDefaultUISchema,
-	getQuantityScalar,
 	getRatio,
 	getRelativeTime,
 	quantityToScalar

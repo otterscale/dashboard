@@ -13,13 +13,11 @@
 	import EmptyCell from './dynamic-table-cells/empty-cell.svelte';
 	import LinkCell, { type LinkMetadata } from './dynamic-table-cells/link-cell.svelte';
 	import NumberCell from './dynamic-table-cells/number-cell.svelte';
-	import NumberWithPrefixCell, {
-		type NumberWithPrefixMetadata
-	} from './dynamic-table-cells/number-with-prefix-cell.svelte';
 	import ObjectCell from './dynamic-table-cells/object-cell.svelte';
 	import ObjectOfKeyValueCell, {
 		type ObjectOfKeyValueMetadata
 	} from './dynamic-table-cells/object-of-key-value-cell.svelte';
+	import QuantityCell, { type QuantityMetadata } from './dynamic-table-cells/quantity-cell.svelte';
 	import RatioCell, { type RatioMetadata } from './dynamic-table-cells/ratio-cell.svelte';
 	import TextCell from './dynamic-table-cells/text-cell.svelte';
 	import TimeCell from './dynamic-table-cells/time-cell.svelte';
@@ -40,7 +38,7 @@
 			| LinkMetadata
 			| RatioMetadata
 			| ObjectOfKeyValueMetadata
-			| NumberWithPrefixMetadata;
+			| QuantityMetadata;
 	} = $props();
 
 	const uiSchema = $derived(uiSchemas[column.id]);
@@ -58,8 +56,8 @@
 	<LinkCell {row} {column} metadata={metadata as LinkMetadata} />
 {:else if uiSchema === 'number'}
 	<NumberCell {row} {column} />
-{:else if uiSchema === 'number-with-prefix'}
-	<NumberWithPrefixCell {row} {column} metadata={metadata as NumberWithPrefixMetadata} />
+{:else if uiSchema === 'quantity'}
+	<QuantityCell {row} {column} metadata={metadata as QuantityMetadata} />
 {:else if uiSchema === 'object'}
 	<ObjectCell {row} {column} />
 {:else if uiSchema === 'object-of-key-value'}

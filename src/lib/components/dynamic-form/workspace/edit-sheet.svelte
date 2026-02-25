@@ -1,16 +1,11 @@
 <script lang="ts">
-	import { createClient, type Transport } from '@connectrpc/connect';
 	import { Pencil } from '@lucide/svelte';
-	import { type TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
-	import { getContext, onMount } from 'svelte';
 
-	import { page } from '$app/state';
-	import { type GetRequest, ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import BasicTierImage from '$lib/assets/basic-tier.jpg';
 	import type { K8sOpenAPISchema } from '$lib/components/custom/schema-form';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Sheet from '$lib/components/ui/sheet';
-	import { activeWorkspaceName } from '$lib/stores';
+	import { role } from '$lib/stores';
 
 	import EditWorkspaceForm from './edit-form.svelte';
 
@@ -26,35 +21,17 @@
 		onsuccess?: () => void;
 	} = $props();
 
-	const transport: Transport = getContext('transport');
-	const resourceClient = createClient(ResourceService, transport);
-
-	let role: string | undefined = $state('');
-
 	let open = $state(false);
 
 	function handleClose() {
 		open = false;
 		onsuccess?.();
 	}
-
-	onMount(async () => {
-		const response = await resourceClient.get({
-			cluster: page.params.cluster ?? page.params.scope ?? '',
-			group: 'tenant.otterscale.io',
-			version: 'v1alpha1',
-			resource: 'workspaces',
-			name: $activeWorkspaceName
-		} as GetRequest);
-		role = (response.object as TenantOtterscaleIoV1Alpha1Workspace).spec.users.find(
-			(user) => user.subject === page.data.user.sub
-		)?.role;
-	});
 </script>
 
 <Sheet.Root bind:open>
 	<Sheet.Trigger
-		disabled={role === 'view'}
+		disabled={$role === 'view'}
 		class={buttonVariants({ variant: 'outline', size: 'icon' })}
 	>
 		<Pencil />

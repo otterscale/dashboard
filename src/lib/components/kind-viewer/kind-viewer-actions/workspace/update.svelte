@@ -2,11 +2,11 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { Pencil } from '@lucide/svelte';
 	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
-	import { getContext, onMount } from 'svelte';
+	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import { page } from '$app/state';
-	import { type GetRequest, ResourceService } from '$lib/api/resource/v1/resource_pb';
+	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import {
 		type GroupedFields,
 		MultiStepSchemaForm,
@@ -14,7 +14,7 @@
 	} from '$lib/components/custom/schema-form';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
-	import { activeWorkspaceName } from '$lib/stores';
+	import { role } from '$lib/stores';
 
 	let {
 		schema: apiSchema,
@@ -22,7 +22,7 @@
 		onOpenChangeComplete
 	}: {
 		schema: any;
-		object: Record<string, unknown>;
+		object: TenantOtterscaleIoV1Alpha1Workspace;
 		onOpenChangeComplete: () => void;
 	} = $props();
 
@@ -153,25 +153,10 @@
 			}
 		);
 	}
-
-	let role: string | undefined = $state('');
-
-	onMount(async () => {
-		const response = await resourceClient.get({
-			cluster: page.params.cluster ?? page.params.scope ?? '',
-			group: 'tenant.otterscale.io',
-			version: 'v1alpha1',
-			resource: 'workspaces',
-			name: $activeWorkspaceName
-		} as GetRequest);
-		role = (response.object as TenantOtterscaleIoV1Alpha1Workspace).spec.users.find(
-			(user) => user.subject === page.data.user.sub
-		)?.role;
-	});
 </script>
 
 <Dialog.Root bind:open {onOpenChangeComplete}>
-	<Dialog.Trigger disabled={role === 'view'} class="w-full disabled:opacity-50">
+	<Dialog.Trigger disabled={$role === 'view'} class="w-full disabled:opacity-50">
 		<Item.Root class="p-0 text-xs" size="sm">
 			<Item.Media>
 				<Pencil />

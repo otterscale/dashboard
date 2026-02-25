@@ -55,8 +55,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/paraglide/messages';
-	import { breadcrumbs } from '$lib/stores';
-	import { activeNamespace, activeWorkspaceName } from '$lib/stores';
+	import { activeNamespace, breadcrumbs } from '$lib/stores';
 
 	import type { LayoutData } from './$types';
 

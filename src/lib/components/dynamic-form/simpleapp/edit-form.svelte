@@ -29,10 +29,19 @@
 	const cluster = $derived($page.params.cluster ?? $page.params.scope ?? ''); // Remove metadata.managedFields from object
 
 	function getCleanedObject() {
-		// Use JSON parse/stringify for deep clone to avoid structuredClone issues
 		const copy = JSON.parse(JSON.stringify(object));
 		if (copy.metadata && typeof copy.metadata === 'object') {
 			delete (copy.metadata as Record<string, unknown>).managedFields;
+		}
+		// K8s stores targetPort as integer; schema expects string → convert for form display.
+		// transformFormData will convert it back to integer on submit.
+		const ports = copy?.spec?.serviceSpec?.ports;
+		if (Array.isArray(ports)) {
+			ports.forEach((port: any) => {
+				if (typeof port.targetPort === 'number') {
+					port.targetPort = String(port.targetPort);
+				}
+			});
 		}
 		return copy;
 	}

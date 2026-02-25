@@ -11,7 +11,6 @@ import type { LinkMetadata } from '$lib/components/dynamic-table/dynamic-table-c
 import { type RatioMetadata } from '$lib/components/dynamic-table/dynamic-table-cells/ratio-cell.svelte';
 import {
 	type DataSchemaType,
-	getQuantityScalar,
 	getRatio,
 	type UISchemaType
 } from '$lib/components/dynamic-table/utils';
@@ -47,24 +46,29 @@ function getResourceQuotaData(
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.metadata?.namespace ?? null,
 		'CPU Limit': getRatio(
-			getQuantityScalar(object?.status?.used?.['limits.cpu'] ?? null),
-			getQuantityScalar(object?.status?.hard?.['limits.cpu'] ?? null)
+			object?.status?.used?.['limits.cpu'] ?? null,
+			object?.status?.hard?.['limits.cpu'] ?? null,
+			'continuous'
 		),
 		'Memory Limit': getRatio(
-			getQuantityScalar(object?.status?.used?.['limits.memory'] ?? null),
-			getQuantityScalar(object?.status?.hard?.['limits.memory'] ?? null)
+			object?.status?.used?.['limits.memory'] ?? null,
+			object?.status?.hard?.['limits.memory'] ?? null,
+			'discrete'
 		),
 		'CPU Request': getRatio(
-			getQuantityScalar(object?.status?.used?.['requests.cpu'] ?? null),
-			getQuantityScalar(object?.status?.hard?.['requests.cpu'] ?? null)
+			object?.status?.used?.['requests.cpu'] ?? null,
+			object?.status?.hard?.['requests.cpu'] ?? null,
+			'continuous'
 		),
 		'GPU Request': getRatio(
-			getQuantityScalar(object?.status?.used?.['requests.gpu'] ?? null),
-			getQuantityScalar(object?.status?.hard?.['requests.gpu'] ?? null)
+			object?.status?.used?.['requests.gpu'] ?? null,
+			object?.status?.hard?.['requests.gpu'] ?? null,
+			'discrete'
 		),
 		'Memory Request': getRatio(
-			getQuantityScalar(object?.status?.used?.['requests.memory'] ?? null),
-			getQuantityScalar(object?.status?.hard?.['requests.memory'] ?? null)
+			object?.status?.used?.['requests.memory'] ?? null,
+			object?.status?.hard?.['requests.memory'] ?? null,
+			'discrete'
 		),
 		raw: object as JsonObject
 	};

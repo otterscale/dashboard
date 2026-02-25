@@ -85,11 +85,14 @@
 		toast.promise(
 			async () => {
 				const manifest = new TextEncoder().encode(JSON.stringify(resourceObject));
-
+				const namespace = page.url.searchParams.get('namespace');
+				if (!namespace) {
+					throw new Error('Namespace is required but not found in searchParams.');
+				}
 				await resourceClient.apply({
 					cluster,
 					name,
-					namespace: page.url.searchParams.get('namespace') ?? '',
+					namespace,
 					group: '',
 					version: 'v1',
 					resource: 'resourcequotas',

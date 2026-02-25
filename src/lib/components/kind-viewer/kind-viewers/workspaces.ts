@@ -12,12 +12,8 @@ import type {
 	ArrayOfObjectMetadata
 } from '$lib/components/dynamic-table/dynamic-table-cells/array-of-object-cell.svelte';
 import type { LinkMetadata } from '$lib/components/dynamic-table/dynamic-table-cells/link-cell.svelte';
-import type { NumberWithPrefixMetadata } from '$lib/components/dynamic-table/dynamic-table-cells/number-with-prefix-cell.svelte';
-import {
-	type DataSchemaType,
-	getQuantityScalar,
-	type UISchemaType
-} from '$lib/components/dynamic-table/utils';
+import type { QuantityMetadata } from '$lib/components/dynamic-table/dynamic-table-cells/quantity-cell.svelte';
+import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
 
 type WorkspaceAttribute =
@@ -37,11 +33,11 @@ function getWorkspaceDataSchemas(): Record<WorkspaceAttribute, DataSchemaType> {
 		Name: 'text',
 		Namespace: 'text',
 		Users: 'number',
-		'CPU Limit': 'number',
-		'CPU Requests': 'number',
-		'Memory Limit': 'number',
-		'Memory Requests': 'number',
-		'GPU Requests': 'number',
+		'CPU Limit': 'quantity',
+		'CPU Requests': 'quantity',
+		'Memory Limit': 'quantity',
+		'Memory Requests': 'quantity',
+		'GPU Requests': 'quantity',
 		'Creation Timestamp': 'time',
 		raw: 'object'
 	};
@@ -49,20 +45,16 @@ function getWorkspaceDataSchemas(): Record<WorkspaceAttribute, DataSchemaType> {
 
 function getWorkspaceData(
 	object: TenantOtterscaleIoV1Alpha1Workspace
-): Record<WorkspaceAttribute, JsonValue | bigint> {
+): Record<WorkspaceAttribute, JsonValue> {
 	return {
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.spec?.namespace ?? null,
 		Users: (object?.spec?.users ?? []).length,
-		'CPU Limit': getQuantityScalar(object?.spec?.resourceQuota?.hard?.['limits.cpu'] ?? null),
-		'CPU Requests': getQuantityScalar(object?.spec?.resourceQuota?.hard?.['requests.cpu'] ?? null),
-		'Memory Limit': getQuantityScalar(object?.spec?.resourceQuota?.hard?.['limits.memory'] ?? null),
-		'Memory Requests': getQuantityScalar(
-			object?.spec?.resourceQuota?.hard?.['requests.memory'] ?? null
-		),
-		'GPU Requests': getQuantityScalar(
-			object?.spec?.resourceQuota?.hard?.['requests.otterscale.com/vgpu'] ?? null
-		),
+		'CPU Limit': object?.spec?.resourceQuota?.hard?.['limits.cpu'] ?? null,
+		'CPU Requests': object?.spec?.resourceQuota?.hard?.['requests.cpu'] ?? null,
+		'Memory Limit': object?.spec?.resourceQuota?.hard?.['limits.memory'] ?? null,
+		'Memory Requests': object?.spec?.resourceQuota?.hard?.['requests.memory'] ?? null,
+		'GPU Requests': object?.spec?.resourceQuota?.hard?.['requests.otterscale.com/vgpu'] ?? null,
 		'Creation Timestamp': object?.metadata?.creationTimestamp as JsonValue,
 		raw: object as JsonObject
 	};
@@ -73,11 +65,11 @@ function getWorkspaceUISchemas(): Record<WorkspaceAttribute, UISchemaType> {
 		Name: 'link',
 		Namespace: 'link',
 		Users: 'array-of-object',
-		'CPU Limit': 'number-with-prefix',
-		'CPU Requests': 'number-with-prefix',
-		'Memory Limit': 'number-with-prefix',
-		'Memory Requests': 'number-with-prefix',
-		'GPU Requests': 'number-with-prefix',
+		'CPU Limit': 'quantity',
+		'CPU Requests': 'quantity',
+		'Memory Limit': 'quantity',
+		'Memory Requests': 'quantity',
+		'GPU Requests': 'quantity',
 		'Creation Timestamp': 'time',
 		raw: 'object'
 	};
@@ -191,8 +183,8 @@ function getWorkspaceColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas,
 					metadata: {
-						prefix: 'binary'
-					} satisfies NumberWithPrefixMetadata
+						type: 'continuous'
+					} satisfies QuantityMetadata
 				}),
 			accessorKey: 'CPU Limit'
 		},
@@ -215,8 +207,8 @@ function getWorkspaceColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas,
 					metadata: {
-						prefix: 'binary'
-					} satisfies NumberWithPrefixMetadata
+						type: 'continuous'
+					} satisfies QuantityMetadata
 				}),
 			accessorKey: 'CPU Requests'
 		},
@@ -239,8 +231,8 @@ function getWorkspaceColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas,
 					metadata: {
-						prefix: 'binary'
-					} satisfies NumberWithPrefixMetadata
+						type: 'discrete'
+					} satisfies QuantityMetadata
 				}),
 			accessorKey: 'Memory Limit'
 		},
@@ -263,8 +255,8 @@ function getWorkspaceColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas,
 					metadata: {
-						prefix: 'binary'
-					} satisfies NumberWithPrefixMetadata
+						type: 'discrete'
+					} satisfies QuantityMetadata
 				}),
 			accessorKey: 'Memory Requests'
 		},
@@ -287,8 +279,8 @@ function getWorkspaceColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas,
 					metadata: {
-						prefix: 'binary'
-					} satisfies NumberWithPrefixMetadata
+						type: 'discrete'
+					} satisfies QuantityMetadata
 				}),
 			accessorKey: 'GPU Requests'
 		},

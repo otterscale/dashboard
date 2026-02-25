@@ -11,7 +11,9 @@
 	import * as Form from '$lib/components/custom/form';
 	import { Single as SingleInput } from '$lib/components/custom/input';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import * as Item from '$lib/components/ui/item';
 	import { m } from '$lib/paraglide/messages';
+	import { role } from '$lib/stores';
 
 	let {
 		name,
@@ -86,9 +88,18 @@
 	}}
 	{onOpenChangeComplete}
 >
-	<AlertDialog.Trigger class="flex w-full items-center gap-2 text-destructive **:text-destructive">
-		<Trash2 size={16} />
-		Delete
+	<AlertDialog.Trigger
+		disabled={$role === 'view'}
+		class="w-full text-destructive **:text-destructive disabled:opacity-50"
+	>
+		<Item.Root class="p-0 text-xs" size="sm">
+			<Item.Media>
+				<Trash2 class="text-destructive" />
+			</Item.Media>
+			<Item.Content>
+				<Item.Title>Delete</Item.Title>
+			</Item.Content>
+		</Item.Root>
 	</AlertDialog.Trigger>
 	<AlertDialog.Content>
 		<AlertDialog.Header>Delete Resource Quota</AlertDialog.Header>
