@@ -264,13 +264,7 @@
 					</DropdownMenu.Item>
 				{/each}
 				<DropdownMenu.Separator />
-				<DropdownMenu.Item
-					class="gap-2 p-2"
-					onSelect={() => (createWorkspaceOpen = true)}
-					disabled={activeWorkspace
-						? activeWorkspace.spec.users.find((u) => u.subject === user.sub)?.role === 'view'
-						: true}
-				>
+				<DropdownMenu.Item class="gap-2 p-2" onSelect={() => (createWorkspaceOpen = true)}>
 					<div class="flex size-6 items-center justify-center rounded-md border bg-transparent">
 						<PlusIcon class="size-3.5" />
 					</div>

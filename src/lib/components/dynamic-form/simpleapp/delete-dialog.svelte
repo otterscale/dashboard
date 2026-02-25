@@ -86,7 +86,7 @@
 	}}
 	{onOpenChangeComplete}
 >
-	<AlertDialog.Trigger class="flex w-full items-center gap-2">
+	<AlertDialog.Trigger class="flex w-full items-center gap-2 text-destructive **:text-destructive">
 		<Trash2 size={16} />
 		Delete
 	</AlertDialog.Trigger>

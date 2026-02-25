@@ -129,7 +129,7 @@
 			{
 				name: m.workspace(),
 				url: resolve(
-					`/(auth)/${activeScope}/Workspace/workspaces?group=tenant.otterscale.io&version=v1alpha1&name=${$activeWorkspaceName}`
+					`/(auth)/${activeScope}/Workspace?group=tenant.otterscale.io&version=v1alpha1&namespace=${$activeNamespace}&resource=workspaces`
 				),
 				icon: MapIcon,
 				edit: false

@@ -6,7 +6,7 @@
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
+	import { page } from '$app/stores';
 	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import * as Form from '$lib/components/custom/form';
 	import { Single as SingleInput } from '$lib/components/custom/input';
@@ -25,7 +25,7 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-	const cluster = $derived(page.params.cluster ?? page.params.scope ?? '');
+	const cluster = $derived($page.params.cluster ?? $page.params.scope ?? '');
 
 	let open = $state(false);
 	let confirmName = $state('');
@@ -46,31 +46,31 @@
 			async () => {
 				await resourceClient.delete({
 					cluster,
-					namespace: page.url.searchParams.get('namespace') ?? '',
-					group: 'batch', // Changed from tenant.otterscale.io
-					version: 'v1', // Changed from v1alpha1
-					resource: 'cronjobs', // Changed from workspaces
+					namespace: $page.url.searchParams.get('namespace') ?? '',
+					group: '',
+					version: 'v1',
+					resource: 'resourcequotas',
 					name: name
 				});
 			},
 			{
-				loading: `Deleting cronjob ${name}...`,
+				loading: `Deleting resource quota ${name}...`,
 				success: () => {
 					isDeleting = false;
 					open = false;
 					onsuccess?.();
-					// Redirect after delete - using scope root for now
+					// Redirect after delete
 					goto(
 						resolve(
-							`/(auth)/${cluster}/CronJob?group=batch&version=v1&namespace=${page.url.searchParams.get('namespace') ?? ''}&resource=cronjobs`
+							`/(auth)/${cluster}/ResourceQuota?group=&version=v1&namespace=${$page.url.searchParams.get('namespace') ?? ''}&resource=resourcequotas`
 						)
 					);
-					return `Successfully deleted cronjob ${name}`;
+					return `Successfully deleted resource quota ${name}`;
 				},
 				error: (err) => {
 					isDeleting = false;
-					console.error('Failed to delete cronjob:', err);
-					return `Failed to delete cronjob: ${(err as ConnectError).message}`;
+					console.error('Failed to delete resource quota:', err);
+					return `Failed to delete resource quota: ${(err as ConnectError).message}`;
 				}
 			}
 		);
@@ -91,13 +91,13 @@
 		Delete
 	</AlertDialog.Trigger>
 	<AlertDialog.Content>
-		<AlertDialog.Header>Delete CronJob</AlertDialog.Header>
+		<AlertDialog.Header>Delete Resource Quota</AlertDialog.Header>
 		<Form.Root>
 			<Form.Fieldset>
 				<Form.Field>
-					<Form.Label>CronJob Name</Form.Label>
+					<Form.Label>Resource Quota Name</Form.Label>
 					<Form.Help>
-						{m.deletion_warning({ identifier: 'CronJob' })}
+						{m.deletion_warning({ identifier: 'Resource Quota' })}
 					</Form.Help>
 					<SingleInput.Confirm required target={name} bind:value={confirmName} bind:invalid />
 				</Form.Field>
