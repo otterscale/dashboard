@@ -135,9 +135,14 @@
 			async () => {
 				const manifest = new TextEncoder().encode(JSON.stringify(resourceObject));
 
+				const namespace = page.url.searchParams.get('namespace');
+				if (!namespace) {
+					throw new Error('Namespace is required but not found in searchParams.');
+				}
+
 				await resourceClient.create({
 					cluster,
-					namespace: page.url.searchParams.get('namespace') ?? '',
+					namespace,
 					group: 'batch',
 					version: 'v1',
 					resource: 'cronjobs',

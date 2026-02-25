@@ -55,8 +55,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/paraglide/messages';
-	import { breadcrumbs } from '$lib/stores';
-	import { activeNamespace, activeWorkspaceName } from '$lib/stores';
+	import { activeNamespace, breadcrumbs } from '$lib/stores';
 
 	import type { LayoutData } from './$types';
 
@@ -129,7 +128,7 @@
 			{
 				name: m.workspace(),
 				url: resolve(
-					`/(auth)/${activeScope}/Workspace/workspaces?group=tenant.otterscale.io&version=v1alpha1&name=${$activeWorkspaceName}`
+					`/(auth)/${activeScope}/Workspace?group=tenant.otterscale.io&version=v1alpha1&namespace=${$activeNamespace}&resource=workspaces`
 				),
 				icon: MapIcon,
 				edit: false

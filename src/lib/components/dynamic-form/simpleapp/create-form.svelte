@@ -27,39 +27,26 @@
 		spec: {
 			deploymentSpec: {
 				replicas: 1,
-				selector: {
-					matchLabels: {}
-				},
-				template: {
-					metadata: {
-						labels: {}
+				image: 'nginx:1.21',
+				command: ['bin/bash', '-c', 'sleep 3600s'],
+				args: [],
+				env: [],
+				resources: {
+					requests: {
+						memory: '128Mi',
+						cpu: '100m'
 					},
-					spec: {
-						containers: [
-							{
-								name: 'app',
-								image: '',
-								command: ['bin/bash', 'sleep 3600s'],
-								ports: [
-									{
-										containerPort: 8080,
-										protocol: 'TCP'
-									}
-								],
-								resources: {
-									requests: {
-										memory: '128Mi',
-										cpu: '100m'
-									},
-									limits: {
-										memory: '256Mi',
-										cpu: '200m'
-									}
-								}
-							}
-						]
+					limits: {
+						memory: '256Mi',
+						cpu: '200m'
 					}
-				}
+				},
+				ports: [
+					{
+						containerPort: 8080,
+						protocol: 'TCP'
+					}
+				]
 			},
 			serviceSpec: {
 				type: 'ClusterIP',
@@ -78,36 +65,23 @@
 					requests: {
 						storage: '1Gi'
 					}
-				},
-				storageClassName: ''
+				}
 			}
 		}
 	};
 
 	const groupedFields: GroupedFields = {
 		General: {
-			'metadata.name': { title: 'Name' },
-			'metadata.namespace': { title: 'Namespace' },
+			'metadata.name': { title: 'Name', required: true },
 			'spec.deploymentSpec.replicas': { title: 'Replicas' }
 		},
 		Container: {
-			'spec.deploymentSpec.template.spec.containers': {
-				title: 'Containers',
-				uiSchema: {
-					items: {
-						'ui:title': 'Container',
-						'ui:options': {
-							addable: true,
-							removable: true,
-							orderable: true
-						}
-					}
-				}
-			},
-			'spec.deploymentSpec.template.spec.containers.name': { title: 'Container Name' },
-			'spec.deploymentSpec.template.spec.containers.image': { title: 'Image' },
-			'spec.deploymentSpec.template.spec.containers.command': { title: 'Command' },
-			'spec.deploymentSpec.template.spec.containers.ports': {
+			'spec.deploymentSpec.image': { title: 'Image' },
+			'spec.deploymentSpec.command': { title: 'Command' },
+			'spec.deploymentSpec.args': { title: 'Args' },
+			'spec.deploymentSpec.env': { title: 'Env' },
+
+			'spec.deploymentSpec.Ports': {
 				title: 'Ports',
 				uiSchema: {
 					items: {
@@ -115,20 +89,17 @@
 					}
 				}
 			},
-			'spec.deploymentSpec.template.spec.containers.ports.containerPort': {
-				title: 'Container Port'
-			},
-			'spec.deploymentSpec.template.spec.containers.ports.protocol': { title: 'Protocol' },
-			'spec.deploymentSpec.template.spec.containers.resources.requests.memory': {
+
+			'spec.deploymentSpec.resources.requests.memory': {
 				title: 'Memory Request'
 			},
-			'spec.deploymentSpec.template.spec.containers.resources.requests.cpu': {
+			'spec.deploymentSpec.resources.requests.cpu': {
 				title: 'CPU Request'
 			},
-			'spec.deploymentSpec.template.spec.containers.resources.limits.memory': {
+			'spec.deploymentSpec.resources.limits.memory': {
 				title: 'Memory Limit'
 			},
-			'spec.deploymentSpec.template.spec.containers.resources.limits.cpu': {
+			'spec.deploymentSpec.resources.limits.cpu': {
 				title: 'CPU Limit'
 			}
 		},
@@ -145,38 +116,32 @@
 			}
 		},
 		Storage: {
-			'spec.pvcSpec.accessModes': { title: 'Access Mode' },
-			'spec.pvcSpec.resources.requests.storage': { title: 'Storage Size' },
-			'spec.pvcSpec.storageClassName': { title: 'StorageClass Name' }
+			'spec.pvcSpec.resources.requests.storage': { title: 'Storage Size' }
 		}
 	};
 
 	function transformFormData(data: Record<string, unknown>): Record<string, unknown> {
-		const transformed = { ...data };
+		const transformed = { ...data }; // Automatically set labels to match selector
 
-		// Automatically set labels to match selector
 		if (transformed.metadata && (transformed.metadata as any).name) {
 			const name = (transformed.metadata as any).name;
-			const labels = { app: name };
+			const labels = { app: name }; // Set deployment selector and template labels
 
-			// Set deployment selector and template labels
 			if (transformed.spec && (transformed.spec as any).deploymentSpec) {
 				const deploymentSpec = (transformed.spec as any).deploymentSpec;
 				deploymentSpec.selector = { matchLabels: labels };
 				if (deploymentSpec.template && deploymentSpec.template.metadata) {
 					deploymentSpec.template.metadata.labels = labels;
 				}
-			}
+			} // Set service selector
 
-			// Set service selector
 			if (transformed.spec && (transformed.spec as any).serviceSpec) {
 				(transformed.spec as any).serviceSpec.selector = labels;
 			}
-		}
-
-		// Convert targetPort to appropriate type (Kubernetes intOrString)
+		} // Convert targetPort to appropriate type (Kubernetes intOrString)
 		// - Number or numeric string → convert to integer
 		// - Named port string like 'http' → keep as string
+
 		if (transformed.spec && (transformed.spec as any).serviceSpec?.ports) {
 			const ports = (transformed.spec as any).serviceSpec.ports;
 			if (Array.isArray(ports)) {
@@ -185,8 +150,7 @@
 						const numValue = parseInt(port.targetPort, 10);
 						if (!isNaN(numValue) && String(numValue) === port.targetPort.trim()) {
 							port.targetPort = numValue;
-						}
-						// If already a number, keep it as number
+						} // If already a number, keep it as number
 					}
 				});
 			}

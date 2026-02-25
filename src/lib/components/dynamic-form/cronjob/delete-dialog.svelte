@@ -11,6 +11,7 @@
 	import * as Form from '$lib/components/custom/form';
 	import { Single as SingleInput } from '$lib/components/custom/input';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import * as Item from '$lib/components/ui/item';
 	import { m } from '$lib/paraglide/messages';
 
 	let {
@@ -44,9 +45,14 @@
 
 		toast.promise(
 			async () => {
+				const namespace = page.url.searchParams.get('namespace');
+				if (!namespace) {
+					throw new Error('Namespace is required but not found in searchParams.');
+				}
+
 				await resourceClient.delete({
 					cluster,
-					namespace: page.url.searchParams.get('namespace') ?? '',
+					namespace,
 					group: 'batch', // Changed from tenant.otterscale.io
 					version: 'v1', // Changed from v1alpha1
 					resource: 'cronjobs', // Changed from workspaces
@@ -86,9 +92,15 @@
 	}}
 	{onOpenChangeComplete}
 >
-	<AlertDialog.Trigger class="flex w-full items-center gap-2">
-		<Trash2 size={16} />
-		Delete
+	<AlertDialog.Trigger class="w-full text-destructive **:text-destructive">
+		<Item.Root class="p-0 text-xs" size="sm">
+			<Item.Media>
+				<Trash2 class="text-destructive" />
+			</Item.Media>
+			<Item.Content>
+				<Item.Title>Delete</Item.Title>
+			</Item.Content>
+		</Item.Root>
 	</AlertDialog.Trigger>
 	<AlertDialog.Content>
 		<AlertDialog.Header>Delete CronJob</AlertDialog.Header>

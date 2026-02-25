@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { Trash2 } from '@lucide/svelte';
+	import { type TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
@@ -10,21 +11,22 @@
 	import * as Form from '$lib/components/custom/form';
 	import { Single as SingleInput } from '$lib/components/custom/input';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
-	import { buttonVariants } from '$lib/components/ui/button';
+	import * as Item from '$lib/components/ui/item';
 	import { m } from '$lib/paraglide/messages';
 	import { role } from '$lib/stores';
 
 	let {
-		name,
-		onsuccess
+		object,
+		onOpenChangeComplete
 	}: {
-		name: string;
-		onsuccess?: () => void;
+		object: TenantOtterscaleIoV1Alpha1Workspace;
+		onOpenChangeComplete: () => void;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 	const cluster = $derived(page.params.cluster ?? page.params.scope ?? '');
+	const name = $derived(object?.metadata?.name ?? '');
 
 	let open = $state(false);
 	let confirmName = $state('');
@@ -56,7 +58,6 @@
 				success: () => {
 					isDeleting = false;
 					open = false;
-					onsuccess?.();
 					// Use window.location.href to force a full page reload and re-trigger fetchWorkspaces
 					window.location.href = resolve(`/(auth)/scope/${cluster}`);
 					return `Successfully deleted workspace ${name}`;
@@ -78,12 +79,20 @@
 			init();
 		}
 	}}
+	{onOpenChangeComplete}
 >
 	<AlertDialog.Trigger
 		disabled={$role === 'view'}
-		class={buttonVariants({ variant: 'outline', size: 'icon' })}
+		class="w-full text-destructive disabled:opacity-50"
 	>
-		<Trash2 class="text-destructive" />
+		<Item.Root class="p-0 text-xs" size="sm">
+			<Item.Media>
+				<Trash2 class="text-destructive" />
+			</Item.Media>
+			<Item.Content>
+				<Item.Title>Delete</Item.Title>
+			</Item.Content>
+		</Item.Root>
 	</AlertDialog.Trigger>
 	<AlertDialog.Content>
 		<AlertDialog.Header>Delete Workspace</AlertDialog.Header>

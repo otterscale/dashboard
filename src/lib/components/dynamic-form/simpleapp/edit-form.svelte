@@ -26,21 +26,28 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-	const cluster = $derived($page.params.cluster ?? $page.params.scope ?? '');
+	const cluster = $derived($page.params.cluster ?? $page.params.scope ?? ''); // Remove metadata.managedFields from object
 
-	// Remove metadata.managedFields from object
 	function getCleanedObject() {
-		// Use JSON parse/stringify for deep clone to avoid structuredClone issues
 		const copy = JSON.parse(JSON.stringify(object));
 		if (copy.metadata && typeof copy.metadata === 'object') {
 			delete (copy.metadata as Record<string, unknown>).managedFields;
 		}
+		// K8s stores targetPort as integer; schema expects string → convert for form display.
+		// transformFormData will convert it back to integer on submit.
+		const ports = copy?.spec?.serviceSpec?.ports;
+		if (Array.isArray(ports)) {
+			ports.forEach((port: any) => {
+				if (typeof port.targetPort === 'number') {
+					port.targetPort = String(port.targetPort);
+				}
+			});
+		}
 		return copy;
 	}
 
-	let isSubmitting = $state(false);
+	let isSubmitting = $state(false); // Grouped fields for multi-step form
 
-	// Grouped fields for multi-step form
 	const groupedFields: GroupedFields = {
 		General: {
 			'metadata.name': { title: 'Name' },
@@ -48,11 +55,14 @@
 			'spec.deploymentSpec.replicas': { title: 'Replicas' }
 		},
 		Container: {
-			'spec.deploymentSpec.template.spec.containers': {
-				title: 'Containers',
+			'spec.deploymentSpec.image': { title: 'Image' },
+			'spec.deploymentSpec.command': { title: 'Command' },
+			'spec.deploymentSpec.args': { title: 'Args' },
+			'spec.deploymentSpec.env': {
+				title: 'Environment Variables',
 				uiSchema: {
 					items: {
-						'ui:title': 'Container',
+						'ui:title': 'Env Var',
 						'ui:options': {
 							addable: true,
 							removable: true,
@@ -61,64 +71,60 @@
 					}
 				}
 			},
-			'spec.deploymentSpec.template.spec.containers.name': { title: 'Container Name' },
-			'spec.deploymentSpec.template.spec.containers.image': { title: 'Image' },
-			'spec.deploymentSpec.template.spec.containers.command': { title: 'Command' },
-			'spec.deploymentSpec.template.spec.containers.ports': {
+			'spec.deploymentSpec.env.name': { title: 'Name' },
+			'spec.deploymentSpec.env.value': { title: 'Value' },
+			'spec.deploymentSpec.ports': {
 				title: 'Ports',
 				uiSchema: {
 					items: {
-						'ui:title': 'Container Port'
+						'ui:title': 'Container Port',
+						'ui:options': {
+							addable: true,
+							removable: true,
+							orderable: true
+						}
 					}
 				}
 			},
-			'spec.deploymentSpec.template.spec.containers.ports.containerPort': {
-				title: 'Container Port'
-			},
-			'spec.deploymentSpec.template.spec.containers.ports.protocol': { title: 'Protocol' },
-			'spec.deploymentSpec.template.spec.containers.resources.requests.memory': {
-				title: 'Memory Request'
-			},
-			'spec.deploymentSpec.template.spec.containers.resources.requests.cpu': {
-				title: 'CPU Request'
-			},
-			'spec.deploymentSpec.template.spec.containers.resources.limits.memory': {
-				title: 'Memory Limit'
-			},
-			'spec.deploymentSpec.template.spec.containers.resources.limits.cpu': {
-				title: 'CPU Limit'
-			}
+			'spec.deploymentSpec.ports.containerPort': { title: 'Container Port' },
+			'spec.deploymentSpec.ports.protocol': { title: 'Protocol' },
+			'spec.deploymentSpec.resources.requests.memory': { title: 'Memory Request' },
+			'spec.deploymentSpec.resources.requests.cpu': { title: 'CPU Request' },
+			'spec.deploymentSpec.resources.limits.memory': { title: 'Memory Limit' },
+			'spec.deploymentSpec.resources.limits.cpu': { title: 'CPU Limit' }
 		},
 		Port: {
 			'spec.serviceSpec.type': { title: 'Service Type' },
 			'spec.serviceSpec.ports.port': { title: 'Service Port' },
-			'spec.serviceSpec.ports.targetPort': { title: 'Target Port' }
+			'spec.serviceSpec.ports.targetPort': {
+				title: 'Target Port',
+				uiSchema: {
+					'ui:options': {
+						inputType: 'number'
+					}
+				}
+			}
 		},
 		Storage: {
-			'spec.pvcSpec.accessModes': { title: 'Access Mode' },
-			'spec.pvcSpec.resources.requests.storage': { title: 'Storage Size' },
-			'spec.pvcSpec.storageClassName': { title: 'StorageClass Name' }
+			'spec.pvcSpec.resources.requests.storage': { title: 'Storage Size' }
 		}
 	};
 
 	function transformFormData(data: Record<string, unknown>): Record<string, unknown> {
-		const transformed = { ...data };
+		const transformed = { ...data }; // Auto-set labels to match selector
 
-		// Auto-set labels to match selector
 		if (transformed.metadata && (transformed.metadata as any).name) {
 			const name = (transformed.metadata as any).name;
-			const labels = { app: name };
+			const labels = { app: name }; // Set deployment selector and template labels
 
-			// Set deployment selector and template labels
 			if (transformed.spec && (transformed.spec as any).deploymentSpec) {
 				const deploymentSpec = (transformed.spec as any).deploymentSpec;
-				deploymentSpec.selector = { matchLabels: labels };
+				// deploymentSpec.selector = { matchLabels: labels };
 				if (deploymentSpec.template && deploymentSpec.template.metadata) {
 					deploymentSpec.template.metadata.labels = labels;
 				}
-			}
+			} // Set service selector
 
-			// Set service selector
 			if (transformed.spec && (transformed.spec as any).serviceSpec) {
 				(transformed.spec as any).serviceSpec.selector = labels;
 			}
@@ -129,16 +135,14 @@
 
 	async function handleMultiStepSubmit(data: Record<string, unknown>) {
 		if (isSubmitting) return;
-		isSubmitting = true;
+		isSubmitting = true; // Construct the full resource object
 
-		// Construct the full resource object
 		const resourceObject: Record<string, unknown> = {
 			apiVersion: 'apps.otterscale.io/v1alpha1',
 			kind: 'SimpleApp',
 			...data
-		};
+		}; // Ensure name is correct
 
-		// Ensure name is correct
 		if (!resourceObject.metadata) resourceObject.metadata = {};
 		(resourceObject.metadata as Record<string, unknown>).name = name;
 

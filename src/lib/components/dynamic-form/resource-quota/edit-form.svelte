@@ -8,8 +8,7 @@
 	import {
 		type GroupedFields,
 		type K8sOpenAPISchema,
-		MultiStepSchemaForm,
-		TimezoneSelectWidget
+		MultiStepSchemaForm
 	} from '$lib/components/custom/schema-form';
 
 	let {
@@ -39,56 +38,34 @@
 
 	let isSubmitting = $state(false);
 
-	// Grouped fields for multi-step form
+	// Grouped fields for multi-step form (3 pages)
 	const groupedFields: GroupedFields = {
-		// Step 1: General Settings
-		General: {
-			'metadata.name': { title: 'Name' },
-			'spec.schedule': { title: 'Schedule', showDescription: true },
-			'spec.timeZone': {
-				title: 'Time Zone',
-				uiSchema: {
-					'ui:components': {
-						textWidget: TimezoneSelectWidget
-					}
-				}
+		'Default Resource Settings': {
+			'spec.hard.requests.cpu': { title: 'Requests CPU' },
+			'spec.hard.requests.memory': { title: 'Requests Memory' },
+			'spec.hard.requests.otterscale.com/vgpu': {
+				title: 'Requests GPU'
 			},
-			'spec.concurrencyPolicy': { title: 'Concurrency Policy' },
-			'spec.suspend': {
-				title: 'Suspend execution',
-				uiSchema: {
-					'ui:components': {
-						checkboxWidget: 'switchWidget'
-					}
-				}
-			}
-		},
-		// Step 2: Container Settings
-		Container: {
-			'spec.jobTemplate.spec.template.spec.containers.name': { title: 'Name' },
-			'spec.jobTemplate.spec.template.spec.containers.image': { title: 'Image' },
-			'spec.jobTemplate.spec.template.spec.containers.command': { title: 'Command' },
-			'spec.jobTemplate.spec.template.spec.containers.args': { title: 'Arguments' },
-			'spec.jobTemplate.spec.template.spec.containers.env': { title: 'Environment Variables' }
-		},
-		// Step 3: Resources
-		Resources: {
-			'spec.jobTemplate.spec.template.spec.containers.resources.requests.cpu': {
-				title: 'Requests CPU'
+			'spec.hard.requests.otterscale.com/vgpumem': {
+				title: 'Requests GPU Memory'
 			},
-			'spec.jobTemplate.spec.template.spec.containers.resources.requests.memory': {
-				title: 'Requests Memory'
-			},
-			'spec.jobTemplate.spec.template.spec.containers.resources.limits.cpu': {
-				title: 'Limits CPU'
-			},
-			'spec.jobTemplate.spec.template.spec.containers.resources.limits.memory': {
-				title: 'Limits Memory'
+			'spec.hard.requests.otterscale.com/vgpumem-percentage': {
+				title: 'Requests GPU Memory Percentage'
 			}
 		}
 	};
 
 	function transformFormData(data: Record<string, unknown>) {
+		const spec = data.spec as Record<string, any>;
+
+		// Handle Resource Quota Logic: limits align with requests, strict defaults
+		if (spec?.hard) {
+			const hard = spec.hard;
+			// Sync limits with requests
+			if (hard['requests.cpu']) hard['limits.cpu'] = hard['requests.cpu'];
+			if (hard['requests.memory']) hard['limits.memory'] = hard['requests.memory'];
+		}
+
 		return data;
 	}
 
@@ -96,16 +73,14 @@
 		if (isSubmitting) return;
 		isSubmitting = true;
 
-		// Construct the full resource object
-		const resourceObject: Record<string, unknown> = {
-			apiVersion: 'batch/v1',
-			kind: 'CronJob',
+		// Construct the full resource object - metadata.name should already be in data or we ensure it
+		const resourceObject: Record<string, any> = {
+			apiVersion: 'v1',
+			kind: 'ResourceQuota',
 			...data
 		};
 
-		// Ensure name is correct
-		if (!resourceObject.metadata) resourceObject.metadata = {};
-		(resourceObject.metadata as Record<string, unknown>).name = name;
+		const name = (data.metadata as { name: string })?.name;
 
 		toast.promise(
 			async () => {
@@ -118,25 +93,25 @@
 					cluster,
 					name,
 					namespace,
-					group: 'batch',
+					group: '',
 					version: 'v1',
-					resource: 'cronjobs',
+					resource: 'resourcequotas',
 					manifest,
 					fieldManager: 'otterscale-web-ui',
 					force: true
 				});
 			},
 			{
-				loading: `Updating cronjob ${name}...`,
+				loading: `Updating resource quota ${name}...`,
 				success: () => {
 					isSubmitting = false;
 					onsuccess?.();
-					return `Successfully updated cronjob ${name}`;
+					return `Successfully updated resource quota ${name}`;
 				},
 				error: (err) => {
 					isSubmitting = false;
-					console.error('Failed to update cronjob:', err);
-					return `Failed to update cronjob: ${(err as ConnectError).message}`;
+					console.error('Failed to update resource quota:', err);
+					return `Failed to update resource quota: ${(err as ConnectError).message}`;
 				}
 			}
 		);
@@ -148,9 +123,8 @@
 		apiSchema={schema}
 		fields={groupedFields}
 		initialData={getCleanedObject()}
-		title={`Edit CronJob: ${name}`}
+		title={`Edit Resource Quota: ${name}`}
 		onSubmit={handleMultiStepSubmit}
 		transformData={transformFormData}
-		yamlEditable={true}
 	/>
 </div>

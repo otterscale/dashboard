@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
-	import { type JsonObject } from '@bufbuild/protobuf';
 	import {
 		BinaryIcon,
 		BookIcon,
@@ -17,7 +16,6 @@
 		Columns3Icon,
 		EraserIcon,
 		HashIcon,
-		PercentIcon,
 		TypeIcon
 	} from '@lucide/svelte';
 	import {
@@ -29,6 +27,7 @@
 		getPaginationRowModel,
 		getSortedRowModel,
 		type PaginationState,
+		type Row,
 		type RowSelectionState,
 		type SortingState,
 		type Table as TanStackTabke,
@@ -59,12 +58,13 @@
 	import * as Table from '$lib/components/ui/table';
 	import { cn } from '$lib/utils';
 
-	import { getColumnType } from './utils';
+	import type { DataSchemaType, UISchemaType } from './utils';
 
 	let {
-		objects,
-		fields,
+		dataset,
 		columnDefinitions,
+		uiSchemas,
+		dataSchemas,
 		create,
 		bulkDelete,
 		reload,
@@ -72,12 +72,19 @@
 			render: () => ''
 		}))
 	}: {
-		objects: Record<string, JsonValue>[];
-		fields: Record<string, JsonValue>;
+		dataset: Record<string, JsonValue>[];
 		columnDefinitions: ColumnDef<Record<string, JsonValue>>[];
+		uiSchemas: Record<string, UISchemaType>;
+		dataSchemas: Record<string, DataSchemaType>;
 		create?: Snippet;
 		bulkDelete?: Snippet<[{ table: TanStackTabke<Record<string, JsonValue>> }]>;
-		rowActions?: Snippet<[{ row: any; fields: any; objects: any }]>;
+		rowActions?: Snippet<
+			[
+				{
+					row: Row<Record<string, JsonValue>>;
+				}
+			]
+		>;
 		reload: Snippet;
 	} = $props();
 
@@ -108,9 +115,7 @@
 			id: 'actions',
 			cell: ({ row }) =>
 				renderSnippet(rowActions, {
-					row: row,
-					objects: objects,
-					fields: fields
+					row: row
 				}),
 			header: () =>
 				renderSnippet(
@@ -127,25 +132,23 @@
 		}
 	];
 
+	const GLOBAL_FILTER_IDENTIFIER = 'global_filter_identifier';
 	let globalFilter = $state('');
 	let globalFilterInput = $state('');
 	let globalFilterError: Error | null = $state(null);
-
-	const extraFunctions = {
+	const globalFilterExtraFunctions = {
 		Time: (time: string | number | Date) => new Date(time).getTime(),
-
 		now: () => Date.now(),
-
 		Seconds: (time: number) => time * 1000,
 		Minutes: (time: number) => time * 60 * 1000,
 		Hours: (time: number) => time * 60 * 60 * 1000,
 		Days: (time: number) => time * 24 * 60 * 60 * 1000,
 		Years: (time: number) => time * 365 * 24 * 60 * 60 * 1000,
-
-		length: (array: unknown[]) => (array ? array.length : 0)
+		size: (object: any) => {
+			return object ? Object.keys(object).length : undefined;
+		}
 	};
-
-	const constants = {
+	const globalFilterConstants = {
 		true: true,
 		false: false
 	};
@@ -156,10 +159,10 @@
 	let sorting = $state<SortingState>([]);
 	let pagination = $state<PaginationState>({ pageIndex: 0, pageSize: 10 });
 
-	let table = createSvelteTable<JsonObject>({
+	let table = createSvelteTable<Record<string, JsonValue>>({
 		columns,
 		get data() {
-			return objects;
+			return dataset;
 		},
 		getCoreRowModel: getCoreRowModel(),
 		getFacetedUniqueValues: getFacetedUniqueValues(),
@@ -231,8 +234,11 @@
 		globalFilterFn: (row) => {
 			if (!globalFilter) return true;
 			try {
-				const expression = compileExpression(globalFilter, { extraFunctions, constants });
-				const result = expression(row.original);
+				const filter = compileExpression(globalFilter, {
+					extraFunctions: globalFilterExtraFunctions,
+					constants: globalFilterConstants
+				});
+				const result = filter(row.original);
 				return Boolean(result);
 			} catch {
 				return false;
@@ -240,23 +246,25 @@
 		}
 	});
 
-	// eslint-disable-next-line
-	function getAlignment(field: any): 'start' | 'center' | 'end' {
-		if (
-			field?.type === 'integer' ||
-			field?.type === 'number' ||
-			(field?.type === 'string' && field?.format === 'date-time')
-		) {
-			return 'end';
-		} else if (field?.type === 'boolean' || field?.type === 'object') {
-			return 'center';
-		} else {
-			return 'start';
-		}
+	function getAlignment(uiSchema: UISchemaType): 'start' | 'center' | 'end' {
+		const map: Record<NonNullable<UISchemaType>, 'start' | 'center' | 'end'> = {
+			boolean: 'center',
+			number: 'end',
+			time: 'end',
+			text: 'start',
+			array: 'center',
+			'array-of-object': 'center',
+			object: 'center',
+			link: 'start',
+			ratio: 'end',
+			quantity: 'end',
+			'array-of-enumeration': 'center',
+			'object-of-key-value': 'center'
+		};
+		return uiSchema ? map[uiSchema] : 'start';
 	}
-	// eslint-disable-next-line
-	function getHeaderAlignment(field: any): string {
-		const alignment = getAlignment(field);
+	function getHeaderAlignment(uiSchema: UISchemaType): string {
+		const alignment = getAlignment(uiSchema);
 		switch (alignment) {
 			case 'start':
 				return 'justify-start';
@@ -267,9 +275,8 @@
 				return 'justify-end';
 		}
 	}
-	// eslint-disable-next-line
-	function getCellAlignment(field: any): string {
-		const alignment = getAlignment(field);
+	function getCellAlignment(uiSchema: UISchemaType): string {
+		const alignment = getAlignment(uiSchema);
 		switch (alignment) {
 			case 'start':
 				return 'text-start';
@@ -296,7 +303,10 @@
 		try {
 			globalFilterError = null;
 			if (globalFilterInput) {
-				compileExpression(globalFilterInput, { extraFunctions, constants });
+				compileExpression(globalFilterInput, {
+					extraFunctions: globalFilterExtraFunctions,
+					constants: globalFilterConstants
+				});
 			}
 			globalFilter = globalFilterInput;
 			table.setGlobalFilter(globalFilterInput);
@@ -317,7 +327,7 @@
 		key: '/',
 		ctrl: false,
 		callback: () => {
-			const input = document.getElementById('global_filter');
+			const input = document.getElementById(GLOBAL_FILTER_IDENTIFIER);
 			if (input) (input as HTMLInputElement).focus();
 		}
 	}}
@@ -332,7 +342,7 @@
 					<CodeIcon size={16} />
 				</InputGroup.Addon>
 				<InputGroup.Input
-					id="global_filter"
+					id={GLOBAL_FILTER_IDENTIFIER}
 					placeholder="Search via Query Language"
 					bind:value={globalFilterInput}
 					class="peer w-full"
@@ -408,6 +418,16 @@
 							<p>Press <kbd>/</kbd> to focus the search box.</p>
 							<p>Press <kbd>esc</kbd> to clear the filter.</p>
 						</div>
+
+						<br />
+
+						<h3 class="font-semibold">Note</h3>
+						<div class="p-4 font-mono text-warning">
+							<p>
+								Operations between quantities with units (e.g., <code>Mi</code>, <code>k</code>) are
+								<b>not supported yet</b>.
+							</p>
+						</div>
 					</div>
 					<Sheet.Footer>
 						<p class="mt-4 text-xs text-muted-foreground">
@@ -439,23 +459,19 @@
 						closeOnSelect={false}
 						onSelect={() => column.toggleVisibility(!column.getIsVisible())}
 					>
-						{@const type = lodash.get(fields, `${column.id}.type`)}
-						{@const format = lodash.get(fields, `${column.id}.format`)}
-						{@const columnType = getColumnType(type, format)}
-						{#if columnType === 'boolean'}
+						{@const dataSchema = dataSchemas[column.id]}
+						{#if dataSchema === 'boolean'}
 							<BinaryIcon />
-						{:else if columnType === 'number'}
+						{:else if dataSchema === 'number'}
 							<HashIcon />
-						{:else if columnType === 'time'}
+						{:else if dataSchema === 'time'}
 							<ClockIcon />
-						{:else if columnType === 'string'}
+						{:else if dataSchema === 'text'}
 							<TypeIcon />
-						{:else if columnType === 'array'}
+						{:else if dataSchema === 'array'}
 							<BracketsIcon />
-						{:else if columnType === 'object'}
+						{:else if dataSchema === 'object'}
 							<BracesIcon />
-						{:else if columnType === 'ratio'}
-							<PercentIcon />
 						{/if}
 						{column.id}
 					</DropdownMenu.Item>
@@ -492,7 +508,7 @@
 										class={cn(
 											header.column.getCanSort() &&
 												'flex h-full cursor-pointer items-center justify-between gap-2 select-none',
-											getHeaderAlignment(fields[header.column.id])
+											getHeaderAlignment(uiSchemas[header.column.id])
 										)}
 										onclick={header.column.getToggleSortingHandler()}
 										onkeydown={(e) => {
@@ -537,7 +553,7 @@
 							{#each row.getVisibleCells() as cell (cell.id)}
 								<Table.Cell
 									class={cn(
-										getCellAlignment(fields[cell.column.id]),
+										getCellAlignment(uiSchemas[cell.column.id]),
 										lodash.get(cell.column.columnDef.meta, 'class')
 									)}
 								>
