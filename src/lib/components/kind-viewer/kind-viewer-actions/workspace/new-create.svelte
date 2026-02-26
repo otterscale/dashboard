@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { Progress } from '$lib/components/ui/progress/index.js';
 	import { Plus } from '@lucide/svelte';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
@@ -15,6 +14,7 @@
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Item from '$lib/components/ui/item';
+	import { Progress } from '$lib/components/ui/progress/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
 	let {
