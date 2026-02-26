@@ -9,7 +9,7 @@ import ResourceQuotaCreate from './resource-quota/create.svelte';
 import SimpleAppActions from './simple-app/actions.svelte';
 import SimpleAppCreate from './simple-app/create.svelte';
 import WorkspaceActions from './workspace/actions.svelte';
-import WorkspaceCreate from './workspace/create.svelte';
+import WorkspaceCreate from './workspace/new-create.svelte'; // TODO: Back to create before push
 
 type RoleType = 'admin' | 'edit' | 'view';
 
