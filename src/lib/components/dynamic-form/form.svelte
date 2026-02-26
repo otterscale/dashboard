@@ -40,16 +40,16 @@
 
 	let {
 		schema,
-		uiSchema,
 		initialValue,
+		uiSchema,
 		transformer,
 		handleSubmit,
 		actions,
 		values = $bindable()
 	}: {
 		schema: Schema;
+		initialValue: FormValue;
 		uiSchema?: UiSchemaRoot;
-		initialValue?: FormValue;
 		transformer?: (value: FormValue) => FormValue;
 		handleSubmit?: (form: FormState<FormValue>) => void;
 		actions?: Snippet;
@@ -198,6 +198,7 @@
 	<Tooltip.Provider>
 		<ButtonGroup.Root class="ml-auto">
 			<Button
+				variant="ghost"
 				size="icon-sm"
 				disabled={mode === 'form'}
 				onclick={async () => {
@@ -218,6 +219,7 @@
 				</Tooltip.Root>
 			</Button>
 			<Button
+				variant="ghost"
 				size="icon-sm"
 				disabled={mode === 'yaml'}
 				onclick={async () => {

@@ -6,13 +6,14 @@
 	import Ajv from 'ajv';
 	import lodash from 'lodash';
 	import { stringify } from 'yaml';
+	import { Progress } from '$lib/components/ui/progress/index.js';
 
 	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import { toVersionedJSONSchema } from '$lib/components/dynamic-form/utils.svelte';
 	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
-	import * as Dialog from '$lib/components/ui/dialog';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	let {
@@ -39,7 +40,12 @@
 	const validate = jsonSchemaValidator.compile(schema);
 	let values: any = $state({
 		metadata: { name: {} },
-		spec: { users: {}, resourceQuota: {}, networkIsolation: {} }
+		spec: { namespace: {}, users: {}, resourceQuota: {}, networkIsolation: {} }
+	});
+	$effect(() => {
+		if (lodash.get(values, 'metadata.name')) {
+			lodash.set(values, 'spec.namespace', lodash.get(values, 'metadata.name'));
+		}
 	});
 	let open = $state(false);
 
@@ -92,27 +98,28 @@
 	}
 </script>
 
-<Dialog.Root
+<AlertDialog.Root
 	bind:open
 	onOpenChangeComplete={() => {
 		reset();
 	}}
 >
-	<Dialog.Trigger>
+	<AlertDialog.Trigger>
 		{#snippet child({ props })}
 			<Button {...props} variant="outline" size="icon">
 				<Plus />
 			</Button>
 		{/snippet}
-	</Dialog.Trigger>
-	<Dialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
+	</AlertDialog.Trigger>
+	<AlertDialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
 		<Item.Root class="p-0">
+			<Progress value={currentIndex + 1} max={steps.length} class="max-w-xl" />
 			<Item.Content class="text-left">
 				<Item.Title class="text-xl">Workspace</Item.Title>
 				<Item.Description>{lodash.get(schema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
-		<Tabs.Root bind:value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
+		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
@@ -153,8 +160,13 @@
 						title: 'Users',
 						items: {
 							...lodash.omit(lodash.get(schema, 'properties.spec.properties.users.items') as any, [
-								'properties'
+								'properties',
+								'required'
 							]),
+							required: [
+								...(lodash.get(schema, 'properties.spec.properties.users.items.required') as any),
+								'name'
+							],
 							properties: {
 								name: {
 									...(lodash.get(
@@ -198,13 +210,6 @@
 								'ui:components': {
 									stringField: 'enumField',
 									selectWidget: 'comboboxWidget'
-								},
-								'ui:options': {
-									TailoredComboboxVisibility: 10,
-									TailoredComboboxInput: {
-										placeholder: 'Role'
-									},
-									TailoredComboboxEmptyText: 'No roles available.'
 								}
 							}
 						}
@@ -356,7 +361,6 @@
 					<Button
 						class="mt-auto w-full"
 						onclick={() => {
-							lodash.set(values, 'spec.namespace', lodash.get(values, 'metadata.name'));
 							const isValid = validate(values);
 							console.log(isValid, validate.errors, values);
 						}}
@@ -366,5 +370,5 @@
 				</div>
 			</Tabs.Content>
 		</Tabs.Root>
-	</Dialog.Content>
-</Dialog.Root>
+	</AlertDialog.Content>
+</AlertDialog.Root>
