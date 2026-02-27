@@ -142,8 +142,10 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={'workspace' as FormValue}
-					handleSubmit={() => {
-						handleNext();
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
 					}}
 					bind:values={values['metadata']['name']}
 				>
@@ -166,7 +168,37 @@
 					schema={{
 						...lodash.omit(lodash.get(schema, 'properties.spec.properties.users') as any, 'items'),
 						title: 'Users',
-						items: {
+						items: [
+							{
+								...lodash.omit(
+									lodash.get(schema, 'properties.spec.properties.users.items') as any,
+									['properties', 'required']
+								),
+								required: [
+									...(lodash.get(schema, 'properties.spec.properties.users.items.required') as any),
+									'name'
+								],
+								properties: {
+									name: {
+										...(lodash.get(
+											schema,
+											'properties.spec.properties.users.items.properties.name'
+										) as any),
+										title: 'Name',
+										readOnly: true
+									},
+									role: {
+										...(lodash.get(
+											schema,
+											'properties.spec.properties.users.items.properties.role'
+										) as any),
+										title: 'Role',
+										readOnly: true
+									}
+								}
+							}
+						],
+						additionalItems: {
 							...lodash.omit(lodash.get(schema, 'properties.spec.properties.users.items') as any, [
 								'properties',
 								'required'
@@ -187,7 +219,8 @@
 									...(lodash.get(
 										schema,
 										'properties.spec.properties.users.items.properties.role'
-									) as any)
+									) as any),
+									title: 'Role'
 								}
 							}
 						}
@@ -201,6 +234,15 @@
 							}
 						},
 						items: {
+							'ui:options': {
+								layouts: {
+									'object-properties': {
+										class: 'grid grid-cols-2 gap-3'
+									}
+								}
+							}
+						},
+						additionalItems: {
 							'ui:options': {
 								layouts: {
 									'object-properties': {
@@ -241,13 +283,17 @@
 						let users = value as SchemaObjectValue[];
 						users = users.map((user) => ({
 							...user,
-							subject: getIdentifier(user.name! as string) ?? null
+							subject: user.subject ?? getIdentifier(user.name! as string) ?? null
 						}));
 						return users;
 					}}
-					handleSubmit={() => {
-						handleNext();
-						lodash.set(values, 'spec.namespace', lodash.get(values, 'metadata.name'));
+					handleSubmit={{
+						prehook: () => {
+							lodash.set(values, 'spec.namespace', lodash.get(values, 'metadata.name'));
+						},
+						posthook: () => {
+							handleNext();
+						}
 					}}
 					bind:values={values['spec']['users']}
 				>
@@ -306,7 +352,25 @@
 									}
 								},
 								translations: {
+									'additional-property': 'additional resource',
 									'add-object-property': 'Add Limit'
+								},
+								additionalPropertyKey: (key: string, attempt: number) => {
+									const index = attempt + 1;
+									switch (index) {
+										case 1: {
+											return `1st ${key}`;
+										}
+										case 2: {
+											return `2nd ${key}`;
+										}
+										case 3: {
+											return `3rd ${key}`;
+										}
+										default: {
+											return `${index}th ${key}`;
+										}
+									}
 								}
 							},
 							additionalProperties: {
@@ -326,8 +390,10 @@
 							'requests.otterscale.com/vgpu': '0'
 						}
 					} as FormValue}
-					handleSubmit={() => {
-						handleNext();
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
 					}}
 					bind:values={values['spec']['resourceQuota']}
 				>
@@ -375,8 +441,10 @@
 						allowedNamespaces: ['namespace'],
 						enabled: false
 					} as FormValue}
-					handleSubmit={() => {
-						handleNext();
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
 					}}
 					bind:values={values['spec']['networkIsolation']}
 				>
