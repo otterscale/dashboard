@@ -115,7 +115,7 @@
 		"filtrex": "^3.1.0",
 		"highlight.js": "^11.11.1",
 		"ioredis": "^5.9.3",
-		"isomorphic-dompurify": "^2.36.0",
+		"isomorphic-dompurify": "^3.0.0",
 		"js-yaml": "^4.1.1",
 		"jsep": "^1.4.0",
 		"json-schema-to-ts": "^3.1.1",
