@@ -7,6 +7,7 @@
 	export type ComboboxEnumeration = {
 		label: string;
 		value: string;
+		disabled?: boolean;
 	};
 	declare module '@sjsf/form' {
 		interface UiOptions {
@@ -90,7 +91,7 @@
 					id: getPseudoId(ctx, config.path, index),
 					label: enumeration.label,
 					value: enumeration.value,
-					disabled: false
+					disabled: enumeration.disabled ?? false
 				}))
 			: options
 	);
