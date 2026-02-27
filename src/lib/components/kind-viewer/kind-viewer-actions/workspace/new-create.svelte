@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Progress } from '$lib/components/ui/progress/index.js';
 	import { Plus } from '@lucide/svelte';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
@@ -6,16 +7,16 @@
 	import Ajv from 'ajv';
 	import lodash from 'lodash';
 	import { stringify } from 'yaml';
-	import { Progress } from '$lib/components/ui/progress/index.js';
 
 	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import { toVersionedJSONSchema } from '$lib/components/dynamic-form/utils.svelte';
 	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
+
 	let {
 		schema: apiSchema
 	}: {
@@ -32,24 +33,23 @@
 	// Validation
 	const jsonSchemaValidator = new Ajv({
 		allErrors: true,
+		// Registe unknown formats of json schema for validation
 		formats: {
 			int64: true,
 			'date-time': true
 		}
 	});
 	const validate = jsonSchemaValidator.compile(schema);
+
+	// Container for Data.
 	let values: any = $state({
+		apiVersion: 'tenant.otterscale.io/v1alpha1',
+		kind: 'Workspace',
 		metadata: { name: {} },
 		spec: { namespace: {}, users: {}, resourceQuota: {}, networkIsolation: {} }
 	});
-	$effect(() => {
-		if (lodash.get(values, 'metadata.name')) {
-			lodash.set(values, 'spec.namespace', lodash.get(values, 'metadata.name'));
-		}
-	});
-	let open = $state(false);
 
-	// TODO: Refactor into Manager.
+	// TODO: Refactor into StepsManager.
 	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
@@ -64,6 +64,7 @@
 		currentStep = firstStep;
 	}
 
+	// TODO: Refactor into UserManager
 	// Users
 	interface KeycloakUser {
 		id: string;
@@ -76,6 +77,7 @@
 	async function fetchUsersAsEnumerations(
 		search: string
 	): Promise<{ label: string; value: string }[]> {
+		// TODO: debounce
 		try {
 			const response = await fetch(`/rest/users?search=${encodeURIComponent(search)}`);
 			if (response.ok) {
@@ -96,6 +98,12 @@
 			return [];
 		}
 	}
+	function getIdentifier(username: string): string | undefined {
+		return usernameToIdentifier[username];
+	}
+
+	// Flag for Dialog
+	let open = $state(false);
 </script>
 
 <AlertDialog.Root
@@ -188,10 +196,18 @@
 						'ui:options': {
 							itemTitle: () => 'User',
 							translations: {
-								submit: 'Next'
+								submit: 'Next',
+								'add-array-item': 'Add User'
 							}
 						},
 						items: {
+							'ui:options': {
+								layouts: {
+									'object-properties': {
+										class: 'grid grid-cols-2 gap-3'
+									}
+								}
+							},
 							name: {
 								'ui:components': {
 									stringField: 'enumField',
@@ -214,17 +230,21 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={[{ name: 'enyao_chang', role: 'admin' }] as FormValue}
+					initialValue={[
+						// From login user information.
+						{ name: 'enyao_chang', role: 'admin', subject: 'enyaochang' }
+					] as FormValue}
 					transformer={(value: FormValue) => {
 						let users = value as SchemaObjectValue[];
 						users = users.map((user) => ({
 							...user,
-							subject: usernameToIdentifier[user.name! as string]
+							subject: getIdentifier(user.name! as string) ?? null
 						}));
 						return users;
 					}}
 					handleSubmit={() => {
 						handleNext();
+						lodash.set(values, 'spec.namespace', lodash.get(values, 'metadata.name'));
 					}}
 					bind:values={values['spec']['users']}
 				>
@@ -281,6 +301,9 @@
 									'object-properties': {
 										class: 'grid grid-cols-2 gap-3'
 									}
+								},
+								translations: {
+									'add-object-property': 'Add Limit'
 								}
 							},
 							additionalProperties: {
@@ -330,6 +353,19 @@
 							translations: {
 								submit: 'Next'
 							}
+						},
+						allowedNamespaces: {
+							'ui:options': {
+								itemTitle: () => 'Allowed Namespace',
+								layouts: {
+									'array-items': {
+										class: 'grid grid-cols-2 gap-3'
+									}
+								},
+								translations: {
+									'add-array-item': 'Add Namespace'
+								}
+							}
 						}
 					} as UiSchemaRoot}
 					initialValue={{
@@ -365,7 +401,7 @@
 							console.log(isValid, validate.errors, values);
 						}}
 					>
-						Validation
+						Validate
 					</Button>
 				</div>
 			</Tabs.Content>
