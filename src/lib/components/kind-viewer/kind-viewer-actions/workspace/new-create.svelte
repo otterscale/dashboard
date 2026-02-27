@@ -226,6 +226,9 @@
 								'ui:components': {
 									stringField: 'enumField',
 									selectWidget: 'comboboxWidget'
+								},
+								'ui:options': {
+									disabledEnumValues: ['admin']
 								}
 							}
 						}
