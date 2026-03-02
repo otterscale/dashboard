@@ -3,7 +3,7 @@
 	import GitHubIcon from '@lucide/svelte/icons/github';
 
 	import { version } from '$app/environment';
-	import LogoImage from '$lib/assets/logo.svg';
+	import LogoFrameImage from '$lib/assets/logo-frame.svg';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -19,14 +19,14 @@
 			<div class="flex w-full flex-col items-center justify-center">
 				<Badge variant="secondary">{version}</Badge>
 				<div class="flex w-full items-center justify-evenly">
-					<img src={LogoImage} alt="logo" class="size-24" />
-					<div class="flex gap-2">
-						<h2 class="text-2xl leading-tight">
-							{m.join_1()}
-							<br />
-							<span class="text-foreground/60"> {m.join_2()} </span>
-						</h2>
+					<div class="flex flex-col items-center gap-2">
+						<img src={LogoFrameImage} alt="logo" class="size-36" />
 					</div>
+					<h2 class="flex flex-col items-center text-2xl leading-tight">
+						{m.join_1()}
+						<br />
+						<span class="text-foreground/60"> {m.join_2()} </span>
+					</h2>
 				</div>
 				<div class="flex gap-2">
 					<Button
