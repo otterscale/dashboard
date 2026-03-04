@@ -127,7 +127,7 @@
 								return `Successfully deleted workspace ${name}`;
 							},
 							error: (error) => {
-								console.error('Failed to delete workspace ${name}:', error);
+								console.error(`Failed to delete workspace ${name}:`, error);
 								return `Failed to delete workspace ${name}: ${(error as ConnectError).message}`;
 							},
 							finally() {

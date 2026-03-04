@@ -27,13 +27,13 @@
 	import { shortcut } from '$lib/actions/shortcut.svelte';
 	import * as defaults from '$lib/components/dynamic-form/defaults';
 	import ObjectPropertyField from '$lib/components/dynamic-form/fields/object-property.svelte';
-	import ArrayItemTemplate from '$lib/components/dynamic-form/templates/array-item.svelte';
 	import ArrayTemplate from '$lib/components/dynamic-form/templates/array.svelte';
+	import ArrayItemTemplate from '$lib/components/dynamic-form/templates/array-item.svelte';
 	import MultiFieldTemplate from '$lib/components/dynamic-form/templates/multi-field.svelte';
-	import ObjectPropertyTemplate from '$lib/components/dynamic-form/templates/object-property.svelte';
 	import ObjectTemplate from '$lib/components/dynamic-form/templates/object.svelte';
-	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
+	import ObjectPropertyTemplate from '$lib/components/dynamic-form/templates/object-property.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
 	import * as Kbd from '$lib/components/ui/kbd/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
@@ -144,10 +144,10 @@
 	// This is achieved by creating a new object based on the form schema and populating it with values from the current form state, ensuring that the order of attributes in the YAML editor reflects the structure defined in the form schema.
 	setValue(form, parse(stringify(getValueSnapshot(form))));
 	let yamlValue = $state(stringify(getValueSnapshot(form)));
-	function onReady(event: CustomEvent) {
-		const editor = event.detail;
-		console.log(editor);
-	}
+	// function onReady(event: CustomEvent) {
+	// 	const editor = event.detail;
+	// 	console.log(editor);
+	// }
 	// Tab
 	async function synchronizeToYAML() {
 		yamlValue = stringify(getValueSnapshot(form));
@@ -155,6 +155,7 @@
 	async function synchronizeToForm() {
 		setValue(form, parse(yamlValue));
 		await tick();
+		// Second call is used for overwrite the state in oneOf Widget.
 		setValue(form, parse(yamlValue));
 	}
 	let mode = $state('form');
@@ -276,7 +277,6 @@
 						renderLineHighlight: 'all',
 						theme: themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'
 					}}
-					on:ready={onReady}
 				/>
 			</div>
 		</Tabs.Content>

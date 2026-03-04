@@ -512,8 +512,6 @@
 								async () => {
 									const manifest = new TextEncoder().encode(JSON.stringify(values));
 
-									console.log(stringify(values, null, 2));
-
 									await resourceClient.create({
 										cluster,
 										group,
