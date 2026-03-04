@@ -20,6 +20,7 @@
 	import MapIcon from '@lucide/svelte/icons/map';
 	import NetworkIcon from '@lucide/svelte/icons/network';
 	import PcCaseIcon from '@lucide/svelte/icons/pc-case';
+	import PlusIcon from '@lucide/svelte/icons/plus';
 	import ScaleIcon from '@lucide/svelte/icons/scale';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import ShipIcon from '@lucide/svelte/icons/ship';
@@ -47,6 +48,7 @@
 		startTour,
 		WorkspaceSwitcher
 	} from '$lib/components/layout';
+	import DialogImportCluster from '$lib/components/layout/dialog-import-cluster.svelte';
 	import { globalRoutes, platformRoutes } from '$lib/components/layout/routes';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 	import { Button } from '$lib/components/ui/button';
@@ -77,6 +79,7 @@
 	let scopes = $state<Scope[]>([]);
 	let workspaces = $state<TenantOtterscaleIoV1Alpha1Workspace[]>([]);
 	let next = $state(false);
+	let openImportCluster = $state(false);
 
 	async function fetchScopes() {
 		try {
@@ -635,9 +638,16 @@
 									<DropdownMenu.RadioItem value={scope.name}>{scope.name}</DropdownMenu.RadioItem>
 								{/each}
 							</DropdownMenu.RadioGroup>
+							<DropdownMenu.Separator />
+							<DropdownMenu.Item onclick={() => (openImportCluster = true)}>
+								<PlusIcon class="mr-2 size-4" />
+								{m.add()}
+								{m.cluster()}
+							</DropdownMenu.Item>
 						</DropdownMenu.Group>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
+				<DialogImportCluster bind:open={openImportCluster} onsuccess={fetchScopes} />
 				<Button variant="ghost" size="icon" class="size-7" onclick={onHomeClick}>
 					<HouseIcon />
 					<span class="sr-only">Back to Home</span>
