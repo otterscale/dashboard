@@ -11,10 +11,12 @@ updates:
       interval: "daily"
     exclude-paths:
       - "static/**"
+
   - package-ecosystem: "github-actions"
     directory: /
     schedule:
       interval: "daily"
+
   - package-ecosystem: docker
     directory: /
     schedule:
