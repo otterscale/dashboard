@@ -13,7 +13,14 @@ import WorkspaceCreate from './workspace/new-create.svelte'; // TODO: Back to cr
 
 type RoleType = 'admin' | 'edit' | 'view';
 
-type CreateType = Component<{ schema?: any }> | null;
+type CreateType = Component<{
+	cluster?: string;
+	group?: string;
+	version?: string;
+	kind?: string;
+	resource?: string;
+	schema?: any;
+}> | null;
 type ActionsType = Component<{
 	row?: any;
 	schema?: any;

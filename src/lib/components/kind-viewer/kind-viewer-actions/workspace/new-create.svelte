@@ -1,12 +1,17 @@
 <script lang="ts">
+	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { Plus } from '@lucide/svelte';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import type { SchemaObjectValue } from '@sjsf/form/core';
 	import Ajv from 'ajv';
 	import lodash from 'lodash';
+	import { getContext } from 'svelte';
+	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
+	import { page } from '$app/state';
+	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import { toVersionedJSONSchema } from '$lib/components/dynamic-form/utils.svelte';
@@ -18,17 +23,25 @@
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
 	let {
-		schema: apiSchema
+		cluster,
+		group,
+		version,
+		kind,
+		resource,
+		schema
 	}: {
+		cluster: string;
+		group: string;
+		version: string;
+		kind: string;
+		resource: string;
 		schema?: any;
 	} = $props();
 
-	const schema = $derived(toVersionedJSONSchema(apiSchema));
+	const jsonSchema = $derived(toVersionedJSONSchema(schema));
 
-	// const transport: Transport = getContext('transport');
-	// const resourceClient = createClient(ResourceService, transport);
-
-	// const cluster = $derived(page.params.cluster ?? page.params.scope ?? '');
+	const transport: Transport = getContext('transport');
+	const resourceClient = createClient(ResourceService, transport);
 
 	// Validation
 	const jsonSchemaValidator = new Ajv({
@@ -39,14 +52,14 @@
 			'date-time': true
 		}
 	});
-	const validate = jsonSchemaValidator.compile(schema);
+	const validate = jsonSchemaValidator.compile(jsonSchema);
 
 	// Container for Data.
 	let values: any = $state({
-		apiVersion: 'tenant.otterscale.io/v1alpha1',
-		kind: 'Workspace',
+		apiVersion: group ? `${group}/${version}` : version,
+		kind,
 		metadata: { name: {} },
-		spec: { namespace: {}, users: {}, resourceQuota: {}, networkIsolation: {} }
+		spec: { namespace: {}, members: {}, resourceQuota: {}, networkIsolation: {} }
 	});
 
 	// TODO: Refactor into StepsManager.
@@ -74,29 +87,35 @@
 		lastName?: string;
 	}
 	let usernameToIdentifier = $state<Record<string, string>>({});
-	async function fetchUsersAsEnumerations(
-		search: string
-	): Promise<{ label: string; value: string }[]> {
-		// TODO: debounce
-		try {
-			const response = await fetch(`/rest/users?search=${encodeURIComponent(search)}`);
-			if (response.ok) {
-				const fetchedUsers: KeycloakUser[] = await response.json();
-				for (const user of fetchedUsers) {
-					usernameToIdentifier[user.username] = user.id;
+	let timer: ReturnType<typeof setTimeout> | null = null;
+	function fetchUsersAsEnumerations(search: string): Promise<{ label: string; value: string }[]> {
+		return new Promise((resolve) => {
+			if (timer) clearTimeout(timer);
+
+			timer = setTimeout(async () => {
+				try {
+					const response = await fetch(`/rest/users?search=${encodeURIComponent(search)}`);
+					if (response.ok) {
+						const fetchedUsers: KeycloakUser[] = await response.json();
+						for (const user of fetchedUsers) {
+							usernameToIdentifier[user.username] = user.id;
+						}
+						resolve(
+							fetchedUsers.map((user) => ({
+								label: user.username,
+								value: user.username
+							}))
+						);
+					} else {
+						console.error('Failed to fetch users:', response.statusText);
+						resolve([]);
+					}
+				} catch (error) {
+					console.error('Error fetching users:', error);
+					resolve([]);
 				}
-				return fetchedUsers.map((user) => ({
-					label: user.username,
-					value: user.username
-				}));
-			} else {
-				console.error('Failed to fetch users:', response.statusText);
-				return [];
-			}
-		} catch (error) {
-			console.error('Error fetching users:', error);
-			return [];
-		}
+			}, 300);
+		});
 	}
 	function getIdentifier(username: string): string | undefined {
 		return usernameToIdentifier[username];
@@ -104,6 +123,7 @@
 
 	// Flag for Dialog
 	let open = $state(false);
+	let isSubmitting = $state(false);
 </script>
 
 <AlertDialog.Root
@@ -121,17 +141,17 @@
 	</AlertDialog.Trigger>
 	<AlertDialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
 		<Item.Root class="p-0">
-			<Progress value={currentIndex + 1} max={steps.length} class="max-w-xl" />
+			<Progress value={currentIndex + 1} max={steps.length} />
 			<Item.Content class="text-left">
 				<Item.Title class="text-xl">Workspace</Item.Title>
-				<Item.Description>{lodash.get(schema, 'description')}</Item.Description>
+				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
 		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
-						...(lodash.get(schema, 'properties.metadata.properties.name') as any),
+						...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as any),
 						title: 'Name'
 					} as Schema}
 					uiSchema={{
@@ -166,31 +186,37 @@
 			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
-						...lodash.omit(lodash.get(schema, 'properties.spec.properties.users') as any, 'items'),
-						title: 'Users',
+						...lodash.omit(
+							lodash.get(jsonSchema, 'properties.spec.properties.members') as any,
+							'items'
+						),
+						title: 'Members',
 						items: [
 							{
 								...lodash.omit(
-									lodash.get(schema, 'properties.spec.properties.users.items') as any,
+									lodash.get(jsonSchema, 'properties.spec.properties.members.items') as any,
 									['properties', 'required']
 								),
 								required: [
-									...(lodash.get(schema, 'properties.spec.properties.users.items.required') as any),
+									...(lodash.get(
+										jsonSchema,
+										'properties.spec.properties.members.items.required'
+									) as any),
 									'name'
 								],
 								properties: {
 									name: {
 										...(lodash.get(
-											schema,
-											'properties.spec.properties.users.items.properties.name'
+											jsonSchema,
+											'properties.spec.properties.members.items.properties.name'
 										) as any),
 										title: 'Name',
 										readOnly: true
 									},
 									role: {
 										...(lodash.get(
-											schema,
-											'properties.spec.properties.users.items.properties.role'
+											jsonSchema,
+											'properties.spec.properties.members.items.properties.role'
 										) as any),
 										title: 'Role',
 										readOnly: true
@@ -199,26 +225,29 @@
 							}
 						],
 						additionalItems: {
-							...lodash.omit(lodash.get(schema, 'properties.spec.properties.users.items') as any, [
-								'properties',
-								'required'
-							]),
+							...lodash.omit(
+								lodash.get(jsonSchema, 'properties.spec.properties.members.items') as any,
+								['properties', 'required']
+							),
 							required: [
-								...(lodash.get(schema, 'properties.spec.properties.users.items.required') as any),
+								...(lodash.get(
+									jsonSchema,
+									'properties.spec.properties.members.items.required'
+								) as any),
 								'name'
 							],
 							properties: {
 								name: {
 									...(lodash.get(
-										schema,
-										'properties.spec.properties.users.items.properties.name'
+										jsonSchema,
+										'properties.spec.properties.members.items.properties.name'
 									) as any),
 									title: 'Name'
 								},
 								role: {
 									...(lodash.get(
-										schema,
-										'properties.spec.properties.users.items.properties.role'
+										jsonSchema,
+										'properties.spec.properties.members.items.properties.role'
 									) as any),
 									title: 'Role'
 								}
@@ -227,10 +256,10 @@
 					} as Schema}
 					uiSchema={{
 						'ui:options': {
-							itemTitle: () => 'User',
+							itemTitle: () => 'Member',
 							translations: {
 								submit: 'Next',
-								'add-array-item': 'Add User'
+								'add-array-item': 'Add Member'
 							}
 						},
 						items: {
@@ -277,15 +306,15 @@
 					} as UiSchemaRoot}
 					initialValue={[
 						// From login user information.
-						{ name: 'enyao_chang', role: 'admin', subject: 'enyaochang' }
+						{ name: page.data.user.name, role: 'admin', subject: page.data.user.sub }
 					] as FormValue}
 					transformer={(value: FormValue) => {
-						let users = value as SchemaObjectValue[];
-						users = users.map((user) => ({
-							...user,
-							subject: user.subject ?? getIdentifier(user.name! as string) ?? null
+						let members = value as SchemaObjectValue[];
+						members = members.map((member) => ({
+							...member,
+							subject: member.subject ?? getIdentifier(member.name! as string) ?? null
 						}));
-						return users;
+						return members;
 					}}
 					handleSubmit={{
 						prehook: () => {
@@ -295,7 +324,7 @@
 							handleNext();
 						}
 					}}
-					bind:values={values['spec']['users']}
+					bind:values={values['spec']['members']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -315,20 +344,20 @@
 				<Form
 					schema={{
 						...(lodash.omit(
-							lodash.get(schema, 'properties.spec.properties.resourceQuota'),
+							lodash.get(jsonSchema, 'properties.spec.properties.resourceQuota'),
 							'properties'
 						) as any),
 						title: 'Resource Quota',
 						properties: {
 							hard: {
 								...(lodash.get(
-									schema,
+									jsonSchema,
 									'properties.spec.properties.resourceQuota.properties.hard'
 								) as any),
 								additionalProperties: {
 									...(lodash.omit(
 										lodash.get(
-											schema,
+											jsonSchema,
 											'properties.spec.properties.resourceQuota.properties.hard.additionalProperties'
 										),
 										'anyOf'
@@ -414,7 +443,7 @@
 			<Tabs.Content value={steps[3]}>
 				<Form
 					schema={{
-						...lodash.get(schema, 'properties.spec.properties.networkIsolation'),
+						...lodash.get(jsonSchema, 'properties.spec.properties.networkIsolation'),
 						title: 'Network Isolation'
 					} as Schema}
 					uiSchema={{
@@ -438,7 +467,6 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						allowedNamespaces: ['namespace'],
 						enabled: false
 					} as FormValue}
 					handleSubmit={{
@@ -468,8 +496,45 @@
 					<Button
 						class="mt-auto w-full"
 						onclick={() => {
+							if (isSubmitting) return;
+
+							isSubmitting = true;
+
 							const isValid = validate(values);
-							console.log(isValid, validate.errors, values);
+
+							if (!isValid) {
+								throw Error(`Validation errors: ${JSON.stringify(validate.errors)}`);
+							}
+
+							toast.promise(
+								async () => {
+									const manifest = new TextEncoder().encode(JSON.stringify(values));
+
+									console.log(stringify(values, null, 2));
+
+									await resourceClient.create({
+										cluster,
+										group,
+										version,
+										resource,
+										manifest
+									});
+								},
+								{
+									loading: `Creating workspace ${lodash.get(jsonSchema, 'metadata.name')}...`,
+									success: () => {
+										return `Successfully created workspace ${lodash.get(jsonSchema, 'metadata.name')}`;
+									},
+									error: (error) => {
+										console.error('Failed to create workspace:', error);
+										return `Failed to create workspace: ${(error as ConnectError).message}`;
+									},
+									finally() {
+										isSubmitting = false;
+										open = false;
+									}
+								}
+							);
 						}}
 					>
 						Validate
