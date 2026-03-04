@@ -38,10 +38,10 @@
 		schema?: any;
 	} = $props();
 
-	const jsonSchema = $derived(toVersionedJSONSchema(schema));
-
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
+
+	const jsonSchema = toVersionedJSONSchema(schema);
 
 	// Validation
 	const jsonSchemaValidator = new Ajv({
