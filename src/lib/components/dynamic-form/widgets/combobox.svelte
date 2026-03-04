@@ -50,7 +50,7 @@
 		PopoverContent,
 		PopoverTrigger,
 		Button,
-		Command,
+		Command: CommandRoot,
 		CommandInput,
 		CommandList,
 		CommandGroup,
@@ -64,7 +64,7 @@
 	}: ComponentProps['comboboxWidget'] = $props();
 	const { oninput, onchange, ...buttonHandlers } = $derived(handlers);
 
-	let filterValue = $state(value ?? '');
+	let filterValue = $state((value as string) ?? '');
 	let enumerations = $state<ComboboxEnumeration[]>([]);
 
 	const enumerationsProvider = $derived(
@@ -160,7 +160,7 @@
 		{/snippet}
 	</PopoverTrigger>
 	<PopoverContent class="w-[200px] p-0">
-		<Command shouldFilter={false}>
+		<CommandRoot shouldFilter={false}>
 			<CommandInput bind:value={filterValue} />
 			<CommandList>
 				{#if filteredOptions.length === 0}
@@ -176,7 +176,7 @@
 				<CommandGroup>
 					{#each filteredOptions.slice(0, visibleOptions) as option (option.id)}
 						<CommandItem
-							value={option.value}
+							value={option.value as string}
 							onSelect={() => {
 								optionsManager.current = option.id;
 								oninput?.();
@@ -207,6 +207,6 @@
 					</CommandItem>
 				{/if}
 			</CommandList>
-		</Command>
+		</CommandRoot>
 	</PopoverContent>
 </Popover>
