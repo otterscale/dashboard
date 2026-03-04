@@ -1,19 +1,23 @@
 import * as JSONSchemaFaker from 'json-schema-faker';
 import traverse from 'json-schema-traverse';
 import lodash from 'lodash';
+import { SvelteSet } from 'svelte/reactivity';
 
-function filterRequiredSchema(schema: any, reservedProperties={
-	'required': ['apiVersion', 'kind', 'metadata', 'spec'],
-	'properties.metadata.required': ['name'],
-}): any {
+function filterRequiredSchema(
+	schema: any,
+	reservedProperties = {
+		required: ['apiVersion', 'kind', 'metadata', 'spec'],
+		'properties.metadata.required': ['name']
+	}
+): any {
 	const result = lodash.cloneDeep(schema);
-	
+
 	Object.entries(reservedProperties).forEach(([path, properties]) => {
-		lodash.set(result, path, [...new Set(lodash.get(result, path, []).concat(properties))]);
+		lodash.set(result, path, [...new SvelteSet(lodash.get(result, path, []).concat(properties))]);
 	});
 
 	traverse(result, {
-		cb: (currentSchema) => {;
+		cb: (currentSchema) => {
 			if (currentSchema.type === 'object' && currentSchema.properties) {
 				const requiredProperties = currentSchema.required || [];
 
@@ -24,7 +28,6 @@ function filterRequiredSchema(schema: any, reservedProperties={
 						delete currentSchema.properties[key];
 					}
 				});
-				
 			}
 		}
 	});
@@ -58,7 +61,7 @@ function getInitialValues(schema: any) {
 		});
 		return JSONSchemaFaker.generate(schemaWithDefaults, {
 			useDefaultValue: true,
-			maxItems: 1,
+			maxItems: 1
 		});
 	} catch (error) {
 		console.error('json-schema-faker error:', error);
