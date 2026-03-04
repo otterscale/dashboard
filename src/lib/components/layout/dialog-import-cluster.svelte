@@ -1,26 +1,48 @@
 <script lang="ts">
+	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import Icon from '@iconify/svelte';
+	import { getContext } from 'svelte';
+	import { toast } from 'svelte-sonner';
 
+	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
+	import { ScopeService } from '$lib/api/scope/v1/scope_pb';
 	import * as Code from '$lib/components/custom/code';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
+	import * as Select from '$lib/components/ui/select';
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { cn } from '$lib/utils';
 
 	// ─── Props ────────────────────────────────────────────────
 	let {
 		open = $bindable(false),
+		cluster,
 		onsuccess
 	}: {
 		open: boolean;
+		cluster: string;
 		onsuccess?: () => void;
 	} = $props();
 
 	// ─── Constants ───────────────────────────────────────────
-	const API_DOMAIN = 'api.otterscale.local';
-	const POLL_INTERVAL = 3000;
+	const CRD_GROUP = 'fleet.otterscale.io';
+	const CRD_VERSION = 'v1alpha1';
+	const CRD_RESOURCE = 'clusters';
+	const CRD_KIND = 'Cluster';
+
+	const DISTRIBUTIONS = [
+		{ value: 'charmed-kubernetes', label: 'Charmed Kubernetes (Juju)' },
+		{ value: 'talos', label: 'Talos Linux' },
+		{ value: 'rancher', label: 'Rancher / RKE2' },
+		{ value: 'eks', label: 'Amazon EKS' },
+		{ value: 'gke', label: 'Google GKE' },
+		{ value: 'aks', label: 'Azure AKS' },
+		{ value: 'k3s', label: 'K3s' },
+		{ value: 'kubeadm', label: 'kubeadm' },
+		{ value: 'other', label: 'Other' }
+	] as const;
 
 	const steps = [
 		{ icon: 'ph:list-checks', label: 'Provider' },
@@ -28,6 +50,11 @@
 		{ icon: 'ph:terminal-window', label: 'Deploy' },
 		{ icon: 'ph:shield-check', label: 'Verify' }
 	] as const;
+
+	// ─── API Clients ─────────────────────────────────────────
+	const transport: Transport = getContext('transport');
+	const resourceClient = createClient(ResourceService, transport);
+	const scopeClient = createClient(ScopeService, transport);
 
 	// ─── Step State ──────────────────────────────────────────
 	let currentStep = $state(1);
@@ -38,11 +65,10 @@
 	// Step 2
 	let clusterName = $state('');
 	let clusterDescription = $state('');
+	let distribution = $state('');
 	let clusterLabels = $state('');
 
-	// Step 3 (from API response)
-	let clusterId = $state('');
-	let registrationToken = $state('');
+	// Step 3
 	let clusterStatus = $state<'pending' | 'ready'>('pending');
 
 	// Step 4
@@ -53,36 +79,12 @@
 	let isCreating = $state(false);
 	let errorMessage = $state('');
 
-	// ─── Mock API Functions ──────────────────────────────────
-	let mockPollCount = 0;
-
-	async function mockCreateCluster(
-		name: string,
-		description: string,
-		_provider: string
-	): Promise<{ clusterId: string; token: string }> {
-		await new Promise((r) => setTimeout(r, 1200));
-		const id = crypto.randomUUID().slice(0, 8);
-		return {
-			clusterId: id,
-			token: `reg-${id}-${Date.now().toString(36)}`
-		};
-	}
-
-	async function mockGetCluster(_id: string): Promise<{ status: 'pending' | 'ready' }> {
-		await new Promise((r) => setTimeout(r, 500));
-		mockPollCount++;
-		return { status: mockPollCount >= 5 ? 'ready' : 'pending' };
-	}
-
-	async function mockBindClusterAdmin(_id: string): Promise<{ success: boolean }> {
-		await new Promise((r) => setTimeout(r, 2000));
-		return { success: true };
-	}
+	// Watch abort controller
+	let watchAbort: AbortController | null = null;
 
 	// ─── Derived ─────────────────────────────────────────────
 	const installCommand = $derived(
-		`kubectl apply -f https://${API_DOMAIN}/v1/fleet/register/manifest?token=${registrationToken}`
+		`kubectl apply -f https://$(kubectl get cm -n otterscale otterscale-config -o jsonpath='{.data.api_domain}')/v1/link/agent-manifest?name=${clusterName || '<cluster-name>'}`
 	);
 
 	const canGoNext = $derived.by(() => {
@@ -91,21 +93,32 @@
 		return false;
 	});
 
+	// ─── Helpers ─────────────────────────────────────────────
+	function parseLabels(raw: string): Record<string, string> {
+		const labels: Record<string, string> = {};
+		if (!raw.trim()) return labels;
+		for (const pair of raw.split(',')) {
+			const [key, value] = pair.split('=').map((s) => s.trim());
+			if (key) labels[key] = value ?? '';
+		}
+		return labels;
+	}
+
 	// ─── Actions ─────────────────────────────────────────────
 	function resetState() {
 		currentStep = 1;
 		providerType = null;
 		clusterName = '';
 		clusterDescription = '';
+		distribution = '';
 		clusterLabels = '';
-		clusterId = '';
-		registrationToken = '';
 		clusterStatus = 'pending';
 		isBinding = false;
 		bindingSuccess = false;
 		isCreating = false;
 		errorMessage = '';
-		mockPollCount = 0;
+		watchAbort?.abort();
+		watchAbort = null;
 	}
 
 	function goNext() {
@@ -120,19 +133,45 @@
 		if (!clusterName.trim()) return;
 		isCreating = true;
 		errorMessage = '';
+
+		const labels = parseLabels(clusterLabels);
+		if (distribution) {
+			labels['fleet.otterscale.io/distribution'] = distribution;
+		}
+
+		const manifest = {
+			apiVersion: `${CRD_GROUP}/${CRD_VERSION}`,
+			kind: CRD_KIND,
+			metadata: {
+				name: clusterName,
+				...(Object.keys(labels).length > 0 ? { labels } : {})
+			},
+			spec: {
+				...(clusterDescription ? { description: clusterDescription } : {}),
+				provider: providerType === 'baremetal' ? 'local' : 'external',
+				...(distribution ? { distribution } : {})
+			}
+		};
+
 		try {
-			const result = await mockCreateCluster(
-				clusterName,
-				clusterDescription,
-				providerType ?? 'external'
-			);
-			clusterId = result.clusterId;
-			registrationToken = result.token;
-			mockPollCount = 0;
+			await resourceClient.create({
+				cluster,
+				group: CRD_GROUP,
+				version: CRD_VERSION,
+				resource: CRD_RESOURCE,
+				manifest: new TextEncoder().encode(JSON.stringify(manifest))
+			});
+
+			toast.success(`Cluster "${clusterName}" created`);
 			clusterStatus = 'pending';
 			currentStep = 3;
 		} catch (e) {
-			errorMessage = e instanceof Error ? e.message : 'Failed to create cluster';
+			if (e instanceof ConnectError) {
+				errorMessage = e.message;
+			} else {
+				errorMessage = e instanceof Error ? e.message : 'Failed to create cluster';
+			}
+			toast.error(errorMessage);
 		} finally {
 			isCreating = false;
 		}
@@ -142,10 +181,16 @@
 		isBinding = true;
 		errorMessage = '';
 		try {
-			const result = await mockBindClusterAdmin(clusterId);
-			bindingSuccess = result.success;
+			await scopeClient.createScope({ name: clusterName });
+			bindingSuccess = true;
+			toast.success(`Scope "${clusterName}" created`);
 		} catch (e) {
-			errorMessage = e instanceof Error ? e.message : 'Failed to bind cluster admin';
+			if (e instanceof ConnectError) {
+				errorMessage = e.message;
+			} else {
+				errorMessage = e instanceof Error ? e.message : 'Failed to bind cluster scope';
+			}
+			toast.error(errorMessage);
 		} finally {
 			isBinding = false;
 		}
@@ -157,31 +202,47 @@
 		resetState();
 	}
 
-	// ─── Polling Effect (Step 3) ─────────────────────────────
+	// ─── Watch Effect (Step 3) ───────────────────────────────
 	$effect(() => {
-		if (currentStep !== 3 || clusterStatus === 'ready') return;
+		if (currentStep !== 3 || clusterStatus === 'ready' || !clusterName) return;
 
-		let active = true;
-		const poll = async () => {
-			while (active && clusterStatus === 'pending') {
-				try {
-					const result = await mockGetCluster(clusterId);
-					if (!active) return;
-					if (result.status === 'ready') {
+		watchAbort = new AbortController();
+		const signal = watchAbort.signal;
+
+		(async () => {
+			try {
+				const stream = resourceClient.watch(
+					{
+						cluster,
+						group: CRD_GROUP,
+						version: CRD_VERSION,
+						resource: CRD_RESOURCE,
+						fieldSelector: `metadata.name=${clusterName}`
+					},
+					{ signal }
+				);
+
+				for await (const event of stream) {
+					if (signal.aborted) return;
+
+					const obj = event.resource?.object as Record<string, unknown> | undefined;
+					const phase = (obj?.status as Record<string, unknown> | undefined)?.phase;
+
+					if (phase === 'Ready' || phase === 'ready') {
 						clusterStatus = 'ready';
 						currentStep = 4;
 						return;
 					}
-				} catch {
-					// Retry on error
 				}
-				await new Promise((r) => setTimeout(r, POLL_INTERVAL));
+			} catch (e) {
+				if (signal.aborted) return;
+				console.error('Watch error:', e);
 			}
-		};
-		poll();
+		})();
 
 		return () => {
-			active = false;
+			watchAbort?.abort();
+			watchAbort = null;
 		};
 	});
 
@@ -204,7 +265,7 @@
 	<Dialog.Content class="max-w-2xl overflow-hidden p-0" showCloseButton={currentStep <= 2}>
 		<!-- Stepper Header -->
 		<div class="flex items-center justify-between border-b px-6 py-4">
-			{#each steps as step, i}
+			{#each steps as step, i (step.label)}
 				{@const stepNum = i + 1}
 				{@const isActive = currentStep === stepNum}
 				{@const isCompleted = currentStep > stepNum}
@@ -346,6 +407,26 @@
 								placeholder="e.g. production-us-west-2"
 								bind:value={clusterName}
 							/>
+							<p class="text-xs text-muted-foreground">
+								Must be a valid Kubernetes resource name (lowercase, hyphens, no spaces).
+							</p>
+						</div>
+						<div class="space-y-2">
+							<Label for="wizard-cluster-dist" class="text-sm font-medium">Distribution</Label>
+							<Select.Root type="single" bind:value={distribution}>
+								<Select.Trigger id="wizard-cluster-dist" class="w-full">
+									{#if distribution}
+										{DISTRIBUTIONS.find((d) => d.value === distribution)?.label ?? distribution}
+									{:else}
+										<span class="text-muted-foreground">Select distribution...</span>
+									{/if}
+								</Select.Trigger>
+								<Select.Content>
+									{#each DISTRIBUTIONS as dist (dist.value)}
+										<Select.Item value={dist.value}>{dist.label}</Select.Item>
+									{/each}
+								</Select.Content>
+							</Select.Root>
 						</div>
 						<div class="space-y-2">
 							<Label for="wizard-cluster-desc" class="text-sm font-medium">Description</Label>
@@ -394,7 +475,11 @@
 					>
 						{#if clusterStatus === 'pending'}
 							<Icon icon="ph:spinner-gap" class="size-4 animate-spin text-primary" />
-							<span class="text-muted-foreground">Waiting for agent to connect...</span>
+							<span class="text-muted-foreground">
+								Watching for agent connection via <code class="font-mono text-xs"
+									>ResourceService.Watch</code
+								>...
+							</span>
 						{:else}
 							<Icon icon="ph:check-circle-fill" class="size-4 text-green-500" />
 							<span class="font-medium text-green-500">Connected!</span>
@@ -404,7 +489,9 @@
 					<div
 						class="flex items-center justify-between rounded-md border border-border/50 bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground"
 					>
-						<span>ID: <code class="font-mono">{clusterId}</code></span>
+						<span>
+							CRD: <code class="font-mono">{CRD_GROUP}/{CRD_VERSION}</code>
+						</span>
 						<span class="flex items-center gap-1">
 							<span class="relative flex h-1.5 w-1.5">
 								<span
@@ -412,7 +499,7 @@
 								></span>
 								<span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary"></span>
 							</span>
-							Polling {POLL_INTERVAL / 1000}s
+							Streaming
 						</span>
 					</div>
 				</div>
@@ -430,9 +517,9 @@
 								</div>
 							</div>
 							<div class="text-center">
-								<h3 class="font-semibold">Establishing Connection</h3>
+								<h3 class="font-semibold">Creating Scope</h3>
 								<p class="mt-1 text-xs text-muted-foreground">
-									Creating tunnel and assigning permissions...
+									Calling <code class="font-mono">ScopeService.CreateScope</code>...
 								</p>
 							</div>
 						</div>
@@ -461,6 +548,15 @@
 											>{providerType === 'external' ? 'External K8s' : 'Bare Metal'}</span
 										>
 									</div>
+									{#if distribution}
+										<div class="flex justify-between">
+											<span class="text-muted-foreground">Distribution</span>
+											<span class="font-medium"
+												>{DISTRIBUTIONS.find((d) => d.value === distribution)?.label ??
+													distribution}</span
+											>
+										</div>
+									{/if}
 									<div class="flex justify-between">
 										<span class="text-muted-foreground">Status</span>
 										<span class="flex items-center gap-1 font-medium text-green-500">

@@ -647,7 +647,11 @@
 						</DropdownMenu.Group>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
-				<DialogImportCluster bind:open={openImportCluster} onsuccess={fetchScopes} />
+				<DialogImportCluster
+					bind:open={openImportCluster}
+					cluster={activeScope}
+					onsuccess={fetchScopes}
+				/>
 				<Button variant="ghost" size="icon" class="size-7" onclick={onHomeClick}>
 					<HouseIcon />
 					<span class="sr-only">Back to Home</span>
