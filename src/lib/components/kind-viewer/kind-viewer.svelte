@@ -257,7 +257,16 @@
 				</Button>
 			{/snippet}
 			{#snippet rowActions({ row })}
-				<Actions {row} {schema} object={row.original.raw} />
+				<Actions
+					{row}
+					{schema}
+					object={row.original.raw}
+					{cluster}
+					{group}
+					{version}
+					{kind}
+					{resource}
+				/>
 			{/snippet}
 		</DynamicTable>
 	{/if}

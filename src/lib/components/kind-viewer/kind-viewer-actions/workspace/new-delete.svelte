@@ -1,35 +1,51 @@
 <script lang="ts">
+	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { Trash2Icon } from '@lucide/svelte';
-	import type { FormValue, Schema } from '@sjsf/form';
+	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
+	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
 	import lodash from 'lodash';
+	import { getContext } from 'svelte';
+	import { toast } from 'svelte-sonner';
 
+	import { resolve } from '$app/paths';
+	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
-	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Item from '$lib/components/ui/item';
 
-	// const transport: Transport = getContext('transport');
-	// const resourceClient = createClient(ResourceService, transport);
+	let {
+		cluster,
+		group,
+		version,
+		kind,
+		resource,
+		schema,
+		object,
+		onOpenChangeComplete
+	}: {
+		cluster: string;
+		group: string;
+		version: string;
+		kind: string;
+		resource: string;
+		schema?: any;
+		object: TenantOtterscaleIoV1Alpha1Workspace;
+		onOpenChangeComplete: () => void;
+	} = $props();
 
-	// const cluster = $derived(page.params.cluster ?? page.params.scope ?? '');
+	const transport: Transport = getContext('transport');
+	const resourceClient = createClient(ResourceService, transport);
 
-	const schema = {
+	const jsonSchema = {
 		type: 'object',
 		required: ['name'],
 		properties: {
-			apiVersion: {
-				type: 'string'
-			},
-			kind: {
-				type: 'string'
-			},
 			name: {
 				title: 'Name',
-				description: 'description',
 				type: 'string',
-				pattern: 'enyao'
+				pattern: object?.metadata?.name
 			}
 		}
 	} as Schema;
@@ -38,53 +54,96 @@
 	const jsonSchemaValidator = new Ajv({
 		allErrors: true
 	});
-	const validate = jsonSchemaValidator.compile(schema);
+	const validate = jsonSchemaValidator.compile(jsonSchema);
 
 	// Container for Data.
 	let values: any = $state({
-		apiVersion: 'tenant.otterscale.io/v1alpha1',
-		kind: 'Workspace',
 		name: ''
 	});
 
-	// Flag for Dialog
+	// Flags
 	let open = $state(false);
+	let isDeleting = $state(false);
 </script>
 
-<AlertDialog.Root bind:open>
+<AlertDialog.Root bind:open {onOpenChangeComplete}>
 	<AlertDialog.Trigger>
 		{#snippet child({ props })}
-			<Button {...props} variant="destructive" size="icon">
-				<Trash2Icon />
-			</Button>
+			<Item.Root {...props} class="w-full p-0 text-xs **:text-destructive" size="sm">
+				<Item.Media>
+					<Trash2Icon />
+				</Item.Media>
+				<Item.Content>
+					<Item.Title>Delete</Item.Title>
+				</Item.Content>
+			</Item.Root>
 		{/snippet}
 	</AlertDialog.Trigger>
-	<AlertDialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
+	<AlertDialog.Content class="max-h-[95vh] min-w-[23vw] overflow-auto">
 		<Item.Root class="p-0">
 			<Item.Content class="text-left">
-				<Item.Title class="text-xl">Workspace</Item.Title>
-				<Item.Description>description</Item.Description>
+				<Item.Title class="text-xl font-bold">{kind}</Item.Title>
+				<Item.Description>{lodash.get(schema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
 		<Form
-			schema={lodash.get(schema, 'properties.name') as any}
+			schema={lodash.get(jsonSchema, 'properties.name') as any}
 			uiSchema={{
 				'ui:options': {
-					help: 'help'
+					help: 'Entering the workspace name.',
+					shadcn4Text: {
+						placeholder: object.metadata?.name
+					}
 				}
-			}}
+			} as UiSchemaRoot}
 			initialValue={'' as FormValue}
 			bind:values={values['name']}
 			handleSubmit={{
 				posthook: () => {
+					if (isDeleting) return;
+					isDeleting = true;
+
 					const isValid = validate(values);
-					console.log(isValid, validate.errors, values);
+					if (!isValid) return;
+
+					const name = values.name as string;
+
+					// console.log(isValid, validate.errors, values);
+					toast.promise(
+						async () => {
+							await resourceClient.delete({
+								cluster,
+								group,
+								version,
+								resource,
+								name
+							});
+						},
+						{
+							loading: `Deleting workspace ${name}...`,
+							success: () => {
+								// Use window.location.href to force a full page reload and re-trigger fetchWorkspaces
+								window.location.href = resolve(`/(auth)/scope/${cluster}`);
+								return `Successfully deleted workspace ${name}`;
+							},
+							error: (error) => {
+								console.error('Failed to delete workspace ${name}:', error);
+								return `Failed to delete workspace ${name}: ${(error as ConnectError).message}`;
+							},
+							finally() {
+								isDeleting = false;
+								open = false;
+							}
+						}
+					);
 				}
 			}}
 			class="**:data-[slot=dynamic-form-mode-controller]:hidden"
 		>
 			{#snippet actions()}
-				<SubmitButton />
+				<div class="*:w-full">
+					<SubmitButton />
+				</div>
 			{/snippet}
 		</Form>
 	</AlertDialog.Content>

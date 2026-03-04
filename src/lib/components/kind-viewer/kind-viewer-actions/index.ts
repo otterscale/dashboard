@@ -26,6 +26,10 @@ type ActionsType = Component<{
 	schema?: any;
 	object?: any;
 	cluster?: string;
+	group?: string;
+	version?: string;
+	kind?: string;
+	resource?: string;
 	onsuccess?: () => void;
 }> | null;
 

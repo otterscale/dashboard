@@ -5,11 +5,27 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
-	import Delete from './delete.svelte';
-	import Update from './update.svelte';
+	import Delete from './new-delete.svelte';
+	import Edit from './new-edit.svelte';
 	import View from './view.svelte';
 
-	let { schema, object }: { schema: any; object: TenantOtterscaleIoV1Alpha1Workspace } = $props();
+	let {
+		schema,
+		object,
+		cluster,
+		group,
+		version,
+		kind,
+		resource
+	}: {
+		schema: any;
+		object: TenantOtterscaleIoV1Alpha1Workspace;
+		cluster: string;
+		group: string;
+		version: string;
+		kind: string;
+		resource: string;
+	} = $props();
 
 	let actionsOpen = $state(false);
 </script>
@@ -31,16 +47,21 @@
 					e.preventDefault();
 				}}
 			>
-				<View {schema} {object} />
+				<View {schema} {object} {cluster} {group} {version} {kind} {resource} />
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
 			>
-				<Update
+				<Edit
 					{schema}
 					{object}
+					{cluster}
+					{group}
+					{version}
+					{kind}
+					{resource}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
 					}}
@@ -52,7 +73,13 @@
 				}}
 			>
 				<Delete
+					{schema}
 					{object}
+					{cluster}
+					{group}
+					{version}
+					{kind}
+					{resource}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
 					}}

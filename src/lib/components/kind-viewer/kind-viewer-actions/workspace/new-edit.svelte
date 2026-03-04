@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { Plus } from '@lucide/svelte';
+	import { PencilIcon } from '@lucide/svelte';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import type { SchemaObjectValue } from '@sjsf/form/core';
@@ -10,7 +10,6 @@
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
-	import { page } from '$app/state';
 	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
@@ -28,7 +27,9 @@
 		version,
 		kind,
 		resource,
-		schema
+		schema,
+		object,
+		onOpenChangeComplete
 	}: {
 		cluster: string;
 		group: string;
@@ -36,6 +37,8 @@
 		kind: string;
 		resource: string;
 		schema?: any;
+		object?: any;
+		onOpenChangeComplete: () => void;
 	} = $props();
 
 	const jsonSchema = $derived(toVersionedJSONSchema(schema));
@@ -58,12 +61,11 @@
 	let values: any = $state({
 		apiVersion: group ? `${group}/${version}` : version,
 		kind,
-		metadata: { name: {} },
-		spec: { namespace: {}, members: {}, resourceQuota: {}, networkIsolation: {} }
+		spec: { members: {}, resourceQuota: {}, networkIsolation: {} }
 	});
 
 	// TODO: Refactor into StepsManager.
-	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -129,61 +131,32 @@
 <AlertDialog.Root
 	bind:open
 	onOpenChangeComplete={() => {
+		onOpenChangeComplete?.();
 		reset();
 	}}
 >
 	<AlertDialog.Trigger>
 		{#snippet child({ props })}
-			<Button {...props} variant="outline" size="icon">
-				<Plus />
-			</Button>
+			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
+				<Item.Media>
+					<PencilIcon />
+				</Item.Media>
+				<Item.Content>
+					<Item.Title>Edit</Item.Title>
+				</Item.Content>
+			</Item.Root>
 		{/snippet}
 	</AlertDialog.Trigger>
 	<AlertDialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
 		<Item.Root class="p-0">
 			<Progress value={currentIndex + 1} max={steps.length} />
 			<Item.Content class="text-left">
-				<Item.Title class="text-xl font-bold">Workspace</Item.Title>
+				<Item.Title class="text-xl font-bold">{kind}</Item.Title>
 				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
 		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
 			<Tabs.Content value={steps[0]}>
-				<Form
-					schema={{
-						...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as any),
-						title: 'Name'
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={'workspace' as FormValue}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-					bind:values={values['metadata']['name']}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
 						...lodash.omit(
@@ -304,10 +277,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={[
-						// From login user information.
-						{ name: page.data.user.name, role: 'admin', subject: page.data.user.sub }
-					] as FormValue}
+					initialValue={[...lodash.get(object, 'spec.members')] as FormValue}
 					transformer={(value: FormValue) => {
 						let members = value as SchemaObjectValue[];
 						members = members.map((member) => ({
@@ -317,9 +287,6 @@
 						return members;
 					}}
 					handleSubmit={{
-						prehook: () => {
-							lodash.set(values, 'spec.namespace', lodash.get(values, 'metadata.name'));
-						},
 						posthook: () => {
 							handleNext();
 						}
@@ -340,7 +307,7 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<Tabs.Content value={steps[2]}>
+			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
 						...(lodash.omit(
@@ -413,11 +380,7 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						hard: {
-							'requests.cpu': '16',
-							'requests.memory': '32Gi',
-							'requests.otterscale.com/vgpu': '0'
-						}
+						...lodash.get(object, 'spec.resourceQuota')
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -440,7 +403,7 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<Tabs.Content value={steps[3]}>
+			<Tabs.Content value={steps[2]}>
 				<Form
 					schema={{
 						...lodash.get(jsonSchema, 'properties.spec.properties.networkIsolation'),
@@ -467,7 +430,7 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						enabled: false
+						...lodash.get(object, 'spec.networkIsolation')
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -490,12 +453,14 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<Tabs.Content value={steps[4]}>
+			<Tabs.Content value={steps[3]}>
 				<div class="flex h-full flex-col gap-3">
 					<Code.Root lang="yaml" class="w-full" hideLines code={stringify(values, null, 2)} />
 					<Button
 						class="mt-auto w-full"
 						onclick={() => {
+							lodash.set(values, 'spec.namespace', lodash.get(object, 'spec.namespace'));
+
 							if (isSubmitting) return;
 
 							isSubmitting = true;
@@ -506,30 +471,31 @@
 								throw Error(`Validation errors: ${JSON.stringify(validate.errors)}`);
 							}
 
-							const name = lodash.get(values, 'metadata.name');
+							const name = lodash.get(object, 'metadata.name');
 
 							toast.promise(
 								async () => {
 									const manifest = new TextEncoder().encode(JSON.stringify(values));
 
-									console.log(stringify(values, null, 2));
-
-									await resourceClient.create({
+									await resourceClient.apply({
 										cluster,
+										name,
 										group,
 										version,
 										resource,
-										manifest
+										manifest,
+										fieldManager: 'otterscale-web-ui',
+										force: true
 									});
 								},
 								{
-									loading: `Creating workspace ${name}...`,
+									loading: `Editing workspace ${name}...`,
 									success: () => {
-										return `Successfully created workspace ${name}`;
+										return `Successfully edited workspace ${name}`;
 									},
 									error: (error) => {
-										console.error(`Failed to create workspace ${name}:`, error);
-										return `Failed to create workspace ${name}: ${(error as ConnectError).message}`;
+										console.error(`Failed to edit workspace ${name}:`, error);
+										return `Failed to edit workspace ${name}: ${(error as ConnectError).message}`;
 									},
 									finally() {
 										isSubmitting = false;
@@ -539,7 +505,7 @@
 							);
 						}}
 					>
-						Create
+						Edit
 					</Button>
 				</div>
 			</Tabs.Content>
