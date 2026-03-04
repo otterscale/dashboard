@@ -245,7 +245,7 @@
 	{#if columnDefinitions}
 		<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {dataSchemas}>
 			{#snippet create()}
-				<Create {schema} />
+				<Create {schema} {cluster} {group} {version} {kind} {resource} />
 			{/snippet}
 			{#snippet reload()}
 				<Button onclick={handleReload} disabled={isWatching} variant="outline">
@@ -257,7 +257,16 @@
 				</Button>
 			{/snippet}
 			{#snippet rowActions({ row })}
-				<Actions {row} {schema} object={row.original.raw} />
+				<Actions
+					{row}
+					{schema}
+					object={row.original.raw}
+					{cluster}
+					{group}
+					{version}
+					{kind}
+					{resource}
+				/>
 			{/snippet}
 		</DynamicTable>
 	{/if}
