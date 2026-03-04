@@ -9,40 +9,35 @@
 	import type { DataSchemaType, UISchemaType } from '$lib/components/dynamic-table/utils';
 	import Button from '$lib/components/ui/button/button.svelte';
 
-	import HarborViewerPicker from './harbor-viewer-picker.svelte';
+	import HarborViewerPicker from './repository-viewer-picker.svelte';
 	import {
-		getImageColumnDefinitions,
-		getImageData,
-		getImageDataSchemas,
-		getImageUISchemas
-	} from './harbor-viewers';
-	import type { HarborImage, HarborProject } from './types';
+		getRepositoryColumnDefinitions,
+		getRepositoryData,
+		getRepositoryDataSchemas,
+		getRepositoryUISchemas
+	} from './repository-viewer.ts';
+	import { listRepositories, type ProjectType, type RepositoryType } from '$lib/server/harbor.ts';
 
-	// ─── Auto Reload ─────────────────────────────────────────────────────────
-
-	const RELOAD_INTERVAL_MS = 15_000;
-	let reloadTimer: ReturnType<typeof setInterval> | null = null;
+	let timer: ReturnType<typeof setInterval> | null = null;
 	let isDestroyed = false;
 
 	function startAutoReload() {
 		stopAutoReload();
-		reloadTimer = setInterval(() => {
+		timer = setInterval(() => {
 			if (!isDestroyed && selectedProject) {
-				fetchImages(selectedProject);
+				fetchRepositories(selectedProject);
 			}
-		}, RELOAD_INTERVAL_MS);
+		}, 15_000);
 	}
 
 	function stopAutoReload() {
-		if (reloadTimer) {
-			clearInterval(reloadTimer);
-			reloadTimer = null;
+		if (timer) {
+			clearInterval(timer);
+			timer = null;
 		}
 	}
 
-	// ─── Projects ────────────────────────────────────────────────────────────
-
-	let projects = $state<HarborProject[]>([]);
+	let projects = $state<ProjectType[]>([]);
 	let selectedProject = $state<string | undefined>(undefined);
 
 	async function fetchProjects() {
@@ -53,7 +48,7 @@
 				toast.error('Failed to fetch Harbor projects');
 				return;
 			}
-			const data: HarborProject[] = await response.json();
+			const data: ProjectType[] = await response.json();
 			projects = data ?? [];
 
 			// Default to first project
@@ -69,53 +64,41 @@
 	function handleProjectSelect() {
 		dataset = [];
 		if (selectedProject) {
-			fetchImages(selectedProject);
+			fetchRepositories(selectedProject);
 		}
 	}
 
-	// ─── Images ──────────────────────────────────────────────────────────────
-
-	const uiSchemas: Record<string, UISchemaType> = getImageUISchemas();
-	const dataSchemas: Record<string, DataSchemaType> = getImageDataSchemas();
+	const uiSchemas: Record<string, UISchemaType> = getRepositoryUISchemas();
+	const dataSchemas: Record<string, DataSchemaType> = getRepositoryDataSchemas();
 
 	let dataset: Record<string, JsonValue>[] = $state([]);
 	let columnDefinitions: ColumnDef<Record<string, JsonValue>>[] | undefined = $state(undefined);
 
 	let isFetching = $state(false);
 
-	async function fetchImages(projectName: string) {
+	async function fetchRepositories(projectName: string) {
 		if (isFetching || isDestroyed || !projectName) return;
 
 		isFetching = true;
 		try {
-			const response = await fetch(
-				`/rest/harbor/images?project=${encodeURIComponent(projectName)}`
-			);
-			if (!response.ok) {
-				console.error('Failed to fetch Harbor images:', response.statusText);
-				toast.error('Failed to fetch Harbor images');
-				return;
-			}
-			const images: HarborImage[] = await response.json();
-			dataset = (images ?? []).map((img) => getImageData(img));
+			const repositories: RepositoryType[] = await listRepositories(projectName);
+			dataset = (repositories ?? []).map((repository) => getRepositoryData(repository));
 		} catch (error) {
-			console.error('Error fetching Harbor images:', error);
-			toast.error('Error fetching Harbor images');
+			console.error('Error fetching Harbor repositories:', error);
+			toast.error('Error fetching Harbor repositories');
 		} finally {
 			isFetching = false;
 		}
 	}
-
-	// ─── Lifecycle ───────────────────────────────────────────────────────────
 
 	let isMounted = $state(false);
 
 	onMount(async () => {
 		await fetchProjects();
 		if (selectedProject) {
-			await fetchImages(selectedProject);
+			await fetchRepositories(selectedProject);
 		}
-		columnDefinitions = getImageColumnDefinitions(uiSchemas, dataSchemas);
+		columnDefinitions = getRepositoryColumnDefinitions(uiSchemas, dataSchemas);
 		startAutoReload();
 		isMounted = true;
 	});
@@ -127,7 +110,7 @@
 
 	function handleReload() {
 		if (selectedProject && !isFetching) {
-			fetchImages(selectedProject);
+			fetchRepositories(selectedProject);
 		}
 	}
 </script>

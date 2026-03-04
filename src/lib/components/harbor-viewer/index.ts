@@ -1,1 +1,1 @@
-export { default as HarborViewer } from './harbor-viewer.svelte';
+export { default as HarborViewer } from './repository-viewer.svelte';

@@ -5,10 +5,10 @@ import { type Row } from '@tanstack/table-core';
 import { DynamicTableCell, DynamicTableHeader } from '$lib/components/dynamic-table';
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
+import type { RepositoryType } from '$lib/server/harbor';
 
-import type { HarborImage } from '../types';
 
-type ImageAttribute =
+type RepositoryAttribute =
 	| 'Repository'
 	| 'Tag'
 	| 'Digest'
@@ -20,7 +20,7 @@ type ImageAttribute =
 	| 'Vulnerabilities'
 	| 'raw';
 
-function getImageDataSchemas(): Record<ImageAttribute, DataSchemaType> {
+function getRepositoryDataSchemas(): Record<RepositoryAttribute, DataSchemaType> {
 	return {
 		Repository: 'text',
 		Tag: 'text',
@@ -35,7 +35,7 @@ function getImageDataSchemas(): Record<ImageAttribute, DataSchemaType> {
 	};
 }
 
-function getImageUISchemas(): Record<ImageAttribute, UISchemaType> {
+function getRepositoryUISchemas(): Record<RepositoryAttribute, UISchemaType> {
 	return {
 		Repository: 'text',
 		Tag: 'text',
@@ -50,7 +50,7 @@ function getImageUISchemas(): Record<ImageAttribute, UISchemaType> {
 	};
 }
 
-function getImageData(image: HarborImage): Record<ImageAttribute, JsonValue> {
+function getRepositoryData(image: RepositoryType): Record<RepositoryAttribute, JsonValue> {
 	const vulnSummary = image.vulnerabilities
 		? `C:${image.vulnerabilities.critical} H:${image.vulnerabilities.high} M:${image.vulnerabilities.medium} L:${image.vulnerabilities.low}`
 		: null;
@@ -74,11 +74,11 @@ function getImageData(image: HarborImage): Record<ImageAttribute, JsonValue> {
 	};
 }
 
-function getImageColumnDefinitions(
-	uiSchemas: Record<ImageAttribute, UISchemaType>,
-	dataSchemas: Record<ImageAttribute, DataSchemaType>
-): ColumnDef<Record<ImageAttribute, JsonValue>>[] {
-	const columns: ImageAttribute[] = [
+function getRepositoryColumnDefinitions(
+	uiSchemas: Record<RepositoryAttribute, UISchemaType>,
+	dataSchemas: Record<RepositoryAttribute, DataSchemaType>
+): ColumnDef<Record<RepositoryAttribute, JsonValue>>[] {
+	const columns: RepositoryAttribute[] = [
 		'Repository',
 		'Tag',
 		'Digest',
@@ -92,7 +92,7 @@ function getImageColumnDefinitions(
 
 	return columns.map((id) => ({
 		id,
-		header: ({ column }: { column: Column<Record<ImageAttribute, JsonValue>> }) =>
+		header: ({ column }: { column: Column<Record<RepositoryAttribute, JsonValue>> }) =>
 			renderComponent(DynamicTableHeader, {
 				column,
 				dataSchemas
@@ -101,8 +101,8 @@ function getImageColumnDefinitions(
 			column,
 			row
 		}: {
-			column: Column<Record<ImageAttribute, JsonValue>>;
-			row: Row<Record<ImageAttribute, JsonValue>>;
+			column: Column<Record<RepositoryAttribute, JsonValue>>;
+			row: Row<Record<RepositoryAttribute, JsonValue>>;
 		}) =>
 			renderComponent(DynamicTableCell, {
 				row,
@@ -114,9 +114,9 @@ function getImageColumnDefinitions(
 }
 
 export {
-	getImageColumnDefinitions,
-	getImageData,
-	getImageDataSchemas,
-	getImageUISchemas,
-	type ImageAttribute
+	getRepositoryColumnDefinitions,
+	getRepositoryData,
+	getRepositoryDataSchemas,
+	getRepositoryUISchemas,
+	type RepositoryAttribute
 };

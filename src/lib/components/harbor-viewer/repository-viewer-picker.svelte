@@ -8,8 +8,7 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item/index.js';
 	import * as Popover from '$lib/components/ui/popover';
-
-	import type { HarborProject } from './types';
+	import type { ProjectType } from '$lib/server/harbor';
 
 	let {
 		value = $bindable(),
@@ -18,8 +17,8 @@
 		class: className
 	}: {
 		value?: string;
-		projects: HarborProject[];
-		onSelect?: (project: HarborProject) => void;
+		projects: ProjectType[];
+		onSelect?: (project: ProjectType) => void;
 		class?: string;
 	} = $props();
 
