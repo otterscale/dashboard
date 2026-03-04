@@ -9,16 +9,27 @@ import ResourceQuotaCreate from './resource-quota/create.svelte';
 import SimpleAppActions from './simple-app/actions.svelte';
 import SimpleAppCreate from './simple-app/create.svelte';
 import WorkspaceActions from './workspace/actions.svelte';
-import WorkspaceCreate from './workspace/create.svelte';
+import WorkspaceCreate from './workspace/new-create.svelte'; // TODO: Back to create before push
 
 type RoleType = 'admin' | 'edit' | 'view';
 
-type CreateType = Component<{ schema?: any }> | null;
+type CreateType = Component<{
+	cluster?: string;
+	group?: string;
+	version?: string;
+	kind?: string;
+	resource?: string;
+	schema?: any;
+}> | null;
 type ActionsType = Component<{
 	row?: any;
 	schema?: any;
 	object?: any;
 	cluster?: string;
+	group?: string;
+	version?: string;
+	kind?: string;
+	resource?: string;
 	onsuccess?: () => void;
 }> | null;
 
