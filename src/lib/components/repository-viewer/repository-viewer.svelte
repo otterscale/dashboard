@@ -9,14 +9,15 @@
 	import type { DataSchemaType, UISchemaType } from '$lib/components/dynamic-table/utils';
 	import Button from '$lib/components/ui/button/button.svelte';
 
-	import HarborViewerPicker from './repository-viewer-picker.svelte';
+	import Picker from './repository-viewer-picker.svelte';
 	import {
 		getRepositoryColumnDefinitions,
 		getRepositoryData,
 		getRepositoryDataSchemas,
 		getRepositoryUISchemas
 	} from './repository-viewer.ts';
-	import { listRepositories, type ProjectType, type RepositoryType } from '$lib/server/harbor.ts';
+
+	import type { ProjectType, RepositoryType } from './types.d.ts';
 
 	let timer: ReturnType<typeof setInterval> | null = null;
 	let isDestroyed = false;
@@ -117,14 +118,18 @@
 
 {#if isMounted}
 	{#if columnDefinitions}
+		<Picker bind:value={selectedProject} {projects} onSelect={handleProjectSelect} />
 		<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {dataSchemas}>
-			{#snippet create()}
-				<HarborViewerPicker
-					bind:value={selectedProject}
-					{projects}
-					onSelect={handleProjectSelect}
-				/>
+			{#snippet grid({ table, row })}
+				{@const data = row.original.raw as unknown as RepositoryType}
+				<div class="rounded-lg border bg-card p-4 shadow-sm">
+					<h3 class="font-semibold">{data.repositoryName}</h3>
+					<p class="text-sm text-muted-foreground">
+						Pulls: {data.pullCount}
+					</p>
+				</div>
 			{/snippet}
+			{#snippet create()}{/snippet}
 			{#snippet reload()}
 				<Button onclick={handleReload} disabled={isFetching} variant="outline">
 					{#if isFetching}
@@ -134,9 +139,7 @@
 					{/if}
 				</Button>
 			{/snippet}
-			{#snippet rowActions({ row })}
-				{row}
-			{/snippet}
+			{#snippet rowActions({ row })}{/snippet}
 		</DynamicTable>
 	{/if}
 {/if}

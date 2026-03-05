@@ -8,7 +8,7 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item/index.js';
 	import * as Popover from '$lib/components/ui/popover';
-	import type { ProjectType } from '$lib/server/harbor';
+	import type { ProjectType } from './types.d.ts';
 
 	let {
 		value = $bindable(),

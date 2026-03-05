@@ -1,52 +1,5 @@
 import { env } from '$env/dynamic/private';
-
-export interface ProjectType {
-	project_id: number;
-	name: string;
-	repo_count: number;
-}
-
-export interface RepositoryType {
-	id: number;
-	name: string;
-	artifact_count: number;
-	pull_count: number;
-}
-
-export interface TagType {
-	id: number;
-	name: string;
-	push_time?: string;
-	pull_time?: string;
-}
-
-export interface LabelType {
-	id: number;
-	name: string;
-	color: string;
-}
-
-export interface VulnerabilityType {
-	total: number;
-	fixable: number;
-	critical: number;
-	high: number;
-	medium: number;
-	low: number;
-}
-
-export interface RepositoryType {
-	projectName: string;
-	repositoryName: string;
-	tag: string | null;
-	digest: string;
-	sizeBytes: number;
-	pushTime: string | null;
-	platform: { os: string | null; architecture: string | null } | null;
-	labels: string[];
-	pullCount: number;
-	vulnerabilities: VulnerabilityType | null;
-}
+import type { ProjectType, RepositoryType } from '$lib/components/repository-viewer/types';
 
 async function fetchData<T>(path: string): Promise<T> {
 	const url = env.HARBOR_URL;

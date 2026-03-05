@@ -5,7 +5,7 @@ import { type Row } from '@tanstack/table-core';
 import { DynamicTableCell, DynamicTableHeader } from '$lib/components/dynamic-table';
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
-import type { RepositoryType } from '$lib/server/harbor';
+import type { RepositoryType } from './types';
 
 
 type RepositoryAttribute =
