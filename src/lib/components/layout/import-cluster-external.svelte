@@ -207,19 +207,6 @@
 			<h3 class="text-xl font-bold">Deploy Agent</h3>
 			<p class="mt-1 text-sm text-muted-foreground">Run this command on your target cluster.</p>
 		</div>
-		<div class="flex items-start gap-3 rounded-md border border-primary/20 bg-primary/5 p-4">
-			<Icon icon="ph:info" class="mt-0.5 size-5 shrink-0 text-primary" />
-			<div class="space-y-1">
-				<p class="text-sm font-medium text-primary">Requires Cluster Admin Privileges</p>
-				<p class="text-sm text-muted-foreground">
-					The agent will self-register via
-					<code class="rounded bg-background px-1.5 py-0.5 font-mono text-xs text-foreground"
-						>LinkService.Register</code
-					>.
-				</p>
-			</div>
-		</div>
-
 		<Code.Root
 			lang="bash"
 			class="w-full text-sm"
@@ -230,18 +217,6 @@
 			<Code.CopyButton />
 		</Code.Root>
 
-		<div class="flex items-center gap-3 rounded-md border bg-muted/50 p-4 text-sm">
-			{#if clusterStatus === 'pending'}
-				<Icon icon="ph:spinner-gap" class="size-5 shrink-0 animate-spin text-primary" />
-				<span class="flex-1 text-muted-foreground">
-					Polling <code class="font-mono text-xs">LinkService.ListLinks</code> for agent registration...
-				</span>
-			{:else}
-				<Icon icon="ph:check-circle-fill" class="size-5 shrink-0 text-primary" />
-				<span class="flex-1 font-medium text-primary">Agent registered successfully!</span>
-			{/if}
-		</div>
-
 		<div
 			class="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-xs text-muted-foreground"
 		>
@@ -250,15 +225,22 @@
 					>{clusterName}</code
 				>
 			</span>
-			<span class="flex items-center gap-2">
-				<span class="relative flex h-2 w-2">
-					<span
-						class="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/75 opacity-75"
-					></span>
-					<span class="relative inline-flex h-2 w-2 rounded-full bg-primary"></span>
+			{#if clusterStatus === 'pending'}
+				<span class="flex items-center gap-2">
+					<span class="relative flex h-2 w-2">
+						<span
+							class="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary/75 opacity-75"
+						></span>
+						<span class="relative inline-flex h-2 w-2 rounded-full bg-primary"></span>
+					</span>
+					Waiting for connection
 				</span>
-				Waiting for connection
-			</span>
+			{:else}
+				<span class="flex items-center gap-2 text-primary">
+					<Icon icon="ph:check-circle-fill" class="size-4" />
+					<span class="font-medium">Agent connected</span>
+				</span>
+			{/if}
 		</div>
 	</div>
 {/snippet}
