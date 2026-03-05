@@ -25,8 +25,7 @@
 	} = $props();
 
 	const isItemActive = (url: string): boolean => url !== '#' && page.url.href.includes(url);
-	const isSubItemActive = (url: string): boolean =>
-		url !== '#' && page.url.href.includes(url);
+	const isSubItemActive = (url: string): boolean => url !== '#' && page.url.href.includes(url);
 </script>
 
 <Sidebar.Group>
@@ -34,10 +33,7 @@
 	<Sidebar.Menu>
 		{#each items as item (item.title)}
 			{#if item.items && item.items.length > 0}
-				<Collapsible.Root
-					open={item.isActive || isItemActive(item.url)}
-					class="group/collapsible"
-				>
+				<Collapsible.Root open={item.isActive || isItemActive(item.url)} class="group/collapsible">
 					{#snippet child({ props })}
 						<Sidebar.MenuItem {...props}>
 							<Sidebar.MenuButton tooltipContent={item.title}>
@@ -60,21 +56,21 @@
 									</Sidebar.MenuAction>
 								{/snippet}
 							</Collapsible.Trigger>
-						<Collapsible.Content>
-							<Sidebar.MenuSub>
-								{#each item.items as subItem (subItem.title)}
-									<Sidebar.MenuSubItem>
-										<Sidebar.MenuSubButton
-											href={subItem.url}
-											aria-disabled={subItem.disabled}
-											isActive={isSubItemActive(subItem.url)}
-										>
-											<span>{subItem.title}</span>
-										</Sidebar.MenuSubButton>
-									</Sidebar.MenuSubItem>
-								{/each}
-							</Sidebar.MenuSub>
-						</Collapsible.Content>
+							<Collapsible.Content>
+								<Sidebar.MenuSub>
+									{#each item.items as subItem (subItem.title)}
+										<Sidebar.MenuSubItem>
+											<Sidebar.MenuSubButton
+												href={subItem.url}
+												aria-disabled={subItem.disabled}
+												isActive={isSubItemActive(subItem.url)}
+											>
+												<span>{subItem.title}</span>
+											</Sidebar.MenuSubButton>
+										</Sidebar.MenuSubItem>
+									{/each}
+								</Sidebar.MenuSub>
+							</Collapsible.Content>
 						</Sidebar.MenuItem>
 					{/snippet}
 				</Collapsible.Root>

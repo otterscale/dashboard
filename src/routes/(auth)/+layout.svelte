@@ -91,7 +91,7 @@
 				group: 'tenant.otterscale.io',
 				version: 'v1alpha1',
 				resource: 'workspaces',
-				// labelSelector: 'user.otterscale.io/' + data.user.sub
+				labelSelector: 'user.otterscale.io/' + data.user.sub
 			});
 			workspaces = response.items.map((item) => item.object as TenantOtterscaleIoV1Alpha1Workspace);
 		} catch (error) {
@@ -293,6 +293,7 @@
 		resources: [
 			{
 				title: m.workloads(),
+				url: '#',
 				icon: FlagIcon,
 				items: [
 					{
@@ -342,11 +343,12 @@
 						url: resolve(
 							`/(auth)/${activeScope}/Secret?group=&version=v1&namespace=${$activeNamespace}&resource=secrets`
 						)
-					},
+					}
 				]
 			},
 			{
 				title: m.compute(),
+				url: '#',
 				icon: CpuIcon,
 				items: [
 					{
@@ -376,6 +378,7 @@
 			},
 			{
 				title: m.storage(),
+				url: '#',
 				icon: HardDriveIcon,
 				items: [
 					{
@@ -542,6 +545,7 @@
 			},
 			{
 				title: 'Metal',
+				url: '#',
 				icon: PcCaseIcon,
 				items: [
 					{
