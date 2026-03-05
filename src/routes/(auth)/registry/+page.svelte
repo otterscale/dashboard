@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import { RepositoryViewer } from '$lib/components/repository-viewer';
+	import { ArtifactViewer } from '$lib/components/artifact-viewer';
 	import { m } from '$lib/paraglide/messages';
 	import { breadcrumbs } from '$lib/stores';
 
@@ -13,4 +13,4 @@
 	]);
 </script>
 
-<RepositoryViewer />
+<ArtifactViewer />

@@ -41,8 +41,8 @@
 	import { createRawSnippet, type Snippet } from 'svelte';
 
 	import { shortcut } from '$lib/actions/shortcut.svelte';
-	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
 	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
+	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import {
 		createSvelteTable,

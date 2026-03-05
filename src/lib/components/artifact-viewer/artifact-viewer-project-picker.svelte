@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import { BoxesIcon, BoxIcon } from '@lucide/svelte';
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import SearchAlert from '@lucide/svelte/icons/search-alert';
 
@@ -8,7 +8,8 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item/index.js';
 	import * as Popover from '$lib/components/ui/popover';
-	import type { ProjectType } from './types.d.ts';
+
+	import type { ProjectType } from './types';
 
 	let {
 		value = $bindable(),
@@ -16,7 +17,7 @@
 		onSelect,
 		class: className
 	}: {
-		value?: string;
+		value?: ProjectType;
 		projects: ProjectType[];
 		onSelect?: (project: ProjectType) => void;
 		class?: string;
@@ -25,13 +26,14 @@
 	let open = $state(false);
 	let searchTerm = $state('');
 
-	const selectedProject = $derived(projects.find((p) => p.name === value));
+	const selectedProject = $derived(projects.find((project) => project.name === value?.name));
 
-	function handleSelect(projectName: string) {
-		value = projectName;
+	function handleSelect(project: ProjectType) {
+		if (!project) return;
+
+		value = project;
+		onSelect?.(project);
 		open = false;
-		const project = projects.find((p) => p.name === projectName);
-		if (project) onSelect?.(project);
 	}
 
 	function handleReset() {
@@ -51,9 +53,8 @@
 			>
 				{#if value && selectedProject}
 					<span class="flex min-w-0 items-center gap-2">
-						<Icon icon="ph:folder-simple" />
-						<span class="truncate">{selectedProject.name}</span>
-						<span class="text-xs text-muted-foreground">({selectedProject.repo_count} repos)</span>
+						<BoxesIcon />
+						{selectedProject.name}
 					</span>
 				{:else}
 					<span class="text-muted-foreground">Select Project</span>
@@ -84,10 +85,10 @@
 				</Command.Empty>
 				<Command.Group>
 					{#each projects as project (project.project_id)}
-						<Command.Item value={project.name} onSelect={() => handleSelect(project.name)}>
+						<Command.Item value={project.name} onSelect={() => handleSelect(project)}>
 							<Item.Root size="sm" class="w-full p-0">
-								<Item.Media class="p-1">
-									<Icon icon="ph:folder-simple" class="size-5" />
+								<Item.Media>
+									<BoxIcon />
 								</Item.Media>
 								<Item.Content class="gap-0.5">
 									<Item.Title class="text-xs">{project.name}</Item.Title>
