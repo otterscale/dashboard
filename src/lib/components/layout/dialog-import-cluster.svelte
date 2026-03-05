@@ -6,6 +6,7 @@
 	import { cn } from '$lib/utils';
 
 	import ImportClusterExternal from './import-cluster-external.svelte';
+	import WizardStepper from './wizard-stepper.svelte';
 
 	let {
 		open = $bindable(false),
@@ -15,10 +16,12 @@
 		onsuccess?: () => void;
 	} = $props();
 
-	let providerType = $state<'baremetal' | 'external' | null>(null);
-	let step = $state(1); // 1 = Provider selection, 2 = Sub-flow
+	type ProviderType = 'baremetal' | 'external' | null;
+	type WizardFlow = 'provider' | 'external-flow';
 
-	// Rendered statically inside Step 1 just for the visual effect
+	let providerType = $state<ProviderType>(null);
+	let flowStep = $state<WizardFlow>('provider');
+
 	const steps = [
 		{ icon: 'ph:list-checks', label: 'Provider' },
 		{ icon: 'ph:note-pencil', label: 'Info' },
@@ -30,58 +33,22 @@
 		open = isOpen;
 		if (!isOpen) {
 			providerType = null;
-			step = 1;
+			flowStep = 'provider';
 		}
 	}
 
 	function handleNext() {
-		if (providerType) step = 2;
+		if (providerType) flowStep = 'external-flow';
 	}
 </script>
 
 <Dialog.Root {open} onOpenChange={handleOpenChange}>
-	<Dialog.Content class="max-w-2xl overflow-hidden p-0" showCloseButton={step === 1}>
+	<Dialog.Content class="max-w-2xl overflow-hidden p-0" showCloseButton={flowStep === 'provider'}>
 		<Dialog.Title class="sr-only">Import Cluster Wizard</Dialog.Title>
 
-		{#if step === 1}
-			<!-- Stepper Header (Static for Step 1) -->
-			<div class="flex items-center justify-between border-b px-6 py-4">
-				{#each steps as s, i (s.label)}
-					{@const stepNum = i + 1}
-					{@const isActive = stepNum === 1}
-					{@const isCompleted = stepNum < 1}
-
-					{#if i > 0}
-						<div class="mx-1 h-0.5 flex-1 bg-muted transition-all duration-500"></div>
-					{/if}
-
-					<div class="flex flex-col items-center gap-1">
-						<div
-							class={cn(
-								'flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all duration-300',
-								isActive &&
-									'border-primary bg-primary text-primary-foreground ring-2 ring-primary/20',
-								isCompleted && 'border-primary bg-primary text-primary-foreground',
-								!isActive && !isCompleted && 'border-muted bg-muted text-muted-foreground'
-							)}
-						>
-							{#if isCompleted}
-								<Icon icon="ph:check-bold" class="size-4" />
-							{:else}
-								<Icon icon={s.icon} class="size-4" />
-							{/if}
-						</div>
-						<span
-							class={cn(
-								'text-[10px] font-medium whitespace-nowrap transition-colors',
-								isActive ? 'text-foreground' : 'text-muted-foreground'
-							)}
-						>
-							{s.label}
-						</span>
-					</div>
-				{/each}
-			</div>
+		{#if flowStep === 'provider'}
+			<!-- Stepper Header -->
+			<WizardStepper {steps} currentStepIndex={0} />
 
 			<!-- Step Content -->
 			<div class="max-h-[60vh] overflow-y-auto px-6 py-5">
@@ -164,9 +131,9 @@
 					<Icon icon="ph:arrow-right" class="ml-1 size-3" />
 				</Button>
 			</div>
-		{:else if providerType === 'external'}
+		{:else if flowStep === 'external-flow'}
 			<ImportClusterExternal
-				onBack={() => (step = 1)}
+				onBack={() => (flowStep = 'provider')}
 				onFinish={() => {
 					handleOpenChange(false);
 					onsuccess?.();
