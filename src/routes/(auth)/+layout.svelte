@@ -4,7 +4,6 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import BotIcon from '@lucide/svelte/icons/bot';
 	import BoxIcon from '@lucide/svelte/icons/box';
-	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import CloudBackupIcon from '@lucide/svelte/icons/cloud-backup';
 	import CodeIcon from '@lucide/svelte/icons/code';
 	import CombineIcon from '@lucide/svelte/icons/combine';
@@ -21,14 +20,15 @@
 	import NetworkIcon from '@lucide/svelte/icons/network';
 	import PcCaseIcon from '@lucide/svelte/icons/pc-case';
 	import ScaleIcon from '@lucide/svelte/icons/scale';
+	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import ShipIcon from '@lucide/svelte/icons/ship';
+	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import TelescopeIcon from '@lucide/svelte/icons/telescope';
 	import TerminalIcon from '@lucide/svelte/icons/terminal';
 	import UnplugIcon from '@lucide/svelte/icons/unplug';
 	import UsersIcon from '@lucide/svelte/icons/users';
 	import WorkflowIcon from '@lucide/svelte/icons/workflow';
-	import ZapIcon from '@lucide/svelte/icons/zap';
 	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import { getContext, onMount, type Snippet } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -39,7 +39,6 @@
 	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import { type Scope, ScopeService } from '$lib/api/scope/v1/scope_pb';
 	import {
-		NavGeneral,
 		NavMain,
 		NavOverview,
 		NavSecondary,
@@ -47,7 +46,6 @@
 		startTour,
 		WorkspaceSwitcher
 	} from '$lib/components/layout';
-	import { globalRoutes, platformRoutes } from '$lib/components/layout/routes';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -76,7 +74,6 @@
 	let activeScope = $state(page.params.scope ?? page.params.cluster ?? ''); //TODO: remove page.params.scope after route updated
 	let scopes = $state<Scope[]>([]);
 	let workspaces = $state<TenantOtterscaleIoV1Alpha1Workspace[]>([]);
-	let next = $state(false);
 
 	async function fetchScopes() {
 		try {
@@ -94,7 +91,7 @@
 				group: 'tenant.otterscale.io',
 				version: 'v1alpha1',
 				resource: 'workspaces',
-				labelSelector: 'user.otterscale.io/' + data.user.sub
+				// labelSelector: 'user.otterscale.io/' + data.user.sub
 			});
 			workspaces = response.items.map((item) => item.object as TenantOtterscaleIoV1Alpha1Workspace);
 		} catch (error) {
@@ -140,6 +137,39 @@
 				),
 				icon: BoxIcon,
 				edit: false
+			},
+			{
+				name: m.settings(),
+				url: resolve('/(auth)/scope/[scope]/settings', { scope: activeScope }),
+				icon: SlidersHorizontalIcon,
+				edit: false
+			}
+		],
+		dashboards: [
+			{
+				title: 'VLLM',
+				url: resolve('/(auth)/scope/[scope]/models', { scope: activeScope }),
+				icon: DumbbellIcon
+			},
+			{
+				title: m.compute(),
+				url: resolve('/(auth)/scope/[scope]/compute', { scope: activeScope }),
+				icon: CpuIcon
+			},
+			{
+				title: m.workloads(),
+				url: resolve('/(auth)/scope/[scope]/applications', { scope: activeScope }),
+				icon: FlagIcon
+			},
+			{
+				title: m.storage(),
+				url: resolve('/(auth)/scope/[scope]/storage', { scope: activeScope }),
+				icon: HardDriveIcon
+			},
+			{
+				title: 'Metal',
+				url: resolve('/(auth)/machines'),
+				icon: PcCaseIcon
 			}
 		],
 		aiStudio: [
@@ -149,6 +179,10 @@
 				icon: BotIcon,
 				items: [
 					{
+						title: m.llm(),
+						url: resolve('/(auth)/scope/[scope]/models/llm', { scope: activeScope })
+					},
+					{
 						title: 'Model',
 						url: '#',
 						disabled: true
@@ -157,7 +191,7 @@
 			},
 			{
 				title: 'Training',
-				url: '#',
+				url: resolve('/(auth)/scope/[scope]/models', { scope: activeScope }),
 				icon: DumbbellIcon,
 				items: [
 					{
@@ -188,9 +222,15 @@
 		applications: [
 			{
 				title: 'Hub',
-				url: '#',
+				url: resolve('/(auth)/scope/[scope]/registry', { scope: activeScope }),
 				icon: LayoutGridIcon,
 				items: [
+					{
+						title: m.repositories(),
+						url: resolve('/(auth)/scope/[scope]/registry/repositories', {
+							scope: activeScope
+						})
+					},
 					{
 						title: 'Release',
 						url: '#',
@@ -252,51 +292,68 @@
 		],
 		resources: [
 			{
-				title: 'Workloads',
-				url: '#',
+				title: m.workloads(),
 				icon: FlagIcon,
 				items: [
 					{
 						title: 'Deployment',
-						url: '#',
-						disabled: true
+						url: resolve(
+							`/(auth)/${activeScope}/Deployment?group=apps&version=v1&namespace=${$activeNamespace}&resource=deployments`
+						)
 					},
 					{
-						title: 'Stateful Set',
-						url: '#',
-						disabled: true
+						title: 'StatefulSet',
+						url: resolve(
+							`/(auth)/${activeScope}/StatefulSet?group=apps&version=v1&namespace=${$activeNamespace}&resource=statefulsets`
+						)
 					},
 					{
-						title: 'Daemon Set',
-						url: '#',
-						disabled: true
+						title: 'DaemonSet',
+						url: resolve(
+							`/(auth)/${activeScope}/DaemonSet?group=apps&version=v1&namespace=${$activeNamespace}&resource=daemonsets`
+						)
 					},
 					{
-						title: 'Cron Job',
-						url: '#',
-						disabled: true
+						title: m.pods(),
+						url: resolve(
+							`/(auth)/${activeScope}/Pod?group=&version=v1&namespace=${$activeNamespace}&resource=pods`
+						)
 					},
 					{
-						title: 'Job',
-						url: '#',
-						disabled: true
+						title: m.services(),
+						url: resolve(
+							`/(auth)/${activeScope}/Service?group=&version=v1&namespace=${$activeNamespace}&resource=services`
+						)
 					},
 					{
-						title: 'Pod',
-						url: '#',
-						disabled: true
-					}
+						title: m.cronjob(),
+						url: resolve(
+							`/(auth)/${activeScope}/CronJob?group=batch&version=v1&namespace=${$activeNamespace}&resource=cronjobs`
+						)
+					},
+					{
+						title: m.simpleapp(),
+						url: resolve(
+							`/(auth)/${activeScope}/SimpleApp?group=apps.otterscale.io&version=v1alpha1&namespace=${$activeNamespace}&resource=simpleapps`
+						)
+					},
+					{
+						title: m.secrets(),
+						url: resolve(
+							`/(auth)/${activeScope}/Secret?group=&version=v1&namespace=${$activeNamespace}&resource=secrets`
+						)
+					},
 				]
 			},
 			{
-				title: 'Compute',
-				url: '#',
+				title: m.compute(),
 				icon: CpuIcon,
 				items: [
 					{
-						title: 'Virtual Machine',
-						url: '#',
-						disabled: true
+						title: m.virtual_machine(),
+						url: resolve('/(auth)/scope/[scope]/compute/virtual-machine', {
+							scope: activeScope
+						})
 					}
 				]
 			},
@@ -318,19 +375,38 @@
 				]
 			},
 			{
-				title: 'Storage',
-				url: '#',
+				title: m.storage(),
 				icon: HardDriveIcon,
 				items: [
 					{
-						title: 'Block Pool',
-						url: '#',
-						disabled: true
+						title: m.osd(),
+						url: resolve('/(auth)/scope/[scope]/storage/osd', { scope: activeScope })
 					},
 					{
-						title: 'File System',
-						url: '#',
-						disabled: true
+						title: m.pool(),
+						url: resolve('/(auth)/scope/[scope]/storage/pool', { scope: activeScope })
+					},
+					{
+						title: m.block_device(),
+						url: resolve('/(auth)/scope/[scope]/storage/block-device', {
+							scope: activeScope
+						})
+					},
+					{
+						title: m.file_system(),
+						url: resolve('/(auth)/scope/[scope]/storage/file-system', {
+							scope: activeScope
+						})
+					},
+					{
+						title: m.smb(),
+						url: resolve('/(auth)/scope/[scope]/storage/smb', { scope: activeScope })
+					},
+					{
+						title: m.object_gateway(),
+						url: resolve('/(auth)/scope/[scope]/storage/object-gateway', {
+							scope: activeScope
+						})
 					}
 				]
 			}
@@ -466,13 +542,11 @@
 			},
 			{
 				title: 'Metal',
-				url: '#',
 				icon: PcCaseIcon,
 				items: [
 					{
-						title: 'Server',
-						url: '#',
-						disabled: true
+						title: m.metal(),
+						url: resolve('/(auth)/machines/metal')
 					}
 				]
 			},
@@ -490,6 +564,25 @@
 						title: 'Client',
 						url: '#',
 						disabled: true
+					}
+				]
+			}
+		],
+		nextGlobal: [
+			{
+				title: m.settings(),
+				url: resolve('/(auth)/scope/[scope]/settings', { scope: activeScope }),
+				icon: SlidersHorizontalIcon,
+				items: [] as { title: string; url: string; disabled?: boolean }[]
+			},
+			{
+				title: m.networking(),
+				url: resolve('/(auth)/networking'),
+				icon: NetworkIcon,
+				items: [
+					{
+						title: m.subnets(),
+						url: resolve('/(auth)/networking/subnets')
 					}
 				]
 			}
@@ -512,33 +605,19 @@
 					onsuccess={() => fetchWorkspaces(activeScope)}
 				/>
 			</Sidebar.Header>
-			<Sidebar.Content class="gap-2">
-				<NavOverview items={navData.overview} />
-				{#if next}
+			{#if $activeNamespace}
+				<Sidebar.Content class="gap-2">
+					<NavOverview items={navData.overview} />
+					<NavMain label={m.dashboard()} items={navData.dashboards} />
 					<NavMain label="AI Studio" items={navData.aiStudio} />
 					<NavMain label="Applications" items={navData.applications} />
 					<NavMain label="Resources" items={navData.resources} />
 					<NavMain label="Governance" items={navData.governance} />
 					<NavMain label="Reliability" items={navData.reliability} />
 					<NavMain label="System" items={navData.system} />
-				{:else}
-					<NavGeneral title={m.platform()} routes={platformRoutes(activeScope, $activeNamespace)} />
-					<NavGeneral title={m.global()} routes={globalRoutes()} />
-				{/if}
-			</Sidebar.Content>
-			<Button
-				class="mx-auto w-full text-xs text-muted-foreground"
-				variant="link"
-				onclick={() => (next = !next)}
-			>
-				{#if next}
-					<ChevronLeftIcon class="size-3.5" />
-					{m.switch_to_classic()}
-				{:else}
-					<ZapIcon class="size-3.5" />
-					{m.try_next_version()}
-				{/if}
-			</Button>
+					<NavMain label={m.global()} items={navData.nextGlobal} />
+				</Sidebar.Content>
+			{/if}
 		{:else}
 			<Sidebar.Header id="workspace-guide-step">
 				<div class="flex h-12 w-full items-center gap-2 overflow-hidden rounded-md p-2">
