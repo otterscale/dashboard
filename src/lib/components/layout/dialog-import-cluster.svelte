@@ -21,6 +21,7 @@
 
 	let providerType = $state<ProviderType>(null);
 	let flowStep = $state<WizardFlow>('provider');
+	let stepIndex = $state(0);
 
 	const steps = [
 		{ icon: 'ph:list-checks', label: 'Provider' },
@@ -34,11 +35,15 @@
 		if (!isOpen) {
 			providerType = null;
 			flowStep = 'provider';
+			stepIndex = 0;
 		}
 	}
 
 	function handleNext() {
-		if (providerType) flowStep = 'external-flow';
+		if (providerType) {
+			flowStep = 'external-flow';
+			stepIndex = 1;
+		}
 	}
 </script>
 
@@ -46,10 +51,10 @@
 	<Dialog.Content class="max-w-2xl overflow-hidden p-0" showCloseButton={flowStep === 'provider'}>
 		<Dialog.Title class="sr-only">Import Cluster Wizard</Dialog.Title>
 
-		{#if flowStep === 'provider'}
-			<!-- Stepper Header -->
-			<WizardStepper {steps} currentStepIndex={0} />
+		<!-- Stepper Header -->
+		<WizardStepper {steps} currentStepIndex={stepIndex} />
 
+		{#if flowStep === 'provider'}
 			<!-- Step Content -->
 			<div class="max-h-[60vh] overflow-y-auto px-6 py-5">
 				<div class="space-y-3">
@@ -133,7 +138,11 @@
 			</div>
 		{:else if flowStep === 'external-flow'}
 			<ImportClusterExternal
-				onBack={() => (flowStep = 'provider')}
+				bind:stepIndex
+				onBack={() => {
+					flowStep = 'provider';
+					stepIndex = 0;
+				}}
 				onFinish={() => {
 					handleOpenChange(false);
 					onsuccess?.();

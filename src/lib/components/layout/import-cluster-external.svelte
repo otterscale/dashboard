@@ -11,42 +11,30 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 
-	import WizardStepper from './wizard-stepper.svelte';
-
 	let {
+		stepIndex = $bindable(1),
 		onBack,
 		onFinish
 	}: {
+		stepIndex: number;
 		onBack: () => void;
 		onFinish: () => void;
 	} = $props();
 
 	const POLL_INTERVAL = 3000;
 
-	// Steps configuration for external provider flow
-	const steps = [
-		{ icon: 'ph:list-checks', label: 'Provider' },
-		{ icon: 'ph:note-pencil', label: 'Info' },
-		{ icon: 'ph:terminal-window', label: 'Deploy' },
-		{ icon: 'ph:shield-check', label: 'Verify' }
-	] as const;
-
 	const transport: Transport = getContext('transport');
 	const linkClient = createClient(LinkService, transport);
 	const scopeClient = createClient(ScopeService, transport);
 
-	const DEFAULT_FORM = {
-		step: 2, // 1 is Provider, we start directly at 2
-		clusterName: '',
-		installUrl: '',
-		clusterStatus: 'pending' as 'pending' | 'ready',
-		isBinding: false,
-		bindingSuccess: false,
-		isCreating: false,
-		errorMessage: ''
-	};
+	let clusterName = $state('');
+	let installUrl = $state('');
+	let clusterStatus = $state<'pending' | 'ready'>('pending');
+	let isBinding = $state(false);
+	let bindingSuccess = $state(false);
+	let isCreating = $state(false);
+	let errorMessage = $state('');
 
-	let form = $state(structuredClone(DEFAULT_FORM));
 	let isPolling = false;
 	let abortController: AbortController | null = null;
 
@@ -58,49 +46,46 @@
 	});
 
 	const installCommand = $derived(
-		form.installUrl ? `kubectl apply -f ${form.installUrl}` : 'Generating install command...'
+		installUrl ? `kubectl apply -f ${installUrl}` : 'Generating install command...'
 	);
 
-	const canGoNext = $derived.by(() => {
-		if (form.step === 2) return form.clusterName.trim().length > 0;
-		return false;
-	});
+	const canGoNext = $derived(stepIndex === 1 ? clusterName.trim().length > 0 : false);
 
 	function goBack() {
-		if (form.step === 2) {
+		if (stepIndex === 1) {
 			onBack();
 		} else {
 			// Actually we don't allow going back from Deploy/Verify for now to keep it simple,
-			// but if needed we could reduce form.step
+			// but if needed we could reduce stepIndex
 			onBack();
 		}
 	}
 
 	async function handleGenerateManifest() {
-		if (!form.clusterName.trim() || form.isCreating) return;
-		form.isCreating = true;
-		form.errorMessage = '';
+		if (!clusterName.trim() || isCreating) return;
+		isCreating = true;
+		errorMessage = '';
 
 		try {
 			const response = await linkClient.getAgentManifest({
-				cluster: form.clusterName
+				cluster: clusterName
 			});
 
-			form.installUrl = response.url;
-			form.clusterStatus = 'pending';
-			form.step = 3; // Move to Deploy
+			installUrl = response.url;
+			clusterStatus = 'pending';
+			stepIndex = 2; // Move to Deploy
 
-			toast.success(`Agent manifest generated for "${form.clusterName}"`);
+			toast.success(`Agent manifest generated for "${clusterName}"`);
 			pollAndBind(); // Imperative trigger instead of $effect
 		} catch (e) {
 			if (e instanceof ConnectError) {
-				form.errorMessage = e.message;
+				errorMessage = e.message;
 			} else {
-				form.errorMessage = e instanceof Error ? e.message : 'Failed to generate manifest';
+				errorMessage = e instanceof Error ? e.message : 'Failed to generate manifest';
 			}
-			toast.error(form.errorMessage);
+			toast.error(errorMessage);
 		} finally {
-			form.isCreating = false;
+			isCreating = false;
 		}
 	}
 
@@ -112,14 +97,14 @@
 		abortController = new AbortController();
 		const signal = abortController.signal;
 
-		while (!signal.aborted && form.clusterStatus === 'pending') {
+		while (!signal.aborted && clusterStatus === 'pending') {
 			try {
 				const response = await linkClient.listLinks({});
 				if (signal.aborted) break;
 
-				const found = response.links.some((link: Link) => link.cluster === form.clusterName);
+				const found = response.links.some((link: Link) => link.cluster === clusterName);
 				if (found) {
-					form.clusterStatus = 'ready';
+					clusterStatus = 'ready';
 					await execBinding();
 					break;
 				}
@@ -134,57 +119,54 @@
 	}
 
 	async function execBinding() {
-		form.step = 4; // Move to Verify
-		form.isBinding = true;
-		form.errorMessage = '';
+		stepIndex = 3; // Move to Verify
+		isBinding = true;
+		errorMessage = '';
 		try {
-			await scopeClient.createScope({ name: form.clusterName });
-			form.bindingSuccess = true;
-			toast.success(`Scope "${form.clusterName}" created`);
+			await scopeClient.createScope({ name: clusterName });
+			bindingSuccess = true;
+			toast.success(`Scope "${clusterName}" created`);
 		} catch (e) {
 			if (e instanceof ConnectError) {
-				form.errorMessage = e.message;
+				errorMessage = e.message;
 			} else {
-				form.errorMessage = e instanceof Error ? e.message : 'Failed to create scope';
+				errorMessage = e instanceof Error ? e.message : 'Failed to create scope';
 			}
-			toast.error(form.errorMessage);
+			toast.error(errorMessage);
 		} finally {
-			form.isBinding = false;
+			isBinding = false;
 		}
 	}
 </script>
 
-<!-- Stepper Header -->
-<WizardStepper {steps} currentStepIndex={form.step - 1} />
-
 <!-- Step Content -->
 <div class="max-h-[60vh] overflow-y-auto px-6 py-5">
-	{#if form.step === 2}
+	{#if stepIndex === 1}
 		{@render stepClusterInfo()}
-	{:else if form.step === 3}
+	{:else if stepIndex === 2}
 		{@render stepDeployAgent()}
-	{:else if form.step === 4}
+	{:else if stepIndex === 3}
 		{@render stepVerifyBinding()}
 	{/if}
 
-	{#if form.errorMessage && form.step < 4}
+	{#if errorMessage && stepIndex < 3}
 		<div
 			class="mt-3 rounded-lg border border-destructive/50 bg-destructive/10 p-2 text-center text-xs text-destructive"
 		>
-			{form.errorMessage}
+			{errorMessage}
 		</div>
 	{/if}
 </div>
 
 <!-- Footer -->
 <div class="flex items-center justify-between border-t px-6 py-3">
-	{#if form.step === 2}
+	{#if stepIndex === 1}
 		<Button variant="outline" size="sm" onclick={goBack}>
 			<Icon icon="ph:arrow-left" class="mr-1 size-3" />
 			Back
 		</Button>
-		<Button size="sm" onclick={handleGenerateManifest} disabled={!canGoNext || form.isCreating}>
-			{#if form.isCreating}
+		<Button size="sm" onclick={handleGenerateManifest} disabled={!canGoNext || isCreating}>
+			{#if isCreating}
 				<Icon icon="ph:spinner-gap" class="mr-1 size-3 animate-spin" />
 				Generating...
 			{:else}
@@ -192,10 +174,10 @@
 				Generate Install Command
 			{/if}
 		</Button>
-	{:else if form.step === 3}
+	{:else if stepIndex === 2}
 		<p class="text-xs text-muted-foreground">Auto-advances when agent registers</p>
 		<div></div>
-	{:else if form.step === 4 && form.bindingSuccess}
+	{:else if stepIndex === 3 && bindingSuccess}
 		<div></div>
 		<Button size="sm" onclick={onFinish}>
 			Done
@@ -227,7 +209,7 @@
 					id="wizard-cluster-name"
 					type="text"
 					placeholder="e.g. production-us-west-2"
-					bind:value={form.clusterName}
+					bind:value={clusterName}
 					required
 				/>
 				<p class="text-xs text-muted-foreground">
@@ -236,7 +218,7 @@
 			</div>
 		</div>
 		<!-- Hidden submit button to allow Enter key to submit the form -->
-		<button type="submit" class="hidden" disabled={!canGoNext || form.isCreating}>Submit</button>
+		<button type="submit" class="hidden" disabled={!canGoNext || isCreating}>Submit</button>
 	</form>
 {/snippet}
 
@@ -265,7 +247,7 @@
 		</Code.Root>
 
 		<div class="flex items-center justify-center gap-2 rounded-lg border bg-card/50 p-3 text-sm">
-			{#if form.clusterStatus === 'pending'}
+			{#if clusterStatus === 'pending'}
 				<Icon icon="ph:spinner-gap" class="size-4 animate-spin text-primary" />
 				<span class="text-muted-foreground">
 					Polling <code class="font-mono text-xs">LinkService.ListLinks</code> for agent registration...
@@ -280,7 +262,7 @@
 			class="flex items-center justify-between rounded-md border border-border/50 bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground"
 		>
 			<span>
-				Cluster: <code class="font-mono">{form.clusterName}</code>
+				Cluster: <code class="font-mono">{clusterName}</code>
 			</span>
 			<span class="flex items-center gap-1">
 				<span class="relative flex h-1.5 w-1.5">
@@ -297,7 +279,7 @@
 
 {#snippet stepVerifyBinding()}
 	<div class="flex flex-col items-center justify-center py-8">
-		{#if form.isBinding}
+		{#if isBinding}
 			<div class="flex flex-col items-center gap-4">
 				<div class="relative">
 					<div
@@ -314,7 +296,7 @@
 					</p>
 				</div>
 			</div>
-		{:else if form.bindingSuccess}
+		{:else if bindingSuccess}
 			<div class="flex flex-col items-center gap-4">
 				<div
 					class="flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10 ring-4 ring-green-500/5"
@@ -324,14 +306,14 @@
 				<div class="text-center">
 					<h3 class="text-lg font-bold">🎉 Import Successful!</h3>
 					<p class="mt-1 text-sm text-muted-foreground">
-						<strong>{form.clusterName}</strong> is connected and registered.
+						<strong>{clusterName}</strong> is connected and registered.
 					</p>
 				</div>
 				<div class="w-full max-w-xs rounded-lg border bg-card p-4 text-sm">
 					<div class="space-y-2">
 						<div class="flex justify-between">
 							<span class="text-muted-foreground">Cluster</span>
-							<span class="font-medium">{form.clusterName}</span>
+							<span class="font-medium">{clusterName}</span>
 						</div>
 						<div class="flex justify-between">
 							<span class="text-muted-foreground">Status</span>
@@ -350,7 +332,7 @@
 				</div>
 				<div class="text-center">
 					<h3 class="font-semibold">Binding Failed</h3>
-					<p class="mt-1 text-xs text-muted-foreground">{form.errorMessage}</p>
+					<p class="mt-1 text-xs text-muted-foreground">{errorMessage}</p>
 				</div>
 				<Button variant="outline" size="sm" onclick={execBinding}>
 					<Icon icon="ph:arrow-clockwise" class="mr-1 size-3" />
