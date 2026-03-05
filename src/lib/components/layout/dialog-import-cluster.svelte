@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import Icon from '@iconify/svelte';
+	import { type Link, LinkService } from '@otterscale/api/link/v1';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
-	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import { ScopeService } from '$lib/api/scope/v1/scope_pb';
 	import * as Code from '$lib/components/custom/code';
 	import { Button } from '$lib/components/ui/button';
@@ -18,19 +18,14 @@
 	// ─── Props ────────────────────────────────────────────────
 	let {
 		open = $bindable(false),
-		cluster,
 		onsuccess
 	}: {
 		open: boolean;
-		cluster: string;
 		onsuccess?: () => void;
 	} = $props();
 
 	// ─── Constants ───────────────────────────────────────────
-	const CRD_GROUP = 'fleet.otterscale.io';
-	const CRD_VERSION = 'v1alpha1';
-	const CRD_RESOURCE = 'clusters';
-	const CRD_KIND = 'Cluster';
+	const POLL_INTERVAL = 3000;
 
 	const DISTRIBUTIONS = [
 		{ value: 'charmed-kubernetes', label: 'Charmed Kubernetes (Juju)' },
@@ -53,7 +48,7 @@
 
 	// ─── API Clients ─────────────────────────────────────────
 	const transport: Transport = getContext('transport');
-	const resourceClient = createClient(ResourceService, transport);
+	const linkClient = createClient(LinkService, transport);
 	const scopeClient = createClient(ScopeService, transport);
 
 	// ─── Step State ──────────────────────────────────────────
@@ -66,9 +61,9 @@
 	let clusterName = $state('');
 	let clusterDescription = $state('');
 	let distribution = $state('');
-	let clusterLabels = $state('');
 
-	// Step 3
+	// Step 3 (from GetAgentManifest API)
+	let installUrl = $state('');
 	let clusterStatus = $state<'pending' | 'ready'>('pending');
 
 	// Step 4
@@ -79,12 +74,9 @@
 	let isCreating = $state(false);
 	let errorMessage = $state('');
 
-	// Watch abort controller
-	let watchAbort: AbortController | null = null;
-
 	// ─── Derived ─────────────────────────────────────────────
 	const installCommand = $derived(
-		`kubectl apply -f https://$(kubectl get cm -n otterscale otterscale-config -o jsonpath='{.data.api_domain}')/v1/link/agent-manifest?name=${clusterName || '<cluster-name>'}`
+		installUrl ? `kubectl apply -f ${installUrl}` : 'Generating install command...'
 	);
 
 	const canGoNext = $derived.by(() => {
@@ -93,17 +85,6 @@
 		return false;
 	});
 
-	// ─── Helpers ─────────────────────────────────────────────
-	function parseLabels(raw: string): Record<string, string> {
-		const labels: Record<string, string> = {};
-		if (!raw.trim()) return labels;
-		for (const pair of raw.split(',')) {
-			const [key, value] = pair.split('=').map((s) => s.trim());
-			if (key) labels[key] = value ?? '';
-		}
-		return labels;
-	}
-
 	// ─── Actions ─────────────────────────────────────────────
 	function resetState() {
 		currentStep = 1;
@@ -111,14 +92,12 @@
 		clusterName = '';
 		clusterDescription = '';
 		distribution = '';
-		clusterLabels = '';
+		installUrl = '';
 		clusterStatus = 'pending';
 		isBinding = false;
 		bindingSuccess = false;
 		isCreating = false;
 		errorMessage = '';
-		watchAbort?.abort();
-		watchAbort = null;
 	}
 
 	function goNext() {
@@ -129,47 +108,27 @@
 		if (currentStep > 1) currentStep--;
 	}
 
-	async function handleCreateCluster() {
+	async function handleGenerateManifest() {
 		if (!clusterName.trim()) return;
 		isCreating = true;
 		errorMessage = '';
 
-		const labels = parseLabels(clusterLabels);
-		if (distribution) {
-			labels['fleet.otterscale.io/distribution'] = distribution;
-		}
-
-		const manifest = {
-			apiVersion: `${CRD_GROUP}/${CRD_VERSION}`,
-			kind: CRD_KIND,
-			metadata: {
-				name: clusterName,
-				...(Object.keys(labels).length > 0 ? { labels } : {})
-			},
-			spec: {
-				...(clusterDescription ? { description: clusterDescription } : {}),
-				provider: providerType === 'baremetal' ? 'local' : 'external',
-				...(distribution ? { distribution } : {})
-			}
-		};
-
 		try {
-			await resourceClient.create({
-				cluster,
-				group: CRD_GROUP,
-				version: CRD_VERSION,
-				resource: CRD_RESOURCE,
-				manifest: new TextEncoder().encode(JSON.stringify(manifest))
+			// Call LinkService.GetAgentManifest to get install URL and manifest
+			const response = await linkClient.getAgentManifest({
+				cluster: clusterName
 			});
 
-			toast.success(`Cluster "${clusterName}" created`);
+			installUrl = response.url;
 			clusterStatus = 'pending';
 			currentStep = 3;
+
+			toast.success(`Agent manifest generated for "${clusterName}"`);
 		} catch (e) {
 			if (e instanceof ConnectError) {
 				errorMessage = e.message;
 			} else {
-				errorMessage = e instanceof Error ? e.message : 'Failed to create cluster';
+				errorMessage = e instanceof Error ? e.message : 'Failed to generate manifest';
 			}
 			toast.error(errorMessage);
 		} finally {
@@ -188,7 +147,7 @@
 			if (e instanceof ConnectError) {
 				errorMessage = e.message;
 			} else {
-				errorMessage = e instanceof Error ? e.message : 'Failed to bind cluster scope';
+				errorMessage = e instanceof Error ? e.message : 'Failed to create scope';
 			}
 			toast.error(errorMessage);
 		} finally {
@@ -202,47 +161,34 @@
 		resetState();
 	}
 
-	// ─── Watch Effect (Step 3) ───────────────────────────────
+	// ─── Polling Effect (Step 3) — poll ListLinks ────────────
 	$effect(() => {
 		if (currentStep !== 3 || clusterStatus === 'ready' || !clusterName) return;
 
-		watchAbort = new AbortController();
-		const signal = watchAbort.signal;
+		let active = true;
 
-		(async () => {
-			try {
-				const stream = resourceClient.watch(
-					{
-						cluster,
-						group: CRD_GROUP,
-						version: CRD_VERSION,
-						resource: CRD_RESOURCE,
-						fieldSelector: `metadata.name=${clusterName}`
-					},
-					{ signal }
-				);
+		const poll = async () => {
+			while (active && clusterStatus === 'pending') {
+				try {
+					const response = await linkClient.listLinks({});
+					if (!active) return;
 
-				for await (const event of stream) {
-					if (signal.aborted) return;
-
-					const obj = event.resource?.object as Record<string, unknown> | undefined;
-					const phase = (obj?.status as Record<string, unknown> | undefined)?.phase;
-
-					if (phase === 'Ready' || phase === 'ready') {
+					const found = response.links.some((link: Link) => link.cluster === clusterName);
+					if (found) {
 						clusterStatus = 'ready';
 						currentStep = 4;
 						return;
 					}
+				} catch {
+					// Retry silently on error
 				}
-			} catch (e) {
-				if (signal.aborted) return;
-				console.error('Watch error:', e);
+				await new Promise((r) => setTimeout(r, POLL_INTERVAL));
 			}
-		})();
+		};
+		poll();
 
 		return () => {
-			watchAbort?.abort();
-			watchAbort = null;
+			active = false;
 		};
 	});
 
@@ -390,7 +336,7 @@
 					</div>
 				</div>
 			{:else if currentStep === 2}
-				<!-- Step 2: Cluster Metadata -->
+				<!-- Step 2: Cluster Info -->
 				<div class="space-y-4">
 					<div>
 						<h3 class="text-lg font-semibold">Cluster Information</h3>
@@ -408,7 +354,7 @@
 								bind:value={clusterName}
 							/>
 							<p class="text-xs text-muted-foreground">
-								Must be a valid Kubernetes resource name (lowercase, hyphens, no spaces).
+								This name will be used as the cluster identifier for the agent registration.
 							</p>
 						</div>
 						<div class="space-y-2">
@@ -437,16 +383,6 @@
 								rows={2}
 							/>
 						</div>
-						<div class="space-y-2">
-							<Label for="wizard-cluster-labels" class="text-sm font-medium">Labels</Label>
-							<Input
-								id="wizard-cluster-labels"
-								type="text"
-								placeholder="e.g. env=production, region=us-west-2"
-								bind:value={clusterLabels}
-							/>
-							<p class="text-xs text-muted-foreground">Comma-separated key=value pairs.</p>
-						</div>
 					</div>
 				</div>
 			{:else if currentStep === 3}
@@ -461,7 +397,11 @@
 							<p class="mt-0.5 text-xs text-muted-foreground">
 								Requires <code class="rounded bg-muted px-1 py-0.5 font-mono text-[10px]"
 									>cluster-admin</code
-								> privileges.
+								>
+								privileges. The agent will self-register via
+								<code class="rounded bg-muted px-1 py-0.5 font-mono text-[10px]"
+									>LinkService.Register</code
+								>.
 							</p>
 						</div>
 					</div>
@@ -476,13 +416,11 @@
 						{#if clusterStatus === 'pending'}
 							<Icon icon="ph:spinner-gap" class="size-4 animate-spin text-primary" />
 							<span class="text-muted-foreground">
-								Watching for agent connection via <code class="font-mono text-xs"
-									>ResourceService.Watch</code
-								>...
+								Polling <code class="font-mono text-xs">LinkService.ListLinks</code> for agent registration...
 							</span>
 						{:else}
 							<Icon icon="ph:check-circle-fill" class="size-4 text-green-500" />
-							<span class="font-medium text-green-500">Connected!</span>
+							<span class="font-medium text-green-500">Agent registered!</span>
 						{/if}
 					</div>
 
@@ -490,7 +428,7 @@
 						class="flex items-center justify-between rounded-md border border-border/50 bg-muted/30 px-3 py-2 text-[11px] text-muted-foreground"
 					>
 						<span>
-							CRD: <code class="font-mono">{CRD_GROUP}/{CRD_VERSION}</code>
+							Cluster: <code class="font-mono">{clusterName}</code>
 						</span>
 						<span class="flex items-center gap-1">
 							<span class="relative flex h-1.5 w-1.5">
@@ -499,7 +437,7 @@
 								></span>
 								<span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-primary"></span>
 							</span>
-							Streaming
+							Polling every {POLL_INTERVAL / 1000}s
 						</span>
 					</div>
 				</div>
@@ -533,7 +471,7 @@
 							<div class="text-center">
 								<h3 class="text-lg font-bold">🎉 Import Successful!</h3>
 								<p class="mt-1 text-sm text-muted-foreground">
-									<strong>{clusterName}</strong> is connected with cluster-admin access.
+									<strong>{clusterName}</strong> is connected and registered.
 								</p>
 							</div>
 							<div class="w-full max-w-xs rounded-lg border bg-card p-4 text-sm">
@@ -604,13 +542,13 @@
 					Back
 				</Button>
 				{#if currentStep === 2}
-					<Button size="sm" onclick={handleCreateCluster} disabled={!canGoNext || isCreating}>
+					<Button size="sm" onclick={handleGenerateManifest} disabled={!canGoNext || isCreating}>
 						{#if isCreating}
 							<Icon icon="ph:spinner-gap" class="mr-1 size-3 animate-spin" />
-							Creating...
+							Generating...
 						{:else}
 							<Icon icon="ph:terminal-window" class="mr-1 size-3" />
-							Generate Command
+							Generate Install Command
 						{/if}
 					</Button>
 				{:else}
@@ -620,7 +558,7 @@
 					</Button>
 				{/if}
 			{:else if currentStep === 3}
-				<p class="text-xs text-muted-foreground">Auto-advances when agent connects</p>
+				<p class="text-xs text-muted-foreground">Auto-advances when agent registers</p>
 				<div></div>
 			{:else if currentStep === 4 && bindingSuccess}
 				<div></div>
