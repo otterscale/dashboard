@@ -163,7 +163,7 @@
 				{/if}
 			</Button>
 		{:else if stepIndex === 2}
-			<p class="text-sm text-muted-foreground">Auto-advances when agent registers</p>
+			<div></div>
 			<div></div>
 		{:else if stepIndex === 3 && bindingSuccess}
 			<div></div>
@@ -246,20 +246,20 @@
 {/snippet}
 
 {#snippet stepVerifyBinding()}
-	<div class="flex flex-col gap-6">
+	<div class="flex flex-col gap-4">
 		<div>
 			<h3 class="text-xl font-bold">Verification</h3>
 			<p class="mt-1 text-sm text-muted-foreground">Finalizing cluster connection.</p>
 		</div>
 
-		<div class="flex flex-col items-center justify-center gap-6 py-12">
+		<div class="flex flex-col items-center justify-center gap-5">
 			{#if isBinding}
 				<div class="relative">
 					<div
-						class="h-20 w-20 animate-spin rounded-full border-4 border-muted border-t-primary"
+						class="h-14 w-14 animate-spin rounded-full border-4 border-muted border-t-primary"
 					></div>
 					<div class="absolute inset-0 flex items-center justify-center">
-						<Icon icon="ph:shield-check" class="size-8 text-primary" />
+						<Icon icon="ph:shield-check" class="size-6 text-primary" />
 					</div>
 				</div>
 				<div class="space-y-1 text-center">
@@ -272,18 +272,18 @@
 				</div>
 			{:else if bindingSuccess}
 				<div
-					class="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 ring-4 ring-primary/5"
+					class="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 ring-4 ring-primary/5"
 				>
-					<Icon icon="ph:check-circle-fill" class="size-10 text-primary" />
+					<Icon icon="ph:check-circle-fill" class="size-8 text-primary" />
 				</div>
 				<div class="space-y-1 text-center">
-					<h3 class="text-2xl font-bold text-foreground">Cluster Connected</h3>
+					<h3 class="text-xl font-bold text-foreground">Cluster Connected</h3>
 					<p class="text-sm text-muted-foreground">
 						<strong>{clusterName}</strong> is now securely registered.
 					</p>
 				</div>
-				<div class="w-full max-w-sm rounded-lg border bg-card p-4 text-sm shadow-sm">
-					<div class="space-y-3">
+				<div class="w-full max-w-sm rounded-lg border bg-card p-3 text-sm shadow-sm">
+					<div class="space-y-2">
 						<div class="flex justify-between">
 							<span class="text-muted-foreground">Cluster</span>
 							<span class="font-medium">{clusterName}</span>
@@ -299,15 +299,15 @@
 				</div>
 			{:else}
 				<div
-					class="flex h-20 w-20 items-center justify-center rounded-full bg-destructive/10 ring-4 ring-destructive/5"
+					class="flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10 ring-4 ring-destructive/5"
 				>
-					<Icon icon="ph:warning-circle" class="size-10 text-destructive" />
+					<Icon icon="ph:warning-circle" class="size-8 text-destructive" />
 				</div>
 				<div class="space-y-1 text-center">
 					<h3 class="text-lg font-semibold text-destructive">Binding Failed</h3>
 					<p class="max-w-xs text-sm text-muted-foreground">{errorMessage}</p>
 				</div>
-				<Button variant="outline" onclick={execBinding}>
+				<Button variant="outline" size="sm" onclick={execBinding}>
 					<Icon icon="ph:arrow-clockwise" class="mr-2 size-4" />
 					Retry Verification
 				</Button>
