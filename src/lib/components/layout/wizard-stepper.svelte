@@ -1,18 +1,21 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
+	import type { HTMLAttributes } from 'svelte/elements';
 
 	import { cn } from '$lib/utils';
 
 	let {
 		steps,
-		currentStepIndex
+		currentStepIndex,
+		class: className,
+		...rest
 	}: {
 		steps: readonly { icon: string; label: string }[];
 		currentStepIndex: number;
-	} = $props();
+	} & HTMLAttributes<HTMLDivElement> = $props();
 </script>
 
-<div class="flex items-center justify-between border-b px-6 py-4">
+<div class={cn('flex items-center justify-between border-b px-6 py-4', className)} {...rest}>
 	{#each steps as step, i (step.label)}
 		{@const isActive = i === currentStepIndex}
 		{@const isCompleted = i < currentStepIndex}
