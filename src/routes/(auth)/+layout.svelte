@@ -20,7 +20,6 @@
 	import NetworkIcon from '@lucide/svelte/icons/network';
 	import PcCaseIcon from '@lucide/svelte/icons/pc-case';
 	import ScaleIcon from '@lucide/svelte/icons/scale';
-	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import ShipIcon from '@lucide/svelte/icons/ship';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
