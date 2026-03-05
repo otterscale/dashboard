@@ -64,6 +64,10 @@
 	});
 
 	let open = $state(false);
+
+	if (!document) {
+		throw new Error('TailoredEditorDocument ui option is required for EditorWidget');
+	}
 </script>
 
 <Dialog.Root bind:open>
