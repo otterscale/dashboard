@@ -15,7 +15,7 @@
 	} & HTMLAttributes<HTMLDivElement> = $props();
 </script>
 
-<div class={cn('flex items-center justify-between border-b px-6 py-4', className)} {...rest}>
+<div class={cn('flex items-center justify-between', className)} {...rest}>
 	{#each steps as step, i (step.label)}
 		{@const isActive = i === currentStepIndex}
 		{@const isCompleted = i < currentStepIndex}
@@ -32,8 +32,8 @@
 		<div class="flex flex-col items-center gap-1">
 			<div
 				class={cn(
-					'flex h-9 w-9 items-center justify-center rounded-full border-2 transition-all duration-300',
-					isActive && 'border-primary bg-primary text-primary-foreground ring-2 ring-primary/20',
+					'flex h-8 w-8 items-center justify-center rounded-full border transition-all duration-300',
+					isActive && 'border-primary bg-primary text-primary-foreground shadow-sm',
 					isCompleted && 'border-primary bg-primary text-primary-foreground',
 					!isActive && !isCompleted && 'border-muted bg-muted text-muted-foreground'
 				)}
@@ -46,7 +46,7 @@
 			</div>
 			<span
 				class={cn(
-					'text-[10px] font-medium whitespace-nowrap transition-colors',
+					'mt-1 text-xs font-semibold whitespace-nowrap transition-colors',
 					isActive ? 'text-foreground' : 'text-muted-foreground'
 				)}
 			>

@@ -3,10 +3,11 @@
 
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import * as Item from '$lib/components/ui/item';
+	import { Progress } from '$lib/components/ui/progress/index.js';
 	import { cn } from '$lib/utils';
 
 	import ImportClusterExternal from './import-cluster-external.svelte';
-	import WizardStepper from './wizard-stepper.svelte';
 
 	let {
 		open = $bindable(false),
@@ -48,38 +49,44 @@
 </script>
 
 <Dialog.Root {open} onOpenChange={handleOpenChange}>
-	<Dialog.Content class="max-w-2xl overflow-hidden p-0" showCloseButton={flowStep === 'provider'}>
+	<Dialog.Content
+		class="flex max-h-[95vh] min-w-[38vw] flex-col overflow-y-auto"
+		showCloseButton={false}
+	>
 		<Dialog.Title class="sr-only">Import Cluster Wizard</Dialog.Title>
 
-		<!-- Stepper Header -->
-		<WizardStepper {steps} currentStepIndex={stepIndex} />
+		<Item.Root class="p-0">
+			<Progress value={stepIndex + 1} max={steps.length} />
+		</Item.Root>
 
-		{#if flowStep === 'provider'}
-			<!-- Step Content -->
-			<div class="max-h-[60vh] overflow-y-auto px-6 py-5">
-				<div class="space-y-3">
+		<div class="mt-4 flex min-h-[38vh] flex-1 flex-col">
+			{#if flowStep === 'provider'}
+				<!-- Step Content -->
+				<div class="flex h-full flex-1 flex-col gap-6">
 					<div>
-						<h3 class="text-lg font-semibold">Select Provider</h3>
-						<p class="text-sm text-muted-foreground">Choose how you'd like to add a cluster.</p>
+						<h3 class="text-lg font-bold">Select Provider</h3>
+						<p class="mt-1 text-sm text-muted-foreground">
+							Choose how you'd like to add a cluster.
+						</p>
 					</div>
-					<div class="grid gap-3 sm:grid-cols-2">
+					<div class="grid flex-1 gap-4 sm:grid-cols-2">
 						<!-- Bare Metal (Disabled) -->
 						<button
 							type="button"
-							class="group relative flex cursor-not-allowed flex-col items-center gap-3 rounded-xl border-2 border-muted bg-muted/30 p-6 text-center opacity-50 transition-all duration-200"
+							class="group relative flex h-full w-full cursor-not-allowed flex-col items-center justify-center gap-3 rounded-lg border bg-muted/30 p-6 text-center opacity-50 transition-all duration-200"
 							disabled
 						>
 							<div
-								class="flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-muted-foreground"
+								class="flex h-12 w-12 items-center justify-center rounded-lg bg-muted text-muted-foreground"
 							>
 								<Icon icon="ph:hard-drives" class="size-6" />
 							</div>
 							<div>
 								<h4 class="font-semibold text-muted-foreground">Bare Metal</h4>
-								<p class="mt-0.5 text-xs text-muted-foreground">Talos-based provisioning</p>
+								<p class="mt-1 text-sm text-muted-foreground">Talos-based provisioning</p>
 							</div>
 							<span
-								class="rounded-full bg-muted/80 px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+								class="rounded-full bg-muted/80 px-2 py-0.5 text-xs font-medium text-muted-foreground"
 							>
 								Coming Soon
 							</span>
@@ -89,65 +96,60 @@
 						<button
 							type="button"
 							class={cn(
-								'group relative flex flex-col items-center gap-3 rounded-xl border-2 p-6 text-center transition-all duration-200',
-								'hover:border-primary/50 hover:bg-accent/50',
+								'group relative flex h-full w-full flex-col items-center justify-center gap-3 rounded-lg border p-6 text-center transition-all duration-200',
+								'cursor-pointer hover:bg-accent hover:text-accent-foreground',
 								providerType === 'external'
-									? 'border-primary bg-accent shadow-md shadow-primary/10'
-									: 'border-muted bg-card'
+									? 'border-primary bg-primary/5 ring-1 ring-primary/20'
+									: 'border-border bg-card'
 							)}
 							onclick={() => {
 								providerType = 'external';
 							}}
 						>
 							{#if providerType === 'external'}
-								<div class="absolute top-2 right-2">
+								<div class="absolute top-3 right-3">
 									<Icon icon="ph:check-circle-fill" class="size-5 text-primary" />
 								</div>
 							{/if}
 							<div
 								class={cn(
-									'flex h-12 w-12 items-center justify-center rounded-xl transition-colors',
+									'flex h-12 w-12 items-center justify-center rounded-lg transition-colors',
 									providerType === 'external'
-										? 'bg-primary/15 text-primary'
-										: 'bg-muted text-muted-foreground'
+										? 'bg-primary/20 text-primary'
+										: 'bg-muted text-muted-foreground group-hover:bg-background group-hover:text-foreground'
 								)}
 							>
 								<Icon icon="ph:cloud-arrow-down" class="size-6" />
 							</div>
 							<div>
 								<h4 class="font-semibold">External K8s</h4>
-								<p class="mt-0.5 text-xs text-muted-foreground">Juju, Rancher, EKS, etc.</p>
+								<p class="mt-1 text-sm text-muted-foreground">Juju, Rancher, EKS, etc.</p>
 							</div>
-							<span
-								class="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary"
-							>
+							<span class="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
 								Recommended
-							</span>
-						</button>
+							</span></button
+						>
 					</div>
 				</div>
-			</div>
 
-			<!-- Footer -->
-			<div class="flex items-center justify-between border-t px-6 py-3">
-				<div></div>
-				<Button size="sm" onclick={handleNext} disabled={!providerType}>
-					Next
-					<Icon icon="ph:arrow-right" class="ml-1 size-3" />
-				</Button>
-			</div>
-		{:else if flowStep === 'external-flow'}
-			<ImportClusterExternal
-				bind:stepIndex
-				onBack={() => {
-					flowStep = 'provider';
-					stepIndex = 0;
-				}}
-				onFinish={() => {
-					handleOpenChange(false);
-					onsuccess?.();
-				}}
-			/>
-		{/if}
+				<!-- Footer -->
+				<div class="mt-auto flex w-full items-center justify-between gap-3 pt-4">
+					<div></div>
+					<Button onclick={handleNext} disabled={!providerType}>Next</Button>
+				</div>
+			{:else if flowStep === 'external-flow'}
+				<ImportClusterExternal
+					bind:stepIndex
+					onBack={() => {
+						flowStep = 'provider';
+						stepIndex = 0;
+					}}
+					onFinish={() => {
+						handleOpenChange(false);
+						onsuccess?.();
+					}}
+				/>
+			{/if}
+		</div>
 	</Dialog.Content>
 </Dialog.Root>
