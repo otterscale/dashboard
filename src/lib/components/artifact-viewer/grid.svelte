@@ -1,15 +1,66 @@
 <script lang="ts">
+	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import Icon from '@iconify/svelte';
-	import { BookmarkIcon, DownloadIcon, TagsIcon } from '@lucide/svelte';
+	import { BookmarkIcon, DownloadIcon, TagsIcon, Trash2Icon } from '@lucide/svelte';
+	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
+	import { SubmitButton } from '@sjsf/form';
+	import Ajv from 'ajv';
+	import lodash from 'lodash';
+	import { getContext } from 'svelte';
+	import { toast } from 'svelte-sonner';
 
+	import { resolve } from '$app/paths';
+	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
+	import Form from '$lib/components/dynamic-form/form.svelte';
+	import DefaultWidget from '$lib/components/dynamic-form/widgets/default.svelte';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
-	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
-	import * as Item from '$lib/components/ui/item/index.ts';
+	import * as Item from '$lib/components/ui/item';
 
+	import { buttonVariants } from '../ui/button/button.svelte';
 	import type { ArtifactType } from './types.d.ts';
 
 	let { artifact }: { artifact: ArtifactType } = $props();
+
+	// const transport: Transport = getContext('transport');
+	// const resourceClient = createClient(ResourceService, transport);
+
+	const jsonSchema = {
+		type: 'object',
+		required: ['name', 'version', 'values'],
+		properties: {
+			name: {
+				title: 'Name',
+				type: 'string'
+			},
+			version: {
+				title: 'Version',
+				type: 'string'
+			},
+			values: {
+				title: 'Values',
+				type: 'string'
+			}
+		}
+	} as Schema;
+
+	// Validation
+	const jsonSchemaValidator = new Ajv({
+		allErrors: true
+	});
+	const validate = jsonSchemaValidator.compile(jsonSchema);
+
+	// Container for Data.
+	let values: any = $state({
+		name: '',
+		version: '',
+		values: {}
+	});
+
+	// Flags
+	let open = $state(false);
+	let isInstalling = $state(false);
 </script>
 
 <Card.Root>
@@ -37,9 +88,80 @@
 			</Item.Content>
 			{#if artifact.type === 'CHART'}
 				<Item.Actions>
-					<Button variant="ghost" size="icon">
-						<DownloadIcon />
-					</Button>
+					<AlertDialog.Root bind:open>
+						<AlertDialog.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+							<DownloadIcon />
+						</AlertDialog.Trigger>
+						<AlertDialog.Content class="max-h-[95vh] min-w-[23vw] overflow-auto">
+							<Item.Root class="p-0">
+								<Item.Content class="text-left">
+									<Item.Title class="text-xl font-bold">Artifact</Item.Title>
+									<Item.Description></Item.Description>
+								</Item.Content>
+							</Item.Root>
+							<Form
+								schema={jsonSchema as any}
+								uiSchema={{
+									values: {
+										'ui:components': {
+											textWidget: DefaultWidget
+										}
+									}
+								} as unknown as UiSchemaRoot}
+								initialValue={{ name: '', version: '', values: {} } as FormValue}
+								bind:values
+								handleSubmit={{
+									prehook: () => {
+										if (isInstalling) return;
+										isInstalling = true;
+
+										const isValid = validate(values);
+										if (!isValid) return;
+
+										const name = values.name as string;
+
+										console.log(name);
+
+										console.log(isValid, validate.errors, values);
+										// toast.promise(
+										// 	async () => {
+										// 		await resourceClient.delete({
+										// 			cluster,
+										// 			group,
+										// 			version,
+										// 			resource,
+										// 			name
+										// 		});
+										// 	},
+										// 	{
+										// 		loading: `Deleting workspace ${name}...`,
+										// 		success: () => {
+										// 			// Use window.location.href to force a full page reload and re-trigger fetchWorkspaces
+										// 			window.location.href = resolve(`/(auth)/scope/${cluster}`);
+										// 			return `Successfully deleted workspace ${name}`;
+										// 		},
+										// 		error: (error) => {
+										// 			console.error(`Failed to delete workspace ${name}:`, error);
+										// 			return `Failed to delete workspace ${name}: ${(error as ConnectError).message}`;
+										// 		},
+										// 		finally() {
+										// 			isInstalling = false;
+										// 			open = false;
+										// 		}
+										// 	}
+										// );
+									}
+								}}
+								class="**:data-[slot=dynamic-form-mode-controller]:hidden"
+							>
+								{#snippet actions()}
+									<div class="*:w-full">
+										<SubmitButton />
+									</div>
+								{/snippet}
+							</Form>
+						</AlertDialog.Content>
+					</AlertDialog.Root>
 				</Item.Actions>
 			{/if}
 		</Item.Root>

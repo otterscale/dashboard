@@ -486,7 +486,7 @@
 		</DropdownMenu.Root>
 		<ButtonGroup.Root>
 			<Button
-				variant={mode === 'table' ? 'default' : 'outline'}
+				variant={mode === 'table' ? 'secondary' : 'ghost'}
 				size="icon-sm"
 				onclick={() => (mode = 'table')}
 				aria-pressed={mode === 'table'}
@@ -494,7 +494,8 @@
 				<SheetIcon />
 			</Button>
 			<Button
-				variant={mode === 'grid' ? 'default' : 'outline'}
+				disabled={!grid}
+				variant={mode === 'grid' ? 'secondary' : 'ghost'}
 				size="icon-sm"
 				onclick={() => (mode = 'grid')}
 				aria-pressed={mode === 'grid'}
@@ -516,7 +517,6 @@
 			{globalFilterError.message}
 		</p>
 	{/if}
-	<!-- Table/Card 渲染區 -->
 	{#if mode === 'table'}
 		<div class="overflow-hidden rounded-md border bg-background">
 			<Table.Root class="table-fixed">
