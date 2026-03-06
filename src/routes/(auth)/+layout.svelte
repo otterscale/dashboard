@@ -2,30 +2,53 @@
 	import 'driver.js/dist/driver.css';
 
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import BotIcon from '@lucide/svelte/icons/bot';
+	import ActivityIcon from '@lucide/svelte/icons/activity';
+	import ArchiveIcon from '@lucide/svelte/icons/archive';
+	import BarChart3Icon from '@lucide/svelte/icons/bar-chart-3';
+	import BellIcon from '@lucide/svelte/icons/bell';
 	import BoxIcon from '@lucide/svelte/icons/box';
 	import BracesIcon from '@lucide/svelte/icons/braces';
+	import BrainIcon from '@lucide/svelte/icons/brain';
+	import CircleDotIcon from '@lucide/svelte/icons/circle-dot';
+	import ClipboardIcon from '@lucide/svelte/icons/clipboard';
+	import ClockIcon from '@lucide/svelte/icons/clock';
 	import CombineIcon from '@lucide/svelte/icons/combine';
+	import CompassIcon from '@lucide/svelte/icons/compass';
+	import CopyIcon from '@lucide/svelte/icons/copy';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
-	import FileKeyIcon from '@lucide/svelte/icons/file-key';
-	import FlagIcon from '@lucide/svelte/icons/flag';
+	import DatabaseIcon from '@lucide/svelte/icons/database';
+	import DiscIcon from '@lucide/svelte/icons/disc';
+	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import FolderIcon from '@lucide/svelte/icons/folder';
 	import GaugeIcon from '@lucide/svelte/icons/gauge';
 	import GlobeIcon from '@lucide/svelte/icons/globe';
 	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 	import HelpCircleIcon from '@lucide/svelte/icons/help-circle';
 	import HouseIcon from '@lucide/svelte/icons/house';
 	import KeyRoundIcon from '@lucide/svelte/icons/key-round';
+	import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
+	import LayersIcon from '@lucide/svelte/icons/layers';
+	import LinkIcon from '@lucide/svelte/icons/link';
 	import LockIcon from '@lucide/svelte/icons/lock';
 	import MapIcon from '@lucide/svelte/icons/map';
 	import MonitorIcon from '@lucide/svelte/icons/monitor';
 	import NetworkIcon from '@lucide/svelte/icons/network';
 	import PackageIcon from '@lucide/svelte/icons/package';
+	import PlayIcon from '@lucide/svelte/icons/play';
+	import PlugIcon from '@lucide/svelte/icons/plug';
+	import RocketIcon from '@lucide/svelte/icons/rocket';
+	import RouteIcon from '@lucide/svelte/icons/route';
+	import ScaleIcon from '@lucide/svelte/icons/scale';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import ShieldAlertIcon from '@lucide/svelte/icons/shield-alert';
+	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
+	import TagIcon from '@lucide/svelte/icons/tag';
+	import UserIcon from '@lucide/svelte/icons/user';
 	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import { getContext, onMount, type Snippet } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -137,12 +160,12 @@
 			{
 				title: m.dashboard(),
 				url: resolve('/(auth)/scope/[scope]/models', { scope: activeScope }),
-				icon: GaugeIcon
+				icon: LayoutDashboardIcon
 			},
 			{
 				title: m.model(),
 				url: resourceUrl('Model', 'model.otterscale.io', 'v1alpha1', 'models'),
-				icon: BotIcon
+				icon: BrainIcon
 			},
 			{
 				title: m.model_artifact(),
@@ -154,7 +177,7 @@
 			{
 				title: m.release(),
 				url: resourceUrl('HelmRelease', 'helm.toolkit.fluxcd.io', 'v2', 'helmreleases'),
-				icon: FlagIcon
+				icon: RocketIcon
 			},
 			{
 				title: m.hub(),
@@ -166,7 +189,7 @@
 			{
 				title: m.dashboard(),
 				url: resolve('/(auth)/scope/[scope]/compute', { scope: activeScope }),
-				icon: GaugeIcon
+				icon: ActivityIcon
 			},
 			{
 				title: m.virtual_machine(),
@@ -176,7 +199,7 @@
 			{
 				title: m.data_volume(),
 				url: resourceUrl('DataVolume', 'cdi.kubevirt.io', 'v1beta1', 'datavolumes'),
-				icon: HardDriveIcon
+				icon: DatabaseIcon
 			},
 			{
 				title: m.instance_type(),
@@ -193,7 +216,7 @@
 			{
 				title: m.dashboard(),
 				url: resolve('/(auth)/scope/[scope]/storage', { scope: activeScope }),
-				icon: GaugeIcon
+				icon: BarChart3Icon
 			},
 			{
 				title: m.block_pool(),
@@ -203,12 +226,12 @@
 			{
 				title: m.file_system(),
 				url: resourceUrl('CephFilesystem', 'ceph.rook.io', 'v1', 'cephfilesystems'),
-				icon: HardDriveIcon
+				icon: FolderIcon
 			},
 			{
 				title: m.object_store(),
 				url: resourceUrl('CephObjectStore', 'ceph.rook.io', 'v1', 'cephobjectstores'),
-				icon: HardDriveIcon
+				icon: ArchiveIcon
 			}
 		],
 		administration: [
@@ -220,7 +243,7 @@
 			{
 				title: m.module(),
 				url: resourceUrl('Module', 'module.otterscale.io', 'v1alpha1', 'modules'),
-				icon: PackageIcon
+				icon: PlugIcon
 			},
 			{
 				title: m.resources(),
@@ -235,7 +258,7 @@
 			{
 				name: m.overview(),
 				url: resolve('/(auth)/scope/[scope]/kubernetes', { scope: activeScope }),
-				icon: GaugeIcon,
+				icon: CompassIcon,
 				edit: false
 			}
 		],
@@ -243,39 +266,39 @@
 			{
 				title: m.deployment(),
 				url: resourceUrl('Deployment', 'apps', 'v1', 'deployments'),
-				icon: FlagIcon
+				icon: BoxIcon
 			},
 			{
 				title: m.stateful_set(),
 				url: resourceUrl('StatefulSet', 'apps', 'v1', 'statefulsets'),
-				icon: FlagIcon
+				icon: LayersIcon
 			},
 			{
 				title: m.daemon_set(),
 				url: resourceUrl('DaemonSet', 'apps', 'v1', 'daemonsets'),
-				icon: FlagIcon
+				icon: CopyIcon
 			},
 			{
 				title: m.cronjob(),
 				url: resourceUrl('CronJob', 'batch', 'v1', 'cronjobs'),
-				icon: FlagIcon
+				icon: ClockIcon
 			},
 			{
 				title: m.job(),
 				url: resourceUrl('Job', 'batch', 'v1', 'jobs'),
-				icon: FlagIcon
+				icon: PlayIcon
 			},
 			{
 				title: m.pod(),
 				url: resourceUrl('Pod', '', 'v1', 'pods'),
-				icon: BoxIcon
+				icon: CircleDotIcon
 			}
 		],
 		configuration: [
 			{
 				title: m.config_map(),
 				url: resourceUrl('ConfigMap', '', 'v1', 'configmaps'),
-				icon: FileKeyIcon
+				icon: FileTextIcon
 			},
 			{
 				title: m.secret(),
@@ -292,7 +315,7 @@
 			{
 				title: m.http_route(),
 				url: resourceUrl('HTTPRoute', 'gateway.networking.k8s.io', 'v1', 'httproutes'),
-				icon: NetworkIcon
+				icon: RouteIcon
 			},
 			{
 				title: m.gateway(),
@@ -302,24 +325,24 @@
 			{
 				title: m.network_policy(),
 				url: resourceUrl('NetworkPolicy', 'networking.k8s.io', 'v1', 'networkpolicies'),
-				icon: ShieldIcon
+				icon: ShieldAlertIcon
 			}
 		],
 		storage: [
 			{
 				title: m.persistent_volume_claim(),
 				url: resourceUrl('PersistentVolumeClaim', '', 'v1', 'persistentvolumeclaims'),
-				icon: HardDriveIcon
+				icon: ClipboardIcon
 			},
 			{
 				title: m.persistent_volume(),
 				url: resourceUrl('PersistentVolume', '', 'v1', 'persistentvolumes'),
-				icon: HardDriveIcon
+				icon: DiscIcon
 			},
 			{
 				title: m.storage_class(),
 				url: resourceUrl('StorageClass', 'storage.k8s.io', 'v1', 'storageclasses'),
-				icon: HardDriveIcon
+				icon: TagIcon
 			}
 		],
 		namespaced: [
@@ -331,22 +354,22 @@
 			{
 				title: m.service_account(),
 				url: resourceUrl('ServiceAccount', '', 'v1', 'serviceaccounts'),
-				icon: KeyRoundIcon
+				icon: UserIcon
 			},
 			{
 				title: m.role(),
 				url: resourceUrl('Role', 'rbac.authorization.k8s.io', 'v1', 'roles'),
-				icon: ShieldIcon
+				icon: KeyRoundIcon
 			},
 			{
 				title: m.role_binding(),
 				url: resourceUrl('RoleBinding', 'rbac.authorization.k8s.io', 'v1', 'rolebindings'),
-				icon: ShieldIcon
+				icon: LinkIcon
 			},
 			{
 				title: m.resource_quota(),
 				url: resourceUrl('ResourceQuota', '', 'v1', 'resourcequotas'),
-				icon: BoxIcon
+				icon: ScaleIcon
 			},
 			{
 				title: m.limit_range(),
@@ -363,7 +386,7 @@
 			{
 				title: m.event(),
 				url: resourceUrl('Event', '', 'v1', 'events'),
-				icon: FlagIcon
+				icon: BellIcon
 			},
 			{
 				title: m.custom_resource_definition(),
@@ -378,7 +401,7 @@
 			{
 				title: m.cluster_role(),
 				url: resourceUrl('ClusterRole', 'rbac.authorization.k8s.io', 'v1', 'clusterroles'),
-				icon: ShieldIcon
+				icon: ShieldCheckIcon
 			},
 			{
 				title: m.cluster_role_binding(),
