@@ -1,16 +1,14 @@
 <script lang="ts">
-	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
+	import { createClient, type Transport } from '@connectrpc/connect';
 	import Icon from '@iconify/svelte';
-	import { BookmarkIcon, DownloadIcon, TagsIcon, Trash2Icon } from '@lucide/svelte';
+	import { BookmarkIcon, DownloadIcon, TagsIcon } from '@lucide/svelte';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
-	import lodash from 'lodash';
 	import { getContext } from 'svelte';
-	import { toast } from 'svelte-sonner';
 
-	import { resolve } from '$app/paths';
-	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
+	import { RegistryService } from '$lib/api/registry/v1/registry_pb.ts';
+	// import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import EditorWidget from '$lib/components/dynamic-form/widgets/editor.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
@@ -23,7 +21,8 @@
 
 	let { artifact }: { artifact: ArtifactType } = $props();
 
-	// const transport: Transport = getContext('transport');
+	const transport: Transport = getContext('transport');
+	const registryClient = createClient(RegistryService, transport);
 	// const resourceClient = createClient(ResourceService, transport);
 
 	const jsonSchema = {
@@ -63,6 +62,22 @@
 	let isInstalling = $state(false);
 </script>
 
+{#snippet header()}
+	<Item.Root size="sm" class="p-0">
+		<Item.Content class="text-left">
+			<Item.Title class="text-lg font-bold">Chart Values Editor</Item.Title>
+			<Item.Description>
+				The provided values serve as overrides to the default settings. For further details, please
+				refer to the <a
+					href="https://helm.sh/docs/helm/helm_install/"
+					target="_blank"
+					class="underline-none hover:underline">Document</a
+				>
+			</Item.Description>
+		</Item.Content>
+	</Item.Root>
+{/snippet}
+
 <Card.Root>
 	{@const extraAttributes = artifact.extra_attrs ?? {}}
 	<Card.Header>
@@ -87,85 +102,89 @@
 				</Item.Description>
 			</Item.Content>
 			{#if artifact.type === 'CHART'}
-				<Item.Actions>
-					<AlertDialog.Root bind:open>
-						<AlertDialog.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-							<DownloadIcon />
-						</AlertDialog.Trigger>
-						<AlertDialog.Content class="max-h-[95vh] min-w-[23vw] overflow-auto">
-							<Item.Root class="p-0">
-								<Item.Content class="text-left">
-									<Item.Title class="text-xl font-bold">Artifact</Item.Title>
-									<Item.Description></Item.Description>
-								</Item.Content>
-							</Item.Root>
-							<Form
-								schema={jsonSchema as any}
-								uiSchema={{
-									values: {
-										'ui:components': {
-											textWidget: EditorWidget
-										},
-										'ui:options': {
-											TailoredEditorDocument: '123'
+				{#await registryClient.getChartInformation( { chartRef: `oci://192.168.196.160:32180/${artifact.repository_name}` } ) then response}
+					<Item.Actions>
+						<AlertDialog.Root bind:open>
+							<AlertDialog.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+								<DownloadIcon />
+							</AlertDialog.Trigger>
+							<AlertDialog.Content class="max-h-[95vh] min-w-[23vw] overflow-auto">
+								<Item.Root class="p-0">
+									<Item.Content class="text-left">
+										<Item.Title class="text-xl font-bold">Artifact</Item.Title>
+										<Item.Description></Item.Description>
+									</Item.Content>
+								</Item.Root>
+
+								<Form
+									schema={jsonSchema as any}
+									uiSchema={{
+										values: {
+											'ui:components': {
+												textWidget: EditorWidget
+											},
+											'ui:options': {
+												TailoredEditorDocument: response.readme,
+												TailoredEditorHeader: header
+											}
 										}
-									}
-								} as unknown as UiSchemaRoot}
-								initialValue={{ name: '', version: '', values: {} } as FormValue}
-								bind:values
-								handleSubmit={{
-									prehook: () => {
-										if (isInstalling) return;
-										isInstalling = true;
+									} as unknown as UiSchemaRoot}
+									initialValue={{ name: '', version: '', values: response.values } as FormValue}
+									bind:values
+									handleSubmit={{
+										prehook: () => {
+											if (isInstalling) return;
+											isInstalling = true;
 
-										const isValid = validate(values);
-										if (!isValid) return;
+											const isValid = validate(values);
+											if (!isValid) return;
 
-										const name = values.name as string;
+											const name = values.name as string;
 
-										console.log(name);
+											console.log(name);
 
-										console.log(isValid, validate.errors, values);
-										// toast.promise(
-										// 	async () => {
-										// 		await resourceClient.delete({
-										// 			cluster,
-										// 			group,
-										// 			version,
-										// 			resource,
-										// 			name
-										// 		});
-										// 	},
-										// 	{
-										// 		loading: `Deleting workspace ${name}...`,
-										// 		success: () => {
-										// 			// Use window.location.href to force a full page reload and re-trigger fetchWorkspaces
-										// 			window.location.href = resolve(`/(auth)/scope/${cluster}`);
-										// 			return `Successfully deleted workspace ${name}`;
-										// 		},
-										// 		error: (error) => {
-										// 			console.error(`Failed to delete workspace ${name}:`, error);
-										// 			return `Failed to delete workspace ${name}: ${(error as ConnectError).message}`;
-										// 		},
-										// 		finally() {
-										// 			isInstalling = false;
-										// 			open = false;
-										// 		}
-										// 	}
-										// );
-									}
-								}}
-								class="**:data-[slot=dynamic-form-mode-controller]:hidden"
-							>
-								{#snippet actions()}
-									<div class="*:w-full">
-										<SubmitButton />
-									</div>
-								{/snippet}
-							</Form>
-						</AlertDialog.Content>
-					</AlertDialog.Root>
-				</Item.Actions>
+											console.log(isValid, validate.errors, values);
+											// toast.promise(
+											// 	async () => {
+											// 		await resourceClient.delete({
+											// 			cluster,
+											// 			group,
+											// 			version,
+											// 			resource,
+											// 			name
+											// 		});
+											// 	},
+											// 	{
+											// 		loading: `Deleting workspace ${name}...`,
+											// 		success: () => {
+											// 			// Use window.location.href to force a full page reload and re-trigger fetchWorkspaces
+											// 			window.location.href = resolve(`/(auth)/scope/${cluster}`);
+											// 			return `Successfully deleted workspace ${name}`;
+											// 		},
+											// 		error: (error) => {
+											// 			console.error(`Failed to delete workspace ${name}:`, error);
+											// 			return `Failed to delete workspace ${name}: ${(error as ConnectError).message}`;
+											// 		},
+											// 		finally() {
+											// 			isInstalling = false;
+											// 			open = false;
+											// 		}
+											// 	}
+											// );
+										}
+									}}
+									class="**:data-[slot=dynamic-form-mode-controller]:hidden"
+								>
+									{#snippet actions()}
+										<div class="*:w-full">
+											<SubmitButton />
+										</div>
+									{/snippet}
+								</Form>
+							</AlertDialog.Content>
+						</AlertDialog.Root>
+					</Item.Actions>
+				{/await}
 			{/if}
 		</Item.Root>
 	</Card.Header>

@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
-	import { LoaderCircleIcon, RefreshCwIcon } from '@lucide/svelte';
+	import { RefreshCwIcon } from '@lucide/svelte';
 	import type { ColumnDef } from '@tanstack/table-core';
-	import { onDestroy, onMount } from 'svelte';
+	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import { DynamicTable } from '$lib/components/dynamic-table';
@@ -17,30 +17,9 @@
 	} from './artifact-viewer.ts';
 	import ProjectPicker from './artifact-viewer-project-picker.svelte';
 	import RepositoryPicker from './artifact-viewer-repository-picker.svelte';
+	import Create from './create.svelte';
 	import Grid from './grid.svelte';
 	import type { ArtifactType, ProjectType, RepositoryType } from './types';
-
-	let timer: ReturnType<typeof setInterval> | null = null;
-	function startWatching() {
-		stopWatching();
-		timer = setInterval(() => {
-			if (!isDestroyed && selectedProject && selectedRepository) {
-				fetchArtifacts(selectedProject.name, selectedRepository.name);
-			}
-		}, 15_000);
-	}
-	function stopWatching() {
-		if (timer) {
-			clearInterval(timer);
-			timer = null;
-		}
-	}
-	function handleWatching() {
-		if (selectedProject && selectedRepository && !isListing) {
-			fetchArtifacts(selectedProject.name, selectedRepository.name);
-		}
-		startWatching();
-	}
 
 	let projects = $state<ProjectType[]>([]);
 	let selectedProject = $state<ProjectType | undefined>(undefined);
@@ -121,7 +100,7 @@
 	let isListing = $state(false);
 
 	async function fetchArtifacts(projectName: string, repositoryFullName: string) {
-		if (isListing || isDestroyed || !projectName || !repositoryFullName) return;
+		if (isListing || !projectName || !repositoryFullName) return;
 
 		// Harbor API expects repo name without the project prefix
 		const repoName = repositoryFullName.includes('/')
@@ -148,6 +127,12 @@
 		}
 	}
 
+	function handleListing() {
+		if (selectedProject && selectedRepository && !isListing) {
+			fetchArtifacts(selectedProject.name, selectedRepository.name);
+		}
+	}
+
 	let isMounted = $state(false);
 	onMount(async () => {
 		await fetchProjects();
@@ -157,14 +142,7 @@
 				await fetchArtifacts(selectedProject.name, selectedRepository.name);
 			}
 		}
-		startWatching();
 		isMounted = true;
-	});
-
-	let isDestroyed = false;
-	onDestroy(() => {
-		isDestroyed = true;
-		stopWatching();
 	});
 </script>
 
@@ -184,14 +162,12 @@
 					{@const artifact = row.original.raw as unknown as ArtifactType}
 					<Grid {artifact} />
 				{/snippet}
-				{#snippet create()}{/snippet}
+				{#snippet create()}
+					<Create />
+				{/snippet}
 				{#snippet reload()}
-					<Button onclick={handleWatching} disabled={isListing} variant="outline">
-						{#if isListing}
-							<LoaderCircleIcon class="animate-spin opacity-60" size={16} />
-						{:else}
-							<RefreshCwIcon class="opacity-60" size={16} />
-						{/if}
+					<Button onclick={handleListing} disabled={isListing} variant="outline">
+						<RefreshCwIcon class="opacity-60" size={16} />
 					</Button>
 				{/snippet}
 				{#snippet rowActions()}{/snippet}

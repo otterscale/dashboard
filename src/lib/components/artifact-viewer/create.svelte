@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
+	import { PlusIcon } from '@lucide/svelte';
 
 	import * as Code from '$lib/components/custom/code';
 	import CopyButton from '$lib/components/custom/copy-button/copy-button.svelte';
@@ -8,13 +9,12 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { m } from '$lib/paraglide/messages';
-	import { PlusIcon } from '@lucide/svelte';
 
 	const registryURL = '192.168.0.1:5000';
 </script>
 
 <Dialog.Root>
-	<Dialog.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+	<Dialog.Trigger class={buttonVariants({ variant: 'outline', size: 'icon' })}>
 		<PlusIcon />
 	</Dialog.Trigger>
 	<Dialog.Content class="max-h-[77vh] w-full min-w-[50vw] overflow-y-auto">
