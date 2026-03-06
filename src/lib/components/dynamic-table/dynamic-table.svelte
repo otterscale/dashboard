@@ -487,7 +487,7 @@
 		<ButtonGroup.Root>
 			<Button
 				variant={mode === 'table' ? 'secondary' : 'outline'}
-				size="icon-sm"
+				size="icon"
 				onclick={() => (mode = 'table')}
 				aria-pressed={mode === 'table'}
 			>
@@ -496,7 +496,7 @@
 			<Button
 				disabled={!grid}
 				variant={mode === 'grid' ? 'secondary' : 'outline'}
-				size="icon-sm"
+				size="icon"
 				onclick={() => (mode = 'grid')}
 				aria-pressed={mode === 'grid'}
 			>

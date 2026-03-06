@@ -97,7 +97,6 @@
 		</Item.Content>
 	</Item.Root>
 {/snippet}
-<!-- {buildOciUrl(publicEnv.PUBLIC_HARBOR_URL, artifact.repository_name)} -->
 <Card.Root>
 	{@const extraAttributes = artifact.extra_attrs ?? {}}
 	<Card.Header>

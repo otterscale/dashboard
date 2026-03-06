@@ -2,7 +2,6 @@
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import { RefreshCwIcon } from '@lucide/svelte';
 	import type { ColumnDef } from '@tanstack/table-core';
-	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import { DynamicTable } from '$lib/components/dynamic-table';
@@ -17,13 +16,20 @@
 	} from './artifact-viewer.ts';
 	import Create from './create.svelte';
 	import Grid from './grid.svelte';
-	import { ProjectPicker, RepositoryPicker } from './index.ts';
 	import type { ArtifactType, ProjectType, RepositoryType } from './types';
 	import View from './view.svelte';
+	import ProjectPicker from './artifact-viewer-project-picker.svelte';
+	import RepositoryPicker from './artifact-viewer-repository-picker.svelte';
+	import { onMount } from 'svelte';
+
+	const uiSchemas: Record<string, UISchemaType> = getArtifactUISchemas();
+	const dataSchemas: Record<string, DataSchemaType> = getArtifactDataSchemas();
+	const columnDefinitions: ColumnDef<Record<string, JsonValue>>[] = getArtifactColumnDefinitions(
+		uiSchemas,
+		dataSchemas
+	);
 
 	let projects = $state<ProjectType[]>([]);
-	let selectedProject = $state<ProjectType | undefined>(undefined);
-
 	async function fetchProjects() {
 		try {
 			const response = await fetch('/rest/harbor/projects');
@@ -34,24 +40,28 @@
 			}
 			const data: ProjectType[] = await response.json();
 			projects = data ?? [];
-			if (projects.length > 0) {
-				[selectedProject] = projects;
-			}
 		} catch (error) {
 			console.error('Error fetching Harbor projects:', error);
 			toast.error('Error fetching Harbor projects');
 		}
 	}
 
-	function handleProjectSelect() {
+	let selectedProject = $state<ProjectType | undefined>(undefined);
+	function handleProjectSelect(project: ProjectType) {
+		selectedProject = project;
+	}
+	$effect(() => {
+		selectedProject = projects.length > 0 ? projects[0] : undefined;
+	});
+	$effect(() => {
 		if (selectedProject) {
 			fetchRepositories(selectedProject.name);
+		} else {
+			repositories = [];
 		}
-	}
+	});
 
 	let repositories = $state<RepositoryType[]>([]);
-	let selectedRepository = $state<RepositoryType | undefined>(undefined);
-
 	async function fetchRepositories(projectName: string) {
 		if (!projectName) return;
 		try {
@@ -65,41 +75,35 @@
 			}
 			const data: RepositoryType[] = await response.json();
 			repositories = data ?? [];
-			if (repositories.length > 0) {
-				[selectedRepository] = repositories;
-				fetchArtifacts(selectedRepository.name);
-			} else {
-				dataset = [];
-			}
 		} catch (error) {
 			console.error('Error fetching Harbor repositories:', error);
 			toast.error('Error fetching Harbor repositories');
 		}
 	}
 
-	function handleRepositorySelect() {
-		if (selectedProject && selectedRepository) {
-			fetchArtifacts(selectedRepository.name);
-		}
+	let selectedRepository = $state<RepositoryType | undefined>(undefined);
+	function handleRepositorySelect(repository: RepositoryType) {
+		selectedRepository = repository;
 	}
-
-	const uiSchemas: Record<string, UISchemaType> = getArtifactUISchemas();
-	const dataSchemas: Record<string, DataSchemaType> = getArtifactDataSchemas();
-	const columnDefinitions: ColumnDef<Record<string, JsonValue>>[] = getArtifactColumnDefinitions(
-		uiSchemas,
-		dataSchemas
-	);
+	$effect(() => {
+		selectedRepository = repositories.length > 0 ? repositories[0] : undefined;
+	});
+	$effect(() => {
+		if (selectedRepository) {
+			fetchArtifacts(selectedRepository.name);
+		} else {
+			dataset = [];
+		}
+	});
 
 	let dataset: Record<string, JsonValue>[] = $state([]);
 	let isFetchingArtifacts = $state(false);
-
 	async function fetchArtifacts(repositoryNameWithProject: string) {
 		if (isFetchingArtifacts || !repositoryNameWithProject) return;
 
-		const [projectName, repositoryName] = repositoryNameWithProject.split('/');
+		isFetchingArtifacts = true;
 
-		isFetchingArtifacts = true;
-		isFetchingArtifacts = true;
+		const [projectName, repositoryName] = repositoryNameWithProject.split('/');
 		try {
 			const response = await fetch(
 				`/rest/harbor/artifacts?project=${encodeURIComponent(projectName)}&repository=${encodeURIComponent(repositoryName)}`
@@ -116,36 +120,30 @@
 			toast.error('Error fetching Harbor artifacts');
 		} finally {
 			isFetchingArtifacts = false;
-			isFetchingArtifacts = false;
 		}
 	}
-
-	function handleListing() {
+	function handleReload() {
 		if (selectedProject && selectedRepository && !isFetchingArtifacts) {
 			fetchArtifacts(selectedRepository.name);
 		}
 	}
 
 	let isMounted = $state(false);
-	onMount(async () => {
-		await fetchProjects();
-		if (selectedProject) {
-			await fetchRepositories(selectedProject.name);
-			if (selectedRepository) {
-				await fetchArtifacts(selectedRepository.name);
-			}
-		}
-		isMounted = true;
+	onMount(() => {
+		fetchProjects().then(() => {
+			isMounted = true;
+		});
+		return () => {};
 	});
 </script>
 
 {#if isMounted}
 	<div class="space-y-4">
 		<div class="flex items-center gap-2">
-			<ProjectPicker bind:value={selectedProject} {projects} onSelect={handleProjectSelect} />
+			<ProjectPicker value={selectedProject} {projects} onSelect={handleProjectSelect} />
 			{#if repositories.length > 0}
 				<RepositoryPicker
-					bind:value={selectedRepository}
+					value={selectedRepository}
 					{repositories}
 					onSelect={handleRepositorySelect}
 				/>
@@ -160,7 +158,7 @@
 				<Create />
 			{/snippet}
 			{#snippet reload()}
-				<Button onclick={handleListing} disabled={isFetchingArtifacts} variant="outline">
+				<Button onclick={handleReload} disabled={isFetchingArtifacts} variant="outline">
 					<RefreshCwIcon class="opacity-60" size={16} />
 				</Button>
 			{/snippet}
