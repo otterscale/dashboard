@@ -143,7 +143,11 @@ const handleProxy: Handle = async ({ event, resolve }) => {
 		return resolve(event);
 	}
 
-	const targetUrl = new URL(event.url.pathname + event.url.search, env.API_URL);
+	const base = new URL(env.API_URL);
+	const targetUrl = new URL(
+		base.pathname.replace(/\/$/, '') + event.url.pathname + event.url.search,
+		base.origin
+	);
 	const proxyHeaders = new Headers(event.request.headers);
 
 	HOP_BY_HOP_HEADERS.forEach((header) => proxyHeaders.delete(header));
