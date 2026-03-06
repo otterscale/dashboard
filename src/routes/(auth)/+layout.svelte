@@ -26,9 +26,9 @@
 	import HelpCircleIcon from '@lucide/svelte/icons/help-circle';
 	import HouseIcon from '@lucide/svelte/icons/house';
 	import KeyRoundIcon from '@lucide/svelte/icons/key-round';
+	import LayersIcon from '@lucide/svelte/icons/layers';
 	import LayoutDashboardIcon from '@lucide/svelte/icons/layout-dashboard';
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
-	import LayersIcon from '@lucide/svelte/icons/layers';
 	import LinkIcon from '@lucide/svelte/icons/link';
 	import LockIcon from '@lucide/svelte/icons/lock';
 	import MapIcon from '@lucide/svelte/icons/map';
@@ -43,9 +43,9 @@
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import ShieldAlertIcon from '@lucide/svelte/icons/shield-alert';
 	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
-	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
 	import TagIcon from '@lucide/svelte/icons/tag';
 	import UserIcon from '@lucide/svelte/icons/user';
@@ -56,6 +56,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { env } from '$env/dynamic/public';
 	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import { type Scope, ScopeService } from '$lib/api/scope/v1/scope_pb';
 	import {
@@ -78,7 +79,6 @@
 	import { activeNamespace, breadcrumbs } from '$lib/stores';
 
 	import type { LayoutData } from './$types';
-	import { env } from '$env/dynamic/public';
 
 	let {
 		data,
