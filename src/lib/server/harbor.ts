@@ -1,12 +1,12 @@
-import { env } from '$env/dynamic/private';
+import { env as publicEnv } from '$env/dynamic/public';
 import type {
 	ArtifactType,
 	ProjectType,
 	RepositoryType
-} from '$lib/components/repository-viewer/types';
+} from '$lib/components/artifact-viewer/types';
 
 async function fetchData<Type>(path: string, accessToken: string): Promise<Type> {
-	const endpoint = env.HARBOR_URL;
+	const endpoint = publicEnv.PUBLIC_HARBOR_URL;
 	const url = new URL(path, endpoint);
 
 	const response = await fetch(url.toString(), {
@@ -57,4 +57,37 @@ export async function listArtifacts(
 		accessToken
 	);
 	return artifacts ?? [];
+}
+
+export async function getReferenceAddition(
+	projectName: string,
+	repositoryName: string,
+	reference: string,
+	addition: string,
+	accessToken: string
+): Promise<unknown> {
+	if (!projectName || !repositoryName || !reference || !addition)
+		throw new Error('projectName, repositoryName, reference and addition are required');
+
+	const endpoint = publicEnv.PUBLIC_HARBOR_URL;
+	const path = `/api/v2.0/projects/${encodeURIComponent(projectName)}/repositories/${encodeURIComponent(repositoryName)}/artifacts/${encodeURIComponent(reference)}/additions/${addition}`;
+	const url = new URL(path, endpoint);
+
+	const response = await fetch(url.toString(), {
+		headers: {
+			Authorization: `Bearer ${accessToken}`
+		}
+	});
+
+	if (!response.ok) {
+		const text = await response.text();
+		console.error(`Harbor API error: ${response.status} ${response.statusText}`, text);
+		throw new Error(`Harbor API error: ${response.status} ${response.statusText}`);
+	}
+
+	const contentType = response.headers.get('content-type') ?? '';
+	if (contentType.includes('application/json')) {
+		return response.json();
+	}
+	return response.text();
 }

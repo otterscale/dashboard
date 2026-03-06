@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { createClient, type Transport } from '@connectrpc/connect';
+	import { type Transport } from '@connectrpc/connect';
 	import Icon from '@iconify/svelte';
 	import { BookmarkIcon, DownloadIcon, TagsIcon } from '@lucide/svelte';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
@@ -7,22 +7,24 @@
 	import Ajv from 'ajv';
 	import { getContext } from 'svelte';
 
-	import { RegistryService } from '$lib/api/registry/v1/registry_pb.ts';
 	// import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import EditorWidget from '$lib/components/dynamic-form/widgets/editor.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
+	import Button, { buttonVariants } from '$lib/components/ui/button/button.svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Item from '$lib/components/ui/item';
 
-	import { buttonVariants } from '../ui/button/button.svelte';
-	import type { ArtifactType } from './types.d.ts';
+	import type { ArtifactType, ProjectType, RepositoryType } from './types.d.ts';
 
-	let { artifact }: { artifact: ArtifactType } = $props();
+	let {
+		project,
+		repository,
+		artifact
+	}: { project: ProjectType; repository: RepositoryType; artifact: ArtifactType } = $props();
 
 	const transport: Transport = getContext('transport');
-	const registryClient = createClient(RegistryService, transport);
 	// const resourceClient = createClient(ResourceService, transport);
 
 	const jsonSchema = {
@@ -60,6 +62,31 @@
 	// Flags
 	let open = $state(false);
 	let isInstalling = $state(false);
+
+	// Harbor API expects repo name without the project prefix
+	const repositoryName = repository.name.includes('/')
+		? repository.name.slice(repository.name.indexOf('/') + 1)
+		: repository.name;
+
+	async function getReferenceAddition(addition: string) {
+		const parameters = new URLSearchParams({
+			project: project.name,
+			repository: repositoryName,
+			reference: artifact.digest,
+			addition
+		});
+		const response = await fetch(`/rest/harbor/referenceAddition?${parameters}`);
+		if (!response.ok) {
+			console.error('Failed to fetch Harbor addition:', response.statusText);
+			throw new Error('Failed to fetch Harbor addition');
+		}
+		return response.json();
+	}
+	async function getChartInformation() {
+		const values = await getReferenceAddition('values.yaml');
+		const readme = await getReferenceAddition('readme.md');
+		return { values, readme };
+	}
 </script>
 
 {#snippet header()}
@@ -77,7 +104,7 @@
 		</Item.Content>
 	</Item.Root>
 {/snippet}
-
+<!-- {buildOciUrl(publicEnv.PUBLIC_HARBOR_URL, artifact.repository_name)} -->
 <Card.Root>
 	{@const extraAttributes = artifact.extra_attrs ?? {}}
 	<Card.Header>
@@ -102,7 +129,11 @@
 				</Item.Description>
 			</Item.Content>
 			{#if artifact.type === 'CHART'}
-				{#await registryClient.getChartInformation( { chartRef: `oci://192.168.196.160:32180/${artifact.repository_name}` } ) then response}
+				{#await getChartInformation()}
+					<Button disabled variant="ghost" size="icon">
+						<DownloadIcon />
+					</Button>
+				{:then response}
 					<Item.Actions>
 						<AlertDialog.Root bind:open>
 							<AlertDialog.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>

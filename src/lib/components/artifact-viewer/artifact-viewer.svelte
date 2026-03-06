@@ -160,7 +160,7 @@
 			<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {dataSchemas}>
 				{#snippet grid({ row })}
 					{@const artifact = row.original.raw as unknown as ArtifactType}
-					<Grid {artifact} />
+					<Grid project={selectedProject!} repository={selectedRepository!} {artifact} />
 				{/snippet}
 				{#snippet create()}
 					<Create />

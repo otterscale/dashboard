@@ -16,11 +16,11 @@ const REQUIRED_ENV_VARS_ALL: readonly EnvVar[] = [{ value: env.API_URL, name: 'A
 
 const REQUIRED_ENV_VARS_NORMAL: readonly EnvVar[] = [
 	{ value: publicEnv.PUBLIC_WEB_URL, name: 'PUBLIC_WEB_URL' },
+	{ value: publicEnv.PUBLIC_HARBOR_URL, name: 'PUBLIC_HARBOR_URL' },
 	{ value: env.KEYCLOAK_REALM_URL, name: 'KEYCLOAK_REALM_URL' },
 	{ value: env.KEYCLOAK_CLIENT_ID, name: 'KEYCLOAK_CLIENT_ID' },
 	{ value: env.KEYCLOAK_CLIENT_SECRET, name: 'KEYCLOAK_CLIENT_SECRET' },
-	{ value: env.REDIS_URL, name: 'REDIS_URL' },
-	{ value: env.HARBOR_URL, name: 'HARBOR_URL' }
+	{ value: env.REDIS_URL, name: 'REDIS_URL' }
 ];
 
 const checkRequiredEnvVars = (envVars: readonly EnvVar[]): void => {
