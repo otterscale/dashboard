@@ -72,7 +72,7 @@
 	import { Separator } from '$lib/components/ui/separator';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-	import * as ToggleGroup from '$lib/components/ui/toggle-group';
+	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
 	import { m } from '$lib/paraglide/messages';
 	import { activeNamespace, breadcrumbs, sidebarView } from '$lib/stores';
 
@@ -431,21 +431,18 @@
 					user={data.user}
 					onsuccess={() => fetchWorkspaces(activeScope)}
 				/>
-				<div class="px-2 pt-2 group-data-[collapsible=icon]:hidden">
-					<ToggleGroup.Root
-						type="single"
-						bind:value={$sidebarView}
-						variant="outline"
-						class="w-full"
-					>
-						<ToggleGroup.Item value="managed" class="flex-1 text-xs">
-							{m.managed()}
-						</ToggleGroup.Item>
-						<ToggleGroup.Item value="kubernetes" class="flex-1 text-xs">
-							{m.kubernetes()}
-						</ToggleGroup.Item>
-					</ToggleGroup.Root>
-				</div>
+				<button
+					type="button"
+					class="flex items-center gap-1 px-4 pt-2 text-xs text-muted-foreground transition-colors group-data-[collapsible=icon]:hidden hover:text-foreground"
+					onclick={() => {
+						$sidebarView = $sidebarView === 'managed' ? 'kubernetes' : 'managed';
+					}}
+				>
+					<ChevronLeftIcon class="size-3.5" />
+					<span>
+						{$sidebarView === 'managed' ? m.kubernetes() : m.managed()}
+					</span>
+				</button>
 			</Sidebar.Header>
 			{#if $activeNamespace}
 				<Sidebar.Content class="gap-2">
