@@ -2,10 +2,8 @@
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 	import type { Component } from 'svelte';
 
-	import { page } from '$app/state';
 	import * as Collapsible from '$lib/components/ui/collapsible/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-
 	let {
 		label,
 		items
@@ -23,73 +21,48 @@
 			}[];
 		}[];
 	} = $props();
-
-	const isItemActive = (url: string): boolean => url !== '#' && page.url.href.includes(url);
-	const isSubItemActive = (url: string): boolean => url !== '#' && page.url.href.includes(url);
 </script>
 
 <Sidebar.Group>
 	<Sidebar.GroupLabel>{label}</Sidebar.GroupLabel>
 	<Sidebar.Menu>
 		{#each items as item (item.title)}
-			{#if item.items && item.items.length > 0}
-				<Collapsible.Root open={item.isActive || isItemActive(item.url)} class="group/collapsible">
-					{#snippet child({ props })}
-						<Sidebar.MenuItem {...props}>
-							<Sidebar.MenuButton tooltipContent={item.title}>
-								{#snippet child({ props })}
-									<!-- eslint-disable svelte/no-navigation-without-resolve -->
-									<a href={item.url} {...props}>
-										{#if item.icon}
-											<item.icon />
-										{/if}
-										<span>{item.title}</span>
-									</a>
-									<!-- eslint-enable svelte/no-navigation-without-resolve -->
-								{/snippet}
-							</Sidebar.MenuButton>
-							<Collapsible.Trigger>
-								{#snippet child({ props })}
-									<Sidebar.MenuAction {...props} class="data-[state=open]:rotate-90">
-										<ChevronRightIcon />
-										<span class="sr-only">Toggle</span>
-									</Sidebar.MenuAction>
-								{/snippet}
-							</Collapsible.Trigger>
-							<Collapsible.Content>
-								<Sidebar.MenuSub>
-									{#each item.items as subItem (subItem.title)}
-										<Sidebar.MenuSubItem>
-											<Sidebar.MenuSubButton
-												href={subItem.url}
-												aria-disabled={subItem.disabled}
-												isActive={isSubItemActive(subItem.url)}
-											>
-												<span>{subItem.title}</span>
-											</Sidebar.MenuSubButton>
-										</Sidebar.MenuSubItem>
-									{/each}
-								</Sidebar.MenuSub>
-							</Collapsible.Content>
-						</Sidebar.MenuItem>
-					{/snippet}
-				</Collapsible.Root>
-			{:else}
-				<Sidebar.MenuItem>
-					<Sidebar.MenuButton tooltipContent={item.title}>
-						{#snippet child({ props })}
-							<!-- eslint-disable svelte/no-navigation-without-resolve -->
-							<a href={item.url} {...props}>
-								{#if item.icon}
-									<item.icon />
-								{/if}
-								<span>{item.title}</span>
-							</a>
-							<!-- eslint-enable svelte/no-navigation-without-resolve -->
-						{/snippet}
-					</Sidebar.MenuButton>
-				</Sidebar.MenuItem>
-			{/if}
+			<Collapsible.Root open={item.isActive} class="group/collapsible">
+				{#snippet child({ props })}
+					<Sidebar.MenuItem {...props}>
+						<Collapsible.Trigger>
+							{#snippet child({ props })}
+								<Sidebar.MenuButton {...props} tooltipContent={item.title}>
+									{#if item.icon}
+										<item.icon />
+									{/if}
+									<span>{item.title}</span>
+									<ChevronRightIcon
+										class="ms-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
+									/>
+								</Sidebar.MenuButton>
+							{/snippet}
+						</Collapsible.Trigger>
+						<Collapsible.Content>
+							<Sidebar.MenuSub>
+								{#each item.items ?? [] as subItem (subItem.title)}
+									<Sidebar.MenuSubItem>
+										<Sidebar.MenuSubButton aria-disabled={subItem.disabled}>
+											{#snippet child({ props })}
+												<!-- eslint-disable svelte/no-navigation-without-resolve -->
+												<a href={subItem.url} {...props}>
+													<span>{subItem.title}</span>
+												</a>
+												<!-- eslint-enable svelte/no-navigation-without-resolve -->
+											{/snippet}
+										</Sidebar.MenuSubButton>
+									</Sidebar.MenuSubItem>
+								{/each}
+							</Sidebar.MenuSub>
+						</Collapsible.Content>
+					</Sidebar.MenuItem>
+				{/snippet}
+			</Collapsible.Root>
 		{/each}
 	</Sidebar.Menu>
 </Sidebar.Group>
