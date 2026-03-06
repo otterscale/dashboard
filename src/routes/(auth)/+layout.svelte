@@ -6,9 +6,9 @@
 	import ArchiveIcon from '@lucide/svelte/icons/archive';
 	import BarChart3Icon from '@lucide/svelte/icons/bar-chart-3';
 	import BellIcon from '@lucide/svelte/icons/bell';
+	import BotIcon from '@lucide/svelte/icons/bot';
 	import BoxIcon from '@lucide/svelte/icons/box';
 	import BracesIcon from '@lucide/svelte/icons/braces';
-	import BrainIcon from '@lucide/svelte/icons/brain';
 	import CircleDotIcon from '@lucide/svelte/icons/circle-dot';
 	import ClipboardIcon from '@lucide/svelte/icons/clipboard';
 	import ClockIcon from '@lucide/svelte/icons/clock';
@@ -165,7 +165,7 @@
 			{
 				title: m.model(),
 				url: resourceUrl('Model', 'model.otterscale.io', 'v1alpha1', 'models'),
-				icon: BrainIcon
+				icon: BotIcon
 			},
 			{
 				title: m.model_artifact(),
