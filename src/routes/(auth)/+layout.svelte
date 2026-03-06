@@ -69,12 +69,13 @@
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { Label } from '$lib/components/ui/label';
 	import { Separator } from '$lib/components/ui/separator';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
+	import { Switch } from '$lib/components/ui/switch';
 	import { m } from '$lib/paraglide/messages';
-	import { activeNamespace, breadcrumbs, sidebarView } from '$lib/stores';
+	import { activeNamespace, breadcrumbs } from '$lib/stores';
 
 	import type { LayoutData } from './$types';
 	import { env } from '$env/dynamic/public';
@@ -96,6 +97,7 @@
 	let activeScope = $state(page.params.scope ?? page.params.cluster ?? '');
 	let scopes = $state<Scope[]>([]);
 	let workspaces = $state<TenantOtterscaleIoV1Alpha1Workspace[]>([]);
+	let nativeMode = $state(false);
 
 	async function fetchScopes() {
 		try {
@@ -123,12 +125,12 @@
 
 	async function onValueChange(cluster: string) {
 		await fetchWorkspaces(cluster);
-		await goto(resolve('/(auth)/scope/[scope]/managed', { scope: cluster }));
+		await goto(resolve('/(auth)/scope/[scope]/workspace', { scope: cluster }));
 		toast.success(m.switch_scope({ name: cluster }));
 	}
 
 	async function onHomeClick() {
-		await goto(resolve('/(auth)/scope/[scope]/managed', { scope: activeScope }));
+		await goto(resolve('/(auth)/scope/[scope]/workspace', { scope: activeScope }));
 	}
 
 	let isMounted = $state(false);
@@ -152,7 +154,7 @@
 		overview: [
 			{
 				name: m.overview(),
-				url: resolve('/(auth)/scope/[scope]/managed', { scope: activeScope }),
+				url: resolve('/(auth)/scope/[scope]/workspace', { scope: activeScope }),
 				icon: GaugeIcon,
 				edit: false
 			}
@@ -432,22 +434,14 @@
 					user={data.user}
 					onsuccess={() => fetchWorkspaces(activeScope)}
 				/>
-				<button
-					type="button"
-					class="flex items-center gap-1 px-4 pt-2 text-xs text-muted-foreground transition-colors group-data-[collapsible=icon]:hidden hover:text-foreground"
-					onclick={() => {
-						$sidebarView = $sidebarView === 'managed' ? 'kubernetes' : 'managed';
-					}}
-				>
-					<ChevronLeftIcon class="size-3.5" />
-					<span>
-						{$sidebarView === 'managed' ? m.kubernetes() : m.managed()}
-					</span>
-				</button>
+				<div class="flex items-center space-x-2">
+					<Switch id="native-mode" bind:checked={nativeMode} />
+					<Label for="native-mode">Native Mode</Label>
+				</div>
 			</Sidebar.Header>
-			{#if $activeNamespace}
-				<Sidebar.Content class="gap-2">
-					{#if $sidebarView === 'managed'}
+			<Sidebar.Content class="gap-2">
+				{#if $activeNamespace}
+					{#if !nativeMode}
 						<NavOverview items={managedNavData.overview} />
 						<NavMain label={m.ai_studio()} items={managedNavData.ai} />
 						<NavMain label={m.apps()} items={managedNavData.apps} />
@@ -463,8 +457,8 @@
 						<NavMain label={m.namespaced()} items={kubernetesNavData.namespaced} />
 						<NavMain label={m.cluster()} items={kubernetesNavData.cluster} />
 					{/if}
-				</Sidebar.Content>
-			{/if}
+				{/if}
+			</Sidebar.Content>
 		{:else}
 			<Sidebar.Header id="workspace-guide-step">
 				<div class="flex h-12 w-full items-center gap-2 overflow-hidden rounded-md p-2">
