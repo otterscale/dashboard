@@ -10,7 +10,8 @@ export const GET: RequestHandler = async ({ locals }) => {
 	}
 
 	try {
-		const projects = await listProjects();
+		const accessToken = locals.session.tokenSet.accessToken;
+		const projects = await listProjects(accessToken);
 		return json(projects);
 	} catch (err) {
 		console.error('Failed to list Harbor projects:', err);

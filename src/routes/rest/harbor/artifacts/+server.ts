@@ -20,7 +20,8 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 	}
 
 	try {
-		const artifacts = await listArtifacts(project, repository);
+		const accessToken = locals.session.tokenSet.accessToken;
+		const artifacts = await listArtifacts(project, repository, accessToken);
 		return json(artifacts);
 	} catch (err) {
 		console.error('Failed to list Harbor artifacts:', err);

@@ -15,7 +15,8 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 	}
 
 	try {
-		const repositories = await listRepositories(project);
+		const accessToken = locals.session.tokenSet.accessToken;
+		const repositories = await listRepositories(project, accessToken);
 		return json(repositories);
 	} catch (err) {
 		console.error('Failed to list Harbor repositories:', err);
