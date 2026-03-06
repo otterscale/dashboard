@@ -132,12 +132,15 @@
 		"yaml": "^2.8.2"
 	},
 	"pnpm": {
+		"overrides": {
+			"cookie": "^0.7.0",
+			"dompurify": "^3.3.0",
+			"esbuild": "^0.25.12",
+			"minimatch": "^10.2.2"
+		},
 		"onlyBuiltDependencies": [
 			"esbuild",
 			"protobufjs"
-		],
-		"overrides": {
-			"dompurify": "^3.3.2"
-		}
+		]
 	}
 }
