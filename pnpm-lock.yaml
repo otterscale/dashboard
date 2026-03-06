@@ -41,6 +41,9 @@ importers:
       '@oslojs/encoding':
         specifier: ^1.1.0
         version: 1.1.0
+      '@otterscale/api':
+        specifier: 0.8.20
+        version: 0.8.20
       '@shikijs/langs':
         specifier: ^3.22.0
         version: 3.22.0
@@ -216,9 +219,6 @@ importers:
       '@neoconfetti/svelte':
         specifier: ^2.2.2
         version: 2.2.2(svelte@5.53.3)
-      '@otterscale/api':
-        specifier: ^0.8.0
-        version: 0.8.0
       '@otterscale/types':
         specifier: ^0.8.1
         version: 0.8.1
@@ -828,8 +828,8 @@ packages:
   '@oslojs/jwt@0.2.0':
     resolution: {integrity: sha512-bLE7BtHrURedCn4Mco3ma9L4Y1GR2SMBuIvjWr7rmQ4/W/4Jy70TIAgZ+0nIlk0xHz1vNP8x8DCns45Sb2XRbg==}
 
-  '@otterscale/api@0.8.0':
-    resolution: {integrity: sha512-WOZA7BzBo91IjJTcqSUrIiNmlwKjrisTD6IpO4P2P6/9hsHa/DstUbdCTaMRbeLWEr4ng7rm8u7aMv61sO9cYw==}
+  '@otterscale/api@0.8.20':
+    resolution: {integrity: sha512-N46zYrQxrl37QC470ZmKmrPaBp+gNFS9I1Q1jdFBbHru7kbuK16IfDaDMGN2HeJhUdDBEshfzDkPd710kP3mEg==}
 
   '@otterscale/types@0.8.1':
     resolution: {integrity: sha512-d9cuz7kk00vtnX0MAfKX3suHn2vIddh11TeOus3SowVx0tmrJlxDyB8py/n+sgzOENUl9pJ33mHLvvb3ZeX44A==}
@@ -4061,7 +4061,7 @@ snapshots:
     dependencies:
       '@oslojs/encoding': 0.4.1
 
-  '@otterscale/api@0.8.0':
+  '@otterscale/api@0.8.20':
     dependencies:
       '@bufbuild/protobuf': 2.11.0
 
