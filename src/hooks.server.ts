@@ -143,6 +143,10 @@ const handleProxy: Handle = async ({ event, resolve }) => {
 		return resolve(event);
 	}
 
+	if (!env.API_URL) {
+		throw new Error('API_URL environment variable is not set');
+	}
+
 	const base = new URL(env.API_URL);
 	const targetUrl = new URL(
 		base.pathname.replace(/\/$/, '') + event.url.pathname + event.url.search,
