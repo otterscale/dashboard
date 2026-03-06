@@ -58,7 +58,7 @@ function getArtifactData(artifact: ArtifactType): Record<ArtifactAttribute, Json
 		platformParts.push(String(artifact.extra_attrs.architecture));
 	const platformStr = platformParts.length > 0 ? platformParts.join('/') : null;
 
-	const { value: sizeValue, unit: sizeUnit } = formatWithBinarySuffix(artifact.size);
+	const { value: sizeValue, unit: sizeUnit } = formatWithBinarySuffix(BigInt(artifact.size));
 
 	return {
 		Digest: artifact.digest ? artifact.digest.slice(0, 19) : null,

@@ -16,13 +16,11 @@
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Item from '$lib/components/ui/item';
 
-	import type { ArtifactType, ProjectType, RepositoryType } from './types.d.ts';
+	import type { ArtifactType } from './types.d.ts';
 
-	let {
-		project,
-		repository,
-		artifact
-	}: { project: ProjectType; repository: RepositoryType; artifact: ArtifactType } = $props();
+	let { artifact }: { artifact: ArtifactType } = $props();
+
+	const [projectName, repositoryName] = $derived(artifact.repository_name.split('/'));
 
 	const transport: Transport = getContext('transport');
 	// const resourceClient = createClient(ResourceService, transport);
@@ -63,15 +61,9 @@
 	let open = $state(false);
 	let isInstalling = $state(false);
 
-	const repositoryName = $derived(
-		repository.name.includes('/')
-			? repository.name.slice(repository.name.indexOf('/') + 1)
-			: repository.name
-	);
-
 	async function getReferenceAddition(addition: string) {
 		const parameters = new URLSearchParams({
-			project: project.name,
+			project: projectName,
 			repository: repositoryName,
 			reference: artifact.digest,
 			addition

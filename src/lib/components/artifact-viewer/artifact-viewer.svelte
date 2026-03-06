@@ -17,9 +17,70 @@
 	} from './artifact-viewer.ts';
 	import Create from './create.svelte';
 	import Grid from './grid.svelte';
+	import { ProjectPicker, RepositoryPicker } from './index.ts';
 	import type { ArtifactType, ProjectType, RepositoryType } from './types';
 
-	let { project, repository }: { project: ProjectType; repository: RepositoryType } = $props();
+	let projects = $state<ProjectType[]>([]);
+	let selectedProject = $state<ProjectType | undefined>(undefined);
+
+	async function fetchProjects() {
+		try {
+			const response = await fetch('/rest/harbor/projects');
+			if (!response.ok) {
+				console.error('Failed to fetch Harbor projects:', response.statusText);
+				toast.error('Failed to fetch Harbor projects');
+				return;
+			}
+			const data: ProjectType[] = await response.json();
+			projects = data ?? [];
+			if (projects.length > 0) {
+				[selectedProject] = projects;
+			}
+		} catch (error) {
+			console.error('Error fetching Harbor projects:', error);
+			toast.error('Error fetching Harbor projects');
+		}
+	}
+
+	function handleProjectSelect() {
+		if (selectedProject) {
+			fetchRepositories(selectedProject.name);
+		}
+	}
+
+	let repositories = $state<RepositoryType[]>([]);
+	let selectedRepository = $state<RepositoryType | undefined>(undefined);
+
+	async function fetchRepositories(projectName: string) {
+		if (!projectName) return;
+		try {
+			const response = await fetch(
+				`/rest/harbor/repositories?project=${encodeURIComponent(projectName)}`
+			);
+			if (!response.ok) {
+				console.error('Failed to fetch Harbor repositories:', response.statusText);
+				toast.error('Failed to fetch Harbor repositories');
+				return;
+			}
+			const data: RepositoryType[] = await response.json();
+			repositories = data ?? [];
+			if (repositories.length > 0) {
+				[selectedRepository] = repositories;
+				fetchArtifacts(selectedRepository.name);
+			} else {
+				dataset = [];
+			}
+		} catch (error) {
+			console.error('Error fetching Harbor repositories:', error);
+			toast.error('Error fetching Harbor repositories');
+		}
+	}
+
+	function handleRepositorySelect() {
+		if (selectedProject && selectedRepository) {
+			fetchArtifacts(selectedRepository.name);
+		}
+	}
 
 	const uiSchemas: Record<string, UISchemaType> = getArtifactUISchemas();
 	const dataSchemas: Record<string, DataSchemaType> = getArtifactDataSchemas();
@@ -31,17 +92,16 @@
 	let dataset: Record<string, JsonValue>[] = $state([]);
 	let isFetchingArtifacts = $state(false);
 
-	async function fetchArtifacts() {
-		if (isFetchingArtifacts || !project || !repository) return;
+	async function fetchArtifacts(repositoryNameWithProject: string) {
+		if (isFetchingArtifacts || !repositoryNameWithProject) return;
 
-		const repoName = repository.name.includes('/')
-			? repository.name.slice(repository.name.indexOf('/') + 1)
-			: repository.name;
+		const [projectName, repositoryName] = repositoryNameWithProject.split('/');
 
+		isFetchingArtifacts = true;
 		isFetchingArtifacts = true;
 		try {
 			const response = await fetch(
-				`/rest/harbor/artifacts?project=${encodeURIComponent(project.name)}&repository=${encodeURIComponent(repoName)}`
+				`/rest/harbor/artifacts?project=${encodeURIComponent(projectName)}&repository=${encodeURIComponent(repositoryName)}`
 			);
 			if (!response.ok) {
 				console.error('Failed to fetch Harbor artifacts:', response.statusText);
@@ -55,28 +115,45 @@
 			toast.error('Error fetching Harbor artifacts');
 		} finally {
 			isFetchingArtifacts = false;
+			isFetchingArtifacts = false;
 		}
 	}
 
 	function handleListing() {
-		if (!isFetchingArtifacts) {
-			fetchArtifacts();
+		if (selectedProject && selectedRepository && !isFetchingArtifacts) {
+			fetchArtifacts(selectedRepository.name);
 		}
 	}
 
 	let isMounted = $state(false);
 	onMount(async () => {
-		await fetchArtifacts();
+		await fetchProjects();
+		if (selectedProject) {
+			await fetchRepositories(selectedProject.name);
+			if (selectedRepository) {
+				await fetchArtifacts(selectedRepository.name);
+			}
+		}
 		isMounted = true;
 	});
 </script>
 
 {#if isMounted}
-	{#if columnDefinitions}
+	<div class="space-y-4">
+		<div class="flex items-center gap-2">
+			<ProjectPicker bind:value={selectedProject} {projects} onSelect={handleProjectSelect} />
+			{#if repositories.length > 0}
+				<RepositoryPicker
+					bind:value={selectedRepository}
+					{repositories}
+					onSelect={handleRepositorySelect}
+				/>
+			{/if}
+		</div>
 		<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {dataSchemas}>
 			{#snippet grid({ row })}
 				{@const artifact = row.original.raw as unknown as ArtifactType}
-				<Grid {project} {repository} {artifact} />
+				<Grid {artifact} />
 			{/snippet}
 			{#snippet create()}
 				<Create />
@@ -88,5 +165,5 @@
 			{/snippet}
 			{#snippet rowActions()}{/snippet}
 		</DynamicTable>
-	{/if}
+	</div>
 {/if}
