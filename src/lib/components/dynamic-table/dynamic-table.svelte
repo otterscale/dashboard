@@ -41,8 +41,8 @@
 	import { createRawSnippet, type Snippet } from 'svelte';
 
 	import { shortcut } from '$lib/actions/shortcut.svelte';
-	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
 	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
+	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import {
 		createSvelteTable,
@@ -72,7 +72,7 @@
 		bulkDelete,
 		reload,
 		rowActions = createRawSnippet(() => ({ render: () => '' })),
-		grid
+		gridsLayout
 	}: {
 		dataset: Record<string, JsonValue>[];
 		columnDefinitions: ColumnDef<Record<string, JsonValue>>[];
@@ -82,11 +82,11 @@
 		bulkDelete?: Snippet<[{ table: TanStackTabke<Record<string, JsonValue>> }]>;
 		rowActions?: Snippet<[{ row: Row<Record<string, JsonValue>> }]>;
 		reload: Snippet;
-		grid?: Snippet<
+		gridsLayout?: Snippet<
 			[
 				{
 					table: TableType<Record<string, JsonValue>>;
-					row: Row<Record<string, JsonValue>>;
+					handleClear: () => void;
 				}
 			]
 		>;
@@ -494,7 +494,7 @@
 				<SheetIcon />
 			</Button>
 			<Button
-				disabled={!grid}
+				disabled={!gridsLayout}
 				variant={mode === 'grid' ? 'secondary' : 'outline'}
 				size="icon"
 				onclick={() => (mode = 'grid')}
@@ -517,130 +517,12 @@
 			{globalFilterError.message}
 		</p>
 	{/if}
+
+	<!-- Layouts -->
 	{#if mode === 'table'}
-		<div class="overflow-hidden rounded-md border bg-background">
-			<Table.Root class="table-fixed">
-				<Table.Header class="bg-muted">
-					{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
-						<Table.Row class="hover:bg-transparent">
-							{#each headerGroup.headers as header (header.id)}
-								<Table.Head
-									style="width: {header.getSize()}px"
-									class={cn(lodash.get(header.column.columnDef.meta, 'class'), 'h-11')}
-								>
-									{#if !header.isPlaceholder && header.column.getCanSort()}
-										<div
-											class={cn(
-												header.column.getCanSort() &&
-													'flex h-full cursor-pointer items-center justify-between gap-2 select-none',
-												getHeaderAlignment(uiSchemas[header.column.id])
-											)}
-											onclick={header.column.getToggleSortingHandler()}
-											onkeydown={(e) => {
-												if (header.column.getCanSort() && (e.key === 'Enter' || e.key === ' ')) {
-													e.preventDefault();
-													header.column.getToggleSortingHandler()?.(e);
-												}
-											}}
-											{...header.column.getCanSort()
-												? {
-														tabindex: 0,
-														role: 'button',
-														'aria-pressed': header.column.getIsSorted() ? 'true' : 'false'
-													}
-												: {}}
-										>
-											<FlexRender
-												content={header.column.columnDef.header}
-												context={header.getContext()}
-											/>
-											{#if header.column.getIsSorted() === 'asc'}
-												<ChevronUpIcon class="shrink-0 opacity-60" size={16} aria-hidden="true" />
-											{:else if header.column.getIsSorted() === 'desc'}
-												<ChevronDownIcon class="shrink-0 opacity-60" size={16} aria-hidden="true" />
-											{/if}
-										</div>
-									{:else if !header.isPlaceholder && !header.column.getCanSort()}
-										<FlexRender
-											content={header.column.columnDef.header}
-											context={header.getContext()}
-										/>
-									{/if}
-								</Table.Head>
-							{/each}
-						</Table.Row>
-					{/each}
-				</Table.Header>
-				<Table.Body>
-					{#if table.getRowModel().rows?.length}
-						{#each table.getRowModel().rows as row (row.id)}
-							<Table.Row data-state={row.getIsSelected() && 'selected'}>
-								{#each row.getVisibleCells() as cell (cell.id)}
-									<Table.Cell
-										class={cn(
-											getCellAlignment(uiSchemas[cell.column.id]),
-											lodash.get(cell.column.columnDef.meta, 'class')
-										)}
-									>
-										<FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} />
-									</Table.Cell>
-								{/each}
-							</Table.Row>
-						{/each}
-					{:else}
-						<Table.Row>
-							<Table.Cell colspan={columns.length} class="h-full text-center">
-								<Empty.Root>
-									<Empty.Header>
-										<Empty.Media variant="icon">
-											<Columns3Icon size={32} class="opacity-60" aria-hidden="true" />
-										</Empty.Media>
-										<Empty.Title>No Resources Found</Empty.Title>
-										<Empty.Description>
-											No resources found. Please adjust your filters or initiate a new resource to
-											populate this table.
-										</Empty.Description>
-									</Empty.Header>
-									<Empty.Content>
-										<Button onclick={handleClear}>
-											<EraserIcon size={16} class="opacity-60" />
-											Reset
-										</Button>
-									</Empty.Content>
-								</Empty.Root>
-							</Table.Cell>
-						</Table.Row>
-					{/if}
-				</Table.Body>
-			</Table.Root>
-		</div>
+		{@render tableLayout()}
 	{:else if mode === 'grid'}
-		{#if table.getRowModel().rows?.length}
-			<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-				{#each table.getRowModel().rows as row (row.id)}
-					{@render grid?.({ table, row })}
-				{/each}
-			</div>
-		{:else}
-			<Empty.Root class="rounded-lg bg-muted">
-				<Empty.Header>
-					<Empty.Media variant="icon">
-						<Columns3Icon size={32} class="opacity-60" aria-hidden="true" />
-					</Empty.Media>
-					<Empty.Title>No Resources Found</Empty.Title>
-					<Empty.Description>
-						No resources found. Please adjust your filters or initiate a new resource to populate
-						this table.
-					</Empty.Description>
-				</Empty.Header>
-				<Empty.Content>
-					<Button onclick={handleClear}>
-						<EraserIcon size={16} class="opacity-60" />
-						Reset
-					</Button>
-				</Empty.Content>
-			</Empty.Root>
-		{/if}
+		{@render gridsLayout?.({ table, handleClear })}
 	{/if}
 
 	<!-- Pagination -->
@@ -752,3 +634,102 @@
 		</div>
 	</div>
 </div>
+
+{#snippet tableLayout()}
+	<div class="overflow-hidden rounded-md border bg-background">
+		<Table.Root class="table-fixed">
+			<Table.Header class="bg-muted">
+				{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
+					<Table.Row class="hover:bg-transparent">
+						{#each headerGroup.headers as header (header.id)}
+							<Table.Head
+								style="width: {header.getSize()}px"
+								class={cn(lodash.get(header.column.columnDef.meta, 'class'), 'h-11')}
+							>
+								{#if !header.isPlaceholder && header.column.getCanSort()}
+									<div
+										class={cn(
+											header.column.getCanSort() &&
+												'flex h-full cursor-pointer items-center justify-between gap-2 select-none',
+											getHeaderAlignment(uiSchemas[header.column.id])
+										)}
+										onclick={header.column.getToggleSortingHandler()}
+										onkeydown={(e) => {
+											if (header.column.getCanSort() && (e.key === 'Enter' || e.key === ' ')) {
+												e.preventDefault();
+												header.column.getToggleSortingHandler()?.(e);
+											}
+										}}
+										{...header.column.getCanSort()
+											? {
+													tabindex: 0,
+													role: 'button',
+													'aria-pressed': header.column.getIsSorted() ? 'true' : 'false'
+												}
+											: {}}
+									>
+										<FlexRender
+											content={header.column.columnDef.header}
+											context={header.getContext()}
+										/>
+										{#if header.column.getIsSorted() === 'asc'}
+											<ChevronUpIcon class="shrink-0 opacity-60" size={16} aria-hidden="true" />
+										{:else if header.column.getIsSorted() === 'desc'}
+											<ChevronDownIcon class="shrink-0 opacity-60" size={16} aria-hidden="true" />
+										{/if}
+									</div>
+								{:else if !header.isPlaceholder && !header.column.getCanSort()}
+									<FlexRender
+										content={header.column.columnDef.header}
+										context={header.getContext()}
+									/>
+								{/if}
+							</Table.Head>
+						{/each}
+					</Table.Row>
+				{/each}
+			</Table.Header>
+			<Table.Body>
+				{#if table.getRowModel().rows?.length}
+					{#each table.getRowModel().rows as row (row.id)}
+						<Table.Row data-state={row.getIsSelected() && 'selected'}>
+							{#each row.getVisibleCells() as cell (cell.id)}
+								<Table.Cell
+									class={cn(
+										getCellAlignment(uiSchemas[cell.column.id]),
+										lodash.get(cell.column.columnDef.meta, 'class')
+									)}
+								>
+									<FlexRender content={cell.column.columnDef.cell} context={cell.getContext()} />
+								</Table.Cell>
+							{/each}
+						</Table.Row>
+					{/each}
+				{:else}
+					<Table.Row>
+						<Table.Cell colspan={columns.length} class="h-full text-center">
+							<Empty.Root>
+								<Empty.Header>
+									<Empty.Media variant="icon">
+										<Columns3Icon size={32} class="opacity-60" aria-hidden="true" />
+									</Empty.Media>
+									<Empty.Title>No Resources Found</Empty.Title>
+									<Empty.Description>
+										No resources found. Please adjust your filters or initiate a new resource to
+										populate this table.
+									</Empty.Description>
+								</Empty.Header>
+								<Empty.Content>
+									<Button onclick={handleClear}>
+										<EraserIcon size={16} class="opacity-60" />
+										Reset
+									</Button>
+								</Empty.Content>
+							</Empty.Root>
+						</Table.Cell>
+					</Table.Row>
+				{/if}
+			</Table.Body>
+		</Table.Root>
+	</div>
+{/snippet}

@@ -1,6 +1,7 @@
 <script lang="ts">
+	import * as Empty from '$lib/components/ui/empty/index.js';
 	import type { JsonValue } from '@bufbuild/protobuf';
-	import { RefreshCwIcon } from '@lucide/svelte';
+	import { Columns3Icon, EraserIcon, RefreshCwIcon } from '@lucide/svelte';
 	import type { ColumnDef } from '@tanstack/table-core';
 	import { toast } from 'svelte-sonner';
 
@@ -8,6 +9,9 @@
 	import type { DataSchemaType, UISchemaType } from '$lib/components/dynamic-table/utils';
 	import Button from '$lib/components/ui/button/button.svelte';
 
+	import { onMount } from 'svelte';
+	import ProjectPicker from './artifact-viewer-project-picker.svelte';
+	import RepositoryPicker from './artifact-viewer-repository-picker.svelte';
 	import {
 		getArtifactColumnDefinitions,
 		getArtifactData,
@@ -18,9 +22,6 @@
 	import Grid from './grid.svelte';
 	import type { ArtifactType, ProjectType, RepositoryType } from './types';
 	import View from './view.svelte';
-	import ProjectPicker from './artifact-viewer-project-picker.svelte';
-	import RepositoryPicker from './artifact-viewer-repository-picker.svelte';
-	import { onMount } from 'svelte';
 
 	const uiSchemas: Record<string, UISchemaType> = getArtifactUISchemas();
 	const dataSchemas: Record<string, DataSchemaType> = getArtifactDataSchemas();
@@ -150,9 +151,34 @@
 			{/if}
 		</div>
 		<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {dataSchemas}>
-			{#snippet grid({ row })}
-				{@const artifact = row.original.raw as unknown as ArtifactType}
-				<Grid {artifact} />
+			{#snippet gridsLayout({ table, handleClear })}
+				{#if table.getRowModel().rows?.length}
+					<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+						{#each table.getRowModel().rows as row (row.id)}
+							{@const artifact = row.original.raw as unknown as ArtifactType}
+							<Grid {artifact} />
+						{/each}
+					</div>
+				{:else}
+					<Empty.Root class="rounded-lg bg-muted">
+						<Empty.Header>
+							<Empty.Media variant="icon">
+								<Columns3Icon size={32} class="opacity-60" aria-hidden="true" />
+							</Empty.Media>
+							<Empty.Title>No Resources Found</Empty.Title>
+							<Empty.Description>
+								No resources found. Please adjust your filters or initiate a new resource to
+								populate this table.
+							</Empty.Description>
+						</Empty.Header>
+						<Empty.Content>
+							<Button onclick={handleClear}>
+								<EraserIcon size={16} class="opacity-60" />
+								Reset
+							</Button>
+						</Empty.Content>
+					</Empty.Root>
+				{/if}
 			{/snippet}
 			{#snippet create()}
 				<Create />
