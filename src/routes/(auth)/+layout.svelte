@@ -77,6 +77,7 @@
 	import { activeNamespace, breadcrumbs, sidebarView } from '$lib/stores';
 
 	import type { LayoutData } from './$types';
+	import { env } from '$env/dynamic/public';
 
 	let {
 		data,
@@ -507,7 +508,7 @@
 				</div>
 			</Sidebar.Content>
 		{/if}
-		<NavSecondary />
+		<NavSecondary harborUrl={env.PUBLIC_HARBOR_URL} />
 		<Sidebar.Footer>
 			<NavUser user={data.user} />
 		</Sidebar.Footer>
