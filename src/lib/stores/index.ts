@@ -91,3 +91,6 @@ const createStores = (): AppStores => ({
 // Export individual stores
 export const { breadcrumbs, activeWorkspaceName, activeNamespace, role, notifications } =
 	createStores();
+
+export type SidebarView = 'managed' | 'kubernetes';
+export const sidebarView = persistentWritable<SidebarView>('otterscale:sidebarView', 'managed');

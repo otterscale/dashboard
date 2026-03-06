@@ -4,30 +4,28 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import BotIcon from '@lucide/svelte/icons/bot';
 	import BoxIcon from '@lucide/svelte/icons/box';
-	import CloudBackupIcon from '@lucide/svelte/icons/cloud-backup';
-	import CodeIcon from '@lucide/svelte/icons/code';
+	import BracesIcon from '@lucide/svelte/icons/braces';
 	import CombineIcon from '@lucide/svelte/icons/combine';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
-	import DatabaseIcon from '@lucide/svelte/icons/database';
-	import DumbbellIcon from '@lucide/svelte/icons/dumbbell';
+	import FileKeyIcon from '@lucide/svelte/icons/file-key';
 	import FlagIcon from '@lucide/svelte/icons/flag';
 	import GaugeIcon from '@lucide/svelte/icons/gauge';
+	import GlobeIcon from '@lucide/svelte/icons/globe';
 	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 	import HelpCircleIcon from '@lucide/svelte/icons/help-circle';
 	import HouseIcon from '@lucide/svelte/icons/house';
+	import KeyRoundIcon from '@lucide/svelte/icons/key-round';
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
+	import LockIcon from '@lucide/svelte/icons/lock';
 	import MapIcon from '@lucide/svelte/icons/map';
+	import MonitorIcon from '@lucide/svelte/icons/monitor';
 	import NetworkIcon from '@lucide/svelte/icons/network';
-	import PcCaseIcon from '@lucide/svelte/icons/pc-case';
-	import ScaleIcon from '@lucide/svelte/icons/scale';
-	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
-	import ShipIcon from '@lucide/svelte/icons/ship';
+	import PackageIcon from '@lucide/svelte/icons/package';
+	import SearchIcon from '@lucide/svelte/icons/search';
+	import ServerIcon from '@lucide/svelte/icons/server';
+	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import SlidersHorizontalIcon from '@lucide/svelte/icons/sliders-horizontal';
-	import TelescopeIcon from '@lucide/svelte/icons/telescope';
-	import TerminalIcon from '@lucide/svelte/icons/terminal';
-	import UnplugIcon from '@lucide/svelte/icons/unplug';
-	import UsersIcon from '@lucide/svelte/icons/users';
-	import WorkflowIcon from '@lucide/svelte/icons/workflow';
 	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import { getContext, onMount, type Snippet } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -51,8 +49,9 @@
 	import { Separator } from '$lib/components/ui/separator';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import * as ToggleGroup from '$lib/components/ui/toggle-group';
 	import { m } from '$lib/paraglide/messages';
-	import { activeNamespace, breadcrumbs } from '$lib/stores';
+	import { activeNamespace, breadcrumbs, sidebarView } from '$lib/stores';
 
 	import type { LayoutData } from './$types';
 
@@ -70,7 +69,7 @@
 	const scopeClient = createClient(ScopeService, transport);
 	const resourceClient = createClient(ResourceService, transport);
 
-	let activeScope = $state(page.params.scope ?? page.params.cluster ?? ''); //TODO: remove page.params.scope after route updated
+	let activeScope = $state(page.params.scope ?? page.params.cluster ?? '');
 	let scopes = $state<Scope[]>([]);
 	let workspaces = $state<TenantOtterscaleIoV1Alpha1Workspace[]>([]);
 
@@ -100,12 +99,12 @@
 
 	async function onValueChange(cluster: string) {
 		await fetchWorkspaces(cluster);
-		await goto(resolve('/(auth)/scope/[scope]', { scope: cluster }));
+		await goto(resolve('/(auth)/scope/[scope]/managed', { scope: cluster }));
 		toast.success(m.switch_scope({ name: cluster }));
 	}
 
 	async function onHomeClick() {
-		await goto(resolve('/(auth)/scope/[scope]', { scope: activeScope }));
+		await goto(resolve('/(auth)/scope/[scope]/managed', { scope: activeScope }));
 	}
 
 	let isMounted = $state(false);
@@ -119,475 +118,277 @@
 		isMounted = true;
 	});
 
-	const navData = $derived({
+	function resourceUrl(kind: string, group: string, version: string, resource: string) {
+		return resolve(
+			`/(auth)/${activeScope}/${kind}?group=${group}&version=${version}&namespace=${$activeNamespace}&resource=${resource}`
+		);
+	}
+
+	const managedNavData = $derived({
 		overview: [
 			{
-				name: m.workspace(),
-				url: resolve(
-					`/(auth)/${activeScope}/Workspace?group=tenant.otterscale.io&version=v1alpha1&namespace=${$activeNamespace}&resource=workspaces`
-				),
-				icon: MapIcon,
-				edit: false
-			},
-			{
-				name: m.resource_quota(),
-				url: resolve(
-					`/(auth)/${activeScope}/ResourceQuota?group=&version=v1&namespace=${$activeNamespace}&resource=resourcequotas`
-				),
-				icon: BoxIcon,
-				edit: false
-			},
-			{
-				name: m.settings(),
-				url: resolve('/(auth)/scope/[scope]/settings', { scope: activeScope }),
-				icon: SlidersHorizontalIcon,
+				name: m.overview(),
+				url: resolve('/(auth)/scope/[scope]/managed', { scope: activeScope }),
+				icon: GaugeIcon,
 				edit: false
 			}
 		],
-		dashboards: [
+		ai: [
 			{
-				title: 'VLLM',
+				title: m.dashboard(),
 				url: resolve('/(auth)/scope/[scope]/models', { scope: activeScope }),
-				icon: DumbbellIcon
+				icon: GaugeIcon
 			},
 			{
-				title: m.compute(),
-				url: resolve('/(auth)/scope/[scope]/compute', { scope: activeScope }),
-				icon: CpuIcon
+				title: m.model(),
+				url: resourceUrl('Model', 'model.otterscale.io', 'v1alpha1', 'models'),
+				icon: BotIcon
 			},
 			{
-				title: m.workloads(),
-				url: resolve('/(auth)/scope/[scope]/applications', { scope: activeScope }),
+				title: m.model_artifact(),
+				url: resourceUrl('ModelArtifact', 'model.otterscale.io', 'v1alpha1', 'modelartifacts'),
+				icon: PackageIcon
+			}
+		],
+		apps: [
+			{
+				title: m.release(),
+				url: resourceUrl('HelmRelease', 'helm.toolkit.fluxcd.io', 'v2', 'helmreleases'),
 				icon: FlagIcon
 			},
 			{
-				title: m.storage(),
-				url: resolve('/(auth)/scope/[scope]/storage', { scope: activeScope }),
+				title: m.hub(),
+				url: '#',
+				icon: LayoutGridIcon
+			}
+		],
+		compute: [
+			{
+				title: m.dashboard(),
+				url: resolve('/(auth)/scope/[scope]/compute', { scope: activeScope }),
+				icon: GaugeIcon
+			},
+			{
+				title: m.virtual_machine(),
+				url: resourceUrl('VirtualMachine', 'kubevirt.io', 'v1', 'virtualmachines'),
+				icon: MonitorIcon
+			},
+			{
+				title: m.data_volume(),
+				url: resourceUrl('DataVolume', 'cdi.kubevirt.io', 'v1beta1', 'datavolumes'),
 				icon: HardDriveIcon
 			},
 			{
-				title: 'Metal',
-				url: resolve('/(auth)/machines'),
-				icon: PcCaseIcon
+				title: m.instance_type(),
+				url: resourceUrl(
+					'VirtualMachineInstancetype',
+					'instancetype.kubevirt.io',
+					'v1beta1',
+					'virtualmachineinstancetypes'
+				),
+				icon: CpuIcon
 			}
 		],
-		aiStudio: [
+		storage: [
 			{
-				title: 'Inference',
-				url: '#',
-				icon: BotIcon,
-				items: [
-					{
-						title: m.llm(),
-						url: resolve('/(auth)/scope/[scope]/models/llm', { scope: activeScope })
-					},
-					{
-						title: 'Model',
-						url: '#',
-						disabled: true
-					}
-				]
+				title: m.dashboard(),
+				url: resolve('/(auth)/scope/[scope]/storage', { scope: activeScope }),
+				icon: GaugeIcon
 			},
 			{
-				title: 'Training',
-				url: resolve('/(auth)/scope/[scope]/models', { scope: activeScope }),
-				icon: DumbbellIcon,
-				items: [
-					{
-						title: 'Finetune Job',
-						url: '#',
-						disabled: true
-					},
-					{
-						title: 'Dataset',
-						url: '#',
-						disabled: true
-					}
-				]
+				title: m.block_pool(),
+				url: resourceUrl('CephBlockPool', 'ceph.rook.io', 'v1', 'cephblockpools'),
+				icon: HardDriveIcon
 			},
 			{
-				title: 'Notebooks',
-				url: '#',
-				icon: TerminalIcon,
-				items: [
-					{
-						title: 'Jupyter',
-						url: '#',
-						disabled: true
-					}
-				]
+				title: m.file_system(),
+				url: resourceUrl('CephFilesystem', 'ceph.rook.io', 'v1', 'cephfilesystems'),
+				icon: HardDriveIcon
+			},
+			{
+				title: m.object_store(),
+				url: resourceUrl('CephObjectStore', 'ceph.rook.io', 'v1', 'cephobjectstores'),
+				icon: HardDriveIcon
 			}
 		],
-		applications: [
+		administration: [
 			{
-				title: 'Hub',
-				url: resolve('/(auth)/scope/[scope]/registry', { scope: activeScope }),
-				icon: LayoutGridIcon,
-				items: [
-					{
-						title: m.repositories(),
-						url: resolve('/(auth)/scope/[scope]/registry/repositories', {
-							scope: activeScope
-						})
-					},
-					{
-						title: 'Release',
-						url: '#',
-						disabled: true
-					},
-					{
-						title: 'Chart',
-						url: '#',
-						disabled: true
-					}
-				]
+				title: m.workspace(),
+				url: resourceUrl('Workspace', 'tenant.otterscale.io', 'v1alpha1', 'workspaces'),
+				icon: MapIcon
 			},
 			{
-				title: 'Cloud IDE',
-				url: '#',
-				icon: CodeIcon,
-				items: [
-					{
-						title: 'Coder',
-						url: '#',
-						disabled: true
-					}
-				]
+				title: m.module(),
+				url: resourceUrl('Module', 'module.otterscale.io', 'v1alpha1', 'modules'),
+				icon: PackageIcon
 			},
 			{
-				title: 'Database',
+				title: m.resources(),
 				url: '#',
-				icon: DatabaseIcon,
-				items: [
-					{
-						title: 'Postgres',
-						url: '#',
-						disabled: true
-					},
-					{
-						title: 'Redis',
-						url: '#',
-						disabled: true
-					}
-				]
-			},
-			{
-				title: 'Workflow',
-				url: '#',
-				icon: WorkflowIcon,
-				items: [
-					{
-						title: 'Pipeline',
-						url: '#',
-						disabled: true
-					},
-					{
-						title: 'Task',
-						url: '#',
-						disabled: true
-					}
-				]
+				icon: SearchIcon
 			}
-		],
-		resources: [
+		]
+	});
+
+	const kubernetesNavData = $derived({
+		overview: [
 			{
-				title: m.workloads(),
-				url: '#',
-				icon: FlagIcon,
-				items: [
-					{
-						title: 'Deployment',
-						url: resolve(
-							`/(auth)/${activeScope}/Deployment?group=apps&version=v1&namespace=${$activeNamespace}&resource=deployments`
-						)
-					},
-					{
-						title: 'StatefulSet',
-						url: resolve(
-							`/(auth)/${activeScope}/StatefulSet?group=apps&version=v1&namespace=${$activeNamespace}&resource=statefulsets`
-						)
-					},
-					{
-						title: 'DaemonSet',
-						url: resolve(
-							`/(auth)/${activeScope}/DaemonSet?group=apps&version=v1&namespace=${$activeNamespace}&resource=daemonsets`
-						)
-					},
-					{
-						title: m.pods(),
-						url: resolve(
-							`/(auth)/${activeScope}/Pod?group=&version=v1&namespace=${$activeNamespace}&resource=pods`
-						)
-					},
-					{
-						title: m.services(),
-						url: resolve(
-							`/(auth)/${activeScope}/Service?group=&version=v1&namespace=${$activeNamespace}&resource=services`
-						)
-					},
-					{
-						title: m.cronjob(),
-						url: resolve(
-							`/(auth)/${activeScope}/CronJob?group=batch&version=v1&namespace=${$activeNamespace}&resource=cronjobs`
-						)
-					},
-					{
-						title: m.simpleapp(),
-						url: resolve(
-							`/(auth)/${activeScope}/SimpleApp?group=apps.otterscale.io&version=v1alpha1&namespace=${$activeNamespace}&resource=simpleapps`
-						)
-					},
-					{
-						title: m.secrets(),
-						url: resolve(
-							`/(auth)/${activeScope}/Secret?group=&version=v1&namespace=${$activeNamespace}&resource=secrets`
-						)
-					}
-				]
-			},
-			{
-				title: m.compute(),
-				url: '#',
-				icon: CpuIcon,
-				items: [
-					{
-						title: m.virtual_machine(),
-						url: resolve('/(auth)/scope/[scope]/compute/virtual-machine', {
-							scope: activeScope
-						})
-					}
-				]
-			},
-			{
-				title: 'Network',
-				url: '#',
-				icon: NetworkIcon,
-				items: [
-					{
-						title: 'VPC',
-						url: '#',
-						disabled: true
-					},
-					{
-						title: 'Load Balancer',
-						url: '#',
-						disabled: true
-					}
-				]
-			},
-			{
-				title: m.storage(),
-				url: '#',
-				icon: HardDriveIcon,
-				items: [
-					{
-						title: m.osd(),
-						url: resolve('/(auth)/scope/[scope]/storage/osd', { scope: activeScope })
-					},
-					{
-						title: m.pool(),
-						url: resolve('/(auth)/scope/[scope]/storage/pool', { scope: activeScope })
-					},
-					{
-						title: m.block_device(),
-						url: resolve('/(auth)/scope/[scope]/storage/block-device', {
-							scope: activeScope
-						})
-					},
-					{
-						title: m.file_system(),
-						url: resolve('/(auth)/scope/[scope]/storage/file-system', {
-							scope: activeScope
-						})
-					},
-					{
-						title: m.smb(),
-						url: resolve('/(auth)/scope/[scope]/storage/smb', { scope: activeScope })
-					},
-					{
-						title: m.object_gateway(),
-						url: resolve('/(auth)/scope/[scope]/storage/object-gateway', {
-							scope: activeScope
-						})
-					}
-				]
-			}
-		],
-		governance: [
-			{
-				title: 'Tenant',
-				url: '#',
-				icon: UsersIcon,
-				items: [
-					{
-						title: 'Workspace',
-						url: '#',
-						disabled: true
-					},
-					{
-						title: 'User',
-						url: '#',
-						disabled: true
-					}
-				]
-			},
-			{
-				title: 'Policy',
-				url: '#',
-				icon: ScaleIcon,
-				items: [
-					{
-						title: 'Policy',
-						url: '#',
-						disabled: true
-					},
-					{
-						title: 'Compliance',
-						url: '#',
-						disabled: true
-					}
-				]
-			},
-			{
-				title: 'Metering',
-				url: '#',
+				name: m.overview(),
+				url: resolve('/(auth)/scope/[scope]/kubernetes', { scope: activeScope }),
 				icon: GaugeIcon,
-				items: [
-					{
-						title: 'Budget',
-						url: '#',
-						disabled: true
-					},
-					{
-						title: 'Usage',
-						url: '#',
-						disabled: true
-					}
-				]
-			},
-			{
-				title: 'Audit',
-				url: '#',
-				icon: ShieldCheckIcon,
-				items: [
-					{
-						title: 'Trail',
-						url: '#',
-						disabled: true
-					},
-					{
-						title: 'Log',
-						url: '#',
-						disabled: true
-					}
-				]
+				edit: false
 			}
 		],
-		reliability: [
+		workloads: [
 			{
-				title: 'Telemetry',
-				url: '#',
-				icon: TelescopeIcon,
-				items: [
-					{
-						title: 'Collector',
-						url: '#',
-						disabled: true
-					},
-					{
-						title: 'Rule',
-						url: '#',
-						disabled: true
-					}
-				]
+				title: m.deployment(),
+				url: resourceUrl('Deployment', 'apps', 'v1', 'deployments'),
+				icon: FlagIcon
 			},
 			{
-				title: 'Recovery',
-				url: '#',
-				icon: CloudBackupIcon,
-				items: [
-					{
-						title: 'Backup',
-						url: '#',
-						disabled: true
-					},
-					{
-						title: 'Restore',
-						url: '#',
-						disabled: true
-					}
-				]
+				title: m.stateful_set(),
+				url: resourceUrl('StatefulSet', 'apps', 'v1', 'statefulsets'),
+				icon: FlagIcon
+			},
+			{
+				title: m.daemon_set(),
+				url: resourceUrl('DaemonSet', 'apps', 'v1', 'daemonsets'),
+				icon: FlagIcon
+			},
+			{
+				title: m.cronjob(),
+				url: resourceUrl('CronJob', 'batch', 'v1', 'cronjobs'),
+				icon: FlagIcon
+			},
+			{
+				title: m.job(),
+				url: resourceUrl('Job', 'batch', 'v1', 'jobs'),
+				icon: FlagIcon
+			},
+			{
+				title: m.pod(),
+				url: resourceUrl('Pod', '', 'v1', 'pods'),
+				icon: BoxIcon
 			}
 		],
-		system: [
+		configuration: [
 			{
-				title: 'Fleet',
-				url: '#',
-				icon: ShipIcon,
-				items: [
-					{
-						title: 'Cluster',
-						url: '#',
-						disabled: true
-					},
-					{
-						title: 'Config',
-						url: '#',
-						disabled: true
-					},
-					{
-						title: 'Image',
-						url: '#',
-						disabled: true
-					}
-				]
+				title: m.config_map(),
+				url: resourceUrl('ConfigMap', '', 'v1', 'configmaps'),
+				icon: FileKeyIcon
 			},
 			{
-				title: 'Metal',
-				url: '#',
-				icon: PcCaseIcon,
-				items: [
-					{
-						title: m.metal(),
-						url: resolve('/(auth)/machines/metal')
-					}
-				]
-			},
-			{
-				title: 'Tunnels',
-				url: '#',
-				icon: UnplugIcon,
-				items: [
-					{
-						title: 'Server',
-						url: '#',
-						disabled: true
-					},
-					{
-						title: 'Client',
-						url: '#',
-						disabled: true
-					}
-				]
+				title: m.secret(),
+				url: resourceUrl('Secret', '', 'v1', 'secrets'),
+				icon: LockIcon
 			}
 		],
-		nextGlobal: [
+		networking: [
 			{
-				title: m.settings(),
-				url: resolve('/(auth)/scope/[scope]/settings', { scope: activeScope }),
-				icon: SlidersHorizontalIcon,
-				items: [] as { title: string; url: string; disabled?: boolean }[]
+				title: m.service(),
+				url: resourceUrl('Service', '', 'v1', 'services'),
+				icon: GlobeIcon
 			},
 			{
-				title: m.networking(),
-				url: resolve('/(auth)/networking'),
-				icon: NetworkIcon,
-				items: [
-					{
-						title: m.subnets(),
-						url: resolve('/(auth)/networking/subnets')
-					}
-				]
+				title: m.http_route(),
+				url: resourceUrl('HTTPRoute', 'gateway.networking.k8s.io', 'v1', 'httproutes'),
+				icon: NetworkIcon
+			},
+			{
+				title: m.gateway(),
+				url: resourceUrl('Gateway', 'gateway.networking.k8s.io', 'v1', 'gateways'),
+				icon: NetworkIcon
+			},
+			{
+				title: m.network_policy(),
+				url: resourceUrl('NetworkPolicy', 'networking.k8s.io', 'v1', 'networkpolicies'),
+				icon: ShieldIcon
+			}
+		],
+		storage: [
+			{
+				title: m.persistent_volume_claim(),
+				url: resourceUrl('PersistentVolumeClaim', '', 'v1', 'persistentvolumeclaims'),
+				icon: HardDriveIcon
+			},
+			{
+				title: m.persistent_volume(),
+				url: resourceUrl('PersistentVolume', '', 'v1', 'persistentvolumes'),
+				icon: HardDriveIcon
+			},
+			{
+				title: m.storage_class(),
+				url: resourceUrl('StorageClass', 'storage.k8s.io', 'v1', 'storageclasses'),
+				icon: HardDriveIcon
+			}
+		],
+		namespaced: [
+			{
+				title: m.namespace(),
+				url: resourceUrl('Namespace', '', 'v1', 'namespaces'),
+				icon: BracesIcon
+			},
+			{
+				title: m.service_account(),
+				url: resourceUrl('ServiceAccount', '', 'v1', 'serviceaccounts'),
+				icon: KeyRoundIcon
+			},
+			{
+				title: m.role(),
+				url: resourceUrl('Role', 'rbac.authorization.k8s.io', 'v1', 'roles'),
+				icon: ShieldIcon
+			},
+			{
+				title: m.role_binding(),
+				url: resourceUrl('RoleBinding', 'rbac.authorization.k8s.io', 'v1', 'rolebindings'),
+				icon: ShieldIcon
+			},
+			{
+				title: m.resource_quota(),
+				url: resourceUrl('ResourceQuota', '', 'v1', 'resourcequotas'),
+				icon: BoxIcon
+			},
+			{
+				title: m.limit_range(),
+				url: resourceUrl('LimitRange', '', 'v1', 'limitranges'),
+				icon: SlidersHorizontalIcon
+			}
+		],
+		cluster: [
+			{
+				title: m.node(),
+				url: resourceUrl('Node', '', 'v1', 'nodes'),
+				icon: ServerIcon
+			},
+			{
+				title: m.event(),
+				url: resourceUrl('Event', '', 'v1', 'events'),
+				icon: FlagIcon
+			},
+			{
+				title: m.custom_resource_definition(),
+				url: resourceUrl(
+					'CustomResourceDefinition',
+					'apiextensions.k8s.io',
+					'v1',
+					'customresourcedefinitions'
+				),
+				icon: SettingsIcon
+			},
+			{
+				title: m.cluster_role(),
+				url: resourceUrl('ClusterRole', 'rbac.authorization.k8s.io', 'v1', 'clusterroles'),
+				icon: ShieldIcon
+			},
+			{
+				title: m.cluster_role_binding(),
+				url: resourceUrl(
+					'ClusterRoleBinding',
+					'rbac.authorization.k8s.io',
+					'v1',
+					'clusterrolebindings'
+				),
+				icon: ShieldIcon
 			}
 		]
 	});
@@ -607,18 +408,40 @@
 					user={data.user}
 					onsuccess={() => fetchWorkspaces(activeScope)}
 				/>
+				<div class="px-2 pt-2 group-data-[collapsible=icon]:hidden">
+					<ToggleGroup.Root
+						type="single"
+						bind:value={$sidebarView}
+						variant="outline"
+						class="w-full"
+					>
+						<ToggleGroup.Item value="managed" class="flex-1 text-xs">
+							{m.managed()}
+						</ToggleGroup.Item>
+						<ToggleGroup.Item value="kubernetes" class="flex-1 text-xs">
+							{m.kubernetes()}
+						</ToggleGroup.Item>
+					</ToggleGroup.Root>
+				</div>
 			</Sidebar.Header>
 			{#if $activeNamespace}
 				<Sidebar.Content class="gap-2">
-					<NavOverview items={navData.overview} />
-					<NavMain label={m.dashboard()} items={navData.dashboards} />
-					<NavMain label="AI Studio" items={navData.aiStudio} />
-					<NavMain label="Applications" items={navData.applications} />
-					<NavMain label="Resources" items={navData.resources} />
-					<NavMain label="Governance" items={navData.governance} />
-					<NavMain label="Reliability" items={navData.reliability} />
-					<NavMain label="System" items={navData.system} />
-					<NavMain label={m.global()} items={navData.nextGlobal} />
+					{#if $sidebarView === 'managed'}
+						<NavOverview items={managedNavData.overview} />
+						<NavMain label={m.ai_studio()} items={managedNavData.ai} />
+						<NavMain label={m.apps()} items={managedNavData.apps} />
+						<NavMain label={m.compute()} items={managedNavData.compute} />
+						<NavMain label={m.storage()} items={managedNavData.storage} />
+						<NavMain label={m.administration()} items={managedNavData.administration} />
+					{:else}
+						<NavOverview items={kubernetesNavData.overview} />
+						<NavMain label={m.workloads()} items={kubernetesNavData.workloads} />
+						<NavMain label={m.configuration()} items={kubernetesNavData.configuration} />
+						<NavMain label={m.networking()} items={kubernetesNavData.networking} />
+						<NavMain label={m.storage()} items={kubernetesNavData.storage} />
+						<NavMain label={m.namespaced()} items={kubernetesNavData.namespaced} />
+						<NavMain label={m.cluster()} items={kubernetesNavData.cluster} />
+					{/if}
 				</Sidebar.Content>
 			{/if}
 		{:else}
