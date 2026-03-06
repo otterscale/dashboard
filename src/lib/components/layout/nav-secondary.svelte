@@ -19,6 +19,18 @@
 <Sidebar.Group bind:ref {...restProps}>
 	<Sidebar.GroupContent>
 		<Sidebar.Menu>
+			{#if harborUrl}
+				<Sidebar.MenuItem>
+					<Sidebar.MenuButton size="sm" tooltipContent="Harbor">
+						{#snippet child({ props })}
+							<a href={harborUrl} target="_blank" {...props}>
+								<AnchorIcon />
+								<span>Harbor</span>
+							</a>
+						{/snippet}
+					</Sidebar.MenuButton>
+				</Sidebar.MenuItem>
+			{/if}
 			<Sidebar.MenuItem>
 				<Sidebar.MenuButton size="sm" tooltipContent={m.documentation()} class="[&>svg]:size-3.5">
 					{#snippet child({ props })}
