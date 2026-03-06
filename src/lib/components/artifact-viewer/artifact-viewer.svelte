@@ -15,79 +15,11 @@
 		getArtifactDataSchemas,
 		getArtifactUISchemas
 	} from './artifact-viewer.ts';
-	import ProjectPicker from './artifact-viewer-project-picker.svelte';
-	import RepositoryPicker from './artifact-viewer-repository-picker.svelte';
 	import Create from './create.svelte';
 	import Grid from './grid.svelte';
 	import type { ArtifactType, ProjectType, RepositoryType } from './types';
 
-	let projects = $state<ProjectType[]>([]);
-	let selectedProject = $state<ProjectType | undefined>(undefined);
-
-	async function fetchProjects() {
-		try {
-			const response = await fetch('/rest/harbor/projects');
-			if (!response.ok) {
-				console.error('Failed to fetch Harbor projects:', response.statusText);
-				toast.error('Failed to fetch Harbor projects');
-				return;
-			}
-			const data: ProjectType[] = await response.json();
-			projects = data ?? [];
-			if (projects.length > 0) {
-				[selectedProject] = projects;
-			}
-		} catch (error) {
-			console.error('Error fetching Harbor projects:', error);
-			toast.error('Error fetching Harbor projects');
-		}
-	}
-
-	function handleProjectSelect() {
-		// Reset downstream state
-		repositories = [];
-		selectedRepository = undefined;
-		dataset = [];
-		if (selectedProject) {
-			fetchRepositories(selectedProject.name);
-		}
-	}
-
-	let repositories = $state<RepositoryType[]>([]);
-	let selectedRepository = $state<RepositoryType | undefined>(undefined);
-
-	async function fetchRepositories(projectName: string) {
-		if (!projectName) return;
-		try {
-			const response = await fetch(
-				`/rest/harbor/repositories?project=${encodeURIComponent(projectName)}`
-			);
-			if (!response.ok) {
-				console.error('Failed to fetch Harbor repositories:', response.statusText);
-				toast.error('Failed to fetch Harbor repositories');
-				return;
-			}
-			const data: RepositoryType[] = await response.json();
-			repositories = data ?? [];
-			if (repositories.length > 0) {
-				[selectedRepository] = repositories;
-				fetchArtifacts(projectName, selectedRepository!.name);
-			} else {
-				selectedRepository = undefined;
-				dataset = [];
-			}
-		} catch (error) {
-			console.error('Error fetching Harbor repositories:', error);
-			toast.error('Error fetching Harbor repositories');
-		}
-	}
-
-	function handleRepositorySelect() {
-		dataset = [];
-		if (selectedProject && selectedRepository) {
-			fetchArtifacts(selectedProject.name, selectedRepository.name);
-		}
-	}
+	let { project, repository }: { project: ProjectType; repository: RepositoryType } = $props();
 
 	const uiSchemas: Record<string, UISchemaType> = getArtifactUISchemas();
 	const dataSchemas: Record<string, DataSchemaType> = getArtifactDataSchemas();
@@ -97,20 +29,19 @@
 	);
 
 	let dataset: Record<string, JsonValue>[] = $state([]);
-	let isListing = $state(false);
+	let isFetchingArtifacts = $state(false);
 
-	async function fetchArtifacts(projectName: string, repositoryFullName: string) {
-		if (isListing || !projectName || !repositoryFullName) return;
+	async function fetchArtifacts() {
+		if (isFetchingArtifacts || !project || !repository) return;
 
-		// Harbor API expects repo name without the project prefix
-		const repoName = repositoryFullName.includes('/')
-			? repositoryFullName.slice(repositoryFullName.indexOf('/') + 1)
-			: repositoryFullName;
+		const repoName = repository.name.includes('/')
+			? repository.name.slice(repository.name.indexOf('/') + 1)
+			: repository.name;
 
-		isListing = true;
+		isFetchingArtifacts = true;
 		try {
 			const response = await fetch(
-				`/rest/harbor/artifacts?project=${encodeURIComponent(projectName)}&repository=${encodeURIComponent(repoName)}`
+				`/rest/harbor/artifacts?project=${encodeURIComponent(project.name)}&repository=${encodeURIComponent(repoName)}`
 			);
 			if (!response.ok) {
 				console.error('Failed to fetch Harbor artifacts:', response.statusText);
@@ -123,55 +54,39 @@
 			console.error('Error fetching Harbor artifacts:', error);
 			toast.error('Error fetching Harbor artifacts');
 		} finally {
-			isListing = false;
+			isFetchingArtifacts = false;
 		}
 	}
 
 	function handleListing() {
-		if (selectedProject && selectedRepository && !isListing) {
-			fetchArtifacts(selectedProject.name, selectedRepository.name);
+		if (!isFetchingArtifacts) {
+			fetchArtifacts();
 		}
 	}
 
 	let isMounted = $state(false);
 	onMount(async () => {
-		await fetchProjects();
-		if (selectedProject) {
-			await fetchRepositories(selectedProject.name);
-			if (selectedRepository) {
-				await fetchArtifacts(selectedProject.name, selectedRepository.name);
-			}
-		}
+		await fetchArtifacts();
 		isMounted = true;
 	});
 </script>
 
 {#if isMounted}
 	{#if columnDefinitions}
-		<div class="space-y-4">
-			<div class="flex items-center gap-2">
-				<ProjectPicker bind:value={selectedProject} {projects} onSelect={handleProjectSelect} />
-				<RepositoryPicker
-					bind:value={selectedRepository}
-					{repositories}
-					onSelect={handleRepositorySelect}
-				/>
-			</div>
-			<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {dataSchemas}>
-				{#snippet grid({ row })}
-					{@const artifact = row.original.raw as unknown as ArtifactType}
-					<Grid project={selectedProject!} repository={selectedRepository!} {artifact} />
-				{/snippet}
-				{#snippet create()}
-					<Create />
-				{/snippet}
-				{#snippet reload()}
-					<Button onclick={handleListing} disabled={isListing} variant="outline">
-						<RefreshCwIcon class="opacity-60" size={16} />
-					</Button>
-				{/snippet}
-				{#snippet rowActions()}{/snippet}
-			</DynamicTable>
-		</div>
+		<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {dataSchemas}>
+			{#snippet grid({ row })}
+				{@const artifact = row.original.raw as unknown as ArtifactType}
+				<Grid {project} {repository} {artifact} />
+			{/snippet}
+			{#snippet create()}
+				<Create />
+			{/snippet}
+			{#snippet reload()}
+				<Button onclick={handleListing} disabled={isFetchingArtifacts} variant="outline">
+					<RefreshCwIcon class="opacity-60" size={16} />
+				</Button>
+			{/snippet}
+			{#snippet rowActions()}{/snippet}
+		</DynamicTable>
 	{/if}
 {/if}

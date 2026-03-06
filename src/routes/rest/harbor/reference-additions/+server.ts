@@ -1,6 +1,8 @@
-import { error, json, type RequestHandler } from '@sveltejs/kit';
+import { error, json } from '@sveltejs/kit';
 
 import { getReferenceAddition } from '$lib/server/harbor';
+
+import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ url, locals }) => {
 	if (!locals.session) {
@@ -29,6 +31,10 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 
 	try {
 		const accessToken = locals.session.tokenSet.accessToken;
+		if (!accessToken) {
+			error(401, 'Access token not available');
+		}
+
 		const referenceAddition = await getReferenceAddition(
 			project,
 			repository,
@@ -39,6 +45,6 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		return json(referenceAddition);
 	} catch (err) {
 		console.error('Failed to get Harbor artifact addition:', err);
-		error(500, 'Failed to list Harbor artifact addition');
+		error(500, 'Failed to get Harbor artifact addition');
 	}
 };

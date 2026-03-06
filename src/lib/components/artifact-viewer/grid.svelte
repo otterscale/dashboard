@@ -63,10 +63,11 @@
 	let open = $state(false);
 	let isInstalling = $state(false);
 
-	// Harbor API expects repo name without the project prefix
-	const repositoryName = repository.name.includes('/')
-		? repository.name.slice(repository.name.indexOf('/') + 1)
-		: repository.name;
+	const repositoryName = $derived(
+		repository.name.includes('/')
+			? repository.name.slice(repository.name.indexOf('/') + 1)
+			: repository.name
+	);
 
 	async function getReferenceAddition(addition: string) {
 		const parameters = new URLSearchParams({
@@ -75,7 +76,7 @@
 			reference: artifact.digest,
 			addition
 		});
-		const response = await fetch(`/rest/harbor/referenceAddition?${parameters}`);
+		const response = await fetch(`/rest/harbor/reference-additions?${parameters}`);
 		if (!response.ok) {
 			console.error('Failed to fetch Harbor addition:', response.statusText);
 			throw new Error('Failed to fetch Harbor addition');
@@ -215,6 +216,10 @@
 							</AlertDialog.Content>
 						</AlertDialog.Root>
 					</Item.Actions>
+				{:catch error}
+					<Button disabled variant="ghost" size="icon" title="Failed to load chart information">
+						<DownloadIcon class="text-destructive" />
+					</Button>
 				{/await}
 			{/if}
 		</Item.Root>
