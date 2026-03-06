@@ -19,6 +19,7 @@
 	import Grid from './grid.svelte';
 	import { ProjectPicker, RepositoryPicker } from './index.ts';
 	import type { ArtifactType, ProjectType, RepositoryType } from './types';
+	import View from './view.svelte';
 
 	let projects = $state<ProjectType[]>([]);
 	let selectedProject = $state<ProjectType | undefined>(undefined);
@@ -163,7 +164,10 @@
 					<RefreshCwIcon class="opacity-60" size={16} />
 				</Button>
 			{/snippet}
-			{#snippet rowActions()}{/snippet}
+			{#snippet rowActions({ row })}
+				{@const artifact = row.original.raw as JsonValue}
+				<View data={artifact} />
+			{/snippet}
 		</DynamicTable>
 	</div>
 {/if}
