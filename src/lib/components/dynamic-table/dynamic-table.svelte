@@ -486,7 +486,7 @@
 		</DropdownMenu.Root>
 		<ButtonGroup.Root>
 			<Button
-				variant={mode === 'table' ? 'secondary' : 'ghost'}
+				variant={mode === 'table' ? 'secondary' : 'outline'}
 				size="icon-sm"
 				onclick={() => (mode = 'table')}
 				aria-pressed={mode === 'table'}
@@ -495,7 +495,7 @@
 			</Button>
 			<Button
 				disabled={!grid}
-				variant={mode === 'grid' ? 'secondary' : 'ghost'}
+				variant={mode === 'grid' ? 'secondary' : 'outline'}
 				size="icon-sm"
 				onclick={() => (mode = 'grid')}
 				aria-pressed={mode === 'grid'}
@@ -622,7 +622,7 @@
 				{/each}
 			</div>
 		{:else}
-			<Empty.Root>
+			<Empty.Root class="rounded-lg bg-muted">
 				<Empty.Header>
 					<Empty.Media variant="icon">
 						<Columns3Icon size={32} class="opacity-60" aria-hidden="true" />
@@ -661,7 +661,7 @@
 				<SelectContent
 					class="[&_*[role=option]]:ps-2 [&_*[role=option]]:pe-8 [&_*[role=option]>span]:start-auto [&_*[role=option]>span]:end-2"
 				>
-					{#each [5, 10, 25, 50] as pageSize (pageSize)}
+					{#each [5, 10, 15] as pageSize (pageSize)}
 						<SelectItem value={pageSize.toString()}>
 							{pageSize}
 						</SelectItem>

@@ -12,7 +12,7 @@
 	import { resolve } from '$app/paths';
 	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import Form from '$lib/components/dynamic-form/form.svelte';
-	import DefaultWidget from '$lib/components/dynamic-form/widgets/default.svelte';
+	import EditorWidget from '$lib/components/dynamic-form/widgets/editor.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import * as Card from '$lib/components/ui/card/index.js';
@@ -104,7 +104,10 @@
 								uiSchema={{
 									values: {
 										'ui:components': {
-											textWidget: DefaultWidget
+											textWidget: EditorWidget
+										},
+										'ui:options': {
+											TailoredEditorDocument: '123'
 										}
 									}
 								} as unknown as UiSchemaRoot}
