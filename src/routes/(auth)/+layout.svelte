@@ -38,11 +38,9 @@
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import { Label } from '$lib/components/ui/label';
 	import { Separator } from '$lib/components/ui/separator';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { Switch } from '$lib/components/ui/switch';
 	import { m } from '$lib/paraglide/messages';
 	import { activeNamespace, breadcrumbs } from '$lib/stores';
 
@@ -405,10 +403,6 @@
 					user={data.user}
 					onsuccess={() => fetchWorkspaces(activeScope)}
 				/>
-				<div class="flex items-center space-x-2">
-					<Switch id="native-mode" bind:checked={nativeMode} />
-					<Label for="native-mode">Native Mode</Label>
-				</div>
 			</Sidebar.Header>
 			<Sidebar.Content class="gap-2">
 				{#if $activeNamespace}
@@ -430,7 +424,7 @@
 				{@render contentSkeleton()}
 			</Sidebar.Content>
 		{/if}
-		<NavSecondary harborUrl={env.PUBLIC_HARBOR_URL} />
+		<NavSecondary />
 		<Sidebar.Footer>
 			<NavUser user={data.user} />
 		</Sidebar.Footer>

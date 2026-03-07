@@ -69,11 +69,22 @@
 								<Sidebar.MenuSub>
 									{#each item.items as subItem (subItem.title)}
 										<Sidebar.MenuSubItem>
-											<Sidebar.MenuSubButton aria-disabled={subItem.disabled}>
+											<Sidebar.MenuSubButton
+												aria-disabled={subItem.disabled}
+												class="gap-1.5 [&>svg]:size-3.5 [&>svg]:shrink-0"
+											>
 												{#snippet child({ props })}
 													<!-- eslint-disable svelte/no-navigation-without-resolve -->
-													<a href={subItem.url} {...props}>
+													<a
+														href={subItem.url}
+														target={subItem.external ? '_blank' : undefined}
+														rel={subItem.external ? 'noopener noreferrer' : undefined}
+														{...props}
+													>
 														<span>{subItem.title}</span>
+														{#if subItem.external}
+															<ExternalLinkIcon />
+														{/if}
 													</a>
 													<!-- eslint-enable svelte/no-navigation-without-resolve -->
 												{/snippet}
