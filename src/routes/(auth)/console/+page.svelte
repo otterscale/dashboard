@@ -25,7 +25,7 @@
 		sidebar.open ? 'ml-(--sidebar-width)' : ''
 	)}
 >
-	<div class="absolute top-12 right-18 flex flex-col items-end opacity-90 md:right-20">
+	<div class="absolute top-10 right-8 flex flex-col items-end opacity-90 md:top-12 md:right-10">
 		<svg
 			width="58"
 			height="43"
