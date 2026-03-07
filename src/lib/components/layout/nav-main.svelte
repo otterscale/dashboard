@@ -1,32 +1,54 @@
 <script lang="ts">
-	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import { ChevronRightIcon, ExternalLinkIcon } from '@lucide/svelte';
 	import type { Component } from 'svelte';
 
-	import * as Collapsible from '$lib/components/ui/collapsible/index.js';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	let {
-		label,
-		items
-	}: {
-		label: string;
-		items: {
+	import * as Collapsible from '$lib/components/ui/collapsible';
+	import * as Sidebar from '$lib/components/ui/sidebar';
+
+	type NavItem = {
+		title: string;
+		url?: string;
+		icon?: Component;
+		isActive?: boolean;
+		items?: {
 			title: string;
-			url: string;
-			icon?: Component;
-			isActive?: boolean;
-			items?: {
-				title: string;
-				url: string;
-				disabled?: boolean;
-			}[];
+			url?: string;
+			disabled?: boolean;
+			external?: boolean;
 		}[];
+	};
+
+	let {
+		managedLabel,
+		managedItems,
+		nativeLabel,
+		nativeItems
+	}: {
+		managedLabel: string;
+		managedItems: NavItem[];
+		nativeLabel: string;
+		nativeItems: NavItem[];
 	} = $props();
+
+	let activeIndex = $state(0);
+
+	const currentLabel = $derived(activeIndex === 0 ? managedLabel : nativeLabel);
+	const currentItems = $derived(activeIndex === 0 ? managedItems : nativeItems);
+
+	function toggleLabel() {
+		activeIndex = 1 - activeIndex;
+	}
 </script>
 
 <Sidebar.Group>
-	<Sidebar.GroupLabel>{label}</Sidebar.GroupLabel>
+	<Sidebar.GroupLabel
+		onclick={toggleLabel}
+		class="w-full cursor-pointer outline-none hover:underline focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+	>
+		{currentLabel}
+	</Sidebar.GroupLabel>
 	<Sidebar.Menu>
-		{#each items as item (item.title)}
+		{#each currentItems as item (item.title)}
 			{#if item.items && item.items.length > 0}
 				<Collapsible.Root open={item.isActive} class="group/collapsible">
 					{#snippet child({ props })}
@@ -48,11 +70,22 @@
 								<Sidebar.MenuSub>
 									{#each item.items as subItem (subItem.title)}
 										<Sidebar.MenuSubItem>
-											<Sidebar.MenuSubButton aria-disabled={subItem.disabled}>
+											<Sidebar.MenuSubButton
+												aria-disabled={subItem.disabled}
+												class="gap-1.5 [&>svg]:size-3.5 [&>svg]:shrink-0"
+											>
 												{#snippet child({ props })}
 													<!-- eslint-disable svelte/no-navigation-without-resolve -->
-													<a href={subItem.url} {...props}>
+													<a
+														href={subItem.url}
+														target={subItem.external ? '_blank' : undefined}
+														rel={subItem.external ? 'noopener noreferrer' : undefined}
+														{...props}
+													>
 														<span>{subItem.title}</span>
+														{#if subItem.external}
+															<ExternalLinkIcon />
+														{/if}
 													</a>
 													<!-- eslint-enable svelte/no-navigation-without-resolve -->
 												{/snippet}

@@ -946,5 +946,6 @@
 	"event": "事件",
 	"custom_resource_definition": "自訂資源定義",
 	"cluster_role": "Cluster Role",
-	"cluster_role_binding": "Cluster Role Binding"
+	"cluster_role_binding": "Cluster Role Binding",
+	"native": "原生"
 }
