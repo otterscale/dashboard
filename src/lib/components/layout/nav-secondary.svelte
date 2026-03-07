@@ -1,5 +1,4 @@
 <script lang="ts">
-	import AnchorIcon from '@lucide/svelte/icons/anchor';
 	import BookOpenIcon from '@lucide/svelte/icons/book-open';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import type { ComponentProps } from 'svelte';
@@ -9,9 +8,9 @@
 
 	import DialogAbout from './dialog-about.svelte';
 
-	type Props = ComponentProps<typeof Sidebar.Group> & { harborUrl?: string };
+	type Props = ComponentProps<typeof Sidebar.Group>;
 
-	let { ref = $bindable(null), harborUrl, ...restProps }: Props = $props();
+	let { ref = $bindable(null), ...restProps }: Props = $props();
 
 	let open = $state(false);
 </script>
@@ -21,18 +20,6 @@
 <Sidebar.Group bind:ref {...restProps}>
 	<Sidebar.GroupContent>
 		<Sidebar.Menu>
-			{#if harborUrl}
-				<Sidebar.MenuItem>
-					<Sidebar.MenuButton size="sm" tooltipContent="Harbor">
-						{#snippet child({ props })}
-							<a href={harborUrl} target="_blank" {...props}>
-								<AnchorIcon />
-								<span>Harbor</span>
-							</a>
-						{/snippet}
-					</Sidebar.MenuButton>
-				</Sidebar.MenuItem>
-			{/if}
 			<Sidebar.MenuItem>
 				<Sidebar.MenuButton size="sm" tooltipContent={m.documentation()}>
 					{#snippet child({ props })}

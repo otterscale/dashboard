@@ -951,5 +951,6 @@
 	"event": "Event",
 	"custom_resource_definition": "Custom Resource Definition",
 	"cluster_role": "Cluster Role",
-	"cluster_role_binding": "Cluster Role Binding"
+	"cluster_role_binding": "Cluster Role Binding",
+	"native": "Native"
 }
