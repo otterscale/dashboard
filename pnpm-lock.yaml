@@ -38,9 +38,6 @@ importers:
       '@oslojs/encoding':
         specifier: ^1.1.0
         version: 1.1.0
-      '@otterscale/api':
-        specifier: 0.8.20
-        version: 0.8.20
       '@shikijs/langs':
         specifier: ^3.23.0
         version: 3.23.0
