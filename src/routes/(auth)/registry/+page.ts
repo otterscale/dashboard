@@ -1,5 +1,6 @@
-import type { PageLoad } from './$types';
 import type { ProjectType, RepositoryType } from '$lib/components/artifact-viewer/types';
+
+import type { PageLoad } from './$types';
 
 export const load: PageLoad = async ({ url, fetch }) => {
 	try {
@@ -33,7 +34,9 @@ export const load: PageLoad = async ({ url, fetch }) => {
 
 		let selectedRepository: RepositoryType | undefined;
 		if (repositoryParameter) {
-			selectedRepository = repositories.find((repository) => repository.name === repositoryParameter);
+			selectedRepository = repositories.find(
+				(repository) => repository.name === repositoryParameter
+			);
 		}
 		if (!selectedRepository && repositories.length > 0) {
 			[selectedRepository] = repositories;
