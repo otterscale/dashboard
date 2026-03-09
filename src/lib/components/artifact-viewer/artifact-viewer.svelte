@@ -1,23 +1,23 @@
 <script lang="ts">
-	import * as Empty from '$lib/components/ui/empty/index.js';
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import { Columns3Icon, EraserIcon, RefreshCwIcon } from '@lucide/svelte';
 	import type { ColumnDef } from '@tanstack/table-core';
+	import { onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import { DynamicTable } from '$lib/components/dynamic-table';
 	import type { DataSchemaType, UISchemaType } from '$lib/components/dynamic-table/utils';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import * as Empty from '$lib/components/ui/empty/index.js';
 
-	import { onMount } from 'svelte';
-	import ProjectPicker from './artifact-viewer-project-picker.svelte';
-	import RepositoryPicker from './artifact-viewer-repository-picker.svelte';
 	import {
 		getArtifactColumnDefinitions,
 		getArtifactData,
 		getArtifactDataSchemas,
 		getArtifactUISchemas
 	} from './artifact-viewer.ts';
+	import ProjectPicker from './artifact-viewer-project-picker.svelte';
+	import RepositoryPicker from './artifact-viewer-repository-picker.svelte';
 	import Create from './create.svelte';
 	import Grid from './grid.svelte';
 	import type { ArtifactType, ProjectType, RepositoryType } from './types';
@@ -41,26 +41,23 @@
 			}
 			const data: ProjectType[] = await response.json();
 			projects = data ?? [];
+			return projects;
 		} catch (error) {
 			console.error('Error fetching Harbor projects:', error);
 			toast.error('Error fetching Harbor projects');
 		}
 	}
 
-	let selectedProject = $state<ProjectType | undefined>(undefined);
-	function handleProjectSelect(project: ProjectType) {
+	let selectedProject = $derived(projects.length > 0 ? projects[0] : undefined);
+	async function handleProjectSelect(project: ProjectType) {
 		selectedProject = project;
-	}
-	$effect(() => {
-		selectedProject = projects.length > 0 ? projects[0] : undefined;
-	});
-	$effect(() => {
-		if (selectedProject) {
-			fetchRepositories(selectedProject.name);
+		await fetchRepositories(selectedProject.name);
+		if (selectedRepository) {
+			await fetchArtifacts(selectedRepository.name);
 		} else {
-			repositories = [];
+			artifacts = [];
 		}
-	});
+	}
 
 	let repositories = $state<RepositoryType[]>([]);
 	async function fetchRepositories(projectName: string) {
@@ -76,28 +73,24 @@
 			}
 			const data: RepositoryType[] = await response.json();
 			repositories = data ?? [];
+			return repositories;
 		} catch (error) {
 			console.error('Error fetching Harbor repositories:', error);
 			toast.error('Error fetching Harbor repositories');
 		}
 	}
 
-	let selectedRepository = $state<RepositoryType | undefined>(undefined);
-	function handleRepositorySelect(repository: RepositoryType) {
+	let selectedRepository = $derived(repositories.length > 0 ? repositories[0] : undefined);
+	async function handleRepositorySelect(repository: RepositoryType) {
 		selectedRepository = repository;
-	}
-	$effect(() => {
-		selectedRepository = repositories.length > 0 ? repositories[0] : undefined;
-	});
-	$effect(() => {
 		if (selectedRepository) {
-			fetchArtifacts(selectedRepository.name);
+			await fetchArtifacts(selectedRepository.name);
 		} else {
-			dataset = [];
+			artifacts = [];
 		}
-	});
+	}
 
-	let dataset: Record<string, JsonValue>[] = $state([]);
+	let artifacts: Record<string, JsonValue>[] = $state([]);
 	let isFetchingArtifacts = $state(false);
 	async function fetchArtifacts(repositoryNameWithProject: string) {
 		if (isFetchingArtifacts || !repositoryNameWithProject) return;
@@ -115,7 +108,8 @@
 				return;
 			}
 			const data: ArtifactType[] = await response.json();
-			dataset = (data ?? []).map((artifact) => getArtifactData(artifact));
+			artifacts = (data ?? []).map((artifact) => getArtifactData(artifact));
+			return artifacts;
 		} catch (error) {
 			console.error('Error fetching Harbor artifacts:', error);
 			toast.error('Error fetching Harbor artifacts');
@@ -130,11 +124,15 @@
 	}
 
 	let isMounted = $state(false);
-	onMount(() => {
-		fetchProjects().then(() => {
-			isMounted = true;
-		});
-		return () => {};
+	onMount(async () => {
+		await fetchProjects();
+		if (selectedProject) {
+			await fetchRepositories(selectedProject.name);
+		}
+		if (selectedRepository) {
+			await fetchArtifacts(selectedRepository.name);
+		}
+		isMounted = true;
 	});
 </script>
 
@@ -150,7 +148,7 @@
 				/>
 			{/if}
 		</div>
-		<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {dataSchemas}>
+		<DynamicTable dataset={artifacts} {columnDefinitions} {uiSchemas} {dataSchemas}>
 			{#snippet gridsLayout({ table, handleClear })}
 				{#if table.getRowModel().rows?.length}
 					<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
