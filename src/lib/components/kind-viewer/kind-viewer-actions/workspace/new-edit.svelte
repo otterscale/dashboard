@@ -46,11 +46,7 @@
 	// Validation
 	const jsonSchemaValidator = new Ajv({
 		allErrors: true,
-		// Registe unknown formats of json schema for validation
-		formats: {
-			int64: true,
-			'date-time': true
-		}
+		strict: false
 	});
 	const validate = jsonSchemaValidator.compile(jsonSchema);
 

@@ -46,7 +46,8 @@
 
 	// Validation
 	const jsonSchemaValidator = new Ajv({
-		allErrors: true
+		allErrors: true,
+		strict: false
 	});
 	const validate = jsonSchemaValidator.compile(jsonSchema);
 

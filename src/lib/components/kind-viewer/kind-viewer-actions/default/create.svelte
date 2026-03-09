@@ -24,7 +24,7 @@
 	const validate = jsonSchemaValidator.compile(jsonSchema);
 
 	const initialValue = `\
-apiVersion: ""
+apiVersion: 123
 kind: ""
 metadata:
   name: ""
@@ -34,17 +34,31 @@ metadata:
 	let open = $state(false);
 	let editorInstance: import('monaco-editor').editor.IStandaloneCodeEditor | undefined =
 		$state(undefined);
+	let monacoInstance: typeof import('monaco-editor') | undefined = $state(undefined);
 
-	async function performValidation() {
-		if (!editorInstance) return;
+	$effect(() => {
+		if (editorInstance && monacoInstance) {
+			// Setup validation listener when editor is ready
+			performValidation();
 
-		const monaco = await import('monaco-editor');
+			const disposable = editorInstance.onDidChangeModelContent(() => {
+				performValidation();
+			});
+
+			return () => disposable.dispose();
+		}
+	});
+
+	function performValidation() {
+		if (!editorInstance || !monacoInstance) return;
+
+		const monaco = monacoInstance;
 		const markers: import('monaco-editor').editor.IMarkerData[] = [];
 
 		const model = editorInstance.getModel();
 		if (!model) return;
 
-		const content = editorInstance.getValue();
+		const content = model.getValue();
 		const document = parseDocument(content);
 
 		// Validate Syntax
@@ -119,13 +133,6 @@ metadata:
 		monaco.editor.setModelMarkers(model, 'yaml-validator', markers);
 	}
 
-	$effect(() => {
-		// Re-validate when value or editor changes
-		if (value !== undefined && editorInstance) {
-			performValidation();
-		}
-	});
-
 	function handleConfirm() {
 		console.log(value);
 	}
@@ -162,6 +169,7 @@ metadata:
 				theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
 				bind:value
 				bind:editor={editorInstance}
+				bind:monaco={monacoInstance}
 			/>
 		</div>
 		<AlertDialog.Footer>
