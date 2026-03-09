@@ -42,10 +42,10 @@
 	}
 
 	const fields: GroupedFields = {
-		'Workspace & Users': {
+		'Workspace & Members': {
 			'metadata.name': { title: 'Workspace Name', disabled: true }, // Name is immutable
-			'spec.users': {
-				title: 'Users',
+			'spec.members': {
+				title: 'Members',
 				uiSchema: {
 					items: {
 						'ui:components': {

@@ -9,11 +9,11 @@ import { buildSchemaFromK8s, type PathOptions } from './converter';
  * imported in node-based tests. The uiSchema config is preserved.
  */
 const workspaceFormPaths: Record<string, PathOptions> = {
-	// Step 1: Workspace & Users
+	// Step 1: Workspace & Members
 	'metadata.name': { title: 'Workspace Name' },
 	'spec.namespace': { title: 'Namespace', showDescription: true },
-	'spec.users': {
-		title: 'Users',
+	'spec.members': {
+		title: 'Members',
 		uiSchema: {
 			items: {
 				'ui:components': {
@@ -81,9 +81,9 @@ describe('buildSchemaFromK8s', () => {
 
 	it('should handle nested array paths correctly', () => {
 		const paths: Record<string, PathOptions> = {
-			'spec.users': { title: 'Users' },
-			'spec.users.subject': { title: 'Subject' },
-			'spec.users.role': { title: 'Role' }
+			'spec.members': { title: 'Members' },
+			'spec.members.subject': { title: 'Subject' },
+			'spec.members.role': { title: 'Role' }
 		};
 		const result = buildSchemaFromK8s(workspaceSchema, paths);
 

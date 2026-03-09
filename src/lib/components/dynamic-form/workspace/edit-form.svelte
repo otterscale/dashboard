@@ -41,11 +41,11 @@
 
 	// Grouped fields for multi-step form (3 pages)
 	const groupedFields: GroupedFields = {
-		// Step 1: Workspace & Users
-		'Workspace & Users': {
+		// Step 1: Workspace & Members
+		'Workspace & Members': {
 			'metadata.name': { title: 'Workspace Name', disabled: true }, // Name is immutable
-			'spec.users': {
-				title: 'Users',
+			'spec.members': {
+				title: 'Members',
 				uiSchema: {
 					items: {
 						'ui:components': {
