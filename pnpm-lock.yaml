@@ -199,7 +199,7 @@ importers:
         specifier: ^0.561.0
         version: 0.561.0(svelte@5.53.7)
       '@otterscale/api':
-        specifier: ^0.8.20
+        specifier: ^0.8.22
         version: 0.8.22
       '@otterscale/types':
         specifier: ^0.8.22

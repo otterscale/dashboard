@@ -34,39 +34,13 @@ function filterRequiredSchema(
 	return result;
 }
 
-function getInitialValues(schema: any) {
-	try {
-		const schemaWithDefaults = lodash.cloneDeep(schema);
-		traverse(schemaWithDefaults, {
-			allKeys: true,
-			cb: (currentSchema) => {
-				if (currentSchema.default === undefined) {
-					switch (currentSchema.type) {
-						case 'null':
-							currentSchema.default = null;
-							break;
-						case 'boolean':
-							currentSchema.default = false;
-							break;
-						case 'integer':
-						case 'number':
-							currentSchema.default = currentSchema.minimum ?? 0;
-							break;
-						case 'string':
-							currentSchema.default = '';
-							break;
-					}
-				}
-			}
-		});
-		return JSONSchemaFaker.generate(schemaWithDefaults, {
-			useDefaultValue: true,
-			maxItems: 1
-		});
-	} catch (error) {
-		console.error('json-schema-faker error:', error);
-		return {};
-	}
+function getMockData(schema: any) {
+	return JSONSchemaFaker.generate(schema, {
+		alwaysFakeOptionals: true,
+		fillProperties: true,
+		maxItems: 1,
+		useDefaultValue: true
+	});
 }
 
-export { filterRequiredSchema, getInitialValues };
+export { filterRequiredSchema, getMockData, toVersionedJSONSchema };
