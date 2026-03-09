@@ -16,6 +16,8 @@
 		Columns3Icon,
 		EraserIcon,
 		HashIcon,
+		LayoutGridIcon,
+		SheetIcon,
 		TypeIcon
 	} from '@lucide/svelte';
 	import {
@@ -30,6 +32,7 @@
 		type Row,
 		type RowSelectionState,
 		type SortingState,
+		type Table as TableType,
 		type Table as TanStackTabke,
 		type VisibilityState
 	} from '@tanstack/table-core';
@@ -68,9 +71,8 @@
 		create,
 		bulkDelete,
 		reload,
-		rowActions = createRawSnippet(() => ({
-			render: () => ''
-		}))
+		rowActions = createRawSnippet(() => ({ render: () => '' })),
+		gridsLayout
 	}: {
 		dataset: Record<string, JsonValue>[];
 		columnDefinitions: ColumnDef<Record<string, JsonValue>>[];
@@ -78,15 +80,19 @@
 		dataSchemas: Record<string, DataSchemaType>;
 		create?: Snippet;
 		bulkDelete?: Snippet<[{ table: TanStackTabke<Record<string, JsonValue>> }]>;
-		rowActions?: Snippet<
+		rowActions?: Snippet<[{ row: Row<Record<string, JsonValue>> }]>;
+		reload: Snippet;
+		gridsLayout?: Snippet<
 			[
 				{
-					row: Row<Record<string, JsonValue>>;
+					table: TableType<Record<string, JsonValue>>;
+					handleClear: () => void;
 				}
 			]
 		>;
-		reload: Snippet;
 	} = $props();
+
+	let mode = $state<'table' | 'grid'>('table');
 
 	const columns: ColumnDef<Record<string, JsonValue>>[] = [
 		{
@@ -478,6 +484,25 @@
 				{/each}
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
+		<ButtonGroup.Root>
+			<Button
+				variant={mode === 'table' ? 'secondary' : 'outline'}
+				size="icon"
+				onclick={() => (mode = 'table')}
+				aria-pressed={mode === 'table'}
+			>
+				<SheetIcon />
+			</Button>
+			<Button
+				disabled={!gridsLayout}
+				variant={mode === 'grid' ? 'secondary' : 'outline'}
+				size="icon"
+				onclick={() => (mode = 'grid')}
+				aria-pressed={mode === 'grid'}
+			>
+				<LayoutGridIcon />
+			</Button>
+		</ButtonGroup.Root>
 		<!-- Accessors -->
 		<div>
 			{@render create?.()}
@@ -492,7 +517,125 @@
 			{globalFilterError.message}
 		</p>
 	{/if}
-	<!-- Table -->
+
+	<!-- Layouts -->
+	{#if mode === 'table'}
+		{@render tableLayout()}
+	{:else if mode === 'grid'}
+		{@render gridsLayout?.({ table, handleClear })}
+	{/if}
+
+	<!-- Pagination -->
+	<div class="flex items-center justify-between gap-8">
+		<!-- Results -->
+		<div class="flex items-center gap-3">
+			<Label class="max-sm:sr-only">Rows per page</Label>
+			<Select
+				type="single"
+				value={table.getState().pagination.pageSize.toString()}
+				onValueChange={(value) => {
+					table.setPageSize(Number(value));
+				}}
+			>
+				<SelectTrigger class="w-fit whitespace-nowrap">
+					{table.getState().pagination.pageSize.toString() ?? 'Select number of results'}
+				</SelectTrigger>
+				<SelectContent
+					class="[&_*[role=option]]:ps-2 [&_*[role=option]]:pe-8 [&_*[role=option]>span]:start-auto [&_*[role=option]>span]:end-2"
+				>
+					{#each [5, 10, 15] as pageSize (pageSize)}
+						<SelectItem value={pageSize.toString()}>
+							{pageSize}
+						</SelectItem>
+					{/each}
+				</SelectContent>
+			</Select>
+		</div>
+
+		<!-- Page -->
+		<div class="flex grow justify-end text-sm whitespace-nowrap text-muted-foreground">
+			<p class="text-sm whitespace-nowrap text-muted-foreground" aria-live="polite">
+				<span class="text-foreground">
+					{table.getState().pagination.pageIndex * table.getState().pagination.pageSize +
+						1}-{Math.min(
+						Math.max(
+							table.getState().pagination.pageIndex * table.getState().pagination.pageSize +
+								table.getState().pagination.pageSize,
+							0
+						),
+						table.getRowCount()
+					)}
+				</span>
+				of
+				<span class="text-foreground">
+					{table.getRowCount().toString()}
+				</span>
+			</p>
+		</div>
+
+		<!-- Controller -->
+		<div>
+			<Pagination.Root count={table.getRowCount()}>
+				<Pagination.Content>
+					<!-- First page button -->
+					<Pagination.Item>
+						<Button
+							size="icon"
+							variant="outline"
+							class="disabled:pointer-events-none disabled:opacity-50"
+							onclick={() => table.firstPage()}
+							disabled={!table.getCanPreviousPage()}
+							aria-label="Go to first page"
+						>
+							<ChevronFirstIcon size={16} aria-hidden="true" />
+						</Button>
+					</Pagination.Item>
+					<!-- Previous page button -->
+					<Pagination.Item>
+						<Button
+							size="icon"
+							variant="outline"
+							class="disabled:pointer-events-none disabled:opacity-50"
+							onclick={() => table.previousPage()}
+							disabled={!table.getCanPreviousPage()}
+							aria-label="Go to previous page"
+						>
+							<ChevronLeftIcon size={16} aria-hidden="true" />
+						</Button>
+					</Pagination.Item>
+					<!-- Next page button -->
+					<Pagination.Item>
+						<Button
+							size="icon"
+							variant="outline"
+							class="disabled:pointer-events-none disabled:opacity-50"
+							onclick={() => table.nextPage()}
+							disabled={!table.getCanNextPage()}
+							aria-label="Go to next page"
+						>
+							<ChevronRightIcon size={16} aria-hidden="true" />
+						</Button>
+					</Pagination.Item>
+					<!-- Last page button -->
+					<Pagination.Item>
+						<Button
+							size="icon"
+							variant="outline"
+							class="disabled:pointer-events-none disabled:opacity-50"
+							onclick={() => table.lastPage()}
+							disabled={!table.getCanNextPage()}
+							aria-label="Go to last page"
+						>
+							<ChevronLastIcon size={16} aria-hidden="true" />
+						</Button>
+					</Pagination.Item>
+				</Pagination.Content>
+			</Pagination.Root>
+		</div>
+	</div>
+</div>
+
+{#snippet tableLayout()}
 	<div class="overflow-hidden rounded-md border bg-background">
 		<Table.Root class="table-fixed">
 			<Table.Header class="bg-muted">
@@ -589,113 +732,4 @@
 			</Table.Body>
 		</Table.Root>
 	</div>
-
-	<!-- Pagination -->
-	<div class="flex items-center justify-between gap-8">
-		<!-- Results -->
-		<div class="flex items-center gap-3">
-			<Label class="max-sm:sr-only">Rows per page</Label>
-			<Select
-				type="single"
-				value={table.getState().pagination.pageSize.toString()}
-				onValueChange={(value) => {
-					table.setPageSize(Number(value));
-				}}
-			>
-				<SelectTrigger class="w-fit whitespace-nowrap">
-					{table.getState().pagination.pageSize.toString() ?? 'Select number of results'}
-				</SelectTrigger>
-				<SelectContent
-					class="[&_*[role=option]]:ps-2 [&_*[role=option]]:pe-8 [&_*[role=option]>span]:start-auto [&_*[role=option]>span]:end-2"
-				>
-					{#each [5, 10, 25, 50] as pageSize (pageSize)}
-						<SelectItem value={pageSize.toString()}>
-							{pageSize}
-						</SelectItem>
-					{/each}
-				</SelectContent>
-			</Select>
-		</div>
-
-		<!-- Page -->
-		<div class="flex grow justify-end text-sm whitespace-nowrap text-muted-foreground">
-			<p class="text-sm whitespace-nowrap text-muted-foreground" aria-live="polite">
-				<span class="text-foreground">
-					{table.getState().pagination.pageIndex * table.getState().pagination.pageSize +
-						1}-{Math.min(
-						Math.max(
-							table.getState().pagination.pageIndex * table.getState().pagination.pageSize +
-								table.getState().pagination.pageSize,
-							0
-						),
-						table.getRowCount()
-					)}
-				</span>
-				of
-				<span class="text-foreground">
-					{table.getRowCount().toString()}
-				</span>
-			</p>
-		</div>
-
-		<!-- Controller -->
-		<div>
-			<Pagination.Root count={table.getRowCount()}>
-				<Pagination.Content>
-					<!-- First page button -->
-					<Pagination.Item>
-						<Button
-							size="icon"
-							variant="outline"
-							class="disabled:pointer-events-none disabled:opacity-50"
-							onclick={() => table.firstPage()}
-							disabled={!table.getCanPreviousPage()}
-							aria-label="Go to first page"
-						>
-							<ChevronFirstIcon size={16} aria-hidden="true" />
-						</Button>
-					</Pagination.Item>
-					<!-- Previous page button -->
-					<Pagination.Item>
-						<Button
-							size="icon"
-							variant="outline"
-							class="disabled:pointer-events-none disabled:opacity-50"
-							onclick={() => table.previousPage()}
-							disabled={!table.getCanPreviousPage()}
-							aria-label="Go to previous page"
-						>
-							<ChevronLeftIcon size={16} aria-hidden="true" />
-						</Button>
-					</Pagination.Item>
-					<!-- Next page button -->
-					<Pagination.Item>
-						<Button
-							size="icon"
-							variant="outline"
-							class="disabled:pointer-events-none disabled:opacity-50"
-							onclick={() => table.nextPage()}
-							disabled={!table.getCanNextPage()}
-							aria-label="Go to next page"
-						>
-							<ChevronRightIcon size={16} aria-hidden="true" />
-						</Button>
-					</Pagination.Item>
-					<!-- Last page button -->
-					<Pagination.Item>
-						<Button
-							size="icon"
-							variant="outline"
-							class="disabled:pointer-events-none disabled:opacity-50"
-							onclick={() => table.lastPage()}
-							disabled={!table.getCanNextPage()}
-							aria-label="Go to last page"
-						>
-							<ChevronLastIcon size={16} aria-hidden="true" />
-						</Button>
-					</Pagination.Item>
-				</Pagination.Content>
-			</Pagination.Root>
-		</div>
-	</div>
-</div>
+{/snippet}

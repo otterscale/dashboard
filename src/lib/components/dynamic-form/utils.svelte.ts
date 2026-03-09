@@ -1,113 +1,32 @@
 import * as JSONSchemaFaker from 'json-schema-faker';
 import traverse from 'json-schema-traverse';
 import lodash from 'lodash';
+import { SvelteSet } from 'svelte/reactivity';
 
-type Version = 'draft-04' | 'draft-07';
-const keywords: Record<Version, Set<string>> = {
-	'draft-04': new Set([
-		'$ref',
-		'title',
-		'description',
-		'default',
-		'multipleOf',
-		'maximum',
-		'exclusiveMaximum',
-		'minimum',
-		'exclusiveMinimum',
-		'maxLength',
-		'minLength',
-		'pattern',
-		'additionalItems',
-		'items',
-		'maxItems',
-		'minItems',
-		'uniqueItems',
-		'maxProperties',
-		'minProperties',
-		'required',
-		'additionalProperties',
-		'properties',
-		'patternProperties',
-		'dependencies',
-		'enum',
-		'type',
-		'allOf',
-		'anyOf',
-		'oneOf',
-		'not',
-		'definitions'
-	]),
-	'draft-07': new Set([
-		'$id',
-		'$schema',
-		'$ref',
-		'$comment',
-		'title',
-		'description',
-		'default',
-		'readOnly',
-		'writeOnly',
-		'examples',
-		'multipleOf',
-		'maximum',
-		'exclusiveMaximum',
-		'minimum',
-		'exclusiveMinimum',
-		'maxLength',
-		'minLength',
-		'pattern',
-		'additionalItems',
-		'items',
-		'maxItems',
-		'minItems',
-		'uniqueItems',
-		'contains',
-		'maxProperties',
-		'minProperties',
-		'required',
-		'additionalProperties',
-		'definitions',
-		'properties',
-		'patternProperties',
-		'dependencies',
-		'propertyNames',
-		'const',
-		'enum',
-		'type',
-		'format',
-		'allOf',
-		'anyOf',
-		'oneOf',
-		'not',
-		'if',
-		'then',
-		'else'
-	])
-};
-
-function toVersionedJSONSchema(schema: any, version: Version = 'draft-07'): any {
+function filterRequiredSchema(
+	schema: any,
+	reservedProperties = {
+		required: ['apiVersion', 'kind', 'metadata', 'spec'],
+		'properties.metadata.required': ['name']
+	}
+): any {
 	const result = lodash.cloneDeep(schema);
-	traverse(result, {
-		allKeys: true,
-		cb: (currentSchema) => {
-			Object.keys(currentSchema).forEach((key) => {
-				if (!keywords[version].has(key)) {
-					delete currentSchema[key];
-				}
-			});
-		}
+
+	Object.entries(reservedProperties).forEach(([path, properties]) => {
+		lodash.set(result, path, [...new SvelteSet(lodash.get(result, path, []).concat(properties))]);
 	});
-	return result;
-}
 
-function filterRequiredSchema(schema: any): any {
-	const result = lodash.cloneDeep(schema);
 	traverse(result, {
 		cb: (currentSchema) => {
-			if (currentSchema.properties) {
-				const requiredFields = currentSchema.required || [];
+			if (currentSchema.type === 'object' && currentSchema.properties) {
+				const requiredProperties = currentSchema.required || [];
+
+				if (requiredProperties.length === 0) return;
+
 				Object.keys(currentSchema.properties).forEach((key) => {
-					if (!requiredFields.includes(key)) delete currentSchema.properties[key];
+					if (!requiredProperties.includes(key)) {
+						delete currentSchema.properties[key];
+					}
 				});
 			}
 		}
@@ -124,4 +43,4 @@ function getMockData(schema: any) {
 	});
 }
 
-export { filterRequiredSchema, getMockData, toVersionedJSONSchema };
+export { filterRequiredSchema, getMockData };
