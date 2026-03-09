@@ -14,7 +14,6 @@
 	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
-	import { toVersionedJSONSchema } from '$lib/components/dynamic-form/utils.svelte';
 	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -28,7 +27,7 @@
 		version,
 		kind,
 		resource,
-		schema
+		schema: jsonSchema
 	}: {
 		cluster: string;
 		group: string;
@@ -41,16 +40,10 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	const jsonSchema = toVersionedJSONSchema(schema);
-
 	// Validation
 	const jsonSchemaValidator = new Ajv({
 		allErrors: true,
-		// Registe unknown formats of json schema for validation
-		formats: {
-			int64: true,
-			'date-time': true
-		}
+		strict: false
 	});
 	const validate = jsonSchemaValidator.compile(jsonSchema);
 

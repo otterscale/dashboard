@@ -83,8 +83,8 @@
 				cluster: cluster,
 				group: 'tenant.otterscale.io',
 				version: 'v1alpha1',
-				resource: 'workspaces',
-				labelSelector: 'user.otterscale.io/' + data.user.sub
+				resource: 'workspaces'
+				// labelSelector: 'user.otterscale.io/' + data.user.sub
 			});
 			workspaces = response.items.map((item) => item.object as TenantOtterscaleIoV1Alpha1Workspace);
 		} catch (error) {
@@ -160,7 +160,7 @@
 					},
 					{
 						title: m.hub(),
-						url: '#'
+						url: resolve('/(auth)/registry')
 					}
 				]
 			},
