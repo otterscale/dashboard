@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { type Transport } from '@connectrpc/connect';
+	// import { type Transport } from '@connectrpc/connect';
 	import Icon from '@iconify/svelte';
 	import { BookmarkIcon, DownloadIcon, TagsIcon } from '@lucide/svelte';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
-	import { getContext } from 'svelte';
 
+	// import { getContext } from 'svelte';
 	// import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import EditorWidget from '$lib/components/dynamic-form/widgets/editor.svelte';
@@ -22,7 +22,7 @@
 
 	const [projectName, repositoryName] = $derived(artifact.repository_name.split('/'));
 
-	const transport: Transport = getContext('transport');
+	// const transport: Transport = getContext('transport');
 	// const resourceClient = createClient(ResourceService, transport);
 
 	const jsonSchema = {

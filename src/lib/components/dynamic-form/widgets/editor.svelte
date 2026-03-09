@@ -4,6 +4,7 @@
 
 	import shell from 'highlight.js/lib/languages/shell';
 	import yaml from 'highlight.js/lib/languages/yaml';
+	import { mode as themeMode } from 'mode-watcher';
 	import rehypeHighlight from 'rehype-highlight';
 	import type { Plugin } from 'svelte-exmarkdown';
 	import Markdown from 'svelte-exmarkdown';
@@ -123,7 +124,7 @@
 						padding: { top: 32, bottom: 8 },
 						automaticLayout: true
 					}}
-					theme="vs-dark"
+					theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs'}
 					bind:value={valueProxy}
 				/>
 			</Resizable.Pane>
