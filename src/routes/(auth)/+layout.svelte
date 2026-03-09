@@ -157,7 +157,7 @@
 					},
 					{
 						title: m.hub(),
-						url: '#'
+						url: resolve('/(auth)/registry')
 					}
 				]
 			},
