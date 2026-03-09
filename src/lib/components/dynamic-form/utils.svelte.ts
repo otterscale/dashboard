@@ -43,4 +43,4 @@ function getMockData(schema: any) {
 	});
 }
 
-export { filterRequiredSchema, getMockData, toVersionedJSONSchema };
+export { filterRequiredSchema, getMockData };
