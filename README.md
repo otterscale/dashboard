@@ -9,23 +9,18 @@ Kubernetes multi-cluster management UI — SvelteKit + Connect RPC.
 
 ```mermaid
 graph LR
-    Browser -->|HTTP| SvelteKit[SvelteKit SSR]
-    SvelteKit -->|OAuth 2.0| Keycloak
-    SvelteKit -->|Session| Redis
-    SvelteKit -->|Connect RPC| API[OtterScale API]
+    Browser -->|HTTP/SSR| SvelteKit[SvelteKit]
+    Browser -->|Connect RPC<br/>same-origin + x-proxy-target| SvelteKit
+    SvelteKit -->|OAuth 2.0 / OIDC| Keycloak[Keycloak]
+    SvelteKit -->|Session / refresh lock| Redis[Redis]
+    SvelteKit -->|Proxy + Bearer| API[OtterScale API]
     API --> K8s[Kubernetes Clusters]
-    API --> Prometheus
+    API --> Prometheus[Prometheus]
 
-    subgraph Connect RPC Services
-        API --- ScopeService
-        API --- ResourceService
-        API --- StorageService
-        API --- NetworkService
-        API --- InstanceService
-        API --- ApplicationService
-        API --- ModelService
-        API --- FleetService
-        API --- OrchestratorService
+    subgraph Connect RPC used by Dashboard
+        API --- LinkService[LinkService]
+        API --- ResourceService[ResourceService]
+        API --- RuntimeService[RuntimeService]
     end
 ```
 
