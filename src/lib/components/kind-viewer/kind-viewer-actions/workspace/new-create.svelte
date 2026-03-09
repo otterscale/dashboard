@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { Plus } from '@lucide/svelte';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import type { SchemaObjectValue } from '@sjsf/form/core';
@@ -11,7 +12,6 @@
 	import { stringify } from 'yaml';
 
 	import { page } from '$app/state';
-	import { ResourceService } from '@otterscale/api/resource/v1';
 	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';

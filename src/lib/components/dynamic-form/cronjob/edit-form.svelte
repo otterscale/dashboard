@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import { page } from '$app/state';
-	import { ResourceService } from '@otterscale/api/resource/v1';
 	import {
 		type GroupedFields,
 		type K8sOpenAPISchema,

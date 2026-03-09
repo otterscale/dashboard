@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { Pencil } from '@lucide/svelte';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import { page } from '$app/state';
-	import { ResourceService } from '@otterscale/api/resource/v1';
 	import {
 		type GroupedFields,
 		MultiStepSchemaForm,
