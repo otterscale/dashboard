@@ -28,11 +28,11 @@
 	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import { type Scope, ScopeService } from '$lib/api/scope/v1/scope_pb';
 	import {
+		DialogAbout,
 		NavMain,
 		NavSecondary,
 		NavUser,
 		startTour,
-		DialogAbout,
 		WorkspaceSwitcher
 	} from '$lib/components/layout';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
