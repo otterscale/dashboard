@@ -11,6 +11,7 @@
 		CpuIcon,
 		FileTextIcon,
 		HardDriveIcon,
+		InfoIcon,
 		LayersIcon,
 		LayoutGridIcon,
 		NetworkIcon,
@@ -31,6 +32,7 @@
 		NavSecondary,
 		NavUser,
 		startTour,
+		DialogAbout,
 		WorkspaceSwitcher
 	} from '$lib/components/layout';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
@@ -61,6 +63,7 @@
 	let activeScope = $state(page.params.scope ?? page.params.cluster ?? '');
 	let scopes = $state<Scope[]>([]);
 	let workspaces = $state<TenantOtterscaleIoV1Alpha1Workspace[]>([]);
+	let aboutOpen = $state(false);
 
 	async function fetchScopes() {
 		try {
@@ -103,6 +106,10 @@
 		isMounted = true;
 	});
 
+	function onAboutClick() {
+		aboutOpen = true;
+	}
+
 	function resourceUrl(kind: string, group: string, version: string, resource: string) {
 		return resolve(
 			`/(auth)/${activeScope}/${kind}?group=${group}&version=${version}&namespace=${$activeNamespace}&resource=${resource}`
@@ -127,10 +134,10 @@
 					},
 					{
 						title: m.model(),
-						url: resourceUrl('Model', 'model.otterscale.io', 'v1alpha1', 'models')
+						url: resourceUrl('ModelService', 'model.otterscale.io', 'v1alpha1', 'modelservices')
 					},
 					{
-						title: m.model_artifact(),
+						title: m.artifact(),
 						url: resourceUrl('ModelArtifact', 'model.otterscale.io', 'v1alpha1', 'modelartifacts')
 					}
 				]
@@ -141,13 +148,12 @@
 				isActive: true,
 				items: [
 					{
-						title: m.release(),
-						url: resourceUrl('HelmRelease', 'helm.toolkit.fluxcd.io', 'v2', 'helmreleases')
+						title: m.application(),
+						url: resourceUrl('Application', 'workload.otterscale.io', 'v1alpha1', 'applications')
 					},
 					{
-						title: m.registry(),
-						url: env.PUBLIC_HARBOR_URL,
-						external: true
+						title: m.release(),
+						url: resourceUrl('HelmRelease', 'helm.toolkit.fluxcd.io', 'v2', 'helmreleases')
 					},
 					{
 						title: m.hub(),
@@ -216,10 +222,6 @@
 					{
 						title: m.module(),
 						url: resourceUrl('Module', 'module.otterscale.io', 'v1alpha1', 'modules')
-					},
-					{
-						title: m.resources(),
-						url: '#'
 					}
 				]
 			}
@@ -389,6 +391,8 @@
 	<title>{current ? `${current.title} - OtterScale` : 'OtterScale'}</title>
 </svelte:head>
 
+<DialogAbout bind:open={aboutOpen} />
+
 <Sidebar.Provider>
 	<Sidebar.Root id="sidebar-guide-step" collapsible="icon" variant="inset" class="p-3">
 		{#if activeScope && isMounted}
@@ -420,7 +424,7 @@
 				{@render contentSkeleton()}
 			</Sidebar.Content>
 		{/if}
-		<NavSecondary />
+		<NavSecondary harborUrl={env.PUBLIC_HARBOR_URL} />
 		<Sidebar.Footer>
 			<NavUser user={data.user} />
 		</Sidebar.Footer>
@@ -451,9 +455,13 @@
 				</Breadcrumb.Root>
 			</div>
 			<div class="flex items-center gap-2 px-4">
+				<Button variant="ghost" size="icon" class="size-7" onclick={onAboutClick}>
+					<InfoIcon />
+					<span class="sr-only">About</span>
+				</Button>
 				<Button variant="ghost" size="icon" class="size-7" onclick={startTour}>
 					<CircleQuestionMarkIcon />
-					<span class="sr-only">Help</span>
+					<span class="sr-only">Guide Tour</span>
 				</Button>
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger>
