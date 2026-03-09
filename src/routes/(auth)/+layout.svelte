@@ -15,8 +15,10 @@
 		LayersIcon,
 		LayoutGridIcon,
 		NetworkIcon,
+		PlusIcon,
 		UserStarIcon
 	} from '@lucide/svelte';
+	import { type Link, LinkService } from '@otterscale/api/link/v1';
 	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import { getContext, onMount, type Snippet } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -26,7 +28,6 @@
 	import { page } from '$app/state';
 	import { env } from '$env/dynamic/public';
 	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
-	import { type Scope, ScopeService } from '$lib/api/scope/v1/scope_pb';
 	import {
 		DialogAbout,
 		NavMain,
@@ -35,6 +36,7 @@
 		startTour,
 		WorkspaceSwitcher
 	} from '$lib/components/layout';
+	import DialogImportCluster from '$lib/components/layout/dialog-import-cluster.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -57,20 +59,21 @@
 	const current = $derived($breadcrumbs.at(-1));
 
 	const transport: Transport = getContext('transport');
-	const scopeClient = createClient(ScopeService, transport);
+	const linkClient = createClient(LinkService, transport);
 	const resourceClient = createClient(ResourceService, transport);
 
-	let activeScope = $state(page.params.scope ?? page.params.cluster ?? '');
-	let scopes = $state<Scope[]>([]);
+	let activeScope = $state(page.params.scope ?? page.params.cluster ?? ''); //TODO: remove page.params.scope after route updated
+	let links = $state<Link[]>([]);
 	let workspaces = $state<TenantOtterscaleIoV1Alpha1Workspace[]>([]);
 	let aboutOpen = $state(false);
+	let openImportCluster = $state(false);
 
-	async function fetchScopes() {
+	async function fetchClusters() {
 		try {
-			const response = await scopeClient.listScopes({});
-			scopes = response.scopes.filter((scope) => scope.name !== 'cos');
+			const response = await linkClient.listLinks({});
+			links = response.links.filter((link) => link.cluster !== 'cos');
 		} catch (error) {
-			console.error('Failed to fetch scopes:', error);
+			console.error('Failed to fetch links:', error);
 		}
 	}
 
@@ -97,7 +100,7 @@
 
 	let isMounted = $state(false);
 	onMount(async () => {
-		await fetchScopes();
+		await fetchClusters();
 
 		if (activeScope) {
 			await fetchWorkspaces(activeScope);
@@ -477,13 +480,22 @@
 							<DropdownMenu.Label>{m.cluster()}</DropdownMenu.Label>
 							<DropdownMenu.Separator />
 							<DropdownMenu.RadioGroup bind:value={activeScope} {onValueChange}>
-								{#each scopes as scope, index (index)}
-									<DropdownMenu.RadioItem value={scope.name}>{scope.name}</DropdownMenu.RadioItem>
+								{#each links as link, index (index)}
+									<DropdownMenu.RadioItem value={link.cluster}
+										>{link.cluster}</DropdownMenu.RadioItem
+									>
 								{/each}
 							</DropdownMenu.RadioGroup>
+							<DropdownMenu.Separator />
+							<DropdownMenu.Item onclick={() => (openImportCluster = true)}>
+								<PlusIcon class="mr-2 size-4" />
+								{m.add()}
+								{m.cluster()}
+							</DropdownMenu.Item>
 						</DropdownMenu.Group>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
+				<DialogImportCluster bind:open={openImportCluster} onsuccess={fetchClusters} />
 			</div>
 		</header>
 		<main class="flex flex-1 flex-col px-2 md:px-4 lg:px-8">
