@@ -1,7 +1,7 @@
 import type { Component } from 'svelte';
 
 import ApplicationActions from './application/actions.svelte';
-import ApplicationCreate from './application/create.svelte';
+import ApplicationCreate from './application/new-create.svelte';
 import CronJobActions from './cronjob/actions.svelte';
 import CronJobCreate from './cronjob/create.svelte';
 import DefaultActions from './default/actions.svelte';

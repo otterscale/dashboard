@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { Plus } from '@lucide/svelte';
+	import { PencilIcon } from '@lucide/svelte';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
@@ -25,7 +25,9 @@
 		version,
 		kind,
 		resource,
-		schema: jsonSchema
+		schema: jsonSchema,
+		object,
+		onOpenChangeComplete
 	}: {
 		cluster: string;
 		group: string;
@@ -33,6 +35,8 @@
 		kind: string;
 		resource: string;
 		schema?: any;
+		object?: any;
+		onOpenChangeComplete: () => void;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -49,34 +53,22 @@
 	let values: any = $state({
 		apiVersion: group ? `${group}/${version}` : version,
 		kind,
-		metadata: { name: '', namespace: page.url.searchParams.get('namespace') ?? 'default' },
+		metadata: {
+			name: lodash.get(object, 'metadata.name'),
+			namespace:
+				lodash.get(object, 'metadata.namespace') ??
+				page.url.searchParams.get('namespace') ??
+				'default'
+		},
 		spec: {
-			deploymentSpec: {
-				replicas: 1,
-				image: 'nginx:1.21',
-				command: ['bin/bash', '-c', 'sleep 3600s'],
-				args: [],
-				env: [],
-				resources: {
-					requests: { memory: '128Mi', cpu: '100m' },
-					limits: { memory: '256Mi', cpu: '200m' }
-				},
-				ports: [{ containerPort: 8080, protocol: 'TCP' }]
-			},
-			serviceSpec: {
-				type: 'ClusterIP',
-				selector: {},
-				ports: [{ port: 80, targetPort: '8080', protocol: 'TCP' }]
-			},
-			pvcSpec: {
-				accessModes: ['ReadWriteOnce'],
-				resources: { requests: { storage: '1Gi' } }
-			}
+			deploymentSpec: {},
+			serviceSpec: {},
+			pvcSpec: {}
 		}
 	});
 
 	// Refactor into StepsManager.
-	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1)); // no need to edit Name
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -98,63 +90,32 @@
 <AlertDialog.Root
 	bind:open
 	onOpenChangeComplete={() => {
+		onOpenChangeComplete?.();
 		reset();
 	}}
 >
 	<AlertDialog.Trigger>
 		{#snippet child({ props })}
-			<Button {...props} variant="outline" size="icon">
-				<Plus />
-			</Button>
+			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
+				<Item.Media>
+					<PencilIcon />
+				</Item.Media>
+				<Item.Content>
+					<Item.Title>Edit</Item.Title>
+				</Item.Content>
+			</Item.Root>
 		{/snippet}
 	</AlertDialog.Trigger>
 	<AlertDialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
 		<Item.Root class="p-0">
 			<Progress value={currentIndex + 1} max={steps.length} />
 			<Item.Content class="text-left">
-				<Item.Title class="text-xl font-bold">Application</Item.Title>
+				<Item.Title class="text-xl font-bold">{kind}</Item.Title>
 				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
 		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
 			<Tabs.Content value={steps[0]}>
-				<Form
-					schema={{
-						...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as any),
-						title: 'Name'
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={'application' as FormValue}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-					bind:values={values['metadata']['name']}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-								disabled={true}
-                                class="invisible"
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
 						...(lodash.get(jsonSchema, 'properties.spec.properties.deploymentSpec') as any),
@@ -167,7 +128,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={values['spec']['deploymentSpec'] as FormValue}
+					initialValue={{ ...lodash.get(object, 'spec.deploymentSpec') } as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
@@ -181,6 +142,8 @@
 								onclick={() => {
 									handlePrevious();
 								}}
+								disabled={true}
+								class="invisible"
 							>
 								Previous
 							</Button>
@@ -189,7 +152,7 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<Tabs.Content value={steps[2]}>
+			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
 						...(lodash.get(jsonSchema, 'properties.spec.properties.serviceSpec') as any),
@@ -202,7 +165,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={values['spec']['serviceSpec'] as FormValue}
+					initialValue={{ ...lodash.get(object, 'spec.serviceSpec') } as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
@@ -224,7 +187,7 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<Tabs.Content value={steps[3]}>
+			<Tabs.Content value={steps[2]}>
 				<Form
 					schema={{
 						...(lodash.get(jsonSchema, 'properties.spec.properties.pvcSpec') as any),
@@ -237,7 +200,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={values['spec']['pvcSpec'] as FormValue}
+					initialValue={{ ...lodash.get(object, 'spec.pvcSpec') } as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
@@ -259,7 +222,7 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<Tabs.Content value={steps[4]}>
+			<Tabs.Content value={steps[3]}>
 				<div class="flex h-full flex-col gap-3">
 					<Code.Root lang="yaml" class="w-full" hideLines code={stringify(values, null, 2)} />
 					<div class="mt-auto flex w-full items-center justify-between gap-3">
@@ -280,7 +243,7 @@
 								// Application specific label linking
 								const name = lodash.get(values, 'metadata.name');
 								const labels = { app: name };
-								
+
 								if (values.spec?.deploymentSpec) {
 									values.spec.deploymentSpec.selector = { matchLabels: labels };
 									if (!values.spec.deploymentSpec.template) {
@@ -298,7 +261,10 @@
 										values.spec.serviceSpec.ports.forEach((port: any) => {
 											if (port.targetPort !== undefined) {
 												const numValue = parseInt(port.targetPort, 10);
-												if (!isNaN(numValue) && String(numValue) === String(port.targetPort).trim()) {
+												if (
+													!isNaN(numValue) &&
+													String(numValue) === String(port.targetPort).trim()
+												) {
 													port.targetPort = numValue;
 												}
 											}
@@ -317,23 +283,26 @@
 									async () => {
 										const manifest = new TextEncoder().encode(JSON.stringify(values));
 
-										await resourceClient.create({
+										await resourceClient.apply({
 											cluster,
 											namespace: values.metadata.namespace,
+											name,
 											group,
 											version,
 											resource,
-											manifest
+											manifest,
+											fieldManager: 'otterscale-web-ui',
+											force: true
 										});
 									},
 									{
-										loading: `Creating application ${name}...`,
+										loading: `Editing application ${name}...`,
 										success: () => {
-											return `Successfully created application ${name}`;
+											return `Successfully edited application ${name}`;
 										},
 										error: (error) => {
-											console.error(`Failed to create application ${name}:`, error);
-											return `Failed to create application ${name}: ${(error as ConnectError).message}`;
+											console.error(`Failed to edit application ${name}:`, error);
+											return `Failed to edit application ${name}: ${(error as ConnectError).message}`;
 										},
 										finally() {
 											isSubmitting = false;
@@ -343,7 +312,7 @@
 								);
 							}}
 						>
-							Create
+							Edit
 						</Button>
 					</div>
 				</div>
