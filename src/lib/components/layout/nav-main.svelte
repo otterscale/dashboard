@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ChevronRightIcon, ExternalLinkIcon } from '@lucide/svelte';
+	import { ChevronRightIcon } from '@lucide/svelte';
 	import type { Component } from 'svelte';
 
 	import * as Collapsible from '$lib/components/ui/collapsible';

@@ -202,8 +202,8 @@ importers:
         specifier: ^0.8.20
         version: 0.8.22
       '@otterscale/types':
-        specifier: ^0.8.1
-        version: 0.8.1
+        specifier: ^0.8.22
+        version: 0.8.22
       '@playwright/test':
         specifier: ^1.58.2
         version: 1.58.2
@@ -811,8 +811,8 @@ packages:
   '@otterscale/api@0.8.22':
     resolution: {integrity: sha512-N3DScTJCkL38luGadKuSPyrqnzLfsp+K7Pwvt0Iw7c1LI8pg8wyxOqBTsVhczgIVIZOJAFVFvqJULfcRbYQ/CA==}
 
-  '@otterscale/types@0.8.1':
-    resolution: {integrity: sha512-d9cuz7kk00vtnX0MAfKX3suHn2vIddh11TeOus3SowVx0tmrJlxDyB8py/n+sgzOENUl9pJ33mHLvvb3ZeX44A==}
+  '@otterscale/types@0.8.22':
+    resolution: {integrity: sha512-67K4ZxMURJPMzFJu2DIhoTeqtmF/Rsy/umKVLnqSpYJ7WGieCC9Hwwd0aGF/nNPkKScZ2FDAE9FpTTf2ghefCg==}
 
   '@playwright/test@1.58.2':
     resolution: {integrity: sha512-akea+6bHYBBfA9uQqSYmlJXn61cTa+jbO87xVLCWbTqbWadRVmhxlXATaOjOgcBaWU4ePo0wB41KMFv3o35IXA==}
@@ -3992,7 +3992,7 @@ snapshots:
     dependencies:
       '@bufbuild/protobuf': 2.11.0
 
-  '@otterscale/types@0.8.1': {}
+  '@otterscale/types@0.8.22': {}
 
   '@playwright/test@1.58.2':
     dependencies:
