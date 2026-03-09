@@ -222,10 +222,6 @@
 					{
 						title: m.module(),
 						url: resourceUrl('Module', 'module.otterscale.io', 'v1alpha1', 'modules')
-					},
-					{
-						title: m.resources(),
-						url: '#'
 					}
 				]
 			}
