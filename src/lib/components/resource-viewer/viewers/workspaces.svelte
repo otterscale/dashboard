@@ -433,9 +433,9 @@
 			<div class="px-4">
 				<Separator class="py-px" />
 			</div>
-			<!-- Users -->
+			<!-- Members -->
 			<Card.Root class="flex h-full flex-col border-0 bg-transparent shadow-none">
-				{@const users = object.spec?.users ?? []}
+				{@const members = object.spec?.members ?? []}
 				<Card.Header>
 					<Card.Title>
 						<Item.Root class="p-0">
@@ -443,28 +443,28 @@
 								<Users size={20} />
 							</Item.Media>
 							<Item.Content>
-								<Item.Title class={typographyVariants({ variant: 'h6' })}>Users</Item.Title>
+								<Item.Title class={typographyVariants({ variant: 'h6' })}>Members</Item.Title>
 							</Item.Content>
 						</Item.Root>
 					</Card.Title>
 					<Card.Action>
-						<Badge>{users.length}</Badge>
+						<Badge>{members.length}</Badge>
 					</Card.Action>
 				</Card.Header>
 				<Card.Content class="flex flex-wrap gap-8">
-					<!-- Users must more than one -->
-					{#if users.length > 0}
-						{#each users as user, index (index)}
+					<!-- Members must more than one -->
+					{#if members.length > 0}
+						{#each members as member, index (index)}
 							<Item.Root class="p-0" size="sm">
 								<Item.Content>
 									<Item.Title>
-										{user.name}
+										{member.name}
 										<Badge>
-											{user.role}
+											{member.role}
 										</Badge>
 									</Item.Title>
 									<Item.Description>
-										{user.subject}
+										{member.subject}
 									</Item.Description>
 								</Item.Content>
 							</Item.Root>
@@ -479,46 +479,7 @@
 			<Label class={typographyVariants({ variant: 'h4' })}>Related Resources</Label>
 			{#if Object.keys(object?.status ?? {}).length > 1}
 				<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-					{#if object?.status?.authorizationPolicyRef?.name}
-						{@const reference = mapper.get(
-							`${object?.status?.authorizationPolicyRef?.apiVersion}/${object?.status?.authorizationPolicyRef?.kind}`
-						)}
-						<Item.Root
-							variant="muted"
-							class="hover:underline"
-							onclick={() => {
-								handleClick(
-									page.params.cluster!,
-									object?.status?.authorizationPolicyRef?.namespace ?? '',
-									reference?.group ?? '',
-									reference?.version ?? '',
-									object?.status?.authorizationPolicyRef?.kind ?? '',
-									reference?.resource ?? '',
-									object?.status?.authorizationPolicyRef?.name ?? ''
-								);
-							}}
-						>
-							<Item.Media>
-								<Box size={20} />
-							</Item.Media>
-							<Item.Content>
-								<Item.Title class="flex flex-wrap">
-									<h1>{object?.status?.authorizationPolicyRef?.kind}</h1>
-									<p class={typographyVariants({ variant: 'muted' })}>
-										{object?.status?.authorizationPolicyRef?.apiVersion}
-									</p>
-								</Item.Title>
-								<Item.Description>
-									{object?.status?.authorizationPolicyRef?.name}
-								</Item.Description>
-							</Item.Content>
-						</Item.Root>
-					{/if}
-
 					{#if object?.status?.limitRangeRef?.name}
-						{@const reference = mapper.get(
-							`${object?.status?.limitRangeRef?.apiVersion}/${object?.status?.limitRangeRef?.kind}`
-						)}
 						<Item.Root
 							variant="muted"
 							class="hover:underline"
@@ -526,10 +487,10 @@
 								handleClick(
 									page.params.cluster!,
 									object?.status?.limitRangeRef?.namespace ?? '',
-									reference?.group ?? '',
-									reference?.version ?? '',
-									object?.status?.limitRangeRef?.kind ?? '',
-									reference?.resource ?? '',
+									'',
+									'v1',
+									'LimitRange',
+									'limitranges',
 									object?.status?.limitRangeRef?.name ?? ''
 								);
 							}}
@@ -552,20 +513,17 @@
 					{/if}
 
 					{#if object?.status?.namespaceRef?.name}
-						{@const reference = mapper.get(
-							`${object?.status?.namespaceRef?.apiVersion}/${object?.status?.namespaceRef?.kind}`
-						)}
 						<Item.Root
 							variant="muted"
 							class="hover:underline"
 							onclick={() => {
 								handleClick(
 									page.params.cluster!,
-									object?.status?.namespaceRef?.namespace ?? '',
-									reference?.group ?? '',
-									reference?.version ?? '',
-									object?.status?.namespaceRef?.kind ?? '',
-									reference?.resource ?? '',
+									'',
+									'',
+									'v1',
+									'Namespace',
+									'namespaces',
 									object?.status?.namespaceRef?.name ?? ''
 								);
 							}}
@@ -587,82 +545,7 @@
 						</Item.Root>
 					{/if}
 
-					{#if object?.status?.networkPolicyRef?.name}
-						{@const reference = mapper.get(
-							`${object?.status?.networkPolicyRef?.apiVersion}/${object?.status?.networkPolicyRef?.kind}`
-						)}
-						<Item.Root
-							variant="muted"
-							class="hover:underline"
-							onclick={() => {
-								handleClick(
-									page.params.cluster!,
-									object?.status?.networkPolicyRef?.namespace ?? '',
-									reference?.group ?? '',
-									reference?.version ?? '',
-									object?.status?.networkPolicyRef?.kind ?? '',
-									reference?.resource ?? '',
-									object?.status?.networkPolicyRef?.name ?? ''
-								);
-							}}
-						>
-							<Item.Media>
-								<Box size={20} />
-							</Item.Media>
-							<Item.Content>
-								<Item.Title class="flex flex-wrap">
-									<h1>{object?.status?.networkPolicyRef?.kind}</h1>
-									<p class={typographyVariants({ variant: 'muted' })}>
-										{object?.status?.networkPolicyRef?.apiVersion}
-									</p>
-								</Item.Title>
-								<Item.Description>
-									{object?.status?.networkPolicyRef?.name}
-								</Item.Description>
-							</Item.Content>
-						</Item.Root>
-					{/if}
-
-					{#if object?.status?.peerAuthenticationRef?.name}
-						{@const reference = mapper.get(
-							`${object?.status?.peerAuthenticationRef?.apiVersion}/${object?.status?.peerAuthenticationRef?.kind}`
-						)}
-						<Item.Root
-							variant="muted"
-							class="hover:underline"
-							onclick={() => {
-								handleClick(
-									page.params.cluster!,
-									object?.status?.peerAuthenticationRef?.namespace ?? '',
-									reference?.group ?? '',
-									reference?.version ?? '',
-									object?.status?.peerAuthenticationRef?.kind ?? '',
-									reference?.resource ?? '',
-									object?.status?.peerAuthenticationRef?.name ?? ''
-								);
-							}}
-						>
-							<Item.Media>
-								<Box size={20} />
-							</Item.Media>
-							<Item.Content>
-								<Item.Title class="flex flex-wrap">
-									<h1>{object?.status?.peerAuthenticationRef?.kind}</h1>
-									<p class={typographyVariants({ variant: 'muted' })}>
-										{object?.status?.peerAuthenticationRef?.apiVersion}
-									</p>
-								</Item.Title>
-								<Item.Description>
-									{object?.status?.peerAuthenticationRef?.name}
-								</Item.Description>
-							</Item.Content>
-						</Item.Root>
-					{/if}
-
 					{#if object?.status?.resourceQuotaRef?.name}
-						{@const reference = mapper.get(
-							`${object?.status?.resourceQuotaRef?.apiVersion}/${object?.status?.resourceQuotaRef?.kind}`
-						)}
 						<Item.Root
 							variant="muted"
 							class="hover:underline"
@@ -670,10 +553,10 @@
 								handleClick(
 									page.params.cluster!,
 									object?.status?.resourceQuotaRef?.namespace ?? '',
-									reference?.group ?? '',
-									reference?.version ?? '',
-									object?.status?.resourceQuotaRef?.kind ?? '',
-									reference?.resource ?? '',
+									'',
+									'v1',
+									'ResourceQuota',
+									'resourcequotas',
 									object?.status?.resourceQuotaRef?.name ?? ''
 								);
 							}}
@@ -695,10 +578,41 @@
 						</Item.Root>
 					{/if}
 
+					{#if object?.status?.networkPolicyRef?.name}
+						<Item.Root
+							variant="muted"
+							class="hover:underline"
+							onclick={() => {
+								handleClick(
+									page.params.cluster!,
+									object?.status?.networkPolicyRef?.namespace ?? '',
+									'networking.k8s.io',
+									'v1',
+									'NetworkPolicy',
+									'networkpolicies',
+									object?.status?.networkPolicyRef?.name ?? ''
+								);
+							}}
+						>
+							<Item.Media>
+								<Box size={20} />
+							</Item.Media>
+							<Item.Content>
+								<Item.Title class="flex flex-wrap">
+									<h1>{object?.status?.networkPolicyRef?.kind}</h1>
+									<p class={typographyVariants({ variant: 'muted' })}>
+										{object?.status?.networkPolicyRef?.apiVersion}
+									</p>
+								</Item.Title>
+								<Item.Description>
+									{object?.status?.networkPolicyRef?.name}
+								</Item.Description>
+							</Item.Content>
+						</Item.Root>
+					{/if}
+
 					{#each object?.status?.roleBindingRefs as roleBindingRef, index (index)}
 						{#if roleBindingRef.name}
-							{@const reference = mapper.get(`${roleBindingRef.apiVersion}/${roleBindingRef.kind}`)}
-
 							<Item.Root
 								variant="muted"
 								class="hover:underline"
@@ -706,10 +620,10 @@
 									handleClick(
 										page.params.cluster!,
 										roleBindingRef.namespace ?? '',
-										reference?.group ?? '',
-										reference?.version ?? '',
-										roleBindingRef.kind ?? '',
-										reference?.resource ?? '',
+										'rbac.authorization.k8s.io',
+										'v1',
+										'RoleBinding',
+										'rolebindings',
 										roleBindingRef.name ?? ''
 									);
 								}}

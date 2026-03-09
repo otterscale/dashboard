@@ -19,7 +19,7 @@ import { renderComponent } from '$lib/components/ui/data-table';
 type WorkspaceAttribute =
 	| 'Name'
 	| 'Namespace'
-	| 'Users'
+	| 'Members'
 	| 'CPU Limit'
 	| 'CPU Requests'
 	| 'Memory Limit'
@@ -32,7 +32,7 @@ function getWorkspaceDataSchemas(): Record<WorkspaceAttribute, DataSchemaType> {
 	return {
 		Name: 'text',
 		Namespace: 'text',
-		Users: 'number',
+		Members: 'number',
 		'CPU Limit': 'quantity',
 		'CPU Requests': 'quantity',
 		'Memory Limit': 'quantity',
@@ -49,7 +49,7 @@ function getWorkspaceData(
 	return {
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.spec?.namespace ?? null,
-		Users: (object?.spec?.users ?? []).length,
+		Members: (object?.spec?.members ?? []).length,
 		'CPU Limit': object?.spec?.resourceQuota?.hard?.['limits.cpu'] ?? null,
 		'CPU Requests': object?.spec?.resourceQuota?.hard?.['requests.cpu'] ?? null,
 		'Memory Limit': object?.spec?.resourceQuota?.hard?.['limits.memory'] ?? null,
@@ -64,7 +64,7 @@ function getWorkspaceUISchemas(): Record<WorkspaceAttribute, UISchemaType> {
 	return {
 		Name: 'link',
 		Namespace: 'link',
-		Users: 'array-of-object',
+		Members: 'array-of-object',
 		'CPU Limit': 'quantity',
 		'CPU Requests': 'quantity',
 		'Memory Limit': 'quantity',
@@ -134,7 +134,7 @@ function getWorkspaceColumnDefinitions(
 			accessorKey: 'Namespace'
 		},
 		{
-			id: 'Users',
+			id: 'Members',
 			header: ({ column }: { column: Column<Record<WorkspaceAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
@@ -152,17 +152,17 @@ function getWorkspaceColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas,
 					metadata: {
-						items: (row.original.raw as TenantOtterscaleIoV1Alpha1Workspace).spec?.users?.map(
-							(user) =>
+						items: (row.original.raw as TenantOtterscaleIoV1Alpha1Workspace).spec?.members?.map(
+							(member) =>
 								({
-									title: user?.name,
-									description: user?.subject,
-									actions: user?.role
+									title: member?.name,
+									description: member?.subject,
+									actions: member?.role
 								}) as ArrayOfObjectItemType
 						)
 					} satisfies ArrayOfObjectMetadata
 				}),
-			accessorKey: 'Users'
+			accessorKey: 'Members'
 		},
 		{
 			id: 'CPU Limit',
