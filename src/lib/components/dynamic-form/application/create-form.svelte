@@ -10,7 +10,7 @@
 
 	type Props = {
 		schema?: any;
-		onsuccess?: (simpleapp?: Record<string, any>) => void;
+		onsuccess?: (application?: Record<string, any>) => void;
 	};
 
 	let { schema, onsuccess }: Props = $props();
@@ -165,11 +165,11 @@
 		if (isSubmitting) return;
 		isSubmitting = true;
 
-		const name = (data.metadata as any)?.name || 'simpleapp';
+		const name = (data.metadata as any)?.name || 'application';
 
 		const resourceObject = {
 			apiVersion: 'apps.otterscale.io/v1alpha1',
-			kind: 'SimpleApp',
+			kind: 'Application',
 			...data
 		};
 
@@ -181,22 +181,22 @@
 					namespace: $page.url.searchParams.get('namespace') ?? '',
 					group: 'apps.otterscale.io',
 					version: 'v1alpha1',
-					resource: 'simpleapps',
+					resource: 'applications',
 					manifest
 				});
 				return resourceObject;
 			},
 			{
-				loading: `Creating simpleapp ${name}...`,
-				success: (simpleapp) => {
+				loading: `Creating application ${name}...`,
+				success: (application) => {
 					isSubmitting = false;
-					onsuccess?.(simpleapp);
-					return `Successfully created simpleapp ${name}`;
+					onsuccess?.(application);
+					return `Successfully created application ${name}`;
 				},
 				error: (err) => {
 					isSubmitting = false;
-					console.error('Failed to create simpleapp:', err);
-					return `Failed to create simpleapp: ${(err as ConnectError).message}`;
+					console.error('Failed to create application:', err);
+					return `Failed to create application: ${(err as ConnectError).message}`;
 				}
 			}
 		);
@@ -209,7 +209,7 @@
 			apiSchema={schema}
 			fields={groupedFields}
 			{initialData}
-			title="Create SimpleApp"
+			title="Create Application"
 			onSubmit={handleMultiStepSubmit}
 			transformData={transformFormData}
 			yamlEditable={true}

@@ -139,7 +139,7 @@
 
 		const resourceObject: Record<string, unknown> = {
 			apiVersion: 'apps.otterscale.io/v1alpha1',
-			kind: 'SimpleApp',
+			kind: 'Application',
 			...data
 		}; // Ensure name is correct
 
@@ -156,23 +156,23 @@
 					namespace: $page.url.searchParams.get('namespace') ?? '',
 					group: 'apps.otterscale.io',
 					version: 'v1alpha1',
-					resource: 'simpleapps',
+					resource: 'applications',
 					manifest,
 					fieldManager: 'otterscale-web-ui',
 					force: true
 				});
 			},
 			{
-				loading: `Updating simpleapp ${name}...`,
+				loading: `Updating application ${name}...`,
 				success: () => {
 					isSubmitting = false;
 					onsuccess?.();
-					return `Successfully updated simpleapp ${name}`;
+					return `Successfully updated application ${name}`;
 				},
 				error: (err) => {
 					isSubmitting = false;
-					console.error('Failed to update simpleapp:', err);
-					return `Failed to update simpleapp: ${(err as ConnectError).message}`;
+					console.error('Failed to update application:', err);
+					return `Failed to update application: ${(err as ConnectError).message}`;
 				}
 			}
 		);
@@ -184,7 +184,7 @@
 		apiSchema={schema}
 		fields={groupedFields}
 		initialData={getCleanedObject()}
-		title={`Edit SimpleApp: ${name}`}
+		title={`Edit Application: ${name}`}
 		onSubmit={handleMultiStepSubmit}
 		transformData={transformFormData}
 		yamlEditable={true}

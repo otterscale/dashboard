@@ -1,13 +1,13 @@
 import type { Component } from 'svelte';
 
+import ApplicationActions from './application/actions.svelte';
+import ApplicationCreate from './application/create.svelte';
 import CronJobActions from './cronjob/actions.svelte';
 import CronJobCreate from './cronjob/create.svelte';
 import DefaultActions from './default/actions.svelte';
 import DefaultCreate from './default/create.svelte';
 import ResourceQuotaActions from './resource-quota/actions.svelte';
 import ResourceQuotaCreate from './resource-quota/create.svelte';
-import SimpleAppActions from './simple-app/actions.svelte';
-import SimpleAppCreate from './simple-app/create.svelte';
 import WorkspaceActions from './workspace/actions.svelte';
 import WorkspaceCreate from './workspace/new-create.svelte'; // TODO: Back to create before push
 
@@ -39,8 +39,8 @@ function getCreate(kind: string): CreateType {
 			return CronJobCreate as CreateType;
 		case 'ResourceQuota':
 			return ResourceQuotaCreate as CreateType;
-		case 'SimpleApp':
-			return SimpleAppCreate as CreateType;
+		case 'Application':
+			return ApplicationCreate as CreateType;
 		case 'Workspace':
 			return WorkspaceCreate as CreateType;
 		default:
@@ -54,8 +54,8 @@ function getActions(kind: string): ActionsType {
 			return CronJobActions as ActionsType;
 		case 'ResourceQuota':
 			return ResourceQuotaActions as ActionsType;
-		case 'SimpleApp':
-			return SimpleAppActions as ActionsType;
+		case 'Application':
+			return ApplicationActions as ActionsType;
 		case 'Workspace':
 			return WorkspaceActions as ActionsType;
 		default:

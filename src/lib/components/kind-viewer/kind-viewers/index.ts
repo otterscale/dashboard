@@ -5,6 +5,12 @@ import type { APIResource } from '$lib/api/resource/v1/resource_pb.js';
 import type { DataSchemaType, UISchemaType } from '$lib/components/dynamic-table/utils.js';
 
 import {
+	getApplicationColumnDefinitions,
+	getApplicationData,
+	getApplicationDataSchemas,
+	getApplicationUISchemas
+} from './application.js';
+import {
 	getCronJobColumnDefinitions,
 	getCronJobData,
 	getCronJobDataSchemas,
@@ -23,12 +29,6 @@ import {
 	getResourceQuotaUISchemas
 } from './resource-quota.js';
 import {
-	getSimpleAppColumnDefinitions,
-	getSimpleAppData,
-	getSimpleAppDataSchemas,
-	getSimpleAppUISchemas
-} from './simple-app.js';
-import {
 	getWorkspaceColumnDefinitions,
 	getWorkspaceData,
 	getWorkspaceDataSchemas,
@@ -43,8 +43,8 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 			return getResourceQuotaDataSchemas();
 		case 'Workspace':
 			return getWorkspaceDataSchemas();
-		case 'SimpleApp':
-			return getSimpleAppDataSchemas();
+		case 'Application':
+			return getApplicationDataSchemas();
 		default:
 			return getDefaultDataSchemas();
 	}
@@ -58,8 +58,8 @@ function getData(kind: string, apiResource: APIResource, object: any): Record<st
 			return getResourceQuotaData(object);
 		case 'Workspace':
 			return getWorkspaceData(object);
-		case 'SimpleApp':
-			return getSimpleAppData(object);
+		case 'Application':
+			return getApplicationData(object);
 		default:
 			return getDefaultData(apiResource, object);
 	}
@@ -73,8 +73,8 @@ function getUISchemas(kind: string): Record<string, UISchemaType> {
 			return getResourceQuotaUISchemas();
 		case 'Workspace':
 			return getWorkspaceUISchemas();
-		case 'SimpleApp':
-			return getSimpleAppUISchemas();
+		case 'Application':
+			return getApplicationUISchemas();
 		default:
 			return getDefaultUISchemas();
 	}
@@ -93,8 +93,8 @@ function getColumnDefinitions(
 			return getResourceQuotaColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'Workspace':
 			return getWorkspaceColumnDefinitions(apiResource, uiSchemas, dataSchemas);
-		case 'SimpleApp':
-			return getSimpleAppColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'Application':
+			return getApplicationColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		default:
 			return getDefaultColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 	}

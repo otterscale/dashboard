@@ -51,7 +51,7 @@
 						<EditWorkspaceForm {name} {schema} {object} onsuccess={handleClose} />
 					{:else}
 						<div class="flex h-full items-center justify-center">
-							<p class="text-muted-foreground">No simpleapp selected.</p>
+							<p class="text-muted-foreground">No resource quota selected.</p>
 						</div>
 					{/if}
 				</div>

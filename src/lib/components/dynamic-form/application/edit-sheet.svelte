@@ -5,7 +5,7 @@
 	import * as Item from '$lib/components/ui/item';
 	import * as Sheet from '$lib/components/ui/sheet';
 
-	import EditSimpleAppForm from './edit-form.svelte';
+	import EditApplicationForm from './edit-form.svelte';
 
 	let {
 		name,
@@ -47,10 +47,10 @@
 			<div class="flex h-full flex-col">
 				<div class="flex-1 overflow-y-auto p-6">
 					{#if name && schema && object}
-						<EditSimpleAppForm {name} {schema} {object} onsuccess={handleClose} />
+						<EditApplicationForm {name} {schema} {object} onsuccess={handleClose} />
 					{:else}
 						<div class="flex h-full items-center justify-center">
-							<p class="text-muted-foreground">No simpleapp selected.</p>
+							<p class="text-muted-foreground">No application selected.</p>
 						</div>
 					{/if}
 				</div>

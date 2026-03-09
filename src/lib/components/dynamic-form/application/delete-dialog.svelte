@@ -50,12 +50,12 @@
 					namespace: $page.url.searchParams.get('namespace') ?? '',
 					group: 'apps.otterscale.io',
 					version: 'v1alpha1',
-					resource: 'simpleapps',
+					resource: 'applications',
 					name: name
 				});
 			},
 			{
-				loading: `Deleting simpleapp ${name}...`,
+				loading: `Deleting application ${name}...`,
 				success: () => {
 					isDeleting = false;
 					open = false;
@@ -63,15 +63,15 @@
 					// Redirect after delete
 					goto(
 						resolve(
-							`/(auth)/${cluster}/SimpleApp?group=apps.otterscale.io&version=v1alpha1&namespace=${$page.url.searchParams.get('namespace') ?? ''}&resource=simpleapps`
+							`/(auth)/${cluster}/Application?group=apps.otterscale.io&version=v1alpha1&namespace=${$page.url.searchParams.get('namespace') ?? ''}&resource=applications`
 						)
 					);
-					return `Successfully deleted simpleapp ${name}`;
+					return `Successfully deleted application ${name}`;
 				},
 				error: (err) => {
 					isDeleting = false;
-					console.error('Failed to delete simpleapp:', err);
-					return `Failed to delete simpleapp: ${(err as ConnectError).message}`;
+					console.error('Failed to delete application:', err);
+					return `Failed to delete application: ${(err as ConnectError).message}`;
 				}
 			}
 		);
@@ -98,11 +98,11 @@
 		</Item.Root>
 	</AlertDialog.Trigger>
 	<AlertDialog.Content>
-		<AlertDialog.Header>Delete SimpleApp</AlertDialog.Header>
+		<AlertDialog.Header>Delete Application</AlertDialog.Header>
 		<Form.Root>
 			<Form.Fieldset>
 				<Form.Field>
-					<Form.Label>SimpleApp Name</Form.Label>
+					<Form.Label>Application Name</Form.Label>
 					<Form.Help>
 						This action cannot be undone. Please type <strong>{name}</strong> to confirm deletion.
 					</Form.Help>

@@ -3,8 +3,8 @@
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 	import type { Row } from '@tanstack/table-core';
 
-	import Deletor from '$lib/components/dynamic-form/simpleapp/delete-dialog.svelte';
-	import Editor from '$lib/components/dynamic-form/simpleapp/edit-sheet.svelte';
+	import Deletor from '$lib/components/dynamic-form/application/delete-dialog.svelte';
+	import Editor from '$lib/components/dynamic-form/application/edit-sheet.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 

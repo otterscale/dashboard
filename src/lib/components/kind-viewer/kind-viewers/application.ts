@@ -11,7 +11,7 @@ import type { QuantityMetadata } from '$lib/components/dynamic-table/dynamic-tab
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
 
-type SimpleAppAttribute =
+type ApplicationAttribute =
 	| 'Name'
 	| 'Namespace'
 	| 'Ready'
@@ -22,7 +22,7 @@ type SimpleAppAttribute =
 	| 'Age'
 	| 'raw';
 
-function getSimpleAppDataSchemas(): Record<SimpleAppAttribute, DataSchemaType> {
+function getApplicationDataSchemas(): Record<ApplicationAttribute, DataSchemaType> {
 	return {
 		Name: 'text',
 		Namespace: 'text',
@@ -36,7 +36,7 @@ function getSimpleAppDataSchemas(): Record<SimpleAppAttribute, DataSchemaType> {
 	};
 }
 
-function getSimpleAppData(object: any): Record<SimpleAppAttribute, JsonValue> {
+function getApplicationData(object: any): Record<ApplicationAttribute, JsonValue> {
 	// Parse Ready status from conditions array
 	// JSONPath: .status.conditions[?(@.type=="Ready")].status
 	let ready: JsonValue = null;
@@ -62,7 +62,7 @@ function getSimpleAppData(object: any): Record<SimpleAppAttribute, JsonValue> {
 	};
 }
 
-function getSimpleAppUISchemas(): Record<SimpleAppAttribute, UISchemaType> {
+function getApplicationUISchemas(): Record<ApplicationAttribute, UISchemaType> {
 	return {
 		Name: 'link',
 		Namespace: 'link',
@@ -76,15 +76,15 @@ function getSimpleAppUISchemas(): Record<SimpleAppAttribute, UISchemaType> {
 	};
 }
 
-function getSimpleAppColumnDefinitions(
+function getApplicationColumnDefinitions(
 	apiResource: APIResource,
-	uiSchemas: Record<SimpleAppAttribute, UISchemaType>,
-	dataSchemas: Record<SimpleAppAttribute, DataSchemaType>
-): ColumnDef<Record<SimpleAppAttribute, JsonValue>>[] {
+	uiSchemas: Record<ApplicationAttribute, UISchemaType>,
+	dataSchemas: Record<ApplicationAttribute, DataSchemaType>
+): ColumnDef<Record<ApplicationAttribute, JsonValue>>[] {
 	return [
 		{
 			id: 'Name',
-			header: ({ column }: { column: Column<Record<SimpleAppAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -93,8 +93,8 @@ function getSimpleAppColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<SimpleAppAttribute, JsonValue>>;
-				row: Row<Record<SimpleAppAttribute, JsonValue>>;
+				column: Column<Record<ApplicationAttribute, JsonValue>>;
+				row: Row<Record<ApplicationAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -102,7 +102,7 @@ function getSimpleAppColumnDefinitions(
 					uiSchemas: uiSchemas,
 					metadata: {
 						hyperlink: resolve(
-							`/(auth)/${page.params.cluster!}/${apiResource.kind}/${apiResource.resource}?group=${apiResource.group}&version=${apiResource.version}&name=${row.original[column.id as SimpleAppAttribute]}&namespace=${page.url.searchParams.get('namespace') ?? ''}`
+							`/(auth)/${page.params.cluster!}/${apiResource.kind}/${apiResource.resource}?group=${apiResource.group}&version=${apiResource.version}&name=${row.original[column.id as ApplicationAttribute]}&namespace=${page.url.searchParams.get('namespace') ?? ''}`
 						)
 					} satisfies LinkMetadata
 				}),
@@ -110,7 +110,7 @@ function getSimpleAppColumnDefinitions(
 		},
 		{
 			id: 'Namespace',
-			header: ({ column }: { column: Column<Record<SimpleAppAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -119,8 +119,8 @@ function getSimpleAppColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<SimpleAppAttribute, JsonValue>>;
-				row: Row<Record<SimpleAppAttribute, JsonValue>>;
+				column: Column<Record<ApplicationAttribute, JsonValue>>;
+				row: Row<Record<ApplicationAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -136,7 +136,7 @@ function getSimpleAppColumnDefinitions(
 		},
 		{
 			id: 'Ready',
-			header: ({ column }: { column: Column<Record<SimpleAppAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -145,8 +145,8 @@ function getSimpleAppColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<SimpleAppAttribute, JsonValue>>;
-				row: Row<Record<SimpleAppAttribute, JsonValue>>;
+				column: Column<Record<ApplicationAttribute, JsonValue>>;
+				row: Row<Record<ApplicationAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -157,7 +157,7 @@ function getSimpleAppColumnDefinitions(
 		},
 		{
 			id: 'Service Type',
-			header: ({ column }: { column: Column<Record<SimpleAppAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -166,8 +166,8 @@ function getSimpleAppColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<SimpleAppAttribute, JsonValue>>;
-				row: Row<Record<SimpleAppAttribute, JsonValue>>;
+				column: Column<Record<ApplicationAttribute, JsonValue>>;
+				row: Row<Record<ApplicationAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -178,7 +178,7 @@ function getSimpleAppColumnDefinitions(
 		},
 		{
 			id: 'Image',
-			header: ({ column }: { column: Column<Record<SimpleAppAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -187,8 +187,8 @@ function getSimpleAppColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<SimpleAppAttribute, JsonValue>>;
-				row: Row<Record<SimpleAppAttribute, JsonValue>>;
+				column: Column<Record<ApplicationAttribute, JsonValue>>;
+				row: Row<Record<ApplicationAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -199,7 +199,7 @@ function getSimpleAppColumnDefinitions(
 		},
 		{
 			id: 'Replicas',
-			header: ({ column }: { column: Column<Record<SimpleAppAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -208,8 +208,8 @@ function getSimpleAppColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<SimpleAppAttribute, JsonValue>>;
-				row: Row<Record<SimpleAppAttribute, JsonValue>>;
+				column: Column<Record<ApplicationAttribute, JsonValue>>;
+				row: Row<Record<ApplicationAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -220,7 +220,7 @@ function getSimpleAppColumnDefinitions(
 		},
 		{
 			id: 'Storage',
-			header: ({ column }: { column: Column<Record<SimpleAppAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -229,8 +229,8 @@ function getSimpleAppColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<SimpleAppAttribute, JsonValue>>;
-				row: Row<Record<SimpleAppAttribute, JsonValue>>;
+				column: Column<Record<ApplicationAttribute, JsonValue>>;
+				row: Row<Record<ApplicationAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -245,7 +245,7 @@ function getSimpleAppColumnDefinitions(
 
 		{
 			id: 'Age',
-			header: ({ column }: { column: Column<Record<SimpleAppAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -254,8 +254,8 @@ function getSimpleAppColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<SimpleAppAttribute, JsonValue>>;
-				row: Row<Record<SimpleAppAttribute, JsonValue>>;
+				column: Column<Record<ApplicationAttribute, JsonValue>>;
+				row: Row<Record<ApplicationAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -268,8 +268,9 @@ function getSimpleAppColumnDefinitions(
 }
 
 export {
-	getSimpleAppColumnDefinitions,
-	getSimpleAppData,
-	getSimpleAppDataSchemas,
-	getSimpleAppUISchemas
+	getApplicationColumnDefinitions,
+	getApplicationData,
+	getApplicationDataSchemas,
+	getApplicationUISchemas
 };
+
