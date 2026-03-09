@@ -149,7 +149,11 @@
 
 		activeNamespace.set(activeWorkspace.spec.namespace);
 		activeWorkspaceName.set(activeWorkspace.metadata?.name ?? '');
-		role.set(activeWorkspace.spec.members?.find((u: { subject?: string; role?: string }) => u.subject === user.sub)?.role ?? '');
+		role.set(
+			activeWorkspace.spec.members?.find(
+				(u: { subject?: string; role?: string }) => u.subject === user.sub
+			)?.role ?? ''
+		);
 	});
 </script>
 
@@ -227,7 +231,9 @@
 							{#if activeWorkspace}
 								<span class="truncate font-medium"> {activeWorkspace.metadata?.name} </span>
 								<span class="flex items-center gap-2 truncate text-xs text-muted-foreground">
-									{activeWorkspace.spec.members?.find((u: { subject?: string; role?: string }) => u.subject === user.sub)?.role}
+									{activeWorkspace.spec.members?.find(
+										(u: { subject?: string; role?: string }) => u.subject === user.sub
+									)?.role}
 								</span>
 							{:else}
 								<span class="truncate font-medium"> OtterScale </span>
@@ -258,7 +264,9 @@
 						<div class="grid flex-1 text-start text-xs leading-tight">
 							<span class="truncate font-medium">{workspace.metadata?.name}</span>
 							<span class="truncate text-[10px] text-muted-foreground"
-								>{workspace.spec.members?.find((u: { subject?: string; role?: string }) => u.subject === user.sub)?.role}</span
+								>{workspace.spec.members?.find(
+									(u: { subject?: string; role?: string }) => u.subject === user.sub
+								)?.role}</span
 							>
 						</div>
 						<DropdownMenu.Shortcut class="flex items-center gap-0.5 text-sm">
