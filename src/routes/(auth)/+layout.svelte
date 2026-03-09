@@ -29,6 +29,7 @@
 	import { type Scope, ScopeService } from '$lib/api/scope/v1/scope_pb';
 	import {
 		DialogAbout,
+		DialogAbout,
 		NavMain,
 		NavSecondary,
 		NavUser,
@@ -424,7 +425,7 @@
 				{@render contentSkeleton()}
 			</Sidebar.Content>
 		{/if}
-		<NavSecondary />
+		<NavSecondary harborUrl={env.PUBLIC_HARBOR_URL} />
 		<Sidebar.Footer>
 			<NavUser user={data.user} />
 		</Sidebar.Footer>

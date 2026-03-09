@@ -7,9 +7,9 @@
 
 	import DialogAbout from './dialog-about.svelte';
 
-	type Props = ComponentProps<typeof Sidebar.Group>;
+	type Props = ComponentProps<typeof Sidebar.Group> & { harborUrl?: string };
 
-	let { ref = $bindable(null), ...restProps }: Props = $props();
+	let { ref = $bindable(null), harborUrl, ...restProps }: Props = $props();
 
 	let open = $state(false);
 </script>
