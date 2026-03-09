@@ -15,9 +15,9 @@
 
 	let {
 		prometheusDriver,
-		scope,
+		cluster,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 
 	const configuration = {
 		receive: { label: 'Receive', color: 'var(--chart-1)' },
@@ -27,7 +27,7 @@
 	let receives: SampleValue[] = $state([]);
 	async function fetchReceives() {
 		const response = await prometheusDriver.rangeQuery(
-			`avg(rate(kubevirt_vmi_network_receive_bytes_total{juju_model="${scope}"}[5m]))`,
+			`avg(rate(kubevirt_vmi_network_receive_bytes_total{juju_model="${cluster}"}[5m]))`,
 			new SvelteDate().setMinutes(0, 0, 0) - 60 * 60 * 1000,
 			new SvelteDate().setMinutes(0, 0, 0),
 			2 * 60
@@ -38,7 +38,7 @@
 	let transmits: SampleValue[] = $state([]);
 	async function fetchTransmits() {
 		const response = await prometheusDriver.rangeQuery(
-			`avg(rate(kubevirt_vmi_network_transmit_bytes_total{juju_model="${scope}"}[5m]))`,
+			`avg(rate(kubevirt_vmi_network_transmit_bytes_total{juju_model="${cluster}"}[5m]))`,
 			new SvelteDate().setMinutes(0, 0, 0) - 60 * 60 * 1000,
 			new SvelteDate().setMinutes(0, 0, 0),
 			2 * 60

@@ -3,7 +3,6 @@ import { error, redirect } from '@sveltejs/kit';
 import { resolve } from '$app/paths';
 import { env } from '$env/dynamic/private';
 import { env as publicEnv } from '$env/dynamic/public';
-import { isFlexibleBooleanTrue } from '$lib/helper';
 
 import type { PageServerLoad } from './$types';
 
@@ -12,9 +11,8 @@ interface EnvVar {
 	name: string;
 }
 
-const REQUIRED_ENV_VARS_ALL: readonly EnvVar[] = [{ value: env.API_URL, name: 'API_URL' }];
-
-const REQUIRED_ENV_VARS_NORMAL: readonly EnvVar[] = [
+const REQUIRED_ENV_VARS: readonly EnvVar[] = [
+	{ value: env.API_URL, name: 'API_URL' },
 	{ value: publicEnv.PUBLIC_WEB_URL, name: 'PUBLIC_WEB_URL' },
 	{ value: publicEnv.PUBLIC_HARBOR_URL, name: 'PUBLIC_HARBOR_URL' },
 	{ value: env.KEYCLOAK_REALM_URL, name: 'KEYCLOAK_REALM_URL' },
@@ -33,13 +31,7 @@ const checkRequiredEnvVars = (envVars: readonly EnvVar[]): void => {
 };
 
 export const load: PageServerLoad = async ({ locals }) => {
-	checkRequiredEnvVars(REQUIRED_ENV_VARS_ALL);
-
-	if (isFlexibleBooleanTrue(env.BOOTSTRAP_MODE)) {
-		throw redirect(307, resolve('/setup'));
-	}
-
-	checkRequiredEnvVars(REQUIRED_ENV_VARS_NORMAL);
+	checkRequiredEnvVars(REQUIRED_ENV_VARS);
 
 	if (!locals.session) {
 		throw redirect(307, resolve('/login'));

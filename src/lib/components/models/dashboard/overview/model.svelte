@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import Icon from '@iconify/svelte';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { scaleUtc } from 'd3-scale';
 	import { curveLinear } from 'd3-shape';
 	import { LineChart } from 'layerchart';
 	import { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { getContext, onDestroy, onMount } from 'svelte';
 
-	import { ModelService } from '$lib/api/model/v1/model_pb';
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
@@ -18,12 +18,18 @@
 
 	let {
 		prometheusDriver,
-		scope,
+		cluster,
+		namespace,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: {
+		prometheusDriver: PrometheusDriver;
+		cluster: string;
+		namespace: string;
+		isReloading: boolean;
+	} = $props();
 
 	const transport: Transport = getContext('transport');
-	const modelClient = createClient(ModelService, transport);
+	const client = createClient(ResourceService, transport);
 
 	const configuration = {
 		number: { label: 'Pods', color: 'var(--chart-1)' }
@@ -32,12 +38,16 @@
 	let latestModels: number | undefined = $state(undefined);
 	async function fetchLatestModels() {
 		try {
-			const response = await modelClient.listModels({
-				scope: scope
+			const response = await client.list({
+				cluster: cluster,
+				group: 'model.otterscale.io',
+				version: 'v1alpha1',
+				resource: 'models',
+				namespace: namespace
 			});
-			latestModels = response.models.length;
+			latestModels = response.items.length;
 		} catch (error) {
-			console.error(`Fail to fetch latest available models in scope ${scope}:`, error);
+			console.error(`Fail to fetch latest available models in cluster ${cluster}:`, error);
 		}
 	}
 
@@ -52,14 +62,14 @@
 	async function fetchAvailablePods() {
 		try {
 			const response = await prometheusDriver.rangeQuery(
-				`count by(endpoint) (vllm:cache_config_info{juju_model="${scope}"})`,
+				`count by(endpoint) (vllm:cache_config_info{juju_model="${cluster}"})`,
 				Date.now() - 24 * 60 * 60 * 1000,
 				Date.now(),
 				2 * 60
 			);
 			availablePods = response.result[0]?.values ?? [];
 		} catch (error) {
-			console.error(`Fail to fetch available pods in scope ${scope}:`, error);
+			console.error(`Fail to fetch available pods in cluster ${cluster}:`, error);
 		}
 	}
 
@@ -67,7 +77,7 @@
 		try {
 			await Promise.all([fetchLatestModels(), fetchAvailablePods()]);
 		} catch (error) {
-			console.error(`Fail to fetch models data in scope ${scope}:`, error);
+			console.error(`Fail to fetch models data in cluster ${cluster}:`, error);
 		}
 	}
 
@@ -79,7 +89,7 @@
 			await fetch();
 			isLoaded = true;
 		} catch (error) {
-			console.error(`Fail to fetch data in scope ${scope}:`, error);
+			console.error(`Fail to fetch data in cluster ${cluster}:`, error);
 		}
 	});
 	onDestroy(() => {

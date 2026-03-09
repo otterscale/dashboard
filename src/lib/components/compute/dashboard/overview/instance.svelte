@@ -10,14 +10,14 @@
 
 	let {
 		prometheusDriver,
-		scope,
+		cluster,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 
 	let instances: SampleValue | undefined = $state(undefined);
 	async function fetchInstances() {
 		const response = await prometheusDriver.instantQuery(
-			`count(kubevirt_vmi_info{juju_model="${scope}"})`
+			`count(kubevirt_vmi_info{juju_model="${cluster}"})`
 		);
 		instances = response.result[0]?.value ?? undefined;
 	}

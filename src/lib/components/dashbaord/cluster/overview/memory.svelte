@@ -12,17 +12,17 @@
 
 	let {
 		prometheusDriver,
-		scope,
+		cluster,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 
 	let memoryUsage: SampleValue | undefined = $state(undefined);
 	async function fetchMemoryUsage() {
 		const usageResponse = await prometheusDriver.instantQuery(
 			`
-			100 * (sum(node_memory_MemTotal_bytes{juju_model="${scope}", container!=""} - node_memory_MemAvailable_bytes{juju_model="${scope}", container!=""}))
+			100 * (sum(node_memory_MemTotal_bytes{juju_model="${cluster}", container!=""} - node_memory_MemAvailable_bytes{juju_model="${cluster}", container!=""}))
 			/
-			sum(node_memory_MemTotal_bytes{juju_model="${scope}", container!=""})
+			sum(node_memory_MemTotal_bytes{juju_model="${cluster}", container!=""})
 			`
 		);
 		memoryUsage = usageResponse.result[0]?.value ?? undefined;
@@ -32,9 +32,9 @@
 	async function fetchMemoryRequest() {
 		const response = await prometheusDriver.instantQuery(
 			`
-			100 * sum(kube_pod_container_resource_requests{resource="memory", unit="byte", juju_model="${scope}", container!=""})
+			100 * sum(kube_pod_container_resource_requests{resource="memory", unit="byte", juju_model="${cluster}", container!=""})
 			/
-			sum(kube_node_status_allocatable{cluster!="", juju_model="${scope}", resource="memory"})
+			sum(kube_node_status_allocatable{cluster!="", juju_model="${cluster}", resource="memory"})
 			`
 		);
 		memoryRequest = response.result[0]?.value ?? undefined;
@@ -44,7 +44,7 @@
 	async function fetchAllocatableMemory() {
 		const response = await prometheusDriver.instantQuery(
 			`
-			sum(kube_node_status_allocatable{cluster!="", juju_model="${scope}", resource="memory"})
+			sum(kube_node_status_allocatable{cluster!="", juju_model="${cluster}", resource="memory"})
 			`
 		);
 		allocatableMemory = response.result[0]?.value?.value ?? undefined;

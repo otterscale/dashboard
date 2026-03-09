@@ -14,9 +14,9 @@
 
 	let {
 		prometheusDriver,
-		scope,
+		cluster,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 
 	const configuration = {
 		usage: { label: 'Usage', color: 'var(--chart-1)' }
@@ -25,7 +25,7 @@
 	let memoryUsages: SampleValue[] = $state([]);
 	async function fetchMemoryUsage() {
 		const response = await prometheusDriver.rangeQuery(
-			`avg(kubevirt_vmi_memory_resident_bytes{juju_model="${scope}"}) / avg(kubevirt_vmi_memory_domain_bytes{juju_model="${scope}"})`,
+			`avg(kubevirt_vmi_memory_resident_bytes{juju_model="${cluster}"}) / avg(kubevirt_vmi_memory_domain_bytes{juju_model="${cluster}"})`,
 			new SvelteDate().setMinutes(0, 0, 0) - 60 * 60 * 1000,
 			new SvelteDate().setMinutes(0, 0, 0),
 			2 * 60

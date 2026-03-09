@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { Pencil } from '@lucide/svelte';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import { page } from '$app/state';
-	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import {
 		type GroupedFields,
 		MultiStepSchemaForm,
@@ -26,7 +26,7 @@
 		onOpenChangeComplete: () => void;
 	} = $props();
 
-	const cluster = $derived(page.params.cluster ?? page.params.scope ?? '');
+	const cluster = $derived(page.params.cluster ?? '');
 
 	let open = $state(false);
 

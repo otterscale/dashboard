@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { Trash2 } from '@lucide/svelte';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import * as Form from '$lib/components/custom/form';
 	import { Single as SingleInput } from '$lib/components/custom/input';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
@@ -24,7 +24,7 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-	const cluster = $derived(page.params.cluster ?? page.params.scope ?? '');
+	const cluster = $derived(page.params.cluster ?? '');
 
 	let open = $state(false);
 	let confirmName = $state('');
@@ -58,7 +58,7 @@
 					open = false;
 					onsuccess?.();
 					// Use window.location.href to force a full page reload and re-trigger fetchWorkspaces
-					window.location.href = resolve(`/(auth)/scope/${cluster}`);
+					window.location.href = resolve(`/(auth)/[cluster]/overview`, { cluster });
 					return `Successfully deleted workspace ${name}`;
 				},
 				error: (err) => {

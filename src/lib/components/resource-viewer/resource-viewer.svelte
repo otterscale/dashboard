@@ -1,18 +1,16 @@
 <script lang="ts">
-	import { toJson } from '@bufbuild/protobuf';
-	import { StructSchema } from '@bufbuild/protobuf/wkt';
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import { Ban, Braces } from '@lucide/svelte';
 	import File from '@lucide/svelte/icons/file';
 	import Layers from '@lucide/svelte/icons/layers';
-	import { getContext, onDestroy, onMount } from 'svelte';
-	import { stringify } from 'yaml';
-
 	import {
 		type GetRequest,
 		ResourceService,
 		type SchemaRequest
-	} from '$lib/api/resource/v1/resource_pb';
+	} from '@otterscale/api/resource/v1';
+	import { getContext, onDestroy, onMount } from 'svelte';
+	import { stringify } from 'yaml';
+
 	import * as Code from '$lib/components/custom/code';
 	import { typographyVariants } from '$lib/components/typography/index.ts';
 	import * as Alert from '$lib/components/ui/alert/index.js';
@@ -73,7 +71,7 @@
 				{ signal: getAbortController?.signal }
 			);
 
-			schema = toJson(StructSchema, schemaResponse);
+			schema = schemaResponse.schema ?? {};
 
 			const getResponse = await resourceClient.get(
 				{

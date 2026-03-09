@@ -23,7 +23,7 @@
 			onsuccess?.(cronjob);
 			goto(
 				resolve(
-					`/(auth)/${page.params.cluster}/CronJob/cronjobs?group=batch&version=v1&name=${cronjob.metadata.name}&namespace=${page.url.searchParams.get('namespace') ?? ''}`
+					`/(auth)/${page.params.cluster}/${page.params.namespace}/${cronjob.metadata.name}?group=&version=v1&kind=CronJob&resource=cronjobs`
 				)
 			);
 		}

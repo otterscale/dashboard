@@ -1,11 +1,11 @@
 import { type JsonObject, type JsonValue } from '@bufbuild/protobuf';
+import type { APIResource } from '@otterscale/api/resource/v1';
 import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 import type { Column, ColumnDef } from '@tanstack/table-core';
 import { type Row } from '@tanstack/table-core';
 
 import { resolve } from '$app/paths';
 import { page } from '$app/state';
-import type { APIResource } from '$lib/api/resource/v1/resource_pb';
 import { DynamicTableCell, DynamicTableHeader } from '$lib/components/dynamic-table';
 import type {
 	ArrayOfObjectItemType,
@@ -101,7 +101,7 @@ function getWorkspaceColumnDefinitions(
 					uiSchemas: uiSchemas,
 					metadata: {
 						hyperlink: resolve(
-							`/(auth)/${page.params.cluster!}/${apiResource.kind}/${apiResource.resource}?group=${apiResource.group}&version=${apiResource.version}&name=${row.original[column.id as WorkspaceAttribute]}`
+							`/(auth)/${page.params.cluster!}/${row.original['Namespace']}/${row.original[column.id as WorkspaceAttribute]}?group=${apiResource.group}&version=${apiResource.version}&kind=${apiResource.kind}&resource=${apiResource.resource}`
 						)
 					} as LinkMetadata
 				}),
@@ -127,7 +127,7 @@ function getWorkspaceColumnDefinitions(
 					uiSchemas: uiSchemas,
 					metadata: {
 						hyperlink: resolve(
-							`/(auth)/${page.params.cluster!}/Namespace/namespaces?group=&version=v1&name=${row.original['Namespace']}`
+							`/(auth)/${page.params.cluster!}/${row.original['Namespace']}/${row.original['Namespace']}?group=&version=v1&kind=Namespace&resource=namespaces`
 						)
 					} satisfies LinkMetadata
 				}),

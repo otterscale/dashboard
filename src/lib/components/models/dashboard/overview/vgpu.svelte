@@ -14,9 +14,9 @@
 
 	let {
 		prometheusDriver,
-		scope,
+		cluster,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 
 	let memoryUsage: Record<string, number>[] = $state([]);
 
@@ -31,7 +31,7 @@
 		try {
 			const response = await prometheusDriver.instantQuery(
 				`
-				topk(10, avg by (nodeid) (nodeGPUMemoryPercentage{juju_model="${scope}"}))
+				topk(10, avg by (nodeid) (nodeGPUMemoryPercentage{juju_model="${cluster}"}))
 				`
 			);
 			const instanceVectors: InstantVector[] = response.result;

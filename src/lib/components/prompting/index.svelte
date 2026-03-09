@@ -1,11 +1,11 @@
 <script lang="ts" module>
 	import Icon from '@iconify/svelte';
 	import SendIcon from '@lucide/svelte/icons/send';
+	import type { ModelOtterscaleIoV1Alpha1ModelService } from '@otterscale/types';
 	import { Dialog as DialogPrimitive } from 'bits-ui';
 	import { toast } from 'svelte-sonner';
 
 	import { resolve } from '$app/paths';
-	import type { Model } from '$lib/api/model/v1/model_pb';
 	import * as Chat from '$lib/components/custom/chat';
 	import { Button, buttonVariants } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
@@ -28,9 +28,15 @@
 	let {
 		serviceUri,
 		model,
-		scope,
+		cluster,
+		namespace,
 		...restProps
-	}: DialogPrimitive.TriggerProps & { serviceUri: string; model: Model; scope: string } = $props();
+	}: DialogPrimitive.TriggerProps & {
+		serviceUri: string;
+		model: ModelOtterscaleIoV1Alpha1ModelService;
+		cluster: string;
+		namespace: string;
+	} = $props();
 
 	let conversation = $state<HTMLDivElement>();
 
@@ -75,7 +81,10 @@
 		];
 
 		const response = await fetch(
-			resolve('/(auth)/scope/[scope]/models/api/completion', { scope }),
+			resolve('/(auth)/[cluster]/[namespace]/model/api/completion', {
+				cluster: cluster,
+				namespace: namespace
+			}),
 			{
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },

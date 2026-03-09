@@ -9,14 +9,14 @@
 
 	let {
 		prometheusDriver,
-		scope,
+		cluster,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 
 	let consumption: string | undefined = $state(undefined);
 	async function fetchConsumption() {
 		const response = await prometheusDriver.instantQuery(
-			`sum(DCGM_FI_DEV_POWER_USAGE{juju_model="${scope}"})`
+			`sum(DCGM_FI_DEV_POWER_USAGE{juju_model="${cluster}"})`
 		);
 		consumption = response.result[0]?.value?.value ?? undefined;
 	}

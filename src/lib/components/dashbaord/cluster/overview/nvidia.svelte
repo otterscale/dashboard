@@ -14,9 +14,9 @@
 
 	let {
 		prometheusDriver,
-		scope,
+		cluster,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 
 	let gpuCount: SampleValue | undefined = $state(undefined);
 	let avgGpuTemperature: SampleValue | undefined = $state(undefined);
@@ -36,12 +36,12 @@
 
 	async function fetchGpuInfo() {
 		const countResponse = await prometheusDriver.instantQuery(
-			`count(DCGM_FI_DEV_GPU_UTIL{juju_model="${scope}"})`
+			`count(DCGM_FI_DEV_GPU_UTIL{juju_model="${cluster}"})`
 		);
 		gpuCount = countResponse.result[0]?.value ?? undefined;
 
 		const tempResponse = await prometheusDriver.instantQuery(
-			`avg(DCGM_FI_DEV_GPU_TEMP{juju_model="${scope}"})`
+			`avg(DCGM_FI_DEV_GPU_TEMP{juju_model="${cluster}"})`
 		);
 		avgGpuTemperature = tempResponse.result[0]?.value ?? undefined;
 	}
@@ -50,7 +50,7 @@
 		try {
 			const range = timeRanges[selectedTimeRange as keyof typeof timeRanges];
 			const response = await prometheusDriver.rangeQuery(
-				`avg(DCGM_FI_DEV_GPU_TEMP{juju_model="${scope}"})`,
+				`avg(DCGM_FI_DEV_GPU_TEMP{juju_model="${cluster}"})`,
 				Date.now() - range.duration,
 				Date.now(),
 				range.step
@@ -67,7 +67,7 @@
 						)
 					: [];
 		} catch (error) {
-			console.error(`Fail to fetch GPU temp history in scope ${scope}:`, error);
+			console.error(`Fail to fetch GPU temp history in cluster ${cluster}:`, error);
 		}
 	}
 

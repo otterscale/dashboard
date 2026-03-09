@@ -2,7 +2,6 @@ import { type Handle, type HandleServerError, redirect } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 
 import { env } from '$env/dynamic/private';
-import { isFlexibleBooleanTrue } from '$lib/helper';
 import { paraglideMiddleware } from '$lib/paraglide/server';
 import { keycloak } from '$lib/server/keycloak';
 import {
@@ -40,10 +39,6 @@ const handleParaglide: Handle = ({ event, resolve }) =>
 	});
 
 const handleAuth: Handle = async ({ event, resolve }) => {
-	if (isFlexibleBooleanTrue(env.BOOTSTRAP_MODE)) {
-		return resolve(event);
-	}
-
 	const token = getSessionTokenCookie(event.cookies);
 
 	if (!token) {
@@ -67,10 +62,6 @@ const handleAuth: Handle = async ({ event, resolve }) => {
 };
 
 const handleRefreshToken: Handle = async ({ event, resolve }) => {
-	if (isFlexibleBooleanTrue(env.BOOTSTRAP_MODE)) {
-		return resolve(event);
-	}
-
 	const session = event.locals.session;
 
 	if (session) {
@@ -113,7 +104,7 @@ const handleRefreshToken: Handle = async ({ event, resolve }) => {
 };
 
 const handleGuard: Handle = async ({ event, resolve }) => {
-	if (isFlexibleBooleanTrue(env.BOOTSTRAP_MODE) || event.locals.session) {
+	if (event.locals.session) {
 		return resolve(event);
 	}
 

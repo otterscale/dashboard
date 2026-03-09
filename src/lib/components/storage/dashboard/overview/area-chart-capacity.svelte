@@ -17,9 +17,9 @@
 	// Props
 	let {
 		client,
-		scope,
+		cluster,
 		isReloading = $bindable()
-	}: { client: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: { client: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 
 	// Types
 	type TimeInterval = 'day' | 'week' | 'month';
@@ -132,8 +132,8 @@
 		const endTimestamp = Math.floor(intervalEnd.getTime() / 1000);
 
 		const queries = {
-			used: `ceph_cluster_total_used_bytes{juju_model="${scope}"} @ ${endTimestamp}`,
-			total: `ceph_cluster_total_bytes{juju_model="${scope}"} @ ${endTimestamp}`
+			used: `ceph_cluster_total_used_bytes{juju_model="${cluster}"} @ ${endTimestamp}`,
+			total: `ceph_cluster_total_bytes{juju_model="${cluster}"} @ ${endTimestamp}`
 		};
 
 		try {

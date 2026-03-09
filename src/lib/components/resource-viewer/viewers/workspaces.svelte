@@ -12,6 +12,11 @@
 		Users,
 		Zap
 	} from '@lucide/svelte';
+	import {
+		type DiscoveryRequest,
+		type GetRequest,
+		ResourceService
+	} from '@otterscale/api/resource/v1';
 	import type { CoreV1ResourceQuota, TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import { getContext, onDestroy } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
@@ -19,11 +24,6 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import {
-		type DiscoveryRequest,
-		type GetRequest,
-		ResourceService
-	} from '$lib/api/resource/v1/resource_pb';
 	import { typographyVariants } from '$lib/components/typography/index.ts';
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Card from '$lib/components/ui/card';
@@ -110,7 +110,7 @@
 	) {
 		return goto(
 			resolve(
-				`/(auth)/${cluster}/${kind}/${resource}?group=${group}&version=${version}&name=${name}&namespace=${namespace}`
+				`/(auth)/${cluster}/${namespace}/${name}?group=${group}&version=${version}&kind=${kind}&resource=${resource}`
 			)
 		);
 	}

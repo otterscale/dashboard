@@ -1,11 +1,11 @@
 <script lang="ts">
 	import type { ConnectError } from '@connectrpc/connect';
 	import { createClient, type Transport } from '@connectrpc/connect';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
-	import { page } from '$app/stores';
-	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
+	import { page } from '$app/state';
 	import { type GroupedFields, MultiStepSchemaForm } from '$lib/components/custom/schema-form';
 
 	type Props = {
@@ -17,12 +17,12 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-	const cluster = $derived($page.params.cluster ?? $page.params.scope ?? '');
+	const cluster = $derived(page.params.cluster ?? '');
 
 	const initialData = {
 		metadata: {
 			name: '',
-			namespace: $page.url.searchParams.get('namespace') ?? 'default'
+			namespace: page.url.searchParams.get('namespace') ?? 'default'
 		},
 		spec: {
 			deploymentSpec: {
@@ -178,7 +178,7 @@
 				const manifest = new TextEncoder().encode(JSON.stringify(resourceObject));
 				await resourceClient.create({
 					cluster,
-					namespace: $page.url.searchParams.get('namespace') ?? '',
+					namespace: page.url.searchParams.get('namespace') ?? '',
 					group: 'apps.otterscale.io',
 					version: 'v1alpha1',
 					resource: 'simpleapps',

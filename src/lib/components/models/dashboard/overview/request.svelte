@@ -13,9 +13,9 @@
 
 	let {
 		prometheusDriver,
-		scope,
+		cluster,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 
 	let ninety_five = $state([] as SampleValue[]);
 	let ninety_nine = $state([] as SampleValue[]);
@@ -38,28 +38,28 @@
 	async function fetchNinetyFive() {
 		try {
 			const response = await prometheusDriver.rangeQuery(
-				`histogram_quantile(0.95, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket{juju_model="${scope}"}[5m])))`,
+				`histogram_quantile(0.95, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket{juju_model="${cluster}"}[5m])))`,
 				Date.now() - 24 * 60 * 60 * 1000,
 				Date.now(),
 				2 * 60
 			);
 			ninety_five = response.result[0]?.values ?? [];
 		} catch (error) {
-			console.error(`Fail to fetch latest running requests in scope ${scope}:`, error);
+			console.error(`Fail to fetch latest running requests in cluster ${cluster}:`, error);
 		}
 	}
 
 	async function fetchNinetyNine() {
 		try {
 			const response = await prometheusDriver.rangeQuery(
-				`histogram_quantile(0.99, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket{juju_model="${scope}"}[5m])))`,
+				`histogram_quantile(0.99, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket{juju_model="${cluster}"}[5m])))`,
 				Date.now() - 24 * 60 * 60 * 1000,
 				Date.now(),
 				2 * 60
 			);
 			ninety_nine = response.result[0]?.values ?? [];
 		} catch (error) {
-			console.error(`Fail to fetch latest waiting requests in scope ${scope}:`, error);
+			console.error(`Fail to fetch latest waiting requests in cluster ${cluster}:`, error);
 		}
 	}
 
@@ -67,7 +67,7 @@
 		try {
 			await Promise.all([fetchNinetyFive(), fetchNinetyNine()]);
 		} catch (error) {
-			console.error(`Fail to fetch requests data in scope ${scope}:`, error);
+			console.error(`Fail to fetch requests data in cluster ${cluster}:`, error);
 		}
 	}
 
@@ -79,7 +79,7 @@
 			await fetch();
 			isLoaded = true;
 		} catch (error) {
-			console.error(`Fail to fetch data in scope ${scope}:`, error);
+			console.error(`Fail to fetch data in cluster ${cluster}:`, error);
 		}
 	});
 	onDestroy(() => {

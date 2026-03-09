@@ -1,30 +1,22 @@
 <script lang="ts">
-	import { createClient, type Transport } from '@connectrpc/connect';
 	import { PrometheusDriver } from 'prometheus-query';
-	import { getContext, onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 
-	import { EnvironmentService } from '$lib/api/environment/v1/environment_pb';
 	import Reloader from '$lib/components/custom/reloader/reloader.svelte';
 	import { Overview } from '$lib/components/storage/dashboard/overview';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/paraglide/messages';
 
-	import ExtensionsAlert from './extensions-alert.svelte';
-
-	let { scope }: { scope: string } = $props();
-
-	const transport: Transport = getContext('transport');
-	const environmentService = createClient(EnvironmentService, transport);
-
-	let prometheusDriver = $state<PrometheusDriver | null>(null);
+	let { cluster }: { cluster: string } = $props();
 
 	let isReloading = $state(true);
+	let prometheusDriver = $state<PrometheusDriver | null>(null);
+
 	onMount(async () => {
 		try {
-			const response = await environmentService.getPrometheus({});
 			prometheusDriver = new PrometheusDriver({
-				endpoint: '/prometheus',
-				baseURL: response.baseUrl,
+				endpoint: `/proxy/${cluster}/prometheus`,
+				baseURL: '/api/v1',
 				headers: {
 					'x-proxy-target': 'api'
 				}
@@ -40,7 +32,6 @@
 </script>
 
 <main class="space-y-4 py-4">
-	<ExtensionsAlert {scope} />
 	{#if prometheusDriver}
 		<div class="mx-auto grid w-full gap-6">
 			<div class="grid gap-1">
@@ -58,10 +49,10 @@
 					<Reloader bind:checked={isReloading} />
 				</div>
 				<Tabs.Content value="overview">
-					<Overview client={prometheusDriver} {scope} bind:isReloading />
+					<Overview client={prometheusDriver} {cluster} bind:isReloading />
 				</Tabs.Content>
 				<Tabs.Content value="analytics">
-					<!-- <Analytics client={prometheusDriver} {scope} /> -->
+					<!-- <Analytics client={prometheusDriver} {cluster} /> -->
 				</Tabs.Content>
 			</Tabs.Root>
 		</div>

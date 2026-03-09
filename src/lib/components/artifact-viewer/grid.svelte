@@ -7,7 +7,7 @@
 	import Ajv from 'ajv';
 
 	// import { getContext } from 'svelte';
-	// import { ResourceService } from '$lib/api/resource/v1/resource_pb';
+	// import { ResourceService } from '@otterscale/api/resource/v1';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import EditorWidget from '$lib/components/dynamic-form/widgets/editor.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';

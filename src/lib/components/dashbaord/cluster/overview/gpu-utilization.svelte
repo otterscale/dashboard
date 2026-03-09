@@ -11,14 +11,14 @@
 
 	let {
 		prometheusDriver,
-		scope,
+		cluster,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 
 	let gpuUtilization: number | undefined = $state(undefined);
 	async function fetchMemoryUsage() {
 		const usageResponse = await prometheusDriver.instantQuery(
-			`avg(Device_utilization_desc_of_container{juju_model="${scope}"})`
+			`avg(Device_utilization_desc_of_container{juju_model="${cluster}"})`
 		);
 		gpuUtilization = usageResponse.result[0]?.value?.value ?? undefined;
 	}
@@ -26,7 +26,7 @@
 	let units: number | undefined = $state(undefined);
 	async function fetchGraphicCardUnits() {
 		const usageResponse = await prometheusDriver.instantQuery(
-			`count(DCGM_FI_DEV_GPU_UTIL{juju_model="${scope}"})`
+			`count(DCGM_FI_DEV_GPU_UTIL{juju_model="${cluster}"})`
 		);
 		units = usageResponse.result[0]?.value?.value ?? undefined;
 	}

@@ -1,11 +1,11 @@
 <script lang="ts">
 	import type { Transport } from '@connectrpc/connect';
 	import { ConnectError, createClient } from '@connectrpc/connect';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
-	import { page } from '$app/stores';
-	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
+	import { page } from '$app/state';
 	import {
 		type GroupedFields,
 		type K8sOpenAPISchema,
@@ -26,7 +26,7 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-	const cluster = $derived($page.params.cluster ?? $page.params.scope ?? ''); // Remove metadata.managedFields from object
+	const cluster = $derived(page.params.cluster ?? '');
 
 	function getCleanedObject() {
 		const copy = JSON.parse(JSON.stringify(object));
@@ -153,7 +153,7 @@
 				await resourceClient.apply({
 					cluster,
 					name,
-					namespace: $page.url.searchParams.get('namespace') ?? '',
+					namespace: page.url.searchParams.get('namespace') ?? '',
 					group: 'apps.otterscale.io',
 					version: 'v1alpha1',
 					resource: 'simpleapps',

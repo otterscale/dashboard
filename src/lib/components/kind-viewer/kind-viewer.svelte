@@ -1,12 +1,7 @@
 <script lang="ts">
-	import { type JsonValue, toJson } from '@bufbuild/protobuf';
-	import { StructSchema } from '@bufbuild/protobuf/wkt';
+	import { type JsonValue } from '@bufbuild/protobuf';
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import { Cable, Unplug } from '@lucide/svelte';
-	import type { ColumnDef } from '@tanstack/table-core';
-	import { getContext, onDestroy, onMount } from 'svelte';
-	import { toast } from 'svelte-sonner';
-
 	import {
 		type APIResource,
 		type ListRequest,
@@ -14,7 +9,11 @@
 		type SchemaRequest,
 		WatchEvent_Type,
 		type WatchRequest
-	} from '$lib/api/resource/v1/resource_pb';
+	} from '@otterscale/api/resource/v1';
+	import type { ColumnDef } from '@tanstack/table-core';
+	import { getContext, onDestroy, onMount } from 'svelte';
+	import { toast } from 'svelte-sonner';
+
 	import { DynamicTable } from '$lib/components/dynamic-table';
 	import Button from '$lib/components/ui/button/button.svelte';
 
@@ -61,7 +60,7 @@
 				kind: kind
 			} as SchemaRequest);
 
-			schema = toJson(StructSchema, schemaResponse);
+			schema = schemaResponse.schema ?? {};
 		} catch (error) {
 			console.error('Failed to fetch schema:', error);
 			return null;

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { Trash2Icon } from '@lucide/svelte';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
@@ -10,7 +11,6 @@
 	import { toast } from 'svelte-sonner';
 
 	import { resolve } from '$app/paths';
-	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import * as Item from '$lib/components/ui/item';
@@ -124,7 +124,7 @@
 							loading: `Deleting workspace ${name}...`,
 							success: () => {
 								// Use window.location.href to force a full page reload and re-trigger fetchWorkspaces
-								window.location.href = resolve(`/(auth)/scope/${cluster}`);
+								window.location.href = resolve(`/(auth)/[cluster]/overview`, { cluster });
 								return `Successfully deleted workspace ${name}`;
 							},
 							error: (error) => {

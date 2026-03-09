@@ -10,20 +10,20 @@
 
 	let {
 		prometheusDriver,
-		scope,
+		cluster,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 
 	let aidaptivCacheTotal: SampleValue | undefined = $state(undefined);
 	let aidaptivCacheUsed: SampleValue | undefined = $state(undefined);
 	async function fetchAidaptivCache() {
 		const totalResponse = await prometheusDriver.instantQuery(
-			`sum(kube_node_status_capacity{resource="phison.com/aidaptivcache", juju_model="${scope}", container!=""})`
+			`sum(kube_node_status_capacity{resource="phison.com/aidaptivcache", juju_model="${cluster}", container!=""})`
 		);
 		aidaptivCacheTotal = totalResponse.result[0]?.value ?? undefined;
 
 		const usedResponse = await prometheusDriver.instantQuery(
-			`sum(kube_pod_container_resource_requests{resource="phison.com/aidaptivcache", juju_model="${scope}", container!=""})`
+			`sum(kube_pod_container_resource_requests{resource="phison.com/aidaptivcache", juju_model="${cluster}", container!=""})`
 		);
 		aidaptivCacheUsed = usedResponse.result[0]?.value ?? undefined;
 	}
