@@ -29,7 +29,6 @@
 	import { type Scope, ScopeService } from '$lib/api/scope/v1/scope_pb';
 	import {
 		DialogAbout,
-		DialogAbout,
 		NavMain,
 		NavSecondary,
 		NavUser,
