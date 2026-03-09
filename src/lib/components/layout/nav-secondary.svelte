@@ -33,10 +33,12 @@
 				<Sidebar.MenuItem>
 					<Sidebar.MenuButton size="sm" tooltipContent={m.registry()} class="[&>svg]:size-3.5">
 						{#snippet child({ props })}
+							<!-- eslint-disable svelte/no-navigation-without-resolve -->
 							<a href={harborUrl} target="_blank" {...props}>
 								<PackageIcon />
 								<span>{m.registry()}</span>
 							</a>
+							<!-- eslint-enable svelte/no-navigation-without-resolve -->
 						{/snippet}
 					</Sidebar.MenuButton>
 				</Sidebar.MenuItem>
