@@ -3,8 +3,12 @@
 	import Ajv from 'ajv';
 	import { mode as themeMode } from 'mode-watcher';
 	import Monaco from 'svelte-monaco';
-	import { parseDocument } from 'yaml';
+	import { parseDocument, stringify } from 'yaml';
 
+	import {
+		filterRequiredSchema,
+		getInitialValues
+	} from '$lib/components/dynamic-form/utils.svelte';
 	import SchemaViewer from '$lib/components/schema-viewer/schema-viewer.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -23,14 +27,9 @@
 	});
 	const validate = jsonSchemaValidator.compile(jsonSchema);
 
-	const initialValue = `\
-apiVersion: 123
-kind: ""
-metadata:
-  name: ""
-`;
+	const requiredSchema = filterRequiredSchema(jsonSchema);
 
-	let value = $state(initialValue);
+	let value = $state('');
 	let open = $state(false);
 	let editorInstance: import('monaco-editor').editor.IStandaloneCodeEditor | undefined =
 		$state(undefined);
@@ -140,10 +139,17 @@ metadata:
 
 <AlertDialog.Root
 	bind:open
-	onOpenChangeComplete={(isOpen) => {
+	onOpenChange={async (isOpen) => {
+		if (isOpen) {
+			const initialValues = await getInitialValues(requiredSchema);
+			value = stringify(initialValues);
+		}
+	}}
+	onOpenChangeComplete={async (isOpen) => {
 		if (!isOpen) {
 			editorInstance = undefined;
-			value = initialValue;
+			const initialValues = await getInitialValues(requiredSchema);
+			value = stringify(initialValues);
 		}
 	}}
 >

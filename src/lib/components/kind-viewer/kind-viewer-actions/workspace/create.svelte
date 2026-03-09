@@ -1,213 +1,539 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { Plus } from '@lucide/svelte';
+	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
+	import { SubmitButton } from '@sjsf/form';
+	import type { SchemaObjectValue } from '@sjsf/form/core';
+	import Ajv from 'ajv';
+	import lodash from 'lodash';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
+	import { stringify } from 'yaml';
 
 	import { page } from '$app/state';
 	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
-	import {
-		type GroupedFields,
-		MultiStepSchemaForm,
-		UserSelectWidget
-	} from '$lib/components/custom/schema-form';
+	import * as Code from '$lib/components/custom/code';
+	import Form from '$lib/components/dynamic-form/form.svelte';
+	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
-	import * as Dialog from '$lib/components/ui/dialog';
+	import * as Item from '$lib/components/ui/item';
+	import { Progress } from '$lib/components/ui/progress/index.js';
+	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
 	let {
-		schema: apiSchema
+		cluster,
+		group,
+		version,
+		kind,
+		resource,
+		schema: jsonSchema
 	}: {
+		cluster: string;
+		group: string;
+		version: string;
+		kind: string;
+		resource: string;
 		schema?: any;
 	} = $props();
-
-	const cluster = $derived(page.params.cluster ?? page.params.scope ?? '');
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	const initialData = {
-		spec: {
-			resourceQuota: {
-				hard: {
-					'requests.cpu': '16',
-					'requests.memory': '32Gi',
-					'requests.otterscale.com/vgpu': '0',
-					'requests.otterscale.com/vgpumem': '0',
-					'requests.otterscale.com/vgpumem-percentage': '0',
-					'limits.cpu': '16',
-					'limits.memory': '32Gi'
-				}
-			},
-			limitRange: {
-				limits: [
-					{
-						type: 'Container',
-						default: {
-							cpu: '1',
-							memory: '2Gi'
-						},
-						defaultRequest: {
-							cpu: '1',
-							memory: '2Gi'
-						}
-					}
-				]
-			},
-			members: [
-				{
-					subject: page.data.user?.sub,
-					name: `${page.data.user?.name} (${page.data.user?.email || page.data.user?.username})`,
-					role: 'admin'
-				}
-			]
-		}
-	};
+	// Validation
+	const jsonSchemaValidator = new Ajv({
+		allErrors: true,
+		strict: false
+	});
+	const validate = jsonSchemaValidator.compile(jsonSchema);
 
-	const groupedFields: GroupedFields = {
-		// Step 1: Workspace & Members
-		'Workspace & Members': {
-			'metadata.name': { title: 'Workspace Name' },
-			'spec.members': {
-				title: 'Members',
-				uiSchema: {
-					items: {
-						'ui:components': {
-							objectField: UserSelectWidget
-						}
-					}
-				}
-			}
-		},
-		// Step 2: Network Isolation
-		'Network Isolation': {
-			'spec.networkIsolation': { title: 'Network Isolation' },
-			'spec.networkIsolation.enabled': {
-				title: 'Enable Network Isolation',
-				uiSchema: {
-					'ui:components': {
-						checkboxWidget: 'switchWidget'
-					}
-				}
-			},
-			'spec.networkIsolation.allowedNamespaces': { title: 'Allowed Namespaces' }
-		},
-		// Step 3: Default Resource Settings (read-only with preset values)
-		'Default Resource Settings': {
-			'spec.resourceQuota.hard.requests.cpu': { title: 'Requests CPU' },
-			'spec.resourceQuota.hard.requests.memory': { title: 'Requests Memory' },
-			'spec.resourceQuota.hard.requests.otterscale.com/vgpu': {
-				title: 'Requests GPU'
-			},
-			'spec.resourceQuota.hard.requests.otterscale.com/vgpumem': {
-				title: 'Requests GPU Memory'
-			},
-			'spec.resourceQuota.hard.requests.otterscale.com/vgpumem-percentage': {
-				title: 'Requests GPU Memory Percentage'
-			}
-		}
-	};
+	// Container for Data.
+	let values: any = $state({
+		apiVersion: group ? `${group}/${version}` : version,
+		kind,
+		metadata: { name: {} },
+		spec: { namespace: {}, members: {}, resourceQuota: {}, networkIsolation: {} }
+	});
 
-	function transformFormData(data: Record<string, unknown>) {
-		const spec = data.spec as Record<string, any>;
-		const metadata = data.metadata as Record<string, any>;
-
-		// Set namespace to be the same as workspace name
-		if (spec && metadata?.name) {
-			spec.namespace = metadata.name;
-		}
-
-		// Handle Resource Quota Logic: limits align with requests, strict defaults
-		if (spec?.resourceQuota?.hard) {
-			const hard = spec.resourceQuota.hard;
-			// Sync limits with requests
-			if (hard['requests.cpu']) hard['limits.cpu'] = hard['requests.cpu'];
-			if (hard['requests.memory']) hard['limits.memory'] = hard['requests.memory'];
-		}
-
-		// Enforce fixed LimitRange
-		if (spec) {
-			spec.limitRange = {
-				limits: [
-					{
-						type: 'Container',
-						default: {
-							cpu: '500m',
-							memory: '512Mi'
-						},
-						defaultRequest: {
-							cpu: '500m',
-							memory: '512Mi'
-						}
-					}
-				]
-			};
-		}
-
-		return data;
+	// TODO: Refactor into StepsManager.
+	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
+	const [firstStep] = steps;
+	let currentStep = $state(firstStep);
+	const currentIndex = $derived(steps.indexOf(currentStep));
+	function handleNext() {
+		currentStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
+	}
+	function handlePrevious() {
+		currentStep = steps[Math.max(currentIndex - 1, 0)];
+	}
+	function reset() {
+		currentStep = firstStep;
 	}
 
-	let isSubmitting = $state(false);
-	async function handleMultiStepSubmit(data: Record<string, unknown>) {
-		if (isSubmitting) return;
-		isSubmitting = true;
+	// TODO: Refactor into UserManager
+	// Users
+	interface KeycloakUser {
+		id: string;
+		username: string;
+		email?: string;
+		firstName?: string;
+		lastName?: string;
+	}
+	let usernameToIdentifier = $state<Record<string, string>>({});
+	let timer: ReturnType<typeof setTimeout> | null = null;
+	function fetchUsersAsEnumerations(search: string): Promise<{ label: string; value: string }[]> {
+		return new Promise((resolve) => {
+			if (timer) clearTimeout(timer);
 
-		// Construct the full resource object
-		const resourceObject = {
-			apiVersion: 'tenant.otterscale.io/v1alpha1',
-			kind: 'Workspace',
-			...data
-		};
-
-		const name = (data.metadata as { name: string })?.name;
-
-		toast.promise(
-			async () => {
-				const manifest = new TextEncoder().encode(JSON.stringify(resourceObject));
-
-				await resourceClient.create({
-					cluster,
-					group: 'tenant.otterscale.io',
-					version: 'v1alpha1',
-					resource: 'workspaces',
-					manifest
-				});
-
-				return resourceObject;
-			},
-			{
-				loading: `Creating workspace ${name}...`,
-				success: () => {
-					return `Successfully created workspace ${name}`;
-				},
-				error: (err) => {
-					console.error('Failed to create workspace:', err);
-					return `Failed to create workspace: ${(err as ConnectError).message}`;
-				},
-				finally() {
-					isSubmitting = false;
-					open = false;
+			timer = setTimeout(async () => {
+				try {
+					const response = await fetch(`/rest/users?search=${encodeURIComponent(search)}`);
+					if (response.ok) {
+						const fetchedUsers: KeycloakUser[] = await response.json();
+						for (const user of fetchedUsers) {
+							usernameToIdentifier[user.username] = user.id;
+						}
+						resolve(
+							fetchedUsers.map((user) => ({
+								label: user.username,
+								value: user.username
+							}))
+						);
+					} else {
+						console.error('Failed to fetch users:', response.statusText);
+						resolve([]);
+					}
+				} catch (error) {
+					console.error('Error fetching users:', error);
+					resolve([]);
 				}
-			}
-		);
+			}, 300);
+		});
+	}
+	function getIdentifier(username: string): string | undefined {
+		return usernameToIdentifier[username];
 	}
 
+	// Flag for Dialog
 	let open = $state(false);
+	let isSubmitting = $state(false);
 </script>
 
-<Dialog.Root bind:open>
-	<Dialog.Trigger class="disabled:opacity-50">
-		<Button variant="outline" size="icon">
-			<Plus />
-		</Button>
-	</Dialog.Trigger>
-	<Dialog.Content class="min-h-[77vh] min-w-[50vw]">
-		<MultiStepSchemaForm
-			{apiSchema}
-			fields={groupedFields}
-			{initialData}
-			title="Create Workspace"
-			onSubmit={handleMultiStepSubmit}
-			transformData={transformFormData}
-		/>
-	</Dialog.Content>
-</Dialog.Root>
+<AlertDialog.Root
+	bind:open
+	onOpenChangeComplete={() => {
+		reset();
+	}}
+>
+	<AlertDialog.Trigger>
+		{#snippet child({ props })}
+			<Button {...props} variant="outline" size="icon">
+				<Plus />
+			</Button>
+		{/snippet}
+	</AlertDialog.Trigger>
+	<AlertDialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
+		<Item.Root class="p-0">
+			<Progress value={currentIndex + 1} max={steps.length} />
+			<Item.Content class="text-left">
+				<Item.Title class="text-xl font-bold">Workspace</Item.Title>
+				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
+			</Item.Content>
+		</Item.Root>
+		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
+			<Tabs.Content value={steps[0]}>
+				<Form
+					schema={{
+						...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as any),
+						title: 'Name'
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={'workspace' as FormValue}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					bind:values={values['metadata']['name']}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+			<Tabs.Content value={steps[1]}>
+				<Form
+					schema={{
+						...lodash.omit(
+							lodash.get(jsonSchema, 'properties.spec.properties.members') as any,
+							'items'
+						),
+						title: 'Members',
+						items: [
+							{
+								...lodash.omit(
+									lodash.get(jsonSchema, 'properties.spec.properties.members.items') as any,
+									['properties', 'required']
+								),
+								required: [
+									...(lodash.get(
+										jsonSchema,
+										'properties.spec.properties.members.items.required'
+									) as any),
+									'name'
+								],
+								properties: {
+									name: {
+										...(lodash.get(
+											jsonSchema,
+											'properties.spec.properties.members.items.properties.name'
+										) as any),
+										title: 'Name',
+										readOnly: true
+									},
+									role: {
+										...(lodash.get(
+											jsonSchema,
+											'properties.spec.properties.members.items.properties.role'
+										) as any),
+										title: 'Role',
+										readOnly: true
+									}
+								}
+							}
+						],
+						additionalItems: {
+							...lodash.omit(
+								lodash.get(jsonSchema, 'properties.spec.properties.members.items') as any,
+								['properties', 'required']
+							),
+							required: [
+								...(lodash.get(
+									jsonSchema,
+									'properties.spec.properties.members.items.required'
+								) as any),
+								'name'
+							],
+							properties: {
+								name: {
+									...(lodash.get(
+										jsonSchema,
+										'properties.spec.properties.members.items.properties.name'
+									) as any),
+									title: 'Name'
+								},
+								role: {
+									...(lodash.get(
+										jsonSchema,
+										'properties.spec.properties.members.items.properties.role'
+									) as any),
+									title: 'Role'
+								}
+							}
+						}
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							itemTitle: () => 'Member',
+							translations: {
+								submit: 'Next',
+								'add-array-item': 'Add Member'
+							}
+						},
+						items: {
+							'ui:options': {
+								layouts: {
+									'object-properties': {
+										class: 'grid grid-cols-2 gap-3'
+									}
+								}
+							}
+						},
+						additionalItems: {
+							'ui:options': {
+								layouts: {
+									'object-properties': {
+										class: 'grid grid-cols-2 gap-3'
+									}
+								}
+							},
+							name: {
+								'ui:components': {
+									stringField: 'enumField',
+									selectWidget: ComboboxWidget
+								},
+								'ui:options': {
+									TailoredComboboxEnumerations: fetchUsersAsEnumerations,
+									TailoredComboboxVisibility: 10,
+									TailoredComboboxInput: {
+										placeholder: 'Name'
+									},
+									TailoredComboboxEmptyText: 'No names available.'
+								}
+							},
+							role: {
+								'ui:components': {
+									stringField: 'enumField',
+									selectWidget: 'comboboxWidget'
+								},
+								'ui:options': {
+									disabledEnumValues: ['admin']
+								}
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={[
+						// From login user information.
+						{ name: page.data.user.name, role: 'admin', subject: page.data.user.sub }
+					] as FormValue}
+					transformer={(value: FormValue) => {
+						let members = value as SchemaObjectValue[];
+						members = members.map((member) => ({
+							...member,
+							subject: member.subject ?? getIdentifier(member.name! as string) ?? null
+						}));
+						return members;
+					}}
+					handleSubmit={{
+						prehook: () => {
+							lodash.set(values, 'spec.namespace', lodash.get(values, 'metadata.name'));
+						},
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					bind:values={values['spec']['members']}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+			<Tabs.Content value={steps[2]}>
+				<Form
+					schema={{
+						...(lodash.omit(
+							lodash.get(jsonSchema, 'properties.spec.properties.resourceQuota'),
+							'properties'
+						) as any),
+						title: 'Resource Quota',
+						properties: {
+							hard: {
+								...(lodash.get(
+									jsonSchema,
+									'properties.spec.properties.resourceQuota.properties.hard'
+								) as any),
+								additionalProperties: {
+									...(lodash.omit(
+										lodash.get(
+											jsonSchema,
+											'properties.spec.properties.resourceQuota.properties.hard.additionalProperties'
+										),
+										'anyOf'
+									) as any),
+									type: 'string'
+								}
+							}
+						}
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						},
+						hard: {
+							'ui:options': {
+								layouts: {
+									'object-properties': {
+										class: 'grid grid-cols-2 gap-3'
+									}
+								},
+								translations: {
+									'additional-property': 'additional resource',
+									'add-object-property': 'Add Limit'
+								},
+								additionalPropertyKey: (key: string, attempt: number) => {
+									const index = attempt + 1;
+									switch (index) {
+										case 1: {
+											return `1st ${key}`;
+										}
+										case 2: {
+											return `2nd ${key}`;
+										}
+										case 3: {
+											return `3rd ${key}`;
+										}
+										default: {
+											return `${index}th ${key}`;
+										}
+									}
+								}
+							},
+							additionalProperties: {
+								'ui:options': {
+									translations: {
+										'key-input-title': 'limit'
+									},
+									hideTitle: true
+								}
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={{
+						hard: {
+							'requests.cpu': '16',
+							'requests.memory': '32Gi',
+							'requests.otterscale.com/vgpu': '0'
+						}
+					} as FormValue}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					bind:values={values['spec']['resourceQuota']}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+			<Tabs.Content value={steps[3]}>
+				<Form
+					schema={{
+						...lodash.get(jsonSchema, 'properties.spec.properties.networkIsolation'),
+						title: 'Network Isolation'
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						},
+						allowedNamespaces: {
+							'ui:options': {
+								itemTitle: () => 'Allowed Namespace',
+								layouts: {
+									'array-items': {
+										class: 'grid grid-cols-2 gap-3'
+									}
+								},
+								translations: {
+									'add-array-item': 'Add Namespace'
+								}
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={{
+						enabled: false
+					} as FormValue}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					bind:values={values['spec']['networkIsolation']}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+			<Tabs.Content value={steps[4]}>
+				<div class="flex h-full flex-col gap-3">
+					<Code.Root lang="yaml" class="w-full" hideLines code={stringify(values, null, 2)} />
+					<Button
+						class="mt-auto w-full"
+						onclick={() => {
+							if (isSubmitting) return;
+
+							isSubmitting = true;
+
+							const isValid = validate(values);
+
+							if (!isValid) {
+								throw Error(`Validation errors: ${JSON.stringify(validate.errors)}`);
+							}
+
+							const name = lodash.get(values, 'metadata.name');
+
+							toast.promise(
+								async () => {
+									const manifest = new TextEncoder().encode(JSON.stringify(values));
+
+									await resourceClient.create({
+										cluster,
+										group,
+										version,
+										resource,
+										manifest
+									});
+								},
+								{
+									loading: `Creating workspace ${name}...`,
+									success: () => {
+										return `Successfully created workspace ${name}`;
+									},
+									error: (error) => {
+										console.error(`Failed to create workspace ${name}:`, error);
+										return `Failed to create workspace ${name}: ${(error as ConnectError).message}`;
+									},
+									finally() {
+										isSubmitting = false;
+										open = false;
+									}
+								}
+							);
+						}}
+					>
+						Create
+					</Button>
+				</div>
+			</Tabs.Content>
+		</Tabs.Root>
+	</AlertDialog.Content>
+</AlertDialog.Root>

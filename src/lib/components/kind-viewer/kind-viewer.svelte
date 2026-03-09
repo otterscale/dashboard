@@ -2,21 +2,24 @@
 	import { type JsonValue, toJson } from '@bufbuild/protobuf';
 	import { StructSchema } from '@bufbuild/protobuf/wkt';
 	import { createClient, type Transport } from '@connectrpc/connect';
+	import { Ban } from '@lucide/svelte';
 	import { Cable, Unplug } from '@lucide/svelte';
 	import type { ColumnDef } from '@tanstack/table-core';
-	import { getContext, onDestroy, onMount } from 'svelte';
+	import { getContext } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
+	import { type APIResource, ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import {
-		type APIResource,
 		type ListRequest,
-		ResourceService,
 		type SchemaRequest,
 		WatchEvent_Type,
 		type WatchRequest
 	} from '$lib/api/resource/v1/resource_pb';
 	import { DynamicTable } from '$lib/components/dynamic-table';
+	import * as Alert from '$lib/components/ui/alert/index.js';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import * as Empty from '$lib/components/ui/empty/index.js';
 
 	import type { DataSchemaType, UISchemaType } from '../dynamic-table/utils';
 	import type { ActionsType, CreateType } from './kind-viewer-actions';
@@ -52,6 +55,7 @@
 	// eslint-disable-next-line
 	let schema: any = $state({});
 
+	let schemaError: any = $state(null);
 	async function fetchSchema() {
 		try {
 			const schemaResponse = await resourceClient.schema({
@@ -64,6 +68,7 @@
 			schema = toJson(StructSchema, schemaResponse);
 		} catch (error) {
 			console.error('Failed to fetch schema:', error);
+			schemaError = error;
 			return null;
 		}
 	}
@@ -242,6 +247,7 @@
 </script>
 
 {#if isMounted}
+	<pre>{JSON.stringify(schema, null, 2)}</pre>
 	{#if columnDefinitions}
 		<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {dataSchemas}>
 			{#snippet create()}
@@ -270,4 +276,28 @@
 			{/snippet}
 		</DynamicTable>
 	{/if}
+{:else if schemaError}
+	<Empty.Root>
+		<Empty.Header>
+			<Empty.Media class="rounded-full bg-muted p-4">
+				<Ban size={36} />
+			</Empty.Media>
+			<Empty.Title class="text-2xl font-bold">Failed to load data</Empty.Title>
+			<Empty.Description>
+				An error occurred while fetching data. Please check your connection or try again later.
+			</Empty.Description>
+		</Empty.Header>
+		<Empty.Content>
+			<Alert.Root variant="destructive" class="border-none bg-destructive/5">
+				<Alert.Title class="font-bold">{schemaError?.name}</Alert.Title>
+				<Alert.Description class="text-start">
+					{schemaError?.rawMessage}
+				</Alert.Description>
+			</Alert.Root>
+			<div class="flex gap-4">
+				<Button variant="outline" onclick={() => history.back()}>Go Back</Button>
+				<Button href="/">Go Home</Button>
+			</div>
+		</Empty.Content>
+	</Empty.Root>
 {/if}

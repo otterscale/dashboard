@@ -1,13 +1,12 @@
 <script lang="ts">
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
-	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
+	import type { ModelOtterscaleIoV1Alpha1ModelService } from '@otterscale/types';
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
+	import Edit from '$lib/components/kind-viewer/kind-viewer-actions/model-service/edit.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
-
-	import Edit from './edit.svelte';
 
 	let {
 		schema,
@@ -19,7 +18,7 @@
 		resource
 	}: {
 		schema: any;
-		object: TenantOtterscaleIoV1Alpha1Workspace;
+		object: ModelOtterscaleIoV1Alpha1ModelService;
 		cluster: string;
 		group: string;
 		version: string;

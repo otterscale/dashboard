@@ -1,23 +1,30 @@
-<!-- <script lang="ts">
-	import Ellipsis from '@lucide/svelte/icons/ellipsis';
-
-	import Button from '$lib/components/ui/button/button.svelte';
-</script>
-
-<Button size="icon" variant="ghost" aria-label="Edit item" disabled>
-	<Ellipsis size={16} aria-hidden="true" />
-</Button> -->
-
 <script lang="ts">
-	import { EllipsisIcon, PencilIcon, Trash2Icon } from '@lucide/svelte';
+	import { EllipsisIcon, PencilIcon } from '@lucide/svelte';
 
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Item from '$lib/components/ui/item';
 
+	import Delete from './delete.svelte';
 	import View from './view.svelte';
 
-	let { schema, object }: { schema: any; object: any } = $props();
+	let {
+		schema,
+		object,
+		cluster,
+		group,
+		version,
+		kind,
+		resource
+	}: {
+		schema: any;
+		object: any;
+		cluster: string;
+		group: string;
+		version: string;
+		kind: string;
+		resource: string;
+	} = $props();
 
 	let actionsOpen = $state(false);
 </script>
@@ -39,7 +46,7 @@
 					e.preventDefault();
 				}}
 			>
-				<View {schema} {object} />
+				<View {schema} {object} {cluster} {group} {version} {kind} {resource} />
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				disabled
@@ -57,19 +64,22 @@
 				</Item.Root>
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
-				disabled
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
 			>
-				<Item.Root class="p-0 text-xs **:text-destructive" size="sm">
-					<Item.Media>
-						<Trash2Icon />
-					</Item.Media>
-					<Item.Content>
-						<Item.Title>Delete</Item.Title>
-					</Item.Content>
-				</Item.Root>
+				<Delete
+					{schema}
+					{object}
+					{cluster}
+					{group}
+					{version}
+					{kind}
+					{resource}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
 			</DropdownMenu.Item>
 		</DropdownMenu.Group>
 	</DropdownMenu.Content>

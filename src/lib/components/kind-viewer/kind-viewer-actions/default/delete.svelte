@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { Trash2Icon } from '@lucide/svelte';
-	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
@@ -9,7 +8,6 @@
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
-	import { resolve } from '$app/paths';
 	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
@@ -31,7 +29,7 @@
 		kind: string;
 		resource: string;
 		schema?: any;
-		object: TenantOtterscaleIoV1Alpha1Workspace;
+		object: any;
 		onOpenChangeComplete: () => void;
 	} = $props();
 
@@ -91,7 +89,7 @@
 			schema={lodash.get(jsonSchema, 'properties.name') as any}
 			uiSchema={{
 				'ui:options': {
-					help: 'Entering the workspace name.',
+					help: `Entering the ${kind.toLowerCase()} name.`,
 					shadcn4Text: {
 						placeholder: object.metadata?.name
 					}
@@ -109,7 +107,6 @@
 
 					const name = values.name as string;
 
-					// console.log(isValid, validate.errors, values);
 					toast.promise(
 						async () => {
 							await resourceClient.delete({
@@ -121,15 +118,13 @@
 							});
 						},
 						{
-							loading: `Deleting workspace ${name}...`,
+							loading: `Deleting ${kind.toLowerCase()} ${name}...`,
 							success: () => {
-								// Use window.location.href to force a full page reload and re-trigger fetchWorkspaces
-								window.location.href = resolve(`/(auth)/scope/${cluster}`);
-								return `Successfully deleted workspace ${name}`;
+								return `Successfully deleted ${kind.toLowerCase()} ${name}`;
 							},
 							error: (error) => {
-								console.error(`Failed to delete workspace ${name}:`, error);
-								return `Failed to delete workspace ${name}: ${(error as ConnectError).message}`;
+								console.error(`Failed to delete ${kind.toLowerCase()} ${name}:`, error);
+								return `Failed to delete ${kind.toLowerCase()} ${name}: ${(error as ConnectError).message}`;
 							},
 							finally() {
 								isDeleting = false;

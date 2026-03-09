@@ -167,19 +167,17 @@
 				</div>
 			</div>
 			{#key clustered + resource + namespace}
-				{#if selectedAPIResource}
-					{@const apiResource = selectedAPIResource}
-					<KindViewer
-						{apiResource}
-						{cluster}
-						{group}
-						{version}
-						{kind}
-						{resource}
-						{namespace}
-						{clustered}
-					/>
-				{/if}
+				{@const apiResource = selectedAPIResource}
+				<KindViewer
+					apiResource={apiResource!}
+					{cluster}
+					{group}
+					{version}
+					{kind}
+					{resource}
+					{namespace}
+					{clustered}
+				/>
 			{/key}
 		</div>
 	{:catch error}

@@ -4,12 +4,14 @@ import CronJobActions from './cronjob/actions.svelte';
 import CronJobCreate from './cronjob/create.svelte';
 import DefaultActions from './default/actions.svelte';
 import DefaultCreate from './default/create.svelte';
+import ModelServiceActions from './model-service/actions.svelte';
+import ModelServiceCreate from './model-service/create.svelte';
 import ResourceQuotaActions from './resource-quota/actions.svelte';
 import ResourceQuotaCreate from './resource-quota/create.svelte';
 import SimpleAppActions from './simple-app/actions.svelte';
 import SimpleAppCreate from './simple-app/create.svelte';
 import WorkspaceActions from './workspace/actions.svelte';
-import WorkspaceCreate from './workspace/new-create.svelte'; // TODO: Back to create before push
+import WorkspaceCreate from './workspace/create.svelte';
 
 type RoleType = 'admin' | 'edit' | 'view';
 
@@ -37,6 +39,8 @@ function getCreate(kind: string): CreateType {
 	switch (kind) {
 		case 'CronJob':
 			return CronJobCreate as CreateType;
+		case 'ModelService':
+			return ModelServiceCreate as CreateType;
 		case 'ResourceQuota':
 			return ResourceQuotaCreate as CreateType;
 		case 'SimpleApp':
@@ -52,6 +56,8 @@ function getActions(kind: string): ActionsType {
 	switch (kind) {
 		case 'CronJob':
 			return CronJobActions as ActionsType;
+		case 'ModelService':
+			return ModelServiceActions as ActionsType;
 		case 'ResourceQuota':
 			return ResourceQuotaActions as ActionsType;
 		case 'SimpleApp':
