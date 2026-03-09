@@ -50,16 +50,14 @@
 		kind,
 		metadata: {},
 		spec: {
-			accelerator: {},
-			decode: {},
-			prefill: {},
-			engine: {},
-			model: {}
+			source: {},
+			storage: {},
+			target: {}
 		}
 	});
 
 	// Steps Manager
-	const steps = Array.from({ length: 7 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -95,12 +93,12 @@
 		<Item.Root class="p-0">
 			<Progress value={currentIndex + 1} max={steps.length} />
 			<Item.Content class="text-left">
-				<Item.Title class="text-xl font-bold">ModelService</Item.Title>
+				<Item.Title class="text-xl font-bold">ModelArtifact</Item.Title>
 				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
 		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
-			<!-- Step 1: Basic Info -->
+			<!-- Step 1: Metadata -->
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
@@ -151,29 +149,21 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 2: Model Config -->
+			<!-- Step 2: Source (HuggingFace) -->
 			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
 						...(lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.model'),
+							lodash.get(jsonSchema, 'properties.spec.properties.source.properties.huggingFace'),
 							'properties'
 						) as any),
-						title: 'Model',
 						properties: {
-							name: {
-								...(lodash.get(
+							model: {
+								...lodash.get(
 									jsonSchema,
-									'properties.spec.properties.model.properties.name'
-								) as any),
-								title: 'Name'
-							},
-							image: {
-								...(lodash.get(
-									jsonSchema,
-									'properties.spec.properties.model.properties.image'
-								) as any),
-								title: 'Image'
+									'properties.spec.properties.source.properties.huggingFace.properties.model'
+								),
+								title: 'Model'
 							}
 						}
 					} as Schema}
@@ -185,15 +175,14 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						name: '',
-						image: ''
+						model: ''
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
 						}
 					}}
-					bind:values={values['spec']['model']}
+					bind:values={values['spec']['source']['huggingFace']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -210,40 +199,46 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 3: Accelerator -->
+			<!-- Step 3: Target (OCI Registry) -->
 			<Tabs.Content value={steps[2]}>
 				<Form
 					schema={{
-						...(lodash.get(jsonSchema, 'properties.spec.properties.accelerator') as any),
-						title: 'Accelerator'
+						...(lodash.omit(
+							lodash.get(jsonSchema, 'properties.spec.properties.target'),
+							'properties'
+						) as any),
+						title: 'Target',
+						properties: {
+							registry: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.target.properties.registry'),
+								title: 'Registry'
+							},
+							repository: {
+								...lodash.get(
+									jsonSchema,
+									'properties.spec.properties.target.properties.repository'
+								),
+								title: 'Repository'
+							}
+						}
 					} as Schema}
 					uiSchema={{
 						'ui:options': {
 							translations: {
 								submit: 'Next'
 							}
-						},
-						type: {
-							'ui:components': {
-								stringField: 'enumField',
-								selectWidget: 'comboboxWidget'
-							},
-							'ui:options': {
-								disabledEnumValues: lodash
-									.get(jsonSchema, 'properties.spec.properties.accelerator.properties.type.enum')
-									.filter((accelerator: string) => accelerator !== 'nvidia')
-							}
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						type: 'nvidia'
+						registry: '',
+						repository: ''
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
 						}
 					}}
-					bind:values={values['spec']['accelerator']}
+					bind:values={values['spec']['target']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -260,181 +255,23 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 4: Decode -->
+			<!-- Step 4: Storage -->
 			<Tabs.Content value={steps[3]}>
 				<Form
 					schema={{
 						...(lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.decode.properties'),
+							lodash.get(jsonSchema, 'properties.spec.properties.storage'),
 							'properties'
 						) as any),
-						title: 'Decode',
+						title: 'Storage',
 						properties: {
-							parallelism: {
-								...(lodash.omit(
-									lodash.get(
-										jsonSchema,
-										'properties.spec.properties.decode.properties.parallelism'
-									),
-									'properties'
-								) as any),
-								title: 'Parallelism',
-								properties: {
-									tensor: {
-										...lodash.get(
-											jsonSchema,
-											'properties.spec.properties.decode.properties.parallelism.properties.tensor'
-										),
-										title: 'Tensor'
-									}
-								}
-							},
-							replicas: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.decode.properties.replicas'),
-								title: 'Replicas'
-							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{} as FormValue}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-					bind:values={values['spec']['decode']}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-
-			<!-- Step 5: Prefill -->
-			<Tabs.Content value={steps[4]}>
-				<Form
-					schema={{
-						...(lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.prefill.properties'),
-							'properties'
-						) as any),
-						title: 'Prefill',
-						properties: {
-							parallelism: {
-								...(lodash.omit(
-									lodash.get(
-										jsonSchema,
-										'properties.spec.properties.prefill.properties.parallelism'
-									),
-									'properties'
-								) as any),
-								title: 'Parallelism',
-								properties: {
-									tensor: {
-										...lodash.get(
-											jsonSchema,
-											'properties.spec.properties.prefill.properties.parallelism.properties.tensor'
-										),
-										title: 'Tensor'
-									}
-								}
-							},
-							replicas: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.prefill.properties.replicas'),
-								title: 'Replicas'
-							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{} as FormValue}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-					bind:values={values['spec']['prefill']}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-
-			<!-- Step 6: Engine -->
-			<Tabs.Content value={steps[5]}>
-				<Form
-					schema={{
-						...(lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.engine'),
-							'properties'
-						) as any),
-						title: 'Engine',
-						properties: {
-							args: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.engine.properties.args'),
-								title: 'Arguments'
-							},
-							env: {
-								...lodash.omit(
-									lodash.get(jsonSchema, 'properties.spec.properties.engine.properties.env'),
-									'items'
+							size: {
+								...lodash.pick(
+									lodash.get(jsonSchema, 'properties.spec.properties.storage.properties.size'),
+									['description', 'type', 'pattern']
 								),
-								title: 'Environment Variables',
-								items: {
-									...lodash.omit(
-										lodash.get(
-											jsonSchema,
-											'properties.spec.properties.engine.properties.env.items'
-										),
-										'properties'
-									),
-									properties: {
-										name: {
-											...lodash.get(
-												jsonSchema,
-												'properties.spec.properties.engine.properties.env.items.properties.name'
-											),
-											title: 'Name'
-										},
-										value: {
-											...lodash.get(
-												jsonSchema,
-												'properties.spec.properties.engine.properties.env.items.properties.value'
-											),
-											title: 'Value'
-										}
-									}
-								}
+								type: 'string',
+								title: 'Storage Size'
 							}
 						}
 					} as Schema}
@@ -446,20 +283,14 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						args: [
-							'--kv-transfer-config',
-							`{"kv_connector":"NixlConnector", "kv_role":"kv_both"}`,
-							'--disable-uvicorn-access-log',
-							'--max-model-len',
-							'8192'
-						]
+						size: '100Gi'
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
 						}
 					}}
-					bind:values={values['spec']['engine']}
+					bind:values={values['spec']['storage']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -476,8 +307,8 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 7: Review -->
-			<Tabs.Content value={steps[6]}>
+			<!-- Step 5: Review -->
+			<Tabs.Content value={steps[4]}>
 				<div class="flex h-full flex-col gap-3">
 					<Code.Root lang="yaml" class="w-full" hideLines code={stringify(values, null, 2)} />
 					<Button
@@ -508,13 +339,13 @@
 									});
 								},
 								{
-									loading: `Creating ModelService ${name}...`,
+									loading: `Creating ModelArtifact ${name}...`,
 									success: () => {
-										return `Successfully created ModelService ${name}`;
+										return `Successfully created ModelArtifact ${name}`;
 									},
 									error: (error) => {
-										console.error(`Failed to create ModelService ${name}:`, error);
-										return `Failed to create ModelService ${name}: ${(error as ConnectError).message}`;
+										console.error(`Failed to create ModelArtifact ${name}:`, error);
+										return `Failed to create ModelArtifact ${name}: ${(error as ConnectError).message}`;
 									},
 									finally() {
 										isSubmitting = false;
