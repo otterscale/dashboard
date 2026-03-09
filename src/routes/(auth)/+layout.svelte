@@ -15,6 +15,7 @@
 		LayersIcon,
 		LayoutGridIcon,
 		NetworkIcon,
+		PlusIcon,
 		UserStarIcon
 	} from '@lucide/svelte';
 	import { type Link, LinkService } from '@otterscale/api/link/v1';
