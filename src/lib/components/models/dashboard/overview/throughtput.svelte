@@ -13,9 +13,9 @@
 
 	let {
 		prometheusDriver,
-		scope,
+		cluster,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 
 	let prompts = $state([] as SampleValue[]);
 	let generations = $state([] as SampleValue[]);
@@ -35,28 +35,28 @@
 	async function fetchPrompts() {
 		try {
 			const response = await prometheusDriver.rangeQuery(
-				`sum(rate(vllm:prompt_tokens_total{juju_model="${scope}"}[2m]))`,
+				`sum(rate(vllm:prompt_tokens_total{juju_model="${cluster}"}[2m]))`,
 				Date.now() - 24 * 60 * 60 * 1000,
 				Date.now(),
 				2 * 60
 			);
 			prompts = response.result[0]?.values ?? [];
 		} catch (error) {
-			console.error(`Fail to fetch latest prompt throughput in scope ${scope}:`, error);
+			console.error(`Fail to fetch latest prompt throughput in cluster ${cluster}:`, error);
 		}
 	}
 
 	async function fetchGenerations() {
 		try {
 			const response = await prometheusDriver.rangeQuery(
-				`sum(rate(vllm:generation_tokens_total{juju_model="${scope}"}[2m]))`,
+				`sum(rate(vllm:generation_tokens_total{juju_model="${cluster}"}[2m]))`,
 				Date.now() - 24 * 60 * 60 * 1000,
 				Date.now(),
 				2 * 60
 			);
 			generations = response.result[0]?.values ?? [];
 		} catch (error) {
-			console.error(`Fail to fetch latest generation throughput in scope ${scope}:`, error);
+			console.error(`Fail to fetch latest generation throughput in cluster ${cluster}:`, error);
 		}
 	}
 
@@ -64,7 +64,7 @@
 		try {
 			await Promise.all([fetchPrompts(), fetchGenerations()]);
 		} catch (error) {
-			console.error(`Fail to fetch throughputs data in scope ${scope}:`, error);
+			console.error(`Fail to fetch throughputs data in cluster ${cluster}:`, error);
 		}
 	}
 
@@ -76,7 +76,7 @@
 			await fetch();
 			isLoaded = true;
 		} catch (error) {
-			console.error(`Fail to fetch data in scope ${scope}:`, error);
+			console.error(`Fail to fetch data in cluster ${cluster}:`, error);
 		}
 	});
 	onDestroy(() => {

@@ -48,15 +48,15 @@ docker run -p 3000:3000 --env-file .env otterscale/dashboard
 
 ## ⚙️ Configuration
 
-| `ENV_VAR`                | Default                 | Description                            |
-| ------------------------ | ----------------------- | -------------------------------------- |
-| `PUBLIC_WEB_URL`         | `http://localhost:3000` | Public URL (required)                  |
-| `API_URL`                | `http://localhost:8299` | OtterScale API endpoint (required)     |
-| `REDIS_URL`              | —                       | Redis connection string (required)     |
-| `KEYCLOAK_REALM_URL`     | —                       | Keycloak realm URL (required)          |
-| `KEYCLOAK_CLIENT_ID`     | —                       | OAuth client ID (required)             |
-| `KEYCLOAK_CLIENT_SECRET` | —                       | OAuth client secret (required)         |
-| `BOOTSTRAP_MODE`         | `0`                     | Skip auth for initial setup (optional) |
+| `ENV_VAR`                | Default                 | Description                        |
+| ------------------------ | ----------------------- | ---------------------------------- |
+| `PUBLIC_WEB_URL`         | `http://localhost:3000` | Public URL (required)              |
+| `PUBLIC_HARBOR_URL`      | `http://localhost:5000` | Public Harbor URL (required)       |
+| `API_URL`                | `http://localhost:8299` | OtterScale API endpoint (required) |
+| `REDIS_URL`              | —                       | Redis connection string (required) |
+| `KEYCLOAK_REALM_URL`     | —                       | Keycloak realm URL (required)      |
+| `KEYCLOAK_CLIENT_ID`     | —                       | OAuth client ID (required)         |
+| `KEYCLOAK_CLIENT_SECRET` | —                       | OAuth client secret (required)     |
 
 ## Features
 

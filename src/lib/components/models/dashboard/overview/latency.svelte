@@ -16,9 +16,9 @@
 
 	let {
 		prometheusDriver,
-		scope,
+		cluster,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 
 	let latestLatency: number | undefined = $state(undefined);
 	let latencies = $state([] as SampleValue[]);
@@ -36,18 +36,18 @@
 	async function fetchLatestLatency() {
 		try {
 			const response = await prometheusDriver.instantQuery(
-				`histogram_quantile(0.95, sum by(le) (vllm:e2e_request_latency_seconds_bucket{juju_model="${scope}"}))`
+				`histogram_quantile(0.95, sum by(le) (vllm:e2e_request_latency_seconds_bucket{juju_model="${cluster}"}))`
 			);
 			latestLatency = response.result[0]?.value?.value;
 		} catch (error) {
-			console.error(`Fail to fetch latest latency in scope ${scope}:`, error);
+			console.error(`Fail to fetch latest latency in cluster ${cluster}:`, error);
 		}
 	}
 
 	async function fetchLatencies() {
 		try {
 			const response = await prometheusDriver.rangeQuery(
-				`histogram_quantile(0.95, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket{juju_model="${scope}"}[5m])))`,
+				`histogram_quantile(0.95, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket{juju_model="${cluster}"}[5m])))`,
 				Date.now() - 24 * 60 * 60 * 1000,
 				Date.now(),
 				2 * 60
@@ -64,7 +64,7 @@
 						)
 					: [];
 		} catch (error) {
-			console.error(`Fail to fetch latencies in scope ${scope}:`, error);
+			console.error(`Fail to fetch latencies in cluster ${cluster}:`, error);
 		}
 	}
 
@@ -72,7 +72,7 @@
 		try {
 			await Promise.all([fetchLatestLatency(), fetchLatencies()]);
 		} catch (error) {
-			console.error(`Fail to fetch data in scope ${scope}:`, error);
+			console.error(`Fail to fetch data in cluster ${cluster}:`, error);
 		}
 	}
 
@@ -84,7 +84,7 @@
 			await fetch();
 			isLoaded = true;
 		} catch (error) {
-			console.error(`Fail to fetch data in scope ${scope}:`, error);
+			console.error(`Fail to fetch data in cluster ${cluster}:`, error);
 		}
 	});
 	onDestroy(() => {

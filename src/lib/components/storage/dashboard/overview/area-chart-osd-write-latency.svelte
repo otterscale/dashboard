@@ -16,9 +16,9 @@
 	// Props
 	let {
 		client,
-		scope,
+		cluster,
 		isReloading = $bindable()
-	}: { client: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: { client: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 
 	// Types
 	type TimeInterval = 'day' | 'week' | 'month';
@@ -44,9 +44,9 @@
 	};
 
 	// Query
-	const PROMETHEUS_QUERY = (scope: string) =>
-		`quantile(0.95, (rate(ceph_osd_op_w_latency_sum{juju_model="${scope}"}[5m]) / ` +
-		`on(ceph_daemon) rate(ceph_osd_op_w_latency_count{juju_model="${scope}"}[5m]) * 1000))`;
+	const PROMETHEUS_QUERY = (cluster: string) =>
+		`quantile(0.95, (rate(ceph_osd_op_w_latency_sum{juju_model="${cluster}"}[5m]) / ` +
+		`on(ceph_daemon) rate(ceph_osd_op_w_latency_count{juju_model="${cluster}"}[5m]) * 1000))`;
 
 	// State
 	let selectedInterval = $state<TimeInterval>('day');
@@ -137,7 +137,7 @@
 		end: Date
 	): Promise<{ date: Date; latency: number }> {
 		try {
-			const query = PROMETHEUS_QUERY(scope);
+			const query = PROMETHEUS_QUERY(cluster);
 			const response = await client.rangeQuery(
 				query,
 				start.getTime(),

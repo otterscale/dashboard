@@ -1,11 +1,11 @@
 import { type JsonObject, type JsonValue } from '@bufbuild/protobuf';
+import type { APIResource } from '@otterscale/api/resource/v1';
 import type { BatchV1CronJob } from '@otterscale/types';
 import type { Column, ColumnDef } from '@tanstack/table-core';
 import { type Row } from '@tanstack/table-core';
 
 import { resolve } from '$app/paths';
 import { page } from '$app/state';
-import type { APIResource } from '$lib/api/resource/v1/resource_pb';
 import { DynamicTableCell, DynamicTableHeader } from '$lib/components/dynamic-table';
 import {
 	type ArrayOfObjectItemsType,

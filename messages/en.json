@@ -171,7 +171,7 @@
 	"scope_name_description": "Enter scope name",
 	"create": "Create",
 	"cancel": "Cancel",
-	"switch_scope": "Switched to scope {name}",
+	"switch_cluster": "Switched to cluster {name}",
 	"scope_not_found_redirect": "Scope  '{invalid_scope}' does not exist, redirected to default scope '{scope}'",
 	"scope_not_configured": "Scope {name} is not configured",
 	"home_integration": "Integrate with your favorite tools",
@@ -953,5 +953,6 @@
 	"cluster_role": "Cluster Role",
 	"cluster_role_binding": "Cluster Role Binding",
 	"native": "Native",
-	"artifact": "Artifact"
+	"artifact": "Artifact",
+	"console": "Console"
 }

@@ -13,9 +13,9 @@
 
 	let {
 		prometheusDriver,
-		scope,
+		cluster,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 
 	let ninety_fives = $state([] as SampleValue[]);
 	let ninety_nines = $state([] as SampleValue[]);
@@ -36,7 +36,7 @@
 
 	async function fetchTimesToFirstToken(quantile: number) {
 		const response = await prometheusDriver.rangeQuery(
-			`histogram_quantile(${quantile}, sum by(le) (rate(vllm:time_to_first_token_seconds_bucket{juju_model="${scope}"}[5m])))`,
+			`histogram_quantile(${quantile}, sum by(le) (rate(vllm:time_to_first_token_seconds_bucket{juju_model="${cluster}"}[5m])))`,
 			Date.now() - 24 * 60 * 60 * 1000,
 			Date.now(),
 			2 * 60
@@ -52,7 +52,7 @@
 		try {
 			await Promise.all([fetchTimesToFirstToken(0.95), fetchTimesToFirstToken(0.99)]);
 		} catch (error) {
-			console.error(`Fail to fetch time to first token data in scope ${scope}:`, error);
+			console.error(`Fail to fetch time to first token data in cluster ${cluster}:`, error);
 		}
 	}
 
@@ -64,7 +64,7 @@
 			await fetch();
 			isLoaded = true;
 		} catch (error) {
-			console.error(`Fail to fetch data in scope ${scope}:`, error);
+			console.error(`Fail to fetch data in cluster ${cluster}:`, error);
 		}
 	});
 	onDestroy(() => {

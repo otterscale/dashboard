@@ -5,7 +5,7 @@
 	import { toast } from 'svelte-sonner';
 
 	import { page } from '$app/state';
-	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import {
 		type GroupedFields,
 		MultiStepSchemaForm,
@@ -20,7 +20,7 @@
 		schema?: any;
 	} = $props();
 
-	const cluster = $derived(page.params.cluster ?? page.params.scope ?? '');
+	const cluster = $derived(page.params.cluster ?? '');
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);

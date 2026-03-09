@@ -127,7 +127,7 @@
 		const workspace = workspaces[index];
 		const workspaceName = workspace.metadata?.name ?? '';
 		const workspaceUrl = resolve(
-			`/(auth)/${cluster}/Workspace/workspaces?group=tenant.otterscale.io&version=v1alpha1&name=${workspaceName}`
+			`/(auth)/${cluster}/${workspaceName}/${workspaceName}?group=tenant.otterscale.io&version=v1alpha1&kind=Workspace&resource=workspaces`
 		);
 
 		activeWorkspace = workspace;

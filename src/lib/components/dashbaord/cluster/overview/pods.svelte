@@ -9,9 +9,9 @@
 
 	let {
 		prometheusDriver,
-		scope,
+		cluster,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 
 	let maxAllocatablePods: SampleValue | undefined = $state(undefined);
 	let runningPods: SampleValue | undefined = $state(undefined);
@@ -19,22 +19,22 @@
 	let failedPods: SampleValue | undefined = $state(undefined);
 	async function fetchPods() {
 		const allocateResponse = await prometheusDriver.instantQuery(
-			`sum(kube_node_status_allocatable{resource="pods", juju_model="${scope}", container!=""})`
+			`sum(kube_node_status_allocatable{resource="pods", juju_model="${cluster}", container!=""})`
 		);
 		maxAllocatablePods = allocateResponse.result[0]?.value ?? undefined;
 
 		const runningResponse = await prometheusDriver.instantQuery(
-			`sum(kube_pod_status_phase{phase="Running", juju_model="${scope}", container!=""})`
+			`sum(kube_pod_status_phase{phase="Running", juju_model="${cluster}", container!=""})`
 		);
 		runningPods = runningResponse.result[0]?.value ?? undefined;
 
 		const pendingResponse = await prometheusDriver.instantQuery(
-			`sum(kube_pod_status_phase{phase="Pending", juju_model="${scope}", container!=""})`
+			`sum(kube_pod_status_phase{phase="Pending", juju_model="${cluster}", container!=""})`
 		);
 		pendingPods = pendingResponse.result[0]?.value ?? undefined;
 
 		const failedResponse = await prometheusDriver.instantQuery(
-			`sum(kube_pod_status_phase{phase="Failed", juju_model="${scope}", container!=""})`
+			`sum(kube_pod_status_phase{phase="Failed", juju_model="${cluster}", container!=""})`
 		);
 		failedPods = failedResponse.result[0]?.value ?? undefined;
 	}

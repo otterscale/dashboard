@@ -12,9 +12,9 @@
 	// Props
 	let {
 		client,
-		scope,
+		cluster,
 		isReloading = $bindable()
-	}: { client: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: { client: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 
 	// Constants
 	const CHART_TITLE = m.osd_type();
@@ -61,7 +61,7 @@
 
 	// Queries
 	const queries = $derived({
-		osdTypeCount: `count by (device_class) (ceph_osd_metadata{juju_model="${scope}"})`
+		osdTypeCount: `count by (device_class) (ceph_osd_metadata{juju_model="${cluster}"})`
 	});
 
 	// Auto Update

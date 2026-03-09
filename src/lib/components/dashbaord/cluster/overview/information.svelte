@@ -9,15 +9,15 @@
 
 	let {
 		prometheusDriver,
-		scope,
+		cluster,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 
 	let version: string | undefined = $state(undefined);
 	let platform: string | undefined = $state(undefined);
 	async function fetchBuildInformation() {
 		const response = await prometheusDriver.instantQuery(
-			`kubernetes_build_info{juju_model="${scope}", job="apiserver"}`
+			`kubernetes_build_info{juju_model="${cluster}", job="apiserver"}`
 		);
 		version = response.result[0]?.metric?.labels?.git_version ?? undefined;
 		platform = response.result[0]?.metric?.labels?.platform ?? undefined;

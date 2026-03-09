@@ -10,7 +10,7 @@
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
-	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';

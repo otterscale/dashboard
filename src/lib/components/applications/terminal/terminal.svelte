@@ -2,23 +2,22 @@
 	import '@xterm/xterm/css/xterm.css';
 
 	import { createClient, type Transport } from '@connectrpc/connect';
+	import {
+		type ExecuteTTYRequest,
+		type ExecuteTTYResponse,
+		RuntimeService
+	} from '@otterscale/api/runtime/v1';
 	import type { ITerminalInitOnlyOptions, ITerminalOptions, Terminal } from '@xterm/xterm';
 	import { getContext, onMount } from 'svelte';
 
-	import {
-		ApplicationService,
-		type ExecuteTTYRequest,
-		type ExecuteTTYResponse
-	} from '$lib/api/application/v1/application_pb';
-
 	let {
-		scope,
+		cluster,
 		namespace,
 		podName,
 		containerName,
 		command
 	}: {
-		scope: string;
+		cluster: string;
 		namespace: string;
 		podName: string;
 		containerName: string;
@@ -93,7 +92,7 @@
 
 	// State
 	const transport: Transport = getContext('transport');
-	const applicationClient = createClient(ApplicationService, transport);
+	const client = createClient(RuntimeService, transport);
 
 	let container = $state<HTMLElement>();
 	let handleResize = $state<() => void>();
@@ -176,12 +175,13 @@
 	// TTY communication
 	async function startTTYSession(): Promise<void> {
 		try {
-			const stream = applicationClient.executeTTY({
-				scope: scope,
+			const stream = client.executeTTY({
+				cluster: cluster,
 				namespace: namespace,
-				podName: podName,
-				containerName: containerName,
-				command: command
+				name: podName,
+				container: containerName,
+				command: command,
+				tty: true
 			} as ExecuteTTYRequest);
 			terminalState.isConnected = true;
 
@@ -214,7 +214,7 @@
 		if (!terminalState.sessionId || !terminalState.isConnected) return;
 
 		try {
-			applicationClient.writeTTY({
+			client.writeTTY({
 				sessionId: terminalState.sessionId,
 				stdin: new TextEncoder().encode(data)
 			});

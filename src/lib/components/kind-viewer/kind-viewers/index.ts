@@ -1,7 +1,7 @@
 import type { JsonValue } from '@bufbuild/protobuf';
+import type { APIResource } from '@otterscale/api/resource/v1';
 import type { ColumnDef } from '@tanstack/table-core';
 
-import type { APIResource } from '$lib/api/resource/v1/resource_pb.js';
 import type { DataSchemaType, UISchemaType } from '$lib/components/dynamic-table/utils.js';
 
 import {

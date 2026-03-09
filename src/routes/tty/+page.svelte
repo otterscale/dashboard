@@ -4,7 +4,7 @@
 </script>
 
 <Terminal
-	scope={page.url.searchParams.get('scope') ?? ''}
+	cluster={page.url.searchParams.get('cluster') ?? ''}
 	namespace={page.url.searchParams.get('namespace') ?? ''}
 	podName={page.url.searchParams.get('pod') ?? ''}
 	containerName={page.url.searchParams.get('container') ?? ''}

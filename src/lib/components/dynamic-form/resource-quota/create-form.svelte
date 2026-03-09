@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import { page } from '$app/state';
-	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import { type GroupedFields, MultiStepSchemaForm } from '$lib/components/custom/schema-form';
 
 	let {
@@ -17,7 +17,7 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-	const cluster = $derived(page.params.cluster ?? page.params.scope ?? ''); // TODO: Change to cluster after the URL refactor completes.
+	const cluster = $derived(page.params.cluster ?? '');
 
 	let isSubmitting = $state(false);
 

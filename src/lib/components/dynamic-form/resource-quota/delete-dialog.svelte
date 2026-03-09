@@ -1,13 +1,13 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { Trash2 } from '@lucide/svelte';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { page } from '$app/stores';
-	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
+	import { page } from '$app/state';
 	import * as Form from '$lib/components/custom/form';
 	import { Single as SingleInput } from '$lib/components/custom/input';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
@@ -27,7 +27,7 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-	const cluster = $derived($page.params.cluster ?? $page.params.scope ?? '');
+	const cluster = $derived(page.params.cluster ?? '');
 
 	let open = $state(false);
 	let confirmName = $state('');
@@ -48,7 +48,7 @@
 			async () => {
 				await resourceClient.delete({
 					cluster,
-					namespace: $page.url.searchParams.get('namespace') ?? '',
+					namespace: page.url.searchParams.get('namespace') ?? '',
 					group: '',
 					version: 'v1',
 					resource: 'resourcequotas',
@@ -64,7 +64,7 @@
 					// Redirect after delete
 					goto(
 						resolve(
-							`/(auth)/${cluster}/ResourceQuota?group=&version=v1&namespace=${$page.url.searchParams.get('namespace') ?? ''}&resource=resourcequotas`
+							`/(auth)/${cluster}/ResourceQuota?group=&version=v1&namespace=${page.url.searchParams.get('namespace') ?? ''}&resource=resourcequotas`
 						)
 					);
 					return `Successfully deleted resource quota ${name}`;

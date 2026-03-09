@@ -19,6 +19,7 @@
 		UserStarIcon
 	} from '@lucide/svelte';
 	import { type Link, LinkService } from '@otterscale/api/link/v1';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import { getContext, onMount, type Snippet } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -27,7 +28,6 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { env } from '$env/dynamic/public';
-	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import {
 		DialogAbout,
 		NavMain,
@@ -62,7 +62,7 @@
 	const linkClient = createClient(LinkService, transport);
 	const resourceClient = createClient(ResourceService, transport);
 
-	let activeScope = $state(page.params.scope ?? page.params.cluster ?? ''); //TODO: remove page.params.scope after route updated
+	let activeCluster = $state(page.params.cluster ?? '');
 	let links = $state<Link[]>([]);
 	let workspaces = $state<TenantOtterscaleIoV1Alpha1Workspace[]>([]);
 	let aboutOpen = $state(false);
@@ -83,8 +83,8 @@
 				cluster: cluster,
 				group: 'tenant.otterscale.io',
 				version: 'v1alpha1',
-				resource: 'workspaces'
-				// labelSelector: 'user.otterscale.io/' + data.user.sub
+				resource: 'workspaces',
+				labelSelector: 'user.otterscale.io/' + data.user.sub
 			});
 			workspaces = response.items.map((item) => item.object as TenantOtterscaleIoV1Alpha1Workspace);
 		} catch (error) {
@@ -94,16 +94,21 @@
 
 	async function onValueChange(cluster: string) {
 		await fetchWorkspaces(cluster);
-		await goto(resolve('/(auth)/scope/[scope]/workspace', { scope: cluster }));
-		toast.success(m.switch_scope({ name: cluster }));
+		await goto(
+			resolve('/(auth)/[cluster]/[namespace]/overview', {
+				cluster: activeCluster,
+				namespace: $activeNamespace
+			})
+		);
+		toast.success(m.switch_cluster({ name: cluster }));
 	}
 
 	let isMounted = $state(false);
 	onMount(async () => {
 		await fetchClusters();
 
-		if (activeScope) {
-			await fetchWorkspaces(activeScope);
+		if (activeCluster) {
+			await fetchWorkspaces(activeCluster);
 		}
 
 		isMounted = true;
@@ -113,9 +118,9 @@
 		aboutOpen = true;
 	}
 
-	function resourceUrl(kind: string, group: string, version: string, resource: string) {
+	function resourceUrl(group: string, version: string, kind: string, resource: string) {
 		return resolve(
-			`/(auth)/${activeScope}/${kind}?group=${group}&version=${version}&namespace=${$activeNamespace}&resource=${resource}`
+			`/(auth)/${activeCluster}/${$activeNamespace}?group=${group}&version=${version}&kind=${kind}&resource=${resource}`
 		);
 	}
 
@@ -123,7 +128,10 @@
 		managed: [
 			{
 				title: m.overview(),
-				url: resolve('/(auth)/scope/[scope]/workspace', { scope: activeScope }),
+				url: resolve('/(auth)/[cluster]/[namespace]/overview', {
+					cluster: activeCluster,
+					namespace: $activeNamespace
+				}),
 				icon: CompassIcon
 			},
 			{
@@ -133,15 +141,18 @@
 				items: [
 					{
 						title: m.dashboard(),
-						url: resolve('/(auth)/scope/[scope]/models', { scope: activeScope })
+						url: resolve('/(auth)/[cluster]/[namespace]/model/dashboard', {
+							cluster: activeCluster,
+							namespace: $activeNamespace
+						})
 					},
 					{
 						title: m.model(),
-						url: resourceUrl('ModelService', 'model.otterscale.io', 'v1alpha1', 'modelservices')
+						url: resourceUrl('model.otterscale.io', 'v1alpha1', 'ModelService', 'modelservices')
 					},
 					{
 						title: m.artifact(),
-						url: resourceUrl('ModelArtifact', 'model.otterscale.io', 'v1alpha1', 'modelartifacts')
+						url: resourceUrl('model.otterscale.io', 'v1alpha1', 'ModelArtifact', 'modelartifacts')
 					}
 				]
 			},
@@ -152,11 +163,11 @@
 				items: [
 					{
 						title: m.application(),
-						url: resourceUrl('Application', 'workload.otterscale.io', 'v1alpha1', 'applications')
+						url: resourceUrl('workload.otterscale.io', 'v1alpha1', 'Application', 'applications')
 					},
 					{
 						title: m.release(),
-						url: resourceUrl('HelmRelease', 'helm.toolkit.fluxcd.io', 'v2', 'helmreleases')
+						url: resourceUrl('helm.toolkit.fluxcd.io', 'v2', 'HelmRelease', 'helmreleases')
 					},
 					{
 						title: m.hub(),
@@ -170,22 +181,25 @@
 				items: [
 					{
 						title: m.dashboard(),
-						url: resolve('/(auth)/scope/[scope]/compute', { scope: activeScope })
+						url: resolve('/(auth)/[cluster]/[namespace]/compute/dashboard', {
+							cluster: activeCluster,
+							namespace: $activeNamespace
+						})
 					},
 					{
 						title: m.virtual_machine(),
-						url: resourceUrl('VirtualMachine', 'kubevirt.io', 'v1', 'virtualmachines')
+						url: resourceUrl('kubevirt.io', 'v1', 'VirtualMachine', 'virtualmachines')
 					},
 					{
 						title: m.data_volume(),
-						url: resourceUrl('DataVolume', 'cdi.kubevirt.io', 'v1beta1', 'datavolumes')
+						url: resourceUrl('cdi.kubevirt.io', 'v1beta1', 'DataVolume', 'datavolumes')
 					},
 					{
 						title: m.instance_type(),
 						url: resourceUrl(
-							'VirtualMachineInstancetype',
 							'instancetype.kubevirt.io',
 							'v1beta1',
+							'VirtualMachineInstancetype',
 							'virtualmachineinstancetypes'
 						)
 					}
@@ -197,19 +211,22 @@
 				items: [
 					{
 						title: m.dashboard(),
-						url: resolve('/(auth)/scope/[scope]/storage', { scope: activeScope })
+						url: resolve('/(auth)/[cluster]/[namespace]/storage/dashboard', {
+							cluster: activeCluster,
+							namespace: $activeNamespace
+						})
 					},
 					{
 						title: m.block_pool(),
-						url: resourceUrl('CephBlockPool', 'ceph.rook.io', 'v1', 'cephblockpools')
+						url: resourceUrl('ceph.rook.io', 'v1', 'CephBlockPool', 'cephblockpools')
 					},
 					{
 						title: m.file_system(),
-						url: resourceUrl('CephFilesystem', 'ceph.rook.io', 'v1', 'cephfilesystems')
+						url: resourceUrl('ceph.rook.io', 'v1', 'CephFilesystem', 'cephfilesystems')
 					},
 					{
 						title: m.object_store(),
-						url: resourceUrl('CephObjectStore', 'ceph.rook.io', 'v1', 'cephobjectstores')
+						url: resourceUrl('ceph.rook.io', 'v1', 'CephObjectStore', 'cephobjectstores')
 					}
 				]
 			},
@@ -220,11 +237,11 @@
 				items: [
 					{
 						title: m.workspace(),
-						url: resourceUrl('Workspace', 'tenant.otterscale.io', 'v1alpha1', 'workspaces')
+						url: resourceUrl('tenant.otterscale.io', 'v1alpha1', 'Workspace', 'workspaces')
 					},
 					{
 						title: m.module(),
-						url: resourceUrl('Module', 'module.otterscale.io', 'v1alpha1', 'modules')
+						url: resourceUrl('module.otterscale.io', 'v1alpha1', 'Module', 'modules')
 					}
 				]
 			}
@@ -232,7 +249,7 @@
 		native: [
 			{
 				title: m.overview(),
-				url: resolve('/(auth)/scope/[scope]/kubernetes', { scope: activeScope }),
+				url: resolve('/(auth)/[cluster]/overview', { cluster: activeCluster }),
 				icon: CompassIcon
 			},
 			{
@@ -242,27 +259,27 @@
 				items: [
 					{
 						title: m.deployment(),
-						url: resourceUrl('Deployment', 'apps', 'v1', 'deployments')
+						url: resourceUrl('apps', 'v1', 'Deployment', 'deployments')
 					},
 					{
 						title: m.stateful_set(),
-						url: resourceUrl('StatefulSet', 'apps', 'v1', 'statefulsets')
+						url: resourceUrl('apps', 'v1', 'StatefulSet', 'statefulsets')
 					},
 					{
 						title: m.daemon_set(),
-						url: resourceUrl('DaemonSet', 'apps', 'v1', 'daemonsets')
+						url: resourceUrl('apps', 'v1', 'DaemonSet', 'daemonsets')
 					},
 					{
 						title: m.cronjob(),
-						url: resourceUrl('CronJob', 'batch', 'v1', 'cronjobs')
+						url: resourceUrl('batch', 'v1', 'CronJob', 'cronjobs')
 					},
 					{
 						title: m.job(),
-						url: resourceUrl('Job', 'batch', 'v1', 'jobs')
+						url: resourceUrl('batch', 'v1', 'Job', 'jobs')
 					},
 					{
 						title: m.pod(),
-						url: resourceUrl('Pod', '', 'v1', 'pods')
+						url: resourceUrl('', 'v1', 'Pod', 'pods')
 					}
 				]
 			},
@@ -272,11 +289,11 @@
 				items: [
 					{
 						title: m.config_map(),
-						url: resourceUrl('ConfigMap', '', 'v1', 'configmaps')
+						url: resourceUrl('', 'v1', 'ConfigMap', 'configmaps')
 					},
 					{
 						title: m.secret(),
-						url: resourceUrl('Secret', '', 'v1', 'secrets')
+						url: resourceUrl('', 'v1', 'Secret', 'secrets')
 					}
 				]
 			},
@@ -286,19 +303,19 @@
 				items: [
 					{
 						title: m.service(),
-						url: resourceUrl('Service', '', 'v1', 'services')
+						url: resourceUrl('', 'v1', 'Service', 'services')
 					},
 					{
 						title: m.http_route(),
-						url: resourceUrl('HTTPRoute', 'gateway.networking.k8s.io', 'v1', 'httproutes')
+						url: resourceUrl('gateway.networking.k8s.io', 'v1', 'HTTPRoute', 'httproutes')
 					},
 					{
 						title: m.gateway(),
-						url: resourceUrl('Gateway', 'gateway.networking.k8s.io', 'v1', 'gateways')
+						url: resourceUrl('gateway.networking.k8s.io', 'v1', 'Gateway', 'gateways')
 					},
 					{
 						title: m.network_policy(),
-						url: resourceUrl('NetworkPolicy', 'networking.k8s.io', 'v1', 'networkpolicies')
+						url: resourceUrl('networking.k8s.io', 'v1', 'NetworkPolicy', 'networkpolicies')
 					}
 				]
 			},
@@ -308,15 +325,15 @@
 				items: [
 					{
 						title: m.persistent_volume_claim(),
-						url: resourceUrl('PersistentVolumeClaim', '', 'v1', 'persistentvolumeclaims')
+						url: resourceUrl('', 'v1', 'PersistentVolumeClaim', 'persistentvolumeclaims')
 					},
 					{
 						title: m.persistent_volume(),
-						url: resourceUrl('PersistentVolume', '', 'v1', 'persistentvolumes')
+						url: resourceUrl('', 'v1', 'PersistentVolume', 'persistentvolumes')
 					},
 					{
 						title: m.storage_class(),
-						url: resourceUrl('StorageClass', 'storage.k8s.io', 'v1', 'storageclasses')
+						url: resourceUrl('storage.k8s.io', 'v1', 'StorageClass', 'storageclasses')
 					}
 				]
 			},
@@ -326,27 +343,27 @@
 				items: [
 					{
 						title: m.namespace(),
-						url: resourceUrl('Namespace', '', 'v1', 'namespaces')
+						url: resourceUrl('', 'v1', 'Namespace', 'namespaces')
 					},
 					{
 						title: m.service_account(),
-						url: resourceUrl('ServiceAccount', '', 'v1', 'serviceaccounts')
+						url: resourceUrl('', 'v1', 'ServiceAccount', 'serviceaccounts')
 					},
 					{
 						title: m.role(),
-						url: resourceUrl('Role', 'rbac.authorization.k8s.io', 'v1', 'roles')
+						url: resourceUrl('rbac.authorization.k8s.io', 'v1', 'Role', 'roles')
 					},
 					{
 						title: m.role_binding(),
-						url: resourceUrl('RoleBinding', 'rbac.authorization.k8s.io', 'v1', 'rolebindings')
+						url: resourceUrl('rbac.authorization.k8s.io', 'v1', 'RoleBinding', 'rolebindings')
 					},
 					{
 						title: m.resource_quota(),
-						url: resourceUrl('ResourceQuota', '', 'v1', 'resourcequotas')
+						url: resourceUrl('', 'v1', 'ResourceQuota', 'resourcequotas')
 					},
 					{
 						title: m.limit_range(),
-						url: resourceUrl('LimitRange', '', 'v1', 'limitranges')
+						url: resourceUrl('', 'v1', 'LimitRange', 'limitranges')
 					}
 				]
 			},
@@ -356,31 +373,31 @@
 				items: [
 					{
 						title: m.node(),
-						url: resourceUrl('Node', '', 'v1', 'nodes')
+						url: resourceUrl('', 'v1', 'Node', 'nodes')
 					},
 					{
 						title: m.event(),
-						url: resourceUrl('Event', '', 'v1', 'events')
+						url: resourceUrl('', 'v1', 'Event', 'events')
 					},
 					{
 						title: m.custom_resource_definition(),
 						url: resourceUrl(
-							'CustomResourceDefinition',
 							'apiextensions.k8s.io',
 							'v1',
+							'CustomResourceDefinition',
 							'customresourcedefinitions'
 						)
 					},
 					{
 						title: m.cluster_role(),
-						url: resourceUrl('ClusterRole', 'rbac.authorization.k8s.io', 'v1', 'clusterroles')
+						url: resourceUrl('rbac.authorization.k8s.io', 'v1', 'ClusterRole', 'clusterroles')
 					},
 					{
 						title: m.cluster_role_binding(),
 						url: resourceUrl(
-							'ClusterRoleBinding',
 							'rbac.authorization.k8s.io',
 							'v1',
+							'ClusterRoleBinding',
 							'clusterrolebindings'
 						)
 					}
@@ -398,13 +415,13 @@
 
 <Sidebar.Provider>
 	<Sidebar.Root id="sidebar-guide-step" collapsible="icon" variant="inset" class="p-3">
-		{#if activeScope && isMounted}
+		{#if activeCluster && isMounted}
 			<Sidebar.Header id="workspace-guide-step">
 				<WorkspaceSwitcher
-					cluster={activeScope}
+					cluster={activeCluster}
 					{workspaces}
 					user={data.user}
-					onsuccess={() => fetchWorkspaces(activeScope)}
+					onsuccess={() => fetchWorkspaces(activeCluster)}
 				/>
 			</Sidebar.Header>
 			<Sidebar.Content class="gap-2">
@@ -479,7 +496,7 @@
 						<DropdownMenu.Group>
 							<DropdownMenu.Label>{m.cluster()}</DropdownMenu.Label>
 							<DropdownMenu.Separator />
-							<DropdownMenu.RadioGroup bind:value={activeScope} {onValueChange}>
+							<DropdownMenu.RadioGroup bind:value={activeCluster} {onValueChange}>
 								{#each links as link, index (index)}
 									<DropdownMenu.RadioItem value={link.cluster}
 										>{link.cluster}</DropdownMenu.RadioItem

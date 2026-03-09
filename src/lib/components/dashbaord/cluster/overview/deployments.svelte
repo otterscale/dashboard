@@ -9,14 +9,14 @@
 
 	let {
 		prometheusDriver,
-		scope,
+		cluster,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 
 	let deployments: SampleValue | undefined = $state(undefined);
 	async function fetchdeployments() {
 		const response = await prometheusDriver.instantQuery(
-			`count(kube_deployment_created{juju_model="${scope}", container!=""})`
+			`count(kube_deployment_created{juju_model="${cluster}", container!=""})`
 		);
 		deployments = response.result[0]?.value ?? undefined;
 	}

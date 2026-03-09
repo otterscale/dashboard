@@ -15,43 +15,43 @@
 
 	let {
 		client,
-		scope,
+		cluster,
 		isReloading = $bindable()
-	}: { client: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: { client: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 </script>
 
 <div class="grid auto-rows-auto grid-cols-2 gap-5 pt-4 md:grid-cols-4 lg:grid-cols-10">
 	<div class="col-span-2">
-		<TextClusterHealth {client} {scope} bind:isReloading />
+		<TextClusterHealth {client} {cluster} bind:isReloading />
 	</div>
 	<div class="col-span-2">
-		<TextTimeTillFull {client} {scope} bind:isReloading />
+		<TextTimeTillFull {client} {cluster} bind:isReloading />
 	</div>
 	<div class="col-span-2 row-span-2">
-		<UsageCapacity {client} {scope} bind:isReloading />
+		<UsageCapacity {client} {cluster} bind:isReloading />
 	</div>
 	<div class="col-span-2 row-span-2">
-		<AreaCapacity {client} {scope} bind:isReloading />
+		<AreaCapacity {client} {cluster} bind:isReloading />
 	</div>
 	<div class="col-span-2 row-span-2">
-		<PieOSDType {client} {scope} bind:isReloading />
+		<PieOSDType {client} {cluster} bind:isReloading />
 	</div>
 	<div class="col-span-2">
-		<TextQuorum {client} {scope} bind:isReloading />
+		<TextQuorum {client} {cluster} bind:isReloading />
 	</div>
 	<div class="col-span-2">
-		<TextOSDs {client} {scope} bind:isReloading />
+		<TextOSDs {client} {cluster} bind:isReloading />
 	</div>
 	<div class="col-span-4 row-span-2">
-		<BarOSDThroughtput {client} {scope} bind:isReloading />
+		<BarOSDThroughtput {client} {cluster} bind:isReloading />
 	</div>
 	<div class="col-span-4 row-span-2">
-		<BarOSDIOPS {client} {scope} bind:isReloading />
+		<BarOSDIOPS {client} {cluster} bind:isReloading />
 	</div>
 	<div class="col-span-2">
-		<AreaOSDReadLatency {client} {scope} bind:isReloading />
+		<AreaOSDReadLatency {client} {cluster} bind:isReloading />
 	</div>
 	<div class="col-span-2">
-		<AreaOSDWriteLatency {client} {scope} bind:isReloading />
+		<AreaOSDWriteLatency {client} {cluster} bind:isReloading />
 	</div>
 </div>

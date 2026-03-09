@@ -15,9 +15,9 @@
 	// Props
 	let {
 		client,
-		scope,
+		cluster,
 		isReloading = $bindable()
-	}: { client: PrometheusDriver; scope: string; isReloading: boolean } = $props();
+	}: { client: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 
 	// Constants
 	const CHART_TITLE = 'OSD IOPS';
@@ -63,8 +63,8 @@
 
 	// Derived state
 	const queries = $derived({
-		Read: `sum(irate(ceph_osd_op_r{juju_model="${scope}"}[1h]))`,
-		Write: `sum(irate(ceph_osd_op_w{juju_model="${scope}"}[1h]))`
+		Read: `sum(irate(ceph_osd_op_r{juju_model="${cluster}"}[1h]))`,
+		Write: `sum(irate(ceph_osd_op_w{juju_model="${cluster}"}[1h]))`
 	});
 
 	const activeSeries = $derived([

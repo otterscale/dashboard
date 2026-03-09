@@ -2,10 +2,20 @@
 	import LayersIcon from '@lucide/svelte/icons/layers';
 	import { onMount } from 'svelte';
 
+	import { resolve } from '$app/paths';
 	import { startTour } from '$lib/components/layout';
 	import { useSidebar } from '$lib/components/ui/sidebar';
 	import { m } from '$lib/paraglide/messages';
+	import { breadcrumbs } from '$lib/stores';
 	import { cn } from '$lib/utils';
+
+	// Set breadcrumbs navigation
+	breadcrumbs.set([
+		{
+			title: m.console(),
+			url: resolve('/(auth)/console')
+		}
+	]);
 
 	const STORAGE_KEY = 'otterscale_tutorial';
 	const sidebar = useSidebar();

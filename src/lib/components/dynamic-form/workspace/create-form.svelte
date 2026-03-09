@@ -1,12 +1,10 @@
 <script lang="ts">
-	import { toJson } from '@bufbuild/protobuf';
-	import { StructSchema } from '@bufbuild/protobuf/wkt';
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext, onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import { page } from '$app/state';
-	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import {
 		type GroupedFields,
 		type K8sOpenAPISchema,
@@ -22,7 +20,7 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-	const cluster = $derived(page.params.cluster ?? page.params.scope ?? ''); // TODO: Change to cluster after the URL refactor completes.
+	const cluster = $derived(page.params.cluster ?? '');
 
 	let apiSchema: K8sOpenAPISchema | undefined = $state();
 	let isSubmitting = $state(false);
@@ -202,7 +200,7 @@
 				kind: 'Workspace'
 			});
 			// Convert Protobuf Struct to plain JSON object
-			apiSchema = toJson(StructSchema, res) as K8sOpenAPISchema;
+			apiSchema = (res.schema ?? {}) as K8sOpenAPISchema;
 		} catch (err) {
 			console.error('Failed to fetch workspace schema:', err);
 			toast.error(`Failed to fetch workspace schema: ${(err as ConnectError).message}`);
