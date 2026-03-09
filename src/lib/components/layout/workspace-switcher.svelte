@@ -68,7 +68,7 @@
 			const found = workspaces.find((w) => w.metadata?.name === $activeWorkspaceName);
 			if (found) return found;
 		}
-		return workspaces[0];
+		return undefined;
 	});
 
 	let createWorkspaceOpen = $state(false);
@@ -140,7 +140,12 @@
 	}
 
 	$effect(() => {
-		if (!activeWorkspace) return;
+		if (!activeWorkspace) {
+			activeNamespace.set('');
+			activeWorkspaceName.set('');
+			role.set('');
+			return;
+		}
 
 		activeNamespace.set(activeWorkspace.spec.namespace);
 		activeWorkspaceName.set(activeWorkspace.metadata?.name ?? '');

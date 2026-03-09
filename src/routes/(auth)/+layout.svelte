@@ -2,34 +2,21 @@
 	import 'driver.js/dist/driver.css';
 
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import BotIcon from '@lucide/svelte/icons/bot';
-	import BoxIcon from '@lucide/svelte/icons/box';
-	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
-	import CloudBackupIcon from '@lucide/svelte/icons/cloud-backup';
-	import CodeIcon from '@lucide/svelte/icons/code';
-	import CombineIcon from '@lucide/svelte/icons/combine';
-	import CpuIcon from '@lucide/svelte/icons/cpu';
-	import DatabaseIcon from '@lucide/svelte/icons/database';
-	import DumbbellIcon from '@lucide/svelte/icons/dumbbell';
-	import FlagIcon from '@lucide/svelte/icons/flag';
-	import GaugeIcon from '@lucide/svelte/icons/gauge';
-	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
-	import HelpCircleIcon from '@lucide/svelte/icons/help-circle';
-	import HouseIcon from '@lucide/svelte/icons/house';
-	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
-	import MapIcon from '@lucide/svelte/icons/map';
-	import NetworkIcon from '@lucide/svelte/icons/network';
-	import PcCaseIcon from '@lucide/svelte/icons/pc-case';
-	import PlusIcon from '@lucide/svelte/icons/plus';
-	import ScaleIcon from '@lucide/svelte/icons/scale';
-	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
-	import ShipIcon from '@lucide/svelte/icons/ship';
-	import TelescopeIcon from '@lucide/svelte/icons/telescope';
-	import TerminalIcon from '@lucide/svelte/icons/terminal';
-	import UnplugIcon from '@lucide/svelte/icons/unplug';
-	import UsersIcon from '@lucide/svelte/icons/users';
-	import WorkflowIcon from '@lucide/svelte/icons/workflow';
-	import ZapIcon from '@lucide/svelte/icons/zap';
+	import {
+		BotIcon,
+		BoxIcon,
+		BracesIcon,
+		CircleQuestionMarkIcon,
+		CompassIcon,
+		CpuIcon,
+		FileTextIcon,
+		HardDriveIcon,
+		InfoIcon,
+		LayersIcon,
+		LayoutGridIcon,
+		NetworkIcon,
+		UserStarIcon
+	} from '@lucide/svelte';
 	import { type Link, LinkService } from '@otterscale/api/link/v1';
 	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import { getContext, onMount, type Snippet } from 'svelte';
@@ -38,18 +25,17 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { env } from '$env/dynamic/public';
 	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
 	import {
-		NavGeneral,
+		DialogAbout,
 		NavMain,
-		NavOverview,
 		NavSecondary,
 		NavUser,
 		startTour,
 		WorkspaceSwitcher
 	} from '$lib/components/layout';
 	import DialogImportCluster from '$lib/components/layout/dialog-import-cluster.svelte';
-	import { globalRoutes, platformRoutes } from '$lib/components/layout/routes';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -78,7 +64,7 @@
 	let activeScope = $state(page.params.scope ?? page.params.cluster ?? ''); //TODO: remove page.params.scope after route updated
 	let links = $state<Link[]>([]);
 	let workspaces = $state<TenantOtterscaleIoV1Alpha1Workspace[]>([]);
-	let next = $state(false);
+	let aboutOpen = $state(false);
 	let openImportCluster = $state(false);
 
 	async function fetchClusters() {
@@ -107,12 +93,8 @@
 
 	async function onValueChange(cluster: string) {
 		await fetchWorkspaces(cluster);
-		await goto(resolve('/(auth)/scope/[scope]', { scope: cluster }));
+		await goto(resolve('/(auth)/scope/[scope]/workspace', { scope: cluster }));
 		toast.success(m.switch_scope({ name: cluster }));
-	}
-
-	async function onHomeClick() {
-		await goto(resolve('/(auth)/scope/[scope]', { scope: activeScope }));
 	}
 
 	let isMounted = $state(false);
@@ -126,373 +108,280 @@
 		isMounted = true;
 	});
 
+	function onAboutClick() {
+		aboutOpen = true;
+	}
+
+	function resourceUrl(kind: string, group: string, version: string, resource: string) {
+		return resolve(
+			`/(auth)/${activeScope}/${kind}?group=${group}&version=${version}&namespace=${$activeNamespace}&resource=${resource}`
+		);
+	}
+
 	const navData = $derived({
-		overview: [
+		managed: [
 			{
-				name: m.workspace(),
-				url: resolve(
-					`/(auth)/${activeScope}/Workspace?group=tenant.otterscale.io&version=v1alpha1&namespace=${$activeNamespace}&resource=workspaces`
-				),
-				icon: MapIcon,
-				edit: false
+				title: m.overview(),
+				url: resolve('/(auth)/scope/[scope]/workspace', { scope: activeScope }),
+				icon: CompassIcon
 			},
 			{
-				name: m.resource_quota(),
-				url: resolve(
-					`/(auth)/${activeScope}/ResourceQuota?group=&version=v1&namespace=${$activeNamespace}&resource=resourcequotas`
-				),
-				icon: BoxIcon,
-				edit: false
-			}
-		],
-		aiStudio: [
-			{
-				title: 'Inference',
-				url: '#',
+				title: m.ai_studio(),
 				icon: BotIcon,
+				isActive: true,
 				items: [
 					{
-						title: 'Model',
-						url: '#',
-						disabled: true
-					}
-				]
-			},
-			{
-				title: 'Training',
-				url: '#',
-				icon: DumbbellIcon,
-				items: [
-					{
-						title: 'Finetune Job',
-						url: '#',
-						disabled: true
+						title: m.dashboard(),
+						url: resolve('/(auth)/scope/[scope]/models', { scope: activeScope })
 					},
 					{
-						title: 'Dataset',
-						url: '#',
-						disabled: true
+						title: m.model(),
+						url: resourceUrl('ModelService', 'model.otterscale.io', 'v1alpha1', 'modelservices')
+					},
+					{
+						title: m.artifact(),
+						url: resourceUrl('ModelArtifact', 'model.otterscale.io', 'v1alpha1', 'modelartifacts')
 					}
 				]
 			},
 			{
-				title: 'Notebooks',
-				url: '#',
-				icon: TerminalIcon,
-				items: [
-					{
-						title: 'Jupyter',
-						url: '#',
-						disabled: true
-					}
-				]
-			}
-		],
-		applications: [
-			{
-				title: 'Hub',
-				url: '#',
+				title: m.apps(),
 				icon: LayoutGridIcon,
+				isActive: true,
 				items: [
 					{
-						title: 'Release',
-						url: '#',
-						disabled: true
+						title: m.application(),
+						url: resourceUrl('Application', 'workload.otterscale.io', 'v1alpha1', 'applications')
 					},
 					{
-						title: 'Chart',
-						url: '#',
-						disabled: true
+						title: m.release(),
+						url: resourceUrl('HelmRelease', 'helm.toolkit.fluxcd.io', 'v2', 'helmreleases')
+					},
+					{
+						title: m.hub(),
+						url: '#'
 					}
 				]
 			},
 			{
-				title: 'Cloud IDE',
-				url: '#',
-				icon: CodeIcon,
-				items: [
-					{
-						title: 'Coder',
-						url: '#',
-						disabled: true
-					}
-				]
-			},
-			{
-				title: 'Database',
-				url: '#',
-				icon: DatabaseIcon,
-				items: [
-					{
-						title: 'Postgres',
-						url: '#',
-						disabled: true
-					},
-					{
-						title: 'Redis',
-						url: '#',
-						disabled: true
-					}
-				]
-			},
-			{
-				title: 'Workflow',
-				url: '#',
-				icon: WorkflowIcon,
-				items: [
-					{
-						title: 'Pipeline',
-						url: '#',
-						disabled: true
-					},
-					{
-						title: 'Task',
-						url: '#',
-						disabled: true
-					}
-				]
-			}
-		],
-		resources: [
-			{
-				title: 'Workloads',
-				url: '#',
-				icon: FlagIcon,
-				items: [
-					{
-						title: 'Deployment',
-						url: '#',
-						disabled: true
-					},
-					{
-						title: 'Stateful Set',
-						url: '#',
-						disabled: true
-					},
-					{
-						title: 'Daemon Set',
-						url: '#',
-						disabled: true
-					},
-					{
-						title: 'Cron Job',
-						url: '#',
-						disabled: true
-					},
-					{
-						title: 'Job',
-						url: '#',
-						disabled: true
-					},
-					{
-						title: 'Pod',
-						url: '#',
-						disabled: true
-					}
-				]
-			},
-			{
-				title: 'Compute',
-				url: '#',
+				title: m.compute(),
 				icon: CpuIcon,
 				items: [
 					{
-						title: 'Virtual Machine',
-						url: '#',
-						disabled: true
-					}
-				]
-			},
-			{
-				title: 'Network',
-				url: '#',
-				icon: NetworkIcon,
-				items: [
-					{
-						title: 'VPC',
-						url: '#',
-						disabled: true
+						title: m.dashboard(),
+						url: resolve('/(auth)/scope/[scope]/compute', { scope: activeScope })
 					},
 					{
-						title: 'Load Balancer',
-						url: '#',
-						disabled: true
+						title: m.virtual_machine(),
+						url: resourceUrl('VirtualMachine', 'kubevirt.io', 'v1', 'virtualmachines')
+					},
+					{
+						title: m.data_volume(),
+						url: resourceUrl('DataVolume', 'cdi.kubevirt.io', 'v1beta1', 'datavolumes')
+					},
+					{
+						title: m.instance_type(),
+						url: resourceUrl(
+							'VirtualMachineInstancetype',
+							'instancetype.kubevirt.io',
+							'v1beta1',
+							'virtualmachineinstancetypes'
+						)
 					}
 				]
 			},
 			{
-				title: 'Storage',
-				url: '#',
+				title: m.storage(),
 				icon: HardDriveIcon,
 				items: [
 					{
-						title: 'Block Pool',
-						url: '#',
-						disabled: true
+						title: m.dashboard(),
+						url: resolve('/(auth)/scope/[scope]/storage', { scope: activeScope })
 					},
 					{
-						title: 'File System',
-						url: '#',
-						disabled: true
+						title: m.block_pool(),
+						url: resourceUrl('CephBlockPool', 'ceph.rook.io', 'v1', 'cephblockpools')
+					},
+					{
+						title: m.file_system(),
+						url: resourceUrl('CephFilesystem', 'ceph.rook.io', 'v1', 'cephfilesystems')
+					},
+					{
+						title: m.object_store(),
+						url: resourceUrl('CephObjectStore', 'ceph.rook.io', 'v1', 'cephobjectstores')
+					}
+				]
+			},
+			{
+				title: m.administration(),
+				icon: UserStarIcon,
+				isActive: true,
+				items: [
+					{
+						title: m.workspace(),
+						url: resourceUrl('Workspace', 'tenant.otterscale.io', 'v1alpha1', 'workspaces')
+					},
+					{
+						title: m.module(),
+						url: resourceUrl('Module', 'module.otterscale.io', 'v1alpha1', 'modules')
 					}
 				]
 			}
 		],
-		governance: [
+		native: [
 			{
-				title: 'Tenant',
-				url: '#',
-				icon: UsersIcon,
+				title: m.overview(),
+				url: resolve('/(auth)/scope/[scope]/kubernetes', { scope: activeScope }),
+				icon: CompassIcon
+			},
+			{
+				title: m.workloads(),
+				icon: BoxIcon,
+				isActive: true,
 				items: [
 					{
-						title: 'Workspace',
-						url: '#',
-						disabled: true
+						title: m.deployment(),
+						url: resourceUrl('Deployment', 'apps', 'v1', 'deployments')
 					},
 					{
-						title: 'User',
-						url: '#',
-						disabled: true
+						title: m.stateful_set(),
+						url: resourceUrl('StatefulSet', 'apps', 'v1', 'statefulsets')
+					},
+					{
+						title: m.daemon_set(),
+						url: resourceUrl('DaemonSet', 'apps', 'v1', 'daemonsets')
+					},
+					{
+						title: m.cronjob(),
+						url: resourceUrl('CronJob', 'batch', 'v1', 'cronjobs')
+					},
+					{
+						title: m.job(),
+						url: resourceUrl('Job', 'batch', 'v1', 'jobs')
+					},
+					{
+						title: m.pod(),
+						url: resourceUrl('Pod', '', 'v1', 'pods')
 					}
 				]
 			},
 			{
-				title: 'Policy',
-				url: '#',
-				icon: ScaleIcon,
+				title: m.configuration(),
+				icon: FileTextIcon,
 				items: [
 					{
-						title: 'Policy',
-						url: '#',
-						disabled: true
+						title: m.config_map(),
+						url: resourceUrl('ConfigMap', '', 'v1', 'configmaps')
 					},
 					{
-						title: 'Compliance',
-						url: '#',
-						disabled: true
+						title: m.secret(),
+						url: resourceUrl('Secret', '', 'v1', 'secrets')
 					}
 				]
 			},
 			{
-				title: 'Metering',
-				url: '#',
-				icon: GaugeIcon,
+				title: m.networking(),
+				icon: NetworkIcon,
 				items: [
 					{
-						title: 'Budget',
-						url: '#',
-						disabled: true
+						title: m.service(),
+						url: resourceUrl('Service', '', 'v1', 'services')
 					},
 					{
-						title: 'Usage',
-						url: '#',
-						disabled: true
+						title: m.http_route(),
+						url: resourceUrl('HTTPRoute', 'gateway.networking.k8s.io', 'v1', 'httproutes')
+					},
+					{
+						title: m.gateway(),
+						url: resourceUrl('Gateway', 'gateway.networking.k8s.io', 'v1', 'gateways')
+					},
+					{
+						title: m.network_policy(),
+						url: resourceUrl('NetworkPolicy', 'networking.k8s.io', 'v1', 'networkpolicies')
 					}
 				]
 			},
 			{
-				title: 'Audit',
-				url: '#',
-				icon: ShieldCheckIcon,
+				title: m.storage(),
+				icon: HardDriveIcon,
 				items: [
 					{
-						title: 'Trail',
-						url: '#',
-						disabled: true
+						title: m.persistent_volume_claim(),
+						url: resourceUrl('PersistentVolumeClaim', '', 'v1', 'persistentvolumeclaims')
 					},
 					{
-						title: 'Log',
-						url: '#',
-						disabled: true
-					}
-				]
-			}
-		],
-		reliability: [
-			{
-				title: 'Telemetry',
-				url: '#',
-				icon: TelescopeIcon,
-				items: [
-					{
-						title: 'Collector',
-						url: '#',
-						disabled: true
+						title: m.persistent_volume(),
+						url: resourceUrl('PersistentVolume', '', 'v1', 'persistentvolumes')
 					},
 					{
-						title: 'Rule',
-						url: '#',
-						disabled: true
+						title: m.storage_class(),
+						url: resourceUrl('StorageClass', 'storage.k8s.io', 'v1', 'storageclasses')
 					}
 				]
 			},
 			{
-				title: 'Recovery',
-				url: '#',
-				icon: CloudBackupIcon,
+				title: m.namespaced(),
+				icon: BracesIcon,
 				items: [
 					{
-						title: 'Backup',
-						url: '#',
-						disabled: true
+						title: m.namespace(),
+						url: resourceUrl('Namespace', '', 'v1', 'namespaces')
 					},
 					{
-						title: 'Restore',
-						url: '#',
-						disabled: true
-					}
-				]
-			}
-		],
-		system: [
-			{
-				title: 'Fleet',
-				url: '#',
-				icon: ShipIcon,
-				items: [
-					{
-						title: 'Cluster',
-						url: '#',
-						disabled: true
+						title: m.service_account(),
+						url: resourceUrl('ServiceAccount', '', 'v1', 'serviceaccounts')
 					},
 					{
-						title: 'Config',
-						url: '#',
-						disabled: true
+						title: m.role(),
+						url: resourceUrl('Role', 'rbac.authorization.k8s.io', 'v1', 'roles')
 					},
 					{
-						title: 'Image',
-						url: '#',
-						disabled: true
+						title: m.role_binding(),
+						url: resourceUrl('RoleBinding', 'rbac.authorization.k8s.io', 'v1', 'rolebindings')
+					},
+					{
+						title: m.resource_quota(),
+						url: resourceUrl('ResourceQuota', '', 'v1', 'resourcequotas')
+					},
+					{
+						title: m.limit_range(),
+						url: resourceUrl('LimitRange', '', 'v1', 'limitranges')
 					}
 				]
 			},
 			{
-				title: 'Metal',
-				url: '#',
-				icon: PcCaseIcon,
+				title: m.cluster(),
+				icon: LayersIcon,
 				items: [
 					{
-						title: 'Server',
-						url: '#',
-						disabled: true
-					}
-				]
-			},
-			{
-				title: 'Tunnels',
-				url: '#',
-				icon: UnplugIcon,
-				items: [
-					{
-						title: 'Server',
-						url: '#',
-						disabled: true
+						title: m.node(),
+						url: resourceUrl('Node', '', 'v1', 'nodes')
 					},
 					{
-						title: 'Client',
-						url: '#',
-						disabled: true
+						title: m.event(),
+						url: resourceUrl('Event', '', 'v1', 'events')
+					},
+					{
+						title: m.custom_resource_definition(),
+						url: resourceUrl(
+							'CustomResourceDefinition',
+							'apiextensions.k8s.io',
+							'v1',
+							'customresourcedefinitions'
+						)
+					},
+					{
+						title: m.cluster_role(),
+						url: resourceUrl('ClusterRole', 'rbac.authorization.k8s.io', 'v1', 'clusterroles')
+					},
+					{
+						title: m.cluster_role_binding(),
+						url: resourceUrl(
+							'ClusterRoleBinding',
+							'rbac.authorization.k8s.io',
+							'v1',
+							'clusterrolebindings'
+						)
 					}
 				]
 			}
@@ -503,6 +392,8 @@
 <svelte:head>
 	<title>{current ? `${current.title} - OtterScale` : 'OtterScale'}</title>
 </svelte:head>
+
+<DialogAbout bind:open={aboutOpen} />
 
 <Sidebar.Provider>
 	<Sidebar.Root id="sidebar-guide-step" collapsible="icon" variant="inset" class="p-3">
@@ -516,76 +407,26 @@
 				/>
 			</Sidebar.Header>
 			<Sidebar.Content class="gap-2">
-				<NavOverview items={navData.overview} />
-				{#if next}
-					<NavMain label="AI Studio" items={navData.aiStudio} />
-					<NavMain label="Applications" items={navData.applications} />
-					<NavMain label="Resources" items={navData.resources} />
-					<NavMain label="Governance" items={navData.governance} />
-					<NavMain label="Reliability" items={navData.reliability} />
-					<NavMain label="System" items={navData.system} />
+				{#if $activeNamespace}
+					<NavMain
+						managedLabel={m.managed()}
+						managedItems={navData.managed}
+						nativeLabel={m.native()}
+						nativeItems={navData.native}
+					/>
 				{:else}
-					<NavGeneral title={m.platform()} routes={platformRoutes(activeScope, $activeNamespace)} />
-					<NavGeneral title={m.global()} routes={globalRoutes()} />
+					{@render contentSkeleton()}
 				{/if}
 			</Sidebar.Content>
-			<Button
-				class="mx-auto w-full text-xs text-muted-foreground"
-				variant="link"
-				onclick={() => (next = !next)}
-			>
-				{#if next}
-					<ChevronLeftIcon class="size-3.5" />
-					{m.switch_to_classic()}
-				{:else}
-					<ZapIcon class="size-3.5" />
-					{m.try_next_version()}
-				{/if}
-			</Button>
 		{:else}
 			<Sidebar.Header id="workspace-guide-step">
-				<div class="flex h-12 w-full items-center gap-2 overflow-hidden rounded-md p-2">
-					<Skeleton class="size-8 bg-foreground/10" />
-					<div class="space-y-2">
-						<Skeleton class="h-3 w-36 bg-foreground/10" />
-						<Skeleton class="h-2 w-12 bg-foreground/10" />
-					</div>
-				</div>
+				{@render headerSkeleton()}
 			</Sidebar.Header>
 			<Sidebar.Content class="gap-2">
-				<div class="relative flex w-full min-w-0 flex-col space-y-4 px-4 py-2">
-					<Skeleton class="h-3 w-8 bg-foreground/10" />
-					<div class="flex items-center space-x-2">
-						<Skeleton class="h-4 w-4 bg-foreground/10" />
-						<Skeleton class="h-4 w-32 bg-foreground/10" />
-					</div>
-					<div class="flex items-center space-x-2">
-						<Skeleton class="h-4 w-4 bg-foreground/10" />
-						<Skeleton class="h-4 w-32 bg-foreground/10" />
-					</div>
-					<div class="flex items-center space-x-2">
-						<Skeleton class="h-4 w-4 bg-foreground/10" />
-						<Skeleton class="h-4 w-32 bg-foreground/10" />
-					</div>
-				</div>
-				<div class="relative flex w-full min-w-0 flex-col space-y-4 px-4 py-2">
-					<Skeleton class="h-3 w-8 bg-foreground/10" />
-					<div class="flex items-center space-x-2">
-						<Skeleton class="h-4 w-4 bg-foreground/10" />
-						<Skeleton class="h-4 w-32 bg-foreground/10" />
-					</div>
-					<div class="flex items-center space-x-2">
-						<Skeleton class="h-4 w-4 bg-foreground/10" />
-						<Skeleton class="h-4 w-32 bg-foreground/10" />
-					</div>
-					<div class="flex items-center space-x-2">
-						<Skeleton class="h-4 w-4 bg-foreground/10" />
-						<Skeleton class="h-4 w-32 bg-foreground/10" />
-					</div>
-				</div>
+				{@render contentSkeleton()}
 			</Sidebar.Content>
 		{/if}
-		<NavSecondary />
+		<NavSecondary harborUrl={env.PUBLIC_HARBOR_URL} />
 		<Sidebar.Footer>
 			<NavUser user={data.user} />
 		</Sidebar.Footer>
@@ -616,15 +457,19 @@
 				</Breadcrumb.Root>
 			</div>
 			<div class="flex items-center gap-2 px-4">
+				<Button variant="ghost" size="icon" class="size-7" onclick={onAboutClick}>
+					<InfoIcon />
+					<span class="sr-only">About</span>
+				</Button>
 				<Button variant="ghost" size="icon" class="size-7" onclick={startTour}>
-					<HelpCircleIcon />
-					<span class="sr-only">Help</span>
+					<CircleQuestionMarkIcon />
+					<span class="sr-only">Guide Tour</span>
 				</Button>
 				<DropdownMenu.Root>
 					<DropdownMenu.Trigger>
 						{#snippet child({ props })}
 							<Button {...props} id="cluster-guide-step" variant="ghost" size="icon" class="size-7">
-								<CombineIcon />
+								<LayersIcon />
 								<span class="sr-only">Toggle Clusters</span>
 							</Button>
 						{/snippet}
@@ -650,10 +495,6 @@
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
 				<DialogImportCluster bind:open={openImportCluster} onsuccess={fetchClusters} />
-				<Button variant="ghost" size="icon" class="size-7" onclick={onHomeClick}>
-					<HouseIcon />
-					<span class="sr-only">Back to Home</span>
-				</Button>
 			</div>
 		</header>
 		<main class="flex flex-1 flex-col px-2 md:px-4 lg:px-8">
@@ -661,3 +502,46 @@
 		</main>
 	</Sidebar.Inset>
 </Sidebar.Provider>
+
+{#snippet headerSkeleton()}
+	<div class="flex h-12 w-full items-center gap-2 overflow-hidden rounded-md p-2">
+		<Skeleton class="size-8 bg-foreground/10" />
+		<div class="space-y-2">
+			<Skeleton class="h-3 w-36 bg-foreground/10" />
+			<Skeleton class="h-2 w-12 bg-foreground/10" />
+		</div>
+	</div>
+{/snippet}
+
+{#snippet contentSkeleton()}
+	<div class="relative flex w-full min-w-0 flex-col space-y-4 px-4 py-2">
+		<Skeleton class="h-3 w-8 bg-foreground/10" />
+		<div class="flex items-center space-x-2">
+			<Skeleton class="h-4 w-4 bg-foreground/10" />
+			<Skeleton class="h-4 w-32 bg-foreground/10" />
+		</div>
+		<div class="flex items-center space-x-2">
+			<Skeleton class="h-4 w-4 bg-foreground/10" />
+			<Skeleton class="h-4 w-32 bg-foreground/10" />
+		</div>
+		<div class="flex items-center space-x-2">
+			<Skeleton class="h-4 w-4 bg-foreground/10" />
+			<Skeleton class="h-4 w-32 bg-foreground/10" />
+		</div>
+	</div>
+	<div class="relative flex w-full min-w-0 flex-col space-y-4 px-4 py-2">
+		<Skeleton class="h-3 w-8 bg-foreground/10" />
+		<div class="flex items-center space-x-2">
+			<Skeleton class="h-4 w-4 bg-foreground/10" />
+			<Skeleton class="h-4 w-32 bg-foreground/10" />
+		</div>
+		<div class="flex items-center space-x-2">
+			<Skeleton class="h-4 w-4 bg-foreground/10" />
+			<Skeleton class="h-4 w-32 bg-foreground/10" />
+		</div>
+		<div class="flex items-center space-x-2">
+			<Skeleton class="h-4 w-4 bg-foreground/10" />
+			<Skeleton class="h-4 w-32 bg-foreground/10" />
+		</div>
+	</div>
+{/snippet}
