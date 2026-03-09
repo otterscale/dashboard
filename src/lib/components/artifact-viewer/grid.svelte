@@ -208,7 +208,7 @@
 							</AlertDialog.Content>
 						</AlertDialog.Root>
 					</Item.Actions>
-				{:catch error}
+				{:catch}
 					<Button disabled variant="ghost" size="icon" title="Failed to load chart information">
 						<DownloadIcon class="text-destructive" />
 					</Button>
