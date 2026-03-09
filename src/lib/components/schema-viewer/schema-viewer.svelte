@@ -1,12 +1,12 @@
 <script lang="ts">
-	import * as Code from '$lib/components/custom/code';
-	import * as HoverCard from '$lib/components/ui/hover-card/index.js';
+	import { stringify } from 'yaml';
 
+	import * as Code from '$lib/components/custom/code';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb/index.js';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import * as HoverCard from '$lib/components/ui/hover-card/index.js';
 	import * as Item from '$lib/components/ui/item';
-	import { stringify } from 'yaml';
 	import { cn } from '$lib/utils';
 
 	let { schema: jsonSchema, class: className }: { schema: any; class?: string } = $props();
