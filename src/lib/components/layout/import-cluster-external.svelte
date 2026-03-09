@@ -5,7 +5,6 @@
 	import { getContext, onDestroy } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
-	import { ScopeService } from '$lib/api/scope/v1/scope_pb';
 	import * as Code from '$lib/components/custom/code';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
@@ -25,13 +24,10 @@
 
 	const transport: Transport = getContext('transport');
 	const linkClient = createClient(LinkService, transport);
-	const scopeClient = createClient(ScopeService, transport);
 
 	let clusterName = $state('');
 	let installUrl = $state('');
 	let clusterStatus = $state<'pending' | 'ready'>('pending');
-	let isBinding = $state(false);
-	let bindingSuccess = $state(false);
 	let isCreating = $state(false);
 	let errorMessage = $state('');
 
@@ -76,7 +72,7 @@
 			stepIndex = 2; // Move to Deploy
 
 			toast.success(`Agent manifest generated for "${clusterName}"`);
-			pollAndBind(); // Imperative trigger instead of $effect
+			pollForConnection(); // Imperative trigger instead of $effect
 		} catch (e) {
 			if (e instanceof ConnectError) {
 				errorMessage = e.message;
@@ -89,7 +85,7 @@
 		}
 	}
 
-	async function pollAndBind() {
+	async function pollForConnection() {
 		if (isPolling) return;
 		isPolling = true;
 
@@ -105,7 +101,7 @@
 				const found = response.links.some((link: Link) => link.cluster === clusterName);
 				if (found) {
 					clusterStatus = 'ready';
-					await execBinding();
+					stepIndex = 3; // Move to Verify step immediately upon connection
 					break;
 				}
 			} catch {
@@ -116,26 +112,6 @@
 			}
 		}
 		isPolling = false;
-	}
-
-	async function execBinding() {
-		stepIndex = 3; // Move to Verify
-		isBinding = true;
-		errorMessage = '';
-		try {
-			await scopeClient.createScope({ name: clusterName });
-			bindingSuccess = true;
-			toast.success(`Scope "${clusterName}" created`);
-		} catch (e) {
-			if (e instanceof ConnectError) {
-				errorMessage = e.message;
-			} else {
-				errorMessage = e instanceof Error ? e.message : 'Failed to create scope';
-			}
-			toast.error(errorMessage);
-		} finally {
-			isBinding = false;
-		}
 	}
 </script>
 
@@ -165,7 +141,7 @@
 		{:else if stepIndex === 2}
 			<div></div>
 			<div></div>
-		{:else if stepIndex === 3 && bindingSuccess}
+		{:else if stepIndex === 3}
 			<div></div>
 			<Button onclick={onFinish}>Done</Button>
 		{:else}
@@ -253,65 +229,32 @@
 		</div>
 
 		<div class="flex flex-col items-center justify-center gap-5">
-			{#if isBinding}
-				<div class="relative">
-					<div
-						class="h-14 w-14 animate-spin rounded-full border-4 border-muted border-t-primary"
-					></div>
-					<div class="absolute inset-0 flex items-center justify-center">
-						<Icon icon="ph:shield-check" class="size-6 text-primary" />
+			<div
+				class="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 ring-4 ring-primary/5"
+			>
+				<Icon icon="ph:check-circle-fill" class="size-8 text-primary" />
+			</div>
+			<div class="space-y-1 text-center">
+				<h3 class="text-xl font-bold text-foreground">Cluster Connected</h3>
+				<p class="text-sm text-muted-foreground">
+					<strong>{clusterName}</strong> is now securely registered.
+				</p>
+			</div>
+			<div class="w-full max-w-sm rounded-lg border bg-card p-3 text-sm shadow-sm">
+				<div class="space-y-2">
+					<div class="flex justify-between">
+						<span class="text-muted-foreground">Cluster</span>
+						<span class="font-medium">{clusterName}</span>
+					</div>
+					<div class="flex justify-between">
+						<span class="text-muted-foreground">Status</span>
+						<span class="flex items-center gap-1.5 font-medium text-primary">
+							<span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
+							Connected
+						</span>
 					</div>
 				</div>
-				<div class="space-y-1 text-center">
-					<h3 class="text-lg font-semibold text-foreground">Creating Scope</h3>
-					<p class="text-sm text-muted-foreground">
-						Registering <code class="rounded bg-muted px-1 py-0.5 font-mono text-xs"
-							>ScopeService.CreateScope</code
-						>
-					</p>
-				</div>
-			{:else if bindingSuccess}
-				<div
-					class="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 ring-4 ring-primary/5"
-				>
-					<Icon icon="ph:check-circle-fill" class="size-8 text-primary" />
-				</div>
-				<div class="space-y-1 text-center">
-					<h3 class="text-xl font-bold text-foreground">Cluster Connected</h3>
-					<p class="text-sm text-muted-foreground">
-						<strong>{clusterName}</strong> is now securely registered.
-					</p>
-				</div>
-				<div class="w-full max-w-sm rounded-lg border bg-card p-3 text-sm shadow-sm">
-					<div class="space-y-2">
-						<div class="flex justify-between">
-							<span class="text-muted-foreground">Cluster</span>
-							<span class="font-medium">{clusterName}</span>
-						</div>
-						<div class="flex justify-between">
-							<span class="text-muted-foreground">Status</span>
-							<span class="flex items-center gap-1.5 font-medium text-primary">
-								<span class="h-1.5 w-1.5 rounded-full bg-primary"></span>
-								Connected
-							</span>
-						</div>
-					</div>
-				</div>
-			{:else}
-				<div
-					class="flex h-14 w-14 items-center justify-center rounded-full bg-destructive/10 ring-4 ring-destructive/5"
-				>
-					<Icon icon="ph:warning-circle" class="size-8 text-destructive" />
-				</div>
-				<div class="space-y-1 text-center">
-					<h3 class="text-lg font-semibold text-destructive">Binding Failed</h3>
-					<p class="max-w-xs text-sm text-muted-foreground">{errorMessage}</p>
-				</div>
-				<Button variant="outline" size="sm" onclick={execBinding}>
-					<Icon icon="ph:arrow-clockwise" class="mr-2 size-4" />
-					Retry Verification
-				</Button>
-			{/if}
+			</div>
 		</div>
 	</div>
 {/snippet}

@@ -30,6 +30,7 @@
 	import UsersIcon from '@lucide/svelte/icons/users';
 	import WorkflowIcon from '@lucide/svelte/icons/workflow';
 	import ZapIcon from '@lucide/svelte/icons/zap';
+	import { type Link, LinkService } from '@otterscale/api/link/v1';
 	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import { getContext, onMount, type Snippet } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -38,7 +39,6 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
-	import { type Scope, ScopeService } from '$lib/api/scope/v1/scope_pb';
 	import {
 		NavGeneral,
 		NavMain,
@@ -72,21 +72,21 @@
 	const current = $derived($breadcrumbs.at(-1));
 
 	const transport: Transport = getContext('transport');
-	const scopeClient = createClient(ScopeService, transport);
+	const linkClient = createClient(LinkService, transport);
 	const resourceClient = createClient(ResourceService, transport);
 
 	let activeScope = $state(page.params.scope ?? page.params.cluster ?? ''); //TODO: remove page.params.scope after route updated
-	let scopes = $state<Scope[]>([]);
+	let links = $state<Link[]>([]);
 	let workspaces = $state<TenantOtterscaleIoV1Alpha1Workspace[]>([]);
 	let next = $state(false);
 	let openImportCluster = $state(false);
 
-	async function fetchScopes() {
+	async function fetchClusters() {
 		try {
-			const response = await scopeClient.listScopes({});
-			scopes = response.scopes.filter((scope) => scope.name !== 'cos');
+			const response = await linkClient.listLinks({});
+			links = response.links.filter((link) => link.cluster !== 'cos');
 		} catch (error) {
-			console.error('Failed to fetch scopes:', error);
+			console.error('Failed to fetch links:', error);
 		}
 	}
 
@@ -117,7 +117,7 @@
 
 	let isMounted = $state(false);
 	onMount(async () => {
-		await fetchScopes();
+		await fetchClusters();
 
 		if (activeScope) {
 			await fetchWorkspaces(activeScope);
@@ -634,8 +634,10 @@
 							<DropdownMenu.Label>{m.cluster()}</DropdownMenu.Label>
 							<DropdownMenu.Separator />
 							<DropdownMenu.RadioGroup bind:value={activeScope} {onValueChange}>
-								{#each scopes as scope, index (index)}
-									<DropdownMenu.RadioItem value={scope.name}>{scope.name}</DropdownMenu.RadioItem>
+								{#each links as link, index (index)}
+									<DropdownMenu.RadioItem value={link.cluster}
+										>{link.cluster}</DropdownMenu.RadioItem
+									>
 								{/each}
 							</DropdownMenu.RadioGroup>
 							<DropdownMenu.Separator />
@@ -647,7 +649,7 @@
 						</DropdownMenu.Group>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
-				<DialogImportCluster bind:open={openImportCluster} onsuccess={fetchScopes} />
+				<DialogImportCluster bind:open={openImportCluster} onsuccess={fetchClusters} />
 				<Button variant="ghost" size="icon" class="size-7" onclick={onHomeClick}>
 					<HouseIcon />
 					<span class="sr-only">Back to Home</span>
