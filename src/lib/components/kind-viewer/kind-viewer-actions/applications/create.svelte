@@ -50,14 +50,14 @@
 		kind,
 		metadata: {},
 		spec: {
-			deployment: { template: { spec: { containers: {} } } },
+			deployment: { replicas: {}, template: { spec: { containers: {} } } },
 			service: {},
 			persistentVolumeClaim: { resources: { requests: {} } }
 		}
 	});
 
 	// Steps Manager
-	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 6 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -151,6 +151,42 @@
 			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
+						...lodash.get(jsonSchema, 'properties.spec.properties.deployment.properties.replicas'),
+						title: 'Replicas'
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={1}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					bind:values={values['spec']['deployment']['replicas']}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+
+			<Tabs.Content value={steps[2]}>
+				<Form
+					schema={{
 						...lodash.omit(
 							lodash.get(
 								jsonSchema,
@@ -188,11 +224,39 @@
 								title: 'Arguments'
 							},
 							env: {
-								...lodash.get(
-									jsonSchema,
-									'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.env'
+								...lodash.omit(
+									lodash.get(
+										jsonSchema,
+										'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.env'
+									),
+									'items'
 								),
-								title: 'Environment Variables'
+								title: 'Environment Variables',
+								items: {
+									...lodash.omit(
+										lodash.get(
+											jsonSchema,
+											'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.env.items'
+										),
+										'properties'
+									),
+									properties: {
+										name: {
+											...lodash.get(
+												jsonSchema,
+												'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.name'
+											),
+											title: 'Name'
+										},
+										value: {
+											...lodash.get(
+												jsonSchema,
+												'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.value'
+											),
+											title: 'Value'
+										}
+									}
+								}
 							},
 							resources: {
 								...lodash.get(
@@ -218,7 +282,13 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						image: ''
+						name: '',
+						image: '',
+						command: [],
+						args: [],
+						env: [],
+						resources: { limits: {}, requests: {} },
+						ports: []
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -242,7 +312,7 @@
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[2]}>
+			<Tabs.Content value={steps[3]}>
 				<Form
 					schema={{
 						...lodash.omit(
@@ -272,7 +342,9 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						ports: []
+						ports: [],
+						selector: {},
+						type: 'ClusterIP'
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -296,7 +368,7 @@
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[3]}>
+			<Tabs.Content value={steps[4]}>
 				<Form
 					schema={{
 						...lodash.get(
@@ -335,7 +407,7 @@
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[4]}>
+			<Tabs.Content value={steps[5]}>
 				<div class="flex h-full flex-col gap-3">
 					<Code.Root lang="yaml" class="w-full" hideLines code={stringify(values, null, 2)} />
 					<Button
