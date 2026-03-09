@@ -56,7 +56,7 @@
 					}
 				]
 			},
-			users: [
+			members: [
 				{
 					subject: page.data.user?.sub,
 					name: `${page.data.user?.name} (${page.data.user?.email || page.data.user?.username})`,
@@ -68,11 +68,11 @@
 
 	// Grouped fields for multi-step form (3 pages)
 	const groupedFields: GroupedFields = {
-		// Step 1: Workspace & Users
-		'Workspace & Users': {
+		// Step 1: Workspace & Members
+		'Workspace & Members': {
 			'metadata.name': { title: 'Workspace Name' },
-			'spec.users': {
-				title: 'Users',
+			'spec.members': {
+				title: 'Members',
 				uiSchema: {
 					items: {
 						'ui:components': {
