@@ -951,5 +951,6 @@
 	"custom_resource_definition": "自訂資源定義",
 	"cluster_role": "Cluster Role",
 	"cluster_role_binding": "Cluster Role Binding",
-	"native": "原生"
+	"native": "原生",
+	"artifact": "產物"
 }
