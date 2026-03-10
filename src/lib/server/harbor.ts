@@ -99,6 +99,35 @@ export async function listArtifacts(
 	return artifacts ?? [];
 }
 
+export async function listModelArtifacts(accessToken: string): Promise<ArtifactType[]> {
+	const modelArtifacts: ArtifactType[] = [];
+
+	try {
+		const projects = await listProjects(accessToken);
+
+		for (const project of projects) {
+			const repositories = await listRepositories(project.name, accessToken);
+
+			for (const repository of repositories) {
+				const [projectName, repositoryName] = repository.name.split('/');
+
+				const artifacts = await listArtifacts(projectName, repositoryName, accessToken);
+
+				const models = artifacts.filter((artifact) => artifact.type === 'MODEL');
+
+				if (models.length > 0) {
+					modelArtifacts.push(...models);
+				}
+			}
+		}
+	} catch (error) {
+		console.error('Fail to fetch models:', error);
+		throw error;
+	}
+
+	return modelArtifacts;
+}
+
 export async function getReferenceAddition(
 	projectName: string,
 	repositoryName: string,
