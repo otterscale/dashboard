@@ -18,7 +18,6 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-	import * as Table from '$lib/components/ui/table/index.js';
 	import { Toggle } from '$lib/components/ui/toggle/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { breadcrumbs } from '$lib/stores';
@@ -69,6 +68,7 @@
 				apiResource.resource === resource
 		)
 	);
+	console.log(selectedAPIResource);
 
 	let clustered = $state(false);
 </script>
@@ -76,48 +76,8 @@
 {#key cluster + group + version + kind}
 	{#await fetchAPIResources(cluster, group, version, kind)}
 		<div class="space-y-4">
-			<div class="space-y-4">
-				<Skeleton class="h-13 w-1/3" />
-				<Skeleton class="h-7 w-1/5" />
-			</div>
-			<div class="flex items-center gap-2">
-				<Skeleton class="h-7 w-full" />
-				{#each Array(3)}
-					<Skeleton class="size-7" />
-				{/each}
-			</div>
-			<div class="rounded-lg border">
-				<Table.Root class="w-full">
-					<Table.Header>
-						<Table.Row>
-							{#each Array(5)}
-								<Table.Head class="p-4">
-									<Skeleton class="h-7 w-full" />
-								</Table.Head>
-							{/each}
-						</Table.Row>
-					</Table.Header>
-					<Table.Body>
-						{#each Array(13)}
-							<Table.Row class="border-none">
-								{#each Array(5)}
-									<Table.Cell>
-										<Skeleton class="h-7 w-full" />
-									</Table.Cell>
-								{/each}
-							</Table.Row>
-						{/each}
-					</Table.Body>
-				</Table.Root>
-			</div>
-			<div class="flex items-center justify-between gap-4">
-				<Skeleton class="h-7 w-1/5" />
-				<div class="flex items-center gap-2">
-					{#each Array(3)}
-						<Skeleton class="size-10" />
-					{/each}
-				</div>
-			</div>
+			<Skeleton class="h-13 w-1/3" />
+			<Skeleton class="h-7 w-1/5" />
 		</div>
 	{:then apiResources}
 		{@const apiResourceOptions = apiResources
@@ -157,33 +117,33 @@
 							<Tooltip.Content>Press to view resources across all namespaces.</Tooltip.Content>
 						</Tooltip.Root>
 					</Tooltip.Provider>
-					<Picker
-						class="w-fit"
-						resource="resource"
-						value={resource}
-						options={apiResourceOptions}
-						onSelect={(option) => {
-							page.url.searchParams.set('resource', option.value);
-							// eslint-disable-next-line svelte/no-navigation-without-resolve
-							goto(page.url.href);
-						}}
-					/>
+					{#if apiResourceOptions.length > 1}
+						<Picker
+							class="w-fit"
+							resource="resource"
+							value={resource}
+							options={apiResourceOptions}
+							onSelect={(option) => {
+								page.url.searchParams.set('resource', option.value);
+								// eslint-disable-next-line svelte/no-navigation-without-resolve
+								goto(page.url.href);
+							}}
+						/>
+					{/if}
 				</div>
 			</div>
 			{#key clustered + resource + namespace}
-				{#if selectedAPIResource}
-					{@const apiResource = selectedAPIResource}
-					<KindViewer
-						{apiResource}
-						{cluster}
-						{group}
-						{version}
-						{kind}
-						{resource}
-						{namespace}
-						{clustered}
-					/>
-				{/if}
+				{@const apiResource = selectedAPIResource}
+				<KindViewer
+					{apiResource}
+					{cluster}
+					{group}
+					{version}
+					{kind}
+					{resource}
+					{namespace}
+					{clustered}
+				/>
 			{/key}
 		</div>
 	{:catch error}

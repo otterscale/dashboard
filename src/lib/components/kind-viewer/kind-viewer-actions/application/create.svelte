@@ -413,6 +413,7 @@
 					<Button
 						class="mt-auto w-full"
 						onclick={() => {
+							console.log(123);
 							if (isSubmitting) return;
 
 							isSubmitting = true;

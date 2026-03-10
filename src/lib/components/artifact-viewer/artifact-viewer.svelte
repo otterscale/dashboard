@@ -97,10 +97,10 @@
 
 		isFetchingArtifacts = true;
 
-		const [projectName, repositoryName] = repositoryNameWithProject.split('/');
+		const [projectName, ...repositoryName] = repositoryNameWithProject.split('/');
 		try {
 			const response = await fetch(
-				`/rest/harbor/artifacts?project=${encodeURIComponent(projectName)}&repository=${encodeURIComponent(repositoryName)}`
+				`/rest/harbor/artifacts?project=${encodeURIComponent(projectName)}&repository=${encodeURIComponent(repositoryName.join('/'))}`
 			);
 			if (!response.ok) {
 				console.error('Failed to fetch Harbor artifacts:', response.statusText);

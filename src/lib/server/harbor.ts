@@ -79,6 +79,7 @@ export async function listRepositories(
 		responseType: 'json',
 		headers: {}
 	});
+
 	return repositories ?? [];
 }
 
@@ -91,7 +92,7 @@ export async function listArtifacts(
 		throw new Error('projectName and repositoryName are required');
 
 	const artifacts = await retrieve<ArtifactType[]>({
-		path: `/api/v2.0/projects/${encodeURIComponent(projectName)}/repositories/${encodeURIComponent(repositoryName)}/artifacts?with_label=true`,
+		path: `/api/v2.0/projects/${encodeURIComponent(projectName)}/repositories/${encodeURIComponent(encodeURIComponent(repositoryName))}/artifacts?with_label=true`,
 		accessToken,
 		responseType: 'json',
 		headers: {}
@@ -103,22 +104,14 @@ export async function listModelArtifacts(accessToken: string): Promise<ArtifactT
 	const modelArtifacts: ArtifactType[] = [];
 
 	try {
-		const projects = await listProjects(accessToken);
+		const repositories = await listRepositories('models', accessToken);
 
-		for (const project of projects) {
-			const repositories = await listRepositories(project.name, accessToken);
+		for (const repository of repositories) {
+			const [projectName, ...repositoryName] = repository.name.split('/');
 
-			for (const repository of repositories) {
-				const [projectName, repositoryName] = repository.name.split('/');
+			const artifacts = await listArtifacts(projectName, repositoryName.join('/'), accessToken);
 
-				const artifacts = await listArtifacts(projectName, repositoryName, accessToken);
-
-				const models = artifacts.filter((artifact) => artifact.type === 'MODEL');
-
-				if (models.length > 0) {
-					modelArtifacts.push(...models);
-				}
-			}
+			modelArtifacts.push(...artifacts);
 		}
 	} catch (error) {
 		console.error('Fail to fetch models:', error);
@@ -139,7 +132,7 @@ export async function getReferenceAddition(
 		throw new Error('projectName, repositoryName, reference and addition are required');
 
 	return retrieve<string | Record<string, unknown>>({
-		path: `/api/v2.0/projects/${encodeURIComponent(projectName)}/repositories/${encodeURIComponent(repositoryName)}/artifacts/${encodeURIComponent(reference)}/additions/${encodeURIComponent(addition)}`,
+		path: `/api/v2.0/projects/${encodeURIComponent(projectName)}/repositories/${encodeURIComponent(encodeURIComponent(repositoryName))}/artifacts/${encodeURIComponent(reference)}/additions/${encodeURIComponent(addition)}`,
 		accessToken,
 		responseType: 'auto',
 		headers: {}

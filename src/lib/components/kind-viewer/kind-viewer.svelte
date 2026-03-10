@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { type JsonValue } from '@bufbuild/protobuf';
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { Cable, Unplug } from '@lucide/svelte';
+	import { Ban, Cable, Unplug } from '@lucide/svelte';
 	import {
 		type APIResource,
 		type ListRequest,
@@ -10,12 +10,15 @@
 		WatchEvent_Type,
 		type WatchRequest
 	} from '@otterscale/api/resource/v1';
-	import type { ColumnDef } from '@tanstack/table-core';
 	import { getContext, onDestroy, onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import { DynamicTable } from '$lib/components/dynamic-table';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import * as Alert from '$lib/components/ui/alert/index.js';
+	import { Button } from '$lib/components/ui/button';
+	import * as Empty from '$lib/components/ui/empty/index.js';
+	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+	import * as Table from '$lib/components/ui/table/index.js';
 
 	import type { DataSchemaType, UISchemaType } from '../dynamic-table/utils';
 	import type { ActionsType, CreateType } from './kind-viewer-actions';
@@ -33,7 +36,7 @@
 		namespace
 	}: {
 		clustered: boolean;
-		apiResource: APIResource;
+		apiResource?: APIResource;
 		cluster: string;
 		group: string;
 		version: string;
@@ -44,9 +47,6 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-
-	const uiSchemas: Record<string, UISchemaType> = $derived(getUISchemas(kind));
-	const dataSchemas: Record<string, DataSchemaType> = $derived(getDataSchemas(kind));
 
 	// eslint-disable-next-line
 	let schema: any = $state({});
@@ -68,15 +68,16 @@
 	}
 
 	let dataset: Record<string, JsonValue>[] = $state([]);
-	let columnDefinitions: ColumnDef<Record<string, JsonValue>>[] | undefined = $state(undefined);
+	let datasetError: any = $state(undefined);
 
 	let listAbortController: AbortController | null = null;
 	let watchAbortController: AbortController | null = null;
 
 	let resourceVersion: string | undefined = $state(undefined);
 
+	// loading flags to manage UI state and avoid flicker
 	let isListing = $state(false);
-	async function listResources() {
+	async function listResources(apiResource: APIResource) {
 		if (isListing || isWatching || isDestroyed) return;
 
 		isListing = true;
@@ -112,6 +113,8 @@
 
 			console.error('Failed to list resources:', error);
 
+			datasetError = error;
+
 			return null;
 		} finally {
 			isListing = false;
@@ -120,7 +123,7 @@
 	}
 
 	let isWatching = $state(false);
-	async function watchResources() {
+	async function watchResources(apiResource: APIResource) {
 		if (isListing || isWatching || isDestroyed) return;
 
 		isWatching = true;
@@ -200,6 +203,8 @@
 			if (watchAbortController.signal.aborted) return;
 
 			console.error('Failed to watch resources:', error);
+
+			datasetError = error;
 		} finally {
 			toast.info(`Watching resource ${namespace} ${resource} was cancelled.`);
 
@@ -208,13 +213,16 @@
 		}
 	}
 
-	let isMounted = $state(false);
+	let isMounted: boolean | undefined = $state(undefined);
 	onMount(async () => {
-		await fetchSchema();
-		await listResources();
-		columnDefinitions = getColumnDefinitions(kind, apiResource, uiSchemas, dataSchemas);
-		watchResources();
+		if (!apiResource) {
+			isMounted = true;
+			return;
+		}
 
+		await fetchSchema();
+		await listResources(apiResource);
+		watchResources(apiResource);
 		isMounted = true;
 	});
 
@@ -231,8 +239,10 @@
 	});
 
 	function handleReload() {
+		if (!apiResource) return;
+
 		if (!isWatching) {
-			watchResources();
+			watchResources(apiResource);
 		}
 	}
 
@@ -240,33 +250,125 @@
 	const Actions: ActionsType = $derived(getActions(kind));
 </script>
 
-{#if isMounted}
-	{#if columnDefinitions}
-		<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {dataSchemas}>
-			{#snippet create()}
-				<Create {schema} {cluster} {group} {version} {kind} {resource} />
-			{/snippet}
-			{#snippet reload()}
-				<Button onclick={handleReload} disabled={isWatching} variant="outline">
-					{#if isWatching}
-						<Cable class="opacity-60" size={16} />
-					{:else}
-						<Unplug class="text-destructive opacity-60" size={16} />
-					{/if}
-				</Button>
-			{/snippet}
-			{#snippet rowActions({ row })}
-				<Actions
-					{row}
-					{schema}
-					object={row.original.raw}
-					{cluster}
-					{group}
-					{version}
-					{kind}
-					{resource}
-				/>
-			{/snippet}
-		</DynamicTable>
+{#if apiResource}
+	{#if isMounted === undefined}
+		<div class="space-y-4">
+			<div class="space-y-4">
+				<Skeleton class="h-13 w-1/3" />
+				<Skeleton class="h-7 w-1/5" />
+			</div>
+			<div class="flex items-center gap-2">
+				<Skeleton class="h-7 w-full" />
+				{#each Array(3)}
+					<Skeleton class="size-7" />
+				{/each}
+			</div>
+			<div class="rounded-lg border">
+				<Table.Root class="w-full">
+					<Table.Header>
+						<Table.Row>
+							{#each Array(5)}
+								<Table.Head class="p-4">
+									<Skeleton class="h-7 w-full" />
+								</Table.Head>
+							{/each}
+						</Table.Row>
+					</Table.Header>
+					<Table.Body>
+						{#each Array(7)}
+							<Table.Row class="border-none">
+								{#each Array(5)}
+									<Table.Cell>
+										<Skeleton class="h-7 w-full" />
+									</Table.Cell>
+								{/each}
+							</Table.Row>
+						{/each}
+					</Table.Body>
+				</Table.Root>
+			</div>
+			<div class="flex items-center justify-between gap-4">
+				<Skeleton class="h-7 w-1/5" />
+				<div class="flex items-center gap-2">
+					{#each Array(3)}
+						<Skeleton class="size-10" />
+					{/each}
+				</div>
+			</div>
+		</div>
+	{:else if isMounted === false}
+		<Empty.Root>
+			<Empty.Header>
+				<Empty.Media class="rounded-full bg-muted p-4">
+					<Ban size={36} />
+				</Empty.Media>
+				<Empty.Title class="text-2xl font-bold">Failed to load data</Empty.Title>
+				<Empty.Description>
+					An error occurred while fetching data. Please check your connection or try again later.
+				</Empty.Description>
+			</Empty.Header>
+			<Empty.Content>
+				<Alert.Root variant="destructive" class="border-none bg-destructive/5">
+					<Alert.Title class="font-bold">{datasetError?.name}</Alert.Title>
+					<Alert.Description class="text-start">
+						{datasetError?.rawMessage}
+					</Alert.Description>
+				</Alert.Root>
+				<div class="flex gap-4">
+					<Button variant="outline" onclick={() => history.back()}>Go Back</Button>
+					<Button href="/">Go Home</Button>
+				</div>
+			</Empty.Content>
+		</Empty.Root>
+	{:else if isMounted === true}
+		{@const uiSchemas: Record<string, UISchemaType> = getUISchemas(kind)}
+		{@const dataSchemas: Record<string, DataSchemaType> = getDataSchemas(kind)}
+		{@const columnDefinitions = getColumnDefinitions(kind, apiResource, uiSchemas, dataSchemas)}
+		{#if columnDefinitions}
+			<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {dataSchemas}>
+				{#snippet create()}
+					<Create {schema} {cluster} {group} {version} {kind} {resource} />
+				{/snippet}
+				{#snippet reload()}
+					<Button onclick={handleReload} disabled={isWatching} variant="outline">
+						{#if isWatching}
+							<Cable class="opacity-60" size={16} />
+						{:else}
+							<Unplug class="text-destructive opacity-60" size={16} />
+						{/if}
+					</Button>
+				{/snippet}
+				{#snippet rowActions({ row })}
+					<Actions
+						{row}
+						{schema}
+						object={row.original.raw}
+						{cluster}
+						{group}
+						{version}
+						{kind}
+						{resource}
+					/>
+				{/snippet}
+			</DynamicTable>
+		{/if}
 	{/if}
+{:else}
+	<Empty.Root>
+		<Empty.Header>
+			<Empty.Media class="rounded-full bg-muted p-4">
+				<Ban size={36} />
+			</Empty.Media>
+			<Empty.Title class="text-2xl font-bold">Failed to fetch schema</Empty.Title>
+			<Empty.Description>
+				An error occurred while fetching schema. Please check your connection or try again later.
+			</Empty.Description>
+		</Empty.Header>
+		<Empty.Content>
+			<div class="flex gap-4">
+				<Button variant="outline" onclick={() => history.back()}>Go Back</Button>
+				<Button href="/">Go Home</Button>
+			</div>
+		</Empty.Content>
+	</Empty.Root>
 {/if}

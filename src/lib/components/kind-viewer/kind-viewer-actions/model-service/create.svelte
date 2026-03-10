@@ -7,6 +7,7 @@
 	import Ajv from 'ajv';
 	import lodash from 'lodash';
 	import { getContext } from 'svelte';
+	import { SvelteURL } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
@@ -81,7 +82,6 @@
 	let isSubmitting = $state(false);
 
 	let timer: ReturnType<typeof setTimeout> | null = null;
-
 	function fetchModelArtifacts(): Promise<{ label: string; value: string }[]> {
 		return new Promise((resolve) => {
 			if (timer) clearTimeout(timer);
@@ -90,12 +90,13 @@
 				try {
 					const response = await fetch(`/rest/harbor/models`);
 					if (response.ok) {
+						const harborUrl = new SvelteURL(publicEnv.PUBLIC_HARBOR_URL);
 						const modelArtifacts = await response.json();
 
 						resolve(
 							modelArtifacts.map((modelArtifact: ArtifactType) => ({
 								label: modelArtifact.repository_name,
-								value: `${publicEnv.PUBLIC_HARBOR_URL}/${modelArtifact.repository_name}`
+								value: `${harborUrl.host}/${modelArtifact.repository_name}`
 							}))
 						);
 					} else {
@@ -218,8 +219,7 @@
 						},
 						image: {
 							'ui:components': {
-								stringField: 'enumField',
-								selectWidget: ComboboxWidget
+								textWidget: ComboboxWidget
 							},
 							'ui:options': {
 								TailoredComboboxEnumerations: fetchModelArtifacts,
