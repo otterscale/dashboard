@@ -514,14 +514,16 @@
 						<DropdownMenu.Group>
 							<DropdownMenu.Label>{m.cluster()}</DropdownMenu.Label>
 							<DropdownMenu.Separator />
-							<DropdownMenu.RadioGroup bind:value={activeCluster} {onValueChange}>
-								{#each links as link, index (index)}
-									<DropdownMenu.RadioItem value={link.cluster}
-										>{link.cluster}</DropdownMenu.RadioItem
-									>
-								{/each}
-							</DropdownMenu.RadioGroup>
-							<DropdownMenu.Separator />
+							{#if links.length > 0}
+								<DropdownMenu.RadioGroup bind:value={activeCluster} {onValueChange}>
+									{#each links as link, index (index)}
+										<DropdownMenu.RadioItem value={link.cluster}
+											>{link.cluster}</DropdownMenu.RadioItem
+										>
+									{/each}
+								</DropdownMenu.RadioGroup>
+								<DropdownMenu.Separator />
+							{/if}
 							<DropdownMenu.Item onclick={() => (openImportCluster = true)}>
 								<PlusIcon class="mr-2 size-4" />
 								{m.add()}

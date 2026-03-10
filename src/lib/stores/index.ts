@@ -79,5 +79,4 @@ const createStores = (): AppStores => ({
 });
 
 // Export individual stores
-export const { breadcrumbs, role, notifications } =
-	createStores();
+export const { breadcrumbs, role, notifications } = createStores();
