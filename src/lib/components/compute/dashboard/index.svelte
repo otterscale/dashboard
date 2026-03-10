@@ -3,17 +3,11 @@
 	import { onDestroy, onMount } from 'svelte';
 
 	import { Reloader } from '$lib/components/custom/reloader';
+	import { WidgetGrid } from '$lib/components/custom/widget-grid';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/paraglide/messages';
 
-	import Controller from './overview/controller.svelte';
-	import CPU from './overview/cpu.svelte';
-	import Instance from './overview/instance.svelte';
-	import Memory from './overview/memory.svelte';
-	import NetworkTraffic from './overview/network-traffic.svelte';
-	import ThroughtPut from './overview/throughput.svelte';
-	import Pod from './overview/virtual-machine.svelte';
-	import Worker from './overview/worker.svelte';
+	import { widgets } from './overview/widgets';
 
 	let { cluster }: { cluster: string } = $props();
 
@@ -61,30 +55,7 @@
 					value="overview"
 					class="grid auto-rows-auto grid-cols-2 gap-5 pt-4 md:grid-cols-4 lg:grid-cols-12"
 				>
-					<div class="col-span-2">
-						<Controller {prometheusDriver} {cluster} bind:isReloading />
-					</div>
-					<div class="col-span-2">
-						<Worker {prometheusDriver} {cluster} bind:isReloading />
-					</div>
-					<div class="col-span-4 row-span-2">
-						<CPU {prometheusDriver} {cluster} bind:isReloading />
-					</div>
-					<div class="col-span-4 row-span-2">
-						<Memory {prometheusDriver} {cluster} bind:isReloading />
-					</div>
-					<div class="col-span-2 col-start-1">
-						<Pod {prometheusDriver} {cluster} bind:isReloading />
-					</div>
-					<div class="col-span-2">
-						<Instance {prometheusDriver} {cluster} bind:isReloading />
-					</div>
-					<div class="col-span-6">
-						<NetworkTraffic {prometheusDriver} {cluster} bind:isReloading />
-					</div>
-					<div class="col-span-6">
-						<ThroughtPut {prometheusDriver} {cluster} bind:isReloading />
-					</div>
+					<WidgetGrid {widgets} {prometheusDriver} {cluster} bind:isReloading />
 				</Tabs.Content>
 				<Tabs.Content value="analytics"></Tabs.Content>
 			</Tabs.Root>
