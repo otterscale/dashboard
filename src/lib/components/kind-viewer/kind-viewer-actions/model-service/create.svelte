@@ -9,9 +9,12 @@
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
+	import { env as publicEnv } from '$env/dynamic/public';
 	import { ResourceService } from '$lib/api/resource/v1/resource_pb';
+	import type { ArtifactType } from '$lib/components/artifact-viewer/types';
 	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
+	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Item from '$lib/components/ui/item';
@@ -76,6 +79,36 @@
 	// Flag for Dialog
 	let open = $state(false);
 	let isSubmitting = $state(false);
+
+	let timer: ReturnType<typeof setTimeout> | null = null;
+
+	function fetchModelArtifacts(): Promise<{ label: string; value: string }[]> {
+		return new Promise((resolve) => {
+			if (timer) clearTimeout(timer);
+
+			timer = setTimeout(async () => {
+				try {
+					const response = await fetch(`/rest/harbor/models`);
+					if (response.ok) {
+						const modelArtifacts = await response.json();
+
+						resolve(
+							modelArtifacts.map((modelArtifact: ArtifactType) => ({
+								label: modelArtifact.repository_name,
+								value: `${publicEnv.PUBLIC_HARBOR_URL}/${modelArtifact.repository_name}`
+							}))
+						);
+					} else {
+						console.error('Failed to fetch models:', response.statusText);
+						resolve([]);
+					}
+				} catch (error) {
+					console.error('Error fetching models:', error);
+					resolve([]);
+				}
+			}, 300);
+		});
+	}
 </script>
 
 <AlertDialog.Root
@@ -181,6 +214,20 @@
 						'ui:options': {
 							translations: {
 								submit: 'Next'
+							}
+						},
+						image: {
+							'ui:components': {
+								stringField: 'enumField',
+								selectWidget: ComboboxWidget
+							},
+							'ui:options': {
+								TailoredComboboxEnumerations: fetchModelArtifacts,
+								TailoredComboboxVisibility: 10,
+								TailoredComboboxInput: {
+									placeholder: 'Name'
+								},
+								TailoredComboboxEmptyText: 'No names available.'
 							}
 						}
 					} as UiSchemaRoot}
@@ -479,7 +526,12 @@
 			<!-- Step 7: Review -->
 			<Tabs.Content value={steps[6]}>
 				<div class="flex h-full flex-col gap-3">
-					<Code.Root lang="yaml" class="w-full" hideLines code={stringify(values, null, 2)} />
+					<Code.Root
+						lang="yaml"
+						class="no-shiki-limit w-full"
+						hideLines
+						code={stringify(values, null, 2)}
+					/>
 					<Button
 						class="mt-auto w-full"
 						onclick={() => {
@@ -531,3 +583,12 @@
 		</Tabs.Root>
 	</AlertDialog.Content>
 </AlertDialog.Root>
+
+<style>
+	@reference '../../../../../app.css';
+
+	:global(.no-shiki-limit pre.shiki:not([data-code-overflow] *):not([data-code-overflow])) {
+		overflow-y: visible !important;
+		max-height: none !important;
+	}
+</style>

@@ -247,7 +247,6 @@
 </script>
 
 {#if isMounted}
-	<pre>{JSON.stringify(schema, null, 2)}</pre>
 	{#if columnDefinitions}
 		<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {dataSchemas}>
 			{#snippet create()}

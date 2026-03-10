@@ -4,6 +4,8 @@ import CronJobActions from './cronjob/actions.svelte';
 import CronJobCreate from './cronjob/create.svelte';
 import DefaultActions from './default/actions.svelte';
 import DefaultCreate from './default/create.svelte';
+import ModelArtifactActions from './model-artifact/actions.svelte';
+import ModelArtifactCreate from './model-artifact/create.svelte';
 import ModelServiceActions from './model-service/actions.svelte';
 import ModelServiceCreate from './model-service/create.svelte';
 import ResourceQuotaActions from './resource-quota/actions.svelte';
@@ -41,6 +43,8 @@ function getCreate(kind: string): CreateType {
 			return CronJobCreate as CreateType;
 		case 'ModelService':
 			return ModelServiceCreate as CreateType;
+		case 'ModelArtifact':
+			return ModelArtifactCreate as CreateType;
 		case 'ResourceQuota':
 			return ResourceQuotaCreate as CreateType;
 		case 'SimpleApp':
@@ -58,6 +62,8 @@ function getActions(kind: string): ActionsType {
 			return CronJobActions as ActionsType;
 		case 'ModelService':
 			return ModelServiceActions as ActionsType;
+		case 'ModelArtifact':
+			return ModelArtifactActions as ActionsType;
 		case 'ResourceQuota':
 			return ResourceQuotaActions as ActionsType;
 		case 'SimpleApp':
