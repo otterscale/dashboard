@@ -1,4 +1,5 @@
 <script lang="ts">
+	import * as Item from '$lib/components/ui/item';
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import { Columns3Icon, EraserIcon, RefreshCwIcon } from '@lucide/svelte';
 	import type { ColumnDef } from '@tanstack/table-core';
@@ -10,14 +11,14 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 
+	import ProjectPicker from './artifact-viewer-project-picker.svelte';
+	import RepositoryPicker from './artifact-viewer-repository-picker.svelte';
 	import {
 		getArtifactColumnDefinitions,
 		getArtifactData,
 		getArtifactDataSchemas,
 		getArtifactUISchemas
 	} from './artifact-viewer.ts';
-	import ProjectPicker from './artifact-viewer-project-picker.svelte';
-	import RepositoryPicker from './artifact-viewer-repository-picker.svelte';
 	import Create from './create.svelte';
 	import Grid from './grid.svelte';
 	import type { ArtifactType, ProjectType, RepositoryType } from './types';
@@ -138,15 +139,23 @@
 
 {#if isMounted}
 	<div class="space-y-4">
-		<div class="flex items-center gap-2">
-			<ProjectPicker value={selectedProject} {projects} onSelect={handleProjectSelect} />
-			{#if repositories.length > 0}
-				<RepositoryPicker
-					value={selectedRepository}
-					{repositories}
-					onSelect={handleRepositorySelect}
-				/>
-			{/if}
+		<div class="flex items-end justify-between gap-4">
+			<Item.Root class="p-0">
+				<Item.Content class="text-left">
+					<Item.Title class="text-xl font-bold">Hub</Item.Title>
+					<Item.Description class="text-base">harbor</Item.Description>
+				</Item.Content>
+			</Item.Root>
+			<div class="flex items-center gap-2">
+				<ProjectPicker value={selectedProject} {projects} onSelect={handleProjectSelect} />
+				{#if repositories.length > 0}
+					<RepositoryPicker
+						value={selectedRepository}
+						{repositories}
+						onSelect={handleRepositorySelect}
+					/>
+				{/if}
+			</div>
 		</div>
 		<DynamicTable dataset={artifacts} {columnDefinitions} {uiSchemas} {dataSchemas}>
 			{#snippet gridsLayout({ table, handleClear })}

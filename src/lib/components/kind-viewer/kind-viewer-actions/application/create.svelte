@@ -291,7 +291,8 @@
 						'ui:options': {
 							translations: {
 								submit: 'Next'
-							}
+							},
+							itemTitle: () => 'Container'
 						}
 					} as UiSchemaRoot}
 					initialValue={[
