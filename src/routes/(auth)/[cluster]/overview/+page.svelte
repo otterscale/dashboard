@@ -5,20 +5,11 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { Reloader } from '$lib/components/custom/reloader';
-	import Consumption from '$lib/components/dashbaord/cluster/overview/consumption.svelte';
-	import CpuUsage from '$lib/components/dashbaord/cluster/overview/cpu.svelte';
-	import Deployments from '$lib/components/dashbaord/cluster/overview/deployments.svelte';
-	import GPUMemoryUsage from '$lib/components/dashbaord/cluster/overview/gpu-memory.svelte';
-	import GPUUtilization from '$lib/components/dashbaord/cluster/overview/gpu-utilization.svelte';
-	import Health from '$lib/components/dashbaord/cluster/overview/health.svelte';
-	import Information from '$lib/components/dashbaord/cluster/overview/information.svelte';
-	import MemoryUsage from '$lib/components/dashbaord/cluster/overview/memory.svelte';
-	import Nodes from '$lib/components/dashbaord/cluster/overview/nodes.svelte';
-	import Pods from '$lib/components/dashbaord/cluster/overview/pods.svelte';
-	import Uptime from '$lib/components/dashbaord/cluster/overview/uptime.svelte';
+	import { WidgetGrid } from '$lib/components/custom/widget-grid';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/paraglide/messages';
 	import { breadcrumbs } from '$lib/stores';
+	import { widgets } from '$lib/components/dashbaord/cluster/overview/widgets';
 
 	// Set breadcrumbs navigation
 	breadcrumbs.set([
@@ -74,41 +65,7 @@
 						<div
 							class="grid auto-rows-[minmax(140px,auto)] grid-cols-2 gap-4 pt-4 md:gap-6 lg:grid-cols-1 2xl:grid-cols-4"
 						>
-							<div class="col-span-1 row-span-1">
-								<Health {prometheusDriver} {cluster} bind:isReloading />
-							</div>
-							<div class="col-span-1 row-span-1">
-								<Uptime {prometheusDriver} {cluster} bind:isReloading />
-							</div>
-							<div class="col-span-1 row-span-1">
-								<Information {prometheusDriver} {cluster} bind:isReloading />
-							</div>
-							<div class="col-span-1 row-span-1">
-								<Consumption {prometheusDriver} {cluster} bind:isReloading />
-							</div>
-
-							<div class="col-span-1 row-span-1">
-								<Nodes {prometheusDriver} {cluster} bind:isReloading />
-							</div>
-							<div class="col-span-1 row-span-1">
-								<Deployments {prometheusDriver} {cluster} bind:isReloading />
-							</div>
-
-							<div class="col-span-2 row-span-1">
-								<Pods {prometheusDriver} {cluster} bind:isReloading />
-							</div>
-							<div class="col-span-1 row-span-2">
-								<CpuUsage {prometheusDriver} {cluster} bind:isReloading />
-							</div>
-							<div class="col-span-1 row-span-2">
-								<MemoryUsage {prometheusDriver} {cluster} bind:isReloading />
-							</div>
-							<div class="col-span-1 row-span-2">
-								<GPUMemoryUsage {prometheusDriver} {cluster} bind:isReloading />
-							</div>
-							<div class="col-span-1 row-span-2">
-								<GPUUtilization {prometheusDriver} {cluster} bind:isReloading />
-							</div>
+							<WidgetGrid {widgets} {prometheusDriver} {cluster} bind:isReloading />
 						</div>
 					</Tabs.Content>
 					<Tabs.Content value="analytics"></Tabs.Content>
