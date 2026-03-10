@@ -11,7 +11,6 @@
 		onsuccess
 	}: {
 		open: boolean;
-		cluster: string;
 		onsuccess?: (workspace?: TenantOtterscaleIoV1Alpha1Workspace) => void;
 	} = $props();
 

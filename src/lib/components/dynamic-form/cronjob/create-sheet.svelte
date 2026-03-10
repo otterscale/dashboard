@@ -1,9 +1,6 @@
 <script lang="ts">
 	import { Plus } from '@lucide/svelte';
 
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Sheet from '$lib/components/ui/sheet';
 

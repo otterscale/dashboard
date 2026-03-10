@@ -153,11 +153,7 @@
 		createWorkspaceOpen = false;
 		if (workspace?.metadata?.name) {
 			onsuccess?.(workspace);
-			goto(
-				resolve(
-					`/(auth)/${cluster}/${workspace.metadata.name}/${workspace.metadata.name}?group=tenant.otterscale.io&version=v1alpha1&kind=Workspace&resource=workspaces&namespaced=false`
-				)
-			);
+			goto(resolve(`/(auth)/${cluster}/${workspace.metadata.name}/overview`));
 		}
 	}
 
