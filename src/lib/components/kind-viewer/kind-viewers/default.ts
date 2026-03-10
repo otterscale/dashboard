@@ -83,7 +83,7 @@ function getDefaultColumnDefinitions(
 					uiSchemas: uiSchemas,
 					metadata: {
 						hyperlink: resolve(
-							`/(auth)/${page.params.cluster!}/${apiResource.kind}/${apiResource.resource}?group=${apiResource.group}&version=${apiResource.version}&name=${row.original[column.id as DefaultAttribute]}&namespace=${page.url.searchParams.get('namespace') ?? ''}`
+							`/(auth)/${page.params.cluster!}/${page.params.namespace!}/${row.original[column.id as DefaultAttribute]}?group=${apiResource.group}&version=${apiResource.version}&kind=${apiResource.kind}&resource=${apiResource.resource}`
 						)
 					} satisfies LinkMetadata
 				}),

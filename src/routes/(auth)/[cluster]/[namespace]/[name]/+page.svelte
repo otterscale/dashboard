@@ -23,8 +23,10 @@
 		}
 	]);
 
+	const namespaced = $derived(page.url.searchParams.get('namespaced') !== 'false');
+
 	const cluster = $derived(page.params.cluster ?? '');
-	const namespace = $derived(page.params.namespace ?? '');
+	const namespace = $derived(namespaced ? (page.params.namespace ?? '') : '');
 	const name = $derived(page.params.name ?? '');
 	const group = $derived(page.url.searchParams.get('group') ?? '');
 	const version = $derived(page.url.searchParams.get('version') ?? '');
@@ -32,6 +34,6 @@
 	const resource = $derived(page.url.searchParams.get('resource') ?? '');
 </script>
 
-{#key cluster + namespace + name + group + version + kind + resource}
+{#key page.url.href}
 	<ResourceViewer {cluster} {namespace} {name} {group} {version} {kind} {resource} />
 {/key}

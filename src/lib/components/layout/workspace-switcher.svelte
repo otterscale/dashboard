@@ -147,9 +147,10 @@
 		const workspace = workspaces[index];
 		const workspaceName = workspace.metadata?.name ?? '';
 		const workspaceUrl = resolve(
-			`/(auth)/${cluster}/${workspaceName}/${workspaceName}?group=tenant.otterscale.io&version=v1alpha1&kind=Workspace&resource=workspaces`
+			`/(auth)/${cluster}/${workspaceName}/${workspaceName}?group=tenant.otterscale.io&version=v1alpha1&kind=Workspace&resource=workspaces&namespaced=false`
 		);
-
+		// /(auth)/${cluster}/${workspaceName}/${workspaceName}?group=tenant.otterscale.io&version=v1alpha1&kind=Workspace&resource=workspaces
+		// https://ots.phison.com/dev/Workspace/workspaces?group=tenant.otterscale.io&version=v1alpha1&name=jacob-asr
 		goto(workspaceUrl);
 
 		if (workspaceName) {
