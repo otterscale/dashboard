@@ -24,8 +24,8 @@
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 
-	import type { DeleterType, EditorType, ViewerType } from './viewers';
-	import { getDeleter, getEditor, getResourceViewer } from './viewers';
+	import type { EditorType, ViewerType } from './viewers';
+	import { getEditor, getResourceViewer } from './viewers';
 
 	let {
 		cluster,
@@ -263,7 +263,6 @@
 				</Item.Content>
 				<Item.Actions>
 					{@const Editor: EditorType = getEditor(resource)}
-					{@const Deleter: DeleterType = getDeleter(resource)}
 					<Sheet.Root>
 						<Sheet.Trigger>
 							<Button variant="outline" size="icon-lg">
@@ -330,9 +329,6 @@
 									});
 							}}
 						/>
-					{/if}
-					{#if Deleter}
-						<Deleter name={object?.metadata?.name} />
 					{/if}
 				</Item.Actions>
 				<Item.Footer class="flex flex-col items-start justify-start gap-2">

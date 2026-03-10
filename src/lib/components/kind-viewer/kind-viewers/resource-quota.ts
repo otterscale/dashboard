@@ -113,7 +113,7 @@ function getResourceQuotaColumnDefinitions(
 					uiSchemas: uiSchemas,
 					metadata: {
 						hyperlink: resolve(
-							`/(auth)/${page.params.cluster!}/${apiResource.kind}/${apiResource.resource}?group=${apiResource.group}&version=${apiResource.version}&name=${row.original[column.id as ResourceQuotaAttribute]}&namespace=${page.url.searchParams.get('namespace') ?? ''}`
+							`/(auth)/${page.params.cluster}/${page.params.namespace}/${row.original[column.id as ResourceQuotaAttribute]}?group=${apiResource.group}&version=${apiResource.version}&kind=${apiResource.kind}&resource=${apiResource.resource}&namespaced=${apiResource.namespaced}`
 						)
 					} satisfies LinkMetadata
 				}),

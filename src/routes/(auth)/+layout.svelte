@@ -65,13 +65,13 @@
 	let activeCluster = $state(page.params.cluster ?? '');
 	let links = $state<Link[]>([]);
 	let workspaces = $state<TenantOtterscaleIoV1Alpha1Workspace[]>([]);
-	let aboutOpen = $state(false);
+	let openAbout = $state(false);
 	let openImportCluster = $state(false);
 
 	async function fetchClusters() {
 		try {
 			const response = await linkClient.listLinks({});
-			links = response.links.filter((link) => link.cluster !== 'cos');
+			links = response.links;
 		} catch (error) {
 			console.error('Failed to fetch links:', error);
 		}
@@ -92,45 +92,38 @@
 		}
 	}
 
-	$effect(() => {
-		if (page.params.cluster && page.params.cluster !== activeCluster) {
-			activeCluster = page.params.cluster;
-			fetchWorkspaces(activeCluster);
-		}
-	});
-
-	async function onValueChange(cluster: string) {
+	async function onClusterChange(cluster: string) {
 		await fetchWorkspaces(cluster);
-
-		await goto(
-			resolve('/(auth)/[cluster]/overview', {
-				cluster: activeCluster
-			})
-		);
-
+		await goto(resolve('/(auth)/[cluster]/overview', { cluster: activeCluster }));
 		toast.success(m.switch_cluster({ name: cluster }));
+	}
+
+	function onAboutClick() {
+		openAbout = true;
 	}
 
 	let isMounted = $state(false);
 	onMount(async () => {
 		await fetchClusters();
-
 		if (activeCluster) {
 			await fetchWorkspaces(activeCluster);
 		}
-
 		isMounted = true;
 	});
 
-	function onAboutClick() {
-		aboutOpen = true;
-	}
-
-	function resourceUrl(group: string, version: string, kind: string, resource: string) {
-		const namespace = page.params.namespace || '_';
-		return resolve(
-			`/(auth)/${activeCluster}/${namespace}?group=${group}&version=${version}&kind=${kind}&resource=${resource}`
-		);
+	function resourceUrl(
+		group: string,
+		version: string,
+		kind: string,
+		resource: string,
+		namespaced: boolean = true
+	) {
+		const namespace = page.params.namespace ?? '_';
+		let query = `?group=${group}&version=${version}&kind=${kind}&resource=${resource}`;
+		if (!namespaced) {
+			query += `&namespaced=false`;
+		}
+		return resolve(`/(auth)/${activeCluster}/${namespace}${query}`);
 	}
 
 	const navData = $derived({
@@ -186,7 +179,7 @@
 						title: m.hub(),
 						url: resolve('/(auth)/[cluster]/[namespace]/hub', {
 							cluster: activeCluster,
-							namespace: $activeNamespace
+							namespace: page.params.namespace!
 						})
 					}
 				]
@@ -208,10 +201,7 @@
 						title: m.virtual_machine(),
 						url: resourceUrl('kubevirt.io', 'v1', 'VirtualMachine', 'virtualmachines')
 					},
-					{
-						title: m.data_volume(),
-						url: resourceUrl('cdi.kubevirt.io', 'v1beta1', 'DataVolume', 'datavolumes')
-					},
+
 					{
 						title: m.instance_type(),
 						url: resourceUrl(
@@ -220,6 +210,10 @@
 							'VirtualMachineInstancetype',
 							'virtualmachineinstancetypes'
 						)
+					},
+					{
+						title: m.data_volume(),
+						url: resourceUrl('cdi.kubevirt.io', 'v1beta1', 'DataVolume', 'datavolumes')
 					}
 				]
 			},
@@ -262,6 +256,14 @@
 					{
 						title: m.module(),
 						url: resourceUrl('module.otterscale.io', 'v1alpha1', 'Module', 'modules')
+					},
+					{
+						title: m.helm_repository(),
+						url: resourceUrl('source.toolkit.fluxcd.io', 'v1', 'HelmRepository', 'helmrepositories')
+					},
+					{
+						title: m.oci_repository(),
+						url: resourceUrl('source.toolkit.fluxcd.io', 'v1', 'OCIRepository', 'ocirepositories')
 					}
 				]
 			}
@@ -384,6 +386,10 @@
 					{
 						title: m.limit_range(),
 						url: resourceUrl('', 'v1', 'LimitRange', 'limitranges')
+					},
+					{
+						title: m.event(),
+						url: resourceUrl('', 'v1', 'Event', 'events')
 					}
 				]
 			},
@@ -393,11 +399,7 @@
 				items: [
 					{
 						title: m.node(),
-						url: resourceUrl('', 'v1', 'Node', 'nodes')
-					},
-					{
-						title: m.event(),
-						url: resourceUrl('', 'v1', 'Event', 'events')
+						url: resourceUrl('', 'v1', 'Node', 'nodes', false)
 					},
 					{
 						title: m.custom_resource_definition(),
@@ -405,12 +407,19 @@
 							'apiextensions.k8s.io',
 							'v1',
 							'CustomResourceDefinition',
-							'customresourcedefinitions'
+							'customresourcedefinitions',
+							false
 						)
 					},
 					{
 						title: m.cluster_role(),
-						url: resourceUrl('rbac.authorization.k8s.io', 'v1', 'ClusterRole', 'clusterroles')
+						url: resourceUrl(
+							'rbac.authorization.k8s.io',
+							'v1',
+							'ClusterRole',
+							'clusterroles',
+							false
+						)
 					},
 					{
 						title: m.cluster_role_binding(),
@@ -418,7 +427,8 @@
 							'rbac.authorization.k8s.io',
 							'v1',
 							'ClusterRoleBinding',
-							'clusterrolebindings'
+							'clusterrolebindings',
+							false
 						)
 					}
 				]
@@ -431,7 +441,7 @@
 	<title>{current ? `${current.title} - OtterScale` : 'OtterScale'}</title>
 </svelte:head>
 
-<DialogAbout bind:open={aboutOpen} />
+<DialogAbout bind:open={openAbout} />
 
 <Sidebar.Provider>
 	<Sidebar.Root id="sidebar-guide-step" collapsible="icon" variant="inset" class="p-3">
@@ -518,7 +528,7 @@
 							<DropdownMenu.Label>{m.cluster()}</DropdownMenu.Label>
 							<DropdownMenu.Separator />
 							{#if links.length > 0}
-								<DropdownMenu.RadioGroup bind:value={activeCluster} {onValueChange}>
+								<DropdownMenu.RadioGroup bind:value={activeCluster} onValueChange={onClusterChange}>
 									{#each links as link, index (index)}
 										<DropdownMenu.RadioItem value={link.cluster}
 											>{link.cluster}</DropdownMenu.RadioItem
