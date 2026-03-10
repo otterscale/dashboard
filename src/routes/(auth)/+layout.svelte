@@ -247,7 +247,6 @@
 			{
 				title: m.administration(),
 				icon: UserStarIcon,
-				isActive: true,
 				items: [
 					{
 						title: m.workspace(),
