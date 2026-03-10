@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { type TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import BasicTierImage from '$lib/assets/basic-tier.jpg';
 	import * as Sheet from '$lib/components/ui/sheet';
 
@@ -10,7 +8,6 @@
 
 	let {
 		open = $bindable(false),
-		cluster,
 		onsuccess
 	}: {
 		open: boolean;
