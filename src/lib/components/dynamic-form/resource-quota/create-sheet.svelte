@@ -7,7 +7,7 @@
 	import { page } from '$app/state';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Sheet from '$lib/components/ui/sheet';
-	import { activeNamespace, role } from '$lib/stores';
+	import { role } from '$lib/stores';
 
 	import CreateForm from './create-form.svelte';
 
@@ -27,7 +27,7 @@
 			onsuccess?.(resourceQuota);
 			goto(
 				resolve(
-					`/(auth)/${page.params.cluster}/ResourceQuota/resourcequotas?group=&version=v1&namespace=${$activeNamespace}&name=${resourceQuota.metadata.name}`
+					`/(auth)/${page.params.cluster}/ResourceQuota/resourcequotas?group=&version=v1&namespace=${page.params.namespace}&name=${resourceQuota.metadata.name}`
 				)
 			);
 		}

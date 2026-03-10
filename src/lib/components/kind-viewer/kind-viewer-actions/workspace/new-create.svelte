@@ -27,14 +27,20 @@
 		version,
 		kind,
 		resource,
-		schema: jsonSchema
+		schema: jsonSchema,
+		open = $bindable(false),
+		showTrigger = true,
+		onsuccess
 	}: {
 		cluster: string;
 		group: string;
 		version: string;
 		kind: string;
 		resource: string;
-		schema?: any;
+		schema: any;
+		open?: boolean;
+		showTrigger?: boolean;
+		onsuccess?: (workspace?: any) => void;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -115,7 +121,6 @@
 	}
 
 	// Flag for Dialog
-	let open = $state(false);
 	let isSubmitting = $state(false);
 </script>
 
@@ -125,13 +130,15 @@
 		reset();
 	}}
 >
-	<AlertDialog.Trigger>
-		{#snippet child({ props })}
-			<Button {...props} variant="outline" size="icon">
-				<Plus />
-			</Button>
-		{/snippet}
-	</AlertDialog.Trigger>
+	{#if showTrigger}
+		<AlertDialog.Trigger>
+			{#snippet child({ props })}
+				<Button {...props} variant="outline" size="icon">
+					<Plus />
+				</Button>
+			{/snippet}
+		</AlertDialog.Trigger>
+	{/if}
 	<AlertDialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
 		<Item.Root class="p-0">
 			<Progress value={currentIndex + 1} max={steps.length} />
@@ -516,6 +523,7 @@
 								{
 									loading: `Creating workspace ${name}...`,
 									success: () => {
+										onsuccess?.(values);
 										return `Successfully created workspace ${name}`;
 									},
 									error: (error) => {
