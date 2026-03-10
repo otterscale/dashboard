@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { createClient, type Transport } from '@connectrpc/connect';
 	import ActivityIcon from '@lucide/svelte/icons/activity';
 	import ApertureIcon from '@lucide/svelte/icons/aperture';
 	import AudioWaveformIcon from '@lucide/svelte/icons/audio-waveform';
@@ -33,45 +34,64 @@
 	import RadarIcon from '@lucide/svelte/icons/radar';
 	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import ZapIcon from '@lucide/svelte/icons/zap';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { type TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
-	import type { Component } from 'svelte';
+	import { type Component, getContext, onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { shortcut } from '$lib/actions/shortcut.svelte';
-	import CreateSheet from '$lib/components/dynamic-form/workspace/create-sheet.svelte';
+	import NewCreate from '$lib/components/kind-viewer/kind-viewer-actions/workspace/new-create.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import type { User } from '$lib/server/session';
-	import { activeNamespace, activeWorkspaceName, role } from '$lib/stores';
+	import { role } from '$lib/stores';
 
 	let {
 		cluster,
 		workspaces,
 		user,
+		namespace,
 		onsuccess
 	}: {
 		cluster: string;
 		workspaces: TenantOtterscaleIoV1Alpha1Workspace[];
 		user: User;
+		namespace?: string;
 		onsuccess?: (workspace?: TenantOtterscaleIoV1Alpha1Workspace) => void;
 	} = $props();
 
-	const sidebar = useSidebar();
-	let activeWorkspace: TenantOtterscaleIoV1Alpha1Workspace | undefined = $derived.by(() => {
-		if (workspaces.length === 0) return undefined;
+	const transport: Transport = getContext('transport');
+	const resourceClient = createClient(ResourceService, transport);
 
-		if ($activeWorkspaceName) {
-			const found = workspaces.find((w) => w.metadata?.name === $activeWorkspaceName);
-			if (found) return found;
+	let workspaceSchema: any = $state();
+	let createWorkspaceOpen = $state(false);
+
+	onMount(async () => {
+		try {
+			const res = await resourceClient.schema({
+				cluster,
+				group: 'tenant.otterscale.io',
+				version: 'v1alpha1',
+				kind: 'Workspace'
+			});
+			workspaceSchema = res.schema ?? {};
+		} catch (err) {
+			console.error('Failed to fetch workspace schema:', err);
 		}
-		return undefined;
 	});
 
-	let createWorkspaceOpen = $state(false);
+	const sidebar = useSidebar();
+
+	let activeWorkspace = $derived(
+		workspaces.length > 0 && namespace
+			? workspaces.find((w) => w.metadata?.name === namespace)
+			: undefined
+	);
+
 	let ActiveIcon = $derived(getWorkspaceIcon(activeWorkspace?.metadata?.name));
 
 	const workspaceIcons: Component[] = [
@@ -130,8 +150,6 @@
 			`/(auth)/${cluster}/${workspaceName}/${workspaceName}?group=tenant.otterscale.io&version=v1alpha1&kind=Workspace&resource=workspaces`
 		);
 
-		activeWorkspace = workspace;
-
 		goto(workspaceUrl);
 
 		if (workspaceName) {
@@ -139,21 +157,28 @@
 		}
 	}
 
-	$effect(() => {
-		if (!activeWorkspace) {
-			activeNamespace.set('');
-			activeWorkspaceName.set('');
-			role.set('');
-			return;
+	function handleWorkspaceSuccess(workspace?: TenantOtterscaleIoV1Alpha1Workspace) {
+		createWorkspaceOpen = false;
+		if (workspace?.metadata?.name) {
+			onsuccess?.(workspace);
+			goto(
+				resolve(
+					`/(auth)/${cluster}/Workspace/workspaces?group=tenant.otterscale.io&version=v1alpha1&name=${workspace.metadata.name}`
+				)
+			);
 		}
+	}
 
-		activeNamespace.set(activeWorkspace.spec.namespace);
-		activeWorkspaceName.set(activeWorkspace.metadata?.name ?? '');
-		role.set(
-			activeWorkspace.spec.members?.find(
-				(u: { subject?: string; role?: string }) => u.subject === user.sub
-			)?.role ?? ''
-		);
+	$effect(() => {
+		if (activeWorkspace) {
+			role.set(
+				activeWorkspace.spec.members?.find(
+					(u: { subject?: string; role?: string }) => u.subject === user.sub
+				)?.role ?? ''
+			);
+		} else {
+			role.set('');
+		}
 	});
 </script>
 
@@ -289,4 +314,16 @@
 	</Sidebar.MenuItem>
 </Sidebar.Menu>
 
-<CreateSheet bind:open={createWorkspaceOpen} {cluster} {onsuccess} />
+{#if workspaceSchema}
+	<NewCreate
+		bind:open={createWorkspaceOpen}
+		showTrigger={false}
+		group="tenant.otterscale.io"
+		version="v1alpha1"
+		kind="Workspace"
+		resource="workspaces"
+		schema={workspaceSchema}
+		{cluster}
+		onsuccess={handleWorkspaceSuccess}
+	/>
+{/if}

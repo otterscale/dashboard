@@ -51,12 +51,6 @@ interface AppStores {
 	// Navigation
 	breadcrumbs: Writable<Path[]>;
 
-	// Workspace
-	activeWorkspaceName: Writable<string>;
-
-	// Namespace
-	activeNamespace: Writable<string>;
-
 	// Role
 	role: Writable<string>;
 
@@ -67,10 +61,6 @@ interface AppStores {
 // Create stores
 const createStores = (): AppStores => ({
 	breadcrumbs: writable<Path[]>([{ title: m.home(), url: resolve('/') }]),
-	// Persistent workspace store
-	activeWorkspaceName: persistentWritable<string>('otterscale:activeWorkspace', ''),
-	// Persistent namespace store
-	activeNamespace: persistentWritable<string>('otterscale:activeNamespace', ''),
 	// Persistent role store
 	role: persistentWritable<string>('otterscale:role', ''),
 	notifications: writable<Notification[]>([
@@ -89,5 +79,5 @@ const createStores = (): AppStores => ({
 });
 
 // Export individual stores
-export const { breadcrumbs, activeWorkspaceName, activeNamespace, role, notifications } =
+export const { breadcrumbs, role, notifications } =
 	createStores();

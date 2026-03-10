@@ -44,7 +44,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/paraglide/messages';
-	import { activeNamespace, breadcrumbs } from '$lib/stores';
+	import { breadcrumbs } from '$lib/stores';
 
 	import type { LayoutData } from './$types';
 
@@ -92,14 +92,22 @@
 		}
 	}
 
+	$effect(() => {
+		if (page.params.cluster && page.params.cluster !== activeCluster) {
+			activeCluster = page.params.cluster;
+			fetchWorkspaces(activeCluster);
+		}
+	});
+
 	async function onValueChange(cluster: string) {
 		await fetchWorkspaces(cluster);
+
 		await goto(
-			resolve('/(auth)/[cluster]/[namespace]/overview', {
-				cluster: activeCluster,
-				namespace: $activeNamespace
+			resolve('/(auth)/[cluster]/overview', {
+				cluster: activeCluster
 			})
 		);
+
 		toast.success(m.switch_cluster({ name: cluster }));
 	}
 
@@ -119,8 +127,9 @@
 	}
 
 	function resourceUrl(group: string, version: string, kind: string, resource: string) {
+		const namespace = page.params.namespace || '_';
 		return resolve(
-			`/(auth)/${activeCluster}/${$activeNamespace}?group=${group}&version=${version}&kind=${kind}&resource=${resource}`
+			`/(auth)/${activeCluster}/${namespace}?group=${group}&version=${version}&kind=${kind}&resource=${resource}`
 		);
 	}
 
@@ -128,10 +137,12 @@
 		managed: [
 			{
 				title: m.overview(),
-				url: resolve('/(auth)/[cluster]/[namespace]/overview', {
-					cluster: activeCluster,
-					namespace: $activeNamespace
-				}),
+				url: page.params.namespace
+					? resolve('/(auth)/[cluster]/[namespace]/overview', {
+							cluster: activeCluster,
+							namespace: page.params.namespace
+						})
+					: '',
 				icon: CompassIcon
 			},
 			{
@@ -141,10 +152,12 @@
 				items: [
 					{
 						title: m.dashboard(),
-						url: resolve('/(auth)/[cluster]/[namespace]/model/dashboard', {
-							cluster: activeCluster,
-							namespace: $activeNamespace
-						})
+						url: page.params.namespace
+							? resolve('/(auth)/[cluster]/[namespace]/model/dashboard', {
+									cluster: activeCluster,
+									namespace: page.params.namespace
+								})
+							: ''
 					},
 					{
 						title: m.model(),
@@ -181,10 +194,12 @@
 				items: [
 					{
 						title: m.dashboard(),
-						url: resolve('/(auth)/[cluster]/[namespace]/compute/dashboard', {
-							cluster: activeCluster,
-							namespace: $activeNamespace
-						})
+						url: page.params.namespace
+							? resolve('/(auth)/[cluster]/[namespace]/compute/dashboard', {
+									cluster: activeCluster,
+									namespace: page.params.namespace
+								})
+							: ''
 					},
 					{
 						title: m.virtual_machine(),
@@ -211,10 +226,12 @@
 				items: [
 					{
 						title: m.dashboard(),
-						url: resolve('/(auth)/[cluster]/[namespace]/storage/dashboard', {
-							cluster: activeCluster,
-							namespace: $activeNamespace
-						})
+						url: page.params.namespace
+							? resolve('/(auth)/[cluster]/[namespace]/storage/dashboard', {
+									cluster: activeCluster,
+									namespace: page.params.namespace
+								})
+							: ''
 					},
 					{
 						title: m.block_pool(),
@@ -421,11 +438,12 @@
 					cluster={activeCluster}
 					{workspaces}
 					user={data.user}
+					namespace={page.params.namespace}
 					onsuccess={() => fetchWorkspaces(activeCluster)}
 				/>
 			</Sidebar.Header>
 			<Sidebar.Content class="gap-2">
-				{#if $activeNamespace}
+				{#if page.params.namespace}
 					<NavMain
 						managedLabel={m.managed()}
 						managedItems={navData.managed}
