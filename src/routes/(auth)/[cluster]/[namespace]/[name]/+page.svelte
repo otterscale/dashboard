@@ -1,7 +1,7 @@
 <script lang="ts">
-	import type { ResolvedPathname } from '$app/types';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import type { ResolvedPathname } from '$app/types';
 	import { ResourceViewer } from '$lib/components/resource-viewer/index.js';
 	import { breadcrumbs } from '$lib/stores';
 
