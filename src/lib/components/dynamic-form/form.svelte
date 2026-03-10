@@ -72,7 +72,18 @@
 	}
 	const extraUiOptions = chain(
 		fromRecord({
-			useLabel: false
+			useLabel: false,
+			layouts: {
+				field: {
+					class: '*:data-[slot=field-description]:line-clamp-2'
+				},
+				'array-field': {
+					class: '*:data-[slot=field-description]:line-clamp-2'
+				},
+				'object-field': {
+					class: '*:data-[slot=field-description]:line-clamp-2'
+				}
+			}
 		}),
 		fromFactories({})
 	);

@@ -50,7 +50,11 @@
 		kind,
 		metadata: {},
 		spec: {
-			deployment: { replicas: {}, template: { spec: { containers: {} } } },
+			deployment: {
+				selector: { matchLabels: { app: '' } },
+				replicas: {},
+				template: { spec: { containers: {} } }
+			},
 			service: {},
 			persistentVolumeClaim: { resources: { requests: {} } }
 		}
@@ -190,87 +194,96 @@
 						...lodash.omit(
 							lodash.get(
 								jsonSchema,
-								'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items'
+								'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers'
 							),
-							'properties'
+							'items'
 						),
-						properties: {
-							name: {
-								...lodash.get(
+						items: {
+							...lodash.omit(
+								lodash.get(
 									jsonSchema,
-									'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.name'
+									'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items'
 								),
-								title: 'Name'
-							},
-							image: {
-								...lodash.get(
-									jsonSchema,
-									'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.image'
-								),
-								title: 'Image'
-							},
-							command: {
-								...lodash.get(
-									jsonSchema,
-									'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.command'
-								),
-								title: 'Command'
-							},
-							args: {
-								...lodash.get(
-									jsonSchema,
-									'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.args'
-								),
-								title: 'Arguments'
-							},
-							env: {
-								...lodash.omit(
-									lodash.get(
+								'properties'
+							),
+							properties: {
+								name: {
+									...lodash.get(
 										jsonSchema,
-										'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.env'
+										'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.name'
 									),
-									'items'
-								),
-								title: 'Environment Variables',
-								items: {
+									title: 'Name'
+								},
+								image: {
+									...lodash.get(
+										jsonSchema,
+										'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.image'
+									),
+									title: 'Image'
+								},
+								command: {
+									...lodash.get(
+										jsonSchema,
+										'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.command'
+									),
+									title: 'Command'
+								},
+								args: {
+									...lodash.get(
+										jsonSchema,
+										'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.args'
+									),
+									title: 'Arguments'
+								},
+								env: {
 									...lodash.omit(
 										lodash.get(
 											jsonSchema,
-											'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.env.items'
+											'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.env'
 										),
-										'properties'
+										'items'
 									),
-									properties: {
-										name: {
-											...lodash.get(
+									title: 'Environment Variables',
+									items: {
+										...lodash.omit(
+											lodash.get(
 												jsonSchema,
-												'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.name'
+												'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.env.items'
 											),
-											title: 'Name'
-										},
-										value: {
-											...lodash.get(
-												jsonSchema,
-												'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.value'
-											),
-											title: 'Value'
+											'properties'
+										),
+										properties: {
+											name: {
+												...lodash.get(
+													jsonSchema,
+													'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.name'
+												),
+												title: 'Name'
+											},
+											value: {
+												...lodash.get(
+													jsonSchema,
+													'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.value'
+												),
+												title: 'Value'
+											}
 										}
 									}
+								},
+								resources: {
+									...lodash.get(
+										jsonSchema,
+										'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.resources'
+									),
+									title: 'Resources'
+								},
+								ports: {
+									...lodash.get(
+										jsonSchema,
+										'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.ports'
+									),
+									title: 'Ports'
 								}
-							},
-							resources: {
-								...lodash.get(
-									jsonSchema,
-									'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.resources'
-								),
-								title: 'Resources'
-							},
-							ports: {
-								...lodash.get(
-									jsonSchema,
-									'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.ports'
-								),
-								title: 'Ports'
 							}
 						}
 					} as Schema}
@@ -281,15 +294,17 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{
-						name: '',
-						image: '',
-						command: [],
-						args: [],
-						env: [],
-						resources: { limits: {}, requests: {} },
-						ports: []
-					} as FormValue}
+					initialValue={[
+						{
+							name: '',
+							image: '',
+							command: [],
+							args: [],
+							env: [],
+							resources: { limits: {}, requests: {} },
+							ports: []
+						}
+					] as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
