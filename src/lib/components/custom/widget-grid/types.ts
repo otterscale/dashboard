@@ -7,7 +7,7 @@ export type WidgetBaseProps = {
 	isReloading: boolean;
 };
 
-export type WidgetComponent = Component<WidgetBaseProps, {}, 'isReloading'>;
+export type WidgetComponent = Component<WidgetBaseProps, Record<string, never>, 'isReloading'>;
 
 export type WidgetDefinition = {
 	key: string;

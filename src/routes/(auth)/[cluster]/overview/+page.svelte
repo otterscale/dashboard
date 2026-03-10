@@ -6,10 +6,10 @@
 	import { page } from '$app/state';
 	import { Reloader } from '$lib/components/custom/reloader';
 	import { WidgetGrid } from '$lib/components/custom/widget-grid';
+	import { widgets } from '$lib/components/dashbaord/cluster/overview/widgets';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/paraglide/messages';
 	import { breadcrumbs } from '$lib/stores';
-	import { widgets } from '$lib/components/dashbaord/cluster/overview/widgets';
 
 	// Set breadcrumbs navigation
 	breadcrumbs.set([

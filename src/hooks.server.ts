@@ -189,7 +189,10 @@ const handleProxy: Handle = async ({ event, resolve }) => {
 	if (!env.API_URL) {
 		if (dev) {
 			return new Response(
-				JSON.stringify({ error: 'Bad Gateway', details: 'API_URL environment variable is not set' }),
+				JSON.stringify({
+					error: 'Bad Gateway',
+					details: 'API_URL environment variable is not set'
+				}),
 				{
 					status: 502,
 					headers: { 'Content-Type': 'application/json' }
