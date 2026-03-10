@@ -1,6 +1,7 @@
 import { type Handle, type HandleServerError, redirect } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 
+import { dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
 import { paraglideMiddleware } from '$lib/paraglide/server';
 import { keycloak } from '$lib/server/keycloak';
@@ -39,6 +40,29 @@ const handleParaglide: Handle = ({ event, resolve }) =>
 	});
 
 const handleAuth: Handle = async ({ event, resolve }) => {
+	if (dev && (env.MOCK_AUTH === '1' || env.MOCK_AUTH === 'true')) {
+		const now = Date.now();
+		event.locals.session = {
+			id: 'mock-session',
+			user: {
+				sub: 'mock-user',
+				username: 'mock',
+				name: 'Mock User',
+				email: 'mock@example.com',
+				picture: '',
+				roles: ['admin']
+			},
+			tokenSet: {
+				idToken: 'mock',
+				accessToken: 'mock',
+				refreshToken: 'mock',
+				accessTokenExpiresAt: new Date(now + 60 * 60 * 1000)
+			},
+			expiresAt: new Date(now + 30 * 24 * 60 * 60 * 1000)
+		};
+		return resolve(event);
+	}
+
 	const token = getSessionTokenCookie(event.cookies);
 
 	if (!token) {
@@ -134,7 +158,44 @@ const handleProxy: Handle = async ({ event, resolve }) => {
 		return resolve(event);
 	}
 
+	if (dev && (env.MOCK_PROMETHEUS === '1' || env.MOCK_PROMETHEUS === 'true')) {
+		const path = event.url.pathname;
+		if (path.includes('/prometheus/api/v1/query_range')) {
+			return new Response(
+				JSON.stringify({
+					status: 'success',
+					data: {
+						resultType: 'matrix',
+						result: []
+					}
+				}),
+				{ headers: { 'Content-Type': 'application/json' } }
+			);
+		}
+		if (path.includes('/prometheus/api/v1/query')) {
+			return new Response(
+				JSON.stringify({
+					status: 'success',
+					data: {
+						resultType: 'vector',
+						result: []
+					}
+				}),
+				{ headers: { 'Content-Type': 'application/json' } }
+			);
+		}
+	}
+
 	if (!env.API_URL) {
+		if (dev) {
+			return new Response(
+				JSON.stringify({ error: 'Bad Gateway', details: 'API_URL environment variable is not set' }),
+				{
+					status: 502,
+					headers: { 'Content-Type': 'application/json' }
+				}
+			);
+		}
 		throw new Error('API_URL environment variable is not set');
 	}
 
