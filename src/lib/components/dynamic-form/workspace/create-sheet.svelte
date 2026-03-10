@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { type TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import BasicTierImage from '$lib/assets/basic-tier.jpg';
 	import * as Sheet from '$lib/components/ui/sheet';
 
@@ -10,7 +8,6 @@
 
 	let {
 		open = $bindable(false),
-		cluster,
 		onsuccess
 	}: {
 		open: boolean;
@@ -22,11 +19,6 @@
 		open = false;
 		if (workspace?.metadata?.name) {
 			onsuccess?.(workspace);
-			goto(
-				resolve(
-					`/(auth)/${cluster}/Workspace/workspaces?group=tenant.otterscale.io&version=v1alpha1&name=${workspace.metadata.name}`
-				)
-			);
 		}
 	}
 

@@ -21,11 +21,6 @@
 		open = false;
 		if (simpleapp?.metadata?.name) {
 			onsuccess?.(simpleapp);
-			goto(
-				resolve(
-					`/(auth)/${page.params.cluster}/SimpleApp/simpleapps?group=apps.otterscale.io&version=v1alpha1&name=${simpleapp.metadata.name}&namespace=${page.url.searchParams.get('namespace') ?? ''}`
-				)
-			);
 		}
 	}
 </script>

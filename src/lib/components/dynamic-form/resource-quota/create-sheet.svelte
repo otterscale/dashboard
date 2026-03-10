@@ -25,11 +25,6 @@
 		open = false;
 		if (resourceQuota?.metadata?.name) {
 			onsuccess?.(resourceQuota);
-			goto(
-				resolve(
-					`/(auth)/${page.params.cluster}/ResourceQuota/resourcequotas?group=&version=v1&namespace=${page.params.namespace}&name=${resourceQuota.metadata.name}`
-				)
-			);
 		}
 	}
 </script>

@@ -170,7 +170,6 @@
 					break;
 			}
 			mode = targetMode;
-			toast.success(`Switched to ${mode.toUpperCase()} mode`);
 		} catch (error) {
 			toast.error(
 				`Failed to switch to ${targetMode.toUpperCase()} mode: ${(error as Error).message}`,

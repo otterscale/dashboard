@@ -221,5 +221,7 @@
 	"cluster_role_binding": "叢集角色綁定",
 	"native": "原生",
 	"artifact": "產物",
-	"console": "主控台"
+	"console": "主控台",
+	"helm_repository": "Helm 倉儲",
+	"oci_repository": "OCI 倉儲"
 }
