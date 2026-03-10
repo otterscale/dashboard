@@ -161,7 +161,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={'workspace' as FormValue}
+					initialValue={'' as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();

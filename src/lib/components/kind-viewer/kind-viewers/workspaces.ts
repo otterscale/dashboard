@@ -101,7 +101,7 @@ function getWorkspaceColumnDefinitions(
 					uiSchemas: uiSchemas,
 					metadata: {
 						hyperlink: resolve(
-							`/(auth)/${page.params.cluster!}/${row.original['Namespace']}/${row.original[column.id as WorkspaceAttribute]}?group=${apiResource.group}&version=${apiResource.version}&kind=${apiResource.kind}&resource=${apiResource.resource}`
+							`/(auth)/${page.params.cluster}/${page.params.namespace}/${row.original[column.id as WorkspaceAttribute]}?group=${apiResource.group}&version=${apiResource.version}&kind=${apiResource.kind}&resource=${apiResource.resource}&namespaced=${apiResource.namespaced}`
 						)
 					} as LinkMetadata
 				}),
@@ -127,7 +127,7 @@ function getWorkspaceColumnDefinitions(
 					uiSchemas: uiSchemas,
 					metadata: {
 						hyperlink: resolve(
-							`/(auth)/${page.params.cluster!}/${row.original['Namespace']}/${row.original['Namespace']}?group=&version=v1&kind=Namespace&resource=namespaces`
+							`/(auth)/${page.params.cluster}/${page.params.namespace}/${page.params.namespace}?group=&version=v1&kind=Namespace&resource=namespaces&namespaced=false`
 						)
 					} satisfies LinkMetadata
 				}),

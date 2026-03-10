@@ -22,11 +22,6 @@
 		open = false;
 		if (workspace?.metadata?.name) {
 			onsuccess?.(workspace);
-			goto(
-				resolve(
-					`/(auth)/${cluster}/Workspace/workspaces?group=tenant.otterscale.io&version=v1alpha1&name=${workspace.metadata.name}`
-				)
-			);
 		}
 	}
 

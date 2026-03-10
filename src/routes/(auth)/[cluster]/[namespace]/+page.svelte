@@ -23,16 +23,18 @@
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { breadcrumbs } from '$lib/stores';
 
-	// Set breadcrumbs navigation
-	breadcrumbs.set([
-		{
-			title: page.url.searchParams.get('kind') ?? 'Resource',
-			url: resolve('/(auth)/[cluster]/[namespace]', {
-				cluster: page.params.cluster!,
-				namespace: page.params.namespace!
-			})
-		}
-	]);
+	$effect(() => {
+		// Set breadcrumbs navigation
+		breadcrumbs.set([
+			{
+				title: page.url.searchParams.get('kind') ?? 'Resource',
+				url: resolve('/(auth)/[cluster]/[namespace]', {
+					cluster: page.params.cluster!,
+					namespace: page.params.namespace!
+				})
+			}
+		]);
+	});
 
 	const cluster = $derived(page.params.cluster ?? '');
 	const namespace = $derived(page.params.namespace ?? '');

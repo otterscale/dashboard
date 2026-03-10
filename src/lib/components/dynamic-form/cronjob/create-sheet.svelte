@@ -21,11 +21,6 @@
 		open = false;
 		if (cronjob?.metadata?.name) {
 			onsuccess?.(cronjob);
-			goto(
-				resolve(
-					`/(auth)/${page.params.cluster}/${page.params.namespace}/${cronjob.metadata.name}?group=&version=v1&kind=CronJob&resource=cronjobs`
-				)
-			);
 		}
 	}
 

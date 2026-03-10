@@ -1,4 +1,6 @@
-<script lang="ts">
+Kubernetes Overview
+
+<!-- <script lang="ts">
 	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
@@ -73,4 +75,4 @@
 			</div>
 		{/if}
 	</main>
-{/key}
+{/key} -->

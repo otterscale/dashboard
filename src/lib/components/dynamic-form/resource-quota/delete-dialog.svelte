@@ -61,12 +61,6 @@
 					isDeleting = false;
 					open = false;
 					onsuccess?.();
-					// Redirect after delete
-					goto(
-						resolve(
-							`/(auth)/${cluster}/ResourceQuota?group=&version=v1&namespace=${page.url.searchParams.get('namespace') ?? ''}&resource=resourcequotas`
-						)
-					);
 					return `Successfully deleted resource quota ${name}`;
 				},
 				error: (err) => {
