@@ -5,8 +5,6 @@
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import * as Form from '$lib/components/custom/form';
 	import { Single as SingleInput } from '$lib/components/custom/input';
@@ -26,7 +24,6 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-	const cluster = $derived(page.params.cluster ?? '');
 
 	let open = $state(false);
 	let confirmName = $state('');
@@ -51,7 +48,7 @@
 				}
 
 				await resourceClient.delete({
-					cluster,
+					cluster: page.params.cluster!,
 					namespace,
 					group: 'batch', // Changed from tenant.otterscale.io
 					version: 'v1', // Changed from v1alpha1
@@ -65,11 +62,6 @@
 					isDeleting = false;
 					open = false;
 					onsuccess?.();
-					goto(
-						resolve(
-							`/(auth)/${cluster}/CronJob?group=batch&version=v1&namespace=${page.url.searchParams.get('namespace') ?? ''}&resource=cronjobs`
-						)
-					);
 					return `Successfully deleted cronjob ${name}`;
 				},
 				error: (err) => {

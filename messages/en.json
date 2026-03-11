@@ -221,5 +221,7 @@
 	"cluster_role_binding": "Cluster Role Binding",
 	"native": "Native",
 	"artifact": "Artifact",
-	"console": "Console"
+	"console": "Console",
+	"helm_repository": "Helm Repository",
+	"oci_repository": "OCI Repository"
 }

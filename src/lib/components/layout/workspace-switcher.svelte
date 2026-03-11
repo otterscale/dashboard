@@ -67,6 +67,11 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
+	let activeWorkspace = $derived(
+		workspaces.length > 0 && namespace
+			? workspaces.find((w) => w.metadata?.name === namespace)
+			: undefined
+	);
 	let workspaceSchema: any = $state();
 	let createWorkspaceOpen = $state(false);
 
@@ -85,12 +90,6 @@
 	});
 
 	const sidebar = useSidebar();
-
-	let activeWorkspace = $derived(
-		workspaces.length > 0 && namespace
-			? workspaces.find((w) => w.metadata?.name === namespace)
-			: undefined
-	);
 
 	let ActiveIcon = $derived(getWorkspaceIcon(activeWorkspace?.metadata?.name));
 
@@ -145,27 +144,16 @@
 		if (index >= workspaces.length) return;
 
 		const workspace = workspaces[index];
-		const workspaceName = workspace.metadata?.name ?? '';
-		const workspaceUrl = resolve(
-			`/(auth)/${cluster}/${workspaceName}/${workspaceName}?group=tenant.otterscale.io&version=v1alpha1&kind=Workspace&resource=workspaces`
-		);
-
-		goto(workspaceUrl);
-
-		if (workspaceName) {
-			toast.success(m.switch_workspace({ name: workspaceName }));
-		}
+		const name = workspace.metadata?.name ?? '';
+		goto(resolve(`/(auth)/${cluster}/${name}/overview`));
+		toast.success(m.switch_workspace({ name: name }));
 	}
 
 	function handleWorkspaceSuccess(workspace?: TenantOtterscaleIoV1Alpha1Workspace) {
 		createWorkspaceOpen = false;
 		if (workspace?.metadata?.name) {
 			onsuccess?.(workspace);
-			goto(
-				resolve(
-					`/(auth)/${cluster}/Workspace/workspaces?group=tenant.otterscale.io&version=v1alpha1&name=${workspace.metadata.name}`
-				)
-			);
+			goto(resolve(`/(auth)/${cluster}/${workspace.metadata.name}/overview`));
 		}
 	}
 
@@ -229,6 +217,21 @@
 		callback: () => onSelect(8)
 	}}
 />
+
+{#if workspaceSchema}
+	<NewCreate
+		bind:open={createWorkspaceOpen}
+		showTrigger={false}
+		group="tenant.otterscale.io"
+		version="v1alpha1"
+		kind="Workspace"
+		resource="workspaces"
+		schema={workspaceSchema}
+		{cluster}
+		onsuccess={handleWorkspaceSuccess}
+	/>
+{/if}
+
 <Sidebar.Menu>
 	<Sidebar.MenuItem>
 		<DropdownMenu.Root>
@@ -313,17 +316,3 @@
 		</DropdownMenu.Root>
 	</Sidebar.MenuItem>
 </Sidebar.Menu>
-
-{#if workspaceSchema}
-	<NewCreate
-		bind:open={createWorkspaceOpen}
-		showTrigger={false}
-		group="tenant.otterscale.io"
-		version="v1alpha1"
-		kind="Workspace"
-		resource="workspaces"
-		schema={workspaceSchema}
-		{cluster}
-		onsuccess={handleWorkspaceSuccess}
-	/>
-{/if}

@@ -1,9 +1,6 @@
 <script lang="ts">
 	import { Plus } from '@lucide/svelte';
 
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
 	import { Button } from '$lib/components/ui/button';
 	import * as Sheet from '$lib/components/ui/sheet';
 
@@ -21,11 +18,6 @@
 		open = false;
 		if (simpleapp?.metadata?.name) {
 			onsuccess?.(simpleapp);
-			goto(
-				resolve(
-					`/(auth)/${page.params.cluster}/SimpleApp/simpleapps?group=apps.otterscale.io&version=v1alpha1&name=${simpleapp.metadata.name}&namespace=${page.url.searchParams.get('namespace') ?? ''}`
-				)
-			);
 		}
 	}
 </script>

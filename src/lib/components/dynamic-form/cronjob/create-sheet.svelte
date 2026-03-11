@@ -1,9 +1,6 @@
 <script lang="ts">
 	import { Plus } from '@lucide/svelte';
 
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Sheet from '$lib/components/ui/sheet';
 
@@ -21,11 +18,6 @@
 		open = false;
 		if (cronjob?.metadata?.name) {
 			onsuccess?.(cronjob);
-			goto(
-				resolve(
-					`/(auth)/${page.params.cluster}/${page.params.namespace}/${cronjob.metadata.name}?group=&version=v1&kind=CronJob&resource=cronjobs`
-				)
-			);
 		}
 	}
 
