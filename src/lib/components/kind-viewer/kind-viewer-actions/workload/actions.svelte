@@ -3,9 +3,11 @@
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
-	// import Edit from '$lib/components/kind-viewer/kind-viewer-actions/model-artifact/edit.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+
+	import Restart from './restart.svelte';
+	import Scale from './scale.svelte';
 
 	let {
 		schema,
@@ -28,6 +30,9 @@
 	} = $props();
 
 	let actionsOpen = $state(false);
+
+	// DaemonSet doesn't support scaling (no replicas concept)
+	const supportsScale = $derived(kind !== 'DaemonSet');
 </script>
 
 <DropdownMenu.Root bind:open={actionsOpen}>
@@ -49,24 +54,50 @@
 			>
 				<View {schema} {object} />
 			</DropdownMenu.Item>
-			<!-- <DropdownMenu.Item
+		</DropdownMenu.Group>
+		<DropdownMenu.Separator />
+		<DropdownMenu.Group>
+			{#if supportsScale}
+				<DropdownMenu.Item
+					onSelect={(e) => {
+						e.preventDefault();
+					}}
+				>
+					<Scale
+						{cluster}
+						{namespace}
+						{group}
+						{version}
+						{kind}
+						{resource}
+						{object}
+						onOpenChangeComplete={() => {
+							actionsOpen = false;
+						}}
+					/>
+				</DropdownMenu.Item>
+			{/if}
+			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
 			>
-				<Edit
-					{schema}
-					{object}
+				<Restart
 					{cluster}
+					{namespace}
 					{group}
 					{version}
 					{kind}
 					{resource}
+					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
 					}}
 				/>
-			</DropdownMenu.Item> -->
+			</DropdownMenu.Item>
+		</DropdownMenu.Group>
+		<DropdownMenu.Separator />
+		<DropdownMenu.Group>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();

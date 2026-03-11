@@ -10,10 +10,12 @@ import ModelArtifactActions from './model-artifact/actions.svelte';
 import ModelArtifactCreate from './model-artifact/create.svelte';
 import ModelServiceActions from './model-service/actions.svelte';
 import ModelServiceCreate from './model-service/create.svelte';
+import PodActions from './pod/actions.svelte';
 import ResourceQuotaActions from './resource-quota/actions.svelte';
 import ResourceQuotaCreate from './resource-quota/create.svelte';
 import SimpleAppActions from './simple-app/actions.svelte';
 import SimpleAppCreate from './simple-app/create.svelte';
+import WorkloadActions from './workload/actions.svelte';
 import WorkspaceActions from './workspace/actions.svelte';
 import WorkspaceCreate from './workspace/create.svelte';
 
@@ -21,6 +23,7 @@ type RoleType = 'admin' | 'edit' | 'view';
 
 type CreateType = Component<{
 	cluster?: string;
+	namespace?: string;
 	group?: string;
 	version?: string;
 	kind?: string;
@@ -32,6 +35,7 @@ type ActionsType = Component<{
 	schema?: any;
 	object?: any;
 	cluster?: string;
+	namespace?: string;
 	group?: string;
 	version?: string;
 	kind?: string;
