@@ -175,7 +175,7 @@
 					},
 					{
 						title: m.hub(),
-						url: resolve('/(auth)/[cluster]/[namespace]/registry', {
+						url: resolve('/(auth)/[cluster]/[namespace]/hub', {
 							cluster: activeCluster,
 							namespace: page.params.namespace!
 						})
