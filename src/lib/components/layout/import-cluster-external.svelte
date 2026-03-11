@@ -7,6 +7,7 @@
 
 	import * as Code from '$lib/components/custom/code';
 	import { Button } from '$lib/components/ui/button';
+	import * as Collapsible from '$lib/components/ui/collapsible';
 	import { Input } from '$lib/components/ui/input';
 	import { Label } from '$lib/components/ui/label';
 
@@ -27,6 +28,7 @@
 
 	let clusterName = $state('');
 	let installUrl = $state('');
+	let manifestYaml = $state('');
 	let clusterStatus = $state<'pending' | 'ready'>('pending');
 	let isCreating = $state(false);
 	let errorMessage = $state('');
@@ -68,6 +70,7 @@
 			});
 
 			installUrl = response.url;
+			manifestYaml = response.manifest;
 			clusterStatus = 'pending';
 			stepIndex = 2; // Move to Deploy
 
@@ -192,6 +195,30 @@
 		>
 			<Code.CopyButton />
 		</Code.Root>
+
+		{#if manifestYaml}
+			<Collapsible.Root>
+				<Collapsible.Trigger
+					class="group flex w-full items-center justify-between rounded-md border bg-card px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent"
+				>
+					<span class="flex items-center gap-2">
+						<Icon icon="ph:file-yaml" class="size-4" />
+						Preview YAML Manifest
+					</span>
+					<Icon
+						icon="ph:caret-down"
+						class="size-4 transition-transform duration-200 group-data-[state=open]:rotate-180"
+					/>
+				</Collapsible.Trigger>
+				<Collapsible.Content>
+					<div class="mt-2 max-h-[500px] overflow-auto rounded-md border">
+						<Code.Root lang="yaml" class="w-full text-xs" code={manifestYaml}>
+							<Code.CopyButton />
+						</Code.Root>
+					</div>
+				</Collapsible.Content>
+			</Collapsible.Root>
+		{/if}
 
 		<div
 			class="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-xs text-muted-foreground"
