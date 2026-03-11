@@ -65,8 +65,10 @@
 	let activeCluster = $state(page.params.cluster ?? '');
 	let links = $state<Link[]>([]);
 	let workspaces = $state<TenantOtterscaleIoV1Alpha1Workspace[]>([]);
-	let openAbout = $state(false);
-	let openImportCluster = $state(false);
+
+	let sidebarOpen = $state(true);
+	let aboutOpen = $state(false);
+	let importOpen = $state(false);
 
 	async function fetchClusters() {
 		try {
@@ -96,10 +98,6 @@
 		await fetchWorkspaces(cluster);
 		await goto(resolve('/(auth)/[cluster]/overview', { cluster: activeCluster }));
 		toast.success(m.switch_cluster({ name: cluster }));
-	}
-
-	function onAboutClick() {
-		openAbout = true;
 	}
 
 	let isMounted = $state(false);
@@ -249,20 +247,21 @@
 				icon: UserStarIcon,
 				items: [
 					{
-						title: m.workspace(),
-						url: resourceUrl('tenant.otterscale.io', 'v1alpha1', 'Workspace', 'workspaces')
-					},
-					{
-						title: m.module(),
-						url: resourceUrl('module.otterscale.io', 'v1alpha1', 'Module', 'modules')
-					},
-					{
 						title: m.helm_repository(),
 						url: resourceUrl('source.toolkit.fluxcd.io', 'v1', 'HelmRepository', 'helmrepositories')
 					},
 					{
 						title: m.oci_repository(),
 						url: resourceUrl('source.toolkit.fluxcd.io', 'v1', 'OCIRepository', 'ocirepositories')
+					},
+
+					{
+						title: m.workspace(),
+						url: resourceUrl('tenant.otterscale.io', 'v1alpha1', 'Workspace', 'workspaces')
+					},
+					{
+						title: m.module(),
+						url: resourceUrl('module.otterscale.io', 'v1alpha1', 'Module', 'modules')
 					}
 				]
 			}
@@ -440,9 +439,9 @@
 	<title>{current ? `${current.title} - OtterScale` : 'OtterScale'}</title>
 </svelte:head>
 
-<DialogAbout bind:open={openAbout} />
+<DialogAbout bind:open={aboutOpen} />
 
-<Sidebar.Provider>
+<Sidebar.Provider bind:open={sidebarOpen}>
 	<Sidebar.Root id="sidebar-guide-step" collapsible="icon" variant="inset" class="p-3">
 		{#if activeCluster && isMounted}
 			<Sidebar.Header id="workspace-guide-step">
@@ -463,15 +462,15 @@
 						nativeItems={navData.native}
 					/>
 				{:else}
-					{@render contentSkeleton()}
+					{@render contentSkeleton(sidebarOpen)}
 				{/if}
 			</Sidebar.Content>
 		{:else}
 			<Sidebar.Header id="workspace-guide-step">
-				{@render headerSkeleton()}
+				{@render headerSkeleton(sidebarOpen)}
 			</Sidebar.Header>
 			<Sidebar.Content class="gap-2">
-				{@render contentSkeleton()}
+				{@render contentSkeleton(sidebarOpen)}
 			</Sidebar.Content>
 		{/if}
 		<NavSecondary harborUrl={env.PUBLIC_HARBOR_URL} />
@@ -505,7 +504,7 @@
 				</Breadcrumb.Root>
 			</div>
 			<div class="flex items-center gap-2 px-4">
-				<Button variant="ghost" size="icon" class="size-7" onclick={onAboutClick}>
+				<Button variant="ghost" size="icon" class="size-7" onclick={() => (aboutOpen = true)}>
 					<InfoIcon />
 					<span class="sr-only">About</span>
 				</Button>
@@ -536,15 +535,14 @@
 								</DropdownMenu.RadioGroup>
 								<DropdownMenu.Separator />
 							{/if}
-							<DropdownMenu.Item onclick={() => (openImportCluster = true)}>
+							<DropdownMenu.Item onclick={() => (importOpen = true)}>
 								<PlusIcon class="mr-2 size-4" />
-								{m.add()}
-								{m.cluster()}
+								{m.add_cluster()}
 							</DropdownMenu.Item>
 						</DropdownMenu.Group>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
-				<DialogImportCluster bind:open={openImportCluster} onsuccess={fetchClusters} />
+				<DialogImportCluster bind:open={importOpen} onsuccess={fetchClusters} />
 			</div>
 		</header>
 		<main class="flex flex-1 flex-col px-2 md:px-4 lg:px-8">
@@ -553,45 +551,42 @@
 	</Sidebar.Inset>
 </Sidebar.Provider>
 
-{#snippet headerSkeleton()}
-	<div class="flex h-12 w-full items-center gap-2 overflow-hidden rounded-md p-2">
-		<Skeleton class="size-8 bg-foreground/10" />
-		<div class="space-y-2">
-			<Skeleton class="h-3 w-36 bg-foreground/10" />
-			<Skeleton class="h-2 w-12 bg-foreground/10" />
+{#snippet headerSkeleton(sidebarOpen?: boolean)}
+	{#if sidebarOpen}
+		<div class="flex w-full items-center gap-2 overflow-hidden rounded-md p-2">
+			<Skeleton class="size-8 bg-foreground/10" />
+			<div class="space-y-2">
+				<Skeleton class="h-3 w-36 bg-foreground/10" />
+				<Skeleton class="h-2 w-12 bg-foreground/10" />
+			</div>
 		</div>
-	</div>
+	{:else}
+		<Skeleton class="size-8 bg-foreground/10" />
+	{/if}
 {/snippet}
 
-{#snippet contentSkeleton()}
-	<div class="relative flex w-full min-w-0 flex-col space-y-4 px-4 py-2">
-		<Skeleton class="h-3 w-8 bg-foreground/10" />
-		<div class="flex items-center space-x-2">
-			<Skeleton class="h-4 w-4 bg-foreground/10" />
-			<Skeleton class="h-4 w-32 bg-foreground/10" />
-		</div>
-		<div class="flex items-center space-x-2">
-			<Skeleton class="h-4 w-4 bg-foreground/10" />
-			<Skeleton class="h-4 w-32 bg-foreground/10" />
-		</div>
-		<div class="flex items-center space-x-2">
-			<Skeleton class="h-4 w-4 bg-foreground/10" />
-			<Skeleton class="h-4 w-32 bg-foreground/10" />
-		</div>
-	</div>
-	<div class="relative flex w-full min-w-0 flex-col space-y-4 px-4 py-2">
-		<Skeleton class="h-3 w-8 bg-foreground/10" />
-		<div class="flex items-center space-x-2">
-			<Skeleton class="h-4 w-4 bg-foreground/10" />
-			<Skeleton class="h-4 w-32 bg-foreground/10" />
-		</div>
-		<div class="flex items-center space-x-2">
-			<Skeleton class="h-4 w-4 bg-foreground/10" />
-			<Skeleton class="h-4 w-32 bg-foreground/10" />
-		</div>
-		<div class="flex items-center space-x-2">
-			<Skeleton class="h-4 w-4 bg-foreground/10" />
-			<Skeleton class="h-4 w-32 bg-foreground/10" />
-		</div>
-	</div>
+{#snippet contentSkeleton(sidebarOpen?: boolean)}
+	{#each Array.from({ length: 3 }, (_, i) => i) as index (index)}
+		{#if sidebarOpen}
+			<div class="relative flex w-full min-w-0 flex-col space-y-4 px-4 py-2">
+				<Skeleton class="h-3 w-8 bg-foreground/10" />
+				<div class="flex items-center space-x-2">
+					<Skeleton class="h-4 w-4 bg-foreground/10" />
+					<Skeleton class="h-4 w-32 bg-foreground/10" />
+				</div>
+				<div class="flex items-center space-x-2">
+					<Skeleton class="h-4 w-4 bg-foreground/10" />
+					<Skeleton class="h-4 w-32 bg-foreground/10" />
+				</div>
+				<div class="flex items-center space-x-2">
+					<Skeleton class="h-4 w-4 bg-foreground/10" />
+					<Skeleton class="h-4 w-32 bg-foreground/10" />
+				</div>
+			</div>
+		{:else}
+			<div class="flex h-8 items-center justify-center gap-2 rounded-md pt-4 pl-1">
+				<Skeleton class="size-4 bg-foreground/10" />
+			</div>
+		{/if}
+	{/each}
 {/snippet}

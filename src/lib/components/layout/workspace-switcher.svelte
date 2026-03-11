@@ -247,7 +247,11 @@
 						>
 							<ActiveIcon class="size-4" />
 							{#if !activeWorkspace}
-								<span class="absolute top-1 left-8 flex size-3">
+								<span
+									class="absolute flex size-3 transition-all {sidebar.open
+										? 'top-1 left-8'
+										: '-top-1 left-6'}"
+								>
 									<span
 										class="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"
 									></span>
