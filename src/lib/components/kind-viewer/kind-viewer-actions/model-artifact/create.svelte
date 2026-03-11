@@ -186,7 +186,7 @@
 						posthook: () => {
 							handleNext();
 
-							const harborUrl = new SvelteURL(publicEnv.PUBLIC_HARBOR_URL);
+							const harborUrl = new SvelteURL(publicEnv.PUBLIC_HARBOR_URL ?? '');
 
 							const target = {
 								registry: harborUrl.host,
