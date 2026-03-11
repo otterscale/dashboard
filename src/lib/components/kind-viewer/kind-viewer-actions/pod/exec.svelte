@@ -37,11 +37,7 @@
 	}
 </script>
 
-<Dialog.Root
-	bind:open
-	{onOpenChangeComplete}
-	onOpenChange={handleOpenChange}
->
+<Dialog.Root bind:open {onOpenChangeComplete} onOpenChange={handleOpenChange}>
 	<Dialog.Trigger class="w-full">
 		<Item.Root class="p-0 text-xs" size="sm">
 			<Item.Media>
@@ -66,10 +62,7 @@
 					type="single"
 					value={selectedContainer}
 					onValueChange={(value) => {
-						selectedContainer = value;
-						// Re-mount terminal with new container
-						showTerminal = false;
-						setTimeout(() => (showTerminal = true), 50);
+						if (value) selectedContainer = value;
 					}}
 				>
 					<SelectTrigger class="w-48">
@@ -86,13 +79,15 @@
 
 		<div class="h-[60vh] overflow-hidden px-2 pb-2">
 			{#if showTerminal && selectedContainer}
-				<Terminal
-					{cluster}
-					{namespace}
-					podName={podName}
-					containerName={selectedContainer}
-					command={['/bin/sh']}
-				/>
+				{#key selectedContainer}
+					<Terminal
+						{cluster}
+						{namespace}
+						{podName}
+						containerName={selectedContainer}
+						command={['/bin/sh']}
+					/>
+				{/key}
 			{/if}
 		</div>
 	</Dialog.Content>

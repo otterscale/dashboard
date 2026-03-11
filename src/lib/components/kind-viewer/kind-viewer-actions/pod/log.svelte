@@ -125,7 +125,8 @@
 	<Dialog.Content class="flex h-fit max-h-[80vh] max-w-[70vw] min-w-[55vw] flex-col gap-3">
 		<Dialog.Header>
 			<Dialog.Title>Pod Logs — {podName}</Dialog.Title>
-			<Dialog.Description>Streaming logs from namespace <strong>{namespace}</strong></Dialog.Description
+			<Dialog.Description
+				>Streaming logs from namespace <strong>{namespace}</strong></Dialog.Description
 			>
 		</Dialog.Header>
 

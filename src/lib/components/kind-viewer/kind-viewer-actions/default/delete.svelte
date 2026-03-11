@@ -111,14 +111,6 @@
 
 					toast.promise(
 						async () => {
-							console.log({
-								cluster,
-								namespace,
-								group,
-								version,
-								resource,
-								name
-							});
 							await resourceClient.delete({
 								cluster,
 								namespace,
