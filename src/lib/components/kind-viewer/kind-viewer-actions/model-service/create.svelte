@@ -24,6 +24,7 @@
 
 	let {
 		cluster,
+		namespace,
 		group,
 		version,
 		kind,
@@ -31,6 +32,7 @@
 		schema: jsonSchema
 	}: {
 		cluster: string;
+		namespace: string;
 		group: string;
 		version: string;
 		kind: string;
@@ -757,6 +759,7 @@
 
 									await resourceClient.create({
 										cluster,
+										namespace: 'test',
 										group,
 										version,
 										resource,

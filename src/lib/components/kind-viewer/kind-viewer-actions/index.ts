@@ -68,6 +68,13 @@ function getActions(kind: string): ActionsType {
 	switch (kind) {
 		case 'Application':
 			return ApplicationActions as ActionsType;
+		case 'Pod':
+			return PodActions as ActionsType;
+		case 'Deployment':
+		case 'StatefulSet':
+		case 'ReplicaSet':
+		case 'DaemonSet':
+			return WorkloadActions as ActionsType;
 		case 'CronJob':
 			return CronJobActions as ActionsType;
 		case 'ModelService':
