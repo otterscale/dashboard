@@ -36,7 +36,7 @@
 	const name: string = $derived(object?.metadata?.name ?? '');
 	const currentReplicas: number = $derived(object?.spec?.replicas ?? 1);
 
-	let replicas = $state(currentReplicas);
+	let replicas = $state(0);
 	let open = $state(false);
 	let isScaling = $state(false);
 
@@ -83,7 +83,15 @@
 	}
 </script>
 
-<AlertDialog.Root bind:open {onOpenChangeComplete}>
+<AlertDialog.Root
+	bind:open
+	{onOpenChangeComplete}
+	onOpenChange={(isOpen) => {
+		if (isOpen) {
+			replicas = currentReplicas;
+		}
+	}}
+>
 	<AlertDialog.Trigger>
 		{#snippet child({ props })}
 			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
