@@ -51,9 +51,6 @@
 			>
 				<View {schema} {object} />
 			</DropdownMenu.Item>
-		</DropdownMenu.Group>
-		<DropdownMenu.Separator />
-		<DropdownMenu.Group>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
@@ -80,9 +77,6 @@
 					}}
 				/>
 			</DropdownMenu.Item>
-		</DropdownMenu.Group>
-		<DropdownMenu.Separator />
-		<DropdownMenu.Group>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
