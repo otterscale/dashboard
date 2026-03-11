@@ -1,5 +1,4 @@
 <script lang="ts">
-	import * as Item from '$lib/components/ui/item';
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import { Columns3Icon, EraserIcon, RefreshCwIcon } from '@lucide/svelte';
 	import type { ColumnDef } from '@tanstack/table-core';
@@ -10,15 +9,16 @@
 	import type { DataSchemaType, UISchemaType } from '$lib/components/dynamic-table/utils';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Empty from '$lib/components/ui/empty/index.js';
+	import * as Item from '$lib/components/ui/item';
 
-	import ProjectPicker from './artifact-viewer-project-picker.svelte';
-	import RepositoryPicker from './artifact-viewer-repository-picker.svelte';
 	import {
 		getArtifactColumnDefinitions,
 		getArtifactData,
 		getArtifactDataSchemas,
 		getArtifactUISchemas
 	} from './artifact-viewer.ts';
+	import ProjectPicker from './artifact-viewer-project-picker.svelte';
+	import RepositoryPicker from './artifact-viewer-repository-picker.svelte';
 	import Create from './create.svelte';
 	import Grid from './grid.svelte';
 	import type { ArtifactType, ProjectType, RepositoryType } from './types';

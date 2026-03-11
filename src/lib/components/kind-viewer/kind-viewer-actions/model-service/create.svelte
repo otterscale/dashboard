@@ -3,16 +3,16 @@
 	import { Plus } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
-	import { SubmitButton } from '@sjsf/form';
+	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
 	import lodash from 'lodash';
 	import { getContext } from 'svelte';
-	import { SvelteURL } from 'svelte/reactivity';
+	import { SvelteMap, SvelteSet, SvelteURL } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
 	import { env as publicEnv } from '$env/dynamic/public';
-	import type { ArtifactType } from '$lib/components/artifact-viewer/types';
+	import type { ArtifactType, RepositoryType } from '$lib/components/artifact-viewer/types';
 	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';
@@ -84,6 +84,7 @@
 	let open = $state(false);
 	let isSubmitting = $state(false);
 
+	const imageToArtifact = new SvelteMap<string, ArtifactType>();
 	let timer: ReturnType<typeof setTimeout> | null = null;
 	function fetchModelArtifacts(): Promise<{ label: string; value: string }[]> {
 		return new Promise((resolve) => {
@@ -91,15 +92,29 @@
 
 			timer = setTimeout(async () => {
 				try {
-					const response = await fetch(`/rest/harbor/models`);
+					const response = await fetch(`/rest/harbor/models?project=${namespace}`);
 					if (response.ok) {
 						const harborUrl = new SvelteURL(publicEnv.PUBLIC_HARBOR_URL);
-						const modelArtifacts = await response.json();
+						const modelArtifacts: ArtifactType[] = await response.json();
+
+						const modelRepositories: string[] = [];
+						modelArtifacts.forEach((artifact) => {
+							if (
+								Array.isArray(artifact.tags) &&
+								artifact.tags.some((tag) => tag.name === 'latest')
+							) {
+								imageToArtifact.set(
+									`${harborUrl.host}/${artifact.repository_name}:latest`,
+									artifact
+								);
+								modelRepositories.push(artifact.repository_name);
+							}
+						});
 
 						resolve(
-							modelArtifacts.map((modelArtifact: ArtifactType) => ({
-								label: modelArtifact.repository_name,
-								value: `${harborUrl.host}/${modelArtifact.repository_name}`
+							modelRepositories.map((repositoryName: string) => ({
+								label: repositoryName,
+								value: `${harborUrl.host}/${repositoryName}:latest`
 							}))
 						);
 					} else {
@@ -190,19 +205,12 @@
 			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
-						...(lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.model'),
+						...(lodash.omit(lodash.get(jsonSchema, 'properties.spec.properties.model'), [
+							'required',
 							'properties'
-						) as any),
+						]) as any),
 						title: 'Model',
 						properties: {
-							name: {
-								...(lodash.get(
-									jsonSchema,
-									'properties.spec.properties.model.properties.name'
-								) as any),
-								title: 'Name'
-							},
 							image: {
 								...(lodash.get(
 									jsonSchema,
@@ -210,7 +218,10 @@
 								) as any),
 								title: 'Image'
 							}
-						}
+						},
+						required: lodash
+							.get(jsonSchema, 'properties.spec.properties.model.required')
+							.filter((property: string) => property !== 'name')
 					} as Schema}
 					uiSchema={{
 						'ui:options': {
@@ -233,12 +244,24 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						name: '',
 						image: ''
 					} as FormValue}
 					handleSubmit={{
-						posthook: () => {
+						posthook: (form) => {
 							handleNext();
+
+							const formValue = getValueSnapshot(form);
+							const image = String(lodash.get(formValue, 'image'));
+							const artifact = imageToArtifact.get(image) as ArtifactType;
+							if (artifact) {
+								const extraAttributes = artifact.extra_attrs;
+								const name = [
+									...(lodash.get(extraAttributes, 'descriptor.authors') as []),
+									lodash.get(extraAttributes, 'descriptor.name')
+								].join('/');
+
+								lodash.set(values, 'spec.model.name', name);
+							}
 						}
 					}}
 					bind:values={values['spec']['model']}

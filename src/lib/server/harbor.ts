@@ -74,13 +74,31 @@ export async function listRepositories(
 	if (!projectName) throw new Error('projectName is required');
 
 	const repositories = await retrieve<RepositoryType[]>({
-		path: `/api/v2.0/projects/${encodeURIComponent(projectName)}/repositories`,
+		path: `/api/v2.0/repositories`,
 		accessToken,
 		responseType: 'json',
 		headers: {}
 	});
 
 	return repositories ?? [];
+}
+
+export async function getArtifact(
+	projectName: string,
+	repositoryName: string,
+	reference: string,
+	accessToken: string
+): Promise<ArtifactType> {
+	if (!projectName || !repositoryName || !reference)
+		throw new Error('projectName, repositoryName and reference are required');
+
+	const artifact = await retrieve<ArtifactType>({
+		path: `/api/v2.0/projects/${encodeURIComponent(projectName)}/repositories/${encodeURIComponent(encodeURIComponent(repositoryName))}/artifacts/${encodeURIComponent(reference)}`,
+		accessToken,
+		responseType: 'json',
+		headers: {}
+	});
+	return artifact ?? {};
 }
 
 export async function listArtifacts(
@@ -100,18 +118,21 @@ export async function listArtifacts(
 	return artifacts ?? [];
 }
 
-export async function listModelArtifacts(accessToken: string): Promise<ArtifactType[]> {
+export async function listModelArtifacts(
+	projectName: string,
+	accessToken: string
+): Promise<ArtifactType[]> {
 	const modelArtifacts: ArtifactType[] = [];
 
 	try {
-		const repositories = await listRepositories('models', accessToken);
+		const repositories = await listRepositories(projectName, accessToken);
 
 		for (const repository of repositories) {
 			const [projectName, ...repositoryName] = repository.name.split('/');
 
 			const artifacts = await listArtifacts(projectName, repositoryName.join('/'), accessToken);
 
-			modelArtifacts.push(...artifacts);
+			modelArtifacts.push(...artifacts.filter((artifact) => artifact.type === 'MODEL'));
 		}
 	} catch (error) {
 		console.error('Fail to fetch models:', error);

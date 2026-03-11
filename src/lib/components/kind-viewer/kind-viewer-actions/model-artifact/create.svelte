@@ -3,7 +3,7 @@
 	import { Plus } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
-	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
+	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
 	import lodash from 'lodash';
 	import { getContext } from 'svelte';
@@ -12,10 +12,8 @@
 	import { stringify } from 'yaml';
 
 	import { env as publicEnv } from '$env/dynamic/public';
-	import type { ArtifactType } from '$lib/components/artifact-viewer/types';
 	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
-	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Item from '$lib/components/ui/item';
@@ -80,38 +78,6 @@
 	// Flag for Dialog
 	let open = $state(false);
 	let isSubmitting = $state(false);
-
-	let timer: ReturnType<typeof setTimeout> | null = null;
-	function fetchModelArtifacts(): Promise<{ label: string; value: string }[]> {
-		return new Promise((resolve) => {
-			if (timer) clearTimeout(timer);
-
-			timer = setTimeout(async () => {
-				try {
-					const response = await fetch(`/rest/harbor/models`);
-					if (response.ok) {
-						const modelArtifacts = await response.json();
-
-						resolve(
-							modelArtifacts.map((modelArtifact: ArtifactType) => {
-								const modelName = modelArtifact.repository_name.replace(/^models\//, '');
-								return {
-									label: modelName,
-									value: modelName
-								};
-							})
-						);
-					} else {
-						console.error('Failed to fetch models:', response.statusText);
-						resolve([]);
-					}
-				} catch (error) {
-					console.error('Error fetching models:', error);
-					resolve([]);
-				}
-			}, 300);
-		});
-	}
 </script>
 
 <AlertDialog.Root
@@ -136,7 +102,6 @@
 			</Item.Content>
 		</Item.Root>
 		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
-			<!-- Step 1: Metadata -->
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
@@ -187,7 +152,6 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 2: Source (HuggingFace) -->
 			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
@@ -197,9 +161,12 @@
 						) as any),
 						properties: {
 							model: {
-								...lodash.get(
-									jsonSchema,
-									'properties.spec.properties.source.properties.huggingFace.properties.model'
+								...lodash.omit(
+									lodash.get(
+										jsonSchema,
+										'properties.spec.properties.source.properties.huggingFace.properties.model'
+									),
+									'pattern'
 								),
 								title: 'Model'
 							}
@@ -210,37 +177,28 @@
 							translations: {
 								submit: 'Next'
 							}
-						},
-						model: {
-							'ui:components': {
-								textWidget: ComboboxWidget
-							},
-							'ui:options': {
-								TailoredComboboxEnumerations: fetchModelArtifacts,
-								TailoredComboboxVisibility: 10,
-								TailoredComboboxInput: {
-									placeholder: 'Model'
-								},
-								TailoredComboboxEmptyText: 'No models available.'
-							}
 						}
 					} as UiSchemaRoot}
 					initialValue={{
 						model: ''
 					} as FormValue}
 					handleSubmit={{
-						prehook: (form) => {
-							const harborUrl = new SvelteURL(publicEnv.PUBLIC_HARBOR_URL);
-
-							lodash.set(values, 'spec.target.registry', harborUrl.host);
-							lodash.set(
-								values,
-								'spec.target.repository',
-								`models/${lodash.get(getValueSnapshot(form), 'model')}`
-							);
-						},
 						posthook: () => {
 							handleNext();
+
+							const harborUrl = new SvelteURL(publicEnv.PUBLIC_HARBOR_URL);
+
+							const target = {
+								registry: harborUrl.host,
+								repository: `${namespace}/${lodash.get(values, 'metadata.name')}`,
+								tag: 'latest',
+								credentialsSecretRef: { name: 'harbor-credential' },
+								insecure: true
+							};
+
+							lodash.set(values, 'spec.target', target);
+
+							lodash.set(values, 'spec.format', 'ModelPack');
 						}
 					}}
 					bind:values={values['spec']['source']['huggingFace']}
