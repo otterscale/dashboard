@@ -69,8 +69,15 @@
 			for await (const response of stream) {
 				if (response.data && response.data.length > 0) {
 					const text = new TextDecoder().decode(response.data);
-					const lines = text.split('\n');
-					logLines = [...logLines, ...lines.filter((l) => l.length > 0)];
+					const lines = text.split('\n').filter((l) => l.length > 0);
+					const MAX_LINES = 2000;
+
+					// Use a more performant way to manage array limits
+					if (logLines.length + lines.length > MAX_LINES) {
+						logLines = [...logLines, ...lines].slice(-MAX_LINES);
+					} else {
+						logLines = [...logLines, ...lines];
+					}
 					scrollToBottom();
 				}
 			}
