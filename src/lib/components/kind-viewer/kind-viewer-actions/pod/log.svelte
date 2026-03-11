@@ -94,24 +94,9 @@
 			stopStreaming();
 		}
 	}
-
-	$effect(() => {
-		if (open) {
-			handleOpenChange(true);
-		}
-		return () => {
-			stopStreaming();
-		};
-	});
 </script>
 
-<Dialog.Root
-	bind:open
-	{onOpenChangeComplete}
-	onOpenChange={(isOpen) => {
-		if (!isOpen) stopStreaming();
-	}}
->
+<Dialog.Root bind:open {onOpenChangeComplete} onOpenChange={handleOpenChange}>
 	<Dialog.Trigger class="w-full">
 		<Item.Root class="p-0 text-xs" size="sm">
 			<Item.Media>
