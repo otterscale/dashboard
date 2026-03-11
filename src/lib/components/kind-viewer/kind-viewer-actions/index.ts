@@ -1,5 +1,7 @@
 import type { Component } from 'svelte';
 
+import ApplicationActions from './application/actions.svelte';
+import ApplicationCreate from './application/create.svelte';
 import CronJobActions from './cronjob/actions.svelte';
 import DaemonSetActions from './daemonset/actions.svelte';
 import DefaultActions from './default/actions.svelte';
@@ -46,6 +48,8 @@ type ActionsType = Component<{
 
 function getCreate(kind: string): CreateType {
 	switch (kind) {
+		case 'Application':
+			return ApplicationCreate as CreateType;
 		case 'ModelService':
 			return ModelServiceCreate as CreateType;
 		case 'ModelArtifact':
@@ -63,6 +67,8 @@ function getCreate(kind: string): CreateType {
 
 function getActions(kind: string): ActionsType {
 	switch (kind) {
+		case 'Application':
+			return ApplicationActions as CreateType;
 		case 'Pod':
 			return PodActions as ActionsType;
 		case 'Deployment':

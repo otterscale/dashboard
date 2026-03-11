@@ -3,10 +3,11 @@
 	import { Plus } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
-	import { SubmitButton } from '@sjsf/form';
+	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
 	import lodash from 'lodash';
 	import { getContext } from 'svelte';
+	import { SvelteMap, SvelteURL } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
@@ -23,6 +24,7 @@
 
 	let {
 		cluster,
+		namespace,
 		group,
 		version,
 		kind,
@@ -30,6 +32,7 @@
 		schema: jsonSchema
 	}: {
 		cluster: string;
+		namespace: string;
 		group: string;
 		version: string;
 		kind: string;
@@ -55,14 +58,15 @@
 		spec: {
 			accelerator: {},
 			decode: {},
-			prefill: {},
 			engine: {},
 			model: {}
 		}
 	});
 
+	let mode: any = $state({});
+
 	// Steps Manager
-	const steps = Array.from({ length: 7 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 6 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -80,22 +84,37 @@
 	let open = $state(false);
 	let isSubmitting = $state(false);
 
+	const imageToArtifact = new SvelteMap<string, ArtifactType>();
 	let timer: ReturnType<typeof setTimeout> | null = null;
-
 	function fetchModelArtifacts(): Promise<{ label: string; value: string }[]> {
 		return new Promise((resolve) => {
 			if (timer) clearTimeout(timer);
 
 			timer = setTimeout(async () => {
 				try {
-					const response = await fetch(`/rest/harbor/models`);
+					const response = await fetch(`/rest/harbor/models?project=${namespace}`);
 					if (response.ok) {
-						const modelArtifacts = await response.json();
+						const harborUrl = new SvelteURL(publicEnv.PUBLIC_HARBOR_URL ?? '');
+						const modelArtifacts: ArtifactType[] = await response.json();
+
+						const modelRepositories: string[] = [];
+						modelArtifacts.forEach((artifact) => {
+							if (
+								Array.isArray(artifact.tags) &&
+								artifact.tags.some((tag) => tag.name === 'latest')
+							) {
+								imageToArtifact.set(
+									`${harborUrl.host}/${artifact.repository_name}:latest`,
+									artifact
+								);
+								modelRepositories.push(artifact.repository_name);
+							}
+						});
 
 						resolve(
-							modelArtifacts.map((modelArtifact: ArtifactType) => ({
-								label: modelArtifact.repository_name,
-								value: `${publicEnv.PUBLIC_HARBOR_URL}/${modelArtifact.repository_name}`
+							modelRepositories.map((repositoryName: string) => ({
+								label: repositoryName,
+								value: `${harborUrl.host}/${repositoryName}:latest`
 							}))
 						);
 					} else {
@@ -128,12 +147,11 @@
 		<Item.Root class="p-0">
 			<Progress value={currentIndex + 1} max={steps.length} />
 			<Item.Content class="text-left">
-				<Item.Title class="text-xl font-bold">ModelService</Item.Title>
+				<Item.Title class="text-xl font-bold">{kind}</Item.Title>
 				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
 		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
-			<!-- Step 1: Basic Info -->
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
@@ -184,23 +202,15 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 2: Model Config -->
 			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
-						...(lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.model'),
+						...(lodash.omit(lodash.get(jsonSchema, 'properties.spec.properties.model'), [
+							'required',
 							'properties'
-						) as any),
+						]) as any),
 						title: 'Model',
 						properties: {
-							name: {
-								...(lodash.get(
-									jsonSchema,
-									'properties.spec.properties.model.properties.name'
-								) as any),
-								title: 'Name'
-							},
 							image: {
 								...(lodash.get(
 									jsonSchema,
@@ -208,7 +218,10 @@
 								) as any),
 								title: 'Image'
 							}
-						}
+						},
+						required: lodash
+							.get(jsonSchema, 'properties.spec.properties.model.required')
+							.filter((property: string) => property !== 'name')
 					} as Schema}
 					uiSchema={{
 						'ui:options': {
@@ -218,8 +231,7 @@
 						},
 						image: {
 							'ui:components': {
-								stringField: 'enumField',
-								selectWidget: ComboboxWidget
+								textWidget: ComboboxWidget
 							},
 							'ui:options': {
 								TailoredComboboxEnumerations: fetchModelArtifacts,
@@ -232,12 +244,24 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						name: '',
 						image: ''
 					} as FormValue}
 					handleSubmit={{
-						posthook: () => {
+						posthook: (form) => {
 							handleNext();
+
+							const formValue = getValueSnapshot(form);
+							const image = String(lodash.get(formValue, 'image'));
+							const artifact = imageToArtifact.get(image) as ArtifactType;
+							if (artifact) {
+								const extraAttributes = artifact.extra_attrs;
+								const name = [
+									...(lodash.get(extraAttributes, 'descriptor.authors') as []),
+									lodash.get(extraAttributes, 'descriptor.name')
+								].join('/');
+
+								lodash.set(values, 'spec.model.name', name);
+							}
 						}
 					}}
 					bind:values={values['spec']['model']}
@@ -257,7 +281,6 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 3: Accelerator -->
 			<Tabs.Content value={steps[2]}>
 				<Form
 					schema={{
@@ -307,55 +330,288 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 4: Decode -->
 			<Tabs.Content value={steps[3]}>
-				<Form
-					schema={{
-						...(lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.decode.properties'),
-							'properties'
-						) as any),
-						title: 'Decode',
-						properties: {
-							parallelism: {
-								...(lodash.omit(
-									lodash.get(
+				{@const decodeSchema = {
+					...(lodash.omit(
+						lodash.get(jsonSchema, 'properties.spec.properties.decode.properties'),
+						'properties'
+					) as any),
+					title: 'Decode',
+					properties: {
+						parallelism: {
+							...(lodash.omit(
+								lodash.get(jsonSchema, 'properties.spec.properties.decode.properties.parallelism'),
+								'properties'
+							) as any),
+							title: 'Parallelism',
+							properties: {
+								tensor: {
+									...lodash.get(
 										jsonSchema,
-										'properties.spec.properties.decode.properties.parallelism'
+										'properties.spec.properties.decode.properties.parallelism.properties.tensor'
 									),
-									'properties'
-								) as any),
-								title: 'Parallelism',
-								properties: {
-									tensor: {
-										...lodash.get(
-											jsonSchema,
-											'properties.spec.properties.decode.properties.parallelism.properties.tensor'
-										),
-										title: 'Tensor'
+									title: 'Tensor'
+								}
+							}
+						},
+						replicas: {
+							...lodash.get(jsonSchema, 'properties.spec.properties.decode.properties.replicas'),
+							title: 'Replicas'
+						},
+						resources: {
+							...lodash.omit(
+								lodash.get(jsonSchema, 'properties.spec.properties.decode.properties.resources'),
+								'properties'
+							),
+							title: 'Resources',
+							properties: {
+								requests: {
+									...(lodash.get(
+										jsonSchema,
+										'properties.spec.properties.prefill.properties.resources.properties.requests'
+									) as any),
+									additionalProperties: {
+										...(lodash.omit(
+											lodash.get(
+												jsonSchema,
+												'properties.spec.properties.prefill.properties.resources.properties.requests.additionalProperties'
+											),
+											'anyOf'
+										) as any),
+										type: 'string'
 									}
 								}
-							},
-							replicas: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.decode.properties.replicas'),
-								title: 'Replicas'
 							}
 						}
+					}
+				}}
+				{@const prefillSchema = {
+					...(lodash.omit(
+						lodash.get(jsonSchema, 'properties.spec.properties.prefill.properties'),
+						'properties'
+					) as any),
+					title: 'Prefill',
+					properties: {
+						parallelism: {
+							...(lodash.omit(
+								lodash.get(jsonSchema, 'properties.spec.properties.prefill.properties.parallelism'),
+								'properties'
+							) as any),
+							title: 'Parallelism',
+							properties: {
+								tensor: {
+									...lodash.get(
+										jsonSchema,
+										'properties.spec.properties.prefill.properties.parallelism.properties.tensor'
+									),
+									title: 'Tensor'
+								}
+							}
+						},
+						replicas: {
+							...lodash.get(jsonSchema, 'properties.spec.properties.prefill.properties.replicas'),
+							title: 'Replicas'
+						},
+						resources: {
+							...lodash.omit(
+								lodash.get(jsonSchema, 'properties.spec.properties.prefill.properties.resources'),
+								'properties'
+							),
+							title: 'Resources',
+							properties: {
+								requests: {
+									...(lodash.get(
+										jsonSchema,
+										'properties.spec.properties.prefill.properties.resources.properties.requests'
+									) as any),
+									additionalProperties: {
+										...(lodash.omit(
+											lodash.get(
+												jsonSchema,
+												'properties.spec.properties.prefill.properties.resources.properties.requests.additionalProperties'
+											),
+											'anyOf'
+										) as any),
+										type: 'string'
+									}
+								}
+							}
+						}
+					}
+				}}
+				<Form
+					schema={{
+						type: 'object',
+						properties: {
+							mode: {
+								title: 'Mode',
+								type: 'string',
+								enum: ['Intelligent', 'Disaggregation'],
+								default: 'Intelligent'
+							}
+						},
+						allOf: [
+							{
+								if: {
+									properties: {
+										mode: {
+											const: 'Intelligent'
+										}
+									}
+								},
+								then: {
+									type: 'object',
+									properties: {
+										decode: decodeSchema
+									},
+									required: ['decode']
+								}
+							},
+							{
+								if: {
+									properties: {
+										mode: {
+											const: 'Disaggregation'
+										}
+									}
+								},
+								then: {
+									type: 'object',
+									properties: {
+										decode: decodeSchema,
+										prefill: prefillSchema
+									},
+									required: ['decode', 'prefill']
+								}
+							},
+							{
+								required: ['mode']
+							}
+						]
 					} as Schema}
 					uiSchema={{
 						'ui:options': {
 							translations: {
 								submit: 'Next'
 							}
+						},
+						mode: {
+							'ui:components': {
+								stringField: 'enumField'
+							}
+						},
+						decode: {
+							resources: {
+								requests: {
+									'ui:options': {
+										layouts: {
+											'object-properties': {
+												class: 'grid grid-cols-2 gap-3'
+											}
+										},
+										translations: {
+											'additional-property': 'additional request',
+											'add-object-property': 'Add Request'
+										},
+										additionalPropertyKey: (key: string, attempt: number) => {
+											const index = attempt + 1;
+											switch (index) {
+												case 1: {
+													return `1st ${key}`;
+												}
+												case 2: {
+													return `2nd ${key}`;
+												}
+												case 3: {
+													return `3rd ${key}`;
+												}
+												default: {
+													return `${index}th ${key}`;
+												}
+											}
+										}
+									},
+									additionalProperties: {
+										'ui:options': {
+											translations: {
+												'key-input-title': 'request'
+											},
+											hideTitle: true
+										}
+									}
+								}
+							}
+						},
+						prefill: {
+							resources: {
+								requests: {
+									'ui:options': {
+										layouts: {
+											'object-properties': {
+												class: 'grid grid-cols-2 gap-3'
+											}
+										},
+										translations: {
+											'additional-property': 'additional request',
+											'add-object-property': 'Add Request'
+										},
+										additionalPropertyKey: (key: string, attempt: number) => {
+											const index = attempt + 1;
+											switch (index) {
+												case 1: {
+													return `1st ${key}`;
+												}
+												case 2: {
+													return `2nd ${key}`;
+												}
+												case 3: {
+													return `3rd ${key}`;
+												}
+												default: {
+													return `${index}th ${key}`;
+												}
+											}
+										}
+									},
+									additionalProperties: {
+										'ui:options': {
+											translations: {
+												'key-input-title': 'request'
+											},
+											hideTitle: true
+										}
+									}
+								}
+							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{} as FormValue}
+					initialValue={{
+						mode: 'Intelligent',
+						decode: {
+							replicas: '',
+							parallelism: { tensor: '' },
+							resources: {
+								requests: { cpu: '', memory: '' }
+							}
+						},
+						prefill: {
+							replicas: '',
+							parallelism: { tensor: '' },
+							resources: {
+								requests: { cpu: '', memory: '' }
+							}
+						}
+					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
+							lodash.set(values, 'spec.decode', lodash.get(mode, 'decode'));
+							if (lodash.get(mode, 'mode') === 'Disaggregation') {
+								lodash.set(values, 'spec.prefill', lodash.get(mode, 'prefill'));
+							}
 						}
 					}}
-					bind:values={values['spec']['decode']}
+					bind:values={mode}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -372,73 +628,7 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 5: Prefill -->
 			<Tabs.Content value={steps[4]}>
-				<Form
-					schema={{
-						...(lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.prefill.properties'),
-							'properties'
-						) as any),
-						title: 'Prefill',
-						properties: {
-							parallelism: {
-								...(lodash.omit(
-									lodash.get(
-										jsonSchema,
-										'properties.spec.properties.prefill.properties.parallelism'
-									),
-									'properties'
-								) as any),
-								title: 'Parallelism',
-								properties: {
-									tensor: {
-										...lodash.get(
-											jsonSchema,
-											'properties.spec.properties.prefill.properties.parallelism.properties.tensor'
-										),
-										title: 'Tensor'
-									}
-								}
-							},
-							replicas: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.prefill.properties.replicas'),
-								title: 'Replicas'
-							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{} as FormValue}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-					bind:values={values['spec']['prefill']}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-
-			<!-- Step 6: Engine -->
-			<Tabs.Content value={steps[5]}>
 				<Form
 					schema={{
 						...(lodash.omit(
@@ -490,6 +680,29 @@
 							translations: {
 								submit: 'Next'
 							}
+						},
+						args: {
+							'ui:options': {
+								layouts: {
+									'array-items': { class: 'grid grid-cols-2 gap-3' }
+								},
+								itemTitle: (title, index) => {
+									switch (index) {
+										case 1: {
+											return `1st ${title}`;
+										}
+										case 2: {
+											return `2nd ${title}`;
+										}
+										case 3: {
+											return `3rd ${title}`;
+										}
+										default: {
+											return `${index}th ${title}`;
+										}
+									}
+								}
+							}
 						}
 					} as UiSchemaRoot}
 					initialValue={{
@@ -523,8 +736,7 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 7: Review -->
-			<Tabs.Content value={steps[6]}>
+			<Tabs.Content value={steps[5]}>
 				<div class="flex h-full flex-col gap-3">
 					<Code.Root
 						lang="yaml"
@@ -553,6 +765,7 @@
 
 									await resourceClient.create({
 										cluster,
+										namespace,
 										group,
 										version,
 										resource,
@@ -560,13 +773,13 @@
 									});
 								},
 								{
-									loading: `Creating ModelService ${name}...`,
+									loading: `Creating ${kind} ${name}...`,
 									success: () => {
-										return `Successfully created ModelService ${name}`;
+										return `Successfully created ${kind} ${name}`;
 									},
 									error: (error) => {
-										console.error(`Failed to create ModelService ${name}:`, error);
-										return `Failed to create ModelService ${name}: ${(error as ConnectError).message}`;
+										console.error(`Failed to create ${kind} ${name}:`, error);
+										return `Failed to create ${kind} ${name}: ${(error as ConnectError).message}`;
 									},
 									finally() {
 										isSubmitting = false;

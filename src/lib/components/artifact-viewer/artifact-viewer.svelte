@@ -9,6 +9,7 @@
 	import type { DataSchemaType, UISchemaType } from '$lib/components/dynamic-table/utils';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Empty from '$lib/components/ui/empty/index.js';
+	import * as Item from '$lib/components/ui/item';
 
 	import {
 		getArtifactColumnDefinitions,
@@ -97,10 +98,10 @@
 
 		isFetchingArtifacts = true;
 
-		const [projectName, repositoryName] = repositoryNameWithProject.split('/');
+		const [projectName, ...repositoryName] = repositoryNameWithProject.split('/');
 		try {
 			const response = await fetch(
-				`/rest/harbor/artifacts?project=${encodeURIComponent(projectName)}&repository=${encodeURIComponent(repositoryName)}`
+				`/rest/harbor/artifacts?project=${encodeURIComponent(projectName)}&repository=${encodeURIComponent(repositoryName.join('/'))}`
 			);
 			if (!response.ok) {
 				console.error('Failed to fetch Harbor artifacts:', response.statusText);
@@ -138,15 +139,23 @@
 
 {#if isMounted}
 	<div class="space-y-4">
-		<div class="flex items-center gap-2">
-			<ProjectPicker value={selectedProject} {projects} onSelect={handleProjectSelect} />
-			{#if repositories.length > 0}
-				<RepositoryPicker
-					value={selectedRepository}
-					{repositories}
-					onSelect={handleRepositorySelect}
-				/>
-			{/if}
+		<div class="flex items-end justify-between gap-4">
+			<Item.Root class="p-0">
+				<Item.Content class="text-left">
+					<Item.Title class="text-xl font-bold">Hub</Item.Title>
+					<Item.Description class="text-base">harbor</Item.Description>
+				</Item.Content>
+			</Item.Root>
+			<div class="flex items-center gap-2">
+				<ProjectPicker value={selectedProject} {projects} onSelect={handleProjectSelect} />
+				{#if repositories.length > 0}
+					<RepositoryPicker
+						value={selectedRepository}
+						{repositories}
+						onSelect={handleRepositorySelect}
+					/>
+				{/if}
+			</div>
 		</div>
 		<DynamicTable dataset={artifacts} {columnDefinitions} {uiSchemas} {dataSchemas}>
 			{#snippet gridsLayout({ table, handleClear })}
