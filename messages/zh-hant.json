@@ -223,5 +223,6 @@
 	"artifact": "產物",
 	"console": "主控台",
 	"helm_repository": "Helm 倉儲",
-	"oci_repository": "OCI 倉儲"
+	"oci_repository": "OCI 倉儲",
+	"add_cluster": "新增叢集"
 }

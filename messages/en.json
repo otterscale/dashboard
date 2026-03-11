@@ -223,5 +223,6 @@
 	"artifact": "Artifact",
 	"console": "Console",
 	"helm_repository": "Helm Repository",
-	"oci_repository": "OCI Repository"
+	"oci_repository": "OCI Repository",
+	"add_cluster": "Add Cluster"
 }
