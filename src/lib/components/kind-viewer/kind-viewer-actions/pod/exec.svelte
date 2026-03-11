@@ -48,8 +48,8 @@
 			</Item.Content>
 		</Item.Root>
 	</Dialog.Trigger>
-	<Dialog.Content class="flex max-h-[85vh] max-w-[80vw] min-w-[60vw] flex-col gap-3 p-0">
-		<Dialog.Header class="px-6 pt-6">
+	<Dialog.Content class="flex h-fit max-h-[80vh] max-w-[70vw] min-w-[55vw] flex-col gap-3">
+		<Dialog.Header>
 			<Dialog.Title>Terminal — {podName}</Dialog.Title>
 			<Dialog.Description>
 				Interactive shell in namespace <strong>{namespace}</strong>
@@ -57,7 +57,7 @@
 		</Dialog.Header>
 
 		{#if containers.length > 1}
-			<div class="flex items-center gap-2 px-6">
+			<div class="flex items-center gap-2">
 				<Select
 					type="single"
 					value={selectedContainer}
@@ -77,7 +77,7 @@
 			</div>
 		{/if}
 
-		<div class="h-[60vh] overflow-hidden px-2 pb-2">
+		<div class="h-[55vh] overflow-hidden rounded-md border bg-[#1e1e1e] p-3">
 			{#if showTerminal && selectedContainer}
 				{#key selectedContainer}
 					<Terminal
