@@ -244,7 +244,7 @@
 	{#if columnDefinitions}
 		<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {dataSchemas}>
 			{#snippet create()}
-				<Create {schema} {cluster} {group} {version} {kind} {resource} />
+				<Create {schema} {cluster} {namespace} {group} {version} {kind} {resource} />
 			{/snippet}
 			{#snippet reload()}
 				<Button onclick={handleReload} disabled={isWatching} variant="outline">
@@ -265,6 +265,7 @@
 					{version}
 					{kind}
 					{resource}
+					{namespace}
 				/>
 			{/snippet}
 		</DynamicTable>

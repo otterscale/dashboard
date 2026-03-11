@@ -256,7 +256,7 @@
 
 <svelte:window onresize={handleResize} />
 
-<div class="h-screen w-screen" bind:this={container}></div>
+<div class="h-full w-full" bind:this={container}></div>
 
 <style>
 	:global(.xterm) {

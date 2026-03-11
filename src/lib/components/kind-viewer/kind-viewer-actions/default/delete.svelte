@@ -16,6 +16,7 @@
 	let {
 		cluster,
 		group,
+		namespace,
 		version,
 		kind,
 		resource,
@@ -24,6 +25,7 @@
 		onOpenChangeComplete
 	}: {
 		cluster: string;
+		namespace: string;
 		group: string;
 		version: string;
 		kind: string;
@@ -109,8 +111,17 @@
 
 					toast.promise(
 						async () => {
+							console.log({
+								cluster,
+								namespace,
+								group,
+								version,
+								resource,
+								name
+							});
 							await resourceClient.delete({
 								cluster,
+								namespace,
 								group,
 								version,
 								resource,
