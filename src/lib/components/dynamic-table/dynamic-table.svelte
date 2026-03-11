@@ -68,6 +68,7 @@
 		columnDefinitions,
 		uiSchemas,
 		dataSchemas,
+		accessReview,
 		create,
 		bulkDelete,
 		reload,
@@ -78,6 +79,7 @@
 		columnDefinitions: ColumnDef<Record<string, JsonValue>>[];
 		uiSchemas: Record<string, UISchemaType>;
 		dataSchemas: Record<string, DataSchemaType>;
+		accessReview: Snippet;
 		create?: Snippet;
 		bulkDelete?: Snippet<[{ table: TanStackTabke<Record<string, JsonValue>> }]>;
 		rowActions?: Snippet<[{ row: Row<Record<string, JsonValue>> }]>;
@@ -342,6 +344,62 @@
 	<!-- Controllers -->
 	<div class="flex w-full items-center gap-2">
 		<!-- Filters -->
+		<ButtonGroup.Root>
+			<Button
+				variant={mode === 'table' ? 'secondary' : 'outline'}
+				size="icon"
+				onclick={() => (mode = 'table')}
+				aria-pressed={mode === 'table'}
+			>
+				<SheetIcon />
+			</Button>
+			<Button
+				disabled={!gridsLayout}
+				variant={mode === 'grid' ? 'secondary' : 'outline'}
+				size="icon"
+				onclick={() => (mode = 'grid')}
+				aria-pressed={mode === 'grid'}
+			>
+				<LayoutGridIcon />
+			</Button>
+		</ButtonGroup.Root>
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger>
+				{#snippet child({ props })}
+					<Button variant="outline" size="icon" {...props}>
+						<Columns3Icon size={16} aria-hidden="true" />
+					</Button>
+				{/snippet}
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Content align="start">
+				<DropdownMenu.Label>Toggle columns</DropdownMenu.Label>
+				{#each table.getAllColumns().filter((column) => column.getCanHide()) as column (column.id)}
+					<DropdownMenu.Item
+						class={column.getIsVisible()
+							? 'text-primary **:text-primary'
+							: 'text-muted-foreground/50 **:text-muted-foreground/50'}
+						closeOnSelect={false}
+						onSelect={() => column.toggleVisibility(!column.getIsVisible())}
+					>
+						{@const dataSchema = dataSchemas[column.id]}
+						{#if dataSchema === 'boolean'}
+							<BinaryIcon />
+						{:else if dataSchema === 'number'}
+							<HashIcon />
+						{:else if dataSchema === 'time'}
+							<ClockIcon />
+						{:else if dataSchema === 'text'}
+							<TypeIcon />
+						{:else if dataSchema === 'array'}
+							<BracketsIcon />
+						{:else if dataSchema === 'object'}
+							<BracesIcon />
+						{/if}
+						{column.id}
+					</DropdownMenu.Item>
+				{/each}
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
 		<ButtonGroup.Root class="w-full">
 			<InputGroup.Root>
 				<InputGroup.Addon>
@@ -447,63 +505,8 @@
 				</Sheet.Content>
 			</Sheet.Root>
 		</ButtonGroup.Root>
-		<DropdownMenu.Root>
-			<DropdownMenu.Trigger>
-				{#snippet child({ props })}
-					<Button variant="outline" {...props}>
-						<Columns3Icon class="-ms-1 opacity-60" size={16} aria-hidden="true" />
-					</Button>
-				{/snippet}
-			</DropdownMenu.Trigger>
-			<DropdownMenu.Content align="end">
-				<DropdownMenu.Label>Toggle columns</DropdownMenu.Label>
-				{#each table.getAllColumns().filter((column) => column.getCanHide()) as column (column.id)}
-					<DropdownMenu.Item
-						class={column.getIsVisible()
-							? 'text-primary **:text-primary'
-							: 'text-muted-foreground/50 **:text-muted-foreground/50'}
-						closeOnSelect={false}
-						onSelect={() => column.toggleVisibility(!column.getIsVisible())}
-					>
-						{@const dataSchema = dataSchemas[column.id]}
-						{#if dataSchema === 'boolean'}
-							<BinaryIcon />
-						{:else if dataSchema === 'number'}
-							<HashIcon />
-						{:else if dataSchema === 'time'}
-							<ClockIcon />
-						{:else if dataSchema === 'text'}
-							<TypeIcon />
-						{:else if dataSchema === 'array'}
-							<BracketsIcon />
-						{:else if dataSchema === 'object'}
-							<BracesIcon />
-						{/if}
-						{column.id}
-					</DropdownMenu.Item>
-				{/each}
-			</DropdownMenu.Content>
-		</DropdownMenu.Root>
-		<ButtonGroup.Root>
-			<Button
-				variant={mode === 'table' ? 'secondary' : 'outline'}
-				size="icon"
-				onclick={() => (mode = 'table')}
-				aria-pressed={mode === 'table'}
-			>
-				<SheetIcon />
-			</Button>
-			<Button
-				disabled={!gridsLayout}
-				variant={mode === 'grid' ? 'secondary' : 'outline'}
-				size="icon"
-				onclick={() => (mode = 'grid')}
-				aria-pressed={mode === 'grid'}
-			>
-				<LayoutGridIcon />
-			</Button>
-		</ButtonGroup.Root>
 		<!-- Accessors -->
+		{@render accessReview?.()}
 		<div>
 			{@render create?.()}
 			{@render bulkDelete?.({ table })}
