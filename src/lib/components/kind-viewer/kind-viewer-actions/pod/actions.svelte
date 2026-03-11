@@ -6,6 +6,7 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
+	import Describe from './describe.svelte';
 	import Log from './log.svelte';
 	import Terminal from './terminal.svelte';
 
@@ -50,6 +51,24 @@
 				}}
 			>
 				<View {schema} {object} />
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Describe
+					{cluster}
+					{namespace}
+					{group}
+					{version}
+					kind="Pod"
+					{resource}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {
