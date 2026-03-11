@@ -56,14 +56,15 @@
 		spec: {
 			accelerator: {},
 			decode: {},
-			prefill: {},
 			engine: {},
 			model: {}
 		}
 	});
 
+	let mode: any = $state({});
+
 	// Steps Manager
-	const steps = Array.from({ length: 7 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 6 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -309,53 +310,287 @@
 
 			<!-- Step 4: Decode -->
 			<Tabs.Content value={steps[3]}>
-				<Form
-					schema={{
-						...(lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.decode.properties'),
-							'properties'
-						) as any),
-						title: 'Decode',
-						properties: {
-							parallelism: {
-								...(lodash.omit(
-									lodash.get(
+				{@const decodeSchema = {
+					...(lodash.omit(
+						lodash.get(jsonSchema, 'properties.spec.properties.decode.properties'),
+						'properties'
+					) as any),
+					title: 'Decode',
+					properties: {
+						parallelism: {
+							...(lodash.omit(
+								lodash.get(jsonSchema, 'properties.spec.properties.decode.properties.parallelism'),
+								'properties'
+							) as any),
+							title: 'Parallelism',
+							properties: {
+								tensor: {
+									...lodash.get(
 										jsonSchema,
-										'properties.spec.properties.decode.properties.parallelism'
+										'properties.spec.properties.decode.properties.parallelism.properties.tensor'
 									),
-									'properties'
-								) as any),
-								title: 'Parallelism',
-								properties: {
-									tensor: {
-										...lodash.get(
-											jsonSchema,
-											'properties.spec.properties.decode.properties.parallelism.properties.tensor'
-										),
-										title: 'Tensor'
+									title: 'Tensor'
+								}
+							}
+						},
+						replicas: {
+							...lodash.get(jsonSchema, 'properties.spec.properties.decode.properties.replicas'),
+							title: 'Replicas'
+						},
+						resources: {
+							...lodash.omit(
+								lodash.get(jsonSchema, 'properties.spec.properties.decode.properties.resources'),
+								'properties'
+							),
+							title: 'Resources',
+							properties: {
+								requests: {
+									...(lodash.get(
+										jsonSchema,
+										'properties.spec.properties.prefill.properties.resources.properties.requests'
+									) as any),
+									additionalProperties: {
+										...(lodash.omit(
+											lodash.get(
+												jsonSchema,
+												'properties.spec.properties.prefill.properties.resources.properties.requests.additionalProperties'
+											),
+											'anyOf'
+										) as any),
+										type: 'string'
 									}
 								}
-							},
-							replicas: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.decode.properties.replicas'),
-								title: 'Replicas'
 							}
 						}
+					}
+				}}
+				{@const prefillSchema = {
+					...(lodash.omit(
+						lodash.get(jsonSchema, 'properties.spec.properties.prefill.properties'),
+						'properties'
+					) as any),
+					title: 'Prefill',
+					properties: {
+						parallelism: {
+							...(lodash.omit(
+								lodash.get(jsonSchema, 'properties.spec.properties.prefill.properties.parallelism'),
+								'properties'
+							) as any),
+							title: 'Parallelism',
+							properties: {
+								tensor: {
+									...lodash.get(
+										jsonSchema,
+										'properties.spec.properties.prefill.properties.parallelism.properties.tensor'
+									),
+									title: 'Tensor'
+								}
+							}
+						},
+						replicas: {
+							...lodash.get(jsonSchema, 'properties.spec.properties.prefill.properties.replicas'),
+							title: 'Replicas'
+						},
+						resources: {
+							...lodash.omit(
+								lodash.get(jsonSchema, 'properties.spec.properties.prefill.properties.resources'),
+								'properties'
+							),
+							title: 'Resources',
+							properties: {
+								requests: {
+									...(lodash.get(
+										jsonSchema,
+										'properties.spec.properties.prefill.properties.resources.properties.requests'
+									) as any),
+									additionalProperties: {
+										...(lodash.omit(
+											lodash.get(
+												jsonSchema,
+												'properties.spec.properties.prefill.properties.resources.properties.requests.additionalProperties'
+											),
+											'anyOf'
+										) as any),
+										type: 'string'
+									}
+								}
+							}
+						}
+					}
+				}}
+				<Form
+					schema={{
+						type: 'object',
+						properties: {
+							mode: {
+								title: 'Mode',
+								type: 'string',
+								enum: ['Intelligent', 'Disaggregation'],
+								default: 'Intelligent'
+							}
+						},
+						allOf: [
+							{
+								if: {
+									properties: {
+										mode: {
+											const: 'Intelligent'
+										}
+									}
+								},
+								then: {
+									type: 'object',
+									properties: {
+										decode: decodeSchema
+									},
+									required: ['decode']
+								}
+							},
+							{
+								if: {
+									properties: {
+										mode: {
+											const: 'Disaggregation'
+										}
+									}
+								},
+								then: {
+									type: 'object',
+									properties: {
+										decode: decodeSchema,
+										prefill: prefillSchema
+									},
+									required: ['decode', 'prefill']
+								}
+							},
+							{
+								required: ['mode']
+							}
+						]
 					} as Schema}
 					uiSchema={{
 						'ui:options': {
 							translations: {
 								submit: 'Next'
 							}
+						},
+						mode: {
+							'ui:components': {
+								stringField: 'enumField'
+							}
+						},
+						decode: {
+							resources: {
+								requests: {
+									'ui:options': {
+										layouts: {
+											'object-properties': {
+												class: 'grid grid-cols-2 gap-3'
+											}
+										},
+										translations: {
+											'additional-property': 'additional request',
+											'add-object-property': 'Add Request'
+										},
+										additionalPropertyKey: (key: string, attempt: number) => {
+											const index = attempt + 1;
+											switch (index) {
+												case 1: {
+													return `1st ${key}`;
+												}
+												case 2: {
+													return `2nd ${key}`;
+												}
+												case 3: {
+													return `3rd ${key}`;
+												}
+												default: {
+													return `${index}th ${key}`;
+												}
+											}
+										}
+									},
+									additionalProperties: {
+										'ui:options': {
+											translations: {
+												'key-input-title': 'request'
+											},
+											hideTitle: true
+										}
+									}
+								}
+							}
+						},
+						prefill: {
+							resources: {
+								requests: {
+									'ui:options': {
+										layouts: {
+											'object-properties': {
+												class: 'grid grid-cols-2 gap-3'
+											}
+										},
+										translations: {
+											'additional-property': 'additional request',
+											'add-object-property': 'Add Request'
+										},
+										additionalPropertyKey: (key: string, attempt: number) => {
+											const index = attempt + 1;
+											switch (index) {
+												case 1: {
+													return `1st ${key}`;
+												}
+												case 2: {
+													return `2nd ${key}`;
+												}
+												case 3: {
+													return `3rd ${key}`;
+												}
+												default: {
+													return `${index}th ${key}`;
+												}
+											}
+										}
+									},
+									additionalProperties: {
+										'ui:options': {
+											translations: {
+												'key-input-title': 'request'
+											},
+											hideTitle: true
+										}
+									}
+								}
+							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{} as FormValue}
+					initialValue={{
+						mode: 'Intelligent',
+						decode: {
+							replicas: '',
+							parallelism: { tensor: '' },
+							resources: {
+								requests: { cpu: '', memory: '' }
+							}
+						},
+						prefill: {
+							replicas: '',
+							parallelism: { tensor: '' },
+							resources: {
+								requests: { cpu: '', memory: '' }
+							}
+						}
+					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
+							lodash.set(values, 'spec.decode', lodash.get(mode, 'decode'));
+							if (lodash.get(mode, 'mode') === 'Disaggregation') {
+								lodash.set(values, 'spec.prefill', lodash.get(mode, 'prefill'));
+							}
 						}
 					}}
-					bind:values={values['spec']['decode']}
+					bind:values={mode}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -373,40 +608,9 @@
 			</Tabs.Content>
 
 			<!-- Step 5: Prefill -->
-			<Tabs.Content value={steps[4]}>
+			<!-- <Tabs.Content value={steps[4]}>
 				<Form
-					schema={{
-						...(lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.prefill.properties'),
-							'properties'
-						) as any),
-						title: 'Prefill',
-						properties: {
-							parallelism: {
-								...(lodash.omit(
-									lodash.get(
-										jsonSchema,
-										'properties.spec.properties.prefill.properties.parallelism'
-									),
-									'properties'
-								) as any),
-								title: 'Parallelism',
-								properties: {
-									tensor: {
-										...lodash.get(
-											jsonSchema,
-											'properties.spec.properties.prefill.properties.parallelism.properties.tensor'
-										),
-										title: 'Tensor'
-									}
-								}
-							},
-							replicas: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.prefill.properties.replicas'),
-								title: 'Replicas'
-							}
-						}
-					} as Schema}
+					schema={ as Schema}
 					uiSchema={{
 						'ui:options': {
 							translations: {
@@ -435,10 +639,10 @@
 						</div>
 					{/snippet}
 				</Form>
-			</Tabs.Content>
+			</Tabs.Content> -->
 
 			<!-- Step 6: Engine -->
-			<Tabs.Content value={steps[5]}>
+			<Tabs.Content value={steps[4]}>
 				<Form
 					schema={{
 						...(lodash.omit(
@@ -524,7 +728,7 @@
 			</Tabs.Content>
 
 			<!-- Step 7: Review -->
-			<Tabs.Content value={steps[6]}>
+			<Tabs.Content value={steps[5]}>
 				<div class="flex h-full flex-col gap-3">
 					<Code.Root
 						lang="yaml"
