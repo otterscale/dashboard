@@ -92,7 +92,7 @@
 		>;
 	} = $props();
 
-	let mode = $state<'table' | 'grid'>('table');
+	let mode = $state<'table' | 'grid'>(gridsLayout ? 'grid' : 'table');
 
 	const columns: ColumnDef<Record<string, JsonValue>>[] = [
 		{
@@ -295,7 +295,7 @@
 	}
 
 	function handleKeyDown(event: KeyboardEvent) {
-		if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+		if (event.key === 'Enter') {
 			event.preventDefault();
 			handleSearch();
 		}
@@ -349,15 +349,16 @@
 				</InputGroup.Addon>
 				<InputGroup.Input
 					id={GLOBAL_FILTER_IDENTIFIER}
-					placeholder="Search via Query Language"
+					placeholder="e.g.. Name ~= &quot;resourceName&quot; and Namespace == &quot;namespace&quot;"
 					bind:value={globalFilterInput}
 					class="peer w-full"
 					onkeydown={handleKeyDown}
 				/>
+
 				<InputGroup.Addon align="inline-end" class="hidden peer-focus:flex">
 					<Kbd.Group>
-						<Kbd.Root>ctrl</Kbd.Root>
 						<Kbd.Root>⏎</Kbd.Root>
+						<Kbd.Root class="bg-destructive/10 text-destructive">esc</Kbd.Root>
 					</Kbd.Group>
 				</InputGroup.Addon>
 				<InputGroup.Addon align="inline-end" class="peer-focus:hidden">

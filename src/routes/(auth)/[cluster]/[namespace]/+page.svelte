@@ -90,7 +90,7 @@
 				value: apiResource.resource,
 				description: `${apiResource.group}/${apiResource.version}/${apiResource.kind}`
 			}))}
-		<div class="space-y-4">
+		<div class="flex h-full flex-col space-y-4">
 			<div class="flex items-end justify-between gap-4">
 				<Item.Root class="p-0">
 					<Item.Content class="text-left">

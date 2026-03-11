@@ -24,6 +24,7 @@
 
 	let {
 		cluster,
+		namespace,
 		group,
 		version,
 		kind,
@@ -31,6 +32,7 @@
 		schema: jsonSchema
 	}: {
 		cluster: string;
+		namespace: string;
 		group: string;
 		version: string;
 		kind: string;
@@ -129,7 +131,7 @@
 		<Item.Root class="p-0">
 			<Progress value={currentIndex + 1} max={steps.length} />
 			<Item.Content class="text-left">
-				<Item.Title class="text-xl font-bold">ModelArtifact</Item.Title>
+				<Item.Title class="text-xl font-bold">{kind}</Item.Title>
 				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
@@ -191,7 +193,7 @@
 					schema={{
 						...(lodash.omit(
 							lodash.get(jsonSchema, 'properties.spec.properties.source.properties.huggingFace'),
-							'properties'
+							['description', 'properties']
 						) as any),
 						properties: {
 							model: {
@@ -257,62 +259,6 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-
-			<!-- Step 3: Target (OCI Registry) -->
-			<!-- <Tabs.Content value={steps[2]}>
-				<Form
-					schema={{
-						...(lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.target'),
-							'properties'
-						) as any),
-						title: 'Target',
-						properties: {
-							registry: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.target.properties.registry'),
-								title: 'Registry'
-							},
-							repository: {
-								...lodash.get(
-									jsonSchema,
-									'properties.spec.properties.target.properties.repository'
-								),
-								title: 'Repository'
-							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{
-						registry: '',
-						repository: ''
-					} as FormValue}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-					bind:values={values['spec']['target']}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content> -->
 
 			<!-- Step 4: Storage -->
 			<Tabs.Content value={steps[2]}>
@@ -391,6 +337,7 @@
 
 									await resourceClient.create({
 										cluster,
+										namespace,
 										group,
 										version,
 										resource,
@@ -398,13 +345,13 @@
 									});
 								},
 								{
-									loading: `Creating ModelArtifact ${name}...`,
+									loading: `Creating ${kind} ${name}...`,
 									success: () => {
-										return `Successfully created ModelArtifact ${name}`;
+										return `Successfully created ${kind} ${name}`;
 									},
 									error: (error) => {
-										console.error(`Failed to create ModelArtifact ${name}:`, error);
-										return `Failed to create ModelArtifact ${name}: ${(error as ConnectError).message}`;
+										console.error(`Failed to create ${kind} ${name}:`, error);
+										return `Failed to create ${kind} ${name}: ${(error as ConnectError).message}`;
 									},
 									finally() {
 										isSubmitting = false;

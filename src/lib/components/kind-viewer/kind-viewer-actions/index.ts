@@ -22,20 +22,22 @@ import WorkspaceCreate from './workspace/create.svelte';
 type RoleType = 'admin' | 'edit' | 'view';
 
 type CreateType = Component<{
+	schema?: any;
 	cluster?: string;
 	namespace?: string;
+	namespaced?: boolean;
 	group?: string;
 	version?: string;
 	kind?: string;
 	resource?: string;
-	schema?: any;
 }> | null;
 type ActionsType = Component<{
-	row?: any;
 	schema?: any;
+	row?: any;
 	object?: any;
 	cluster?: string;
 	namespace?: string;
+	namespaced?: boolean;
 	group?: string;
 	version?: string;
 	kind?: string;

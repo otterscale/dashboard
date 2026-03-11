@@ -132,12 +132,11 @@
 		<Item.Root class="p-0">
 			<Progress value={currentIndex + 1} max={steps.length} />
 			<Item.Content class="text-left">
-				<Item.Title class="text-xl font-bold">ModelService</Item.Title>
+				<Item.Title class="text-xl font-bold">{kind}</Item.Title>
 				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
 		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
-			<!-- Step 1: Basic Info -->
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
@@ -188,7 +187,6 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 2: Model Config -->
 			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
@@ -260,7 +258,6 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 3: Accelerator -->
 			<Tabs.Content value={steps[2]}>
 				<Form
 					schema={{
@@ -310,7 +307,6 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 4: Decode -->
 			<Tabs.Content value={steps[3]}>
 				{@const decodeSchema = {
 					...(lodash.omit(
@@ -609,41 +605,6 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 5: Prefill -->
-			<!-- <Tabs.Content value={steps[4]}>
-				<Form
-					schema={ as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{} as FormValue}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-					bind:values={values['spec']['prefill']}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content> -->
-
-			<!-- Step 6: Engine -->
 			<Tabs.Content value={steps[4]}>
 				<Form
 					schema={{
@@ -696,6 +657,29 @@
 							translations: {
 								submit: 'Next'
 							}
+						},
+						args: {
+							'ui:options': {
+								layouts: {
+									'array-items': { class: 'grid grid-cols-2 gap-3' }
+								},
+								itemTitle: (title, index) => {
+									switch (index) {
+										case 1: {
+											return `1st ${title}`;
+										}
+										case 2: {
+											return `2nd ${title}`;
+										}
+										case 3: {
+											return `3rd ${title}`;
+										}
+										default: {
+											return `${index}th ${title}`;
+										}
+									}
+								}
+							}
 						}
 					} as UiSchemaRoot}
 					initialValue={{
@@ -729,7 +713,6 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 7: Review -->
 			<Tabs.Content value={steps[5]}>
 				<div class="flex h-full flex-col gap-3">
 					<Code.Root
@@ -759,7 +742,7 @@
 
 									await resourceClient.create({
 										cluster,
-										namespace: 'test',
+										namespace,
 										group,
 										version,
 										resource,
@@ -767,13 +750,13 @@
 									});
 								},
 								{
-									loading: `Creating ModelService ${name}...`,
+									loading: `Creating ${kind} ${name}...`,
 									success: () => {
-										return `Successfully created ModelService ${name}`;
+										return `Successfully created ${kind} ${name}`;
 									},
 									error: (error) => {
-										console.error(`Failed to create ModelService ${name}:`, error);
-										return `Failed to create ModelService ${name}: ${(error as ConnectError).message}`;
+										console.error(`Failed to create ${kind} ${name}:`, error);
+										return `Failed to create ${kind} ${name}: ${(error as ConnectError).message}`;
 									},
 									finally() {
 										isSubmitting = false;

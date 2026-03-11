@@ -327,7 +327,16 @@
 		{#if columnDefinitions}
 			<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {dataSchemas}>
 				{#snippet create()}
-					<Create {schema} {cluster} {group} {version} {kind} {resource} />
+					<Create
+						{schema}
+						{cluster}
+						{namespace}
+						namespaced={apiResource.namespaced}
+						{group}
+						{version}
+						{kind}
+						{resource}
+					/>
 				{/snippet}
 				{#snippet reload()}
 					<Button onclick={handleReload} disabled={isWatching} variant="outline">
@@ -341,9 +350,11 @@
 				{#snippet rowActions({ row })}
 					<Actions
 						{row}
-						{schema}
 						object={row.original.raw}
+						{schema}
 						{cluster}
+						{namespace}
+						namespaced={apiResource.namespaced}
 						{group}
 						{version}
 						{kind}
@@ -354,7 +365,7 @@
 		{/if}
 	{/if}
 {:else}
-	<Empty.Root>
+	<Empty.Root class="flex flex-1 items-center justify-center">
 		<Empty.Header>
 			<Empty.Media class="rounded-full bg-muted p-4">
 				<Ban size={36} />
