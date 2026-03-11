@@ -12,6 +12,7 @@
 		schema,
 		object,
 		cluster,
+		namespace,
 		group,
 		version,
 		kind,
@@ -20,6 +21,7 @@
 		schema: any;
 		object: ModelOtterscaleIoV1Alpha1ModelService;
 		cluster: string;
+		namespace: string;
 		group: string;
 		version: string;
 		kind: string;
@@ -75,6 +77,7 @@
 					{schema}
 					{object}
 					{cluster}
+					{namespace}
 					{group}
 					{version}
 					{kind}

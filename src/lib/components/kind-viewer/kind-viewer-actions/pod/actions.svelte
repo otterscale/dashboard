@@ -3,9 +3,11 @@
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
-	// import Edit from '$lib/components/kind-viewer/kind-viewer-actions/model-artifact/edit.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+
+	import Exec from './exec.svelte';
+	import Log from './log.svelte';
 
 	let {
 		schema,
@@ -49,24 +51,38 @@
 			>
 				<View {schema} {object} />
 			</DropdownMenu.Item>
-			<!-- <DropdownMenu.Item
+		</DropdownMenu.Group>
+		<DropdownMenu.Separator />
+		<DropdownMenu.Group>
+			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
 			>
-				<Edit
-					{schema}
-					{object}
+				<Log
 					{cluster}
-					{group}
-					{version}
-					{kind}
-					{resource}
+					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
 					}}
 				/>
-			</DropdownMenu.Item> -->
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Exec
+					{cluster}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
+		</DropdownMenu.Group>
+		<DropdownMenu.Separator />
+		<DropdownMenu.Group>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();

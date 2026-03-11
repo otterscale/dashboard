@@ -1,8 +1,12 @@
 <script lang="ts">
+	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { Plus } from '@lucide/svelte';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import Ajv from 'ajv';
 	import { mode as themeMode } from 'mode-watcher';
+	import { getContext } from 'svelte';
 	import Monaco from 'svelte-monaco';
+	import { toast } from 'svelte-sonner';
 	import { parseDocument } from 'yaml';
 
 	import SchemaViewer from '$lib/components/schema-viewer/schema-viewer.svelte';
@@ -11,10 +15,25 @@
 	import { m } from '$lib/paraglide/messages';
 
 	let {
+		cluster,
+		namespace,
+		group,
+		version,
+		kind,
+		resource,
 		schema: jsonSchema
 	}: {
+		cluster: string;
+		namespace: string;
+		group: string;
+		version: string;
+		kind: string;
+		resource: string;
 		schema: any;
 	} = $props();
+
+	const transport: Transport = getContext('transport');
+	const resourceClient = createClient(ResourceService, transport);
 
 	const jsonSchemaValidator = new Ajv({
 		allErrors: true,
@@ -24,7 +43,7 @@
 	const validate = jsonSchemaValidator.compile(jsonSchema);
 
 	const initialValue = `\
-apiVersion: 123
+apiVersion: ""
 kind: ""
 metadata:
   name: ""
@@ -32,6 +51,7 @@ metadata:
 
 	let value = $state(initialValue);
 	let open = $state(false);
+	let isSubmitting = $state(false);
 	let editorInstance: import('monaco-editor').editor.IStandaloneCodeEditor | undefined =
 		$state(undefined);
 	let monacoInstance: typeof import('monaco-editor') | undefined = $state(undefined);
@@ -134,7 +154,47 @@ metadata:
 	}
 
 	function handleConfirm() {
-		console.log(value);
+		if (isSubmitting) return;
+
+		const document = parseDocument(value);
+		if (document.errors.length > 0) {
+			toast.error('YAML syntax errors found. Please fix them before submitting.');
+			return;
+		}
+
+		const parsed = document.toJS() as Record<string, any>;
+		if (!validate(parsed)) {
+			toast.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
+			return;
+		}
+
+		isSubmitting = true;
+		const name = (parsed.metadata as { name: string })?.name || kind;
+
+		toast.promise(
+			async () => {
+				await resourceClient.create({
+					cluster,
+					namespace,
+					group,
+					version,
+					resource,
+					manifest: new TextEncoder().encode(JSON.stringify(parsed))
+				});
+			},
+			{
+				loading: `Creating ${kind} ${name}...`,
+				success: `Successfully created ${kind} ${name}`,
+				error: (error) => {
+					console.error(`Failed to create ${kind} ${name}:`, error);
+					return `Failed to create ${kind} ${name}: ${(error as ConnectError).message}`;
+				},
+				finally: () => {
+					isSubmitting = false;
+					open = false;
+				}
+			}
+		);
 	}
 </script>
 
