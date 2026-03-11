@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { type JsonValue } from '@bufbuild/protobuf';
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { Cable, Unplug } from '@lucide/svelte';
+	import { CableIcon, UnplugIcon, UsersRoundIcon } from '@lucide/svelte';
 	import {
 		type APIResource,
 		type ListRequest,
@@ -16,6 +16,7 @@
 
 	import { DynamicTable } from '$lib/components/dynamic-table';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import { Toggle } from '$lib/components/ui/toggle';
 
 	import type { DataSchemaType, UISchemaType } from '../dynamic-table/utils';
 	import type { ActionsType, CreateType } from './kind-viewer-actions';
@@ -23,7 +24,7 @@
 	import { getColumnDefinitions, getData, getDataSchemas, getUISchemas } from './kind-viewers';
 
 	let {
-		clustered,
+		isAdmin,
 		apiResource,
 		cluster,
 		group,
@@ -32,7 +33,7 @@
 		resource,
 		namespace
 	}: {
-		clustered: boolean;
+		isAdmin: boolean;
 		apiResource: APIResource;
 		cluster: string;
 		group: string;
@@ -208,6 +209,29 @@
 		}
 	}
 
+	const sleep = (ms: number = 0) => new Promise((resolve) => setTimeout(resolve, ms));
+
+	let clustered = $state(false);
+
+	async function resetAndReload() {
+		if (listAbortController) {
+			listAbortController.abort();
+		}
+		if (watchAbortController) {
+			watchAbortController.abort();
+		}
+
+		dataset = [];
+		resourceVersion = undefined;
+		isListing = false;
+		isWatching = false;
+
+		await sleep(500); // for smooth transition
+
+		await listResources();
+		watchResources();
+	}
+
 	let isMounted = $state(false);
 	onMount(async () => {
 		await fetchSchema();
@@ -233,6 +257,10 @@
 	function handleReload() {
 		if (!isWatching) {
 			watchResources();
+			return;
+		}
+		if (watchAbortController) {
+			watchAbortController.abort();
 		}
 	}
 
@@ -243,15 +271,31 @@
 {#if isMounted}
 	{#if columnDefinitions}
 		<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {dataSchemas}>
+			{#snippet accessReview()}
+				{#if isAdmin}
+					<Toggle
+						bind:pressed={clustered}
+						onPressedChange={(pressed) => {
+							clustered = pressed;
+							resetAndReload();
+						}}
+						aria-label="switch clustered"
+						variant="outline"
+						class="data-[state=on]:*:text-destructive"
+					>
+						<UsersRoundIcon class="size-4" />
+					</Toggle>
+				{/if}
+			{/snippet}
 			{#snippet create()}
 				<Create {schema} {cluster} {namespace} {group} {version} {kind} {resource} />
 			{/snippet}
 			{#snippet reload()}
-				<Button onclick={handleReload} disabled={isWatching} variant="outline">
+				<Button onclick={handleReload} variant="outline" size="icon">
 					{#if isWatching}
-						<Cable class="opacity-60" size={16} />
+						<CableIcon class="size-4" />
 					{:else}
-						<Unplug class="text-destructive opacity-60" size={16} />
+						<UnplugIcon class="size-4 text-destructive" />
 					{/if}
 				</Button>
 			{/snippet}

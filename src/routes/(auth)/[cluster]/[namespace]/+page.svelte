@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { Ban, Boxes } from '@lucide/svelte';
+	import { BanIcon } from '@lucide/svelte';
 	import {
 		type APIResource,
 		type DiscoveryRequest,
@@ -8,19 +8,14 @@
 	} from '@otterscale/api/resource/v1';
 	import { getContext } from 'svelte';
 
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import KindViewer from '$lib/components/kind-viewer/kind-viewer.svelte';
-	import Picker from '$lib/components/kind-viewer/kind-viewer-picker.svelte';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-	import * as Table from '$lib/components/ui/table/index.js';
-	import { Toggle } from '$lib/components/ui/toggle/index.js';
-	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { breadcrumbs } from '$lib/stores';
 
 	$effect(() => {
@@ -36,6 +31,7 @@
 		]);
 	});
 
+	const isAdmin = $derived(page.data.isAdmin === true);
 	const cluster = $derived(page.params.cluster ?? '');
 	const namespace = $derived(page.params.namespace ?? '');
 	const group = $derived(page.url.searchParams.get('group') ?? '');
@@ -61,75 +57,24 @@
 		);
 		return apiResources;
 	}
-	const selectedAPIResource = $derived(
-		apiResources.find(
-			(apiResource) =>
-				apiResource &&
-				apiResource.group === group &&
-				apiResource.version === version &&
-				apiResource.kind === kind &&
-				apiResource.resource === resource
-		)
-	);
-
-	let clustered = $state(false);
 </script>
 
 {#key cluster + group + version + kind}
 	{#await fetchAPIResources(cluster, group, version, kind)}
-		<div class="space-y-4">
-			<div class="space-y-4">
-				<Skeleton class="h-13 w-1/3" />
-				<Skeleton class="h-7 w-1/5" />
-			</div>
-			<div class="flex items-center gap-2">
-				<Skeleton class="h-7 w-full" />
-				{#each Array(3)}
-					<Skeleton class="size-7" />
-				{/each}
-			</div>
-			<div class="rounded-lg border">
-				<Table.Root class="w-full">
-					<Table.Header>
-						<Table.Row>
-							{#each Array(5)}
-								<Table.Head class="p-4">
-									<Skeleton class="h-7 w-full" />
-								</Table.Head>
-							{/each}
-						</Table.Row>
-					</Table.Header>
-					<Table.Body>
-						{#each Array(13)}
-							<Table.Row class="border-none">
-								{#each Array(5)}
-									<Table.Cell>
-										<Skeleton class="h-7 w-full" />
-									</Table.Cell>
-								{/each}
-							</Table.Row>
-						{/each}
-					</Table.Body>
-				</Table.Root>
-			</div>
-			<div class="flex items-center justify-between gap-4">
-				<Skeleton class="h-7 w-1/5" />
-				<div class="flex items-center gap-2">
-					{#each Array(3)}
-						<Skeleton class="size-10" />
-					{/each}
+		<div class="flex flex-col gap-4 pt-1">
+			<Skeleton class="h-6 w-32" />
+			<Skeleton class="h-4 w-64" />
+			<Skeleton class="h-8 w-full" />
+			<Skeleton class="h-144 w-full" />
+			<div class="flex items-center justify-between">
+				<Skeleton class="h-8 w-36" />
+				<div class="flex items-center gap-4">
+					<Skeleton class="h-8 w-24" />
+					<Skeleton class="h-8 w-48" />
 				</div>
 			</div>
 		</div>
 	{:then apiResources}
-		{@const apiResourceOptions = apiResources
-			.filter((apiResource) => apiResource.resource.indexOf('/') < 0)
-			.map((apiResource) => ({
-				icon: 'ph:user',
-				label: apiResource.resource,
-				value: apiResource.resource,
-				description: `${apiResource.group}/${apiResource.version}/${apiResource.kind}`
-			}))}
 		<div class="space-y-4">
 			<div class="flex items-end justify-between gap-4">
 				<Item.Root class="p-0">
@@ -142,40 +87,19 @@
 						</Item.Description>
 					</Item.Content>
 				</Item.Root>
-				<div class="flex items-center gap-2">
-					<Tooltip.Provider>
-						<Tooltip.Root>
-							<Tooltip.Trigger class={page.data.user.roles.includes('admin') ? 'flex' : 'hidden'}>
-								<Toggle
-									bind:pressed={clustered}
-									aria-label="switch clustered"
-									variant="outline"
-									class="data-[state=on]:*:bg-transparent"
-								>
-									<Boxes size={16} />
-									All Namespaces
-								</Toggle>
-							</Tooltip.Trigger>
-							<Tooltip.Content>Press to view resources across all namespaces.</Tooltip.Content>
-						</Tooltip.Root>
-					</Tooltip.Provider>
-					<Picker
-						class="w-fit"
-						resource="resource"
-						value={resource}
-						options={apiResourceOptions}
-						onSelect={(option) => {
-							page.url.searchParams.set('resource', option.value);
-							// eslint-disable-next-line svelte/no-navigation-without-resolve
-							goto(page.url.href);
-						}}
-					/>
-				</div>
 			</div>
-			{#key clustered + resource + namespace}
-				{#if selectedAPIResource}
-					{@const apiResource = selectedAPIResource}
+			{#key resource + namespace}
+				{@const apiResource = apiResources.find(
+					(apiResource) =>
+						apiResource &&
+						apiResource.group === group &&
+						apiResource.version === version &&
+						apiResource.kind === kind &&
+						apiResource.resource === resource
+				)}
+				{#if apiResource}
 					<KindViewer
+						{isAdmin}
 						{apiResource}
 						{cluster}
 						{group}
@@ -183,7 +107,6 @@
 						{kind}
 						{resource}
 						{namespace}
-						{clustered}
 					/>
 				{/if}
 			{/key}
@@ -192,7 +115,7 @@
 		<Empty.Root>
 			<Empty.Header>
 				<Empty.Media class="rounded-full bg-muted p-4">
-					<Ban size={36} />
+					<BanIcon class="size-8" />
 				</Empty.Media>
 				<Empty.Title class="text-2xl font-bold">Failed to load data</Empty.Title>
 				<Empty.Description>
