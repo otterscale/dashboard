@@ -6,8 +6,8 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
-	import Exec from './exec.svelte';
 	import Log from './log.svelte';
+	import Terminal from './terminal.svelte';
 
 	let {
 		schema,
@@ -72,7 +72,7 @@
 					e.preventDefault();
 				}}
 			>
-				<Exec
+				<Terminal
 					{cluster}
 					{object}
 					onOpenChangeComplete={() => {

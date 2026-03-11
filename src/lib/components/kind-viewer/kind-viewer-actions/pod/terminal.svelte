@@ -44,7 +44,7 @@
 				<TerminalSquareIcon />
 			</Item.Media>
 			<Item.Content>
-				<Item.Title>Exec</Item.Title>
+				<Item.Title>Terminal</Item.Title>
 			</Item.Content>
 		</Item.Root>
 	</Dialog.Trigger>
