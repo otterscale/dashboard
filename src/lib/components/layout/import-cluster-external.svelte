@@ -29,7 +29,6 @@
 	let clusterName = $state('');
 	let installUrl = $state('');
 	let manifestYaml = $state('');
-	let showManifest = $state(false);
 	let clusterStatus = $state<'pending' | 'ready'>('pending');
 	let isCreating = $state(false);
 	let errorMessage = $state('');
@@ -198,9 +197,9 @@
 		</Code.Root>
 
 		{#if manifestYaml}
-			<Collapsible.Root bind:open={showManifest}>
+			<Collapsible.Root>
 				<Collapsible.Trigger
-					class="flex w-full items-center justify-between rounded-md border bg-card px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent"
+					class="group flex w-full items-center justify-between rounded-md border bg-card px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent"
 				>
 					<span class="flex items-center gap-2">
 						<Icon icon="ph:file-yaml" class="size-4" />
@@ -208,7 +207,7 @@
 					</span>
 					<Icon
 						icon="ph:caret-down"
-						class="size-4 transition-transform duration-200 {showManifest ? 'rotate-180' : ''}"
+						class="size-4 transition-transform duration-200 group-data-[state=open]:rotate-180"
 					/>
 				</Collapsible.Trigger>
 				<Collapsible.Content>
