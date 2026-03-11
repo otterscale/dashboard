@@ -20,7 +20,7 @@
 
 	let { artifact }: { artifact: ArtifactType } = $props();
 
-	const [projectName, repositoryName] = $derived(artifact.repository_name.split('/'));
+	const [projectName, ...repositoryName] = $derived(artifact.repository_name.split('/'));
 
 	// const transport: Transport = getContext('transport');
 	// const resourceClient = createClient(ResourceService, transport);
@@ -65,7 +65,7 @@
 	async function getReferenceAddition(addition: string) {
 		const parameters = new URLSearchParams({
 			project: projectName,
-			repository: repositoryName,
+			repository: repositoryName.join('/'),
 			reference: artifact.digest,
 			addition
 		});
