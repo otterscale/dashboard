@@ -2,8 +2,8 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { Plus } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
-	import { SubmitButton } from '@sjsf/form';
+	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
+	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import type { SchemaObjectValue } from '@sjsf/form/core';
 	import Ajv from 'ajv';
 	import lodash from 'lodash';
@@ -161,7 +161,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={'' as FormValue}
+					initialValue={null as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
@@ -416,12 +416,46 @@
 						hard: {
 							'requests.cpu': '16',
 							'requests.memory': '32Gi',
-							'requests.otterscale.com/vgpu': '0'
+							'requests.otterscale.com/vgpu': '0',
+							'requests.otterscale.com/vgpumem': '0',
+							'requests.otterscale.com/vgpumem-percentage': '0'
 						}
 					} as FormValue}
 					handleSubmit={{
-						posthook: () => {
+						posthook: (form: FormState<FormValue>) => {
 							handleNext();
+
+							const formValue = getValueSnapshot(form);
+
+							lodash.set(values, 'spec.limitRange', {
+								limits: [
+									{
+										type: 'Container',
+										default: {
+											cpu: '1',
+											memory: '2Gi'
+										},
+										defaultRequest: {
+											cpu: '1',
+											memory: '2Gi'
+										}
+									}
+								]
+							});
+
+							if (lodash.get(formValue, ['hard', 'requests.cpu']))
+								lodash.setWith(
+									values,
+									['spec', 'resourceQuota', 'hard', 'limits.cpu'],
+									lodash.get(formValue, ['hard', 'requests.cpu'])
+								);
+
+							if (lodash.get(formValue, ['hard', 'requests.memory']))
+								lodash.setWith(
+									values,
+									['spec', 'resourceQuota', 'hard', 'limits.memory'],
+									lodash.get(formValue, ['hard', 'requests.memory'])
+								);
 						}
 					}}
 					bind:values={values['spec']['resourceQuota']}
@@ -492,7 +526,12 @@
 			</Tabs.Content>
 			<Tabs.Content value={steps[4]}>
 				<div class="flex h-full flex-col gap-3">
-					<Code.Root lang="yaml" class="w-full" hideLines code={stringify(values, null, 2)} />
+					<Code.Root
+						lang="yaml"
+						class=".no-shiki-limit w-full"
+						hideLines
+						code={stringify(values, null, 2)}
+					/>
 					<Button
 						class="mt-auto w-full"
 						onclick={() => {

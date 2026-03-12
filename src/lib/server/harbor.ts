@@ -74,13 +74,30 @@ export async function listRepositories(
 	if (!projectName) throw new Error('projectName is required');
 
 	const repositories = await retrieve<RepositoryType[]>({
-		path: `/api/v2.0/repositories`,
+		path: `/api/v2.0/projects/${encodeURIComponent(projectName)}/repositories`,
 		accessToken,
 		responseType: 'json',
 		headers: {}
 	});
 
 	return repositories ?? [];
+}
+
+export async function getLatestArtifact(
+	projectName: string,
+	repositoryName: string,
+	accessToken: string
+): Promise<ArtifactType> {
+	if (!projectName || !repositoryName)
+		throw new Error('projectName and repositoryName are required');
+
+	const artifact = await retrieve<ArtifactType>({
+		path: `/api/v2.0/projects/${encodeURIComponent(projectName)}/repositories/${encodeURIComponent(encodeURIComponent(repositoryName))}/artifacts?sort=-push_time&page=1&page_size=1`,
+		accessToken,
+		responseType: 'json',
+		headers: {}
+	});
+	return artifact ?? {};
 }
 
 export async function listArtifacts(
@@ -93,6 +110,23 @@ export async function listArtifacts(
 
 	const artifacts = await retrieve<ArtifactType[]>({
 		path: `/api/v2.0/projects/${encodeURIComponent(projectName)}/repositories/${encodeURIComponent(encodeURIComponent(repositoryName))}/artifacts?with_label=true`,
+		accessToken,
+		responseType: 'json',
+		headers: {}
+	});
+	return artifacts ?? [];
+}
+
+export async function listAllLatestArtifacts(
+	projectName: string,
+	accessToken: string
+): Promise<ArtifactType[]> {
+	if (!projectName) throw new Error('projectName is required');
+	console.log(
+		`/api/v2.0/projects/${encodeURIComponent(projectName)}/artifacts?q=${encodeURIComponent('media_type=application/vnd.cncf.helm.config.v1+json')}`
+	);
+	const artifacts = await retrieve<ArtifactType[]>({
+		path: `/api/v2.0/projects/${encodeURIComponent(projectName)}/artifacts?q=${encodeURIComponent(encodeURIComponent('media_type=application/vnd.cncf.helm.config.v1+json'))}&latest_in_repository=true`,
 		accessToken,
 		responseType: 'json',
 		headers: {}

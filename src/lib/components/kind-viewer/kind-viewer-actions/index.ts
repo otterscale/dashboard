@@ -6,6 +6,9 @@ import CronJobActions from './cronjob/actions.svelte';
 import CronJobCreate from './cronjob/create.svelte';
 import DefaultActions from './default/actions.svelte';
 import DefaultCreate from './default/create.svelte';
+import HelmReleaseActions from './helm-release/actions.svelte';
+import HelmRepositoryActions from './helm-repository/actions.svelte';
+import HelmRepositoryCreate from './helm-repository/create.svelte';
 import ModelArtifactActions from './model-artifact/actions.svelte';
 import ModelArtifactCreate from './model-artifact/create.svelte';
 import ModelServiceActions from './model-service/actions.svelte';
@@ -49,6 +52,8 @@ function getCreate(kind: string): CreateType {
 			return ApplicationCreate as CreateType;
 		case 'CronJob':
 			return CronJobCreate as CreateType;
+		case 'HelmRepository':
+			return HelmRepositoryCreate as CreateType;
 		case 'ModelService':
 			return ModelServiceCreate as CreateType;
 		case 'ModelArtifact':
@@ -77,6 +82,10 @@ function getActions(kind: string): ActionsType {
 			return WorkloadActions as ActionsType;
 		case 'CronJob':
 			return CronJobActions as ActionsType;
+		case 'HelmRelease':
+			return HelmReleaseActions as CreateType;
+		case 'HelmRepository':
+			return HelmRepositoryActions as ActionsType;
 		case 'ModelService':
 			return ModelServiceActions as ActionsType;
 		case 'ModelArtifact':
