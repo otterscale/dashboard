@@ -6,11 +6,9 @@
 	import { getContext } from 'svelte';
 
 	import Button from '$lib/components/ui/button/button.svelte';
-	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
-	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 
 	import { formatDescribe } from './describe-formatter';
 
@@ -111,36 +109,24 @@
 						{/if}
 					</Dialog.Description>
 				</div>
-				<Tooltip.Provider>
-					<ButtonGroup.Root class="ml-auto">
-						<Button
-							variant="ghost"
-							size="icon-sm"
-							disabled={mode === 'describe'}
-							onclick={() => (mode = 'describe')}
-						>
-							<Tooltip.Root>
-								<Tooltip.Trigger>
-									<FileSearchIcon />
-								</Tooltip.Trigger>
-								<Tooltip.Content>Describe</Tooltip.Content>
-							</Tooltip.Root>
-						</Button>
-						<Button
-							variant="ghost"
-							size="icon-sm"
-							disabled={mode === 'json'}
-							onclick={() => (mode = 'json')}
-						>
-							<Tooltip.Root>
-								<Tooltip.Trigger>
-									<FileJsonIcon />
-								</Tooltip.Trigger>
-								<Tooltip.Content>JSON</Tooltip.Content>
-							</Tooltip.Root>
-						</Button>
-					</ButtonGroup.Root>
-				</Tooltip.Provider>
+				<div class="ml-auto flex gap-1">
+					<Button
+						size="icon-sm"
+						variant="ghost"
+						disabled={mode === 'describe'}
+						onclick={() => (mode = 'describe')}
+					>
+						<FileSearchIcon />
+					</Button>
+					<Button
+						size="icon-sm"
+						variant="ghost"
+						disabled={mode === 'json'}
+						onclick={() => (mode = 'json')}
+					>
+						<FileJsonIcon />
+					</Button>
+				</div>
 			</div>
 		</Dialog.Header>
 
