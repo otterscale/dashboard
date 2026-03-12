@@ -24,7 +24,7 @@
 	import { getColumnDefinitions, getData, getDataSchemas, getUISchemas } from './kind-viewers';
 
 	let {
-		isAdmin,
+		isClusterAdmin,
 		apiResource,
 		cluster,
 		group,
@@ -33,7 +33,7 @@
 		resource,
 		namespace
 	}: {
-		isAdmin: boolean;
+		isClusterAdmin: boolean;
 		apiResource: APIResource;
 		cluster: string;
 		group: string;
@@ -272,7 +272,7 @@
 	{#if columnDefinitions}
 		<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {dataSchemas}>
 			{#snippet accessReview()}
-				{#if isAdmin}
+				{#if isClusterAdmin}
 					<Toggle
 						bind:pressed={clustered}
 						onPressedChange={(pressed) => {
