@@ -2,11 +2,13 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { RotateCcwIcon } from '@lucide/svelte';
 	import { RuntimeService } from '@otterscale/api/runtime/v1';
+	import type { FormValue, Schema } from '@sjsf/form';
+	import { SubmitButton } from '@sjsf/form';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
+	import Form from '$lib/components/dynamic-form/form.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
-	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Item from '$lib/components/ui/item';
 
 	let {
@@ -34,6 +36,13 @@
 	const client = createClient(RuntimeService, transport);
 
 	const name: string = $derived(object?.metadata?.name ?? '');
+
+	const jsonSchema = {
+		type: 'object',
+		properties: {}
+	} as Schema;
+
+	let values: any = $state({});
 
 	let open = $state(false);
 	let isRestarting = $state(false);
@@ -85,18 +94,32 @@
 		{/snippet}
 	</AlertDialog.Trigger>
 	<AlertDialog.Content class="max-h-[95vh] min-w-[23vw] overflow-auto">
-		<AlertDialog.Header>
-			<AlertDialog.Title>Restart {kind}</AlertDialog.Title>
-			<AlertDialog.Description>
-				Are you sure you want to trigger a rolling restart for <strong>{name}</strong>
-				in namespace <strong>{namespace}</strong>? This will recreate all pods managed by this {kind.toLowerCase()}.
-			</AlertDialog.Description>
-		</AlertDialog.Header>
-		<AlertDialog.Footer>
-			<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
-			<Button variant="destructive" onclick={handleRestart} disabled={isRestarting}>
-				{isRestarting ? 'Restarting...' : 'Restart'}
-			</Button>
-		</AlertDialog.Footer>
+		<Item.Root class="p-0">
+			<Item.Content class="text-left">
+				<Item.Title class="text-xl font-bold">Restart {kind}</Item.Title>
+				<Item.Description>
+					Are you sure you want to trigger a rolling restart for <strong>{name}</strong>
+					in namespace <strong>{namespace}</strong>? This will recreate all pods managed by this {kind.toLowerCase()}.
+				</Item.Description>
+			</Item.Content>
+		</Item.Root>
+		<Form
+			schema={jsonSchema as any}
+			uiSchema={{}}
+			initialValue={{} as FormValue}
+			bind:values
+			handleSubmit={{
+				posthook: () => {
+					handleRestart();
+				}
+			}}
+			class="**:data-[slot=dynamic-form-mode-controller]:hidden"
+		>
+			{#snippet actions()}
+				<div class="*:w-full">
+					<SubmitButton />
+				</div>
+			{/snippet}
+		</Form>
 	</AlertDialog.Content>
 </AlertDialog.Root>

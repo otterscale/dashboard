@@ -1,9 +1,9 @@
 <script lang="ts">
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 
-	// import Edit from '$lib/components/kind-viewer/kind-viewer-actions/applications/edit.svelte';
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
+	import Log from '$lib/components/kind-viewer/kind-viewer-actions/default/log.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
@@ -43,18 +43,10 @@
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content align="end">
 		<DropdownMenu.Group>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
+			<DropdownMenu.Item onSelect={(e) => e.preventDefault()}>
 				<View {schema} {object} />
 			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
+			<DropdownMenu.Item onSelect={(e) => e.preventDefault()}>
 				<Describe
 					{cluster}
 					{namespace}
@@ -67,29 +59,16 @@
 					}}
 				/>
 			</DropdownMenu.Item>
-			<!-- <DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<Edit
-					{schema}
-					{object}
+			<DropdownMenu.Item onSelect={(e) => e.preventDefault()}>
+				<Log
 					{cluster}
-					{group}
-					{version}
-					{kind}
-					{resource}
+					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
 					}}
 				/>
-			</DropdownMenu.Item> -->
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
+			</DropdownMenu.Item>
+			<DropdownMenu.Item onSelect={(e) => e.preventDefault()}>
 				<Delete
 					{schema}
 					{object}
