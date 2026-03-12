@@ -4,21 +4,25 @@ import ApplicationActions from './application/actions.svelte';
 import ApplicationCreate from './application/create.svelte';
 import CronJobActions from './cronjob/actions.svelte';
 import CronJobCreate from './cronjob/create.svelte';
+import DaemonSetActions from './daemonset/actions.svelte';
 import DefaultActions from './default/actions.svelte';
 import DefaultCreate from './default/create.svelte';
+import DeploymentActions from './deployment/actions.svelte';
 import HelmReleaseActions from './helm-release/actions.svelte';
 import HelmRepositoryActions from './helm-repository/actions.svelte';
 import HelmRepositoryCreate from './helm-repository/create.svelte';
+import JobActions from './job/actions.svelte';
 import ModelArtifactActions from './model-artifact/actions.svelte';
 import ModelArtifactCreate from './model-artifact/create.svelte';
 import ModelServiceActions from './model-service/actions.svelte';
 import ModelServiceCreate from './model-service/create.svelte';
 import PodActions from './pod/actions.svelte';
+import ReplicaSetActions from './replicaset/actions.svelte';
 import ResourceQuotaActions from './resource-quota/actions.svelte';
 import ResourceQuotaCreate from './resource-quota/create.svelte';
 import SimpleAppActions from './simple-app/actions.svelte';
 import SimpleAppCreate from './simple-app/create.svelte';
-import WorkloadActions from './workload/actions.svelte';
+import StatefulSetActions from './statefulset/actions.svelte';
 import WorkspaceActions from './workspace/actions.svelte';
 import WorkspaceCreate from './workspace/create.svelte';
 
@@ -76,10 +80,15 @@ function getActions(kind: string): ActionsType {
 		case 'Pod':
 			return PodActions as ActionsType;
 		case 'Deployment':
+			return DeploymentActions as ActionsType;
 		case 'StatefulSet':
+			return StatefulSetActions as ActionsType;
 		case 'ReplicaSet':
+			return ReplicaSetActions as ActionsType;
 		case 'DaemonSet':
-			return WorkloadActions as ActionsType;
+			return DaemonSetActions as ActionsType;
+		case 'Job':
+			return JobActions as ActionsType;
 		case 'CronJob':
 			return CronJobActions as ActionsType;
 		case 'HelmRelease':
