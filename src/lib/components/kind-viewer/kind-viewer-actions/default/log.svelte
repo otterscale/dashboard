@@ -28,7 +28,10 @@
 	const podName: string = $derived(object?.metadata?.name ?? '');
 	const containers: string[] = $derived(
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		(object?.spec?.containers as any[])?.map((c: any) => c.name as string) ?? []
+		((object?.spec?.containers || object?.spec?.template?.spec?.containers) as any[])?.map(
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			(c: any) => c.name as string
+		) ?? []
 	);
 
 	let selectedContainer = $state(containers[0] ?? '');

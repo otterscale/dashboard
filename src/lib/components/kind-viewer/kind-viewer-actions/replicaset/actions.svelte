@@ -3,12 +3,10 @@
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
+	import Scale from '$lib/components/kind-viewer/kind-viewer-actions/default/scale.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
-
-	import Log from '../default/log.svelte';
-	import Terminal from '../default/terminal.svelte';
 
 	let {
 		schema,
@@ -45,18 +43,10 @@
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content align="end">
 		<DropdownMenu.Group>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
+			<DropdownMenu.Item onSelect={(e) => e.preventDefault()}>
 				<View {schema} {object} />
 			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
+			<DropdownMenu.Item onSelect={(e) => e.preventDefault()}>
 				<Describe
 					{cluster}
 					{namespace}
@@ -69,37 +59,21 @@
 					}}
 				/>
 			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<Log
+			<DropdownMenu.Item onSelect={(e) => e.preventDefault()}>
+				<Scale
 					{cluster}
+					{namespace}
+					{group}
+					{version}
+					{kind}
+					{resource}
 					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
 					}}
 				/>
 			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<Terminal
-					{cluster}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
-			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
+			<DropdownMenu.Item onSelect={(e) => e.preventDefault()}>
 				<Delete
 					{schema}
 					{object}
