@@ -16,7 +16,7 @@
 	let {
 		cluster,
 		group,
-		namespace,
+		namespace = '',
 		version,
 		kind,
 		resource,
@@ -25,7 +25,7 @@
 		onOpenChangeComplete
 	}: {
 		cluster: string;
-		namespace: string;
+		namespace?: string;
 		group: string;
 		version: string;
 		kind: string;
