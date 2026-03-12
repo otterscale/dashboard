@@ -94,7 +94,10 @@
 					{schema}
 					{object}
 					{cluster}
-					{namespace}
+					{
+                
+                
+                }
 					{group}
 					{version}
 					{kind}
