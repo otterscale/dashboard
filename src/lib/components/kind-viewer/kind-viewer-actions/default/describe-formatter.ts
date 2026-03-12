@@ -1,19 +1,22 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
- * Formats a Pod JSON object + events into kubectl-describe-style plain text.
+ * Formats any Kubernetes resource JSON + events into kubectl-describe-style
+ * plain text.
  *
- * Strategy (hybrid C):
- *   - Metadata, Containers, Conditions, Events → hardcoded (matches kubectl field order)
- *   - Volumes → known types get kubectl-matching descriptions;
- *               unknown types use a generic tree renderer so nothing is silently lost
+ * - Pod → dedicated formatter (matches `kubectl describe pod` field order)
+ * - Everything else → generic tree renderer (matches `kubectl describe <crd>`)
+ *
+ * The generic renderer converts camelCase keys to "Title Case" and
+ * recursively renders the full object tree, just like kubectl's
+ * GenericDescriberFor().
  */
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-const W = 25; // global label column width (matches kubectl's default)
+const W = 25; // global label column width
 
 function none(): string {
 	return '<none>';
@@ -21,6 +24,21 @@ function none(): string {
 
 function nil(): string {
 	return '<nil>';
+}
+
+/**
+ * Convert camelCase / PascalCase key to "Title Case With Spaces".
+ *   creationTimestamp → Creation Timestamp
+ *   resourceVersion   → Resource Version
+ *   apiVersion        → API Version  (special-cased acronyms)
+ */
+function toTitleCase(key: string): string {
+	// Insert space before uppercase letters that follow lowercase or before
+	// a run of uppercase followed by a lowercase (e.g. "APIVersion" → "API Version")
+	const spaced = key
+		.replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+		.replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2');
+	return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
 function formatTimestamp(ts: string | undefined | null): string {
@@ -74,16 +92,15 @@ function multiLine(label: string, values: string[], width = W): string {
 }
 
 // ---------------------------------------------------------------------------
-// Generic tree renderer (used for unknown volume types)
+// Generic tree renderer
 // ---------------------------------------------------------------------------
 
 /**
  * Recursively renders any JSON value as indented key: value lines,
- * producing a kubectl-esque tree. Known scalars become `Key: value`;
- * objects become `Key:` followed by indented children;
- * arrays become numbered entries.
+ * matching kubectl's generic describe output style. camelCase keys are
+ * converted to "Title Case With Spaces".
  */
-function renderTree(obj: any, indent = 4): string {
+function renderTree(obj: any, indent = 2, skipKeys?: Set<string>): string {
 	const prefix = ' '.repeat(indent);
 	const lines: string[] = [];
 
@@ -98,11 +115,12 @@ function renderTree(obj: any, indent = 4): string {
 			lines.push(`${prefix}${none()}`);
 		} else {
 			for (const item of obj) {
-				if (typeof item === 'object' && item !== null) {
-					lines.push(`${prefix}-`);
-					lines.push(renderTree(item, indent + 2));
+				if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
+					// Each array element is rendered as indented key-values
+					const inner = renderTree(item, indent + 2);
+					lines.push(inner);
 				} else {
-					lines.push(`${prefix}- ${String(item)}`);
+					lines.push(`${prefix}${String(item)}`);
 				}
 			}
 		}
@@ -111,19 +129,90 @@ function renderTree(obj: any, indent = 4): string {
 
 	// Plain object
 	for (const [key, val] of Object.entries(obj)) {
-		const label = key.charAt(0).toUpperCase() + key.slice(1);
+		if (skipKeys?.has(key)) continue;
+		const label = toTitleCase(key);
 		if (val === null || val === undefined) {
-			lines.push(`${prefix}${label}: ${nil()}`);
-		} else if (typeof val === 'object' && !Array.isArray(val) && Object.keys(val).length > 0) {
-			lines.push(`${prefix}${label}:`);
-			lines.push(renderTree(val, indent + 2));
+			lines.push(`${prefix}${label}:  ${nil()}`);
 		} else if (Array.isArray(val)) {
+			if (val.length === 0) {
+				lines.push(`${prefix}${label}:  ${none()}`);
+			} else {
+				lines.push(`${prefix}${label}:`);
+				lines.push(renderTree(val, indent + 2));
+			}
+		} else if (typeof val === 'object' && Object.keys(val).length > 0) {
 			lines.push(`${prefix}${label}:`);
 			lines.push(renderTree(val, indent + 2));
+		} else if (typeof val === 'object' && Object.keys(val).length === 0) {
+			lines.push(`${prefix}${label}:  {}`);
 		} else {
-			lines.push(`${prefix}${label}: ${String(val)}`);
+			lines.push(`${prefix}${label}:  ${String(val)}`);
 		}
 	}
+	return lines.join('\n');
+}
+
+// =========================================================================
+//  GENERIC DESCRIBE  (for any non-Pod resource — like `kubectl describe <crd>`)
+// =========================================================================
+
+function formatGenericDescribe(resource: any, events: any[]): string {
+	const meta = resource.metadata ?? {};
+	const lines: string[] = [];
+
+	// Top-level header fields (same order as kubectl generic describe)
+	lines.push(`${pad('Name')}${meta.name ?? ''}`);
+	lines.push(`${pad('Namespace')}${meta.namespace ?? ''}`);
+
+	// Labels
+	lines.push(multiLine('Labels', mapToStr(meta.labels, '=').split('\n')));
+
+	// Annotations
+	const ann = meta.annotations;
+	if (ann && Object.keys(ann).length > 0) {
+		lines.push(
+			multiLine(
+				'Annotations',
+				Object.entries(ann as Record<string, string>).map(([k, v]) => `${k}: ${v}`)
+			)
+		);
+	} else {
+		lines.push(`${pad('Annotations')}${none()}`);
+	}
+
+	// API Version & Kind
+	if (resource.apiVersion) lines.push(`${pad('API Version')}${resource.apiVersion}`);
+	if (resource.kind) lines.push(`${pad('Kind')}${resource.kind}`);
+
+	// Metadata (remaining fields as tree, skip managedFields + already-shown fields)
+	const metaSkip = new Set(['managedFields', 'name', 'namespace', 'labels', 'annotations']);
+	const metaRest: Record<string, any> = {};
+	for (const [k, v] of Object.entries(meta)) {
+		if (!metaSkip.has(k)) metaRest[k] = v;
+	}
+	if (Object.keys(metaRest).length > 0) {
+		lines.push('Metadata:');
+		lines.push(renderTree(metaRest, 2));
+	}
+
+	// Remaining top-level fields as tree sections (skip metadata, apiVersion, kind)
+	const topSkip = new Set(['metadata', 'apiVersion', 'kind']);
+	for (const [key, val] of Object.entries(resource)) {
+		if (topSkip.has(key)) continue;
+		const label = toTitleCase(key);
+		if (val === null || val === undefined) {
+			lines.push(`${label}:  ${nil()}`);
+		} else if (typeof val === 'object') {
+			lines.push(`${label}:`);
+			lines.push(renderTree(val, 2));
+		} else {
+			lines.push(`${label}:  ${String(val)}`);
+		}
+	}
+
+	// Events
+	lines.push(buildEventsTable(events));
+
 	return lines.join('\n');
 }
 
@@ -864,6 +953,22 @@ function buildEventsTable(events: any[]): string {
 // Public API
 // ---------------------------------------------------------------------------
 
+/**
+ * Format any Kubernetes resource + events into kubectl-describe-style text.
+ * Automatically routes to the Pod-specific formatter when kind === 'Pod',
+ * otherwise uses the generic tree renderer.
+ */
+export function formatDescribe(resource: any, events?: any[]): string {
+	const kind = resource?.kind;
+	if (kind === 'Pod') {
+		return formatPodDescribe(resource, events ?? []);
+	}
+	return formatGenericDescribe(resource, events ?? []);
+}
+
+/**
+ * Pod-specific formatter — matches `kubectl describe pod` field order.
+ */
 export function formatPodDescribe(pod: any, events?: any[]): string {
 	const status = pod.status ?? {};
 	const spec = pod.spec ?? {};

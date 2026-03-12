@@ -8,7 +8,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 
-	import { formatPodDescribe } from './describe-formatter';
+	import { formatDescribe } from './describe-formatter';
 
 	let {
 		cluster,
@@ -55,9 +55,9 @@
 			});
 
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const pod = (response.resource?.object as Record<string, any>) ?? {};
+			const obj = (response.resource?.object as Record<string, any>) ?? {};
 			const events = (response.events ?? []).map((e: Resource) => e.object ?? e);
-			describeText = formatPodDescribe(pod, events);
+			describeText = formatDescribe(obj, events);
 		} catch (err) {
 			console.error(`Failed to describe ${name}:`, err);
 			error = `Failed to describe ${name}: ${(err as ConnectError).message}`;
