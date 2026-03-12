@@ -2,7 +2,6 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { FileJsonIcon, FileSearchIcon } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type { Resource } from '@otterscale/api/resource/v1/resource_pb';
 	import { getContext } from 'svelte';
 
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -61,7 +60,7 @@
 
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const obj = (response.resource?.object as Record<string, any>) ?? {};
-			const events = (response.events ?? []).map((e: Resource) => e.object ?? e);
+			const events = (response.events ?? []).map((e) => e.object ?? e);
 			describeText = formatDescribe(obj, events);
 
 			// response.resource and response.events are either plain objects or protobuf generated structures, JSON.stringify can handle them
