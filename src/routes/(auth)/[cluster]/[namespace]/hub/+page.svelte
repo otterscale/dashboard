@@ -8,7 +8,7 @@
 	// Set breadcrumbs navigation
 	breadcrumbs.set([
 		{
-			title: m.hub(),
+			title: m.application_hub(),
 			url: resolve('/(auth)/[cluster]/[namespace]/hub', {
 				cluster: page.params.cluster!,
 				namespace: page.params.namespace!
