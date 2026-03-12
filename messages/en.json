@@ -194,7 +194,7 @@
 	"ai_studio": "AI Studio",
 	"apps": "Apps",
 	"release": "Release",
-	"hub": "Hub",
+	"application_hub": "Hub",
 	"block_pool": "Block Pool",
 	"object_store": "Object Store",
 	"administration": "Administration",
@@ -222,7 +222,6 @@
 	"native": "Native",
 	"artifact": "Artifact",
 	"console": "Console",
-	"helm_repository": "Helm Repository",
-	"oci_repository": "OCI Repository",
+	"repository": "Repository",
 	"add_cluster": "Add Cluster"
 }

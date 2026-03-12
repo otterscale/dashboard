@@ -174,7 +174,11 @@
 						url: resourceUrl('helm.toolkit.fluxcd.io', 'v2', 'HelmRelease', 'helmreleases')
 					},
 					{
-						title: m.hub(),
+						title: m.repository(),
+						url: resourceUrl('source.toolkit.fluxcd.io', 'v1', 'HelmRepository', 'helmrepositories')
+					},
+					{
+						title: m.application_hub(),
 						url: resolve('/(auth)/[cluster]/[namespace]/hub', {
 							cluster: activeCluster,
 							namespace: page.params.namespace!
@@ -246,15 +250,6 @@
 				title: m.administration(),
 				icon: UserStarIcon,
 				items: [
-					{
-						title: m.helm_repository(),
-						url: resourceUrl('source.toolkit.fluxcd.io', 'v1', 'HelmRepository', 'helmrepositories')
-					},
-					{
-						title: m.oci_repository(),
-						url: resourceUrl('source.toolkit.fluxcd.io', 'v1', 'OCIRepository', 'ocirepositories')
-					},
-
 					{
 						title: m.workspace(),
 						url: resourceUrl('tenant.otterscale.io', 'v1alpha1', 'Workspace', 'workspaces')
