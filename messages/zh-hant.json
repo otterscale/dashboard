@@ -192,9 +192,9 @@
 	"power_usage": "用電量",
 	"managed": "已納管",
 	"ai_studio": "AI 工作室",
-	"apps": "應用程式",
-	"release": "版本",
-	"hub": "中心",
+	"apps": "應用",
+	"release": "Helm 版本",
+	"application_hub": "應用中心",
 	"block_pool": "區塊儲存池",
 	"object_store": "物件儲存",
 	"administration": "管理",
@@ -222,7 +222,6 @@
 	"native": "原生",
 	"artifact": "產物",
 	"console": "主控台",
-	"helm_repository": "Helm 倉儲",
-	"oci_repository": "OCI 倉儲",
+	"repository": "倉儲",
 	"add_cluster": "新增叢集"
 }
