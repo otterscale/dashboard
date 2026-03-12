@@ -12,7 +12,7 @@
 
 	let {
 		cluster,
-		namespace,
+		namespace = '',
 		group,
 		version,
 		resource,
@@ -20,7 +20,7 @@
 		onOpenChangeComplete
 	}: {
 		cluster: string;
-		namespace: string;
+		namespace?: string;
 		group: string;
 		version: string;
 		resource: string;
@@ -88,7 +88,11 @@
 		<Dialog.Header>
 			<Dialog.Title>Describe — {name}</Dialog.Title>
 			<Dialog.Description>
-				Resource details and events in namespace <strong>{namespace}</strong>
+				{#if namespace}
+					Resource details and events in namespace <strong>{namespace}</strong>
+				{:else}
+					Resource details and events
+				{/if}
 			</Dialog.Description>
 		</Dialog.Header>
 

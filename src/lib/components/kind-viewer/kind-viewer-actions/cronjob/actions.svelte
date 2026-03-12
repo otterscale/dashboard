@@ -5,13 +5,31 @@
 
 	import Delete from '$lib/components/dynamic-form/cronjob/delete-dialog.svelte';
 	import Edit from '$lib/components/dynamic-form/cronjob/edit-sheet.svelte';
+	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
 	import View from './view.svelte';
 
-	let { row, schema, object }: { row: Row<Record<string, JsonValue>>; schema: any; object: any } =
-		$props();
+	let {
+		row,
+		schema,
+		object,
+		cluster,
+		namespace,
+		group,
+		version,
+		resource
+	}: {
+		row: Row<Record<string, JsonValue>>;
+		schema: any;
+		object: any;
+		cluster: string;
+		namespace: string;
+		group: string;
+		version: string;
+		resource: string;
+	} = $props();
 
 	let actionsOpen = $state(false);
 </script>
@@ -34,6 +52,25 @@
 				}}
 			>
 				<View {schema} {object} />
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Describe
+					{cluster}
+					{namespace}
+					{group}
+					{version}
+					{resource}
+					{object}
+					onOpenChangeComplete={() => {
+						if (actionsOpen) {
+							actionsOpen = false;
+						}
+					}}
+				/>
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {

@@ -11,13 +11,30 @@
 <script lang="ts">
 	import { EllipsisIcon, PencilIcon, Trash2Icon } from '@lucide/svelte';
 
+	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Item from '$lib/components/ui/item';
 
 	import View from './view.svelte';
 
-	let { schema, object }: { schema: any; object: any } = $props();
+	let {
+		schema,
+		object,
+		cluster,
+		namespace,
+		group,
+		version,
+		resource
+	}: {
+		schema: any;
+		object: any;
+		cluster: string;
+		namespace: string;
+		group: string;
+		version: string;
+		resource: string;
+	} = $props();
 
 	let actionsOpen = $state(false);
 </script>
@@ -40,6 +57,23 @@
 				}}
 			>
 				<View {schema} {object} />
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Describe
+					{cluster}
+					{namespace}
+					{group}
+					{version}
+					{resource}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				disabled

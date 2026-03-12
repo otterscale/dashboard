@@ -2,11 +2,11 @@
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
+	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
-	import Describe from './describe.svelte';
 	import Log from './log.svelte';
 	import Terminal from './terminal.svelte';
 
@@ -62,7 +62,6 @@
 					{namespace}
 					{group}
 					{version}
-					kind="Pod"
 					{resource}
 					{object}
 					onOpenChangeComplete={() => {
