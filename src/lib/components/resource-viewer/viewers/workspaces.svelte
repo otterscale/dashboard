@@ -67,17 +67,13 @@
 				});
 			}
 
-			const resourceQuotaReference = mapper.get(
-				`${object.status?.resourceQuotaRef?.apiVersion}/${object.status?.resourceQuotaRef?.kind}`
-			);
-
 			const resourceQuotaResponse = await resourceClient.get(
 				{
 					cluster: page.params.cluster,
 					namespace: object.status?.resourceQuotaRef?.namespace ?? '',
-					group: resourceQuotaReference?.group ?? '',
-					version: resourceQuotaReference?.version ?? '',
-					resource: resourceQuotaReference?.resource ?? '',
+					group: '',
+					version: 'v1',
+					resource: 'resourcequotas',
 					name: object.status?.resourceQuotaRef?.name ?? ''
 				} as GetRequest,
 				{ signal: getAbortController.signal }
