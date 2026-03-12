@@ -31,7 +31,7 @@
 		]);
 	});
 
-	const isAdmin = $derived(page.data.isAdmin === true);
+	const isClusterAdmin = $derived(page.data.isClusterAdmin === true);
 	const cluster = $derived(page.params.cluster ?? '');
 	const namespace = $derived(page.params.namespace ?? '');
 	const group = $derived(page.url.searchParams.get('group') ?? '');
@@ -99,7 +99,7 @@
 				)}
 				{#if apiResource}
 					<KindViewer
-						{isAdmin}
+						{isClusterAdmin}
 						{apiResource}
 						{cluster}
 						{group}
