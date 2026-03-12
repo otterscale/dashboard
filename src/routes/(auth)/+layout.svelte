@@ -246,20 +246,24 @@
 					}
 				]
 			},
-			{
-				title: m.administration(),
-				icon: UserStarIcon,
-				items: [
-					{
-						title: m.workspace(),
-						url: resourceUrl('tenant.otterscale.io', 'v1alpha1', 'Workspace', 'workspaces')
-					},
-					{
-						title: m.module(),
-						url: resourceUrl('module.otterscale.io', 'v1alpha1', 'Module', 'modules')
-					}
-				]
-			}
+			...(data.isClusterAdmin
+				? [
+						{
+							title: m.administration(),
+							icon: UserStarIcon,
+							items: [
+								{
+									title: m.workspace(),
+									url: resourceUrl('tenant.otterscale.io', 'v1alpha1', 'Workspace', 'workspaces')
+								},
+								{
+									title: m.module(),
+									url: resourceUrl('module.otterscale.io', 'v1alpha1', 'Module', 'modules')
+								}
+							]
+						}
+					]
+				: [])
 		],
 		native: [
 			{
@@ -536,12 +540,14 @@
 										>
 									{/each}
 								</DropdownMenu.RadioGroup>
-								<DropdownMenu.Separator />
 							{/if}
-							<DropdownMenu.Item onclick={() => (importOpen = true)}>
-								<PlusIcon class="mr-2 size-4" />
-								{m.add_cluster()}
-							</DropdownMenu.Item>
+							{#if data.user.roles.includes('admin')}
+								<DropdownMenu.Separator />
+								<DropdownMenu.Item onclick={() => (importOpen = true)}>
+									<PlusIcon class="mr-2 size-4" />
+									{m.add_cluster()}
+								</DropdownMenu.Item>
+							{/if}
 						</DropdownMenu.Group>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
