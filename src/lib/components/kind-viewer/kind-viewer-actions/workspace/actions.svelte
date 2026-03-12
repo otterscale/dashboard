@@ -2,6 +2,7 @@
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 
+	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
@@ -48,6 +49,22 @@
 				}}
 			>
 				<View {schema} {object} {cluster} {group} {version} {kind} {resource} />
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Describe
+					{cluster}
+					{group}
+					{version}
+					{resource}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {

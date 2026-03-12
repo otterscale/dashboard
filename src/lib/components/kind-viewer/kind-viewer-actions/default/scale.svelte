@@ -1,12 +1,16 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { MinusIcon, PlusIcon, ScalingIcon } from '@lucide/svelte';
+	import { ScalingIcon } from '@lucide/svelte';
 	import { RuntimeService } from '@otterscale/api/runtime/v1';
+	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
+	import { SubmitButton } from '@sjsf/form';
+	import Ajv from 'ajv';
+	import lodash from 'lodash';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
+	import Form from '$lib/components/dynamic-form/form.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
-	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Item from '$lib/components/ui/item';
 
 	let {
@@ -36,17 +40,30 @@
 	const name: string = $derived(object?.metadata?.name ?? '');
 	const currentReplicas: number = $derived(object?.spec?.replicas ?? 1);
 
-	let replicas = $state(0);
+	const jsonSchema = {
+		type: 'object',
+		required: ['replicas'],
+		properties: {
+			replicas: {
+				title: 'Replicas',
+				type: 'integer',
+				minimum: 0
+			}
+		}
+	} as Schema;
+
+	const jsonSchemaValidator = new Ajv({
+		allErrors: true,
+		strict: true
+	});
+	const validate = jsonSchemaValidator.compile(jsonSchema);
+
+	let values: any = $state({
+		replicas: 0
+	});
+
 	let open = $state(false);
 	let isScaling = $state(false);
-
-	function increment() {
-		replicas = Math.max(0, replicas + 1);
-	}
-
-	function decrement() {
-		replicas = Math.max(0, replicas - 1);
-	}
 
 	function handleScale() {
 		if (isScaling) return;
@@ -61,12 +78,12 @@
 					version,
 					resource,
 					name,
-					replicas
+					replicas: values.replicas
 				});
 				return response;
 			},
 			{
-				loading: `Scaling ${kind.toLowerCase()} ${name} to ${replicas} replicas...`,
+				loading: `Scaling ${kind.toLowerCase()} ${name} to ${values.replicas} replicas...`,
 				success: (response) => {
 					return `Successfully scaled ${kind.toLowerCase()} ${name} to ${response.replicas} replicas`;
 				},
@@ -88,7 +105,7 @@
 	{onOpenChangeComplete}
 	onOpenChange={(isOpen) => {
 		if (isOpen) {
-			replicas = currentReplicas;
+			values.replicas = currentReplicas;
 		}
 	}}
 >
@@ -105,38 +122,43 @@
 		{/snippet}
 	</AlertDialog.Trigger>
 	<AlertDialog.Content class="max-h-[95vh] min-w-[23vw] overflow-auto">
-		<AlertDialog.Header>
-			<AlertDialog.Title>Scale {kind}</AlertDialog.Title>
-			<AlertDialog.Description>
-				Adjust the number of replicas for <strong>{name}</strong> in namespace
-				<strong>{namespace}</strong>. Current replicas: <strong>{currentReplicas}</strong>.
-			</AlertDialog.Description>
-		</AlertDialog.Header>
-		<div class="flex items-center justify-center gap-4 py-4">
-			<Button
-				size="icon"
-				variant="outline"
-				onclick={decrement}
-				disabled={replicas <= 0}
-				aria-label="Decrease replicas"
-			>
-				<MinusIcon size={16} />
-			</Button>
-			<input
-				type="number"
-				min="0"
-				bind:value={replicas}
-				class="h-10 w-20 rounded-md border bg-background text-center text-lg font-semibold"
-			/>
-			<Button size="icon" variant="outline" onclick={increment} aria-label="Increase replicas">
-				<PlusIcon size={16} />
-			</Button>
-		</div>
-		<AlertDialog.Footer>
-			<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
-			<Button onclick={handleScale} disabled={isScaling || replicas === currentReplicas}>
-				{isScaling ? 'Scaling...' : 'Apply'}
-			</Button>
-		</AlertDialog.Footer>
+		<Item.Root class="p-0">
+			<Item.Content class="text-left">
+				<Item.Title class="text-xl font-bold">Scale {kind}</Item.Title>
+				<Item.Description>
+					Adjust the number of replicas for <strong>{name}</strong> in namespace
+					<strong>{namespace}</strong>. Current replicas: <strong>{currentReplicas}</strong>.
+				</Item.Description>
+			</Item.Content>
+		</Item.Root>
+		<Form
+			schema={lodash.get(jsonSchema, 'properties.replicas') as any}
+			uiSchema={{
+				'ui:options': {
+					help: 'Enter the desired number of replicas.'
+				}
+			} as UiSchemaRoot}
+			initialValue={currentReplicas as FormValue}
+			bind:values={values['replicas']}
+			handleSubmit={{
+				posthook: () => {
+					if (isScaling) return;
+
+					// Validate entire form or single field manually? The ajv schema covers the object
+					// values object looks like: { replicas: 3 }
+					const isValid = validate(values);
+					if (!isValid) return;
+
+					handleScale();
+				}
+			}}
+			class="**:data-[slot=dynamic-form-mode-controller]:hidden"
+		>
+			{#snippet actions()}
+				<div class="*:w-full">
+					<SubmitButton />
+				</div>
+			{/snippet}
+		</Form>
 	</AlertDialog.Content>
 </AlertDialog.Root>
