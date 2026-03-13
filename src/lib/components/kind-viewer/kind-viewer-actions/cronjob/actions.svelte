@@ -1,33 +1,29 @@
 <script lang="ts">
-	import type { JsonValue } from '@bufbuild/protobuf';
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
-	import type { Row } from '@tanstack/table-core';
 
-	import Delete from '$lib/components/dynamic-form/cronjob/delete-dialog.svelte';
-	import Edit from '$lib/components/dynamic-form/cronjob/edit-sheet.svelte';
+	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
+	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
-	import View from './view.svelte';
-
 	let {
-		row,
 		schema,
 		object,
 		cluster,
 		namespace,
 		group,
 		version,
+		kind,
 		resource
 	}: {
-		row: Row<Record<string, JsonValue>>;
 		schema: any;
 		object: any;
 		cluster: string;
 		namespace: string;
 		group: string;
 		version: string;
+		kind: string;
 		resource: string;
 	} = $props();
 
@@ -46,18 +42,10 @@
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content align="end">
 		<DropdownMenu.Group>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
+			<DropdownMenu.Item onSelect={(e) => e.preventDefault()}>
 				<View {schema} {object} />
 			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
+			<DropdownMenu.Item onSelect={(e) => e.preventDefault()}>
 				<Describe
 					{cluster}
 					{namespace}
@@ -66,39 +54,22 @@
 					{resource}
 					{object}
 					onOpenChangeComplete={() => {
-						if (actionsOpen) {
-							actionsOpen = false;
-						}
+						actionsOpen = false;
 					}}
 				/>
 			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<Edit
-					name={String(row.original['Name'])}
+			<DropdownMenu.Item onSelect={(e) => e.preventDefault()}>
+				<Delete
 					{schema}
 					{object}
+					{cluster}
+					{namespace}
+					{group}
+					{version}
+					{kind}
+					{resource}
 					onOpenChangeComplete={() => {
-						if (actionsOpen) {
-							actionsOpen = false;
-						}
-					}}
-				/>
-			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<Delete
-					name={String(row.original['Name'])}
-					onOpenChangeComplete={() => {
-						if (actionsOpen) {
-							actionsOpen = false;
-						}
+						actionsOpen = false;
 					}}
 				/>
 			</DropdownMenu.Item>
