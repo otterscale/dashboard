@@ -5,32 +5,6 @@ import type { ColumnDef } from '@tanstack/table-core';
 import type { DataSchemaType, UISchemaType } from '$lib/components/dynamic-table/utils.js';
 
 import {
-	getCronJobColumnDefinitions,
-	getCronJobData,
-	getCronJobDataSchemas,
-	getCronJobUISchemas
-} from './cronjob.js';
-import {
-	getDaemonSetColumnDefinitions,
-	getDaemonSetData,
-	getDaemonSetDataSchemas,
-	getDaemonSetUISchemas
-} from './daemonset.js';
-import {
-	getDeploymentColumnDefinitions,
-	getDeploymentData,
-	getDeploymentDataSchemas,
-	getDeploymentUISchemas
-} from './deployment.js';
-import { getJobColumnDefinitions, getJobData, getJobDataSchemas, getJobUISchemas } from './job.js';
-import { getPodColumnDefinitions, getPodData, getPodDataSchemas, getPodUISchemas } from './pod.js';
-import {
-	getStatefulSetColumnDefinitions,
-	getStatefulSetData,
-	getStatefulSetDataSchemas,
-	getStatefulSetUISchemas
-} from './statefulset.js';
-import {
 	getClusterRoleColumnDefinitions,
 	getClusterRoleData,
 	getClusterRoleDataSchemas,
@@ -49,17 +23,54 @@ import {
 	getConfigMapUISchemas
 } from './configmap.js';
 import {
+	getCronJobColumnDefinitions,
+	getCronJobData,
+	getCronJobDataSchemas,
+	getCronJobUISchemas
+} from './cronjob.js';
+import {
 	getCRDColumnDefinitions,
 	getCRDData,
 	getCRDDataSchemas,
 	getCRDUISchemas
 } from './customresourcedefinition.js';
 import {
+	getDaemonSetColumnDefinitions,
+	getDaemonSetData,
+	getDaemonSetDataSchemas,
+	getDaemonSetUISchemas
+} from './daemonset.js';
+import {
+	getDefaultColumnDefinitions,
+	getDefaultData,
+	getDefaultDataSchemas,
+	getDefaultUISchemas
+} from './default.js';
+import {
+	getDeploymentColumnDefinitions,
+	getDeploymentData,
+	getDeploymentDataSchemas,
+	getDeploymentUISchemas
+} from './deployment.js';
+import {
 	getEventColumnDefinitions,
 	getEventData,
 	getEventDataSchemas,
 	getEventUISchemas
 } from './event.js';
+import {
+	getGatewayColumnDefinitions,
+	getGatewayData,
+	getGatewayDataSchemas,
+	getGatewayUISchemas
+} from './gateway.js';
+import {
+	getHTTPRouteColumnDefinitions,
+	getHTTPRouteData,
+	getHTTPRouteDataSchemas,
+	getHTTPRouteUISchemas
+} from './httproute.js';
+import { getJobColumnDefinitions, getJobData, getJobDataSchemas, getJobUISchemas } from './job.js';
 import {
 	getLimitRangeColumnDefinitions,
 	getLimitRangeData,
@@ -73,11 +84,36 @@ import {
 	getNamespaceUISchemas
 } from './namespace.js';
 import {
+	getNetworkPolicyColumnDefinitions,
+	getNetworkPolicyData,
+	getNetworkPolicyDataSchemas,
+	getNetworkPolicyUISchemas
+} from './networkpolicy.js';
+import {
 	getNodeColumnDefinitions,
 	getNodeData,
 	getNodeDataSchemas,
 	getNodeUISchemas
 } from './node.js';
+import {
+	getPVColumnDefinitions,
+	getPVData,
+	getPVDataSchemas,
+	getPVUISchemas
+} from './persistentvolume.js';
+import {
+	getPVCColumnDefinitions,
+	getPVCData,
+	getPVCDataSchemas,
+	getPVCUISchemas
+} from './persistentvolumeclaim.js';
+import { getPodColumnDefinitions, getPodData, getPodDataSchemas, getPodUISchemas } from './pod.js';
+import {
+	getResourceQuotaColumnDefinitions,
+	getResourceQuotaData,
+	getResourceQuotaDataSchemas,
+	getResourceQuotaUISchemas
+} from './resource-quota.js';
 import {
 	getRoleColumnDefinitions,
 	getRoleData,
@@ -91,30 +127,6 @@ import {
 	getRoleBindingUISchemas
 } from './rolebinding.js';
 import {
-	getServiceAccountColumnDefinitions,
-	getServiceAccountData,
-	getServiceAccountDataSchemas,
-	getServiceAccountUISchemas
-} from './serviceaccount.js';
-import {
-	getNetworkPolicyColumnDefinitions,
-	getNetworkPolicyData,
-	getNetworkPolicyDataSchemas,
-	getNetworkPolicyUISchemas
-} from './networkpolicy.js';
-import {
-	getPVColumnDefinitions,
-	getPVData,
-	getPVDataSchemas,
-	getPVUISchemas
-} from './persistentvolume.js';
-import {
-	getPVCColumnDefinitions,
-	getPVCData,
-	getPVCDataSchemas,
-	getPVCUISchemas
-} from './persistentvolumeclaim.js';
-import {
 	getSecretColumnDefinitions,
 	getSecretData,
 	getSecretDataSchemas,
@@ -127,23 +139,11 @@ import {
 	getServiceUISchemas
 } from './service.js';
 import {
-	getStorageClassColumnDefinitions,
-	getStorageClassData,
-	getStorageClassDataSchemas,
-	getStorageClassUISchemas
-} from './storageclass.js';
-import {
-	getDefaultColumnDefinitions,
-	getDefaultData,
-	getDefaultDataSchemas,
-	getDefaultUISchemas
-} from './default.js';
-import {
-	getResourceQuotaColumnDefinitions,
-	getResourceQuotaData,
-	getResourceQuotaDataSchemas,
-	getResourceQuotaUISchemas
-} from './resource-quota.js';
+	getServiceAccountColumnDefinitions,
+	getServiceAccountData,
+	getServiceAccountDataSchemas,
+	getServiceAccountUISchemas
+} from './serviceaccount.js';
 import {
 	getSimpleAppColumnDefinitions,
 	getSimpleAppData,
@@ -151,23 +151,23 @@ import {
 	getSimpleAppUISchemas
 } from './simple-app.js';
 import {
+	getStatefulSetColumnDefinitions,
+	getStatefulSetData,
+	getStatefulSetDataSchemas,
+	getStatefulSetUISchemas
+} from './statefulset.js';
+import {
+	getStorageClassColumnDefinitions,
+	getStorageClassData,
+	getStorageClassDataSchemas,
+	getStorageClassUISchemas
+} from './storageclass.js';
+import {
 	getWorkspaceColumnDefinitions,
 	getWorkspaceData,
 	getWorkspaceDataSchemas,
 	getWorkspaceUISchemas
 } from './workspaces.js';
-import {
-	getHTTPRouteColumnDefinitions,
-	getHTTPRouteData,
-	getHTTPRouteDataSchemas,
-	getHTTPRouteUISchemas
-} from './httproute.js';
-import {
-	getGatewayColumnDefinitions,
-	getGatewayData,
-	getGatewayDataSchemas,
-	getGatewayUISchemas
-} from './gateway.js';
 
 function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 	switch (kind) {
