@@ -16,7 +16,7 @@
 	let {
 		cluster,
 		group,
-		namespace = '',
+		namespace,
 		version,
 		kind,
 		resource,

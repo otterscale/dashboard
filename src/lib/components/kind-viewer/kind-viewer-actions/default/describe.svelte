@@ -13,7 +13,7 @@
 
 	let {
 		cluster,
-		namespace = '',
+		namespace,
 		group,
 		version,
 		resource,
