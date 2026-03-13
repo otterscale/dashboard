@@ -7,29 +7,28 @@ import type { QuantityMetadata } from '$lib/components/dynamic-table/dynamic-tab
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { formatWithBinarySuffix } from '$lib/components/dynamic-table/utils.ts';
 import { renderComponent } from '$lib/components/ui/data-table';
-
-import type { ArtifactType } from './types';
+import type { ArtifactType } from '$lib/server/harbor';
 
 type ArtifactAttribute =
+	| 'Repository'
 	| 'Digest'
 	| 'Tags'
 	| 'Size'
 	| 'Push Time'
 	| 'Pull Time'
 	| 'Type'
-	| 'Platform'
 	| 'Labels'
 	| 'raw';
 
 function getArtifactDataSchemas(): Record<ArtifactAttribute, DataSchemaType> {
 	return {
+		Repository: 'text',
 		Digest: 'text',
 		Tags: 'array',
 		Size: 'quantity',
 		'Push Time': 'time',
 		'Pull Time': 'time',
 		Type: 'text',
-		Platform: 'text',
 		Labels: 'array',
 		raw: 'object'
 	};
@@ -37,13 +36,13 @@ function getArtifactDataSchemas(): Record<ArtifactAttribute, DataSchemaType> {
 
 function getArtifactUISchemas(): Record<ArtifactAttribute, UISchemaType> {
 	return {
+		Repository: 'text',
 		Digest: 'text',
 		Tags: 'array',
 		Size: 'quantity',
 		'Push Time': 'time',
 		'Pull Time': 'time',
 		Type: 'text',
-		Platform: 'text',
 		Labels: 'array',
 		raw: 'object'
 	};
@@ -52,22 +51,16 @@ function getArtifactUISchemas(): Record<ArtifactAttribute, UISchemaType> {
 function getArtifactData(artifact: ArtifactType): Record<ArtifactAttribute, JsonValue> {
 	const tags = (artifact.tags ?? []).map((t) => t.name);
 
-	const platformParts: string[] = [];
-	if (artifact.extra_attrs?.os) platformParts.push(String(artifact.extra_attrs.os));
-	if (artifact.extra_attrs?.architecture)
-		platformParts.push(String(artifact.extra_attrs.architecture));
-	const platformStr = platformParts.length > 0 ? platformParts.join('/') : null;
-
 	const { value: sizeValue, unit: sizeUnit } = formatWithBinarySuffix(BigInt(artifact.size));
 
 	return {
+		Repository: artifact.repository_name,
 		Digest: artifact.digest ? artifact.digest.slice(0, 19) : null,
 		Tags: tags as JsonValue,
 		Size: `${sizeValue.toFixed(0)}${sizeUnit}`,
 		'Push Time': artifact.push_time ?? null,
 		'Pull Time': artifact.pull_time ?? null,
 		Type: artifact.type ?? null,
-		Platform: platformStr,
 		Labels: (artifact.labels ?? []).map((l) => l.name) as JsonValue,
 		raw: artifact as unknown as JsonValue
 	};
@@ -78,12 +71,12 @@ function getArtifactColumnDefinitions(
 	dataSchemas: Record<ArtifactAttribute, DataSchemaType>
 ): ColumnDef<Record<ArtifactAttribute, JsonValue>>[] {
 	const columns: ArtifactAttribute[] = [
+		'Repository',
 		'Digest',
 		'Type',
 		'Tags',
 		'Labels',
 		'Size',
-		'Platform',
 		'Push Time',
 		'Pull Time'
 	];

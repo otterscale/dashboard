@@ -12,7 +12,6 @@
 	import { stringify } from 'yaml';
 
 	import { env as publicEnv } from '$env/dynamic/public';
-	import type { ArtifactType } from '$lib/components/artifact-viewer/types';
 	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';
@@ -21,6 +20,7 @@
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
+	import type { ArtifactType } from '$lib/server/harbor';
 
 	let {
 		cluster,

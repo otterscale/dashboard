@@ -1,7 +1,9 @@
 <script lang="ts">
 	import Icon from '@iconify/svelte';
 	import { PlusIcon } from '@lucide/svelte';
+	import { SvelteURL } from 'svelte/reactivity';
 
+	import { env as publicEnv } from '$env/dynamic/public';
 	import * as Code from '$lib/components/custom/code';
 	import CopyButton from '$lib/components/custom/copy-button/copy-button.svelte';
 	import { buttonVariants } from '$lib/components/ui/button';
@@ -10,7 +12,7 @@
 	import * as Item from '$lib/components/ui/item';
 	import { m } from '$lib/paraglide/messages';
 
-	const registryURL = '192.168.0.1:5000';
+	const harborUniformResourceLocator = new SvelteURL(publicEnv.PUBLIC_HARBOR_URL ?? '');
 </script>
 
 <Dialog.Root>
@@ -23,7 +25,7 @@
 		</Dialog.Header>
 
 		<Item.Root class="w-full">
-			{@const command = `docker push ${registryURL}/<repository>[:<tag>]`}
+			{@const command = `docker push ${harborUniformResourceLocator.host}/<repository>[:<tag>]`}
 			<Item.Media variant="icon">
 				<Icon icon="logos:docker-icon" />
 			</Item.Media>
@@ -37,7 +39,7 @@
 		</Item.Root>
 
 		<Item.Root class="w-full">
-			{@const command = `helm push <chart_package> oci://${registryURL}/<namespace> --plain-http`}
+			{@const command = `helm push <chart_package> oci://${harborUniformResourceLocator.host}/<namespace> --plain-http`}
 			<Item.Media variant="icon">
 				<Icon icon="logos:helm" />
 			</Item.Media>
@@ -73,7 +75,7 @@
 							lang="json"
 							code={JSON.stringify(
 								{
-									'insecure-registries': [registryURL]
+									'insecure-registries': [harborUniformResourceLocator.host]
 								},
 								null,
 								2

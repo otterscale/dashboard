@@ -52,13 +52,15 @@
 		kind,
 		metadata: {},
 		spec: {
-			deployment: {
-				selector: { matchLabels: { app: '' } },
-				replicas: {},
-				template: { spec: { containers: {} } }
-			},
-			service: {},
-			persistentVolumeClaim: { resources: { requests: {} } }
+			deploymentConfig: {
+				deployment: {
+					selector: { matchLabels: { app: '' } },
+					replicas: {},
+					template: { spec: { containers: {} } }
+				},
+				service: {},
+				persistentVolumeClaim: { resources: { requests: {} } }
+			}
 		}
 	});
 
@@ -157,7 +159,10 @@
 			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
-						...lodash.get(jsonSchema, 'properties.spec.properties.deployment.properties.replicas'),
+						...lodash.get(
+							jsonSchema,
+							'properties.spec.properties.deploymentConfig.properties.deployment.properties.replicas'
+						),
 						title: 'Replicas'
 					} as Schema}
 					uiSchema={{
@@ -173,7 +178,7 @@
 							handleNext();
 						}
 					}}
-					bind:values={values['spec']['deployment']['replicas']}
+					bind:values={values['spec']['deploymentConfig']['deployment']['replicas']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -197,7 +202,7 @@
 						...lodash.omit(
 							lodash.get(
 								jsonSchema,
-								'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers'
+								'properties.spec.properties.deploymentConfig.properties.deployment.properties.template.properties.spec.properties.containers'
 							),
 							'items'
 						),
@@ -205,7 +210,7 @@
 							...lodash.omit(
 								lodash.get(
 									jsonSchema,
-									'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items'
+									'properties.spec.properties.deploymentConfig.properties.deployment.properties.template.properties.spec.properties.containers.items'
 								),
 								'properties'
 							),
@@ -213,28 +218,28 @@
 								name: {
 									...lodash.get(
 										jsonSchema,
-										'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.name'
+										'properties.spec.properties.deploymentConfig.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.name'
 									),
 									title: 'Name'
 								},
 								image: {
 									...lodash.get(
 										jsonSchema,
-										'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.image'
+										'properties.spec.properties.deploymentConfig.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.image'
 									),
 									title: 'Image'
 								},
 								command: {
 									...lodash.get(
 										jsonSchema,
-										'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.command'
+										'properties.spec.properties.deploymentConfig.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.command'
 									),
 									title: 'Command'
 								},
 								args: {
 									...lodash.get(
 										jsonSchema,
-										'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.args'
+										'properties.spec.properties.deploymentConfig.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.args'
 									),
 									title: 'Arguments'
 								},
@@ -242,7 +247,7 @@
 									...lodash.omit(
 										lodash.get(
 											jsonSchema,
-											'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.env'
+											'properties.spec.properties.deploymentConfig.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.env'
 										),
 										'items'
 									),
@@ -251,7 +256,7 @@
 										...lodash.omit(
 											lodash.get(
 												jsonSchema,
-												'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.env.items'
+												'properties.spec.properties.deploymentConfig.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.env.items'
 											),
 											'properties'
 										),
@@ -259,14 +264,14 @@
 											name: {
 												...lodash.get(
 													jsonSchema,
-													'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.name'
+													'properties.spec.properties.deploymentConfig.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.name'
 												),
 												title: 'Name'
 											},
 											value: {
 												...lodash.get(
 													jsonSchema,
-													'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.value'
+													'properties.spec.properties.deploymentConfig.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.value'
 												),
 												title: 'Value'
 											}
@@ -278,7 +283,7 @@
 									...lodash.omit(
 										lodash.get(
 											jsonSchema,
-											'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.ports'
+											'properties.spec.properties.deploymentConfig.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.ports'
 										),
 										'items'
 									),
@@ -286,7 +291,7 @@
 										...lodash.omit(
 											lodash.get(
 												jsonSchema,
-												'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.ports.items'
+												'properties.spec.properties.deploymentConfig.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.ports.items'
 											),
 											'properties'
 										),
@@ -295,7 +300,7 @@
 												title: 'Container Port',
 												...lodash.get(
 													jsonSchema,
-													'properties.spec.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.ports.items.properties.containerPort'
+													'properties.spec.properties.deploymentConfig.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.ports.items.properties.containerPort'
 												)
 											}
 										}
@@ -318,7 +323,9 @@
 							handleNext();
 						}
 					}}
-					bind:values={values['spec']['deployment']['template']['spec']['containers']}
+					bind:values={
+						values['spec']['deploymentConfig']['deployment']['template']['spec']['containers']
+					}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -340,25 +347,35 @@
 					schema={{
 						title: 'Services',
 						...lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.service'),
+							lodash.get(
+								jsonSchema,
+								'properties.spec.properties.deploymentConfig.properties.service'
+							),
 							'properties'
 						),
 						properties: {
 							type: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.service.properties.type'),
-								title: 'Type'
+								...lodash.get(
+									jsonSchema,
+									'properties.spec.properties.deploymentConfig.properties.service.properties.type'
+								),
+								title: 'Type',
+								enum: ['ExternalName', 'ClusterIP', 'NodePort', 'LoadBalancer']
 							},
 							ports: {
 								title: 'Ports',
 								...lodash.omit(
-									lodash.get(jsonSchema, 'properties.spec.properties.service.properties.ports'),
+									lodash.get(
+										jsonSchema,
+										'properties.spec.properties.deploymentConfig.properties.service.properties.ports'
+									),
 									'items'
 								),
 								items: {
 									...lodash.omit(
 										lodash.get(
 											jsonSchema,
-											'properties.spec.properties.service.properties.ports.items'
+											'properties.spec.properties.deploymentConfig.properties.service.properties.ports.items'
 										),
 										'properties'
 									),
@@ -367,14 +384,14 @@
 											title: 'Port',
 											...lodash.get(
 												jsonSchema,
-												'properties.spec.properties.service.properties.ports.items.properties.port'
+												'properties.spec.properties.deploymentConfig.properties.service.properties.ports.items.properties.port'
 											)
 										},
 										nodePort: {
 											title: 'Node Port',
 											...lodash.get(
 												jsonSchema,
-												'properties.spec.properties.service.properties.ports.items.properties.nodePort'
+												'properties.spec.properties.deploymentConfig.properties.service.properties.ports.items.properties.nodePort'
 											)
 										}
 									}
@@ -401,7 +418,7 @@
 							handleNext();
 						}
 					}}
-					bind:values={values['spec']['service']}
+					bind:values={values['spec']['deploymentConfig']['service']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -424,7 +441,7 @@
 						title: 'Persistent Volume Claim',
 						...lodash.get(
 							jsonSchema,
-							'properties.spec.properties.persistentVolumeClaim.properties.resources.properties.requests'
+							'properties.spec.properties.deploymentConfig.properties.persistentVolumeClaim.properties.resources.properties.requests'
 						)
 					} as Schema}
 					uiSchema={{
@@ -438,12 +455,22 @@
 					handleSubmit={{
 						posthook: () => {
 							const label = `app-${lodash.get(values, 'metadata.name')}`;
-							lodash.set(values, 'spec.deployment.selector.matchLabels.app', label);
-							lodash.set(values, 'spec.deployment.template.metadata.labels.app', label);
+							lodash.set(
+								values,
+								'spec.deploymentConfig.deployment.selector.matchLabels.app',
+								label
+							);
+							lodash.set(
+								values,
+								'spec.deploymentConfig.deployment.template.metadata.labels.app',
+								label
+							);
 							handleNext();
 						}
 					}}
-					bind:values={values['spec']['persistentVolumeClaim']['resources']['requests']}
+					bind:values={
+						values['spec']['deploymentConfig']['persistentVolumeClaim']['resources']['requests']
+					}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">

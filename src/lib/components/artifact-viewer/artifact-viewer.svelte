@@ -3,26 +3,29 @@
 	import { Columns3Icon, EraserIcon, RefreshCwIcon } from '@lucide/svelte';
 	import type { ColumnDef } from '@tanstack/table-core';
 	import { onMount } from 'svelte';
+	import { SvelteURL } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 
+	import { env as publicEnv } from '$env/dynamic/public';
 	import { DynamicTable } from '$lib/components/dynamic-table';
 	import type { DataSchemaType, UISchemaType } from '$lib/components/dynamic-table/utils';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
+	import type { ArtifactType } from '$lib/server/harbor';
 
 	import {
+		type ArtifactAttribute,
 		getArtifactColumnDefinitions,
 		getArtifactData,
 		getArtifactDataSchemas,
 		getArtifactUISchemas
 	} from './artifact-viewer.ts';
-	import ProjectPicker from './artifact-viewer-project-picker.svelte';
-	import RepositoryPicker from './artifact-viewer-repository-picker.svelte';
-	import Create from './create.svelte';
 	import Grid from './grid.svelte';
-	import type { ArtifactType, ProjectType, RepositoryType } from './types';
+	import UploadCommand from './upload-command.svelte';
 	import View from './view.svelte';
+
+	let { cluster, namespace }: { cluster: string; namespace: string } = $props();
 
 	const uiSchemas: Record<string, UISchemaType> = getArtifactUISchemas();
 	const dataSchemas: Record<string, DataSchemaType> = getArtifactDataSchemas();
@@ -31,108 +34,46 @@
 		dataSchemas
 	);
 
-	let projects = $state<ProjectType[]>([]);
-	async function fetchProjects() {
-		try {
-			const response = await fetch('/rest/harbor/projects');
-			if (!response.ok) {
-				console.error('Failed to fetch Harbor projects:', response.statusText);
-				toast.error('Failed to fetch Harbor projects');
-				return;
-			}
-			const data: ProjectType[] = await response.json();
-			projects = data ?? [];
-			return projects;
-		} catch (error) {
-			console.error('Error fetching Harbor projects:', error);
-			toast.error('Error fetching Harbor projects');
-		}
-	}
-
-	let selectedProject = $derived(projects.length > 0 ? projects[0] : undefined);
-	async function handleProjectSelect(project: ProjectType) {
-		selectedProject = project;
-		await fetchRepositories(selectedProject.name);
-		if (selectedRepository) {
-			await fetchArtifacts(selectedRepository.name);
-		} else {
-			artifacts = [];
-		}
-	}
-
-	let repositories = $state<RepositoryType[]>([]);
-	async function fetchRepositories(projectName: string) {
-		if (!projectName) return;
-		try {
-			const response = await fetch(
-				`/rest/harbor/repositories?project=${encodeURIComponent(projectName)}`
-			);
-			if (!response.ok) {
-				console.error('Failed to fetch Harbor repositories:', response.statusText);
-				toast.error('Failed to fetch Harbor repositories');
-				return;
-			}
-			const data: RepositoryType[] = await response.json();
-			repositories = data ?? [];
-			return repositories;
-		} catch (error) {
-			console.error('Error fetching Harbor repositories:', error);
-			toast.error('Error fetching Harbor repositories');
-		}
-	}
-
-	let selectedRepository = $derived(repositories.length > 0 ? repositories[0] : undefined);
-	async function handleRepositorySelect(repository: RepositoryType) {
-		selectedRepository = repository;
-		if (selectedRepository) {
-			await fetchArtifacts(selectedRepository.name);
-		} else {
-			artifacts = [];
-		}
-	}
-
-	let artifacts: Record<string, JsonValue>[] = $state([]);
+	let latestRepositoryChartArtifacts: Record<ArtifactAttribute, JsonValue>[] = $state([]);
 	let isFetchingArtifacts = $state(false);
-	async function fetchArtifacts(repositoryNameWithProject: string) {
-		if (isFetchingArtifacts || !repositoryNameWithProject) return;
+
+	async function fetchLatestArtifacts(namespace: string) {
+		if (isFetchingArtifacts || !namespace) return;
 
 		isFetchingArtifacts = true;
 
-		const [projectName, ...repositoryName] = repositoryNameWithProject.split('/');
 		try {
-			const response = await fetch(
-				`/rest/harbor/artifacts?project=${encodeURIComponent(projectName)}&repository=${encodeURIComponent(repositoryName.join('/'))}`
-			);
+			const response = await fetch(`/rest/harbor/all-latest-artifacts?project=${namespace}`);
 			if (!response.ok) {
-				console.error('Failed to fetch Harbor artifacts:', response.statusText);
-				toast.error('Failed to fetch Harbor artifacts');
+				console.error(
+					'Failed to fetch latest chart artifact of each repository:',
+					response.statusText
+				);
+				toast.error('Failed to fetch latest chart artifact of each repository');
 				return;
 			}
 			const data: ArtifactType[] = await response.json();
-			artifacts = (data ?? []).map((artifact) => getArtifactData(artifact));
-			return artifacts;
+			latestRepositoryChartArtifacts = (data ?? []).map((artifact) => getArtifactData(artifact));
+			return latestRepositoryChartArtifacts;
 		} catch (error) {
-			console.error('Error fetching Harbor artifacts:', error);
-			toast.error('Error fetching Harbor artifacts');
+			console.error('Error fetching latest chart artifact of each repository:', error);
+			toast.error('Error fetching latest chart artifact of each repository');
 		} finally {
 			isFetchingArtifacts = false;
 		}
 	}
+
 	function handleReload() {
-		if (selectedProject && selectedRepository && !isFetchingArtifacts) {
-			fetchArtifacts(selectedRepository.name);
-		}
+		if (!namespace) return;
+
+		fetchLatestArtifacts(namespace);
 	}
 
 	let isMounted = $state(false);
 	onMount(async () => {
-		await fetchProjects();
-		if (selectedProject) {
-			await fetchRepositories(selectedProject.name);
-		}
-		if (selectedRepository) {
-			await fetchArtifacts(selectedRepository.name);
-		}
+		if (!namespace) return;
+		await fetchLatestArtifacts(namespace);
+
 		isMounted = true;
 	});
 </script>
@@ -142,28 +83,26 @@
 		<div class="flex items-end justify-between gap-4">
 			<Item.Root class="p-0">
 				<Item.Content class="text-left">
+					{@const harborUniformResourceLocator = new SvelteURL(publicEnv.PUBLIC_HARBOR_URL ?? '')}
 					<Item.Title class="text-xl font-bold">Hub</Item.Title>
-					<Item.Description class="text-base">harbor</Item.Description>
+					<Item.Description class="text-base"
+						>{harborUniformResourceLocator.host} in {cluster} {namespace}</Item.Description
+					>
 				</Item.Content>
 			</Item.Root>
-			<div class="flex items-center gap-2">
-				<ProjectPicker value={selectedProject} {projects} onSelect={handleProjectSelect} />
-				{#if repositories.length > 0}
-					<RepositoryPicker
-						value={selectedRepository}
-						{repositories}
-						onSelect={handleRepositorySelect}
-					/>
-				{/if}
-			</div>
 		</div>
-		<DynamicTable dataset={artifacts} {columnDefinitions} {uiSchemas} {dataSchemas}>
+		<DynamicTable
+			dataset={latestRepositoryChartArtifacts}
+			{columnDefinitions}
+			{uiSchemas}
+			{dataSchemas}
+		>
 			{#snippet gridsLayout({ table, handleClear })}
 				{#if table.getRowModel().rows?.length}
 					<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
 						{#each table.getRowModel().rows as row (row.id)}
-							{@const artifact = row.original.raw as unknown as ArtifactType}
-							<Grid {artifact} />
+							{@const latestChartArtifact = row.original.raw as unknown as ArtifactType}
+							<Grid {latestChartArtifact} {cluster} {namespace} />
 						{/each}
 					</div>
 				{:else}
@@ -188,7 +127,7 @@
 				{/if}
 			{/snippet}
 			{#snippet create()}
-				<Create />
+				<UploadCommand />
 			{/snippet}
 			{#snippet reload()}
 				<Button onclick={handleReload} disabled={isFetchingArtifacts} variant="outline">

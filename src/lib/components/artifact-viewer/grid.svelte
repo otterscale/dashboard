@@ -1,13 +1,22 @@
 <script lang="ts">
-	// import { type Transport } from '@connectrpc/connect';
+	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import Icon from '@iconify/svelte';
 	import { BookmarkIcon, DownloadIcon, TagsIcon } from '@lucide/svelte';
-	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
-	import { SubmitButton } from '@sjsf/form';
+	import {
+		type ListRequest,
+		ResourceService,
+		type SchemaRequest
+	} from '@otterscale/api/resource/v1';
+	import {} from '@otterscale/types';
+	import { type Schema, SubmitButton, type UiSchemaRoot } from '@sjsf/form';
 	import Ajv from 'ajv';
+	import { load } from 'js-yaml';
+	import lodash from 'lodash';
+	import { getContext, onMount } from 'svelte';
+	import { toast } from 'svelte-sonner';
+	import { stringify } from 'yaml';
 
-	// import { getContext } from 'svelte';
-	// import { ResourceService } from '@otterscale/api/resource/v1';
+	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import EditorWidget from '$lib/components/dynamic-form/widgets/editor.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
@@ -15,58 +24,127 @@
 	import Button, { buttonVariants } from '$lib/components/ui/button/button.svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Item from '$lib/components/ui/item';
+	import * as Tabs from '$lib/components/ui/tabs/index.js';
+	import type { ArtifactType } from '$lib/server/harbor';
 
-	import type { ArtifactType } from './types.d.ts';
+	let {
+		cluster,
+		namespace,
+		latestChartArtifact
+	}: { cluster: string; namespace: string; latestChartArtifact: ArtifactType } = $props();
 
-	let { artifact }: { artifact: ArtifactType } = $props();
+	const [projectName, ...latestChartName] = $derived(
+		latestChartArtifact.repository_name.split('/')
+	);
+	const repositoryName = $derived(latestChartName.join('/'));
+	const extraAttributes = $derived(latestChartArtifact.extra_attrs ?? {});
 
-	const [projectName, ...repositoryName] = $derived(artifact.repository_name.split('/'));
+	const transport: Transport = getContext('transport');
+	const resourceClient = createClient(ResourceService, transport);
 
-	// const transport: Transport = getContext('transport');
-	// const resourceClient = createClient(ResourceService, transport);
+	const group = 'helm.toolkit.fluxcd.io';
+	const version = 'v2';
+	const kind = 'HelmRelease';
+	const resource = 'helmreleases';
 
-	const jsonSchema = {
-		type: 'object',
-		required: ['name', 'version', 'values'],
-		properties: {
-			name: {
-				title: 'Name',
-				type: 'string'
-			},
-			version: {
-				title: 'Version',
-				type: 'string'
-			},
-			values: {
-				title: 'Values',
-				type: 'string'
-			}
+	let jsonSchema: Schema | undefined = $state(undefined);
+
+	async function fetchSchema() {
+		try {
+			const schemaResponse = await resourceClient.schema({
+				cluster,
+				group,
+				version,
+				kind
+			} as SchemaRequest);
+
+			jsonSchema = schemaResponse.schema;
+		} catch (error) {
+			console.error('Failed to fetch schema:', error);
+			toast.error('Failed to fetch HelmRelease schema');
 		}
-	} as Schema;
+	}
 
 	// Validation
 	const jsonSchemaValidator = new Ajv({
 		allErrors: true,
 		strict: false
 	});
-	const validate = jsonSchemaValidator.compile(jsonSchema);
+	const validate = $derived(jsonSchemaValidator.compile(jsonSchema ?? {}));
 
 	// Container for Data.
-	let values: any = $state({
-		name: '',
-		version: '',
-		values: {}
+	let values = $state({
+		apiVersion: `${group}/${version}`,
+		kind,
+		metadata: {},
+		spec: {
+			interval: '15m',
+			chart: {
+				spec: {}
+			},
+			values: {}
+		}
 	});
 
-	// Flags
-	let open = $state(false);
-	let isInstalling = $state(false);
+	let artifacts: ArtifactType[] = $state([]);
+	async function fetchArtifacts() {
+		try {
+			const searchParameters = new URLSearchParams({
+				project: projectName,
+				repository: repositoryName
+			});
+			const response = await fetch(`/rest/harbor/artifacts?${searchParameters}`);
+			if (!response.ok) {
+				console.error('Failed to fetch repository artifacts:', response.statusText);
+				return;
+			}
+			artifacts = await response.json();
+		} catch (error) {
+			console.error('Error fetching repository artifacts:', error);
+		}
+	}
 
-	async function getReferenceAddition(addition: string) {
+	let selectedChartArtifact: ArtifactType = $derived(latestChartArtifact);
+	function getVersions() {
+		return artifacts.map((artifact) => lodash.get(artifact.extra_attrs, 'version'));
+	}
+	function getSelectedChartArtifact(version: string) {
+		return (
+			artifacts.find((artifact) => artifact.extra_attrs.version === version) ?? latestChartArtifact
+		);
+	}
+	$effect(() => {
+		const version = lodash.get(values, 'spec.chart.spec.version');
+		if (version) {
+			selectedChartArtifact = getSelectedChartArtifact(version);
+		}
+	});
+
+	// HelmRepository resources in the namespace
+	let helmRepositories: any[] = $state([]);
+	async function fetchHelmRepositories() {
+		try {
+			const response = await resourceClient.list({
+				cluster,
+				namespace,
+				group: 'source.toolkit.fluxcd.io',
+				version: 'v1',
+				resource: 'helmrepositories'
+			} as ListRequest);
+			helmRepositories = response.items.map((item) => item.object);
+		} catch (error) {
+			console.error('Failed to fetch HelmRepositories:', error);
+		}
+	}
+	function getSelectedSourceReferences(name: string) {
+		return helmRepositories.find((repository) => repository.metadata.name === name);
+	}
+
+	async function getReferenceAddition(digest: string, addition: string) {
 		const parameters = new URLSearchParams({
 			project: projectName,
-			repository: repositoryName.join('/'),
-			reference: artifact.digest,
+			repository: repositoryName,
+			reference: digest,
 			addition
 		});
 		const response = await fetch(`/rest/harbor/reference-additions?${parameters}`);
@@ -76,30 +154,41 @@
 		}
 		return response.json();
 	}
-	async function getChartInformation() {
-		const values = await getReferenceAddition('values.yaml');
-		const readme = await getReferenceAddition('readme.md');
+
+	async function getChartInformation(digest: string) {
+		const [values, readme] = await Promise.all([
+			getReferenceAddition(digest, 'values.yaml'),
+			getReferenceAddition(digest, 'readme.md')
+		]);
+
 		return { values, readme };
 	}
+
+	// Steps Manager
+	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
+	const [firstStep] = steps;
+	let currentStep = $state(firstStep);
+	const currentIndex = $derived(steps.indexOf(currentStep));
+	function handleNext() {
+		currentStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
+	}
+	function handlePrevious() {
+		currentStep = steps[Math.max(currentIndex - 1, 0)];
+	}
+	function reset() {
+		currentStep = firstStep;
+	}
+
+	// Flags
+	let open = $state(false);
+	let isSubmitting = $state(false);
+
+	onMount(async () => {
+		await Promise.all([fetchSchema(), fetchArtifacts(), fetchHelmRepositories()]);
+	});
 </script>
 
-{#snippet header()}
-	<Item.Root size="sm" class="p-0">
-		<Item.Content class="text-left">
-			<Item.Title class="text-lg font-bold">Chart Values Editor</Item.Title>
-			<Item.Description>
-				The provided values serve as overrides to the default settings. For further details, please
-				refer to the <a
-					href="https://helm.sh/docs/helm/helm_install/"
-					target="_blank"
-					class="underline-none hover:underline">Document</a
-				>
-			</Item.Description>
-		</Item.Content>
-	</Item.Root>
-{/snippet}
 <Card.Root>
-	{@const extraAttributes = artifact.extra_attrs ?? {}}
 	<Card.Header>
 		<Item.Root class="items-start p-0">
 			<Item.Media>
@@ -112,134 +201,321 @@
 			</Item.Media>
 			<Item.Content class="text-left">
 				<Item.Title>
-					{@const title = [artifact.repository_name, extraAttributes.name]
+					{@const title = [latestChartArtifact.repository_name, extraAttributes.name]
 						.filter((term) => !!term)
 						.join(' ')}
 					{title}
 				</Item.Title>
 				<Item.Description class="max-w-40  truncate">
-					{artifact.digest}
+					{latestChartArtifact.digest}
 				</Item.Description>
 			</Item.Content>
-			{#if artifact.type === 'CHART'}
-				{#await getChartInformation()}
-					<Button disabled variant="ghost" size="icon">
-						<DownloadIcon />
-					</Button>
-				{:then response}
-					<Item.Actions>
-						<AlertDialog.Root bind:open>
-							<AlertDialog.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-								<DownloadIcon />
-							</AlertDialog.Trigger>
-							<AlertDialog.Content class="max-h-[95vh] min-w-[23vw] overflow-auto">
-								<Item.Root class="p-0">
-									<Item.Content class="text-left">
-										<Item.Title class="text-xl font-bold">Artifact</Item.Title>
-										<Item.Description></Item.Description>
-									</Item.Content>
-								</Item.Root>
-
-								<Form
-									schema={jsonSchema as any}
-									uiSchema={{
-										values: {
-											'ui:components': {
-												textWidget: EditorWidget
-											},
-											'ui:options': {
-												TailoredEditorDocument: response.readme,
-												TailoredEditorHeader: header
+			<Item.Actions>
+				<Item.Actions>
+					<AlertDialog.Root
+						bind:open
+						onOpenChangeComplete={() => {
+							reset();
+						}}
+					>
+						<AlertDialog.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+							<DownloadIcon />
+						</AlertDialog.Trigger>
+						<AlertDialog.Content class="max-h-[95vh] min-w-[50vw] overflow-auto">
+							<Item.Root class="p-0">
+								<Item.Content class="text-left">
+									<Item.Title class="text-xl font-bold">Install Helm Chart</Item.Title>
+									<Item.Description></Item.Description>
+								</Item.Content>
+							</Item.Root>
+							<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[33vh]">
+								<Tabs.Content value={steps[0]}>
+									<Form
+										schema={{
+											...(lodash.omit(
+												lodash.get(jsonSchema, 'properties.metadata') as Schema,
+												'properties'
+											) as any),
+											title: 'Metadata',
+											properties: {
+												name: {
+													...(lodash.get(
+														jsonSchema,
+														'properties.metadata.properties.name'
+													) as Schema),
+													title: 'Name'
+												},
+												namespace: {
+													...(lodash.get(
+														jsonSchema,
+														'properties.metadata.properties.namespace'
+													) as Schema),
+													title: 'Namespace'
+												}
 											}
-										}
-									} as unknown as UiSchemaRoot}
-									initialValue={{ name: '', version: '', values: response.values } as FormValue}
-									bind:values
-									handleSubmit={{
-										prehook: () => {
-											if (isInstalling) return;
-											isInstalling = true;
+										} as Schema}
+										uiSchema={{
+											'ui:options': {
+												translations: {
+													submit: 'Next'
+												}
+											}
+										} as UiSchemaRoot}
+										initialValue={{}}
+										bind:values={values['metadata']}
+										handleSubmit={{
+											posthook: () => {
+												handleNext();
+											}
+										}}
+									>
+										{#snippet actions()}
+											<div class="flex w-full items-center justify-between gap-3">
+												<Button
+													onclick={() => {
+														handlePrevious();
+													}}
+													disabled={currentIndex === 0}
+												>
+													Previous
+												</Button>
+												<SubmitButton />
+											</div>
+										{/snippet}
+									</Form>
+								</Tabs.Content>
 
-											const isValid = validate(values);
-											if (!isValid) return;
+								<Tabs.Content value={steps[1]}>
+									<Form
+										schema={{
+											...(lodash.omit(
+												lodash.get(
+													jsonSchema,
+													'properties.spec.properties.chart.properties.spec'
+												) as Schema,
+												'properties'
+											) as Schema),
+											title: 'Chart',
+											properties: {
+												chart: {
+													...(lodash.get(
+														jsonSchema,
+														'properties.spec.properties.chart.properties.spec.properties.chart'
+													) as Schema)
+												},
+												version: {
+													...(lodash.get(
+														jsonSchema,
+														'properties.spec.properties.chart.properties.spec.properties.version'
+													) as Schema),
+													title: 'Version',
+													enum: getVersions()
+												},
+												sourceRef: {
+													...(lodash.get(
+														jsonSchema,
+														'properties.spec.properties.chart.properties.spec.properties.sourceRef'
+													) as Schema),
+													title: 'Source Reference',
+													properties: {
+														name: {
+															...(lodash.get(
+																jsonSchema,
+																'properties.spec.properties.chart.properties.spec.properties.sourceRef.properties.name'
+															) as Schema),
+															title: 'Name',
+															enum: helmRepositories.map((repository) => repository.metadata.name)
+														}
+													}
+												}
+											}
+										} as Schema}
+										uiSchema={{
+											'ui:options': {
+												translations: {
+													submit: 'Next'
+												}
+											},
+											version: {
+												'ui:components': {
+													stringField: 'enumField'
+												}
+											},
+											sourceRef: {
+												name: {
+													'ui:components': {
+														stringField: 'enumField'
+													}
+												}
+											}
+										} as UiSchemaRoot}
+										initialValue={{
+											chart: lodash.get(latestChartArtifact.extra_attrs, 'name'),
+											version: lodash.get(latestChartArtifact.extra_attrs, 'version')
+										} as any}
+										bind:values={values['spec']['chart']['spec']}
+										transformer={(value: any) => {
+											const selectedSourceReference = getSelectedSourceReferences(
+												lodash.get(value, 'sourceRef.name')
+											);
+											lodash.set(value, 'sourceRef', {
+												apiVersion: selectedSourceReference?.apiVersion,
+												kind: selectedSourceReference?.kind,
+												metadata: {
+													name: selectedSourceReference?.metadata?.name
+												}
+											});
+											return value;
+										}}
+										handleSubmit={{
+											posthook: () => {
+												handleNext();
+											}
+										}}
+									>
+										{#snippet actions()}
+											<div class="flex w-full items-center justify-between gap-3">
+												<Button
+													onclick={() => {
+														handlePrevious();
+													}}
+													disabled={currentIndex === 0}
+												>
+													Previous
+												</Button>
+												<SubmitButton />
+											</div>
+										{/snippet}
+									</Form>
+								</Tabs.Content>
 
-											const name = values.name as string;
+								<Tabs.Content value={steps[2]}>
+									{#await getChartInformation(selectedChartArtifact.digest) then information}
+										<Form
+											schema={{
+												...(lodash.get(jsonSchema, 'properties.spec.properties.values') as Schema),
+												type: 'string',
+												title: 'Values'
+											} as Schema}
+											uiSchema={{
+												'ui:options': {
+													translations: {
+														submit: 'Next'
+													},
+													TailoredEditorDocument: String(information.readme)
+														? information.readme
+														: undefined
+												},
+												'ui:components': {
+													textWidget: EditorWidget
+												}
+											} as UiSchemaRoot}
+											initialValue={information.values}
+											bind:values={values['spec']['values']}
+											handleSubmit={{
+												posthook: () => {
+													handleNext();
 
-											console.log(name);
+													lodash.set(
+														values,
+														'spec.values',
+														load(lodash.get(values, 'spec.values') as string)
+													);
+												}
+											}}
+										>
+											{#snippet actions()}
+												<div class="flex w-full items-center justify-between gap-3">
+													<Button
+														onclick={() => {
+															handlePrevious();
+														}}
+														disabled={currentIndex === 0}
+													>
+														Previous
+													</Button>
+													<SubmitButton />
+												</div>
+											{/snippet}
+										</Form>
+									{/await}
+								</Tabs.Content>
 
-											console.log(isValid, validate.errors, values);
-											// toast.promise(
-											// 	async () => {
-											// 		await resourceClient.delete({
-											// 			cluster,
-											// 			group,
-											// 			version,
-											// 			resource,
-											// 			name
-											// 		});
-											// 	},
-											// 	{
-											// 		loading: `Deleting workspace ${name}...`,
-											// 		success: () => {
-											// 			// Use window.location.href to force a full page reload and re-trigger fetchWorkspaces
-											// 			window.location.href = resolve(`/(auth)/scope/${cluster}`);
-											// 			return `Successfully deleted workspace ${name}`;
-											// 		},
-											// 		error: (error) => {
-											// 			console.error(`Failed to delete workspace ${name}:`, error);
-											// 			return `Failed to delete workspace ${name}: ${(error as ConnectError).message}`;
-											// 		},
-											// 		finally() {
-											// 			isInstalling = false;
-											// 			open = false;
-											// 		}
-											// 	}
-											// );
-										}
-									}}
-									class="**:data-[slot=dynamic-form-mode-controller]:hidden"
-								>
-									{#snippet actions()}
-										<div class="*:w-full">
-											<SubmitButton />
-										</div>
-									{/snippet}
-								</Form>
-							</AlertDialog.Content>
-						</AlertDialog.Root>
-					</Item.Actions>
-				{:catch}
-					<Button disabled variant="ghost" size="icon" title="Failed to load chart information">
-						<DownloadIcon class="text-destructive" />
-					</Button>
-				{/await}
-			{/if}
+								<Tabs.Content value={steps[3]}>
+									<div class="flex h-full flex-col gap-3">
+										<Code.Root
+											lang="yaml"
+											class="no-shiki-limit w-full"
+											hideLines
+											code={stringify(values, null, 2)}
+										/>
+										<Button
+											class="mt-auto w-full"
+											onclick={() => {
+												if (isSubmitting) return;
+												isSubmitting = true;
+
+												const isValid = validate(values);
+												if (!isValid) {
+													isSubmitting = false;
+													return;
+												}
+
+												const name = lodash.get(values, 'metadata.name');
+
+												toast.promise(
+													async () => {
+														const manifest = new TextEncoder().encode(JSON.stringify(values));
+
+														await resourceClient.create({
+															cluster,
+															namespace,
+															group,
+															version,
+															resource,
+															manifest
+														});
+													},
+													{
+														loading: `Creating ${kind} ${name}...`,
+														success: () => {
+															return `Successfully created ${kind} ${name}`;
+														},
+														error: (error) => {
+															console.error(`Failed to create ${kind} ${name}:`, error);
+															return `Failed to create ${kind} ${name}: ${(error as ConnectError).message}`;
+														},
+														finally() {
+															isSubmitting = false;
+															open = false;
+														}
+													}
+												);
+											}}
+										>
+											Create
+										</Button>
+									</div>
+								</Tabs.Content>
+							</Tabs.Root>
+						</AlertDialog.Content>
+					</AlertDialog.Root>
+				</Item.Actions>
+			</Item.Actions>
 		</Item.Root>
 	</Card.Header>
 	<Card.Content>
-		{#if artifact.type === 'CHART'}
-			<Item.Root class="col-span-2 items-start p-0">
-				<Item.Content class="text-left">
-					<Item.Description>
-						{extraAttributes.description}
-					</Item.Description>
-				</Item.Content>
-			</Item.Root>
-		{:else if artifact.type === 'IMAGE'}
-			<Item.Root class="items-start p-0">
-				<Item.Content class="text-left">
-					{@const system = `${extraAttributes.architecture}/${extraAttributes.os}`}
-					<Item.Description>{system}</Item.Description>
-				</Item.Content>
-				<Item.Content class="text-left">
-					<Item.Description>{extraAttributes.author}</Item.Description>
-				</Item.Content>
-			</Item.Root>
-		{/if}
+		<Item.Root class="col-span-2 items-start p-0">
+			<Item.Content class="text-left">
+				<Item.Description>
+					{extraAttributes.description}
+				</Item.Description>
+			</Item.Content>
+		</Item.Root>
 	</Card.Content>
 	<Card.Footer class="flex gap-1 overflow-hidden text-xs text-gray-500">
-		{@const labels = artifact.labels ?? []}
-		{@const tags = artifact.tags ?? []}
+		{@const labels = latestChartArtifact.labels ?? []}
+		{@const tags = latestChartArtifact.tags ?? []}
 		{#each labels as label, index (index)}
 			<BookmarkIcon size={12} />
 			{label.name}
