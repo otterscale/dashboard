@@ -6,7 +6,10 @@
 	import { getContext, onDestroy, onMount } from 'svelte';
 	import { fly } from 'svelte/transition';
 
-	import type { Application_Pod } from '$lib/api/application/v1/application_pb';
+	import type {
+		Application_Container,
+		Application_Pod
+	} from '$lib/api/application/v1/application_pb';
 	import { ApplicationService } from '$lib/api/application/v1/application_pb';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Select from '$lib/components/ui/select';
@@ -17,9 +20,15 @@
 		pod,
 		scope,
 		namespace,
+		containers,
 		closeActions
-	}: { pod: Application_Pod; scope: string; namespace: string; closeActions: () => void } =
-		$props();
+	}: {
+		pod: Application_Pod;
+		scope: string;
+		namespace: string;
+		containers: Application_Container[];
+		closeActions: () => void;
+	} = $props();
 
 	const msToString = (ms: number): string => String(ms);
 	const MINUTE = 60 * 1000;
@@ -45,10 +54,11 @@
 
 	let controller: AbortController;
 	let triggerContent = $state('');
+	let selectedContainer = $state(containers[0]?.containerName ?? '');
 	let messages = $state<{ message: string; phase: string }[]>([]);
 	let terminal = $state<HTMLDivElement>();
 
-	async function watchLogs(duration: string) {
+	async function watchLogs(duration: string, containerName: string = selectedContainer) {
 		try {
 			controller = new AbortController();
 			const signal = controller.signal;
@@ -60,7 +70,7 @@
 					scope,
 					namespace,
 					podName: pod.name,
-					containerName: '',
+					containerName,
 					duration: durationFromMs(+duration)
 				},
 				{
@@ -115,13 +125,22 @@
 		}
 	}
 
+	let currentDuration = $state(msToString(5 * MINUTE));
+
 	function handleDurationChange(newValue: string) {
+		currentDuration = newValue;
 		stopWatching();
 		watchLogs(newValue);
 	}
 
+	function handleContainerChange(newValue: string) {
+		selectedContainer = newValue;
+		stopWatching();
+		watchLogs(currentDuration, newValue);
+	}
+
 	onMount(() => {
-		watchLogs(msToString(5 * MINUTE)); // Default to 5 minutes
+		watchLogs(currentDuration); // Default to 5 minutes
 	});
 
 	onDestroy(() => {
@@ -151,7 +170,26 @@
 			<div class="flex h-12 items-center justify-between border-b border-border p-4">
 				<h3 class="text-lg font-semibold">{m.log()}</h3>
 				<div class="mr-8 flex items-center gap-2">
-					<Select.Root type="single" onValueChange={handleDurationChange}>
+					<Select.Root
+						type="single"
+						value={selectedContainer}
+						onValueChange={handleContainerChange}
+					>
+						<Select.Trigger class="w-48">
+							{selectedContainer || 'Container'}
+						</Select.Trigger>
+						<Select.Content>
+							<Select.Group>
+								<Select.Label>Container</Select.Label>
+								{#each containers as container (container.containerName)}
+									<Select.Item value={container.containerName}>
+										{container.containerName}
+									</Select.Item>
+								{/each}
+							</Select.Group>
+						</Select.Content>
+					</Select.Root>
+					<Select.Root type="single" value={currentDuration} onValueChange={handleDurationChange}>
 						<Select.Trigger class="w-20">
 							{triggerContent}
 						</Select.Trigger>

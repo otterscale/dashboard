@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	import type { Application_Pod } from '$lib/api/application/v1/application_pb';
+	import type { Application_Container, Application_Pod } from '$lib/api/application/v1/application_pb';
 	import { Actions } from '$lib/components/custom/data-table/core';
 	import type { ReloadManager } from '$lib/components/custom/reloader';
 	import { m } from '$lib/paraglide/messages';
@@ -13,8 +13,9 @@
 		pod,
 		scope,
 		namespace,
-		reloadManager
-	}: { pod: Application_Pod; scope: string; namespace: string; reloadManager: ReloadManager } =
+		reloadManager,
+		containers
+	}: { pod: Application_Pod; scope: string; namespace: string; reloadManager: ReloadManager; containers: Application_Container[] } =
 		$props();
 
 	let open = $state(false);
@@ -29,7 +30,7 @@
 	</Actions.Label>
 	<Actions.Separator />
 	<Actions.Item>
-		<Log {pod} {scope} {namespace} closeActions={close} />
+		<Log {pod} {scope} {namespace} {containers} closeActions={close} />
 	</Actions.Item>
 	<Actions.Item>
 		<Delete {pod} {scope} {namespace} {reloadManager} closeActions={close} />

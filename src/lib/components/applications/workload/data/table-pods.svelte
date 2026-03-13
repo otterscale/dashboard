@@ -435,7 +435,7 @@
 					</Button>
 				</Table.Cell>
 				<Table.Cell>
-					<Actions {pod} {scope} {namespace} {reloadManager} />
+					<Actions {pod} {scope} {namespace} {reloadManager} containers={$application.containers} />
 				</Table.Cell>
 			</Table.Row>
 		{/each}
