@@ -72,7 +72,7 @@ function getCreate(kind: string): CreateType {
 function getActions(kind: string): ActionsType {
 	switch (kind) {
 		case 'Application':
-			return ApplicationActions as CreateType;
+			return ApplicationActions as ActionsType;
 		case 'ClusterRoleBinding':
 			return ClusterRoleBindingActions as ActionsType;
 		case 'Pod':
