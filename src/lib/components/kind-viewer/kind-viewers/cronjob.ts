@@ -17,8 +17,8 @@ import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-
 import { renderComponent } from '$lib/components/ui/data-table';
 
 type CronJobAttribute =
-	| 'Name'
 	| 'Namespace'
+	| 'Name'
 	| 'Schedule'
 	| 'Time Zone'
 	| 'Suspend'
@@ -31,8 +31,8 @@ type CronJobAttribute =
 
 function getCronJobDataSchemas(): Record<CronJobAttribute, DataSchemaType> {
 	return {
-		Name: 'text',
 		Namespace: 'text',
+		Name: 'text',
 		Schedule: 'text',
 		'Time Zone': 'text',
 		Suspend: 'boolean',
@@ -47,8 +47,8 @@ function getCronJobDataSchemas(): Record<CronJobAttribute, DataSchemaType> {
 
 function getCronJobData(object: BatchV1CronJob): Record<CronJobAttribute, JsonValue> {
 	return {
-		Name: object?.metadata?.name ?? null,
 		Namespace: object?.metadata?.namespace ?? null,
+		Name: object?.metadata?.name ?? null,
 		Schedule: object?.spec?.schedule ?? null,
 		'Time Zone': object?.spec?.timeZone ?? null,
 		Suspend: object?.spec?.suspend ?? null,
@@ -68,8 +68,8 @@ function getCronJobData(object: BatchV1CronJob): Record<CronJobAttribute, JsonVa
 
 function getCronJobUISchemas(): Record<CronJobAttribute, UISchemaType> {
 	return {
-		Name: 'link',
 		Namespace: 'text',
+		Name: 'link',
 		Schedule: 'text',
 		'Time Zone': 'text',
 		Suspend: 'boolean',
@@ -88,6 +88,27 @@ function getCronJobColumnDefinitions(
 	dataSchemas: Record<CronJobAttribute, DataSchemaType>
 ): ColumnDef<Record<CronJobAttribute, JsonValue>>[] {
 	return [
+		{
+			id: 'Namespace',
+			header: ({ column }: { column: Column<Record<CronJobAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<CronJobAttribute, JsonValue>>;
+				row: Row<Record<CronJobAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Namespace'
+		},
 		{
 			id: 'Name',
 			header: ({ column }: { column: Column<Record<CronJobAttribute, JsonValue>> }) =>
@@ -113,27 +134,6 @@ function getCronJobColumnDefinitions(
 					} satisfies LinkMetadata
 				}),
 			accessorKey: 'Name'
-		},
-		{
-			id: 'Namespace',
-			header: ({ column }: { column: Column<Record<CronJobAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<CronJobAttribute, JsonValue>>;
-				row: Row<Record<CronJobAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas
-				}),
-			accessorKey: 'Namespace'
 		},
 		{
 			id: 'Schedule',
