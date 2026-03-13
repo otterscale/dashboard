@@ -2,6 +2,8 @@ import type { Component } from 'svelte';
 
 import ApplicationActions from './application/actions.svelte';
 import ApplicationCreate from './application/create.svelte';
+import ClusterRoleBindingActions from './cluster-role-binding/actions.svelte';
+import ClusterRoleBindingCreate from './cluster-role-binding/new-create.svelte';
 import CronJobActions from './cronjob/actions.svelte';
 import CronJobCreate from './cronjob/create.svelte';
 import DaemonSetActions from './daemonset/actions.svelte';
@@ -24,7 +26,7 @@ import SimpleAppActions from './simple-app/actions.svelte';
 import SimpleAppCreate from './simple-app/create.svelte';
 import StatefulSetActions from './statefulset/actions.svelte';
 import WorkspaceActions from './workspace/actions.svelte';
-import WorkspaceCreate from './workspace/create.svelte';
+import WorkspaceCreate from './workspace/new-create.svelte';
 
 type RoleType = 'admin' | 'edit' | 'view';
 
@@ -58,6 +60,8 @@ function getCreate(kind: string): CreateType {
 			return CronJobCreate as CreateType;
 		case 'HelmRepository':
 			return HelmRepositoryCreate as CreateType;
+		case 'ClusterRoleBinding':
+			return ClusterRoleBindingCreate as CreateType;
 		case 'ModelService':
 			return ModelServiceCreate as CreateType;
 		case 'ModelArtifact':
@@ -76,7 +80,9 @@ function getCreate(kind: string): CreateType {
 function getActions(kind: string): ActionsType {
 	switch (kind) {
 		case 'Application':
-			return ApplicationActions as CreateType;
+			return ApplicationActions as ActionsType;
+		case 'ClusterRoleBinding':
+			return ClusterRoleBindingActions as ActionsType;
 		case 'Pod':
 			return PodActions as ActionsType;
 		case 'Deployment':
