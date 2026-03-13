@@ -13,12 +13,7 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 // kubectl get serviceaccount
 // NAME   NAMESPACE   SECRETS   AGE
-type ServiceAccountAttribute =
-	| 'Namespace'
-	| 'Name'
-	| 'Secrets'
-	| 'Age'
-	| 'raw';
+type ServiceAccountAttribute = 'Namespace' | 'Name' | 'Secrets' | 'Age' | 'raw';
 
 function getServiceAccountDataSchemas(): Record<ServiceAccountAttribute, DataSchemaType> {
 	return {

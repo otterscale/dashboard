@@ -44,9 +44,7 @@ function getPVData(object: CoreV1PersistentVolume): Record<PVAttribute, JsonValu
 	const accessModes = (object?.spec?.accessModes ?? []).join(', ');
 	const capacity = (object?.spec?.capacity as Record<string, string>)?.storage ?? '';
 	const claimRef = object?.spec?.claimRef;
-	const claim = claimRef
-		? `${claimRef.namespace ?? ''}/${claimRef.name ?? ''}`
-		: null;
+	const claim = claimRef ? `${claimRef.namespace ?? ''}/${claimRef.name ?? ''}` : null;
 
 	return {
 		Name: object?.metadata?.name ?? null,

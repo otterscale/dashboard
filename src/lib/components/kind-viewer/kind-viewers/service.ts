@@ -264,13 +264,13 @@ function getServiceColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas,
 					metadata: {
-						items: Object.entries(
-							(row.original.raw as CoreV1Service).spec?.selector ?? {}
-						).map(([key, value]) => ({
-							title: key,
-							description: value,
-							raw: { key, value }
-						})) as ArrayOfObjectItemsType
+						items: Object.entries((row.original.raw as CoreV1Service).spec?.selector ?? {}).map(
+							([key, value]) => ({
+								title: key,
+								description: value,
+								raw: { key, value }
+							})
+						) as ArrayOfObjectItemsType
 					} satisfies ArrayOfObjectMetadata
 				}),
 			accessorKey: 'Selector',

@@ -13,12 +13,7 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 // kubectl get role
 // NAME   NAMESPACE   CREATED AT
-type RoleAttribute =
-	| 'Namespace'
-	| 'Name'
-	| 'Rules'
-	| 'Age'
-	| 'raw';
+type RoleAttribute = 'Namespace' | 'Name' | 'Rules' | 'Age' | 'raw';
 
 function getRoleDataSchemas(): Record<RoleAttribute, DataSchemaType> {
 	return {

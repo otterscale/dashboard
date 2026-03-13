@@ -17,12 +17,7 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 // kubectl get limitrange
 // NAME   NAMESPACE   CREATED AT
-type LimitRangeAttribute =
-	| 'Namespace'
-	| 'Name'
-	| 'Limits'
-	| 'Age'
-	| 'raw';
+type LimitRangeAttribute = 'Namespace' | 'Name' | 'Limits' | 'Age' | 'raw';
 
 function getLimitRangeDataSchemas(): Record<LimitRangeAttribute, DataSchemaType> {
 	return {
@@ -118,9 +113,7 @@ function getLimitRangeColumnDefinitions(
 					column,
 					uiSchemas,
 					metadata: {
-						items: (
-							(row.original.raw as CoreV1LimitRange).spec?.limits ?? []
-						).map((limit) => ({
+						items: ((row.original.raw as CoreV1LimitRange).spec?.limits ?? []).map((limit) => ({
 							title: limit.type,
 							description: Object.entries(limit.default ?? {})
 								.map(([k, v]) => `${k}: ${v}`)

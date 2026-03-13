@@ -13,11 +13,7 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 // kubectl get clusterrole
 // NAME   CREATED AT
-type ClusterRoleAttribute =
-	| 'Name'
-	| 'Rules'
-	| 'Age'
-	| 'raw';
+type ClusterRoleAttribute = 'Name' | 'Rules' | 'Age' | 'raw';
 
 function getClusterRoleDataSchemas(): Record<ClusterRoleAttribute, DataSchemaType> {
 	return {

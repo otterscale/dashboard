@@ -17,12 +17,7 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 // kubectl get configmap
 // NAME   DATA   AGE
-type ConfigMapAttribute =
-	| 'Namespace'
-	| 'Name'
-	| 'Data'
-	| 'Age'
-	| 'raw';
+type ConfigMapAttribute = 'Namespace' | 'Name' | 'Data' | 'Age' | 'raw';
 
 function getConfigMapDataSchemas(): Record<ConfigMapAttribute, DataSchemaType> {
 	return {

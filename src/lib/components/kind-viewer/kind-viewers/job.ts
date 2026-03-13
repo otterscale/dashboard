@@ -69,9 +69,8 @@ function getJobData(object: BatchV1Job): Record<JobAttribute, JsonValue> {
 		Age: object?.metadata?.creationTimestamp ?? null,
 		Containers: object?.spec?.template?.spec?.containers?.length ?? null,
 		Images:
-			new Set(
-				object?.spec?.template?.spec?.containers?.map((container) => container.image)
-			).size ?? null,
+			new Set(object?.spec?.template?.spec?.containers?.map((container) => container.image)).size ??
+			null,
 		Selector: Object.keys(selectorLabels).length,
 		raw: (object as JsonObject) ?? null
 	};

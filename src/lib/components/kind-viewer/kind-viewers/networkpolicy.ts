@@ -137,8 +137,8 @@ function getNetworkPolicyColumnDefinitions(
 					uiSchemas: uiSchemas,
 					metadata: {
 						items: Object.entries(
-							(row.original.raw as NetworkingK8SIoV1NetworkPolicy).spec?.podSelector
-								?.matchLabels ?? {}
+							(row.original.raw as NetworkingK8SIoV1NetworkPolicy).spec?.podSelector?.matchLabels ??
+								{}
 						).map(([key, value]) => ({
 							title: key,
 							description: value,

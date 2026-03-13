@@ -17,14 +17,7 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 // kubectl get crd
 // NAME   GROUP   KIND   SCOPE   VERSIONS   AGE
-type CRDAttribute =
-	| 'Name'
-	| 'Group'
-	| 'Kind'
-	| 'Scope'
-	| 'Versions'
-	| 'Age'
-	| 'raw';
+type CRDAttribute = 'Name' | 'Group' | 'Kind' | 'Scope' | 'Versions' | 'Age' | 'raw';
 
 function getCRDDataSchemas(): Record<CRDAttribute, DataSchemaType> {
 	return {
@@ -133,7 +126,8 @@ function getCRDColumnDefinitions(
 					uiSchemas,
 					metadata: {
 						items: (
-							(row.original.raw as ApiextensionsK8SIoV1CustomResourceDefinition).spec?.versions ?? []
+							(row.original.raw as ApiextensionsK8SIoV1CustomResourceDefinition).spec?.versions ??
+							[]
 						).map((v) => ({
 							title: v.name,
 							description: [

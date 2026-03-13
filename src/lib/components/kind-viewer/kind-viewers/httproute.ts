@@ -17,13 +17,7 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 // kubectl get httproute -o wide
 // NAME   HOSTNAMES   PARENT   AGE
-type HTTPRouteAttribute =
-	| 'Namespace'
-	| 'Name'
-	| 'Hostnames'
-	| 'Parent'
-	| 'Age'
-	| 'raw';
+type HTTPRouteAttribute = 'Namespace' | 'Name' | 'Hostnames' | 'Parent' | 'Age' | 'raw';
 
 function getHTTPRouteDataSchemas(): Record<HTTPRouteAttribute, DataSchemaType> {
 	return {

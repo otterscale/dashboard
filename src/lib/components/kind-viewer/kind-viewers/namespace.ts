@@ -13,11 +13,7 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 // kubectl get namespace
 // NAME   STATUS   AGE
-type NamespaceAttribute =
-	| 'Name'
-	| 'Status'
-	| 'Age'
-	| 'raw';
+type NamespaceAttribute = 'Name' | 'Status' | 'Age' | 'raw';
 
 function getNamespaceDataSchemas(): Record<NamespaceAttribute, DataSchemaType> {
 	return {

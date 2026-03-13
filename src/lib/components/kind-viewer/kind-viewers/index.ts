@@ -22,18 +22,8 @@ import {
 	getDeploymentDataSchemas,
 	getDeploymentUISchemas
 } from './deployment.js';
-import {
-	getJobColumnDefinitions,
-	getJobData,
-	getJobDataSchemas,
-	getJobUISchemas
-} from './job.js';
-import {
-	getPodColumnDefinitions,
-	getPodData,
-	getPodDataSchemas,
-	getPodUISchemas
-} from './pod.js';
+import { getJobColumnDefinitions, getJobData, getJobDataSchemas, getJobUISchemas } from './job.js';
+import { getPodColumnDefinitions, getPodData, getPodDataSchemas, getPodUISchemas } from './pod.js';
 import {
 	getStatefulSetColumnDefinitions,
 	getStatefulSetData,

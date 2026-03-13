@@ -63,10 +63,8 @@ function getNodeData(object: CoreV1Node): Record<NodeAttribute, JsonValue> {
 
 	// Extract addresses
 	const addresses = object?.status?.addresses ?? [];
-	const internalIP =
-		addresses.find((a) => a.type === 'InternalIP')?.address ?? '<none>';
-	const externalIP =
-		addresses.find((a) => a.type === 'ExternalIP')?.address ?? '<none>';
+	const internalIP = addresses.find((a) => a.type === 'InternalIP')?.address ?? '<none>';
+	const externalIP = addresses.find((a) => a.type === 'ExternalIP')?.address ?? '<none>';
 
 	const nodeInfo = object?.status?.nodeInfo;
 

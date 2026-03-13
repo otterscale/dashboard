@@ -17,12 +17,7 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 // kubectl get clusterrolebinding -o wide
 // NAME   ROLE   AGE   USERS   GROUPS   SERVICEACCOUNTS
-type ClusterRoleBindingAttribute =
-	| 'Name'
-	| 'Role'
-	| 'Age'
-	| 'Subjects'
-	| 'raw';
+type ClusterRoleBindingAttribute = 'Name' | 'Role' | 'Age' | 'Subjects' | 'raw';
 
 function getClusterRoleBindingDataSchemas(): Record<ClusterRoleBindingAttribute, DataSchemaType> {
 	return {
@@ -110,11 +105,8 @@ function getClusterRoleBindingColumnDefinitions(
 		simpleColumn('Age'),
 		{
 			id: 'Subjects',
-			header: ({
-				column
-			}: {
-				column: Column<Record<ClusterRoleBindingAttribute, JsonValue>>;
-			}) => renderComponent(DynamicTableHeader, { column, dataSchemas }),
+			header: ({ column }: { column: Column<Record<ClusterRoleBindingAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, { column, dataSchemas }),
 			cell: ({
 				column,
 				row

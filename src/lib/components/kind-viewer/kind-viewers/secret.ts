@@ -13,13 +13,7 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 // kubectl get secret
 // NAME   TYPE   DATA   AGE
-type SecretAttribute =
-	| 'Namespace'
-	| 'Name'
-	| 'Type'
-	| 'Data'
-	| 'Age'
-	| 'raw';
+type SecretAttribute = 'Namespace' | 'Name' | 'Type' | 'Data' | 'Age' | 'raw';
 
 function getSecretDataSchemas(): Record<SecretAttribute, DataSchemaType> {
 	return {

@@ -66,9 +66,8 @@ function getDaemonSetData(object: AppsV1DaemonSet): Record<DaemonSetAttribute, J
 		Age: object?.metadata?.creationTimestamp ?? null,
 		Containers: object?.spec?.template?.spec?.containers?.length ?? null,
 		Images:
-			new Set(
-				object?.spec?.template?.spec?.containers?.map((container) => container.image)
-			).size ?? null,
+			new Set(object?.spec?.template?.spec?.containers?.map((container) => container.image)).size ??
+			null,
 		Selector: Object.keys(selectorLabels).length,
 		raw: (object as JsonObject) ?? null
 	};
@@ -323,14 +322,14 @@ function getDaemonSetColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas,
 					metadata: {
-						items: (
-							row.original.raw as AppsV1DaemonSet
-						).spec?.template?.spec?.containers?.map((container) => ({
-							title: container.name,
-							description: container.command?.join(' '),
-							actions: container.image,
-							raw: container
-						})) as ArrayOfObjectItemsType
+						items: (row.original.raw as AppsV1DaemonSet).spec?.template?.spec?.containers?.map(
+							(container) => ({
+								title: container.name,
+								description: container.command?.join(' '),
+								actions: container.image,
+								raw: container
+							})
+						) as ArrayOfObjectItemsType
 					} satisfies ArrayOfObjectMetadata
 				}),
 			accessorKey: 'Containers',
@@ -357,17 +356,17 @@ function getDaemonSetColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas,
 					metadata: {
-						items: (
-							row.original.raw as AppsV1DaemonSet
-						).spec?.template?.spec?.containers?.map((container) => ({
-							title: container.image,
-							description: container.name,
-							raw: {
-								image: container.image,
-								imagePullPolicy: container.imagePullPolicy,
-								container: container.name
-							}
-						})) as ArrayOfObjectItemsType
+						items: (row.original.raw as AppsV1DaemonSet).spec?.template?.spec?.containers?.map(
+							(container) => ({
+								title: container.image,
+								description: container.name,
+								raw: {
+									image: container.image,
+									imagePullPolicy: container.imagePullPolicy,
+									container: container.name
+								}
+							})
+						) as ArrayOfObjectItemsType
 					} satisfies ArrayOfObjectMetadata
 				}),
 			accessorKey: 'Images',

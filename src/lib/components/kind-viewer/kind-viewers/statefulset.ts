@@ -49,9 +49,8 @@ function getStatefulSetData(object: AppsV1StatefulSet): Record<StatefulSetAttrib
 		Age: object?.metadata?.creationTimestamp ?? null,
 		Containers: object?.spec?.template?.spec?.containers?.length ?? null,
 		Images:
-			new Set(
-				object?.spec?.template?.spec?.containers?.map((container) => container.image)
-			).size ?? null,
+			new Set(object?.spec?.template?.spec?.containers?.map((container) => container.image)).size ??
+			null,
 		raw: (object as JsonObject) ?? null
 	};
 }
@@ -182,14 +181,14 @@ function getStatefulSetColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas,
 					metadata: {
-						items: (
-							row.original.raw as AppsV1StatefulSet
-						).spec?.template?.spec?.containers?.map((container) => ({
-							title: container.name,
-							description: container.command?.join(' '),
-							actions: container.image,
-							raw: container
-						})) as ArrayOfObjectItemsType
+						items: (row.original.raw as AppsV1StatefulSet).spec?.template?.spec?.containers?.map(
+							(container) => ({
+								title: container.name,
+								description: container.command?.join(' '),
+								actions: container.image,
+								raw: container
+							})
+						) as ArrayOfObjectItemsType
 					} satisfies ArrayOfObjectMetadata
 				}),
 			accessorKey: 'Containers',
@@ -216,17 +215,17 @@ function getStatefulSetColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas,
 					metadata: {
-						items: (
-							row.original.raw as AppsV1StatefulSet
-						).spec?.template?.spec?.containers?.map((container) => ({
-							title: container.image,
-							description: container.name,
-							raw: {
-								image: container.image,
-								imagePullPolicy: container.imagePullPolicy,
-								container: container.name
-							}
-						})) as ArrayOfObjectItemsType
+						items: (row.original.raw as AppsV1StatefulSet).spec?.template?.spec?.containers?.map(
+							(container) => ({
+								title: container.image,
+								description: container.name,
+								raw: {
+									image: container.image,
+									imagePullPolicy: container.imagePullPolicy,
+									container: container.name
+								}
+							})
+						) as ArrayOfObjectItemsType
 					} satisfies ArrayOfObjectMetadata
 				}),
 			accessorKey: 'Images',

@@ -312,9 +312,7 @@ function getPodColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas,
 					metadata: {
-						items: (
-							(row.original.raw as CoreV1Pod).spec?.readinessGates ?? []
-						).map((gate) => ({
+						items: ((row.original.raw as CoreV1Pod).spec?.readinessGates ?? []).map((gate) => ({
 							title: gate.conditionType,
 							raw: gate
 						})) as ArrayOfObjectItemsType

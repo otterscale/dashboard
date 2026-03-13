@@ -17,14 +17,7 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 // kubectl get gateway -o wide
 // NAME   CLASS   ADDRESS   PROGRAMMED   AGE
-type GatewayAttribute =
-	| 'Namespace'
-	| 'Name'
-	| 'Class'
-	| 'Listeners'
-	| 'Addresses'
-	| 'Age'
-	| 'raw';
+type GatewayAttribute = 'Namespace' | 'Name' | 'Class' | 'Listeners' | 'Addresses' | 'Age' | 'raw';
 
 function getGatewayDataSchemas(): Record<GatewayAttribute, DataSchemaType> {
 	return {
@@ -222,9 +215,4 @@ function getGatewayColumnDefinitions(
 	];
 }
 
-export {
-	getGatewayColumnDefinitions,
-	getGatewayData,
-	getGatewayDataSchemas,
-	getGatewayUISchemas
-};
+export { getGatewayColumnDefinitions, getGatewayData, getGatewayDataSchemas, getGatewayUISchemas };

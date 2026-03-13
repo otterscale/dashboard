@@ -17,13 +17,7 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 // kubectl get rolebinding -o wide
 // NAME   NAMESPACE   ROLE   AGE   USERS   GROUPS   SERVICEACCOUNTS
-type RoleBindingAttribute =
-	| 'Namespace'
-	| 'Name'
-	| 'Role'
-	| 'Age'
-	| 'Subjects'
-	| 'raw';
+type RoleBindingAttribute = 'Namespace' | 'Name' | 'Role' | 'Age' | 'Subjects' | 'raw';
 
 function getRoleBindingDataSchemas(): Record<RoleBindingAttribute, DataSchemaType> {
 	return {
@@ -129,13 +123,13 @@ function getRoleBindingColumnDefinitions(
 					column,
 					uiSchemas,
 					metadata: {
-						items: (
-							(row.original.raw as RbacAuthorizationK8SIoV1RoleBinding).subjects ?? []
-						).map((s) => ({
-							title: s.name,
-							description: `${s.kind}${s.namespace ? ` (${s.namespace})` : ''}`,
-							raw: s as JsonObject
-						})) as ArrayOfObjectItemsType
+						items: ((row.original.raw as RbacAuthorizationK8SIoV1RoleBinding).subjects ?? []).map(
+							(s) => ({
+								title: s.name,
+								description: `${s.kind}${s.namespace ? ` (${s.namespace})` : ''}`,
+								raw: s as JsonObject
+							})
+						) as ArrayOfObjectItemsType
 					} satisfies ArrayOfObjectMetadata
 				}),
 			accessorKey: 'Subjects',

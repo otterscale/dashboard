@@ -58,9 +58,8 @@ function getDeploymentData(object: AppsV1Deployment): Record<DeploymentAttribute
 		Age: object?.metadata?.creationTimestamp ?? null,
 		Containers: object?.spec?.template?.spec?.containers?.length ?? null,
 		Images:
-			new Set(
-				object?.spec?.template?.spec?.containers?.map((container) => container.image)
-			).size ?? null,
+			new Set(object?.spec?.template?.spec?.containers?.map((container) => container.image)).size ??
+			null,
 		Selector: selectorCount,
 		raw: (object as JsonObject) ?? null
 	};
