@@ -1,6 +1,5 @@
 <script lang="ts">
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
-	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
@@ -20,7 +19,7 @@
 		resource
 	}: {
 		schema: any;
-		object: TenantOtterscaleIoV1Alpha1Workspace;
+		object: any;
 		cluster: string;
 		group: string;
 		version: string;

@@ -19,22 +19,22 @@
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
 	let {
+		schema: jsonSchema,
 		cluster,
 		group,
 		version,
 		kind,
 		resource,
-		schema: jsonSchema,
 		open = $bindable(false),
 		showTrigger = true,
 		onsuccess
 	}: {
+		schema: any;
 		cluster: string;
 		group: string;
 		version: string;
 		kind: string;
 		resource: string;
-		schema: any;
 		open?: boolean;
 		showTrigger?: boolean;
 		onsuccess?: () => void;

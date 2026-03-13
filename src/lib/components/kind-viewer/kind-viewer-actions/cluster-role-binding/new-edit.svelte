@@ -19,22 +19,22 @@
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
 	let {
+		schema: jsonSchema,
+		object,
 		cluster,
 		group,
 		version,
 		kind,
 		resource,
-		schema: jsonSchema,
-		object,
 		onOpenChangeComplete
 	}: {
+		schema: any;
+		object: any;
 		cluster: string;
 		group: string;
 		version: string;
 		kind: string;
 		resource: string;
-		schema?: any;
-		object?: any;
 		onOpenChangeComplete: () => void;
 	} = $props();
 
