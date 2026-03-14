@@ -17,8 +17,8 @@ import {
 import { renderComponent } from '$lib/components/ui/data-table';
 
 type ResourceQuotaAttribute =
-	| 'Name'
 	| 'Namespace'
+	| 'Name'
 	| 'CPU Limit'
 	| 'Memory Limit'
 	| 'CPU Request'
@@ -94,6 +94,27 @@ function getResourceQuotaColumnDefinitions(
 ): ColumnDef<Record<ResourceQuotaAttribute, JsonValue>>[] {
 	return [
 		{
+			id: 'Namespace',
+			header: ({ column }: { column: Column<Record<ResourceQuotaAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<ResourceQuotaAttribute, JsonValue>>;
+				row: Row<Record<ResourceQuotaAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Namespace'
+		},
+		{
 			id: 'Name',
 			header: ({ column }: { column: Column<Record<ResourceQuotaAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
@@ -118,27 +139,6 @@ function getResourceQuotaColumnDefinitions(
 					} satisfies LinkMetadata
 				}),
 			accessorKey: 'Name'
-		},
-		{
-			id: 'Namespace',
-			header: ({ column }: { column: Column<Record<ResourceQuotaAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<ResourceQuotaAttribute, JsonValue>>;
-				row: Row<Record<ResourceQuotaAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas
-				}),
-			accessorKey: 'Namespace'
 		},
 		{
 			id: 'CPU Limit',

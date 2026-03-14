@@ -1,0 +1,224 @@
+import { type JsonObject, type JsonValue } from '@bufbuild/protobuf';
+import type { APIResource } from '@otterscale/api/resource/v1';
+import type { NetworkingK8SIoV1NetworkPolicy } from '@otterscale/types';
+import type { Column, ColumnDef } from '@tanstack/table-core';
+import { type Row } from '@tanstack/table-core';
+
+import { resolve } from '$app/paths';
+import { page } from '$app/state';
+import { DynamicTableCell, DynamicTableHeader } from '$lib/components/dynamic-table';
+import {
+	type ArrayOfObjectItemsType,
+	type ArrayOfObjectMetadata
+} from '$lib/components/dynamic-table/dynamic-table-cells/array-of-object-cell.svelte';
+import type { LinkMetadata } from '$lib/components/dynamic-table/dynamic-table-cells/link-cell.svelte';
+import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
+import { renderComponent } from '$lib/components/ui/data-table';
+
+// kubectl get networkpolicy -o wide
+// NAME   POD-SELECTOR   AGE
+type NetworkPolicyAttribute =
+	| 'Namespace'
+	| 'Name'
+	| 'Pod-Selector'
+	| 'Ingress Rules'
+	| 'Egress Rules'
+	| 'Age'
+	| 'raw';
+
+function getNetworkPolicyDataSchemas(): Record<NetworkPolicyAttribute, DataSchemaType> {
+	return {
+		Namespace: 'text',
+		Name: 'text',
+		'Pod-Selector': 'object',
+		'Ingress Rules': 'number',
+		'Egress Rules': 'number',
+		Age: 'time',
+		raw: 'object'
+	};
+}
+
+function getNetworkPolicyData(
+	object: NetworkingK8SIoV1NetworkPolicy
+): Record<NetworkPolicyAttribute, JsonValue> {
+	return {
+		Namespace: object?.metadata?.namespace ?? null,
+		Name: object?.metadata?.name ?? null,
+		'Pod-Selector': (object?.spec?.podSelector as JsonValue) ?? null,
+		'Ingress Rules': object?.spec?.ingress?.length ?? 0,
+		'Egress Rules': object?.spec?.egress?.length ?? 0,
+		Age: object?.metadata?.creationTimestamp ?? null,
+		raw: (object as JsonObject) ?? null
+	};
+}
+
+function getNetworkPolicyUISchemas(): Record<NetworkPolicyAttribute, UISchemaType> {
+	return {
+		Namespace: 'text',
+		Name: 'link',
+		'Pod-Selector': 'array-of-object',
+		'Ingress Rules': 'number',
+		'Egress Rules': 'number',
+		Age: 'time',
+		raw: 'object'
+	};
+}
+
+function getNetworkPolicyColumnDefinitions(
+	apiResource: APIResource,
+	uiSchemas: Record<NetworkPolicyAttribute, UISchemaType>,
+	dataSchemas: Record<NetworkPolicyAttribute, DataSchemaType>
+): ColumnDef<Record<NetworkPolicyAttribute, JsonValue>>[] {
+	return [
+		{
+			id: 'Namespace',
+			header: ({ column }: { column: Column<Record<NetworkPolicyAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<NetworkPolicyAttribute, JsonValue>>;
+				row: Row<Record<NetworkPolicyAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Namespace'
+		},
+		{
+			id: 'Name',
+			header: ({ column }: { column: Column<Record<NetworkPolicyAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<NetworkPolicyAttribute, JsonValue>>;
+				row: Row<Record<NetworkPolicyAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas,
+					metadata: {
+						hyperlink: resolve(
+							`/(auth)/${page.params.cluster}/${page.params.namespace}/${row.original[column.id as NetworkPolicyAttribute]}?group=${apiResource.group}&version=${apiResource.version}&kind=${apiResource.kind}&resource=${apiResource.resource}&namespaced=${apiResource.namespaced}`
+						)
+					} satisfies LinkMetadata
+				}),
+			accessorKey: 'Name'
+		},
+		{
+			id: 'Pod-Selector',
+			header: ({ column }: { column: Column<Record<NetworkPolicyAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<NetworkPolicyAttribute, JsonValue>>;
+				row: Row<Record<NetworkPolicyAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas,
+					metadata: {
+						items: Object.entries(
+							(row.original.raw as NetworkingK8SIoV1NetworkPolicy).spec?.podSelector?.matchLabels ??
+								{}
+						).map(([key, value]) => ({
+							title: key,
+							description: value,
+							raw: { key, value }
+						})) as ArrayOfObjectItemsType
+					} satisfies ArrayOfObjectMetadata
+				}),
+			accessorKey: 'Pod-Selector'
+		},
+		{
+			id: 'Ingress Rules',
+			header: ({ column }: { column: Column<Record<NetworkPolicyAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<NetworkPolicyAttribute, JsonValue>>;
+				row: Row<Record<NetworkPolicyAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Ingress Rules',
+			meta: { class: 'hidden xl:table-cell' }
+		},
+		{
+			id: 'Egress Rules',
+			header: ({ column }: { column: Column<Record<NetworkPolicyAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<NetworkPolicyAttribute, JsonValue>>;
+				row: Row<Record<NetworkPolicyAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Egress Rules',
+			meta: { class: 'hidden xl:table-cell' }
+		},
+		{
+			id: 'Age',
+			header: ({ column }: { column: Column<Record<NetworkPolicyAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<NetworkPolicyAttribute, JsonValue>>;
+				row: Row<Record<NetworkPolicyAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Age'
+		}
+	];
+}
+
+export {
+	getNetworkPolicyColumnDefinitions,
+	getNetworkPolicyData,
+	getNetworkPolicyDataSchemas,
+	getNetworkPolicyUISchemas
+};
