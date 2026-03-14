@@ -29,14 +29,9 @@
 </script>
 
 <div class="flex h-screen items-center justify-center">
-	<p class="text-muted-foreground text-sm">{m.setting_up_environment()}</p>
+	<p class="text-sm text-muted-foreground">{m.setting_up_environment()}</p>
 </div>
 
 {#if harborLoginUrl}
-	<iframe
-		src={harborLoginUrl}
-		title="Harbor auto-login"
-		class="hidden"
-		onload={complete}
-	></iframe>
+	<iframe src={harborLoginUrl} title="Harbor auto-login" class="hidden" onload={complete}></iframe>
 {/if}
