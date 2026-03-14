@@ -10,16 +10,16 @@
 		breadcrumbs.set([
 			{
 				title: page.url.searchParams.get('kind') ?? 'Resource',
-				url: (resolve('/(auth)/[cluster]/[namespace]', {
+				url: (resolve('/(auth)/[cluster]/[workspace]', {
 					cluster: page.params.cluster!,
-					namespace: page.params.namespace!
+					workspace: page.params.workspace!
 				}) + page.url.search) as ResolvedPathname
 			},
 			{
 				title: page.params.name!,
-				url: resolve('/(auth)/[cluster]/[namespace]/[name]', {
+				url: resolve('/(auth)/[cluster]/[workspace]/[name]', {
 					cluster: page.params.cluster!,
-					namespace: page.params.namespace!,
+					workspace: page.params.workspace!,
 					name: page.params.name!
 				})
 			}
@@ -29,7 +29,9 @@
 	const namespaced = $derived(page.url.searchParams.get('namespaced') !== 'false');
 
 	const cluster = $derived(page.params.cluster ?? '');
-	const namespace = $derived(namespaced ? (page.params.namespace ?? '') : '');
+	const namespace = $derived(
+		namespaced ? (page.data.namespace ?? '') : ''
+	);
 	const name = $derived(page.params.name ?? '');
 	const group = $derived(page.url.searchParams.get('group') ?? '');
 	const version = $derived(page.url.searchParams.get('version') ?? '');

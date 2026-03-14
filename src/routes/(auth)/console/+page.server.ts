@@ -49,11 +49,11 @@ export const load: PageServerLoad = async ({ parent, fetch }) => {
 
 		if (wsRes.ok) {
 			const { items } = (await wsRes.json()) as ListResponse;
-			const namespace = items[0]?.object?.metadata?.name;
-			if (namespace) {
+			const workspace = items[0]?.object?.metadata?.name;
+			if (workspace) {
 				throw redirect(
 					307,
-					resolve('/(auth)/[cluster]/[namespace]/overview', { cluster, namespace })
+					resolve('/(auth)/[cluster]/[workspace]/overview', { cluster, workspace })
 				);
 			}
 		}

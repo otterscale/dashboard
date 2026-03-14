@@ -9,15 +9,15 @@
 	breadcrumbs.set([
 		{
 			title: m.application_hub(),
-			url: resolve('/(auth)/[cluster]/[namespace]/hub', {
+			url: resolve('/(auth)/[cluster]/[workspace]/hub', {
 				cluster: page.params.cluster!,
-				namespace: page.params.namespace!
+				workspace: page.params.workspace!
 			})
 		}
 	]);
 
 	const cluster = $derived(page.params.cluster ?? '');
-	const namespace = $derived(page.params.namespace ?? '');
+	const namespace = $derived(page.data.namespace ?? '');
 </script>
 
 {#key cluster + namespace}

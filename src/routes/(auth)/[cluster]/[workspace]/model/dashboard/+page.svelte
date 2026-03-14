@@ -9,14 +9,16 @@
 	breadcrumbs.set([
 		{
 			title: m.models(),
-			url: resolve('/(auth)/[cluster]/[namespace]/model/dashboard', {
+			url: resolve('/(auth)/[cluster]/[workspace]/model/dashboard', {
 				cluster: page.params.cluster!,
-				namespace: page.params.namespace!
+				workspace: page.params.workspace!
 			})
 		}
 	]);
+
+	const namespace = $derived(page.data.namespace ?? '');
 </script>
 
-{#key page.params.cluster! + page.params.namespace!}
-	<Dashboard cluster={page.params.cluster!} namespace={page.params.namespace!} />
+{#key page.params.cluster! + namespace}
+	<Dashboard cluster={page.params.cluster!} {namespace} />
 {/key}

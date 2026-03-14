@@ -58,13 +58,13 @@
 		cluster,
 		workspaces,
 		user,
-		namespace,
+		workspace,
 		onsuccess
 	}: {
 		cluster: string;
 		workspaces: TenantOtterscaleIoV1Alpha1Workspace[];
 		user: User;
-		namespace?: string;
+		workspace?: string;
 		onsuccess?: (workspace?: TenantOtterscaleIoV1Alpha1Workspace) => void;
 	} = $props();
 
@@ -72,8 +72,8 @@
 	const resourceClient = createClient(ResourceService, transport);
 
 	let activeWorkspace = $derived(
-		workspaces.length > 0 && namespace
-			? workspaces.find((w) => w.metadata?.name === namespace)
+		workspaces.length > 0 && workspace
+			? workspaces.find((w) => w.metadata?.name === workspace)
 			: undefined
 	);
 	let workspaceSchema: any = $state();
@@ -249,7 +249,7 @@
 						<Button
 							href={activeWorkspace
 								? resolve(
-										`/(auth)/${cluster}/${activeWorkspace.spec.namespace}/${activeWorkspace.metadata?.name}?group=tenant.otterscale.io&version=v1alpha1&kind=Workspace&resource=workspaces&namespaced=false`
+										`/(auth)/${cluster}/${activeWorkspace.metadata?.name}/${activeWorkspace.metadata?.name}?group=tenant.otterscale.io&version=v1alpha1&kind=Workspace&resource=workspaces&namespaced=false`
 									)
 								: undefined}
 							class="group/icon flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground transition"

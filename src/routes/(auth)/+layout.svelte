@@ -116,22 +116,22 @@
 		resource: string,
 		namespaced: boolean = true
 	) {
-		const namespace = page.params.namespace ?? '_';
+		const workspace = page.params.workspace ?? '_';
 		let query = `?group=${group}&version=${version}&kind=${kind}&resource=${resource}`;
 		if (!namespaced) {
 			query += `&namespaced=false`;
 		}
-		return resolve(`/(auth)/${activeCluster}/${namespace}${query}`);
+		return resolve(`/(auth)/${activeCluster}/${workspace}${query}`);
 	}
 
 	const navData = $derived({
 		managed: [
 			{
 				title: m.overview(),
-				url: page.params.namespace
-					? resolve('/(auth)/[cluster]/[namespace]/overview', {
+				url: page.params.workspace
+					? resolve('/(auth)/[cluster]/[workspace]/overview', {
 							cluster: activeCluster,
-							namespace: page.params.namespace
+							workspace: page.params.workspace
 						})
 					: '',
 				icon: CompassIcon
@@ -143,10 +143,10 @@
 				items: [
 					{
 						title: m.dashboard(),
-						url: page.params.namespace
-							? resolve('/(auth)/[cluster]/[namespace]/model/dashboard', {
+						url: page.params.workspace
+							? resolve('/(auth)/[cluster]/[workspace]/model/dashboard', {
 									cluster: activeCluster,
-									namespace: page.params.namespace
+									workspace: page.params.workspace
 								})
 							: ''
 					},
@@ -179,9 +179,9 @@
 					},
 					{
 						title: m.application_hub(),
-						url: resolve('/(auth)/[cluster]/[namespace]/hub', {
+						url: resolve('/(auth)/[cluster]/[workspace]/hub', {
 							cluster: activeCluster,
-							namespace: page.params.namespace!
+							workspace: page.params.workspace!
 						})
 					}
 				]
@@ -192,10 +192,10 @@
 				items: [
 					{
 						title: m.dashboard(),
-						url: page.params.namespace
-							? resolve('/(auth)/[cluster]/[namespace]/compute/dashboard', {
+						url: page.params.workspace
+							? resolve('/(auth)/[cluster]/[workspace]/compute/dashboard', {
 									cluster: activeCluster,
-									namespace: page.params.namespace
+									workspace: page.params.workspace
 								})
 							: ''
 					},
@@ -225,10 +225,10 @@
 				items: [
 					{
 						title: m.dashboard(),
-						url: page.params.namespace
-							? resolve('/(auth)/[cluster]/[namespace]/storage/dashboard', {
+						url: page.params.workspace
+							? resolve('/(auth)/[cluster]/[workspace]/storage/dashboard', {
 									cluster: activeCluster,
-									namespace: page.params.namespace
+									workspace: page.params.workspace
 								})
 							: ''
 					},
@@ -448,12 +448,12 @@
 					cluster={activeCluster}
 					{workspaces}
 					user={data.user}
-					namespace={page.params.namespace}
+					workspace={page.params.workspace}
 					onsuccess={() => fetchWorkspaces(activeCluster)}
 				/>
 			</Sidebar.Header>
 			<Sidebar.Content class="gap-2">
-				{#if page.params.namespace}
+				{#if page.params.workspace}
 					<NavMain
 						managedLabel={m.managed()}
 						managedItems={navData.managed}
