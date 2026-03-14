@@ -4,6 +4,7 @@
 		Box,
 		CircleCheck,
 		CircleX,
+		ExternalLinkIcon,
 		Gauge,
 		Grid,
 		HeartPulse,
@@ -21,7 +22,6 @@
 	import { getContext, onDestroy } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { typographyVariants } from '$lib/components/typography/index.ts';
@@ -95,21 +95,6 @@
 		}
 	});
 
-	function handleClick(
-		cluster: string,
-		namespace: string,
-		group: string,
-		version: string,
-		kind: string,
-		resource: string,
-		name: string
-	) {
-		return goto(
-			resolve(
-				`/(auth)/${cluster}/${namespace}/${name}?group=${group}&version=${version}&kind=${kind}&resource=${resource}`
-			)
-		);
-	}
 	function getGridLayout(key: string) {
 		if (key === 'limits.cpu') return 'md:row-start-1 2xl:row-start-1';
 		if (key === 'limits.memory') return 'md:row-start-2 2xl:row-start-1';
@@ -126,7 +111,93 @@
 
 		return '2xl:row-start-3 md:row-start-6';
 	}
+
 	let isResourceQuotasGrid = $state(false);
+
+	type RelatedResource = {
+		name: string;
+		group: string;
+		version: string;
+		kind: string;
+		resource: string;
+	};
+
+	let relatedResources = $derived.by(() => {
+		const refs: RelatedResource[] = [];
+		const status = object?.status;
+		if (!status) return refs;
+
+		const singleRefs: {
+			ref: typeof status.namespaceRef;
+			group: string;
+			version: string;
+			kind: string;
+			resource: string;
+		}[] = [
+			{
+				ref: status.namespaceRef,
+				group: '',
+				version: 'v1',
+				kind: 'Namespace',
+				resource: 'namespaces'
+			},
+			{
+				ref: status.resourceQuotaRef,
+				group: '',
+				version: 'v1',
+				kind: 'ResourceQuota',
+				resource: 'resourcequotas'
+			},
+			{
+				ref: status.limitRangeRef,
+				group: '',
+				version: 'v1',
+				kind: 'LimitRange',
+				resource: 'limitranges'
+			},
+			{
+				ref: status.networkPolicyRef,
+				group: 'networking.k8s.io',
+				version: 'v1',
+				kind: 'NetworkPolicy',
+				resource: 'networkpolicies'
+			},
+			{
+				ref: status.helmRepositoryRef,
+				group: 'source.toolkit.fluxcd.io',
+				version: 'v1',
+				kind: 'HelmRepository',
+				resource: 'helmrepositories'
+			},
+			{
+				ref: status.imagePullSecretRef,
+				group: '',
+				version: 'v1',
+				kind: 'Secret',
+				resource: 'secrets'
+			}
+		];
+
+		for (const { ref, group, version, kind, resource } of singleRefs) {
+			if (ref?.name) {
+				refs.push({ name: ref.name, group, version, kind, resource });
+			}
+		}
+
+		for (const roleBindingRef of status.roleBindingRefs ?? []) {
+			if (roleBindingRef.name) {
+				refs.push({
+					name: roleBindingRef.name,
+					group: 'rbac.authorization.k8s.io',
+					version: 'v1',
+					kind: 'RoleBinding',
+					resource: 'rolebindings'
+				});
+			}
+		}
+
+		return refs;
+	});
 </script>
 
 {#await GetResourceQuota()}
@@ -475,240 +546,28 @@
 		<Field.Set>
 			<!-- Related Resources -->
 			<Label class={typographyVariants({ variant: 'h4' })}>Related Resources</Label>
-			{#if Object.keys(object?.status ?? {}).length > 1}
-				<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-					{#if object?.status?.namespaceRef?.name}
-						<Item.Root
-							variant="muted"
-							class="hover:underline"
-							onclick={() => {
-								handleClick(
-									page.params.cluster!,
-									'',
-									'',
-									'v1',
-									'Namespace',
-									'namespaces',
-									object?.status?.namespaceRef?.name ?? ''
-								);
-							}}
-						>
-							<Item.Media>
-								<Box size={20} />
-							</Item.Media>
-							<Item.Content>
-								<Item.Title class="flex flex-wrap">
-									<h1>{object?.status?.namespaceRef?.kind}</h1>
-									<p class={typographyVariants({ variant: 'muted' })}>
-										{object?.status?.namespaceRef?.apiVersion}
-									</p>
-								</Item.Title>
-								<Item.Description>
-									{object?.status?.namespaceRef?.name}
-								</Item.Description>
-							</Item.Content>
+			{#if relatedResources.length > 0}
+				<div class="grid gap-4 xl:grid-cols-3 2xl:grid-cols-4">
+					{#each relatedResources as ref (ref.kind + ref.name)}
+						<Item.Root variant="outline">
+							{#snippet child({ props })}
+								{@const url = resolve(
+									`/(auth)/${page.params.cluster}/${page.params.workspace}/${ref.name}?group=${ref.group}&version=${ref.version}&kind=${ref.kind}&resource=${ref.resource}&namespaced=${ref.resource !== 'namespaces'}`
+								)}
+								<a href={url} target="_blank" rel="noopener noreferrer" {...props}>
+									<Item.Content>
+										<Item.Title>{ref.name}</Item.Title>
+										<Item.Description>
+											{ref.resource}.{ref.group ? `${ref.group}/${ref.version}` : ref.version}
+										</Item.Description>
+									</Item.Content>
+									<Item.Actions>
+										<ExternalLinkIcon class="size-4" />
+									</Item.Actions>
+								</a>
+							{/snippet}
 						</Item.Root>
-					{/if}
-
-					{#if object?.status?.resourceQuotaRef?.name}
-						<Item.Root
-							variant="muted"
-							class="hover:underline"
-							onclick={() => {
-								handleClick(
-									page.params.cluster!,
-									object?.status?.resourceQuotaRef?.namespace ?? '',
-									'',
-									'v1',
-									'ResourceQuota',
-									'resourcequotas',
-									object?.status?.resourceQuotaRef?.name ?? ''
-								);
-							}}
-						>
-							<Item.Media>
-								<Box size={20} />
-							</Item.Media>
-							<Item.Content>
-								<Item.Title class="flex flex-wrap">
-									<h1>{object?.status?.resourceQuotaRef?.kind}</h1>
-									<p class={typographyVariants({ variant: 'muted' })}>
-										{object?.status?.resourceQuotaRef?.apiVersion}
-									</p>
-								</Item.Title>
-								<Item.Description>
-									{object?.status?.resourceQuotaRef?.name}
-								</Item.Description>
-							</Item.Content>
-						</Item.Root>
-					{/if}
-
-					{#if object?.status?.limitRangeRef?.name}
-						<Item.Root
-							variant="muted"
-							class="hover:underline"
-							onclick={() => {
-								handleClick(
-									page.params.cluster!,
-									object?.status?.limitRangeRef?.namespace ?? '',
-									'',
-									'v1',
-									'LimitRange',
-									'limitranges',
-									object?.status?.limitRangeRef?.name ?? ''
-								);
-							}}
-						>
-							<Item.Media>
-								<Box size={20} />
-							</Item.Media>
-							<Item.Content>
-								<Item.Title class="flex flex-wrap">
-									<h1>{object?.status?.limitRangeRef?.kind}</h1>
-									<p class={typographyVariants({ variant: 'muted' })}>
-										{object?.status?.limitRangeRef?.apiVersion}
-									</p>
-								</Item.Title>
-								<Item.Description>
-									{object?.status?.limitRangeRef?.name}
-								</Item.Description>
-							</Item.Content>
-						</Item.Root>
-					{/if}
-
-					{#if object?.status?.networkPolicyRef?.name}
-						<Item.Root
-							variant="muted"
-							class="hover:underline"
-							onclick={() => {
-								handleClick(
-									page.params.cluster!,
-									object?.status?.networkPolicyRef?.namespace ?? '',
-									'networking.k8s.io',
-									'v1',
-									'NetworkPolicy',
-									'networkpolicies',
-									object?.status?.networkPolicyRef?.name ?? ''
-								);
-							}}
-						>
-							<Item.Media>
-								<Box size={20} />
-							</Item.Media>
-							<Item.Content>
-								<Item.Title class="flex flex-wrap">
-									<h1>{object?.status?.networkPolicyRef?.kind}</h1>
-									<p class={typographyVariants({ variant: 'muted' })}>
-										{object?.status?.networkPolicyRef?.apiVersion}
-									</p>
-								</Item.Title>
-								<Item.Description>
-									{object?.status?.networkPolicyRef?.name}
-								</Item.Description>
-							</Item.Content>
-						</Item.Root>
-					{/if}
-
-					{#each object?.status?.roleBindingRefs as roleBindingRef, index (index)}
-						{#if roleBindingRef.name}
-							<Item.Root
-								variant="muted"
-								class="hover:underline"
-								onclick={() => {
-									handleClick(
-										page.params.cluster!,
-										roleBindingRef.namespace ?? '',
-										'rbac.authorization.k8s.io',
-										'v1',
-										'RoleBinding',
-										'rolebindings',
-										roleBindingRef.name ?? ''
-									);
-								}}
-							>
-								<Item.Media>
-									<Box size={20} />
-								</Item.Media>
-								<Item.Content>
-									<Item.Title class="flex flex-wrap">
-										<h1>{roleBindingRef.kind}</h1>
-										<p class={typographyVariants({ variant: 'muted' })}>
-											{roleBindingRef.apiVersion}
-										</p>
-									</Item.Title>
-									<Item.Description>
-										{roleBindingRef.name}
-									</Item.Description>
-								</Item.Content>
-							</Item.Root>
-						{/if}
 					{/each}
-
-					{#if object?.status?.helmRepositoryRef?.name}
-						<Item.Root
-							variant="muted"
-							class="hover:underline"
-							onclick={() => {
-								handleClick(
-									page.params.cluster!,
-									object?.status?.helmRepositoryRef?.namespace ?? '',
-									'source.toolkit.fluxcd.io',
-									'v1',
-									'HelmRepository',
-									'helmrepositories',
-									object?.status?.helmRepositoryRef?.name ?? ''
-								);
-							}}
-						>
-							<Item.Media>
-								<Box size={20} />
-							</Item.Media>
-							<Item.Content>
-								<Item.Title class="flex flex-wrap">
-									<h1>{object?.status?.helmRepositoryRef?.kind}</h1>
-									<p class={typographyVariants({ variant: 'muted' })}>
-										{object?.status?.helmRepositoryRef?.apiVersion}
-									</p>
-								</Item.Title>
-								<Item.Description>
-									{object?.status?.helmRepositoryRef?.name}
-								</Item.Description>
-							</Item.Content>
-						</Item.Root>
-					{/if}
-
-					{#if object?.status?.imagePullSecretRef?.name}
-						<Item.Root
-							variant="muted"
-							class="hover:underline"
-							onclick={() => {
-								handleClick(
-									page.params.cluster!,
-									object?.status?.imagePullSecretRef?.namespace ?? '',
-									'',
-									'v1',
-									'Secret',
-									'secrets',
-									object?.status?.imagePullSecretRef?.name ?? ''
-								);
-							}}
-						>
-							<Item.Media>
-								<Box size={20} />
-							</Item.Media>
-							<Item.Content>
-								<Item.Title class="flex flex-wrap">
-									<h1>{object?.status?.imagePullSecretRef?.kind}</h1>
-									<p class={typographyVariants({ variant: 'muted' })}>
-										{object?.status?.imagePullSecretRef?.apiVersion}
-									</p>
-								</Item.Title>
-								<Item.Description>
-									{object?.status?.imagePullSecretRef?.name}
-								</Item.Description>
-							</Item.Content>
-						</Item.Root>
-					{/if}
 				</div>
 			{:else}
 				<Empty.Root class="h-full">
