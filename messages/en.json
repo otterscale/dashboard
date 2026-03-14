@@ -223,5 +223,6 @@
 	"artifact": "Artifact",
 	"console": "Console",
 	"repository": "Repository",
-	"add_cluster": "Add Cluster"
+	"add_cluster": "Add Cluster",
+	"setting_up_environment": "Setting up your environment, please wait..."
 }

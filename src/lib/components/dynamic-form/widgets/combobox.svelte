@@ -116,7 +116,9 @@
 	});
 
 	const attributes = $derived(inputAttributes(ctx, config, 'TailoredComboboxInput', handlers, {}));
-	const triggerContent = $derived(value ?? attributes.placeholder);
+	const triggerContent = $derived(
+		optionsProxy.find((option) => option.value === value)?.label ?? value ?? attributes.placeholder
+	);
 
 	const emptyText = $derived(retrieveUiOption(ctx, config, 'TailoredComboboxEmptyText'));
 

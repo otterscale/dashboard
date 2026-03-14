@@ -18,8 +18,8 @@ import { renderComponent } from '$lib/components/ui/data-table';
 // kubectl get networkpolicy -o wide
 // NAME   POD-SELECTOR   AGE
 type NetworkPolicyAttribute =
-	| 'Namespace'
 	| 'Name'
+	| 'Namespace'
 	| 'Pod-Selector'
 	| 'Ingress Rules'
 	| 'Egress Rules'
@@ -28,8 +28,8 @@ type NetworkPolicyAttribute =
 
 function getNetworkPolicyDataSchemas(): Record<NetworkPolicyAttribute, DataSchemaType> {
 	return {
-		Namespace: 'text',
 		Name: 'text',
+		Namespace: 'text',
 		'Pod-Selector': 'object',
 		'Ingress Rules': 'number',
 		'Egress Rules': 'number',
@@ -42,8 +42,8 @@ function getNetworkPolicyData(
 	object: NetworkingK8SIoV1NetworkPolicy
 ): Record<NetworkPolicyAttribute, JsonValue> {
 	return {
-		Namespace: object?.metadata?.namespace ?? null,
 		Name: object?.metadata?.name ?? null,
+		Namespace: object?.metadata?.namespace ?? null,
 		'Pod-Selector': (object?.spec?.podSelector as JsonValue) ?? null,
 		'Ingress Rules': object?.spec?.ingress?.length ?? 0,
 		'Egress Rules': object?.spec?.egress?.length ?? 0,
@@ -54,8 +54,8 @@ function getNetworkPolicyData(
 
 function getNetworkPolicyUISchemas(): Record<NetworkPolicyAttribute, UISchemaType> {
 	return {
-		Namespace: 'text',
 		Name: 'link',
+		Namespace: 'link',
 		'Pod-Selector': 'array-of-object',
 		'Ingress Rules': 'number',
 		'Egress Rules': 'number',
@@ -70,27 +70,6 @@ function getNetworkPolicyColumnDefinitions(
 	dataSchemas: Record<NetworkPolicyAttribute, DataSchemaType>
 ): ColumnDef<Record<NetworkPolicyAttribute, JsonValue>>[] {
 	return [
-		{
-			id: 'Namespace',
-			header: ({ column }: { column: Column<Record<NetworkPolicyAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<NetworkPolicyAttribute, JsonValue>>;
-				row: Row<Record<NetworkPolicyAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas
-				}),
-			accessorKey: 'Namespace'
-		},
 		{
 			id: 'Name',
 			header: ({ column }: { column: Column<Record<NetworkPolicyAttribute, JsonValue>> }) =>
@@ -111,11 +90,37 @@ function getNetworkPolicyColumnDefinitions(
 					uiSchemas: uiSchemas,
 					metadata: {
 						hyperlink: resolve(
-							`/(auth)/${page.params.cluster}/${page.params.namespace}/${row.original[column.id as NetworkPolicyAttribute]}?group=${apiResource.group}&version=${apiResource.version}&kind=${apiResource.kind}&resource=${apiResource.resource}&namespaced=${apiResource.namespaced}`
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original[column.id as NetworkPolicyAttribute]}?group=${apiResource.group}&version=${apiResource.version}&kind=${apiResource.kind}&resource=${apiResource.resource}&namespaced=${apiResource.namespaced}`
 						)
 					} satisfies LinkMetadata
 				}),
 			accessorKey: 'Name'
+		},
+		{
+			id: 'Namespace',
+			header: ({ column }: { column: Column<Record<NetworkPolicyAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<NetworkPolicyAttribute, JsonValue>>;
+				row: Row<Record<NetworkPolicyAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas,
+					metadata: {
+						hyperlink: resolve(
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original['Namespace']}?group=&version=v1&kind=Namespace&resource=namespaces&namespaced=false`
+						)
+					} satisfies LinkMetadata
+				}),
+			accessorKey: 'Namespace'
 		},
 		{
 			id: 'Pod-Selector',

@@ -102,7 +102,7 @@ function getSimpleAppColumnDefinitions(
 					uiSchemas: uiSchemas,
 					metadata: {
 						hyperlink: resolve(
-							`/(auth)/${page.params.cluster}/${page.params.namespace}/${row.original[column.id as SimpleAppAttribute]}?group=${apiResource.group}&version=${apiResource.version}&kind=${apiResource.kind}&resource=${apiResource.resource}&namespaced=${apiResource.namespaced}`
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original[column.id as SimpleAppAttribute]}?group=${apiResource.group}&version=${apiResource.version}&kind=${apiResource.kind}&resource=${apiResource.resource}&namespaced=${apiResource.namespaced}`
 						)
 					} satisfies LinkMetadata
 				}),
@@ -128,7 +128,7 @@ function getSimpleAppColumnDefinitions(
 					uiSchemas: uiSchemas,
 					metadata: {
 						hyperlink: resolve(
-							`/(auth)/${page.params.cluster}/${page.params.namespace}/${page.params.namespace}?group=&version=v1&kind=Namespace&resource=namespaces&namespaced=false`
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original['Namespace']}?group=&version=v1&kind=Namespace&resource=namespaces&namespaced=false`
 						)
 					} satisfies LinkMetadata
 				}),

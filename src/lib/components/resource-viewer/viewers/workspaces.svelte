@@ -460,7 +460,9 @@
 										</Badge>
 									</Item.Title>
 									<Item.Description>
-										{member.subject}
+										<span>{member.username}</span>
+										<br />
+										<span> {member.subject}</span>
 									</Item.Description>
 								</Item.Content>
 							</Item.Root>
@@ -475,39 +477,6 @@
 			<Label class={typographyVariants({ variant: 'h4' })}>Related Resources</Label>
 			{#if Object.keys(object?.status ?? {}).length > 1}
 				<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-					{#if object?.status?.limitRangeRef?.name}
-						<Item.Root
-							variant="muted"
-							class="hover:underline"
-							onclick={() => {
-								handleClick(
-									page.params.cluster!,
-									object?.status?.limitRangeRef?.namespace ?? '',
-									'',
-									'v1',
-									'LimitRange',
-									'limitranges',
-									object?.status?.limitRangeRef?.name ?? ''
-								);
-							}}
-						>
-							<Item.Media>
-								<Box size={20} />
-							</Item.Media>
-							<Item.Content>
-								<Item.Title class="flex flex-wrap">
-									<h1>{object?.status?.limitRangeRef?.kind}</h1>
-									<p class={typographyVariants({ variant: 'muted' })}>
-										{object?.status?.limitRangeRef?.apiVersion}
-									</p>
-								</Item.Title>
-								<Item.Description>
-									{object?.status?.limitRangeRef?.name}
-								</Item.Description>
-							</Item.Content>
-						</Item.Root>
-					{/if}
-
 					{#if object?.status?.namespaceRef?.name}
 						<Item.Root
 							variant="muted"
@@ -569,6 +538,39 @@
 								</Item.Title>
 								<Item.Description>
 									{object?.status?.resourceQuotaRef?.name}
+								</Item.Description>
+							</Item.Content>
+						</Item.Root>
+					{/if}
+
+					{#if object?.status?.limitRangeRef?.name}
+						<Item.Root
+							variant="muted"
+							class="hover:underline"
+							onclick={() => {
+								handleClick(
+									page.params.cluster!,
+									object?.status?.limitRangeRef?.namespace ?? '',
+									'',
+									'v1',
+									'LimitRange',
+									'limitranges',
+									object?.status?.limitRangeRef?.name ?? ''
+								);
+							}}
+						>
+							<Item.Media>
+								<Box size={20} />
+							</Item.Media>
+							<Item.Content>
+								<Item.Title class="flex flex-wrap">
+									<h1>{object?.status?.limitRangeRef?.kind}</h1>
+									<p class={typographyVariants({ variant: 'muted' })}>
+										{object?.status?.limitRangeRef?.apiVersion}
+									</p>
+								</Item.Title>
+								<Item.Description>
+									{object?.status?.limitRangeRef?.name}
 								</Item.Description>
 							</Item.Content>
 						</Item.Root>
@@ -641,6 +643,72 @@
 							</Item.Root>
 						{/if}
 					{/each}
+
+					{#if object?.status?.helmRepositoryRef?.name}
+						<Item.Root
+							variant="muted"
+							class="hover:underline"
+							onclick={() => {
+								handleClick(
+									page.params.cluster!,
+									object?.status?.helmRepositoryRef?.namespace ?? '',
+									'source.toolkit.fluxcd.io',
+									'v1',
+									'HelmRepository',
+									'helmrepositories',
+									object?.status?.helmRepositoryRef?.name ?? ''
+								);
+							}}
+						>
+							<Item.Media>
+								<Box size={20} />
+							</Item.Media>
+							<Item.Content>
+								<Item.Title class="flex flex-wrap">
+									<h1>{object?.status?.helmRepositoryRef?.kind}</h1>
+									<p class={typographyVariants({ variant: 'muted' })}>
+										{object?.status?.helmRepositoryRef?.apiVersion}
+									</p>
+								</Item.Title>
+								<Item.Description>
+									{object?.status?.helmRepositoryRef?.name}
+								</Item.Description>
+							</Item.Content>
+						</Item.Root>
+					{/if}
+
+					{#if object?.status?.imagePullSecretRef?.name}
+						<Item.Root
+							variant="muted"
+							class="hover:underline"
+							onclick={() => {
+								handleClick(
+									page.params.cluster!,
+									object?.status?.imagePullSecretRef?.namespace ?? '',
+									'',
+									'v1',
+									'Secret',
+									'secrets',
+									object?.status?.imagePullSecretRef?.name ?? ''
+								);
+							}}
+						>
+							<Item.Media>
+								<Box size={20} />
+							</Item.Media>
+							<Item.Content>
+								<Item.Title class="flex flex-wrap">
+									<h1>{object?.status?.imagePullSecretRef?.kind}</h1>
+									<p class={typographyVariants({ variant: 'muted' })}>
+										{object?.status?.imagePullSecretRef?.apiVersion}
+									</p>
+								</Item.Title>
+								<Item.Description>
+									{object?.status?.imagePullSecretRef?.name}
+								</Item.Description>
+							</Item.Content>
+						</Item.Root>
+					{/if}
 				</div>
 			{:else}
 				<Empty.Root class="h-full">

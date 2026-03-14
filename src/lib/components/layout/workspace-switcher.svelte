@@ -1,39 +1,42 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import ActivityIcon from '@lucide/svelte/icons/activity';
-	import ApertureIcon from '@lucide/svelte/icons/aperture';
-	import AudioWaveformIcon from '@lucide/svelte/icons/audio-waveform';
-	import BlocksIcon from '@lucide/svelte/icons/blocks';
-	import BoxIcon from '@lucide/svelte/icons/box';
-	import BriefcaseIcon from '@lucide/svelte/icons/briefcase';
-	import ChartPieIcon from '@lucide/svelte/icons/chart-pie';
-	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
-	import CircleDashedIcon from '@lucide/svelte/icons/circle-dashed';
-	import CommandIcon from '@lucide/svelte/icons/command';
-	import ComponentIcon from '@lucide/svelte/icons/component';
-	import CrownIcon from '@lucide/svelte/icons/crown';
-	import CylinderIcon from '@lucide/svelte/icons/cylinder';
-	import DiamondIcon from '@lucide/svelte/icons/diamond';
-	import DiscIcon from '@lucide/svelte/icons/disc';
-	import DnaIcon from '@lucide/svelte/icons/dna';
-	import FrameIcon from '@lucide/svelte/icons/frame';
-	import GalleryVerticalEndIcon from '@lucide/svelte/icons/gallery-vertical-end';
-	import GemIcon from '@lucide/svelte/icons/gem';
-	import GlobeIcon from '@lucide/svelte/icons/globe';
-	import GridIcon from '@lucide/svelte/icons/grid';
-	import HashIcon from '@lucide/svelte/icons/hash';
-	import HexagonIcon from '@lucide/svelte/icons/hexagon';
-	import LayersIcon from '@lucide/svelte/icons/layers';
-	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
-	import LibraryIcon from '@lucide/svelte/icons/library';
-	import MedalIcon from '@lucide/svelte/icons/medal';
-	import MountainIcon from '@lucide/svelte/icons/mountain';
-	import PackageIcon from '@lucide/svelte/icons/package';
-	import PlusIcon from '@lucide/svelte/icons/plus';
-	import PyramidIcon from '@lucide/svelte/icons/pyramid';
-	import RadarIcon from '@lucide/svelte/icons/radar';
-	import ShieldIcon from '@lucide/svelte/icons/shield';
-	import ZapIcon from '@lucide/svelte/icons/zap';
+	import {
+		ActivityIcon,
+		ApertureIcon,
+		AudioWaveformIcon,
+		BlocksIcon,
+		BoxIcon,
+		BriefcaseIcon,
+		ChartPieIcon,
+		ChevronsUpDownIcon,
+		CircleDashedIcon,
+		CommandIcon,
+		ComponentIcon,
+		CrownIcon,
+		CylinderIcon,
+		DiamondIcon,
+		DiscIcon,
+		DnaIcon,
+		FrameIcon,
+		GalleryVerticalEndIcon,
+		GemIcon,
+		GlobeIcon,
+		GridIcon,
+		HashIcon,
+		HexagonIcon,
+		LayersIcon,
+		LayoutGridIcon,
+		LibraryIcon,
+		MedalIcon,
+		MountainIcon,
+		PackageIcon,
+		PlusIcon,
+		PyramidIcon,
+		RadarIcon,
+		Settings2Icon,
+		ShieldIcon,
+		ZapIcon
+	} from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { type TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import { type Component, getContext, onMount } from 'svelte';
@@ -43,6 +46,7 @@
 	import { resolve } from '$app/paths';
 	import { shortcut } from '$lib/actions/shortcut.svelte';
 	import NewCreate from '$lib/components/kind-viewer/kind-viewer-actions/workspace/new-create.svelte';
+	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
@@ -54,13 +58,13 @@
 		cluster,
 		workspaces,
 		user,
-		namespace,
+		workspace,
 		onsuccess
 	}: {
 		cluster: string;
 		workspaces: TenantOtterscaleIoV1Alpha1Workspace[];
 		user: User;
-		namespace?: string;
+		workspace?: string;
 		onsuccess?: (workspace?: TenantOtterscaleIoV1Alpha1Workspace) => void;
 	} = $props();
 
@@ -68,8 +72,8 @@
 	const resourceClient = createClient(ResourceService, transport);
 
 	let activeWorkspace = $derived(
-		workspaces.length > 0 && namespace
-			? workspaces.find((w) => w.metadata?.name === namespace)
+		workspaces.length > 0 && workspace
+			? workspaces.find((w) => w.metadata?.name === workspace)
 			: undefined
 	);
 	let workspaceSchema: any = $state();
@@ -238,14 +242,21 @@
 			<DropdownMenu.Trigger>
 				{#snippet child({ props })}
 					<Sidebar.MenuButton
-						{...props}
+						data-state={props['data-state']}
 						size="lg"
 						class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
 					>
-						<div
-							class="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground"
+						<Button
+							href={activeWorkspace
+								? resolve(
+										`/(auth)/${cluster}/${activeWorkspace.metadata?.name}/${activeWorkspace.metadata?.name}?group=tenant.otterscale.io&version=v1alpha1&kind=Workspace&resource=workspaces&namespaced=false`
+									)
+								: undefined}
+							class="group/icon flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground transition"
+							disabled={!activeWorkspace}
 						>
-							<ActiveIcon class="size-4" />
+							<ActiveIcon class="size-4 group-hover/icon:hidden" />
+							<Settings2Icon class="hidden size-4 group-hover/icon:block" />
 							{#if !activeWorkspace}
 								<span
 									class="absolute flex size-3 transition-all {sidebar.open
@@ -258,23 +269,27 @@
 									<span class="relative inline-flex size-3 rounded-full bg-blue-500"></span>
 								</span>
 							{/if}
+						</Button>
+						<div {...props} class="flex h-12 w-full items-center">
+							<div class="grid flex-1 text-start text-sm leading-tight">
+								{#if activeWorkspace}
+									<span class="truncate font-medium">
+										{activeWorkspace.metadata?.name}
+									</span>
+									<span class="flex items-center gap-2 truncate text-xs text-muted-foreground">
+										{activeWorkspace.spec.members?.find(
+											(u: { subject?: string; role?: string }) => u.subject === user.sub
+										)?.role}
+									</span>
+								{:else}
+									<span class="truncate font-medium"> OtterScale </span>
+									<span class="flex items-center gap-2 truncate text-xs text-muted-foreground">
+										{m.no_workspace_selected()}
+									</span>
+								{/if}
+							</div>
+							<ChevronsUpDownIcon class="ms-auto size-4 shrink-0" />
 						</div>
-						<div class="grid flex-1 text-start text-sm leading-tight">
-							{#if activeWorkspace}
-								<span class="truncate font-medium"> {activeWorkspace.metadata?.name} </span>
-								<span class="flex items-center gap-2 truncate text-xs text-muted-foreground">
-									{activeWorkspace.spec.members?.find(
-										(u: { subject?: string; role?: string }) => u.subject === user.sub
-									)?.role}
-								</span>
-							{:else}
-								<span class="truncate font-medium"> OtterScale </span>
-								<span class="flex items-center gap-2 truncate text-xs text-muted-foreground">
-									{m.no_workspace_selected()}
-								</span>
-							{/if}
-						</div>
-						<ChevronsUpDownIcon class="ms-auto" />
 					</Sidebar.MenuButton>
 				{/snippet}
 			</DropdownMenu.Trigger>

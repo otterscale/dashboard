@@ -58,7 +58,7 @@
 		apiVersion: group ? `${group}/${version}` : version,
 		kind,
 		metadata: { name: {} },
-		spec: { namespace: {}, members: {}, resourceQuota: {}, networkIsolation: {} }
+		spec: { members: {}, resourceQuota: {}, networkIsolation: {} }
 	});
 
 	// TODO: Refactor into StepsManager.
@@ -85,7 +85,7 @@
 		firstName?: string;
 		lastName?: string;
 	}
-	let usernameToIdentifier = $state<Record<string, string>>({});
+	let usernameToKeycloakUser = $state<Record<string, KeycloakUser>>({});
 	let timer: ReturnType<typeof setTimeout> | null = null;
 	function fetchUsersAsEnumerations(search: string): Promise<{ label: string; value: string }[]> {
 		return new Promise((resolve) => {
@@ -97,11 +97,12 @@
 					if (response.ok) {
 						const fetchedUsers: KeycloakUser[] = await response.json();
 						for (const user of fetchedUsers) {
-							usernameToIdentifier[user.username] = user.id;
+							usernameToKeycloakUser[user.username] = user;
 						}
 						resolve(
 							fetchedUsers.map((user) => ({
-								label: user.username,
+								label:
+									((user.firstName ?? '') + ' ' + (user.lastName ?? '')).trim() || user.username,
 								value: user.username
 							}))
 						);
@@ -116,8 +117,8 @@
 			}, 300);
 		});
 	}
-	function getIdentifier(username: string): string | undefined {
-		return usernameToIdentifier[username];
+	function getKeycloakUser(username: string): KeycloakUser | undefined {
+		return usernameToKeycloakUser[username];
 	}
 
 	// Flag for Dialog
@@ -306,20 +307,26 @@
 					} as UiSchemaRoot}
 					initialValue={[
 						// From login user information.
-						{ name: page.data.user.name, role: 'admin', subject: page.data.user.sub }
+						{
+							role: 'admin',
+							subject: page.data.user.sub,
+							username: page.data.user.username,
+							name: page.data.user.name
+						}
 					] as FormValue}
 					transformer={(value: FormValue) => {
 						let members = value as SchemaObjectValue[];
-						members = members.map((member) => ({
-							...member,
-							subject: member.subject ?? getIdentifier(member.name! as string) ?? null
-						}));
+						members = members.map((member) => {
+							const keycloakUser = getKeycloakUser(member.name as string);
+							return {
+								...member,
+								subject: member.subject ?? keycloakUser?.id ?? null,
+								username: member.username ?? keycloakUser?.username ?? null
+							};
+						});
 						return members;
 					}}
 					handleSubmit={{
-						prehook: () => {
-							lodash.set(values, 'spec.namespace', lodash.get(values, 'metadata.name'));
-						},
 						posthook: () => {
 							handleNext();
 						}
