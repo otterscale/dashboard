@@ -14,8 +14,8 @@ import { renderComponent } from '$lib/components/ui/data-table';
 // kubectl get event
 // LAST SEEN   TYPE   REASON   OBJECT   MESSAGE
 type EventAttribute =
-	| 'Namespace'
 	| 'Name'
+	| 'Namespace'
 	| 'Type'
 	| 'Reason'
 	| 'Object'
@@ -60,7 +60,7 @@ function getEventData(object: CoreV1Event): Record<EventAttribute, JsonValue> {
 function getEventUISchemas(): Record<EventAttribute, UISchemaType> {
 	return {
 		Name: 'link',
-		Namespace: 'text',
+		Namespace: 'link',
 		Type: 'text',
 		Reason: 'text',
 		Object: 'text',
@@ -95,7 +95,6 @@ function getEventColumnDefinitions(
 	});
 
 	return [
-		simpleColumn('Namespace'),
 		{
 			id: 'Name',
 			header: ({ column }: { column: Column<Record<EventAttribute, JsonValue>> }) =>
@@ -113,11 +112,34 @@ function getEventColumnDefinitions(
 					uiSchemas,
 					metadata: {
 						hyperlink: resolve(
-							`/(auth)/${page.params.cluster}/${page.params.namespace}/${row.original[column.id as EventAttribute]}?group=${apiResource.group}&version=${apiResource.version}&kind=${apiResource.kind}&resource=${apiResource.resource}&namespaced=${apiResource.namespaced}`
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original[column.id as EventAttribute]}?group=${apiResource.group}&version=${apiResource.version}&kind=${apiResource.kind}&resource=${apiResource.resource}&namespaced=${apiResource.namespaced}`
 						)
 					} satisfies LinkMetadata
 				}),
 			accessorKey: 'Name'
+		},
+		{
+			id: 'Namespace',
+			header: ({ column }: { column: Column<Record<EventAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, { column, dataSchemas }),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<EventAttribute, JsonValue>>;
+				row: Row<Record<EventAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row,
+					column,
+					uiSchemas,
+					metadata: {
+						hyperlink: resolve(
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original['Namespace']}?group=&version=v1&kind=Namespace&resource=namespaces&namespaced=false`
+						)
+					} satisfies LinkMetadata
+				}),
+			accessorKey: 'Namespace'
 		},
 		simpleColumn('Type'),
 		simpleColumn('Reason'),

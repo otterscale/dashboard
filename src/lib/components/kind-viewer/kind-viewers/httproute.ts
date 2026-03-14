@@ -17,12 +17,12 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 // kubectl get httproute -o wide
 // NAME   HOSTNAMES   PARENT   AGE
-type HTTPRouteAttribute = 'Namespace' | 'Name' | 'Hostnames' | 'Parent' | 'Age' | 'raw';
+type HTTPRouteAttribute = 'Name' | 'Namespace' | 'Hostnames' | 'Parent' | 'Age' | 'raw';
 
 function getHTTPRouteDataSchemas(): Record<HTTPRouteAttribute, DataSchemaType> {
 	return {
-		Namespace: 'text',
 		Name: 'text',
+		Namespace: 'text',
 		Hostnames: 'object',
 		Parent: 'object',
 		Age: 'time',
@@ -34,8 +34,8 @@ function getHTTPRouteData(
 	object: GatewayNetworkingK8SIoV1HTTPRoute
 ): Record<HTTPRouteAttribute, JsonValue> {
 	return {
-		Namespace: object?.metadata?.namespace ?? null,
 		Name: object?.metadata?.name ?? null,
+		Namespace: object?.metadata?.namespace ?? null,
 		Hostnames: (object?.spec?.hostnames as JsonValue) ?? null,
 		Parent: (object?.spec?.parentRefs as JsonValue) ?? null,
 		Age: object?.metadata?.creationTimestamp ?? null,
@@ -45,8 +45,8 @@ function getHTTPRouteData(
 
 function getHTTPRouteUISchemas(): Record<HTTPRouteAttribute, UISchemaType> {
 	return {
-		Namespace: 'text',
 		Name: 'link',
+		Namespace: 'link',
 		Hostnames: 'array-of-object',
 		Parent: 'array-of-object',
 		Age: 'time',
@@ -60,27 +60,6 @@ function getHTTPRouteColumnDefinitions(
 	dataSchemas: Record<HTTPRouteAttribute, DataSchemaType>
 ): ColumnDef<Record<HTTPRouteAttribute, JsonValue>>[] {
 	return [
-		{
-			id: 'Namespace',
-			header: ({ column }: { column: Column<Record<HTTPRouteAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<HTTPRouteAttribute, JsonValue>>;
-				row: Row<Record<HTTPRouteAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas
-				}),
-			accessorKey: 'Namespace'
-		},
 		{
 			id: 'Name',
 			header: ({ column }: { column: Column<Record<HTTPRouteAttribute, JsonValue>> }) =>
@@ -101,11 +80,37 @@ function getHTTPRouteColumnDefinitions(
 					uiSchemas: uiSchemas,
 					metadata: {
 						hyperlink: resolve(
-							`/(auth)/${page.params.cluster}/${page.params.namespace}/${row.original[column.id as HTTPRouteAttribute]}?group=${apiResource.group}&version=${apiResource.version}&kind=${apiResource.kind}&resource=${apiResource.resource}&namespaced=${apiResource.namespaced}`
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original[column.id as HTTPRouteAttribute]}?group=${apiResource.group}&version=${apiResource.version}&kind=${apiResource.kind}&resource=${apiResource.resource}&namespaced=${apiResource.namespaced}`
 						)
 					} satisfies LinkMetadata
 				}),
 			accessorKey: 'Name'
+		},
+		{
+			id: 'Namespace',
+			header: ({ column }: { column: Column<Record<HTTPRouteAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<HTTPRouteAttribute, JsonValue>>;
+				row: Row<Record<HTTPRouteAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas,
+					metadata: {
+						hyperlink: resolve(
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original['Namespace']}?group=&version=v1&kind=Namespace&resource=namespaces&namespaced=false`
+						)
+					} satisfies LinkMetadata
+				}),
+			accessorKey: 'Namespace'
 		},
 		{
 			id: 'Hostnames',

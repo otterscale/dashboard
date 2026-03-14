@@ -17,7 +17,7 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 // kubectl get rolebinding -o wide
 // NAME   NAMESPACE   ROLE   AGE   USERS   GROUPS   SERVICEACCOUNTS
-type RoleBindingAttribute = 'Namespace' | 'Name' | 'Role' | 'Age' | 'Subjects' | 'raw';
+type RoleBindingAttribute = 'Name' | 'Namespace' | 'Role' | 'Age' | 'Subjects' | 'raw';
 
 function getRoleBindingDataSchemas(): Record<RoleBindingAttribute, DataSchemaType> {
 	return {
@@ -49,7 +49,7 @@ function getRoleBindingData(
 function getRoleBindingUISchemas(): Record<RoleBindingAttribute, UISchemaType> {
 	return {
 		Name: 'link',
-		Namespace: 'text',
+		Namespace: 'link',
 		Role: 'text',
 		Age: 'time',
 		Subjects: 'array-of-object',
@@ -81,7 +81,6 @@ function getRoleBindingColumnDefinitions(
 	});
 
 	return [
-		simpleColumn('Namespace'),
 		{
 			id: 'Name',
 			header: ({ column }: { column: Column<Record<RoleBindingAttribute, JsonValue>> }) =>
@@ -99,11 +98,34 @@ function getRoleBindingColumnDefinitions(
 					uiSchemas,
 					metadata: {
 						hyperlink: resolve(
-							`/(auth)/${page.params.cluster}/${page.params.namespace}/${row.original[column.id as RoleBindingAttribute]}?group=${apiResource.group}&version=${apiResource.version}&kind=${apiResource.kind}&resource=${apiResource.resource}&namespaced=${apiResource.namespaced}`
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original[column.id as RoleBindingAttribute]}?group=${apiResource.group}&version=${apiResource.version}&kind=${apiResource.kind}&resource=${apiResource.resource}&namespaced=${apiResource.namespaced}`
 						)
 					} satisfies LinkMetadata
 				}),
 			accessorKey: 'Name'
+		},
+		{
+			id: 'Namespace',
+			header: ({ column }: { column: Column<Record<RoleBindingAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, { column, dataSchemas }),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<RoleBindingAttribute, JsonValue>>;
+				row: Row<Record<RoleBindingAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row,
+					column,
+					uiSchemas,
+					metadata: {
+						hyperlink: resolve(
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original['Namespace']}?group=&version=v1&kind=Namespace&resource=namespaces&namespaced=false`
+						)
+					} satisfies LinkMetadata
+				}),
+			accessorKey: 'Namespace'
 		},
 		simpleColumn('Role'),
 		simpleColumn('Age'),

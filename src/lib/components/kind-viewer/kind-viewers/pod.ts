@@ -18,8 +18,8 @@ import { renderComponent } from '$lib/components/ui/data-table';
 // kubectl get pod -o wide
 // NAME   READY   STATUS   RESTARTS   AGE   IP   NODE   NOMINATED NODE   READINESS GATES
 type PodAttribute =
-	| 'Namespace'
 	| 'Name'
+	| 'Namespace'
 	| 'Ready'
 	| 'Status'
 	| 'Restarts'
@@ -32,8 +32,8 @@ type PodAttribute =
 
 function getPodDataSchemas(): Record<PodAttribute, DataSchemaType> {
 	return {
-		Namespace: 'text',
 		Name: 'text',
+		Namespace: 'text',
 		Ready: 'text',
 		Status: 'text',
 		Restarts: 'number',
@@ -54,8 +54,8 @@ function getPodData(object: CoreV1Pod): Record<PodAttribute, JsonValue> {
 	const readinessGatesCount = object?.spec?.readinessGates?.length ?? 0;
 
 	return {
-		Namespace: object?.metadata?.namespace ?? null,
 		Name: object?.metadata?.name ?? null,
+		Namespace: object?.metadata?.namespace ?? null,
 		Ready: `${readyContainers}/${totalContainers}`,
 		Status: object?.status?.phase ?? null,
 		Restarts: totalRestarts,
@@ -70,8 +70,8 @@ function getPodData(object: CoreV1Pod): Record<PodAttribute, JsonValue> {
 
 function getPodUISchemas(): Record<PodAttribute, UISchemaType> {
 	return {
-		Namespace: 'text',
 		Name: 'link',
+		Namespace: 'link',
 		Ready: 'text',
 		Status: 'text',
 		Restarts: 'text',
@@ -90,27 +90,6 @@ function getPodColumnDefinitions(
 	dataSchemas: Record<PodAttribute, DataSchemaType>
 ): ColumnDef<Record<PodAttribute, JsonValue>>[] {
 	return [
-		{
-			id: 'Namespace',
-			header: ({ column }: { column: Column<Record<PodAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<PodAttribute, JsonValue>>;
-				row: Row<Record<PodAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas
-				}),
-			accessorKey: 'Namespace'
-		},
 		{
 			id: 'Name',
 			header: ({ column }: { column: Column<Record<PodAttribute, JsonValue>> }) =>
@@ -131,11 +110,37 @@ function getPodColumnDefinitions(
 					uiSchemas: uiSchemas,
 					metadata: {
 						hyperlink: resolve(
-							`/(auth)/${page.params.cluster}/${page.params.namespace}/${row.original[column.id as PodAttribute]}?group=${apiResource.group}&version=${apiResource.version}&kind=${apiResource.kind}&resource=${apiResource.resource}&namespaced=${apiResource.namespaced}`
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original[column.id as PodAttribute]}?group=${apiResource.group}&version=${apiResource.version}&kind=${apiResource.kind}&resource=${apiResource.resource}&namespaced=${apiResource.namespaced}`
 						)
 					} satisfies LinkMetadata
 				}),
 			accessorKey: 'Name'
+		},
+		{
+			id: 'Namespace',
+			header: ({ column }: { column: Column<Record<PodAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<PodAttribute, JsonValue>>;
+				row: Row<Record<PodAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas,
+					metadata: {
+						hyperlink: resolve(
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original['Namespace']}?group=&version=v1&kind=Namespace&resource=namespaces&namespaced=false`
+						)
+					} satisfies LinkMetadata
+				}),
+			accessorKey: 'Namespace'
 		},
 		{
 			id: 'Ready',

@@ -56,9 +56,10 @@
 			},
 			members: [
 				{
+					role: 'admin',
 					subject: page.data.user?.sub,
-					name: `${page.data.user?.name} (${page.data.user?.email || page.data.user?.username})`,
-					role: 'admin'
+					username: page.data.user?.username,
+					name: `${page.data.user?.name} (${page.data.user?.email || page.data.user?.username})`
 				}
 			]
 		}
@@ -111,12 +112,6 @@
 
 	function transformFormData(data: Record<string, unknown>) {
 		const spec = data.spec as Record<string, any>;
-		const metadata = data.metadata as Record<string, any>;
-
-		// Set namespace to be the same as workspace name
-		if (spec && metadata?.name) {
-			spec.namespace = metadata.name;
-		}
 
 		// Handle Resource Quota Logic: limits align with requests, strict defaults
 		if (spec?.resourceQuota?.hard) {

@@ -23,9 +23,9 @@
 		breadcrumbs.set([
 			{
 				title: page.url.searchParams.get('kind') ?? 'Resource',
-				url: resolve('/(auth)/[cluster]/[namespace]', {
+				url: resolve('/(auth)/[cluster]/[workspace]', {
 					cluster: page.params.cluster!,
-					namespace: page.params.namespace!
+					workspace: page.params.workspace!
 				})
 			}
 		]);
@@ -33,7 +33,7 @@
 
 	const isClusterAdmin = $derived(page.data.isClusterAdmin === true);
 	const cluster = $derived(page.params.cluster ?? '');
-	const namespace = $derived(page.params.namespace ?? '');
+	const namespace = $derived(page.data.namespace ?? '');
 	const group = $derived(page.url.searchParams.get('group') ?? '');
 	const version = $derived(page.url.searchParams.get('version') ?? '');
 	const kind = $derived(page.url.searchParams.get('kind') ?? '');

@@ -10,7 +10,7 @@ RUN npm install -g pnpm
 
 # Copy dependency files first for better caching
 COPY package.json pnpm-lock.yaml ./
-RUN npm install -g pnpm && pnpm install --frozen-lockfile && pnpm store prune
+RUN pnpm install --frozen-lockfile --ignore-scripts && pnpm store prune
 
 # Copy source code
 COPY . .
@@ -33,7 +33,7 @@ RUN npm install -g pnpm
 COPY package.json pnpm-lock.yaml ./
 
 # Install only production dependencies
-RUN pnpm install --production --frozen-lockfile && pnpm store prune
+RUN pnpm install --production --frozen-lockfile --ignore-scripts && pnpm store prune
 
 # Copy built application from builder stage
 COPY --from=builder --chown=nobody:nobody /src/build ./build
