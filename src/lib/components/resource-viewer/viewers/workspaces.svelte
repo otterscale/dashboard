@@ -205,7 +205,7 @@
 										<Item.Title class={typographyVariants({ variant: 'h6' })}>
 											{condition?.reason}
 										</Item.Title>
-										<Item.Description class="max-w-3xs">{condition?.message}</Item.Description>
+										<Item.Description>{condition?.message}</Item.Description>
 									</Item.Content>
 								</Item.Root>
 							{/each}
