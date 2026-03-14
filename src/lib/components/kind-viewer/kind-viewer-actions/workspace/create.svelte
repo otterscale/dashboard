@@ -55,9 +55,10 @@
 			},
 			members: [
 				{
+					role: 'admin',
 					subject: page.data.user?.sub,
-					name: `${page.data.user?.name} (${page.data.user?.email || page.data.user?.username})`,
-					role: 'admin'
+					username: page.data.user?.username,
+					name: `${page.data.user?.name} (${page.data.user?.email || page.data.user?.username})`
 				}
 			]
 		}
