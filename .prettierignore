@@ -13,3 +13,6 @@ bun.lockb
 
 # GitHub
 .github
+
+# Claude
+.claude
