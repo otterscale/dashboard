@@ -460,7 +460,9 @@
 										</Badge>
 									</Item.Title>
 									<Item.Description>
-										{member.subject}
+										<span>{member.username}</span>
+										<br />
+										<span> {member.subject}</span>
 									</Item.Description>
 								</Item.Content>
 							</Item.Root>
