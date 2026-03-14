@@ -18,8 +18,8 @@ import { renderComponent } from '$lib/components/ui/data-table';
 // kubectl get statefulset -o wide
 // NAME   READY   AGE   CONTAINERS   IMAGES
 type StatefulSetAttribute =
-	| 'Namespace'
 	| 'Name'
+	| 'Namespace'
 	| 'Ready'
 	| 'Age'
 	| 'Containers'
@@ -28,8 +28,8 @@ type StatefulSetAttribute =
 
 function getStatefulSetDataSchemas(): Record<StatefulSetAttribute, DataSchemaType> {
 	return {
-		Namespace: 'text',
 		Name: 'text',
+		Namespace: 'text',
 		Ready: 'text',
 		Age: 'time',
 		Containers: 'number',
@@ -43,8 +43,8 @@ function getStatefulSetData(object: AppsV1StatefulSet): Record<StatefulSetAttrib
 	const desiredReplicas = object?.spec?.replicas ?? 0;
 
 	return {
-		Namespace: object?.metadata?.namespace ?? null,
 		Name: object?.metadata?.name ?? null,
+		Namespace: object?.metadata?.namespace ?? null,
 		Ready: `${readyReplicas}/${desiredReplicas}`,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		Containers: object?.spec?.template?.spec?.containers?.length ?? null,
@@ -57,8 +57,8 @@ function getStatefulSetData(object: AppsV1StatefulSet): Record<StatefulSetAttrib
 
 function getStatefulSetUISchemas(): Record<StatefulSetAttribute, UISchemaType> {
 	return {
-		Namespace: 'text',
 		Name: 'link',
+		Namespace: 'link',
 		Ready: 'text',
 		Age: 'time',
 		Containers: 'array-of-object',
@@ -73,27 +73,6 @@ function getStatefulSetColumnDefinitions(
 	dataSchemas: Record<StatefulSetAttribute, DataSchemaType>
 ): ColumnDef<Record<StatefulSetAttribute, JsonValue>>[] {
 	return [
-		{
-			id: 'Namespace',
-			header: ({ column }: { column: Column<Record<StatefulSetAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<StatefulSetAttribute, JsonValue>>;
-				row: Row<Record<StatefulSetAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas
-				}),
-			accessorKey: 'Namespace'
-		},
 		{
 			id: 'Name',
 			header: ({ column }: { column: Column<Record<StatefulSetAttribute, JsonValue>> }) =>
@@ -119,6 +98,32 @@ function getStatefulSetColumnDefinitions(
 					} satisfies LinkMetadata
 				}),
 			accessorKey: 'Name'
+		},
+		{
+			id: 'Namespace',
+			header: ({ column }: { column: Column<Record<StatefulSetAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<StatefulSetAttribute, JsonValue>>;
+				row: Row<Record<StatefulSetAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas,
+					metadata: {
+						hyperlink: resolve(
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original['Namespace']}?group=&version=v1&kind=Namespace&resource=namespaces&namespaced=false`
+						)
+					} satisfies LinkMetadata
+				}),
+			accessorKey: 'Namespace'
 		},
 		{
 			id: 'Ready',

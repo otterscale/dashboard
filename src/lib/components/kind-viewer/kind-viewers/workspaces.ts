@@ -127,7 +127,7 @@ function getWorkspaceColumnDefinitions(
 					uiSchemas: uiSchemas,
 					metadata: {
 						hyperlink: resolve(
-							`/(auth)/${page.params.cluster}/${page.params.workspace}/${page.params.workspace}?group=&version=v1&kind=Namespace&resource=namespaces&namespaced=false`
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original['Namespace']}?group=&version=v1&kind=Namespace&resource=namespaces&namespaced=false`
 						)
 					} satisfies LinkMetadata
 				}),

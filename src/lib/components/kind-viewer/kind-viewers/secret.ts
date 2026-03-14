@@ -13,12 +13,12 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 // kubectl get secret
 // NAME   TYPE   DATA   AGE
-type SecretAttribute = 'Namespace' | 'Name' | 'Type' | 'Data' | 'Age' | 'raw';
+type SecretAttribute = 'Name' | 'Namespace' | 'Type' | 'Data' | 'Age' | 'raw';
 
 function getSecretDataSchemas(): Record<SecretAttribute, DataSchemaType> {
 	return {
-		Namespace: 'text',
 		Name: 'text',
+		Namespace: 'text',
 		Type: 'text',
 		Data: 'number',
 		Age: 'time',
@@ -30,8 +30,8 @@ function getSecretData(object: CoreV1Secret): Record<SecretAttribute, JsonValue>
 	const dataCount = Object.keys(object?.data ?? {}).length;
 
 	return {
-		Namespace: object?.metadata?.namespace ?? null,
 		Name: object?.metadata?.name ?? null,
+		Namespace: object?.metadata?.namespace ?? null,
 		Type: object?.type ?? null,
 		Data: dataCount,
 		Age: object?.metadata?.creationTimestamp ?? null,
@@ -41,8 +41,8 @@ function getSecretData(object: CoreV1Secret): Record<SecretAttribute, JsonValue>
 
 function getSecretUISchemas(): Record<SecretAttribute, UISchemaType> {
 	return {
-		Namespace: 'text',
 		Name: 'link',
+		Namespace: 'link',
 		Type: 'text',
 		Data: 'number',
 		Age: 'time',
@@ -56,27 +56,6 @@ function getSecretColumnDefinitions(
 	dataSchemas: Record<SecretAttribute, DataSchemaType>
 ): ColumnDef<Record<SecretAttribute, JsonValue>>[] {
 	return [
-		{
-			id: 'Namespace',
-			header: ({ column }: { column: Column<Record<SecretAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<SecretAttribute, JsonValue>>;
-				row: Row<Record<SecretAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas
-				}),
-			accessorKey: 'Namespace'
-		},
 		{
 			id: 'Name',
 			header: ({ column }: { column: Column<Record<SecretAttribute, JsonValue>> }) =>
@@ -102,6 +81,32 @@ function getSecretColumnDefinitions(
 					} satisfies LinkMetadata
 				}),
 			accessorKey: 'Name'
+		},
+		{
+			id: 'Namespace',
+			header: ({ column }: { column: Column<Record<SecretAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<SecretAttribute, JsonValue>>;
+				row: Row<Record<SecretAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas,
+					metadata: {
+						hyperlink: resolve(
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original['Namespace']}?group=&version=v1&kind=Namespace&resource=namespaces&namespaced=false`
+						)
+					} satisfies LinkMetadata
+				}),
+			accessorKey: 'Namespace'
 		},
 		{
 			id: 'Type',

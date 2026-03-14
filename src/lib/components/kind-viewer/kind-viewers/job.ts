@@ -18,8 +18,8 @@ import { renderComponent } from '$lib/components/ui/data-table';
 // kubectl get job -o wide
 // NAME   COMPLETIONS   DURATION   AGE   CONTAINERS   IMAGES   SELECTOR
 type JobAttribute =
-	| 'Namespace'
 	| 'Name'
+	| 'Namespace'
 	| 'Completions'
 	| 'Duration'
 	| 'Age'
@@ -30,8 +30,8 @@ type JobAttribute =
 
 function getJobDataSchemas(): Record<JobAttribute, DataSchemaType> {
 	return {
-		Namespace: 'text',
 		Name: 'text',
+		Namespace: 'text',
 		Completions: 'text',
 		Duration: 'text',
 		Age: 'time',
@@ -62,8 +62,8 @@ function getJobData(object: BatchV1Job): Record<JobAttribute, JsonValue> {
 	const selectorLabels = object?.spec?.selector?.matchLabels ?? {};
 
 	return {
-		Namespace: object?.metadata?.namespace ?? null,
 		Name: object?.metadata?.name ?? null,
+		Namespace: object?.metadata?.namespace ?? null,
 		Completions: `${succeeded}/${completions}`,
 		Duration: calcDuration(object?.status?.startTime, object?.status?.completionTime),
 		Age: object?.metadata?.creationTimestamp ?? null,
@@ -78,8 +78,8 @@ function getJobData(object: BatchV1Job): Record<JobAttribute, JsonValue> {
 
 function getJobUISchemas(): Record<JobAttribute, UISchemaType> {
 	return {
-		Namespace: 'text',
 		Name: 'link',
+		Namespace: 'link',
 		Completions: 'text',
 		Duration: 'text',
 		Age: 'time',
@@ -96,27 +96,6 @@ function getJobColumnDefinitions(
 	dataSchemas: Record<JobAttribute, DataSchemaType>
 ): ColumnDef<Record<JobAttribute, JsonValue>>[] {
 	return [
-		{
-			id: 'Namespace',
-			header: ({ column }: { column: Column<Record<JobAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<JobAttribute, JsonValue>>;
-				row: Row<Record<JobAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas
-				}),
-			accessorKey: 'Namespace'
-		},
 		{
 			id: 'Name',
 			header: ({ column }: { column: Column<Record<JobAttribute, JsonValue>> }) =>
@@ -142,6 +121,32 @@ function getJobColumnDefinitions(
 					} satisfies LinkMetadata
 				}),
 			accessorKey: 'Name'
+		},
+		{
+			id: 'Namespace',
+			header: ({ column }: { column: Column<Record<JobAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<JobAttribute, JsonValue>>;
+				row: Row<Record<JobAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas,
+					metadata: {
+						hyperlink: resolve(
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original['Namespace']}?group=&version=v1&kind=Namespace&resource=namespaces&namespaced=false`
+						)
+					} satisfies LinkMetadata
+				}),
+			accessorKey: 'Namespace'
 		},
 		{
 			id: 'Completions',

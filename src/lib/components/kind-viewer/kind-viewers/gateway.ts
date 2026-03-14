@@ -17,12 +17,12 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 // kubectl get gateway -o wide
 // NAME   CLASS   ADDRESS   PROGRAMMED   AGE
-type GatewayAttribute = 'Namespace' | 'Name' | 'Class' | 'Listeners' | 'Addresses' | 'Age' | 'raw';
+type GatewayAttribute = 'Name' | 'Namespace' | 'Class' | 'Listeners' | 'Addresses' | 'Age' | 'raw';
 
 function getGatewayDataSchemas(): Record<GatewayAttribute, DataSchemaType> {
 	return {
-		Namespace: 'text',
 		Name: 'text',
+		Namespace: 'text',
 		Class: 'text',
 		Listeners: 'number',
 		Addresses: 'object',
@@ -39,8 +39,8 @@ function getGatewayData(
 	const addresses = statusAddresses.length > 0 ? statusAddresses : specAddresses;
 
 	return {
-		Namespace: object?.metadata?.namespace ?? null,
 		Name: object?.metadata?.name ?? null,
+		Namespace: object?.metadata?.namespace ?? null,
 		Class: object?.spec?.gatewayClassName ?? null,
 		Listeners: object?.spec?.listeners?.length ?? 0,
 		Addresses: (addresses as JsonValue) ?? null,
@@ -51,8 +51,8 @@ function getGatewayData(
 
 function getGatewayUISchemas(): Record<GatewayAttribute, UISchemaType> {
 	return {
-		Namespace: 'text',
 		Name: 'link',
+		Namespace: 'link',
 		Class: 'text',
 		Listeners: 'number',
 		Addresses: 'array-of-object',
@@ -67,27 +67,6 @@ function getGatewayColumnDefinitions(
 	dataSchemas: Record<GatewayAttribute, DataSchemaType>
 ): ColumnDef<Record<GatewayAttribute, JsonValue>>[] {
 	return [
-		{
-			id: 'Namespace',
-			header: ({ column }: { column: Column<Record<GatewayAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<GatewayAttribute, JsonValue>>;
-				row: Row<Record<GatewayAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas
-				}),
-			accessorKey: 'Namespace'
-		},
 		{
 			id: 'Name',
 			header: ({ column }: { column: Column<Record<GatewayAttribute, JsonValue>> }) =>
@@ -113,6 +92,32 @@ function getGatewayColumnDefinitions(
 					} satisfies LinkMetadata
 				}),
 			accessorKey: 'Name'
+		},
+		{
+			id: 'Namespace',
+			header: ({ column }: { column: Column<Record<GatewayAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<GatewayAttribute, JsonValue>>;
+				row: Row<Record<GatewayAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas,
+					metadata: {
+						hyperlink: resolve(
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original['Namespace']}?group=&version=v1&kind=Namespace&resource=namespaces&namespaced=false`
+						)
+					} satisfies LinkMetadata
+				}),
+			accessorKey: 'Namespace'
 		},
 		{
 			id: 'Class',

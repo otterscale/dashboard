@@ -17,8 +17,8 @@ import {
 import { renderComponent } from '$lib/components/ui/data-table';
 
 type ResourceQuotaAttribute =
-	| 'Namespace'
 	| 'Name'
+	| 'Namespace'
 	| 'CPU Limit'
 	| 'Memory Limit'
 	| 'CPU Request'
@@ -77,7 +77,7 @@ function getResourceQuotaData(
 function getResourceQuotaUISchemas(): Record<ResourceQuotaAttribute, UISchemaType> {
 	return {
 		Name: 'link',
-		Namespace: 'text',
+		Namespace: 'link',
 		'CPU Limit': 'ratio',
 		'Memory Limit': 'ratio',
 		'CPU Request': 'ratio',
@@ -93,27 +93,6 @@ function getResourceQuotaColumnDefinitions(
 	dataSchemas: Record<ResourceQuotaAttribute, DataSchemaType>
 ): ColumnDef<Record<ResourceQuotaAttribute, JsonValue>>[] {
 	return [
-		{
-			id: 'Namespace',
-			header: ({ column }: { column: Column<Record<ResourceQuotaAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<ResourceQuotaAttribute, JsonValue>>;
-				row: Row<Record<ResourceQuotaAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas
-				}),
-			accessorKey: 'Namespace'
-		},
 		{
 			id: 'Name',
 			header: ({ column }: { column: Column<Record<ResourceQuotaAttribute, JsonValue>> }) =>
@@ -139,6 +118,32 @@ function getResourceQuotaColumnDefinitions(
 					} satisfies LinkMetadata
 				}),
 			accessorKey: 'Name'
+		},
+		{
+			id: 'Namespace',
+			header: ({ column }: { column: Column<Record<ResourceQuotaAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<ResourceQuotaAttribute, JsonValue>>;
+				row: Row<Record<ResourceQuotaAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas,
+					metadata: {
+						hyperlink: resolve(
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original['Namespace']}?group=&version=v1&kind=Namespace&resource=namespaces&namespaced=false`
+						)
+					} satisfies LinkMetadata
+				}),
+			accessorKey: 'Namespace'
 		},
 		{
 			id: 'CPU Limit',

@@ -17,12 +17,12 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 // kubectl get configmap
 // NAME   DATA   AGE
-type ConfigMapAttribute = 'Namespace' | 'Name' | 'Data' | 'Age' | 'raw';
+type ConfigMapAttribute = 'Name' | 'Namespace' | 'Data' | 'Age' | 'raw';
 
 function getConfigMapDataSchemas(): Record<ConfigMapAttribute, DataSchemaType> {
 	return {
-		Namespace: 'text',
 		Name: 'text',
+		Namespace: 'text',
 		Data: 'number',
 		Age: 'time',
 		raw: 'object'
@@ -34,8 +34,8 @@ function getConfigMapData(object: CoreV1ConfigMap): Record<ConfigMapAttribute, J
 		Object.keys(object?.data ?? {}).length + Object.keys(object?.binaryData ?? {}).length;
 
 	return {
-		Namespace: object?.metadata?.namespace ?? null,
 		Name: object?.metadata?.name ?? null,
+		Namespace: object?.metadata?.namespace ?? null,
 		Data: dataCount,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
@@ -44,8 +44,8 @@ function getConfigMapData(object: CoreV1ConfigMap): Record<ConfigMapAttribute, J
 
 function getConfigMapUISchemas(): Record<ConfigMapAttribute, UISchemaType> {
 	return {
-		Namespace: 'text',
 		Name: 'link',
+		Namespace: 'link',
 		Data: 'array-of-object',
 		Age: 'time',
 		raw: 'object'
@@ -58,27 +58,6 @@ function getConfigMapColumnDefinitions(
 	dataSchemas: Record<ConfigMapAttribute, DataSchemaType>
 ): ColumnDef<Record<ConfigMapAttribute, JsonValue>>[] {
 	return [
-		{
-			id: 'Namespace',
-			header: ({ column }: { column: Column<Record<ConfigMapAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<ConfigMapAttribute, JsonValue>>;
-				row: Row<Record<ConfigMapAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas
-				}),
-			accessorKey: 'Namespace'
-		},
 		{
 			id: 'Name',
 			header: ({ column }: { column: Column<Record<ConfigMapAttribute, JsonValue>> }) =>
@@ -104,6 +83,32 @@ function getConfigMapColumnDefinitions(
 					} satisfies LinkMetadata
 				}),
 			accessorKey: 'Name'
+		},
+		{
+			id: 'Namespace',
+			header: ({ column }: { column: Column<Record<ConfigMapAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<ConfigMapAttribute, JsonValue>>;
+				row: Row<Record<ConfigMapAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas,
+					metadata: {
+						hyperlink: resolve(
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original['Namespace']}?group=&version=v1&kind=Namespace&resource=namespaces&namespaced=false`
+						)
+					} satisfies LinkMetadata
+				}),
+			accessorKey: 'Namespace'
 		},
 		{
 			id: 'Data',

@@ -16,8 +16,8 @@ import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-
 import { renderComponent } from '$lib/components/ui/data-table';
 
 type DeploymentAttribute =
-	| 'Namespace'
 	| 'Name'
+	| 'Namespace'
 	| 'Ready'
 	| 'Up-To-Date'
 	| 'Available'
@@ -29,8 +29,8 @@ type DeploymentAttribute =
 
 function getDeploymentDataSchemas(): Record<DeploymentAttribute, DataSchemaType> {
 	return {
-		Namespace: 'text',
 		Name: 'text',
+		Namespace: 'text',
 		Ready: 'text',
 		'Up-To-Date': 'number',
 		Available: 'number',
@@ -50,8 +50,8 @@ function getDeploymentData(object: AppsV1Deployment): Record<DeploymentAttribute
 	const selectorCount = Object.keys(selectorLabels).length;
 
 	return {
-		Namespace: object?.metadata?.namespace ?? null,
 		Name: object?.metadata?.name ?? null,
+		Namespace: object?.metadata?.namespace ?? null,
 		Ready: `${readyReplicas}/${desiredReplicas}`,
 		'Up-To-Date': object?.status?.updatedReplicas ?? null,
 		Available: object?.status?.availableReplicas ?? null,
@@ -67,8 +67,8 @@ function getDeploymentData(object: AppsV1Deployment): Record<DeploymentAttribute
 
 function getDeploymentUISchemas(): Record<DeploymentAttribute, UISchemaType> {
 	return {
-		Namespace: 'text',
 		Name: 'link',
+		Namespace: 'link',
 		Ready: 'text',
 		'Up-To-Date': 'text',
 		Available: 'text',
@@ -86,27 +86,6 @@ function getDeploymentColumnDefinitions(
 	dataSchemas: Record<DeploymentAttribute, DataSchemaType>
 ): ColumnDef<Record<DeploymentAttribute, JsonValue>>[] {
 	return [
-		{
-			id: 'Namespace',
-			header: ({ column }: { column: Column<Record<DeploymentAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<DeploymentAttribute, JsonValue>>;
-				row: Row<Record<DeploymentAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas
-				}),
-			accessorKey: 'Namespace'
-		},
 		{
 			id: 'Name',
 			header: ({ column }: { column: Column<Record<DeploymentAttribute, JsonValue>> }) =>
@@ -132,6 +111,32 @@ function getDeploymentColumnDefinitions(
 					} satisfies LinkMetadata
 				}),
 			accessorKey: 'Name'
+		},
+		{
+			id: 'Namespace',
+			header: ({ column }: { column: Column<Record<DeploymentAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<DeploymentAttribute, JsonValue>>;
+				row: Row<Record<DeploymentAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas,
+					metadata: {
+						hyperlink: resolve(
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original['Namespace']}?group=&version=v1&kind=Namespace&resource=namespaces&namespaced=false`
+						)
+					} satisfies LinkMetadata
+				}),
+			accessorKey: 'Namespace'
 		},
 		{
 			id: 'Ready',

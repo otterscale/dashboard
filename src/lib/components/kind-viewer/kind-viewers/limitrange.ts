@@ -17,7 +17,7 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 // kubectl get limitrange
 // NAME   NAMESPACE   CREATED AT
-type LimitRangeAttribute = 'Namespace' | 'Name' | 'Limits' | 'Age' | 'raw';
+type LimitRangeAttribute = 'Name' | 'Namespace' | 'Limits' | 'Age' | 'raw';
 
 function getLimitRangeDataSchemas(): Record<LimitRangeAttribute, DataSchemaType> {
 	return {
@@ -42,7 +42,7 @@ function getLimitRangeData(object: CoreV1LimitRange): Record<LimitRangeAttribute
 function getLimitRangeUISchemas(): Record<LimitRangeAttribute, UISchemaType> {
 	return {
 		Name: 'link',
-		Namespace: 'text',
+		Namespace: 'link',
 		Limits: 'array-of-object',
 		Age: 'time',
 		raw: 'object'
@@ -73,7 +73,6 @@ function getLimitRangeColumnDefinitions(
 	});
 
 	return [
-		simpleColumn('Namespace'),
 		{
 			id: 'Name',
 			header: ({ column }: { column: Column<Record<LimitRangeAttribute, JsonValue>> }) =>
@@ -96,6 +95,29 @@ function getLimitRangeColumnDefinitions(
 					} satisfies LinkMetadata
 				}),
 			accessorKey: 'Name'
+		},
+		{
+			id: 'Namespace',
+			header: ({ column }: { column: Column<Record<LimitRangeAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, { column, dataSchemas }),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<LimitRangeAttribute, JsonValue>>;
+				row: Row<Record<LimitRangeAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row,
+					column,
+					uiSchemas,
+					metadata: {
+						hyperlink: resolve(
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original['Namespace']}?group=&version=v1&kind=Namespace&resource=namespaces&namespaced=false`
+						)
+					} satisfies LinkMetadata
+				}),
+			accessorKey: 'Namespace'
 		},
 		{
 			id: 'Limits',

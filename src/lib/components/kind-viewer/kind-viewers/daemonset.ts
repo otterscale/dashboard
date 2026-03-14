@@ -18,8 +18,8 @@ import { renderComponent } from '$lib/components/ui/data-table';
 // kubectl get daemonset -o wide
 // NAME   DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE   CONTAINERS   IMAGES   SELECTOR
 type DaemonSetAttribute =
-	| 'Namespace'
 	| 'Name'
+	| 'Namespace'
 	| 'Desired'
 	| 'Current'
 	| 'Ready'
@@ -34,8 +34,8 @@ type DaemonSetAttribute =
 
 function getDaemonSetDataSchemas(): Record<DaemonSetAttribute, DataSchemaType> {
 	return {
-		Namespace: 'text',
 		Name: 'text',
+		Namespace: 'text',
 		Desired: 'number',
 		Current: 'number',
 		Ready: 'number',
@@ -55,8 +55,8 @@ function getDaemonSetData(object: AppsV1DaemonSet): Record<DaemonSetAttribute, J
 	const selectorLabels = object?.spec?.selector?.matchLabels ?? {};
 
 	return {
-		Namespace: object?.metadata?.namespace ?? null,
 		Name: object?.metadata?.name ?? null,
+		Namespace: object?.metadata?.namespace ?? null,
 		Desired: object?.status?.desiredNumberScheduled ?? null,
 		Current: object?.status?.currentNumberScheduled ?? null,
 		Ready: object?.status?.numberReady ?? null,
@@ -75,8 +75,8 @@ function getDaemonSetData(object: AppsV1DaemonSet): Record<DaemonSetAttribute, J
 
 function getDaemonSetUISchemas(): Record<DaemonSetAttribute, UISchemaType> {
 	return {
-		Namespace: 'text',
 		Name: 'link',
+		Namespace: 'link',
 		Desired: 'text',
 		Current: 'text',
 		Ready: 'text',
@@ -97,27 +97,6 @@ function getDaemonSetColumnDefinitions(
 	dataSchemas: Record<DaemonSetAttribute, DataSchemaType>
 ): ColumnDef<Record<DaemonSetAttribute, JsonValue>>[] {
 	return [
-		{
-			id: 'Namespace',
-			header: ({ column }: { column: Column<Record<DaemonSetAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<DaemonSetAttribute, JsonValue>>;
-				row: Row<Record<DaemonSetAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas
-				}),
-			accessorKey: 'Namespace'
-		},
 		{
 			id: 'Name',
 			header: ({ column }: { column: Column<Record<DaemonSetAttribute, JsonValue>> }) =>
@@ -143,6 +122,32 @@ function getDaemonSetColumnDefinitions(
 					} satisfies LinkMetadata
 				}),
 			accessorKey: 'Name'
+		},
+		{
+			id: 'Namespace',
+			header: ({ column }: { column: Column<Record<DaemonSetAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<DaemonSetAttribute, JsonValue>>;
+				row: Row<Record<DaemonSetAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas,
+					metadata: {
+						hyperlink: resolve(
+							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original['Namespace']}?group=&version=v1&kind=Namespace&resource=namespaces&namespaced=false`
+						)
+					} satisfies LinkMetadata
+				}),
+			accessorKey: 'Namespace'
 		},
 		{
 			id: 'Desired',
