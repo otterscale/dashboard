@@ -25,8 +25,9 @@ interface KeycloakIdTokenClaims {
 function validateRequest(event: RequestEvent): { code: string; codeVerifier: string } | Response {
 	const error = event.url.searchParams.get('error_description');
 	if (error) {
-		return new Response(error, {
-			status: 400
+		return new Response(`${error} <a href="${resolve('/')}">Back to home</a>`, {
+			status: 400,
+			headers: { 'Content-Type': 'text/html' }
 		});
 	}
 
@@ -36,14 +37,16 @@ function validateRequest(event: RequestEvent): { code: string; codeVerifier: str
 	const codeVerifier = event.cookies.get('OS_CODE_VERIFIER') ?? null;
 
 	if (!code || !state || !storedState || !codeVerifier) {
-		return new Response('Please restart the process.', {
-			status: 400
+		return new Response(`Missing required parameters. <a href="${resolve('/')}">Back to home</a>`, {
+			status: 400,
+			headers: { 'Content-Type': 'text/html' }
 		});
 	}
 
 	if (state !== storedState) {
-		return new Response('Please restart the process.', {
-			status: 400
+		return new Response(`Invalid state parameter. <a href="${resolve('/')}">Back to home</a>`, {
+			status: 400,
+			headers: { 'Content-Type': 'text/html' }
 		});
 	}
 
@@ -86,8 +89,9 @@ export async function GET(event: RequestEvent): Promise<Response> {
 	try {
 		tokens = await keycloak.validateAuthorizationCode(code, codeVerifier);
 	} catch {
-		return new Response('Invalid authorization code.', {
-			status: 400
+		return new Response(`Invalid authorization code. <a href="${resolve('/')}">Back to home</a>`, {
+			status: 400,
+			headers: { 'Content-Type': 'text/html' }
 		});
 	}
 

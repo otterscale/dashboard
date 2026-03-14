@@ -7,7 +7,6 @@ import { isSecure } from '$lib/server/session';
 export async function GET(event: RequestEvent): Promise<Response> {
 	const state = generateState();
 	const codeVerifier = generateCodeVerifier();
-	const url = keycloak.createAuthorizationURL(state, codeVerifier, ['openid', 'profile', 'email']);
 
 	event.cookies.set('OS_STATE', state, {
 		httpOnly: true,
@@ -24,6 +23,8 @@ export async function GET(event: RequestEvent): Promise<Response> {
 		sameSite: 'lax' as const,
 		secure: isSecure()
 	});
+
+	const url = keycloak.createAuthorizationURL(state, codeVerifier, ['openid', 'profile', 'email']);
 
 	return new Response(null, {
 		status: 307,
