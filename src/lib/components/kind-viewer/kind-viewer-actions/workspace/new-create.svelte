@@ -58,7 +58,7 @@
 		apiVersion: group ? `${group}/${version}` : version,
 		kind,
 		metadata: { name: {} },
-		spec: { namespace: {}, members: {}, resourceQuota: {}, networkIsolation: {} }
+		spec: { members: {}, resourceQuota: {}, networkIsolation: {} }
 	});
 
 	// TODO: Refactor into StepsManager.
@@ -317,9 +317,6 @@
 						return members;
 					}}
 					handleSubmit={{
-						prehook: () => {
-							lodash.set(values, 'spec.namespace', lodash.get(values, 'metadata.name'));
-						},
 						posthook: () => {
 							handleNext();
 						}

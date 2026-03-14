@@ -452,8 +452,6 @@
 					<Button
 						class="mt-auto w-full"
 						onclick={() => {
-							lodash.set(values, 'spec.namespace', lodash.get(object, 'spec.namespace'));
-
 							if (isSubmitting) return;
 
 							isSubmitting = true;
