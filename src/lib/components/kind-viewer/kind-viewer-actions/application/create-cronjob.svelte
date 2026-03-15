@@ -1,18 +1,18 @@
 <script lang="ts">
-	import { mode as themeMode } from 'mode-watcher';
-	import Monaco from 'svelte-monaco';
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { ClockIcon } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
+	import { load } from 'js-yaml';
 	import lodash from 'lodash';
+	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
+	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
-	import { parse, stringify } from 'yaml';
+	import { stringify } from 'yaml';
 
-	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
@@ -20,7 +20,6 @@
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
-	import { load } from 'js-yaml';
 
 	let {
 		cluster,
@@ -44,13 +43,6 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-
-	// Validation
-	const jsonSchemaValidator = new Ajv({
-		allErrors: true,
-		strict: false
-	});
-	const validate = jsonSchemaValidator.compile(jsonSchema);
 
 	// Timezone List
 	function getTimezones(): string[] {
@@ -116,11 +108,10 @@
 			cronJob: {}
 		}
 	});
+	let value = $derived(stringify(values));
 
 	let cronjobValues: any = $state({});
 	let jobValues: any = $state({});
-
-	let value = $derived(stringify(values));
 
 	// Steps Manager
 	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
@@ -171,7 +162,6 @@
 		</Item.Root>
 		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
 			<Tabs.Content value={steps[0]}>
-				<!-- Step 1: Metadata -->
 				<Form
 					schema={{
 						...(lodash.omit(lodash.get(jsonSchema, 'properties.metadata'), 'properties') as any),
@@ -322,7 +312,6 @@
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[2]}>
-				<!-- Step 3: Containers -->
 				<Form
 					schema={{
 						...lodash.omit(
@@ -540,9 +529,7 @@
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[3]}>
-				<!-- Step 5: Review -->
 				<div class="flex h-full flex-col gap-3">
-					<!-- <Code.Root lang="yaml" class="w-full" hideLines code={stringify(values, null, 2)} /> -->
 					<Monaco
 						options={{
 							language: 'yaml',
@@ -562,6 +549,12 @@
 
 							isSubmitting = true;
 
+							const jsonSchemaValidator = new Ajv({
+								allErrors: true,
+								strict: false
+							});
+							const validate = jsonSchemaValidator.compile(jsonSchema);
+
 							const isValid = validate(load(value));
 
 							if (!isValid) {
@@ -571,7 +564,7 @@
 								return;
 							}
 
-							const name = lodash.get(values, 'metadata.name');
+							const name = lodash.get(load(value), 'metadata.name');
 
 							toast.promise(
 								async () => {

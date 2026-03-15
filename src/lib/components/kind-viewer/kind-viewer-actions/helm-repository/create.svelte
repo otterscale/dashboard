@@ -5,12 +5,14 @@
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
+	import { load } from 'js-yaml';
 	import lodash from 'lodash';
+	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
+	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
-	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -39,13 +41,6 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	// Validation
-	const jsonSchemaValidator = new Ajv({
-		allErrors: true,
-		strict: false
-	});
-	const validate = jsonSchemaValidator.compile(jsonSchema);
-
 	// Container for Data
 	let values: any = $state({
 		apiVersion: `${group}/${version}`,
@@ -53,6 +48,7 @@
 		metadata: {},
 		spec: {}
 	});
+	let value = $derived(stringify(values));
 
 	// Steps Manager
 	const steps = Array.from({ length: 3 }, (_, index) => String(index + 1));
@@ -74,29 +70,6 @@
 	let isSubmitting = $state(false);
 </script>
 
-<pre>{JSON.stringify(
-		{
-			name: {
-				...lodash.get(jsonSchema, 'properties.metadata.properties.name'),
-				title: 'Name'
-			},
-			namespace: {
-				...lodash.get(jsonSchema, 'properties.metadata.properties.namespace'),
-				title: 'Namespace'
-			},
-			labels: {
-				...lodash.get(jsonSchema, 'properties.metadata.properties.labels'),
-				properties: {
-					'tenant.otterscale.io/from-harbor': {
-						type: 'boolean',
-						title: 'From Harbor'
-					}
-				}
-			}
-		},
-		null,
-		2
-	)}</pre>
 <AlertDialog.Root
 	bind:open
 	onOpenChangeComplete={() => {
@@ -159,14 +132,21 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						name: '',
-						namespace: '',
+						name: null,
+						namespace: namespace,
 						labels: {
 							'tenant.otterscale.io/from-harbor': null
 						}
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
+							lodash.set(
+								values,
+								['metadata', 'labels', 'tenant.otterscale.io/from-harbor'],
+								String(
+									lodash.get(values, ['metadata', 'labels', 'tenant.otterscale.io/from-harbor'])
+								)
+							);
 							handleNext();
 						}
 					}}
@@ -268,7 +248,19 @@
 
 			<Tabs.Content value={steps[2]}>
 				<div class="flex h-full flex-col gap-3">
-					<Code.Root lang="yaml" class="w-full" hideLines code={stringify(values, null, 2)} />
+					<!-- <Code.Root lang="yaml" class="w-full" hideLines code={stringify(values, null, 2)} /> -->
+					<Monaco
+						options={{
+							language: 'yaml',
+							padding: { top: 24 },
+							automaticLayout: true,
+							folding: true,
+							foldingStrategy: 'indentation',
+							showFoldingControls: 'always'
+						}}
+						bind:value
+						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
+					/>
 					<Button
 						class="mt-auto w-full"
 						onclick={() => {
@@ -276,17 +268,23 @@
 
 							isSubmitting = true;
 
-							const isValid = validate(values);
+							const jsonSchemaValidator = new Ajv({
+								allErrors: true,
+								strict: false
+							});
+							const validate = jsonSchemaValidator.compile(jsonSchema);
+
+							const isValid = validate(load(value));
 
 							if (!isValid) {
 								throw Error(`Validation errors: ${JSON.stringify(validate.errors)}`);
 							}
 
-							const name = lodash.get(values, 'metadata.name');
+							const name = lodash.get(load(value), 'metadata.name');
 
 							toast.promise(
 								async () => {
-									const manifest = new TextEncoder().encode(JSON.stringify(values));
+									const manifest = new TextEncoder().encode(value);
 
 									await resourceClient.create({
 										cluster,

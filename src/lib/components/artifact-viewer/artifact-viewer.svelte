@@ -6,6 +6,7 @@
 	import type { ColumnDef } from '@tanstack/table-core';
 	import lodash from 'lodash';
 	import { getContext, onMount } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 
 	import { DynamicTable } from '$lib/components/dynamic-table';
@@ -57,7 +58,7 @@
 		return project;
 	}
 
-	const repositoryToAuthorization = new Map<string, string>();
+	const repositoryToAuthorization = new SvelteMap<string, string>();
 	async function fetchHarborAuthorizationHeader(secretName: string): Promise<string> {
 		if (repositoryToAuthorization.has(secretName)) {
 			return repositoryToAuthorization.get(secretName)!;
@@ -130,14 +131,17 @@
 				encodeURIComponent('media_type=application/vnd.cncf.helm.config.v1+json')
 			);
 			const artifactsUrl = `${harborBaseUrl}/api/v2.0/projects/${encodedProject}/artifacts?q=${mediaTypeQuery}&latest_in_repository=true`;
-
-			const headers: Record<string, string> = {
-				Accept: 'application/json'
-			};
-			if (authorizationHeader) {
-				headers['Authorization'] = authorizationHeader;
-			}
-			const response = await fetch(artifactsUrl, { headers });
+			console.log(artifactsUrl);
+			const response = await fetch('/rest/harbor/proxy', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					url: artifactsUrl,
+					authorization: authorizationHeader
+				})
+			});
 			if (!response.ok) {
 				throw new Error(`Harbor API error: ${response.status} ${response.statusText}`);
 			}
@@ -230,7 +234,7 @@
 					<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
 						{#each table.getRowModel().rows as row (row.id)}
 							{@const latestChartArtifact = row.original.raw as unknown as ArtifactType}
-							{@const harborBaseUrl = row.original.helmRepository as string}
+							{@const harborBaseUrl = getHarborBaseUrl(row.original.helmRepository)}
 							{@const authorizationHeader = repositoryToAuthorization.get(
 								lodash.get(row.original.helmRepository, 'spec.secretRef.name') as string
 							)!}

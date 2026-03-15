@@ -109,14 +109,16 @@
 			const repositoryPath = encodeURIComponentWithSlashEscape(repository);
 			const artifactsUrl = `${harborBaseUrl}/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts?with_label=true`;
 
-			const headers: Record<string, string> = {
-				Accept: 'application/json'
-			};
-			if (authorizationHeader) {
-				headers['Authorization'] = authorizationHeader;
-			}
-
-			const response = await fetch(artifactsUrl, { headers });
+			const response = await fetch('/rest/harbor/proxy', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					url: artifactsUrl,
+					authorization: authorizationHeader
+				})
+			});
 			if (!response.ok) {
 				console.error('Failed to fetch repository artifacts:', response.statusText);
 				return;
@@ -176,14 +178,16 @@
 
 		const additionUrl = `${harborBaseUrl}/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${referencePath}/additions/${additionPath}`;
 
-		const headers: Record<string, string> = {
-			Accept: 'application/json'
-		};
-		if (authorizationHeader) {
-			headers['Authorization'] = authorizationHeader;
-		}
-
-		const response = await fetch(additionUrl, { headers });
+		const response = await fetch('/rest/harbor/proxy', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({
+				url: additionUrl,
+				authorization: authorizationHeader
+			})
+		});
 		if (!response.ok) {
 			console.error('Failed to fetch Harbor addition:', response.statusText);
 			throw new Error('Failed to fetch Harbor addition');

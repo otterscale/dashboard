@@ -1,16 +1,18 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { LayoutGridIcon, PlusIcon } from '@lucide/svelte';
+	import { LayoutGridIcon } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
+	import { load } from 'js-yaml';
 	import lodash from 'lodash';
+	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
+	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
-	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -41,13 +43,6 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	// Validation
-	const jsonSchemaValidator = new Ajv({
-		allErrors: true,
-		strict: false
-	});
-	const validate = jsonSchemaValidator.compile(jsonSchema);
-
 	// Container for Data
 	let values: any = $state({
 		apiVersion: `${group}/${version}`,
@@ -58,17 +53,18 @@
 			deploymentConfig: {
 				deployment: {
 					replicas: {},
-					selector: { matchLabels: { app: '' } },
 					template: { spec: { containers: {} } }
 				},
 				service: {},
-				persistentVolumeClaim: { resources: { requests: {} } }
+				persistentVolumeClaim: { resources: { requests: {} } },
+				mountPath: {}
 			}
 		}
 	});
+	let value = $derived(stringify(values));
 
 	// Steps Manager
-	const steps = Array.from({ length: 6 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 7 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -139,8 +135,8 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						name: '',
-						namespace: ''
+						name: null,
+						namespace: namespace
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -424,8 +420,8 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						ports: [],
-						type: 'ClusterIP'
+						type: 'ClusterIP',
+						ports: []
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -460,16 +456,6 @@
 							),
 							'additionalProperties'
 						),
-						// properties: {
-						// 	...lodash.omit(
-						// 		lodash.get(
-						// 			jsonSchema,
-						// 			'properties.spec.properties.deploymentConfig.properties.persistentVolumeClaim.properties.resources.properties.requests.additionalProperties'
-						// 		),
-						// 		'anyOf'
-						// 	),
-						// 	type: 'string'
-						// },
 						additionalProperties: {
 							...lodash.omit(
 								lodash.get(
@@ -540,8 +526,58 @@
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[5]}>
+				<Form
+					schema={{
+						title: 'Mount Path',
+						...lodash.get(
+							jsonSchema,
+							'properties.spec.properties.deploymentConfig.properties.mountPath'
+						)
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={{}}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					bind:values={values['spec']['deploymentConfig']['mountPath']}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+
+			<Tabs.Content value={steps[6]}>
 				<div class="flex h-full flex-col gap-3">
-					<Code.Root lang="yaml" class="w-full" hideLines code={stringify(values, null, 2)} />
+					<Monaco
+						options={{
+							language: 'yaml',
+							padding: { top: 24 },
+							automaticLayout: true,
+							folding: true,
+							foldingStrategy: 'indentation',
+							showFoldingControls: 'always'
+						}}
+						bind:value
+						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
+					/>
 					<Button
 						class="mt-auto w-full"
 						onclick={() => {
@@ -549,17 +585,23 @@
 
 							isSubmitting = true;
 
-							const isValid = validate(values);
+							const jsonSchemaValidator = new Ajv({
+								allErrors: true,
+								strict: false
+							});
+							const validate = jsonSchemaValidator.compile(jsonSchema);
+
+							const isValid = validate(load(value));
 
 							if (!isValid) {
 								throw Error(`Validation errors: ${JSON.stringify(validate.errors)}`);
 							}
 
-							const name = lodash.get(values, 'metadata.name');
+							const name = lodash.get(load(value), 'metadata.name');
 
 							toast.promise(
 								async () => {
-									const manifest = new TextEncoder().encode(JSON.stringify(values));
+									const manifest = new TextEncoder().encode(value);
 
 									await resourceClient.create({
 										cluster,

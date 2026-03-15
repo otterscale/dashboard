@@ -6,13 +6,14 @@
 	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
 	import lodash from 'lodash';
+	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
 	import { SvelteMap, SvelteURL } from 'svelte/reactivity';
+	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
 	import { env as publicEnv } from '$env/dynamic/public';
-	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
@@ -43,13 +44,6 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	// Validation
-	const jsonSchemaValidator = new Ajv({
-		allErrors: true,
-		strict: false
-	});
-	const validate = jsonSchemaValidator.compile(jsonSchema);
-
 	// Container for Data
 	let values: any = $state({
 		apiVersion: `${group}/${version}`,
@@ -62,6 +56,7 @@
 			model: {}
 		}
 	});
+	let value = $derived(stringify(values));
 
 	let mode: any = $state({});
 
@@ -176,8 +171,7 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						name: '',
-						namespace: ''
+						namespace: namespace
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -244,7 +238,7 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						image: ''
+						image: null
 					} as FormValue}
 					handleSubmit={{
 						posthook: (form) => {
@@ -738,11 +732,17 @@
 
 			<Tabs.Content value={steps[5]}>
 				<div class="flex h-full flex-col gap-3">
-					<Code.Root
-						lang="yaml"
-						class="no-shiki-limit w-full"
-						hideLines
-						code={stringify(values, null, 2)}
+					<Monaco
+						options={{
+							language: 'yaml',
+							padding: { top: 24 },
+							automaticLayout: true,
+							folding: true,
+							foldingStrategy: 'indentation',
+							showFoldingControls: 'always'
+						}}
+						bind:value
+						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
 					/>
 					<Button
 						class="mt-auto w-full"
@@ -750,6 +750,12 @@
 							if (isSubmitting) return;
 
 							isSubmitting = true;
+
+							const jsonSchemaValidator = new Ajv({
+								allErrors: true,
+								strict: false
+							});
+							const validate = jsonSchemaValidator.compile(jsonSchema);
 
 							const isValid = validate(values);
 

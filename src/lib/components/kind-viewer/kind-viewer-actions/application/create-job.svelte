@@ -5,6 +5,7 @@
 	import type { Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
+	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -41,13 +42,6 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	// Validation
-	const jsonSchemaValidator = new Ajv({
-		allErrors: true,
-		strict: false
-	});
-	const validate = jsonSchemaValidator.compile(jsonSchema);
-
 	// Container for Data
 	let values: any = $state({
 		apiVersion: group ? `${group}/${version}` : version,
@@ -58,6 +52,8 @@
 			job: {}
 		}
 	});
+	let value = $derived(stringify(values));
+
 	let template = $state({});
 
 	// Steps Manager
@@ -109,7 +105,6 @@
 		</Item.Root>
 		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
 			<Tabs.Content value={steps[0]}>
-				<!-- Step 1: Metadata -->
 				<Form
 					schema={{
 						...(lodash.omit(lodash.get(jsonSchema, 'properties.metadata'), 'properties') as any),
@@ -157,11 +152,13 @@
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[1]}>
-				<!-- Step 2: Settings -->
 				<Form
 					schema={{
 						title: 'Settings',
 						...lodash.omit(lodash.get(jsonSchema, 'properties.spec.properties.job'), 'properties'),
+						required: lodash
+							.get(jsonSchema, 'properties.spec.properties.job.required')
+							.filter((require: string) => require !== 'template'),
 						properties: {
 							completions: {
 								...lodash.get(jsonSchema, 'properties.spec.properties.job.properties.completions'),
@@ -211,8 +208,7 @@
 						completions: 1,
 						parallelism: 1,
 						backoffLimit: 6,
-						suspend: false,
-						template: {}
+						suspend: false
 					}}
 					handleSubmit={{
 						posthook: () => {
@@ -237,7 +233,6 @@
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[2]}>
-				<!-- Step 3: Containers -->
 				<Form
 					schema={{
 						...lodash.omit(
@@ -433,8 +428,8 @@
 					}}
 					handleSubmit={{
 						posthook: () => {
-							handleNext();
 							lodash.set(values, 'spec.job.template.spec', template);
+							handleNext();
 						}
 					}}
 					bind:values={template}
@@ -455,7 +450,6 @@
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[3]}>
-				<!-- Step 4: Review -->
 				<div class="flex h-full flex-col gap-3">
 					<Code.Root
 						lang="yaml"
@@ -470,8 +464,13 @@
 
 							isSubmitting = true;
 
-							const finalValues = lodash.omit(values, 'jobValues');
-							const isValid = validate(finalValues);
+							const jsonSchemaValidator = new Ajv({
+								allErrors: true,
+								strict: false
+							});
+							const validate = jsonSchemaValidator.compile(jsonSchema);
+
+							const isValid = validate(load(value));
 
 							if (!isValid) {
 								console.error('Validation errors:', validate.errors);
@@ -480,11 +479,11 @@
 								return;
 							}
 
-							const name = lodash.get(finalValues, 'metadata.name');
+							const name = lodash.get(load(value), 'metadata.name');
 
 							toast.promise(
 								async () => {
-									const manifest = new TextEncoder().encode(JSON.stringify(finalValues));
+									const manifest = new TextEncoder().encode(value);
 
 									await resourceClient.create({
 										cluster,
