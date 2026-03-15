@@ -74,6 +74,29 @@
 	let isSubmitting = $state(false);
 </script>
 
+<pre>{JSON.stringify(
+		{
+			name: {
+				...lodash.get(jsonSchema, 'properties.metadata.properties.name'),
+				title: 'Name'
+			},
+			namespace: {
+				...lodash.get(jsonSchema, 'properties.metadata.properties.namespace'),
+				title: 'Namespace'
+			},
+			labels: {
+				...lodash.get(jsonSchema, 'properties.metadata.properties.labels'),
+				properties: {
+					'tenant.otterscale.io/from-harbor': {
+						type: 'boolean',
+						title: 'From Harbor'
+					}
+				}
+			}
+		},
+		null,
+		2
+	)}</pre>
 <AlertDialog.Root
 	bind:open
 	onOpenChangeComplete={() => {
@@ -109,6 +132,15 @@
 							namespace: {
 								...lodash.get(jsonSchema, 'properties.metadata.properties.namespace'),
 								title: 'Namespace'
+							},
+							labels: {
+								title: 'Labels',
+								...lodash.get(jsonSchema, 'properties.metadata.properties.labels'),
+								properties: {
+									'tenant.otterscale.io/from-harbor': {
+										type: 'boolean'
+									}
+								}
 							}
 						}
 					} as Schema}
@@ -117,11 +149,21 @@
 							translations: {
 								submit: 'Next'
 							}
+						},
+						labels: {
+							'tenant.otterscale.io/from-harbor': {
+								'ui:options': {
+									help: 'Indicates whether this repository originates from Harbor'
+								}
+							}
 						}
 					} as UiSchemaRoot}
 					initialValue={{
 						name: '',
-						namespace: ''
+						namespace: '',
+						labels: {
+							'tenant.otterscale.io/from-harbor': null
+						}
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -158,6 +200,18 @@
 							url: {
 								...lodash.get(jsonSchema, 'properties.spec.properties.url'),
 								title: 'URL'
+							},
+							insecure: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.insecure'),
+								title: 'Insecure'
+							},
+							secretRef: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.secretRef'),
+								title: 'Secret Reference'
+							},
+							certSecretRef: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.certSecretRef'),
+								title: 'Certificate Secret Reference'
 							}
 						}
 					} as Schema}
@@ -176,19 +230,23 @@
 									.get(jsonSchema, 'properties.spec.properties.type.enum')
 									.filter((type: string) => type !== 'oci')
 							}
+						},
+						secretRef: {
+							name: {
+								'ui:options': {
+									help: 'To connect to the internal Harbor service, use "harbor-credential" as the Secret name.'
+								}
+							}
 						}
 					} as UiSchemaRoot}
 					initialValue={{
 						type: 'oci',
-						url: ''
+						url: '',
+						interval: '10m'
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
-							lodash.merge(values['spec'], {
-								interval: '10m',
-								secretRef: { name: 'harbor-credential' }
-							});
 						}
 					}}
 					bind:values={values['spec']}

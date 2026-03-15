@@ -30,13 +30,21 @@
 	let {
 		cluster,
 		namespace,
-		latestChartArtifact
-	}: { cluster: string; namespace: string; latestChartArtifact: ArtifactType } = $props();
+		latestChartArtifact,
+		harborBaseUrl,
+		authorizationHeader
+	}: {
+		cluster: string;
+		namespace: string;
+		latestChartArtifact: ArtifactType;
+		harborBaseUrl: string;
+		authorizationHeader: string;
+	} = $props();
 
-	const [projectName, ...latestChartName] = $derived(
+	const [project, ...latestChartNameParts] = $derived(
 		latestChartArtifact.repository_name.split('/')
 	);
-	const repositoryName = $derived(latestChartName.join('/'));
+	const repository = $derived(latestChartNameParts.join('/'));
 	const extraAttributes = $derived(latestChartArtifact.extra_attrs ?? {});
 
 	const transport: Transport = getContext('transport');
@@ -86,14 +94,29 @@
 		}
 	});
 
+	function encodeURIComponentWithSlashEscape(value: string): string {
+		return value.includes('/')
+			? encodeURIComponent(encodeURIComponent(value))
+			: encodeURIComponent(value);
+	}
+
 	let artifacts: ArtifactType[] = $state([]);
 	async function fetchArtifacts() {
+		if (!harborBaseUrl) return;
+
 		try {
-			const searchParameters = new URLSearchParams({
-				project: projectName,
-				repository: repositoryName
-			});
-			const response = await fetch(`/rest/harbor/artifacts?${searchParameters}`);
+			const projectPath = encodeURIComponentWithSlashEscape(project);
+			const repositoryPath = encodeURIComponentWithSlashEscape(repository);
+			const artifactsUrl = `${harborBaseUrl}/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts?with_label=true`;
+
+			const headers: Record<string, string> = {
+				Accept: 'application/json'
+			};
+			if (authorizationHeader) {
+				headers['Authorization'] = authorizationHeader;
+			}
+
+			const response = await fetch(artifactsUrl, { headers });
 			if (!response.ok) {
 				console.error('Failed to fetch repository artifacts:', response.statusText);
 				return;
@@ -106,17 +129,20 @@
 
 	let selectedChartArtifact: ArtifactType = $derived(latestChartArtifact);
 	function getVersions() {
-		return artifacts.map((artifact) => lodash.get(artifact.extra_attrs, 'version'));
+		return artifacts.map(
+			(artifact) => lodash.get(artifact.extra_attrs, 'version') as unknown as string
+		);
 	}
 	function getSelectedChartArtifact(version: string) {
 		return (
-			artifacts.find((artifact) => artifact.extra_attrs.version === version) ?? latestChartArtifact
+			artifacts.find((artifact) => lodash.get(artifact.extra_attrs, 'version') === version) ??
+			latestChartArtifact
 		);
 	}
 	$effect(() => {
-		const version = lodash.get(values, 'spec.chart.spec.version');
-		if (version) {
-			selectedChartArtifact = getSelectedChartArtifact(version);
+		const versionValue = lodash.get(values, 'spec.chart.spec.version') as unknown as string;
+		if (versionValue) {
+			selectedChartArtifact = getSelectedChartArtifact(versionValue);
 		}
 	});
 
@@ -137,31 +163,46 @@
 		}
 	}
 	function getSelectedSourceReferences(name: string) {
-		return helmRepositories.find((repository) => repository.metadata.name === name);
+		return helmRepositories.find((repositoryItem) => repositoryItem.metadata.name === name);
 	}
 
-	async function getReferenceAddition(digest: string, addition: string) {
-		const parameters = new URLSearchParams({
-			project: projectName,
-			repository: repositoryName,
-			reference: digest,
-			addition
-		});
-		const response = await fetch(`/rest/harbor/reference-additions?${parameters}`);
+	async function getReferenceAddition(reference: string, addition: string) {
+		if (!harborBaseUrl) return null;
+
+		const projectPath = encodeURIComponentWithSlashEscape(project);
+		const repositoryPath = encodeURIComponentWithSlashEscape(repository);
+		const referencePath = encodeURIComponentWithSlashEscape(reference);
+		const additionPath = encodeURIComponentWithSlashEscape(addition);
+
+		const additionUrl = `${harborBaseUrl}/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${referencePath}/additions/${additionPath}`;
+
+		const headers: Record<string, string> = {
+			Accept: 'application/json'
+		};
+		if (authorizationHeader) {
+			headers['Authorization'] = authorizationHeader;
+		}
+
+		const response = await fetch(additionUrl, { headers });
 		if (!response.ok) {
 			console.error('Failed to fetch Harbor addition:', response.statusText);
 			throw new Error('Failed to fetch Harbor addition');
 		}
-		return response.json();
+
+		const contentType = response.headers.get('content-type') ?? '';
+		if (contentType.includes('application/json')) {
+			return response.json();
+		}
+		return response.text();
 	}
 
 	async function getChartInformation(digest: string) {
-		const [values, readme] = await Promise.all([
+		const [valuesData, readmeData] = await Promise.all([
 			getReferenceAddition(digest, 'values.yaml'),
 			getReferenceAddition(digest, 'readme.md')
 		]);
 
-		return { values, readme };
+		return { values: valuesData, readme: readmeData };
 	}
 
 	// Steps Manager

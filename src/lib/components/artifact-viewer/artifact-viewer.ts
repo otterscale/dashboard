@@ -18,6 +18,7 @@ type ArtifactAttribute =
 	| 'Pull Time'
 	| 'Type'
 	| 'Labels'
+	| 'helmRepository'
 	| 'raw';
 
 function getArtifactDataSchemas(): Record<ArtifactAttribute, DataSchemaType> {
@@ -30,6 +31,7 @@ function getArtifactDataSchemas(): Record<ArtifactAttribute, DataSchemaType> {
 		'Pull Time': 'time',
 		Type: 'text',
 		Labels: 'array',
+		helmRepository: 'object',
 		raw: 'object'
 	};
 }
@@ -44,11 +46,15 @@ function getArtifactUISchemas(): Record<ArtifactAttribute, UISchemaType> {
 		'Pull Time': 'time',
 		Type: 'text',
 		Labels: 'array',
+		helmRepository: 'object',
 		raw: 'object'
 	};
 }
 
-function getArtifactData(artifact: ArtifactType): Record<ArtifactAttribute, JsonValue> {
+function getArtifactData(
+	artifact: ArtifactType,
+	helmRepository: any,
+): Record<ArtifactAttribute, JsonValue> {
 	const tags = (artifact.tags ?? []).map((t) => t.name);
 
 	const { value: sizeValue, unit: sizeUnit } = formatWithBinarySuffix(BigInt(artifact.size));
@@ -62,6 +68,7 @@ function getArtifactData(artifact: ArtifactType): Record<ArtifactAttribute, Json
 		'Pull Time': artifact.pull_time ?? null,
 		Type: artifact.type ?? null,
 		Labels: (artifact.labels ?? []).map((l) => l.name) as JsonValue,
+		helmRepository: helmRepository as JsonValue,
 		raw: artifact as unknown as JsonValue
 	};
 }
@@ -134,9 +141,9 @@ function getArtifactColumnDefinitions(
 }
 
 export {
-	type ArtifactAttribute,
 	getArtifactColumnDefinitions,
 	getArtifactData,
 	getArtifactDataSchemas,
-	getArtifactUISchemas
+	getArtifactUISchemas, type ArtifactAttribute
 };
+

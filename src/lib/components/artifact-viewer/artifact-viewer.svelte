@@ -1,12 +1,13 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
+	import { createClient, type Transport } from '@connectrpc/connect';
 	import { Columns3Icon, EraserIcon, RefreshCwIcon } from '@lucide/svelte';
+	import { type GetRequest, type ListRequest, ResourceService } from '@otterscale/api/resource/v1';
 	import type { ColumnDef } from '@tanstack/table-core';
-	import { onMount } from 'svelte';
-	import { SvelteURL } from 'svelte/reactivity';
+	import lodash from 'lodash';
+	import { getContext, onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
-	import { env as publicEnv } from '$env/dynamic/public';
 	import { DynamicTable } from '$lib/components/dynamic-table';
 	import type { DataSchemaType, UISchemaType } from '$lib/components/dynamic-table/utils';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -27,6 +28,133 @@
 
 	let { cluster, namespace }: { cluster: string; namespace: string } = $props();
 
+	const transport: Transport = getContext('transport');
+	const resourceClient = createClient(ResourceService, transport);
+
+	function getHarborBaseUrl(helmRepository: any): string {
+		const helmRepositoryName = lodash.get(helmRepository, 'metadata.name');
+
+		const url = new URL(lodash.get(helmRepository, 'spec.url'));
+		if (!url) {
+			throw new Error(`HelmRepository "${helmRepositoryName}": invalid URL "${url}"`);
+		}
+
+		const insecure = lodash.get(helmRepository, 'spec.insecure');
+		const protocol = insecure ? 'http' : 'https';
+
+		return `${protocol}://${url.host}`;
+	}
+
+	function getProjectName(helmRepository: any): string {
+		const helmRepositoryName = lodash.get(helmRepository, 'metadata.name');
+
+		const url = new URL(lodash.get(helmRepository, 'spec.url', ''));
+		if (!url) {
+			throw new Error(`HelmRepository "${helmRepositoryName}": invalid URL "${url}"`);
+		}
+		const project = lodash.trim(url.pathname, '/');
+
+		return project;
+	}
+
+	const repositoryToAuthorization = new Map<string, string>();
+	async function fetchHarborAuthorizationHeader(secretName: string): Promise<string> {
+		if (repositoryToAuthorization.has(secretName)) {
+			return repositoryToAuthorization.get(secretName)!;
+		}
+
+		const secretResponse = await resourceClient.get({
+			cluster,
+			namespace,
+			group: '',
+			version: 'v1',
+			resource: 'secrets',
+			name: secretName
+		} as GetRequest);
+
+		const secret = secretResponse.object as any;
+
+		if (secret?.type !== 'kubernetes.io/basic-auth') {
+			throw new Error(`Secret "${secretName}" is not of type "kubernetes.io/basic-auth"`);
+		}
+
+		const data = secret?.data as Record<string, string> | undefined;
+
+		if (!data) return '';
+
+		const username = data.username ? atob(data.username) : '';
+		const password = data.password ? atob(data.password) : '';
+
+		if (!username && !password) return '';
+
+		const authorizationHeader = `Basic ${btoa(`${username}:${password}`)}`;
+		repositoryToAuthorization.set(secretName, authorizationHeader);
+		return repositoryToAuthorization.get(secretName)!;
+	}
+
+	let dataset: Record<ArtifactAttribute, JsonValue>[] = $state([]);
+	async function fetchChartsByHelmRepository(helmRepository: any) {
+		const fromHarbor = lodash.get(
+			helmRepository,
+			['metadata', 'labels', 'tenant.otterscale.io/from-harbor'],
+			'unknown'
+		);
+
+		// Only support Harbor HelmRepository temporarily.
+		if (!fromHarbor) return;
+
+		const helmRepositoryName = lodash.get(helmRepository, 'metadata.name', 'unknown');
+
+		const secretRefName = lodash.get(helmRepository, 'spec.secretRef.name', '');
+		let authorizationHeader = '';
+		if (secretRefName) {
+			try {
+				authorizationHeader = await fetchHarborAuthorizationHeader(secretRefName);
+			} catch (error: any) {
+				console.error(
+					`Failed to fetch Secret "${secretRefName}" for HelmRepository "${helmRepositoryName}":`,
+					error
+				);
+				toast.error(
+					`HelmRepository "${helmRepositoryName}": ${error?.message || 'failed to fetch authority Secret'}`
+				);
+				return;
+			}
+		}
+
+		const harborBaseUrl = getHarborBaseUrl(helmRepository);
+		const projectName = getProjectName(helmRepository);
+		try {
+			const encodedProject = encodeURIComponent(encodeURIComponent(projectName));
+			const mediaTypeQuery = encodeURIComponent(
+				encodeURIComponent('media_type=application/vnd.cncf.helm.config.v1+json')
+			);
+			const artifactsUrl = `${harborBaseUrl}/api/v2.0/projects/${encodedProject}/artifacts?q=${mediaTypeQuery}&latest_in_repository=true`;
+
+			const headers: Record<string, string> = {
+				Accept: 'application/json'
+			};
+			if (authorizationHeader) {
+				headers['Authorization'] = authorizationHeader;
+			}
+			const response = await fetch(artifactsUrl, { headers });
+			if (!response.ok) {
+				throw new Error(`Harbor API error: ${response.status} ${response.statusText}`);
+			}
+
+			const artifacts: ArtifactType[] = await response.json();
+
+			const data = artifacts.map((artifact) => getArtifactData(artifact, helmRepository));
+
+			dataset = [...dataset, ...data];
+		} catch (error) {
+			console.error(`HelmRepository "${helmRepositoryName}": error fetching charts:`, error);
+			toast.error(
+				`HelmRepository "${helmRepositoryName}": unable to reach Harbor at ${harborBaseUrl}`
+			);
+		}
+	}
+
 	const uiSchemas: Record<string, UISchemaType> = getArtifactUISchemas();
 	const dataSchemas: Record<string, DataSchemaType> = getArtifactDataSchemas();
 	const columnDefinitions: ColumnDef<Record<string, JsonValue>>[] = getArtifactColumnDefinitions(
@@ -34,46 +162,54 @@
 		dataSchemas
 	);
 
-	let latestRepositoryChartArtifacts: Record<ArtifactAttribute, JsonValue>[] = $state([]);
-	let isFetchingArtifacts = $state(false);
+	let isFetching = $state(false);
 
-	async function fetchLatestArtifacts(namespace: string) {
-		if (isFetchingArtifacts || !namespace) return;
+	async function fetchCharts() {
+		if (isFetching || !namespace) return;
 
-		isFetchingArtifacts = true;
+		isFetching = true;
 
 		try {
-			const response = await fetch(`/rest/harbor/all-latest-artifacts?project=${namespace}`);
-			if (!response.ok) {
-				console.error(
-					'Failed to fetch latest chart artifact of each repository:',
-					response.statusText
-				);
-				toast.error('Failed to fetch latest chart artifact of each repository');
+			const response = await resourceClient.list({
+				cluster,
+				namespace,
+				group: 'source.toolkit.fluxcd.io',
+				version: 'v1',
+				resource: 'helmrepositories'
+			} as ListRequest);
+
+			const helmRepositories = response.items.map((item) => item.object);
+
+			if (helmRepositories.length === 0) {
+				toast.info('No HelmRepository resources found in this namespace');
+				isFetching = false;
 				return;
 			}
-			const data: ArtifactType[] = await response.json();
-			latestRepositoryChartArtifacts = (data ?? []).map((artifact) => getArtifactData(artifact));
-			return latestRepositoryChartArtifacts;
+
+			let pendings = helmRepositories.length;
+			for (const helmRepository of helmRepositories) {
+				fetchChartsByHelmRepository(helmRepository).finally(() => {
+					pendings = pendings - 1;
+					if (pendings === 0) {
+						isFetching = false;
+					}
+				});
+			}
 		} catch (error) {
-			console.error('Error fetching latest chart artifact of each repository:', error);
-			toast.error('Error fetching latest chart artifact of each repository');
-		} finally {
-			isFetchingArtifacts = false;
+			console.error('Failed to list HelmRepositories:', error);
+			toast.error('Failed to list HelmRepository resources');
+			isFetching = false;
 		}
 	}
 
 	function handleReload() {
-		if (!namespace) return;
-
-		fetchLatestArtifacts(namespace);
+		fetchCharts();
 	}
 
 	let isMounted = $state(false);
-	onMount(async () => {
+	onMount(() => {
 		if (!namespace) return;
-		await fetchLatestArtifacts(namespace);
-
+		fetchCharts();
 		isMounted = true;
 	});
 </script>
@@ -83,26 +219,28 @@
 		<div class="flex items-end justify-between gap-4">
 			<Item.Root class="p-0">
 				<Item.Content class="text-left">
-					{@const harborUniformResourceLocator = new SvelteURL(publicEnv.PUBLIC_HARBOR_URL ?? '')}
 					<Item.Title class="text-xl font-bold">Hub</Item.Title>
-					<Item.Description class="text-base"
-						>{harborUniformResourceLocator.host} in {cluster} {namespace}</Item.Description
-					>
+					<Item.Description class="text-base">{cluster} {namespace}</Item.Description>
 				</Item.Content>
 			</Item.Root>
 		</div>
-		<DynamicTable
-			dataset={latestRepositoryChartArtifacts}
-			{columnDefinitions}
-			{uiSchemas}
-			{dataSchemas}
-		>
+		<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {dataSchemas}>
 			{#snippet gridsLayout({ table, handleClear })}
 				{#if table.getRowModel().rows?.length}
 					<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
 						{#each table.getRowModel().rows as row (row.id)}
 							{@const latestChartArtifact = row.original.raw as unknown as ArtifactType}
-							<Grid {latestChartArtifact} {cluster} {namespace} />
+							{@const harborBaseUrl = row.original.helmRepository as string}
+							{@const authorizationHeader = repositoryToAuthorization.get(
+								lodash.get(row.original.helmRepository, 'spec.secretRef.name') as string
+							)!}
+							<Grid
+								{latestChartArtifact}
+								{cluster}
+								{namespace}
+								{harborBaseUrl}
+								{authorizationHeader}
+							/>
 						{/each}
 					</div>
 				{:else}
@@ -130,7 +268,7 @@
 				<UploadCommand />
 			{/snippet}
 			{#snippet reload()}
-				<Button onclick={handleReload} disabled={isFetchingArtifacts} variant="outline">
+				<Button onclick={handleReload} disabled={isFetching} variant="outline">
 					<RefreshCwIcon class="opacity-60" size={16} />
 				</Button>
 			{/snippet}
