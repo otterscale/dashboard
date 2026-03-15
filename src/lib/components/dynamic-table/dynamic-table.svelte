@@ -1,24 +1,19 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import {
-		BinaryIcon,
 		BookIcon,
-		BracesIcon,
-		BracketsIcon,
+		CheckIcon,
 		ChevronDownIcon,
 		ChevronFirstIcon,
 		ChevronLastIcon,
 		ChevronLeftIcon,
 		ChevronRightIcon,
 		ChevronUpIcon,
-		ClockIcon,
 		CodeIcon,
 		Columns3Icon,
 		EraserIcon,
-		HashIcon,
 		LayoutGridIcon,
-		SheetIcon,
-		TypeIcon
+		SheetIcon
 	} from '@lucide/svelte';
 	import {
 		type ColumnDef,
@@ -61,13 +56,13 @@
 	import * as Table from '$lib/components/ui/table';
 	import { cn } from '$lib/utils';
 
-	import type { DataSchemaType, UISchemaType } from './utils';
+	import type { UISchemaType } from './utils';
 
 	let {
 		dataset,
 		columnDefinitions,
 		uiSchemas,
-		dataSchemas,
+		// dataSchemas,
 		accessReview,
 		create,
 		bulkDelete,
@@ -78,7 +73,7 @@
 		dataset: Record<string, JsonValue>[];
 		columnDefinitions: ColumnDef<Record<string, JsonValue>>[];
 		uiSchemas: Record<string, UISchemaType>;
-		dataSchemas: Record<string, DataSchemaType>;
+		// dataSchemas: Record<string, DataSchemaType>;
 		accessReview?: Snippet;
 		create?: Snippet;
 		bulkDelete?: Snippet<[{ table: TanStackTabke<Record<string, JsonValue>> }]>;
@@ -333,13 +328,14 @@
 <svelte:window
 	use:shortcut={{
 		key: '/',
-		ctrl: false,
+		ctrl: true,
 		callback: () => {
 			const input = document.getElementById(GLOBAL_FILTER_IDENTIFIER);
 			if (input) (input as HTMLInputElement).focus();
 		}
 	}}
 />
+
 <div class="space-y-4">
 	<!-- Controllers -->
 	<div class="flex w-full items-center gap-2">
@@ -381,20 +377,7 @@
 						closeOnSelect={false}
 						onSelect={() => column.toggleVisibility(!column.getIsVisible())}
 					>
-						{@const dataSchema = dataSchemas[column.id]}
-						{#if dataSchema === 'boolean'}
-							<BinaryIcon />
-						{:else if dataSchema === 'number'}
-							<HashIcon />
-						{:else if dataSchema === 'time'}
-							<ClockIcon />
-						{:else if dataSchema === 'text'}
-							<TypeIcon />
-						{:else if dataSchema === 'array'}
-							<BracketsIcon />
-						{:else if dataSchema === 'object'}
-							<BracesIcon />
-						{/if}
+						<CheckIcon class={column.getIsVisible() ? 'visible' : 'invisible'} />
 						{column.id}
 					</DropdownMenu.Item>
 				{/each}
@@ -420,6 +403,7 @@
 				</InputGroup.Addon>
 				<InputGroup.Addon align="inline-end" class="peer-focus:hidden">
 					<Kbd.Group>
+						<Kbd.Root>ctrl</Kbd.Root>
 						<Kbd.Root>/</Kbd.Root>
 					</Kbd.Group>
 				</InputGroup.Addon>
