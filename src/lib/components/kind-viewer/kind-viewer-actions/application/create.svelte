@@ -1,7 +1,9 @@
 <script lang="ts">
+	import { PlusIcon } from '@lucide/svelte';
+
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
-	import { PlusIcon } from '@lucide/svelte';
+
 	import CreateCronjob from './create-cronjob.svelte';
 	import CreateDeployment from './create-deployment.svelte';
 	import CreateJob from './create-job.svelte';
@@ -30,7 +32,7 @@
 <DropdownMenu.Root bind:open={actionsOpen}>
 	<DropdownMenu.Trigger>
 		{#snippet child({ props })}
-			<Button size="icon" variant="ghost" class="shadow-none" {...props}>
+			<Button size="icon" variant="outline" class="shadow-none" {...props}>
 				<PlusIcon size={16} aria-hidden="true" />
 			</Button>
 		{/snippet}
