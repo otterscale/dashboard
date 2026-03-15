@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { mode as themeMode } from 'mode-watcher';
+	import Monaco from 'svelte-monaco';
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { ClockIcon } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
@@ -8,7 +10,7 @@
 	import lodash from 'lodash';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import { stringify } from 'yaml';
+	import { parse, stringify } from 'yaml';
 
 	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
@@ -18,6 +20,7 @@
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
+	import { load } from 'js-yaml';
 
 	let {
 		cluster,
@@ -50,10 +53,14 @@
 	const validate = jsonSchemaValidator.compile(jsonSchema);
 
 	// Timezone List
-	function getAllTimezones(): string[] {
+	function getTimezones(): string[] {
 		try {
 			const timezones = Intl.supportedValuesOf('timeZone');
-			return ['Etc/UTC', ...timezones.filter((tz) => tz !== 'Etc/UTC')];
+			return timezones.sort((previous, next) => {
+				if (previous === 'Etc/UTC') return -1;
+				if (next === 'Etc/UTC') return 1;
+				return previous.localeCompare(next);
+			});
 		} catch {
 			return [
 				'Etc/UTC',
@@ -88,13 +95,15 @@
 			];
 		}
 	}
-	const TIMEZONES = getAllTimezones();
 
+	const timezones = getTimezones();
 	async function fetchTimezones(search: string): Promise<{ label: string; value: string }[]> {
-		return TIMEZONES.filter((tz) => tz.toLowerCase().includes(search.toLowerCase())).map((tz) => ({
-			label: tz,
-			value: tz
-		}));
+		return timezones
+			.filter((timezone) => timezone.toLowerCase().includes(search.toLowerCase()))
+			.map((timezone) => ({
+				label: timezone,
+				value: timezone
+			}));
 	}
 
 	// Container for Data
@@ -108,7 +117,10 @@
 		}
 	});
 
+	let cronjobValues: any = $state({});
 	let jobValues: any = $state({});
+
+	let value = $derived(stringify(values));
 
 	// Steps Manager
 	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
@@ -162,18 +174,15 @@
 				<!-- Step 1: Metadata -->
 				<Form
 					schema={{
-						...(lodash.omit(
-							lodash.get(jsonSchema, 'schema.properties.metadata'),
-							'properties'
-						) as any),
+						...(lodash.omit(lodash.get(jsonSchema, 'properties.metadata'), 'properties') as any),
 						title: 'Metadata',
 						properties: {
 							name: {
-								...lodash.get(jsonSchema, 'schema.properties.metadata.properties.name'),
+								...lodash.get(jsonSchema, 'properties.metadata.properties.name'),
 								title: 'Name'
 							},
 							namespace: {
-								...lodash.get(jsonSchema, 'schema.properties.metadata.properties.namespace'),
+								...lodash.get(jsonSchema, 'properties.metadata.properties.namespace'),
 								title: 'Namespace'
 							}
 						}
@@ -210,54 +219,47 @@
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[1]}>
-				<!-- Step 2: Schedule -->
 				<Form
 					schema={{
 						title: 'Schedule',
-						...lodash.omit(
-							lodash.get(jsonSchema, 'schema.properties.spec.properties.cronJob'),
-							'properties'
-						),
+						...lodash.omit(lodash.get(jsonSchema, 'properties.spec.properties.cronJob'), [
+							'properties',
+							'required'
+						]),
+						required: lodash
+							.get(jsonSchema, 'properties.spec.properties.cronJob.required')
+							.filter((require: string) => require !== 'jobTemplate'),
 						properties: {
 							schedule: {
-								...lodash.get(
-									jsonSchema,
-									'schema.properties.spec.properties.cronJob.properties.schedule'
-								),
+								...lodash.get(jsonSchema, 'properties.spec.properties.cronJob.properties.schedule'),
 								title: 'Schedule'
 							},
 							timeZone: {
-								...lodash.get(
-									jsonSchema,
-									'schema.properties.spec.properties.cronJob.properties.timeZone'
-								),
+								...lodash.get(jsonSchema, 'properties.spec.properties.cronJob.properties.timeZone'),
 								title: 'Time Zone'
 							},
 							concurrencyPolicy: {
 								...lodash.get(
 									jsonSchema,
-									'schema.properties.spec.properties.cronJob.properties.concurrencyPolicy'
+									'properties.spec.properties.cronJob.properties.concurrencyPolicy'
 								),
 								title: 'Concurrency Policy'
 							},
 							suspend: {
-								...lodash.get(
-									jsonSchema,
-									'schema.properties.spec.properties.cronJob.properties.suspend'
-								),
+								...lodash.get(jsonSchema, 'properties.spec.properties.cronJob.properties.suspend'),
 								title: 'Suspend execution'
 							},
 							successfulJobsHistoryLimit: {
 								...lodash.get(
 									jsonSchema,
-									'schema.properties.spec.properties.cronJob.properties.successfulJobsHistoryLimit'
+									'properties.spec.properties.cronJob.properties.successfulJobsHistoryLimit'
 								),
 								title: 'Successful Jobs History Limit'
 							},
 							failedJobsHistoryLimit: {
 								...lodash.get(
 									jsonSchema,
-									'schema.properties.spec.properties.cronJob.properties.failedJobsHistoryLimit'
+									'properties.spec.properties.cronJob.properties.failedJobsHistoryLimit'
 								),
 								title: 'Failed Jobs History Limit'
 							}
@@ -294,21 +296,15 @@
 						concurrencyPolicy: 'Allow',
 						suspend: false,
 						successfulJobsHistoryLimit: 3,
-						failedJobsHistoryLimit: 1,
-						jobTemplate: {
-							spec: {
-								template: {
-									spec: {}
-								}
-							}
-						}
+						failedJobsHistoryLimit: 1
 					}}
 					handleSubmit={{
 						posthook: () => {
+							lodash.set(values, 'spec.cronJob', cronjobValues);
 							handleNext();
 						}
 					}}
-					bind:values={values['spec']['cronJob']}
+					bind:values={cronjobValues}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -332,7 +328,7 @@
 						...lodash.omit(
 							lodash.get(
 								jsonSchema,
-								'schema.properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec'
+								'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec'
 							),
 							'properties'
 						),
@@ -341,7 +337,7 @@
 								title: 'Restart Policy',
 								...lodash.get(
 									jsonSchema,
-									'schema.properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.restartPolicy'
+									'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.restartPolicy'
 								)
 							},
 							containers: {
@@ -349,7 +345,7 @@
 								...lodash.omit(
 									lodash.get(
 										jsonSchema,
-										'schema.properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers'
+										'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers'
 									),
 									'items'
 								),
@@ -357,7 +353,7 @@
 									...lodash.omit(
 										lodash.get(
 											jsonSchema,
-											'schema.properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items'
+											'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items'
 										),
 										'properties'
 									),
@@ -365,28 +361,28 @@
 										name: {
 											...lodash.get(
 												jsonSchema,
-												'schema.properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.name'
+												'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.name'
 											),
 											title: 'Name'
 										},
 										image: {
 											...lodash.get(
 												jsonSchema,
-												'schema.properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.image'
+												'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.image'
 											),
 											title: 'Image'
 										},
 										command: {
 											...lodash.get(
 												jsonSchema,
-												'schema.properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.command'
+												'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.command'
 											),
 											title: 'Command'
 										},
 										args: {
 											...lodash.get(
 												jsonSchema,
-												'schema.properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.args'
+												'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.args'
 											),
 											title: 'Arguments'
 										},
@@ -394,7 +390,7 @@
 											...lodash.omit(
 												lodash.get(
 													jsonSchema,
-													'schema.properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.env'
+													'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.env'
 												),
 												'items'
 											),
@@ -403,7 +399,7 @@
 												...lodash.omit(
 													lodash.get(
 														jsonSchema,
-														'schema.properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.env.items'
+														'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.env.items'
 													),
 													'properties'
 												),
@@ -411,14 +407,14 @@
 													name: {
 														...lodash.get(
 															jsonSchema,
-															'schema.properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.name'
+															'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.name'
 														),
 														title: 'Name'
 													},
 													value: {
 														...lodash.get(
 															jsonSchema,
-															'schema.properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.value'
+															'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.value'
 														),
 														title: 'Value'
 													}
@@ -429,13 +425,13 @@
 											title: 'Resources',
 											...lodash.get(
 												jsonSchema,
-												'schema.properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.resources'
+												'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources'
 											),
 											properties: {
 												requests: {
 													...lodash.get(
 														jsonSchema,
-														'schema.properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.resources.properties.requests'
+														'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources.properties.requests'
 													),
 													title: 'Requests',
 													additionalProperties: {
@@ -445,7 +441,7 @@
 												limits: {
 													...lodash.get(
 														jsonSchema,
-														'schema.properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.resources.properties.limits'
+														'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources.properties.limits'
 													),
 													title: 'Limits',
 													additionalProperties: {
@@ -522,8 +518,8 @@
 					}}
 					handleSubmit={{
 						posthook: () => {
-							handleNext();
 							lodash.set(values, 'spec.cronJob.jobTemplate.spec.template.spec', jobValues);
+							handleNext();
 						}
 					}}
 					bind:values={jobValues}
@@ -546,7 +542,19 @@
 			<Tabs.Content value={steps[3]}>
 				<!-- Step 5: Review -->
 				<div class="flex h-full flex-col gap-3">
-					<Code.Root lang="yaml" class="w-full" hideLines code={stringify(values, null, 2)} />
+					<!-- <Code.Root lang="yaml" class="w-full" hideLines code={stringify(values, null, 2)} /> -->
+					<Monaco
+						options={{
+							language: 'yaml',
+							padding: { top: 24 },
+							automaticLayout: true,
+							folding: true,
+							foldingStrategy: 'indentation',
+							showFoldingControls: 'always'
+						}}
+						bind:value
+						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
+					/>
 					<Button
 						class="mt-auto w-full"
 						onclick={() => {
@@ -554,7 +562,7 @@
 
 							isSubmitting = true;
 
-							const isValid = validate(values);
+							const isValid = validate(load(value));
 
 							if (!isValid) {
 								console.error('Validation errors:', validate.errors);
@@ -567,7 +575,7 @@
 
 							toast.promise(
 								async () => {
-									const manifest = new TextEncoder().encode(JSON.stringify(values));
+									const manifest = new TextEncoder().encode(value);
 
 									await resourceClient.create({
 										cluster,

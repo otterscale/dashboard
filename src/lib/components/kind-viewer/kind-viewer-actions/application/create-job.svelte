@@ -112,18 +112,15 @@
 				<!-- Step 1: Metadata -->
 				<Form
 					schema={{
-						...(lodash.omit(
-							lodash.get(jsonSchema, 'schema.properties.metadata'),
-							'properties'
-						) as any),
+						...(lodash.omit(lodash.get(jsonSchema, 'properties.metadata'), 'properties') as any),
 						title: 'Metadata',
 						properties: {
 							name: {
-								...lodash.get(jsonSchema, 'schema.properties.metadata.properties.name'),
+								...lodash.get(jsonSchema, 'properties.metadata.properties.name'),
 								title: 'Name'
 							},
 							namespace: {
-								...lodash.get(jsonSchema, 'schema.properties.metadata.properties.namespace'),
+								...lodash.get(jsonSchema, 'properties.metadata.properties.namespace'),
 								title: 'Namespace'
 							}
 						}
@@ -164,51 +161,36 @@
 				<Form
 					schema={{
 						title: 'Settings',
-						...lodash.omit(
-							lodash.get(jsonSchema, 'schema.properties.spec.properties.job'),
-							'properties'
-						),
+						...lodash.omit(lodash.get(jsonSchema, 'properties.spec.properties.job'), 'properties'),
 						properties: {
 							completions: {
-								...lodash.get(
-									jsonSchema,
-									'schema.properties.spec.properties.job.properties.completions'
-								),
+								...lodash.get(jsonSchema, 'properties.spec.properties.job.properties.completions'),
 								title: 'Completions'
 							},
 							parallelism: {
-								...lodash.get(
-									jsonSchema,
-									'schema.properties.spec.properties.job.properties.parallelism'
-								),
+								...lodash.get(jsonSchema, 'properties.spec.properties.job.properties.parallelism'),
 								title: 'Parallelism'
 							},
 							backoffLimit: {
-								...lodash.get(
-									jsonSchema,
-									'schema.properties.spec.properties.job.properties.backoffLimit'
-								),
+								...lodash.get(jsonSchema, 'properties.spec.properties.job.properties.backoffLimit'),
 								title: 'Backoff Limit'
 							},
 							activeDeadlineSeconds: {
 								...lodash.get(
 									jsonSchema,
-									'schema.properties.spec.properties.job.properties.activeDeadlineSeconds'
+									'properties.spec.properties.job.properties.activeDeadlineSeconds'
 								),
 								title: 'Active Deadline Seconds'
 							},
 							ttlSecondsAfterFinished: {
 								...lodash.get(
 									jsonSchema,
-									'schema.properties.spec.properties.job.properties.ttlSecondsAfterFinished'
+									'properties.spec.properties.job.properties.ttlSecondsAfterFinished'
 								),
 								title: 'TTL Seconds After Finished'
 							},
 							suspend: {
-								...lodash.get(
-									jsonSchema,
-									'schema.properties.spec.properties.job.properties.suspend'
-								),
+								...lodash.get(jsonSchema, 'properties.spec.properties.job.properties.suspend'),
 								title: 'Suspend execution'
 							}
 						}
@@ -261,7 +243,7 @@
 						...lodash.omit(
 							lodash.get(
 								jsonSchema,
-								'schema.properties.spec.properties.job.properties.template.properties.spec'
+								'properties.spec.properties.job.properties.template.properties.spec'
 							),
 							'properties'
 						),
@@ -270,7 +252,7 @@
 								title: 'Restart Policy',
 								...lodash.get(
 									jsonSchema,
-									'schema.properties.spec.properties.job.properties.template.properties.spec.properties.restartPolicy'
+									'properties.spec.properties.job.properties.template.properties.spec.properties.restartPolicy'
 								)
 							},
 							containers: {
@@ -278,7 +260,7 @@
 								...lodash.omit(
 									lodash.get(
 										jsonSchema,
-										'schema.properties.spec.properties.job.properties.template.properties.spec.properties.containers'
+										'properties.spec.properties.job.properties.template.properties.spec.properties.containers'
 									),
 									'items'
 								),
@@ -286,7 +268,7 @@
 									...lodash.omit(
 										lodash.get(
 											jsonSchema,
-											'schema.properties.spec.properties.job.properties.template.properties.spec.properties.containers.items'
+											'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items'
 										),
 										'properties'
 									),
@@ -294,28 +276,28 @@
 										name: {
 											...lodash.get(
 												jsonSchema,
-												'schema.properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.name'
+												'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.name'
 											),
 											title: 'Name'
 										},
 										image: {
 											...lodash.get(
 												jsonSchema,
-												'schema.properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.image'
+												'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.image'
 											),
 											title: 'Image'
 										},
 										command: {
 											...lodash.get(
 												jsonSchema,
-												'schema.properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.command'
+												'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.command'
 											),
 											title: 'Command'
 										},
 										args: {
 											...lodash.get(
 												jsonSchema,
-												'schema.properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.args'
+												'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.args'
 											),
 											title: 'Arguments'
 										},
@@ -323,7 +305,7 @@
 											...lodash.omit(
 												lodash.get(
 													jsonSchema,
-													'schema.properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.env'
+													'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.env'
 												),
 												'items'
 											),
@@ -332,7 +314,7 @@
 												...lodash.omit(
 													lodash.get(
 														jsonSchema,
-														'schema.properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.env.items'
+														'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.env.items'
 													),
 													'properties'
 												),
@@ -340,14 +322,14 @@
 													name: {
 														...lodash.get(
 															jsonSchema,
-															'schema.properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.name'
+															'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.name'
 														),
 														title: 'Name'
 													},
 													value: {
 														...lodash.get(
 															jsonSchema,
-															'schema.properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.value'
+															'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.value'
 														),
 														title: 'Value'
 													}
@@ -358,13 +340,13 @@
 											title: 'Resources',
 											...lodash.get(
 												jsonSchema,
-												'schema.properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources'
+												'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources'
 											),
 											properties: {
 												requests: {
 													...lodash.get(
 														jsonSchema,
-														'schema.properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources.properties.requests'
+														'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources.properties.requests'
 													),
 													title: 'Requests',
 													additionalProperties: {
@@ -374,7 +356,7 @@
 												limits: {
 													...lodash.get(
 														jsonSchema,
-														'schema.properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources.properties.limits'
+														'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources.properties.limits'
 													),
 													title: 'Limits',
 													additionalProperties: {
