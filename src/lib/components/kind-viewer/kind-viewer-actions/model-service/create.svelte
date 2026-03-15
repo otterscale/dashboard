@@ -5,6 +5,7 @@
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
+	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
@@ -757,17 +758,20 @@
 							});
 							const validate = jsonSchemaValidator.compile(jsonSchema);
 
-							const isValid = validate(values);
+							const isValid = validate(load(value));
 
 							if (!isValid) {
-								throw Error(`Validation errors: ${JSON.stringify(validate.errors)}`);
+								console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
+								toast.error('Validation failed. Please check the YAML.');
+								isSubmitting = false;
+								return;
 							}
 
-							const name = lodash.get(values, 'metadata.name');
+							const name = lodash.get(load(value), 'metadata.name');
 
 							toast.promise(
 								async () => {
-									const manifest = new TextEncoder().encode(JSON.stringify(values));
+									const manifest = new TextEncoder().encode(value);
 
 									await resourceClient.create({
 										cluster,

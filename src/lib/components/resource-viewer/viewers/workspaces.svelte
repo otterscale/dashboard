@@ -163,14 +163,18 @@
 				resource: 'networkpolicies'
 			},
 			{
-				ref: status.helmRepositoryRef,
+				ref: status.helmRepositoryRef as { [k: string]: unknown; name: string; namespace?: string },
 				group: 'source.toolkit.fluxcd.io',
 				version: 'v1',
 				kind: 'HelmRepository',
 				resource: 'helmrepositories'
 			},
 			{
-				ref: status.imagePullSecretRef,
+				ref: status.imagePullSecretRef as {
+					[k: string]: unknown;
+					name: string;
+					namespace?: string;
+				},
 				group: '',
 				version: 'v1',
 				kind: 'Secret',

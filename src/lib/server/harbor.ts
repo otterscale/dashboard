@@ -1,4 +1,4 @@
-import { env as publicEnv } from "$env/dynamic/public";
+import { env as publicEnv } from '$env/dynamic/public';
 interface ProjectType {
 	project_id: number;
 	owner_id: number;
@@ -235,9 +235,7 @@ export async function listAllLatestArtifacts(
 	accessToken: string
 ): Promise<ArtifactType[]> {
 	if (!projectName) throw new Error('projectName is required');
-	console.log(
-		`/api/v2.0/projects/${encodeURIComponentWithSlashEscape(projectName)}/artifacts?q=${encodeURIComponentWithSlashEscape('media_type=application/vnd.cncf.helm.config.v1+json')}`
-	);
+
 	const artifacts = await retrieve<ArtifactType[]>({
 		path: `/api/v2.0/projects/${encodeURIComponentWithSlashEscape(projectName)}/artifacts?q=${encodeURIComponentWithSlashEscape('media_type=application/vnd.cncf.helm.config.v1+json')}&latest_in_repository=true`,
 		accessToken,

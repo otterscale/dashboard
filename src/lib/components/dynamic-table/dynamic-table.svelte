@@ -56,13 +56,13 @@
 	import * as Table from '$lib/components/ui/table';
 	import { cn } from '$lib/utils';
 
-	import type { DataSchemaType, UISchemaType } from './utils';
+	import type { UISchemaType } from './utils';
 
 	let {
 		dataset,
 		columnDefinitions,
 		uiSchemas,
-		dataSchemas,
+		// dataSchemas,
 		accessReview,
 		create,
 		bulkDelete,
@@ -73,7 +73,7 @@
 		dataset: Record<string, JsonValue>[];
 		columnDefinitions: ColumnDef<Record<string, JsonValue>>[];
 		uiSchemas: Record<string, UISchemaType>;
-		dataSchemas: Record<string, DataSchemaType>;
+		// dataSchemas: Record<string, DataSchemaType>;
 		accessReview?: Snippet;
 		create?: Snippet;
 		bulkDelete?: Snippet<[{ table: TanStackTabke<Record<string, JsonValue>> }]>;

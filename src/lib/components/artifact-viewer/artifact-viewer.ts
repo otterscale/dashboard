@@ -53,7 +53,7 @@ function getArtifactUISchemas(): Record<ArtifactAttribute, UISchemaType> {
 
 function getArtifactData(
 	artifact: ArtifactType,
-	helmRepository: any,
+	helmRepository: any
 ): Record<ArtifactAttribute, JsonValue> {
 	const tags = (artifact.tags ?? []).map((t) => t.name);
 
@@ -141,9 +141,9 @@ function getArtifactColumnDefinitions(
 }
 
 export {
+	type ArtifactAttribute,
 	getArtifactColumnDefinitions,
 	getArtifactData,
 	getArtifactDataSchemas,
-	getArtifactUISchemas, type ArtifactAttribute
+	getArtifactUISchemas
 };
-

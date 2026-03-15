@@ -594,7 +594,10 @@
 							const isValid = validate(load(value));
 
 							if (!isValid) {
-								throw Error(`Validation errors: ${JSON.stringify(validate.errors)}`);
+								console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
+								toast.error('Validation failed. Please check the YAML.');
+								isSubmitting = false;
+								return;
 							}
 
 							const name = lodash.get(load(value), 'metadata.name');

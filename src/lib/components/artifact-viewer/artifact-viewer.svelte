@@ -172,6 +172,7 @@
 		if (isFetching || !namespace) return;
 
 		isFetching = true;
+		dataset = [];
 
 		try {
 			const response = await resourceClient.list({
@@ -228,7 +229,7 @@
 				</Item.Content>
 			</Item.Root>
 		</div>
-		<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {dataSchemas}>
+		<DynamicTable {dataset} {columnDefinitions} {uiSchemas}>
 			{#snippet gridsLayout({ table, handleClear })}
 				{#if table.getRowModel().rows?.length}
 					<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
