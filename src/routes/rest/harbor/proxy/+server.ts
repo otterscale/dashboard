@@ -95,10 +95,14 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 
 				const secret = secretResponse.object as any;
 				if (secret?.type === 'kubernetes.io/basic-auth' && secret?.data) {
-					const username = secret.data.username ? atob(secret.data.username) : '';
-					const password = secret.data.password ? atob(secret.data.password) : '';
+					const username = secret.data.username
+						? Buffer.from(secret.data.username, 'base64').toString('utf8')
+						: '';
+					const password = secret.data.password
+						? Buffer.from(secret.data.password, 'base64').toString('utf8')
+						: '';
 					if (username || password) {
-						authorizationHeader = `Basic ${btoa(`${username}:${password}`)}`;
+						authorizationHeader = `Basic ${Buffer.from(`${username}:${password}`, 'utf8').toString('base64')}`;
 					}
 				}
 			}
