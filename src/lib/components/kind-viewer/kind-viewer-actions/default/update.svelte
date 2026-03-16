@@ -1,14 +1,15 @@
 <script lang="ts">
-	import * as jsonpatch from 'fast-json-patch';
-	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
+	import { createClient, type Transport } from '@connectrpc/connect';
 	import { Plus } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import Ajv, { type Schema } from 'ajv';
+	import * as jsonpatch from 'fast-json-patch';
+	import { JsonPointer } from 'json-ptr';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext, tick } from 'svelte';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
-	import { parseDocument, YAMLError, isMap, isPair, isScalar } from 'yaml';
+	import { isMap, isPair, isScalar, parseDocument } from 'yaml';
 
 	import SchemaViewer from '$lib/components/schema-viewer/schema-viewer.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
@@ -218,6 +219,27 @@
 		monaco.editor.setModelMarkers(model, 'yaml-validator', markers);
 	}
 
+	function getPartialObject(identity: any, patches: jsonpatch.Operation[]) {
+		const partialObject = {
+			apiVersion: identity.apiVersion,
+			kind: identity.kind,
+			metadata: {
+				name: identity.metadata.name,
+				...(identity.metadata.namespace && { namespace: identity.metadata.namespace })
+			}
+		};
+
+		patches.forEach((patch) => {
+			if (patch.op === 'add' || patch.op === 'replace') {
+				JsonPointer.set(partialObject, patch.path, patch.value, true);
+			} else if (patch.op === 'remove') {
+				JsonPointer.set(partialObject, patch.path, null, true);
+			}
+		});
+
+		return partialObject;
+	}
+
 	function handleConfirm() {
 		if (isSubmitting) return;
 
@@ -225,7 +247,9 @@
 
 		const initialParsed = load(initialValue) as any;
 		const currentParsed = load(value) as any;
-		console.log(jsonpatch.compare(initialParsed, currentParsed));
+		const patches = jsonpatch.compare(initialParsed, currentParsed);
+		const partialObject = getPartialObject(initialParsed, patches);
+		console.log(partialObject);
 
 		const document = parseDocument(value);
 		if (document.errors.length > 0) {
@@ -242,30 +266,30 @@
 		isSubmitting = true;
 		const name = (parsed.metadata as { name: string })?.name || kind;
 
-		toast.promise(
-			async () => {
-				await resourceClient.create({
-					cluster,
-					namespace,
-					group,
-					version,
-					resource,
-					manifest: new TextEncoder().encode(JSON.stringify(parsed))
-				});
-			},
-			{
-				loading: `Creating ${kind} ${name}...`,
-				success: `Successfully created ${kind} ${name}`,
-				error: (error) => {
-					console.error(`Failed to create ${kind} ${name}:`, error);
-					return `Failed to create ${kind} ${name}: ${(error as ConnectError).message}`;
-				},
-				finally: () => {
-					// isSubmitting = false;
-					// open = false;
-				}
-			}
-		);
+		// toast.promise(
+		// 	async () => {
+		// 		await resourceClient.create({
+		// 			cluster,
+		// 			namespace,
+		// 			group,
+		// 			version,
+		// 			resource,
+		// 			manifest: new TextEncoder().encode(JSON.stringify(parsed))
+		// 		});
+		// 	},
+		// 	{
+		// 		loading: `Creating ${kind} ${name}...`,
+		// 		success: `Successfully created ${kind} ${name}`,
+		// 		error: (error) => {
+		// 			console.error(`Failed to create ${kind} ${name}:`, error);
+		// 			return `Failed to create ${kind} ${name}: ${(error as ConnectError).message}`;
+		// 		},
+		// 		finally: () => {
+		// 			isSubmitting = false;
+		// 			open = false;
+		// 		}
+		// 	}
+		// );
 	}
 </script>
 
