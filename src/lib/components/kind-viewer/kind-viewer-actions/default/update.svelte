@@ -5,7 +5,6 @@
 	import Ajv, { type Schema } from 'ajv';
 	import * as jsonpatch from 'fast-json-patch';
 	import { JSON_SCHEMA, load } from 'js-yaml';
-	import { JsonPointer } from 'json-ptr';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext, tick } from 'svelte';
@@ -210,26 +209,6 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	function getPartialObject(identity: any, patches: jsonpatch.Operation[]) {
-		const partialObject = {
-			apiVersion: identity.apiVersion,
-			kind: identity.kind,
-			metadata: {
-				name: identity.metadata.name,
-				...(identity.metadata.namespace && { namespace: identity.metadata.namespace })
-			}
-		};
-
-		patches.forEach((patch) => {
-			if (patch.op === 'add' || patch.op === 'replace') {
-				JsonPointer.set(partialObject, patch.path, patch.value, true);
-			} else if (patch.op === 'remove') {
-				JsonPointer.set(partialObject, patch.path, null, true);
-			}
-		});
-
-		return partialObject;
-	}
 	let open = $state(false);
 	let isSubmitting = $state(false);
 	function handleConfirm() {
@@ -239,11 +218,46 @@
 
 		const initialStructuredValue: any = load(stringify(object), { schema: JSON_SCHEMA });
 		const currentStructuredValue: any = load(value, { schema: JSON_SCHEMA });
+
 		const patches = jsonpatch.compare(initialStructuredValue, currentStructuredValue);
 
-		const partialObject = getPartialObject(initialStructuredValue, patches);
+		if (patches.length === 0) {
+			isSubmitting = false;
+			open = false;
+			return;
+		}
 
-		const manifest = new TextEncoder().encode(JSON.stringify(partialObject))
+		let partialManifestValue = lodash.cloneDeep(currentStructuredValue);
+
+		const systemFields = [
+			'clusterName',
+			'creationTimestamp',
+			'deletionGracePeriodSeconds',
+			'deletionTimestamp',
+			'finalizers',
+			'generateName',
+			'generation',
+			'initializers',
+			'managedFields',
+			'ownerReferences',
+			'resourceVersion',
+			'relationships',
+			'selfLink',
+			'state',
+			'uid',
+		];
+
+		if (partialManifestValue.metadata) {
+			for (const field of systemFields) {
+				if (partialManifestValue.metadata[field] !== undefined) {
+					delete partialManifestValue.metadata[field];
+				}
+			}
+		}
+
+		console.log(partialManifestValue);
+
+		const manifest = new TextEncoder().encode(JSON.stringify(partialManifestValue));
 		const name = lodash.get(initialStructuredValue, 'metadata.name');
 		toast.promise(
 			async () => {
