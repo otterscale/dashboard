@@ -31,14 +31,12 @@
 		cluster,
 		namespace,
 		latestChartArtifact,
-		harborBaseUrl,
-		authorizationHeader
+		helmRepositoryName
 	}: {
 		cluster: string;
 		namespace: string;
 		latestChartArtifact: ArtifactType;
-		harborBaseUrl: string;
-		authorizationHeader: string;
+		helmRepositoryName: string;
 	} = $props();
 
 	const [project, ...latestChartNameParts] = $derived(
@@ -102,12 +100,9 @@
 
 	let artifacts: ArtifactType[] = $state([]);
 	async function fetchArtifacts() {
-		if (!harborBaseUrl) return;
-
 		try {
 			const projectPath = encodeURIComponentWithSlashEscape(project);
 			const repositoryPath = encodeURIComponentWithSlashEscape(repository);
-			const artifactsUrl = `${harborBaseUrl}/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts?with_label=true`;
 
 			const response = await fetch('/rest/harbor/proxy', {
 				method: 'POST',
@@ -115,8 +110,10 @@
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify({
-					url: artifactsUrl,
-					authorization: authorizationHeader
+					cluster,
+					namespace,
+					helmRepositoryName,
+					apiPath: `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts?with_label=true`
 				})
 			});
 			if (!response.ok) {
@@ -169,14 +166,10 @@
 	}
 
 	async function getReferenceAddition(reference: string, addition: string) {
-		if (!harborBaseUrl) return null;
-
 		const projectPath = encodeURIComponentWithSlashEscape(project);
 		const repositoryPath = encodeURIComponentWithSlashEscape(repository);
 		const referencePath = encodeURIComponentWithSlashEscape(reference);
 		const additionPath = encodeURIComponentWithSlashEscape(addition);
-
-		const additionUrl = `${harborBaseUrl}/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${referencePath}/additions/${additionPath}`;
 
 		const response = await fetch('/rest/harbor/proxy', {
 			method: 'POST',
@@ -184,8 +177,10 @@
 				'Content-Type': 'application/json'
 			},
 			body: JSON.stringify({
-				url: additionUrl,
-				authorization: authorizationHeader
+				cluster,
+				namespace,
+				helmRepositoryName,
+				apiPath: `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${referencePath}/additions/${additionPath}`
 			})
 		});
 		if (!response.ok) {
