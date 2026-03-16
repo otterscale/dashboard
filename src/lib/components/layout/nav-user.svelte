@@ -53,7 +53,7 @@
 
 <svelte:window
 	use:shortcut={{
-		key: '/',
+		key: 'n',
 		ctrl: true,
 		callback: toggleNotification
 	}}

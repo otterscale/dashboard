@@ -270,7 +270,7 @@
 
 {#if isMounted}
 	{#if columnDefinitions}
-		<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {dataSchemas}>
+		<DynamicTable {dataset} {columnDefinitions} {uiSchemas}>
 			{#snippet accessReview()}
 				{#if isClusterAdmin}
 					<Toggle

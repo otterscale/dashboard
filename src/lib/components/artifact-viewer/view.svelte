@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
-	import { Eye } from '@lucide/svelte';
+	import { FileIcon } from '@lucide/svelte';
 	import lodash from 'lodash';
 	import { stringify } from 'yaml';
 
@@ -20,7 +20,7 @@
 
 <Dialog.Root bind:open>
 	<Dialog.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-		<Eye />
+		<FileIcon />
 	</Dialog.Trigger>
 	<Dialog.Content
 		class="flex h-fit max-h-[77vh] max-w-[62vw] min-w-[50vw] flex-col justify-between"

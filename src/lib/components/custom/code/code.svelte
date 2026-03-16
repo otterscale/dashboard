@@ -57,10 +57,10 @@
 		@apply overflow-x-auto rounded-lg bg-inherit py-4 text-sm;
 	}
 
-	:global(pre.shiki:not([data-code-overflow] *):not([data-code-overflow])) {
+	/* :global(pre.shiki:not([data-code-overflow] *):not([data-code-overflow])) {
 		@apply overflow-y-auto;
 		max-height: min(100%, 650px);
-	}
+	} */
 
 	:global(pre.shiki code) {
 		@apply grid min-w-full rounded-none border-0 bg-transparent p-0 break-words;
