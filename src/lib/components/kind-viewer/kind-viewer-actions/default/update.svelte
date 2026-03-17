@@ -313,7 +313,7 @@
 	</AlertDialog.Trigger>
 	<AlertDialog.Content class="min-w-[77vw]">
 		<AlertDialog.Header>
-			<AlertDialog.Title>Create Resource</AlertDialog.Title>
+			<AlertDialog.Title>Update Resource</AlertDialog.Title>
 		</AlertDialog.Header>
 		<div class="grid grid-cols-2 gap-4 *:max-h-[62vh] *:min-h-[62vh]">
 			<SchemaViewer schema={jsonSchema} class="h-full max-h-screen min-h-0 overflow-auto" />
