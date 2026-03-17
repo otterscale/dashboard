@@ -10,7 +10,7 @@ RUN npm install -g pnpm
 
 # Copy dependency files first for better caching
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile --ignore-scripts && pnpm store prune
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # Copy source code
 COPY . .
@@ -21,25 +21,21 @@ ENV VERSION=${VERSION}
 # Build the application
 RUN pnpm build
 
+# Prune to production dependencies only
+RUN pnpm prune --production --ignore-scripts && pnpm store prune
+
 # Runtime stage
-FROM node:24-alpine@sha256:c921b97d4b74f51744057454b306b418cf693865e73b8100559189605f6955b8
+FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:658a87364c8fcd8e09a199cbd06bf125932c32fe229993b2eda8fdde89b9f31e
 
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
-
-# Copy package.json and pnpm-lock.yaml
-COPY package.json pnpm-lock.yaml ./
-
-# Install only production dependencies
-RUN pnpm install --production --frozen-lockfile --ignore-scripts && pnpm store prune
-
-# Copy built application from builder stage
-COPY --from=builder --chown=nobody:nobody /src/build ./build
+# Copy built application and production dependencies from builder
+COPY --from=builder --chown=65532:65532 /src/build ./build
+COPY --from=builder --chown=65532:65532 /src/node_modules ./node_modules
+COPY --from=builder --chown=65532:65532 /src/package.json ./
 
 # Switch to non-root user
-USER nobody
+USER 65532:65532
 
 # Set environment variable
 ENV NODE_ENV=production
@@ -50,4 +46,4 @@ EXPOSE 3000
 # Labels
 LABEL maintainer="Chung-Hsuan Tsai <paul_tsai@phison.com>"
 
-CMD ["node", "./build"]
+CMD ["./build"]
