@@ -82,7 +82,7 @@
 		"@oslojs/crypto": "^1.0.1",
 		"@oslojs/encoding": "^1.1.0",
 		"@shikijs/langs": "^3.23.0",
-		"@shikijs/themes": "^3.23.0",
+		"@shikijs/themes": "^4.0.2",
 		"@sjsf/ajv8-validator": "^3.3.1",
 		"@sjsf/basic-theme": "^3.3.1",
 		"@sjsf/form": "^3.3.1",
