@@ -5,15 +5,16 @@
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
+	import { load } from 'js-yaml';
 	import lodash from 'lodash';
+	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
 	import { SvelteMap, SvelteURL } from 'svelte/reactivity';
+	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
 	import { env as publicEnv } from '$env/dynamic/public';
-	import type { ArtifactType } from '$lib/components/artifact-viewer/types';
-	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
@@ -21,6 +22,7 @@
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
+	import type { ArtifactType } from '$lib/server/harbor';
 
 	let {
 		cluster,
@@ -43,13 +45,6 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	// Validation
-	const jsonSchemaValidator = new Ajv({
-		allErrors: true,
-		strict: false
-	});
-	const validate = jsonSchemaValidator.compile(jsonSchema);
-
 	// Container for Data
 	let values: any = $state({
 		apiVersion: `${group}/${version}`,
@@ -62,6 +57,7 @@
 			model: {}
 		}
 	});
+	let value = $derived(stringify(values));
 
 	let mode: any = $state({});
 
@@ -176,8 +172,7 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						name: '',
-						namespace: ''
+						namespace: namespace
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -244,7 +239,7 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						image: ''
+						image: null
 					} as FormValue}
 					handleSubmit={{
 						posthook: (form) => {
@@ -738,11 +733,17 @@
 
 			<Tabs.Content value={steps[5]}>
 				<div class="flex h-full flex-col gap-3">
-					<Code.Root
-						lang="yaml"
-						class="no-shiki-limit w-full"
-						hideLines
-						code={stringify(values, null, 2)}
+					<Monaco
+						options={{
+							language: 'yaml',
+							padding: { top: 24 },
+							automaticLayout: true,
+							folding: true,
+							foldingStrategy: 'indentation',
+							showFoldingControls: 'always'
+						}}
+						bind:value
+						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
 					/>
 					<Button
 						class="mt-auto w-full"
@@ -751,17 +752,26 @@
 
 							isSubmitting = true;
 
-							const isValid = validate(values);
+							const jsonSchemaValidator = new Ajv({
+								allErrors: true,
+								strict: false
+							});
+							const validate = jsonSchemaValidator.compile(jsonSchema);
+
+							const isValid = validate(load(value));
 
 							if (!isValid) {
-								throw Error(`Validation errors: ${JSON.stringify(validate.errors)}`);
+								console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
+								toast.error('Validation failed. Please check the YAML.');
+								isSubmitting = false;
+								return;
 							}
 
-							const name = lodash.get(values, 'metadata.name');
+							const name = lodash.get(load(value), 'metadata.name');
 
 							toast.promise(
 								async () => {
-									const manifest = new TextEncoder().encode(JSON.stringify(values));
+									const manifest = new TextEncoder().encode(value);
 
 									await resourceClient.create({
 										cluster,

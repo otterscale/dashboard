@@ -2,6 +2,7 @@
 	import '@sjsf/form/fields/extra-widgets/combobox';
 	import 'highlight.js/styles/github.css';
 
+	import { FileTextIcon } from '@lucide/svelte';
 	import shell from 'highlight.js/lib/languages/shell';
 	import yaml from 'highlight.js/lib/languages/yaml';
 	import { mode as themeMode } from 'mode-watcher';
@@ -12,6 +13,7 @@
 	import Monaco from 'svelte-monaco';
 
 	import type { ButtonProps } from '$lib/components/ui/button/button.svelte';
+	import * as Empty from '$lib/components/ui/empty';
 	import * as Resizable from '$lib/components/ui/resizable';
 	import ScrollArea from '$lib/components/ui/scroll-area/scroll-area.svelte';
 
@@ -73,9 +75,7 @@
 
 	let open = $state(false);
 
-	if (!document) {
-		throw new Error('TailoredEditorDocument ui option is required for EditorWidget');
-	}
+	const documentRatio = $derived(document ? 50 : 23);
 </script>
 
 <Dialog.Root bind:open>
@@ -109,15 +109,27 @@
 			</div>
 		{/if}
 		<Resizable.PaneGroup direction="horizontal" class="min-h-0 flex-1">
-			<Resizable.Pane defaultSize={50}>
-				<ScrollArea class="h-full w-full" orientation="both">
-					<div class="markdown border px-4">
-						<Markdown {plugins} md={document} />
-					</div>
-				</ScrollArea>
+			<Resizable.Pane defaultSize={documentRatio}>
+				{#if document}
+					<ScrollArea class="h-full w-full" orientation="both">
+						<div class="markdown border px-4">
+							<Markdown {plugins} md={document} />
+						</div>
+					</ScrollArea>
+				{:else}
+					<Empty.Root class="h-full w-full border bg-muted">
+						<Empty.Content>
+							<Empty.Media variant="icon">
+								<FileTextIcon />
+							</Empty.Media>
+							<Empty.Title>No README Available</Empty.Title>
+							<Empty.Description>This chart does not include a README document.</Empty.Description>
+						</Empty.Content>
+					</Empty.Root>
+				{/if}
 			</Resizable.Pane>
 			<Resizable.Handle withHandle />
-			<Resizable.Pane defaultSize={50}>
+			<Resizable.Pane defaultSize={100 - documentRatio}>
 				<Monaco
 					options={{
 						language: 'yaml',

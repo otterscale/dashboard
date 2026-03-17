@@ -21,5 +21,5 @@
 </script>
 
 {#key cluster + namespace}
-	<ArtifactViewer />
+	<ArtifactViewer {cluster} {namespace} />
 {/key}

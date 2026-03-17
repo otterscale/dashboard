@@ -1,20 +1,16 @@
-<script lang="ts">
+<!-- <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { Plus } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
-	import { SubmitButton } from '@sjsf/form';
+	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
+	import { getValueSnapshot, setValue, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
-	import { load } from 'js-yaml';
 	import lodash from 'lodash';
-	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
-	import { SvelteURL } from 'svelte/reactivity';
-	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
-	import { env as publicEnv } from '$env/dynamic/public';
+	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -43,21 +39,23 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
+	// Validation
+	const jsonSchemaValidator = new Ajv({
+		allErrors: true,
+		strict: false
+	});
+	const validate = jsonSchemaValidator.compile(jsonSchema);
+
 	// Container for Data
 	let values: any = $state({
 		apiVersion: `${group}/${version}`,
 		kind,
 		metadata: {},
-		spec: {
-			source: {},
-			storage: {},
-			target: {}
-		}
+		spec: {}
 	});
-	let value = $derived(stringify(values));
 
 	// Steps Manager
-	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 3 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -122,8 +120,8 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						name: null,
-						namespace: namespace
+						name: '',
+						namespace: ''
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -151,20 +149,15 @@
 			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
-						...(lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.source.properties.huggingFace'),
-							['description', 'properties']
-						) as any),
+						...(lodash.omit(lodash.get(jsonSchema, 'properties.spec'), 'properties') as any),
 						properties: {
-							model: {
-								...lodash.omit(
-									lodash.get(
-										jsonSchema,
-										'properties.spec.properties.source.properties.huggingFace.properties.model'
-									),
-									'pattern'
-								),
-								title: 'Model'
+							type: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.type'),
+								title: 'Type'
+							},
+							url: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.url'),
+								title: 'URL'
 							}
 						}
 					} as Schema}
@@ -173,31 +166,32 @@
 							translations: {
 								submit: 'Next'
 							}
+						},
+						type: {
+							'ui:components': {
+								stringField: 'enumField'
+							},
+							'ui:options': {
+								disabledEnumValues: lodash
+									.get(jsonSchema, 'properties.spec.properties.type.enum')
+									.filter((type: string) => type !== 'oci')
+							}
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						model: ''
+						type: 'oci',
+						url: ''
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
-
-							const harborUrl = new SvelteURL(publicEnv.PUBLIC_HARBOR_URL ?? '');
-
-							const target = {
-								registry: harborUrl.host,
-								repository: `${namespace}/${lodash.get(values, 'metadata.name')}`,
-								tag: 'latest',
-								credentialsSecretRef: { name: 'harbor-credential' },
-								insecure: true
-							};
-
-							lodash.set(values, 'spec.target', target);
-
-							lodash.set(values, 'spec.format', 'ModelPack');
+							lodash.merge(values['spec'], {
+								interval: '10m',
+								secretRef: { name: 'harbor-credential' }
+							});
 						}
 					}}
-					bind:values={values['spec']['source']['huggingFace']}
+					bind:values={values['spec']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -215,70 +209,8 @@
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[2]}>
-				<Form
-					schema={{
-						...(lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.storage'),
-							'properties'
-						) as any),
-						title: 'Storage',
-						properties: {
-							size: {
-								...lodash.pick(
-									lodash.get(jsonSchema, 'properties.spec.properties.storage.properties.size'),
-									['description', 'type', 'pattern']
-								),
-								type: 'string',
-								title: 'Storage Size'
-							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{
-						size: '100Gi'
-					} as FormValue}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-					bind:values={values['spec']['storage']}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-
-			<Tabs.Content value={steps[3]}>
 				<div class="flex h-full flex-col gap-3">
-					<Monaco
-						options={{
-							language: 'yaml',
-							padding: { top: 24 },
-							automaticLayout: true,
-							folding: true,
-							foldingStrategy: 'indentation',
-							showFoldingControls: 'always'
-						}}
-						bind:value
-						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
-					/>
+					<Code.Root lang="yaml" class="w-full" hideLines code={stringify(values, null, 2)} />
 					<Button
 						class="mt-auto w-full"
 						onclick={() => {
@@ -286,27 +218,19 @@
 
 							isSubmitting = true;
 
-							// Validation
-							const jsonSchemaValidator = new Ajv({
-								allErrors: true,
-								strict: false
-							});
-							const validate = jsonSchemaValidator.compile(jsonSchema);
+							const isValid = validate(values);
 
-							const isValid = validate(load(value));
-
-							if (!isValid) {
+if (!isValid) {
 								console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
 								toast.error('Validation failed. Please check the YAML.');
 								isSubmitting = false;
 								return;
 							}
-
-							const name = lodash.get(load(value), 'metadata.name');
+							const name = lodash.get(values, 'metadata.name');
 
 							toast.promise(
 								async () => {
-									const manifest = new TextEncoder().encode(value);
+									const manifest = new TextEncoder().encode(JSON.stringify(values));
 
 									await resourceClient.create({
 										cluster,
@@ -340,4 +264,4 @@
 			</Tabs.Content>
 		</Tabs.Root>
 	</AlertDialog.Content>
-</AlertDialog.Root>
+</AlertDialog.Root> -->

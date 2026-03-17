@@ -5,10 +5,14 @@ import ApplicationCreate from './application/create.svelte';
 import ClusterRoleBindingActions from './cluster-role-binding/actions.svelte';
 import ClusterRoleBindingCreate from './cluster-role-binding/new-create.svelte';
 import CronJobActions from './cronjob/actions.svelte';
+import CronJobCreate from './cronjob/create.svelte';
 import DaemonSetActions from './daemonset/actions.svelte';
 import DefaultActions from './default/actions.svelte';
 import DefaultCreate from './default/create.svelte';
 import DeploymentActions from './deployment/actions.svelte';
+import HelmReleaseActions from './helm-release/actions.svelte';
+import HelmRepositoryActions from './helm-repository/actions.svelte';
+import HelmRepositoryCreate from './helm-repository/create.svelte';
 import JobActions from './job/actions.svelte';
 import ModelArtifactActions from './model-artifact/actions.svelte';
 import ModelArtifactCreate from './model-artifact/create.svelte';
@@ -52,6 +56,10 @@ function getCreate(kind: string): CreateType {
 	switch (kind) {
 		case 'Application':
 			return ApplicationCreate as CreateType;
+		case 'CronJob':
+			return CronJobCreate as CreateType;
+		case 'HelmRepository':
+			return HelmRepositoryCreate as CreateType;
 		case 'ClusterRoleBinding':
 			return ClusterRoleBindingCreate as CreateType;
 		case 'ModelService':
@@ -89,6 +97,10 @@ function getActions(kind: string): ActionsType {
 			return JobActions as ActionsType;
 		case 'CronJob':
 			return CronJobActions as ActionsType;
+		case 'HelmRelease':
+			return HelmReleaseActions as CreateType;
+		case 'HelmRepository':
+			return HelmRepositoryActions as ActionsType;
 		case 'ModelService':
 			return ModelServiceActions as ActionsType;
 		case 'ModelArtifact':
