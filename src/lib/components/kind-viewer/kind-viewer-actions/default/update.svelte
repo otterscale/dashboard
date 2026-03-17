@@ -29,7 +29,7 @@
 		onOpenChangeComplete
 	}: {
 		cluster: string;
-		namespace: string;
+		namespace?: string;
 		group: string;
 		version: string;
 		kind: string;

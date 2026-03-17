@@ -24,7 +24,7 @@ import SimpleAppActions from './simple-app/actions.svelte';
 import SimpleAppCreate from './simple-app/create.svelte';
 import StatefulSetActions from './statefulset/actions.svelte';
 import WorkspaceActions from './workspace/actions.svelte';
-import WorkspaceCreate from './workspace/new-create.svelte';
+import WorkspaceCreate from './workspace/create.svelte';
 
 type RoleType = 'admin' | 'edit' | 'view';
 
