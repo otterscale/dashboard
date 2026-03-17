@@ -5,7 +5,6 @@ import ApplicationCreate from './application/create.svelte';
 import ClusterRoleBindingActions from './cluster-role-binding/actions.svelte';
 import ClusterRoleBindingCreate from './cluster-role-binding/new-create.svelte';
 import CronJobActions from './cronjob/actions.svelte';
-import CronJobCreate from './cronjob/create.svelte';
 import DaemonSetActions from './daemonset/actions.svelte';
 import DefaultActions from './default/actions.svelte';
 import DefaultCreate from './default/create.svelte';
@@ -19,7 +18,6 @@ import ModelArtifactCreate from './model-artifact/create.svelte';
 import ModelServiceActions from './model-service/actions.svelte';
 import ModelServiceCreate from './model-service/create.svelte';
 import PodActions from './pod/actions.svelte';
-import ReplicaSetActions from './replicaset/actions.svelte';
 import ResourceQuotaActions from './resource-quota/actions.svelte';
 import ResourceQuotaCreate from './resource-quota/create.svelte';
 import SimpleAppActions from './simple-app/actions.svelte';
@@ -56,8 +54,6 @@ function getCreate(kind: string): CreateType {
 	switch (kind) {
 		case 'Application':
 			return ApplicationCreate as CreateType;
-		case 'CronJob':
-			return CronJobCreate as CreateType;
 		case 'HelmRepository':
 			return HelmRepositoryCreate as CreateType;
 		case 'ClusterRoleBinding':
@@ -89,8 +85,6 @@ function getActions(kind: string): ActionsType {
 			return DeploymentActions as ActionsType;
 		case 'StatefulSet':
 			return StatefulSetActions as ActionsType;
-		case 'ReplicaSet':
-			return ReplicaSetActions as ActionsType;
 		case 'DaemonSet':
 			return DaemonSetActions as ActionsType;
 		case 'Job':
