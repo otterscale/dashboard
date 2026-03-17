@@ -244,7 +244,7 @@
 			'relationships',
 			'selfLink',
 			'state',
-			'uid',
+			'uid'
 		];
 
 		if (partialManifestValue.metadata) {
