@@ -6,6 +6,7 @@
 	import Log from '$lib/components/kind-viewer/kind-viewer-actions/default/log.svelte';
 	import Restart from '$lib/components/kind-viewer/kind-viewer-actions/default/restart.svelte';
 	import Terminal from '$lib/components/kind-viewer/kind-viewer-actions/default/terminal.svelte';
+	import Update from '$lib/components/kind-viewer/kind-viewer-actions/default/update.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
@@ -88,6 +89,21 @@
 					{kind}
 					{resource}
 					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Item onSelect={(e) => e.preventDefault()}>
+				<Update
+					{schema}
+					{object}
+					{cluster}
+					{namespace}
+					{group}
+					{version}
+					{kind}
+					{resource}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
 					}}

@@ -255,8 +255,6 @@
 			}
 		}
 
-		console.log(partialManifestValue);
-
 		const manifest = new TextEncoder().encode(JSON.stringify(partialManifestValue));
 		const name = lodash.get(initialStructuredValue, 'metadata.name');
 		toast.promise(
@@ -269,7 +267,8 @@
 					resource,
 					name,
 					manifest,
-					fieldManager: 'otterscale-web-ui'
+					fieldManager: 'otterscale-web-ui',
+					force: true
 				});
 			},
 			{
