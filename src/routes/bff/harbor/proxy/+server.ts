@@ -35,7 +35,6 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 			const cached = JSON.parse(cachedCredentials);
 			harborBaseUrl = cached.harborBaseUrl;
 			authorizationHeader = cached.authorizationHeader;
-			console.log(harborBaseUrl, authorizationHeader)
 		} else {
 			const proxyHeaderInterceptor: Interceptor = (next) => async (req) => {
 				req.header.set('x-proxy-target', 'api');
