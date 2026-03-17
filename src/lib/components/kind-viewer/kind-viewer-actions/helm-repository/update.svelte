@@ -118,7 +118,7 @@
 							},
 							labels: {
 								title: 'Labels',
-								...lodash.get(jsonSchema, 'properties.metadata.properties.labels'),
+								...lodash.get(jsonSchema, 'properties.metadata.properties.labels')
 							}
 						}
 					} as Schema}
@@ -127,8 +127,7 @@
 							translations: {
 								submit: 'Next'
 							}
-						},
-						
+						}
 					} as UiSchemaRoot}
 					initialValue={{
 						name: lodash.get(object, 'metadata.name'),

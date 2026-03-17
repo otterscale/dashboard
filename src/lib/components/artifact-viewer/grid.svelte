@@ -3,11 +3,8 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import Icon from '@iconify/svelte';
 	import { BookmarkIcon, DownloadIcon, TagsIcon } from '@lucide/svelte';
-	import {
-		ResourceService,
-		type SchemaRequest
-	} from '@otterscale/api/resource/v1';
-	import { } from '@otterscale/types';
+	import { ResourceService, type SchemaRequest } from '@otterscale/api/resource/v1';
+	import {} from '@otterscale/types';
 	import { type Schema, SubmitButton, type UiSchemaRoot } from '@sjsf/form';
 	import type { Row } from '@tanstack/table-core';
 	import Ajv from 'ajv';
@@ -34,7 +31,7 @@
 	let {
 		row,
 		cluster,
-		namespace,
+		namespace
 	}: {
 		row: Row<Record<ArtifactAttribute, JsonValue>>;
 		cluster: string;
@@ -98,8 +95,6 @@
 		}
 	});
 
-
-
 	let artifacts: ArtifactType[] = $state([]);
 	async function fetchArtifacts() {
 		try {
@@ -149,7 +144,6 @@
 	});
 
 	async function getReferenceAddition(reference: string, addition: string) {
-
 		const projectPath = encodeURIComponentWithSlashEscape(project);
 		const repositoryPath = encodeURIComponentWithSlashEscape(repository);
 		const referencePath = encodeURIComponentWithSlashEscape(reference);
@@ -287,7 +281,7 @@
 												}
 											}
 										} as UiSchemaRoot}
-										initialValue={{namespace: namespace}}
+										initialValue={{ namespace: namespace }}
 										bind:values={values['metadata']}
 										handleSubmit={{
 											posthook: () => {
@@ -349,14 +343,14 @@
 																jsonSchema,
 																'properties.spec.properties.chart.properties.spec.properties.sourceRef.properties.name'
 															) as Schema),
-															title: 'Name',
+															title: 'Name'
 														},
 														namespace: {
 															...(lodash.get(
 																jsonSchema,
 																'properties.spec.properties.chart.properties.spec.properties.sourceRef.properties.namespace'
 															) as Schema),
-															title: 'Namespace',
+															title: 'Namespace'
 														}
 													}
 												}
@@ -372,7 +366,7 @@
 												'ui:components': {
 													stringField: 'enumField'
 												}
-											},
+											}
 										} as UiSchemaRoot}
 										initialValue={{
 											chart: lodash.get(latestChartArtifact.extra_attrs, 'name'),
@@ -381,7 +375,7 @@
 												apiVersion: lodash.get(helmRepository, 'apiVersion'),
 												kind: lodash.get(helmRepository, 'kind'),
 												name: lodash.get(helmRepository, 'metadata.name'),
-												namespace: lodash.get(helmRepository, 'metadata.namespace'),
+												namespace: lodash.get(helmRepository, 'metadata.namespace')
 											}
 										} as any}
 										bind:values={values['spec']['chart']['spec']}

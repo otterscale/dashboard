@@ -32,8 +32,6 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	
-
 	function getProjectName(helmRepository: any): string {
 		const helmRepositoryName = lodash.get(helmRepository, 'metadata.name');
 
@@ -45,8 +43,6 @@
 
 		return project;
 	}
-
-	
 
 	let dataset: Record<ArtifactAttribute, JsonValue>[] = $state([]);
 	async function fetchChartsByHelmRepository(helmRepository: any) {
@@ -64,7 +60,9 @@
 		const projectName = getProjectName(helmRepository);
 		try {
 			const encodedProject = encodeURIComponentWithSlashEscape(projectName);
-			const mediaTypeQuery = encodeURIComponentWithSlashEscape('media_type=application/vnd.cncf.helm.config.v1+json');
+			const mediaTypeQuery = encodeURIComponentWithSlashEscape(
+				'media_type=application/vnd.cncf.helm.config.v1+json'
+			);
 			const artifactsUrl = `/api/v2.0/projects/${encodedProject}/artifacts?q=${mediaTypeQuery}&latest_in_repository=true`;
 			const response = await fetch('/bff/harbor/proxy', {
 				method: 'POST',
@@ -87,18 +85,14 @@
 			dataset = [...dataset, ...data];
 		} catch (error) {
 			console.error(`HelmRepository "${helmRepositoryName}": error fetching charts:`, error);
-			toast.error(
-				`HelmRepository "${helmRepositoryName}": unable to reach repository`
-			);
+			toast.error(`HelmRepository "${helmRepositoryName}": unable to reach repository`);
 		}
 	}
 
 	const uiSchemas: Record<string, UISchemaType> = getArtifactUISchemas();
 	const dataSchemas: Record<string, DataSchemaType> = getArtifactDataSchemas();
-	const columnDefinitions: ColumnDef<Record<ArtifactAttribute, JsonValue>>[] = getArtifactColumnDefinitions(
-		uiSchemas,
-		dataSchemas
-	);
+	const columnDefinitions: ColumnDef<Record<ArtifactAttribute, JsonValue>>[] =
+		getArtifactColumnDefinitions(uiSchemas, dataSchemas);
 
 	let isFetching = $state(false);
 
@@ -168,11 +162,7 @@
 				{#if table.getRowModel().rows?.length}
 					<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
 						{#each table.getRowModel().rows as row (row.id)}
-							<Grid
-								{row}
-								{cluster}
-								{namespace}
-							/>
+							<Grid {row} {cluster} {namespace} />
 						{/each}
 					</div>
 				{:else}
