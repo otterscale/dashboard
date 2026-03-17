@@ -52,10 +52,10 @@ importers:
         version: 3.3.1(esm-env@1.2.2)(svelte@5.53.12)
       '@sjsf/lucide-icons':
         specifier: ^3.3.1
-        version: 3.3.1(@lucide/svelte@0.561.0(svelte@5.53.12))(@sjsf/form@3.3.1(esm-env@1.2.2)(svelte@5.53.12))(svelte@5.53.12)
+        version: 3.3.1(@lucide/svelte@0.575.0(svelte@5.53.12))(@sjsf/form@3.3.1(esm-env@1.2.2)(svelte@5.53.12))(svelte@5.53.12)
       '@sjsf/shadcn4-theme':
         specifier: ^3.3.1
-        version: 3.3.1(@internationalized/date@3.12.0)(@lucide/svelte@0.561.0(svelte@5.53.12))(@sjsf/form@3.3.1(esm-env@1.2.2)(svelte@5.53.12))(bits-ui@2.16.3(@internationalized/date@3.12.0)(@sveltejs/kit@2.55.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.53.12)(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.31.1)(yaml@2.8.2)))(svelte@5.53.12)(typescript@5.9.3)(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.31.1)(yaml@2.8.2)))(svelte@5.53.12))(clsx@2.1.1)(svelte@5.53.12)(tailwind-merge@3.5.0)(tailwind-variants@3.2.2(tailwind-merge@3.5.0)(tailwindcss@4.2.1))
+        version: 3.3.1(@internationalized/date@3.12.0)(@lucide/svelte@0.575.0(svelte@5.53.12))(@sjsf/form@3.3.1(esm-env@1.2.2)(svelte@5.53.12))(bits-ui@2.16.3(@internationalized/date@3.12.0)(@sveltejs/kit@2.55.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.53.12)(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.31.1)(yaml@2.8.2)))(svelte@5.53.12)(typescript@5.9.3)(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.31.1)(yaml@2.8.2)))(svelte@5.53.12))(clsx@2.1.1)(svelte@5.53.12)(tailwind-merge@3.5.0)(tailwind-variants@3.2.2(tailwind-merge@3.5.0)(tailwindcss@4.2.1))
       '@xterm/addon-clipboard':
         specifier: ^0.2.0
         version: 0.2.0
@@ -178,8 +178,8 @@ importers:
         specifier: ^3.12.0
         version: 3.12.0
       '@lucide/svelte':
-        specifier: ^0.561.0
-        version: 0.561.0(svelte@5.53.12)
+        specifier: ^0.575.0
+        version: 0.575.0(svelte@5.53.12)
       '@otterscale/api':
         specifier: 0.9.0-beta.1
         version: 0.9.0-beta.1
@@ -707,8 +707,8 @@ packages:
   '@lix-js/server-protocol-schema@0.1.1':
     resolution: {integrity: sha512-jBeALB6prAbtr5q4vTuxnRZZv1M2rKe8iNqRQhFJ4Tv7150unEa0vKyz0hs8Gl3fUGsWaNJBh3J8++fpbrpRBQ==}
 
-  '@lucide/svelte@0.561.0':
-    resolution: {integrity: sha512-vofKV2UFVrKE6I4ewKJ3dfCXSV6iP6nWVmiM83MLjsU91EeJcEg7LoWUABLp/aOTxj1HQNbJD1f3g3L0JQgH9A==}
+  '@lucide/svelte@0.575.0':
+    resolution: {integrity: sha512-FEFp/0McZwsjBqh1Dn8H+UBm1yHFQYk+utuVMFDw57155+wz2XMoc1pw027ylCPzs+bi14UEXYKbekFhuJKtnw==}
     peerDependencies:
       svelte: ^5
 
@@ -3562,7 +3562,7 @@ snapshots:
 
   '@lix-js/server-protocol-schema@0.1.1': {}
 
-  '@lucide/svelte@0.561.0(svelte@5.53.12)':
+  '@lucide/svelte@0.575.0(svelte@5.53.12)':
     dependencies:
       svelte: 5.53.12
 
@@ -3765,15 +3765,15 @@ snapshots:
       jsonpointer: 5.0.1
       svelte: 5.53.12
 
-  '@sjsf/lucide-icons@3.3.1(@lucide/svelte@0.561.0(svelte@5.53.12))(@sjsf/form@3.3.1(esm-env@1.2.2)(svelte@5.53.12))(svelte@5.53.12)':
+  '@sjsf/lucide-icons@3.3.1(@lucide/svelte@0.575.0(svelte@5.53.12))(@sjsf/form@3.3.1(esm-env@1.2.2)(svelte@5.53.12))(svelte@5.53.12)':
     dependencies:
-      '@lucide/svelte': 0.561.0(svelte@5.53.12)
+      '@lucide/svelte': 0.575.0(svelte@5.53.12)
       '@sjsf/form': 3.3.1(esm-env@1.2.2)(svelte@5.53.12)
       svelte: 5.53.12
 
-  '@sjsf/shadcn4-theme@3.3.1(@internationalized/date@3.12.0)(@lucide/svelte@0.561.0(svelte@5.53.12))(@sjsf/form@3.3.1(esm-env@1.2.2)(svelte@5.53.12))(bits-ui@2.16.3(@internationalized/date@3.12.0)(@sveltejs/kit@2.55.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.53.12)(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.31.1)(yaml@2.8.2)))(svelte@5.53.12)(typescript@5.9.3)(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.31.1)(yaml@2.8.2)))(svelte@5.53.12))(clsx@2.1.1)(svelte@5.53.12)(tailwind-merge@3.5.0)(tailwind-variants@3.2.2(tailwind-merge@3.5.0)(tailwindcss@4.2.1))':
+  '@sjsf/shadcn4-theme@3.3.1(@internationalized/date@3.12.0)(@lucide/svelte@0.575.0(svelte@5.53.12))(@sjsf/form@3.3.1(esm-env@1.2.2)(svelte@5.53.12))(bits-ui@2.16.3(@internationalized/date@3.12.0)(@sveltejs/kit@2.55.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.53.12)(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.31.1)(yaml@2.8.2)))(svelte@5.53.12)(typescript@5.9.3)(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.31.1)(yaml@2.8.2)))(svelte@5.53.12))(clsx@2.1.1)(svelte@5.53.12)(tailwind-merge@3.5.0)(tailwind-variants@3.2.2(tailwind-merge@3.5.0)(tailwindcss@4.2.1))':
     dependencies:
-      '@lucide/svelte': 0.561.0(svelte@5.53.12)
+      '@lucide/svelte': 0.575.0(svelte@5.53.12)
       '@sjsf/basic-theme': 3.3.1(@sjsf/form@3.3.1(esm-env@1.2.2)(svelte@5.53.12))(svelte@5.53.12)
       '@sjsf/form': 3.3.1(esm-env@1.2.2)(svelte@5.53.12)
       bits-ui: 2.16.3(@internationalized/date@3.12.0)(@sveltejs/kit@2.55.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.53.12)(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.31.1)(yaml@2.8.2)))(svelte@5.53.12)(typescript@5.9.3)(vite@7.3.1(@types/node@25.5.0)(jiti@2.6.1)(lightningcss@1.31.1)(yaml@2.8.2)))(svelte@5.53.12)
