@@ -1,14 +1,12 @@
 <script lang="ts">
+	import type { JsonValue } from '@bufbuild/protobuf';
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import Icon from '@iconify/svelte';
 	import { BookmarkIcon, DownloadIcon, TagsIcon } from '@lucide/svelte';
-	import {
-		type ListRequest,
-		ResourceService,
-		type SchemaRequest
-	} from '@otterscale/api/resource/v1';
+	import { ResourceService, type SchemaRequest } from '@otterscale/api/resource/v1';
 	import {} from '@otterscale/types';
 	import { type Schema, SubmitButton, type UiSchemaRoot } from '@sjsf/form';
+	import type { Row } from '@tanstack/table-core';
 	import Ajv from 'ajv';
 	import { load } from 'js-yaml';
 	import lodash from 'lodash';
@@ -27,19 +25,22 @@
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import type { ArtifactType } from '$lib/server/harbor';
 
+	import type { ArtifactAttribute } from './artifact-viewer';
+	import { encodeURIComponentWithSlashEscape } from './utils.svelte';
+
 	let {
+		row,
 		cluster,
-		namespace,
-		latestChartArtifact,
-		harborBaseUrl,
-		authorizationHeader
+		namespace
 	}: {
+		row: Row<Record<ArtifactAttribute, JsonValue>>;
 		cluster: string;
 		namespace: string;
-		latestChartArtifact: ArtifactType;
-		harborBaseUrl: string;
-		authorizationHeader: string;
 	} = $props();
+
+	const latestChartArtifact = $derived(row.original.raw as unknown as ArtifactType);
+	const helmRepository = $derived(row.original.helmRepository as any);
+	const helmRepositoryName = lodash.get(helmRepository, 'metadata.name', 'unknown');
 
 	const [project, ...latestChartNameParts] = $derived(
 		latestChartArtifact.repository_name.split('/')
@@ -94,29 +95,23 @@
 		}
 	});
 
-	function encodeURIComponentWithSlashEscape(value: string): string {
-		return value.includes('/')
-			? encodeURIComponent(encodeURIComponent(value))
-			: encodeURIComponent(value);
-	}
-
 	let artifacts: ArtifactType[] = $state([]);
 	async function fetchArtifacts() {
-		if (!harborBaseUrl) return;
-
 		try {
 			const projectPath = encodeURIComponentWithSlashEscape(project);
 			const repositoryPath = encodeURIComponentWithSlashEscape(repository);
-			const artifactsUrl = `${harborBaseUrl}/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts?with_label=true`;
+			const artifactsUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts?with_label=true`;
 
-			const response = await fetch('/rest/harbor/proxy', {
+			const response = await fetch('/bff/harbor/proxy', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify({
-					url: artifactsUrl,
-					authorization: authorizationHeader
+					cluster,
+					namespace,
+					helmRepositoryName,
+					apiPath: artifactsUrl
 				})
 			});
 			if (!response.ok) {
@@ -148,44 +143,24 @@
 		}
 	});
 
-	// HelmRepository resources in the namespace
-	let helmRepositories: any[] = $state([]);
-	async function fetchHelmRepositories() {
-		try {
-			const response = await resourceClient.list({
-				cluster,
-				namespace,
-				group: 'source.toolkit.fluxcd.io',
-				version: 'v1',
-				resource: 'helmrepositories'
-			} as ListRequest);
-			helmRepositories = response.items.map((item) => item.object);
-		} catch (error) {
-			console.error('Failed to fetch HelmRepositories:', error);
-		}
-	}
-	function getSelectedSourceReferences(name: string) {
-		return helmRepositories.find((repositoryItem) => repositoryItem.metadata.name === name);
-	}
-
 	async function getReferenceAddition(reference: string, addition: string) {
-		if (!harborBaseUrl) return null;
-
 		const projectPath = encodeURIComponentWithSlashEscape(project);
 		const repositoryPath = encodeURIComponentWithSlashEscape(repository);
 		const referencePath = encodeURIComponentWithSlashEscape(reference);
 		const additionPath = encodeURIComponentWithSlashEscape(addition);
 
-		const additionUrl = `${harborBaseUrl}/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${referencePath}/additions/${additionPath}`;
+		const additionUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${referencePath}/additions/${additionPath}`;
 
-		const response = await fetch('/rest/harbor/proxy', {
+		const response = await fetch('/bff/harbor/proxy', {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json'
 			},
 			body: JSON.stringify({
-				url: additionUrl,
-				authorization: authorizationHeader
+				cluster,
+				namespace,
+				helmRepositoryName,
+				apiPath: additionUrl
 			})
 		});
 		if (!response.ok) {
@@ -229,7 +204,7 @@
 	let isSubmitting = $state(false);
 
 	onMount(async () => {
-		await Promise.all([fetchSchema(), fetchArtifacts(), fetchHelmRepositories()]);
+		await Promise.all([fetchSchema(), fetchArtifacts()]);
 	});
 </script>
 
@@ -306,7 +281,7 @@
 												}
 											}
 										} as UiSchemaRoot}
-										initialValue={{}}
+										initialValue={{ namespace: namespace }}
 										bind:values={values['metadata']}
 										handleSubmit={{
 											posthook: () => {
@@ -368,8 +343,14 @@
 																jsonSchema,
 																'properties.spec.properties.chart.properties.spec.properties.sourceRef.properties.name'
 															) as Schema),
-															title: 'Name',
-															enum: helmRepositories.map((repository) => repository.metadata.name)
+															title: 'Name'
+														},
+														namespace: {
+															...(lodash.get(
+																jsonSchema,
+																'properties.spec.properties.chart.properties.spec.properties.sourceRef.properties.namespace'
+															) as Schema),
+															title: 'Namespace'
 														}
 													}
 												}
@@ -385,33 +366,19 @@
 												'ui:components': {
 													stringField: 'enumField'
 												}
-											},
-											sourceRef: {
-												name: {
-													'ui:components': {
-														stringField: 'enumField'
-													}
-												}
 											}
 										} as UiSchemaRoot}
 										initialValue={{
 											chart: lodash.get(latestChartArtifact.extra_attrs, 'name'),
-											version: lodash.get(latestChartArtifact.extra_attrs, 'version')
+											version: lodash.get(latestChartArtifact.extra_attrs, 'version'),
+											sourceRef: {
+												apiVersion: lodash.get(helmRepository, 'apiVersion'),
+												kind: lodash.get(helmRepository, 'kind'),
+												name: lodash.get(helmRepository, 'metadata.name'),
+												namespace: lodash.get(helmRepository, 'metadata.namespace')
+											}
 										} as any}
 										bind:values={values['spec']['chart']['spec']}
-										transformer={(value: any) => {
-											const selectedSourceReference = getSelectedSourceReferences(
-												lodash.get(value, 'sourceRef.name')
-											);
-											lodash.set(value, 'sourceRef', {
-												apiVersion: selectedSourceReference?.apiVersion,
-												kind: selectedSourceReference?.kind,
-												metadata: {
-													name: selectedSourceReference?.metadata?.name
-												}
-											});
-											return value;
-										}}
 										handleSubmit={{
 											posthook: () => {
 												handleNext();
