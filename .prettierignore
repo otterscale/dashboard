@@ -16,3 +16,6 @@ bun.lockb
 
 # Claude
 .claude
+
+# Inlang
+project.inlang
