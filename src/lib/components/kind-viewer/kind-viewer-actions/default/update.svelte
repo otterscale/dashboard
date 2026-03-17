@@ -255,8 +255,6 @@
 			}
 		}
 
-		console.log(partialManifestValue);
-
 		const manifest = new TextEncoder().encode(JSON.stringify(partialManifestValue));
 		const name = lodash.get(initialStructuredValue, 'metadata.name');
 		toast.promise(
