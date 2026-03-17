@@ -25,7 +25,7 @@ RUN pnpm build
 RUN pnpm prune --production --ignore-scripts && pnpm store prune
 
 # Runtime stage
-FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:658a87364c8fcd8e09a199cbd06bf125932c32fe229993b2eda8fdde89b9f31e
+FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:56d532109c00500d7bf42b3c999e596b3ba546de15c704da1507aa02bba2f0ff
 
 WORKDIR /app
 
