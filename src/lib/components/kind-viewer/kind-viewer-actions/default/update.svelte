@@ -269,7 +269,8 @@
 					resource,
 					name,
 					manifest,
-					fieldManager: 'otterscale-web-ui'
+					fieldManager: 'otterscale-web-ui',
+					force: true
 				});
 			},
 			{
