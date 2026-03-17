@@ -12,7 +12,6 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"format": "prettier --write .",
-		"lint:ci": "git diff --name-only --diff-filter=d origin/main...HEAD | grep -E '\\.(js|ts|svelte)$' | xargs -r npx eslint",
 		"lint": "prettier --check . && eslint . --cache",
 		"test:unit": "vitest",
 		"test": "npm run test:unit -- --run && npm run test:e2e",
