@@ -454,56 +454,47 @@
 						hideLines
 						code={stringify(submissionValues, null, 2)}
 					/>
-					<div class="mt-auto flex w-full items-center justify-between gap-3">
-						<Button
-							onclick={() => {
-								handlePrevious();
-							}}
-						>
-							Previous
-						</Button>
-						<Button
-							class="flex-1"
-							onclick={() => {
-								if (isSubmitting) return;
+					<Button
+						class="mt-auto w-full"
+						onclick={() => {
+							if (isSubmitting) return;
 
-								isSubmitting = true;
+							isSubmitting = true;
 
-								const name = submissionValues.metadata.name;
+							const name = submissionValues.metadata.name;
 
-								toast.promise(
-									async () => {
-										const manifest = new TextEncoder().encode(JSON.stringify(submissionValues));
+							toast.promise(
+								async () => {
+									const manifest = new TextEncoder().encode(JSON.stringify(submissionValues));
 
-										await resourceClient.create({
-											cluster,
-											group,
-											version,
-											resource,
-											manifest
-										});
+									await resourceClient.create({
+										cluster,
+										group,
+										version,
+										resource,
+										manifest
+									});
+								},
+								{
+									loading: `Creating ClusterRoleBinding ${name}...`,
+									success: () => {
+										onsuccess?.();
+										return `Successfully created ClusterRoleBinding ${name}`;
 									},
-									{
-										loading: `Creating ClusterRoleBinding ${name}...`,
-										success: () => {
-											onsuccess?.();
-											return `Successfully created ClusterRoleBinding ${name}`;
-										},
-										error: (error) => {
-											console.error(`Failed to create ClusterRoleBinding ${name}:`, error);
-											return `Failed to create ClusterRoleBinding ${name}: ${(error as ConnectError).message}`;
-										},
-										finally() {
-											isSubmitting = false;
-											open = false;
-										}
+									error: (error) => {
+										console.error(`Failed to create ClusterRoleBinding ${name}:`, error);
+										return `Failed to create ClusterRoleBinding ${name}: ${(error as ConnectError).message}`;
+									},
+									finally() {
+										isSubmitting = false;
+										open = false;
 									}
-								);
-							}}
-						>
-							Create
-						</Button>
-					</div>
+								}
+							);
+						}}
+					>
+						Create
+					</Button>
 				</div>
 			</Tabs.Content>
 		</Tabs.Root>
