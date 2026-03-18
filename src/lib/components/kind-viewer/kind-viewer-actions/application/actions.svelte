@@ -66,24 +66,6 @@
 					}}
 				/>
 			</DropdownMenu.Item>
-			<!-- <DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<Edit
-					{schema}
-					{object}
-					{cluster}
-					{group}
-					{version}
-					{kind}
-					{resource}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
-			</DropdownMenu.Item> -->
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();

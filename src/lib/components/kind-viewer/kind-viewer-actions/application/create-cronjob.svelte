@@ -13,10 +13,11 @@
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
+	import { page } from '$app/stores';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
@@ -45,54 +46,12 @@
 	const resourceClient = createClient(ResourceService, transport);
 
 	// Timezone List
-	function getTimezones(): string[] {
-		try {
-			const timezones = Intl.supportedValuesOf('timeZone');
-			return timezones.sort((previous, next) => {
-				if (previous === 'Etc/UTC') return -1;
-				if (next === 'Etc/UTC') return 1;
-				return previous.localeCompare(next);
-			});
-		} catch {
-			return [
-				'Etc/UTC',
-				'Africa/Cairo',
-				'Africa/Johannesburg',
-				'Africa/Lagos',
-				'Africa/Nairobi',
-				'America/Anchorage',
-				'America/Chicago',
-				'America/Denver',
-				'America/Los_Angeles',
-				'America/New_York',
-				'America/Sao_Paulo',
-				'America/Toronto',
-				'Asia/Dubai',
-				'Asia/Hong_Kong',
-				'Asia/Kolkata',
-				'Asia/Seoul',
-				'Asia/Shanghai',
-				'Asia/Singapore',
-				'Asia/Taipei',
-				'Asia/Tokyo',
-				'Australia/Melbourne',
-				'Australia/Sydney',
-				'Europe/Amsterdam',
-				'Europe/Berlin',
-				'Europe/London',
-				'Europe/Moscow',
-				'Europe/Paris',
-				'Pacific/Auckland',
-				'Pacific/Honolulu'
-			];
-		}
-	}
+	const timezones = $derived($page.data.timezones ?? []);
 
-	const timezones = getTimezones();
 	async function fetchTimezones(search: string): Promise<{ label: string; value: string }[]> {
 		return timezones
-			.filter((timezone) => timezone.toLowerCase().includes(search.toLowerCase()))
-			.map((timezone) => ({
+			.filter((timezone: string) => timezone.toLowerCase().includes(search.toLowerCase()))
+			.map((timezone: string) => ({
 				label: timezone,
 				value: timezone
 			}));
@@ -133,14 +92,14 @@
 	let isSubmitting = $state(false);
 </script>
 
-<AlertDialog.Root
+<Dialog.Root
 	bind:open
 	onOpenChange={() => {
 		reset();
 	}}
 	{onOpenChangeComplete}
 >
-	<AlertDialog.Trigger>
+	<Dialog.Trigger>
 		{#snippet child({ props })}
 			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
 				<Item.Media>
@@ -151,8 +110,8 @@
 				</Item.Content>
 			</Item.Root>
 		{/snippet}
-	</AlertDialog.Trigger>
-	<AlertDialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
+	</Dialog.Trigger>
+	<Dialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
 		<Item.Root class="p-0">
 			<Progress value={currentIndex + 1} max={steps.length} />
 			<Item.Content class="text-left">
@@ -160,7 +119,7 @@
 				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
-		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
+		<Tabs.Root value={currentStep}>
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
@@ -283,6 +242,7 @@
 					} as UiSchemaRoot}
 					initialValue={{
 						schedule: '0 0 * * *',
+						timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
 						concurrencyPolicy: 'Allow',
 						suspend: false,
 						successfulJobsHistoryLimit: 3,
@@ -338,6 +298,7 @@
 									),
 									'items'
 								),
+								minItems: 1,
 								items: {
 									...lodash.omit(
 										lodash.get(
@@ -414,27 +375,63 @@
 											title: 'Resources',
 											...lodash.get(
 												jsonSchema,
-												'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources'
+												'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.resources'
 											),
 											properties: {
 												requests: {
-													...lodash.get(
-														jsonSchema,
-														'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources.properties.requests'
+													...lodash.omit(
+														lodash.get(
+															jsonSchema,
+															'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.resources.properties.requests'
+														),
+														['additionalProperties']
 													),
 													title: 'Requests',
-													additionalProperties: {
-														type: 'string'
+													properties: {
+														cpu: {
+															title: 'CPU',
+															type: 'string'
+														},
+														memory: {
+															title: 'Memory',
+															type: 'string'
+														},
+														'nvidia.com/gpu': {
+															title: 'GPU',
+															type: 'integer'
+														},
+														'nvidia.com/gpumem': {
+															title: 'GPU Memory',
+															type: 'string'
+														}
 													}
 												},
 												limits: {
-													...lodash.get(
-														jsonSchema,
-														'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources.properties.limits'
+													...lodash.omit(
+														lodash.get(
+															jsonSchema,
+															'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.resources.properties.limits'
+														),
+														['additionalProperties']
 													),
 													title: 'Limits',
-													additionalProperties: {
-														type: 'string'
+													properties: {
+														cpu: {
+															title: 'CPU',
+															type: 'string'
+														},
+														memory: {
+															title: 'Memory',
+															type: 'string'
+														},
+														'nvidia.com/gpu': {
+															title: 'GPU',
+															type: 'integer'
+														},
+														'nvidia.com/gpumem': {
+															title: 'GPU Memory',
+															type: 'string'
+														}
 													}
 												}
 											}
@@ -448,26 +445,39 @@
 						'ui:options': {
 							translations: {
 								submit: 'Next'
-							}
+							},
+							addable: false,
+							removable: false,
+							orderable: false
 						},
 						containers: {
 							'ui:options': {
 								itemTitle: () => 'Container'
 							},
 							items: {
+								command: {
+									'ui:options': {
+										itemTitle: () => 'command'
+									}
+								},
 								args: {
-									items: {
-										'ui:components': {
-											textWidget: 'textareaWidget'
-										}
+									'ui:options': {
+										itemTitle: () => 'argument'
+									}
+								},
+								env: {
+									'ui:options': {
+										itemTitle: () => 'environment variable'
+									}
+								},
+								ports: {
+									'ui:options': {
+										itemTitle: () => 'port'
 									}
 								},
 								resources: {
 									requests: {
 										'ui:options': {
-											translations: {
-												'add-object-property': 'Add Request'
-											},
 											layouts: {
 												'object-properties': {
 													class: 'grid grid-cols-2 gap-3'
@@ -477,9 +487,6 @@
 									},
 									limits: {
 										'ui:options': {
-											translations: {
-												'add-object-property': 'Add Limit'
-											},
 											layouts: {
 												'object-properties': {
 													class: 'grid grid-cols-2 gap-3'
@@ -497,11 +504,7 @@
 							{
 								name: 'main',
 								image: 'busybox:latest',
-								command: ['sh', '-c', 'echo Hello World'],
-								resources: {
-									requests: { cpu: '' },
-									limits: { cpu: '' }
-								}
+								command: ['sh', '-c', 'echo Hello World']
 							}
 						]
 					}}
@@ -528,7 +531,7 @@
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[3]}>
+			<Tabs.Content value={steps[3]} class="min-h-[7vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{
@@ -601,5 +604,5 @@
 				</div>
 			</Tabs.Content>
 		</Tabs.Root>
-	</AlertDialog.Content>
-</AlertDialog.Root>
+	</Dialog.Content>
+</Dialog.Root>

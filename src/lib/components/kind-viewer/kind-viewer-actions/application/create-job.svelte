@@ -7,14 +7,15 @@
 	import Ajv from 'ajv';
 	import { load } from 'js-yaml';
 	import lodash from 'lodash';
+	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
+	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
-	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
@@ -76,14 +77,14 @@
 	let isSubmitting = $state(false);
 </script>
 
-<AlertDialog.Root
+<Dialog.Root
 	bind:open
 	onOpenChange={() => {
 		reset();
 	}}
 	{onOpenChangeComplete}
 >
-	<AlertDialog.Trigger>
+	<Dialog.Trigger>
 		{#snippet child({ props })}
 			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
 				<Item.Media>
@@ -94,8 +95,8 @@
 				</Item.Content>
 			</Item.Root>
 		{/snippet}
-	</AlertDialog.Trigger>
-	<AlertDialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
+	</Dialog.Trigger>
+	<Dialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
 		<Item.Root class="p-0">
 			<Progress value={currentIndex + 1} max={steps.length} />
 			<Item.Content class="text-left">
@@ -103,7 +104,7 @@
 				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
-		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
+		<Tabs.Root value={currentStep}>
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
@@ -150,7 +151,6 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-
 			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
@@ -196,11 +196,21 @@
 						'ui:options': {
 							translations: {
 								submit: 'Next'
+							},
+							layouts: {
+								'object-properties': {
+									class: 'grid grid-cols-2 gap-3'
+								}
 							}
 						},
 						suspend: {
 							'ui:components': {
 								checkboxWidget: 'switchWidget'
+							},
+							'ui:options': {
+								layout: {
+									class: 'col-span-full'
+								}
 							}
 						}
 					} as UiSchemaRoot}
@@ -231,7 +241,6 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-
 			<Tabs.Content value={steps[2]}>
 				<Form
 					schema={{
@@ -259,6 +268,7 @@
 									),
 									'items'
 								),
+								minItems: 1,
 								items: {
 									...lodash.omit(
 										lodash.get(
@@ -339,23 +349,59 @@
 											),
 											properties: {
 												requests: {
-													...lodash.get(
-														jsonSchema,
-														'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources.properties.requests'
+													...lodash.omit(
+														lodash.get(
+															jsonSchema,
+															'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources.properties.requests'
+														),
+														['additionalProperties']
 													),
 													title: 'Requests',
-													additionalProperties: {
-														type: 'string'
+													properties: {
+														cpu: {
+															title: 'CPU',
+															type: 'string'
+														},
+														memory: {
+															title: 'Memory',
+															type: 'string'
+														},
+														'nvidia.com/gpu': {
+															title: 'GPU',
+															type: 'integer'
+														},
+														'nvidia.com/gpumem': {
+															title: 'GPU Memory',
+															type: 'string'
+														}
 													}
 												},
 												limits: {
-													...lodash.get(
-														jsonSchema,
-														'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources.properties.limits'
+													...lodash.omit(
+														lodash.get(
+															jsonSchema,
+															'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources.properties.limits'
+														),
+														['additionalProperties']
 													),
 													title: 'Limits',
-													additionalProperties: {
-														type: 'string'
+													properties: {
+														cpu: {
+															title: 'CPU',
+															type: 'string'
+														},
+														memory: {
+															title: 'Memory',
+															type: 'string'
+														},
+														'nvidia.com/gpu': {
+															title: 'GPU',
+															type: 'integer'
+														},
+														'nvidia.com/gpumem': {
+															title: 'GPU Memory',
+															type: 'string'
+														}
 													}
 												}
 											}
@@ -369,26 +415,39 @@
 						'ui:options': {
 							translations: {
 								submit: 'Next'
-							}
+							},
+							addable: false,
+							removable: false,
+							orderable: false
 						},
 						containers: {
 							'ui:options': {
 								itemTitle: () => 'Container'
 							},
 							items: {
+								command: {
+									'ui:options': {
+										itemTitle: () => 'command'
+									}
+								},
 								args: {
-									items: {
-										'ui:components': {
-											textWidget: 'textareaWidget'
-										}
+									'ui:options': {
+										itemTitle: () => 'argument'
+									}
+								},
+								env: {
+									'ui:options': {
+										itemTitle: () => 'environment variable'
+									}
+								},
+								ports: {
+									'ui:options': {
+										itemTitle: () => 'port'
 									}
 								},
 								resources: {
 									requests: {
 										'ui:options': {
-											translations: {
-												'add-object-property': 'Add Request'
-											},
 											layouts: {
 												'object-properties': {
 													class: 'grid grid-cols-2 gap-3'
@@ -398,9 +457,6 @@
 									},
 									limits: {
 										'ui:options': {
-											translations: {
-												'add-object-property': 'Add Limit'
-											},
 											layouts: {
 												'object-properties': {
 													class: 'grid grid-cols-2 gap-3'
@@ -418,11 +474,7 @@
 							{
 								name: 'main',
 								image: 'busybox:latest',
-								command: ['sh', '-c', 'echo Hello World'],
-								resources: {
-									requests: { cpu: '' },
-									limits: { cpu: '' }
-								}
+								command: ['sh', '-c', 'echo Hello World']
 							}
 						]
 					}}
@@ -449,13 +501,20 @@
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[3]}>
+			<Tabs.Content value={steps[3]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
-					<Code.Root
-						lang="yaml"
-						class="w-full"
-						hideLines
-						code={stringify(lodash.omit(values, 'jobValues'), null, 2)}
+					<Monaco
+						options={{
+							language: 'yaml',
+							padding: { top: 24 },
+							automaticLayout: true,
+							folding: true,
+							foldingStrategy: 'indentation',
+							showFoldingControls: 'always',
+							scrollBeyondLastLine: false
+						}}
+						bind:value
+						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
 					/>
 					<Button
 						class="mt-auto w-full"
@@ -516,5 +575,5 @@
 				</div>
 			</Tabs.Content>
 		</Tabs.Root>
-	</AlertDialog.Content>
-</AlertDialog.Root>
+	</Dialog.Content>
+</Dialog.Root>

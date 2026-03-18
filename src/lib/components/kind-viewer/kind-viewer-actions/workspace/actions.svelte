@@ -2,13 +2,12 @@
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 
+	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
+	import Edit from '$lib/components/kind-viewer/kind-viewer-actions/default/update.svelte';
+	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
-
-	import Delete from './new-delete.svelte';
-	import Edit from './new-edit.svelte';
-	import View from './view.svelte';
 
 	let {
 		schema,
@@ -48,7 +47,7 @@
 					e.preventDefault();
 				}}
 			>
-				<View {schema} {object} {cluster} {group} {version} {kind} {resource} />
+				<View {schema} {object} />
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {

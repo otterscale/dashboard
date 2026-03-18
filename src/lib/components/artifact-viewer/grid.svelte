@@ -248,7 +248,7 @@
 									<Item.Description></Item.Description>
 								</Item.Content>
 							</Item.Root>
-							<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[33vh]">
+							<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
 								<Tabs.Content value={steps[0]}>
 									<Form
 										schema={{
