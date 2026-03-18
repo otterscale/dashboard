@@ -70,7 +70,7 @@
 	let value = $derived(stringify(values));
 
 	// Steps Manager
-	const steps = Array.from({ length: 7 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 6 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -118,7 +118,7 @@
 				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
-		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
+		<Tabs.Root value={currentStep}>
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
@@ -220,6 +220,7 @@
 							),
 							'items'
 						),
+						minItems: 1,
 						items: {
 							...lodash.omit(
 								lodash.get(
@@ -393,7 +394,10 @@
 							translations: {
 								submit: 'Next'
 							},
-							itemTitle: () => 'Container'
+							itemTitle: () => 'Container',
+							addable: false,
+							removable: false,
+							orderable: false
 						},
 						items: {
 							command: {
@@ -438,7 +442,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={[] as FormValue}
+					initialValue={[{ name: null }] as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
@@ -538,8 +542,7 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						type: 'ClusterIP',
-						ports: []
+						type: 'ClusterIP'
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -578,6 +581,19 @@
 							storage: {
 								type: 'string'
 							}
+						},
+						dependencies: {
+							storage: {
+								properties: {
+									mountPath: {
+										title: 'Mount Path',
+										...lodash.get(
+											jsonSchema,
+											'properties.spec.properties.deploymentConfig.properties.mountPath'
+										)
+									}
+								}
+							}
 						}
 					} as Schema}
 					uiSchema={{
@@ -589,7 +605,17 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{ storage: null }}
+					initialValue={null}
+					transformer={(value: FormValue) => {
+						const formValue: any = lodash.cloneDeep(value);
+						lodash.set(
+							values,
+							'spec.deploymentConfig.mountPath',
+							lodash.get(formValue, 'mountPath')
+						);
+						lodash.unset(formValue, 'mountPath');
+						return formValue;
+					}}
 					handleSubmit={{
 						posthook: () => {
 							const label = `app-${lodash.get(values, 'metadata.name')}`;
@@ -625,46 +651,7 @@
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[5]}>
-				<Form
-					schema={{
-						title: 'Mount Path',
-						...lodash.get(
-							jsonSchema,
-							'properties.spec.properties.deploymentConfig.properties.mountPath'
-						)
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue=""
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-					bind:values={values['spec']['deploymentConfig']['mountPath']}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-
-			<Tabs.Content value={steps[6]}>
+			<Tabs.Content value={steps[5]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{

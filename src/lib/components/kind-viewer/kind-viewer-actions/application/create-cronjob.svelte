@@ -119,7 +119,7 @@
 				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
-		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
+		<Tabs.Root value={currentStep}>
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
@@ -298,6 +298,7 @@
 									),
 									'items'
 								),
+								minItems: 1,
 								items: {
 									...lodash.omit(
 										lodash.get(
@@ -444,7 +445,10 @@
 						'ui:options': {
 							translations: {
 								submit: 'Next'
-							}
+							},
+							addable: false,
+							removable: false,
+							orderable: false
 						},
 						containers: {
 							'ui:options': {
@@ -500,11 +504,7 @@
 							{
 								name: 'main',
 								image: 'busybox:latest',
-								command: ['sh', '-c', 'echo Hello World'],
-								resources: {
-									requests: { cpu: '' },
-									limits: { cpu: '' }
-								}
+								command: ['sh', '-c', 'echo Hello World']
 							}
 						]
 					}}
@@ -531,7 +531,7 @@
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[3]}>
+			<Tabs.Content value={steps[3]} class="min-h-[7vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{
