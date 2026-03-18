@@ -6,6 +6,7 @@
 	import { SubmitButton } from '@sjsf/form';
 	import type { SchemaObjectValue } from '@sjsf/form/core';
 	import Ajv from 'ajv';
+	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
@@ -16,12 +17,11 @@
 	import { page } from '$app/state';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';
-	import * as Dialog from '$lib/components/ui/dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
-	import { load } from 'js-yaml';
 
 	let {
 		cluster,
@@ -177,7 +177,7 @@
 				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
-		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[33vh]">
+		<Tabs.Root value={currentStep}>
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
@@ -379,8 +379,23 @@
 			<Tabs.Content value={steps[2]}>
 				<Form
 					schema={{
-						...lodash.get(jsonSchema, 'properties.spec.properties.networkIsolation'),
-						title: 'Network Isolation'
+						...lodash.omit(lodash.get(jsonSchema, 'properties.spec.properties.networkIsolation'), [
+							'properties'
+						]),
+						title: 'Network Isolation',
+						properties: {
+							allowedNamespaces: {
+								title: 'Allowed Namespaces',
+								...lodash.get(
+									jsonSchema,
+									'properties.spec.properties.networkIsolation.properties.allowedNamespaces'
+								)
+							},
+							...lodash.omit(
+								lodash.get(jsonSchema, 'properties.spec.properties.networkIsolation.properties'),
+								['allowedNamespaces']
+							)
+						}
 					} as Schema}
 					uiSchema={{
 						'ui:options': {
@@ -426,7 +441,7 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<Tabs.Content value={steps[3]}>
+			<Tabs.Content value={steps[3]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{

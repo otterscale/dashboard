@@ -14,8 +14,8 @@
 	import { stringify } from 'yaml';
 
 	import Form from '$lib/components/dynamic-form/form.svelte';
-	import * as Dialog from '$lib/components/ui/dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
@@ -118,7 +118,7 @@
 				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
-		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[33vh]">
+		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
@@ -641,7 +641,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={''}
+					initialValue=""
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
