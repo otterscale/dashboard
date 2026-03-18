@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '../app.css';
 
-	import type { Interceptor } from '@connectrpc/connect';
+	import { Code, ConnectError, type Interceptor } from '@connectrpc/connect';
 	import { createConnectTransport } from '@connectrpc/connect-web';
 	import { addCollection } from '@iconify/svelte';
 	import logos from '@iconify-json/logos/icons.json';
@@ -12,6 +12,8 @@
 	import { ModeWatcher } from 'mode-watcher';
 	import { setContext } from 'svelte';
 
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { Toaster } from '$lib/components/ui/sonner';
 	import { Spinner } from '$lib/components/ui/spinner';
 
@@ -22,9 +24,20 @@
 		return await next(req);
 	};
 
+	const unauthenticatedInterceptor: Interceptor = (next) => async (req) => {
+		try {
+			return await next(req);
+		} catch (err) {
+			if (err instanceof ConnectError && err.code === Code.Unauthenticated) {
+				await goto(resolve('/login'));
+			}
+			throw err;
+		}
+	};
+
 	const transport = createConnectTransport({
 		baseUrl: '/',
-		interceptors: [proxyHeaderInterceptor],
+		interceptors: [proxyHeaderInterceptor, unauthenticatedInterceptor],
 		fetch
 	});
 

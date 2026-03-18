@@ -96,6 +96,18 @@ const handleRefreshToken: Handle = async ({ event, resolve }) => {
 				} finally {
 					await releaseRefreshLock(session.id);
 				}
+			} else {
+				// Another request is refreshing — reload session from Redis to pick up updated tokens
+				const token = getSessionTokenCookie(event.cookies);
+				if (token) {
+					const { session: refreshedSession } = await validateSessionToken(token);
+					if (refreshedSession) {
+						event.locals.session = refreshedSession;
+					} else {
+						deleteSessionTokenCookie(event.cookies);
+						event.locals.session = null;
+					}
+				}
 			}
 		}
 	}
