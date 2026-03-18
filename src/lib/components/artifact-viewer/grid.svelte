@@ -17,7 +17,7 @@
 	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import EditorWidget from '$lib/components/dynamic-form/widgets/editor.svelte';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import Button, { buttonVariants } from '$lib/components/ui/button/button.svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
@@ -40,7 +40,18 @@
 
 	const latestChartArtifact = $derived(row.original.raw as unknown as ArtifactType);
 	const helmRepository = $derived(row.original.helmRepository as any);
-	const helmRepositoryName = lodash.get(helmRepository, 'metadata.name', 'unknown');
+
+	const harborHost = $derived.by(() => {
+		const specUrl = lodash.get(helmRepository, 'spec.url', '');
+		const url = new URL(specUrl);
+		const insecure = lodash.get(helmRepository, 'spec.insecure');
+		const protocol = insecure ? 'http' : 'https';
+		return `${protocol}://${url.host}`;
+	});
+	const secretName = $derived(lodash.get(helmRepository, 'spec.secretRef.name', '') as string);
+	const isInternal = $derived(
+		lodash.get(helmRepository, ['metadata', 'labels', 'tenant.otterscale.io/internal']) === 'true'
+	);
 
 	const [project, ...latestChartNameParts] = $derived(
 		latestChartArtifact.repository_name.split('/')
@@ -110,7 +121,9 @@
 				body: JSON.stringify({
 					cluster,
 					namespace,
-					helmRepositoryName,
+					harborHost,
+					secretName,
+					isInternal,
 					apiPath: artifactsUrl
 				})
 			});
@@ -159,7 +172,9 @@
 			body: JSON.stringify({
 				cluster,
 				namespace,
-				helmRepositoryName,
+				harborHost,
+				secretName,
+				isInternal,
 				apiPath: additionUrl
 			})
 		});
@@ -232,23 +247,23 @@
 			</Item.Content>
 			<Item.Actions>
 				<Item.Actions>
-					<AlertDialog.Root
+					<Dialog.Root
 						bind:open
 						onOpenChangeComplete={() => {
 							reset();
 						}}
 					>
-						<AlertDialog.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+						<Dialog.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
 							<DownloadIcon />
-						</AlertDialog.Trigger>
-						<AlertDialog.Content class="max-h-[95vh] min-w-[50vw] overflow-auto">
+						</Dialog.Trigger>
+						<Dialog.Content class="max-h-[95vh] min-w-[50vw] overflow-auto">
 							<Item.Root class="p-0">
 								<Item.Content class="text-left">
 									<Item.Title class="text-xl font-bold">Install Helm Chart</Item.Title>
 									<Item.Description></Item.Description>
 								</Item.Content>
 							</Item.Root>
-							<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
+							<Tabs.Root value={currentStep}>
 								<Tabs.Content value={steps[0]}>
 									<Form
 										schema={{
@@ -270,7 +285,8 @@
 														jsonSchema,
 														'properties.metadata.properties.namespace'
 													) as Schema),
-													title: 'Namespace'
+													title: 'Namespace',
+													readOnly: true
 												}
 											}
 										} as Schema}
@@ -330,29 +346,6 @@
 													) as Schema),
 													title: 'Version',
 													enum: getVersions()
-												},
-												sourceRef: {
-													...(lodash.get(
-														jsonSchema,
-														'properties.spec.properties.chart.properties.spec.properties.sourceRef'
-													) as Schema),
-													title: 'Source Reference',
-													properties: {
-														name: {
-															...(lodash.get(
-																jsonSchema,
-																'properties.spec.properties.chart.properties.spec.properties.sourceRef.properties.name'
-															) as Schema),
-															title: 'Name'
-														},
-														namespace: {
-															...(lodash.get(
-																jsonSchema,
-																'properties.spec.properties.chart.properties.spec.properties.sourceRef.properties.namespace'
-															) as Schema),
-															title: 'Namespace'
-														}
-													}
 												}
 											}
 										} as Schema}
@@ -453,7 +446,7 @@
 									{/await}
 								</Tabs.Content>
 
-								<Tabs.Content value={steps[3]}>
+								<Tabs.Content value={steps[3]} class="min-h-[77vh]">
 									<div class="flex h-full flex-col gap-3">
 										<Code.Root
 											lang="yaml"
@@ -510,8 +503,8 @@
 									</div>
 								</Tabs.Content>
 							</Tabs.Root>
-						</AlertDialog.Content>
-					</AlertDialog.Root>
+						</Dialog.Content>
+					</Dialog.Root>
 				</Item.Actions>
 			</Item.Actions>
 		</Item.Root>

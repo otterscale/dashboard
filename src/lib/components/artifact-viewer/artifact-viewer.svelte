@@ -32,6 +32,14 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
+	function getHarborHost(helmRepository: any): string {
+		const specUrl = lodash.get(helmRepository, 'spec.url', '');
+		const url = new URL(specUrl);
+		const insecure = lodash.get(helmRepository, 'spec.insecure');
+		const protocol = insecure ? 'http' : 'https';
+		return `${protocol}://${url.host}`;
+	}
+
 	function getProjectName(helmRepository: any): string {
 		const helmRepositoryName = lodash.get(helmRepository, 'metadata.name');
 
@@ -56,6 +64,11 @@
 		if (!fromHarbor) return;
 
 		const helmRepositoryName = lodash.get(helmRepository, 'metadata.name', 'unknown');
+		const isInternal =
+			lodash.get(helmRepository, ['metadata', 'labels', 'tenant.otterscale.io/internal']) ===
+			'true';
+		const harborHost = getHarborHost(helmRepository);
+		const secretName = lodash.get(helmRepository, 'spec.secretRef.name', '') as string;
 
 		const projectName = getProjectName(helmRepository);
 		try {
@@ -70,7 +83,9 @@
 				body: JSON.stringify({
 					cluster,
 					namespace,
-					helmRepositoryName,
+					harborHost,
+					secretName,
+					isInternal,
 					apiPath: artifactsUrl
 				})
 			});
