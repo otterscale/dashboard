@@ -2,13 +2,12 @@
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 
-	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
-
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
+	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import Edit from '$lib/components/kind-viewer/kind-viewer-actions/default/update.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
 	let {
 		schema,
