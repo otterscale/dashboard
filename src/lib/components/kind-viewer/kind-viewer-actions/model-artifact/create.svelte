@@ -97,7 +97,7 @@
 				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
-		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
+		<Tabs.Root value={currentStep}>
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
@@ -110,7 +110,8 @@
 							},
 							namespace: {
 								...lodash.get(jsonSchema, 'properties.metadata.properties.namespace'),
-								title: 'Namespace'
+								title: 'Namespace',
+								readOnly: true
 							}
 						}
 					} as Schema}
@@ -265,7 +266,7 @@
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[3]}>
+			<Tabs.Content value={steps[3]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{
