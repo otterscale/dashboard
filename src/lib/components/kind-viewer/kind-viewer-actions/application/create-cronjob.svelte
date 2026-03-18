@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/stores';
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { ClockIcon } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
@@ -45,54 +46,12 @@
 	const resourceClient = createClient(ResourceService, transport);
 
 	// Timezone List
-	function getTimezones(): string[] {
-		try {
-			const timezones = Intl.supportedValuesOf('timeZone');
-			return timezones.sort((previous, next) => {
-				if (previous === 'Etc/UTC') return -1;
-				if (next === 'Etc/UTC') return 1;
-				return previous.localeCompare(next);
-			});
-		} catch {
-			return [
-				'Etc/UTC',
-				'Africa/Cairo',
-				'Africa/Johannesburg',
-				'Africa/Lagos',
-				'Africa/Nairobi',
-				'America/Anchorage',
-				'America/Chicago',
-				'America/Denver',
-				'America/Los_Angeles',
-				'America/New_York',
-				'America/Sao_Paulo',
-				'America/Toronto',
-				'Asia/Dubai',
-				'Asia/Hong_Kong',
-				'Asia/Kolkata',
-				'Asia/Seoul',
-				'Asia/Shanghai',
-				'Asia/Singapore',
-				'Asia/Taipei',
-				'Asia/Tokyo',
-				'Australia/Melbourne',
-				'Australia/Sydney',
-				'Europe/Amsterdam',
-				'Europe/Berlin',
-				'Europe/London',
-				'Europe/Moscow',
-				'Europe/Paris',
-				'Pacific/Auckland',
-				'Pacific/Honolulu'
-			];
-		}
-	}
+	const timezones = $derived($page.data.timezones ?? []);
 
-	const timezones = getTimezones();
 	async function fetchTimezones(search: string): Promise<{ label: string; value: string }[]> {
 		return timezones
-			.filter((timezone) => timezone.toLowerCase().includes(search.toLowerCase()))
-			.map((timezone) => ({
+			.filter((timezone: string) => timezone.toLowerCase().includes(search.toLowerCase()))
+			.map((timezone: string) => ({
 				label: timezone,
 				value: timezone
 			}));
@@ -283,6 +242,7 @@
 					} as UiSchemaRoot}
 					initialValue={{
 						schedule: '0 0 * * *',
+						timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
 						concurrencyPolicy: 'Allow',
 						suspend: false,
 						successfulJobsHistoryLimit: 3,

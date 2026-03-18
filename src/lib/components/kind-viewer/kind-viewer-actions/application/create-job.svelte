@@ -7,11 +7,12 @@
 	import Ajv from 'ajv';
 	import { load } from 'js-yaml';
 	import lodash from 'lodash';
+	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
+	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
-	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -498,11 +499,18 @@
 
 			<Tabs.Content value={steps[3]}>
 				<div class="flex h-full flex-col gap-3">
-					<Code.Root
-						lang="yaml"
-						class="w-full"
-						hideLines
-						code={stringify(lodash.omit(values, 'jobValues'), null, 2)}
+					<Monaco
+						options={{
+							language: 'yaml',
+							padding: { top: 24 },
+							automaticLayout: true,
+							folding: true,
+							foldingStrategy: 'indentation',
+							showFoldingControls: 'always',
+							scrollBeyondLastLine: false
+						}}
+						bind:value
+						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
 					/>
 					<Button
 						class="mt-auto w-full"
