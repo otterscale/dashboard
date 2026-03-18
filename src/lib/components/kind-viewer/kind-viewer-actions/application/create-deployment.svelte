@@ -14,7 +14,7 @@
 	import { stringify } from 'yaml';
 
 	import Form from '$lib/components/dynamic-form/form.svelte';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import * as Dialog from '$lib/components/ui/dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
@@ -42,6 +42,12 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
+
+	const jsonSchemaValidator = new Ajv({
+		allErrors: true,
+		strict: false
+	});
+	const validate = jsonSchemaValidator.compile(jsonSchema);
 
 	// Container for Data
 	let values: any = $state({
@@ -83,14 +89,16 @@
 	let isSubmitting = $state(false);
 </script>
 
-<AlertDialog.Root
+<Dialog.Root
 	bind:open
-	onOpenChange={() => {
-		reset();
+	onOpenChange={(isOpen) => {
+		if (!isOpen) {
+			reset();
+		}
 	}}
 	{onOpenChangeComplete}
 >
-	<AlertDialog.Trigger>
+	<Dialog.Trigger>
 		{#snippet child({ props })}
 			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
 				<Item.Media>
@@ -101,8 +109,8 @@
 				</Item.Content>
 			</Item.Root>
 		{/snippet}
-	</AlertDialog.Trigger>
-	<AlertDialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
+	</Dialog.Trigger>
+	<Dialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
 		<Item.Root class="p-0">
 			<Progress value={currentIndex + 1} max={steps.length} />
 			<Item.Content class="text-left">
@@ -110,7 +118,7 @@
 				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
-		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
+		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[33vh]">
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
@@ -123,7 +131,8 @@
 							},
 							namespace: {
 								...lodash.get(jsonSchema, 'properties.metadata.properties.namespace'),
-								title: 'Namespace'
+								title: 'Namespace',
+								readOnly: true
 							}
 						}
 					} as Schema}
@@ -310,6 +319,71 @@
 											}
 										}
 									}
+								},
+								resources: {
+									title: 'Resources',
+									...lodash.get(
+										jsonSchema,
+										'properties.spec.properties.deploymentConfig.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.resources'
+									),
+									properties: {
+										requests: {
+											...lodash.omit(
+												lodash.get(
+													jsonSchema,
+													'properties.spec.properties.deploymentConfig.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.resources.properties.requests'
+												),
+												['additionalProperties']
+											),
+											title: 'Requests',
+											properties: {
+												cpu: {
+													title: 'CPU',
+													type: 'string'
+												},
+												memory: {
+													title: 'Memory',
+													type: 'string'
+												},
+												'nvidia.com/gpu': {
+													title: 'GPU',
+													type: 'integer'
+												},
+												'nvidia.com/gpumem': {
+													title: 'GPU Memory',
+													type: 'string'
+												}
+											}
+										},
+										limits: {
+											...lodash.omit(
+												lodash.get(
+													jsonSchema,
+													'properties.spec.properties.deploymentConfig.properties.deployment.properties.template.properties.spec.properties.containers.items.properties.resources.properties.limits'
+												),
+												['additionalProperties']
+											),
+											title: 'Limits',
+											properties: {
+												cpu: {
+													title: 'CPU',
+													type: 'string'
+												},
+												memory: {
+													title: 'Memory',
+													type: 'string'
+												},
+												'nvidia.com/gpu': {
+													title: 'GPU',
+													type: 'integer'
+												},
+												'nvidia.com/gpumem': {
+													title: 'GPU Memory',
+													type: 'string'
+												}
+											}
+										}
+									}
 								}
 							}
 						}
@@ -320,6 +394,48 @@
 								submit: 'Next'
 							},
 							itemTitle: () => 'Container'
+						},
+						items: {
+							command: {
+								'ui:options': {
+									itemTitle: () => 'command'
+								}
+							},
+							args: {
+								'ui:options': {
+									itemTitle: () => 'argument'
+								}
+							},
+							env: {
+								'ui:options': {
+									itemTitle: () => 'environment variable'
+								}
+							},
+							ports: {
+								'ui:options': {
+									itemTitle: () => 'port'
+								}
+							},
+							resources: {
+								requests: {
+									'ui:options': {
+										layouts: {
+											'object-properties': {
+												class: 'grid grid-cols-2 gap-3'
+											}
+										}
+									}
+								},
+								limits: {
+									'ui:options': {
+										layouts: {
+											'object-properties': {
+												class: 'grid grid-cols-2 gap-3'
+											}
+										}
+									}
+								}
+							}
 						}
 					} as UiSchemaRoot}
 					initialValue={[] as FormValue}
@@ -416,7 +532,9 @@
 							}
 						},
 						ports: {
-							itemTitle: () => ''
+							'ui:options': {
+								itemTitle: () => 'Service Port'
+							}
 						}
 					} as UiSchemaRoot}
 					initialValue={{
@@ -456,15 +574,10 @@
 							),
 							'additionalProperties'
 						),
-						additionalProperties: {
-							...lodash.omit(
-								lodash.get(
-									jsonSchema,
-									'properties.spec.properties.deploymentConfig.properties.persistentVolumeClaim.properties.resources.properties.requests.additionalProperties'
-								),
-								'anyOf'
-							),
-							type: 'string'
+						properties: {
+							storage: {
+								type: 'string'
+							}
 						}
 					} as Schema}
 					uiSchema={{
@@ -473,23 +586,10 @@
 								submit: 'Next',
 								'additional-property': 'additional request',
 								'add-object-property': 'Add Request'
-							},
-							layouts: {
-								'object-properties': {
-									class: 'grid grid-cols-2 gap-3'
-								}
-							}
-						},
-						additionalProperties: {
-							'ui:options': {
-								translations: {
-									'key-input-title': 'request'
-								},
-								hideTitle: true
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{}}
+					initialValue={{ storage: null }}
 					handleSubmit={{
 						posthook: () => {
 							const label = `app-${lodash.get(values, 'metadata.name')}`;
@@ -541,7 +641,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{}}
+					initialValue={''}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
@@ -573,7 +673,8 @@
 							automaticLayout: true,
 							folding: true,
 							foldingStrategy: 'indentation',
-							showFoldingControls: 'always'
+							showFoldingControls: 'always',
+							scrollBeyondLastLine: false
 						}}
 						bind:value
 						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
@@ -584,12 +685,6 @@
 							if (isSubmitting) return;
 
 							isSubmitting = true;
-
-							const jsonSchemaValidator = new Ajv({
-								allErrors: true,
-								strict: false
-							});
-							const validate = jsonSchemaValidator.compile(jsonSchema);
 
 							const isValid = validate(load(value));
 
@@ -637,5 +732,5 @@
 				</div>
 			</Tabs.Content>
 		</Tabs.Root>
-	</AlertDialog.Content>
-</AlertDialog.Root>
+	</Dialog.Content>
+</Dialog.Root>

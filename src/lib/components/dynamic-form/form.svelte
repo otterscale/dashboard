@@ -75,13 +75,16 @@
 			useLabel: false,
 			layouts: {
 				field: {
-					class: '*:data-[slot=field-description]:line-clamp-1'
+					class: '*:data-[slot=field-description]:hidden'
+				},
+				'field-meta': {
+					class: '*:data-[slot=field-description]:hidden'
 				},
 				'array-field': {
-					class: '*:data-[slot=field-description]:line-clamp-1'
+					class: '*:data-[slot=field-description]:hidden'
 				},
 				'object-field': {
-					class: '*:data-[slot=field-description]:line-clamp-1'
+					class: '*:data-[slot=field-description]:hidden'
 				}
 			}
 		}),

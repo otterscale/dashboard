@@ -414,27 +414,63 @@
 											title: 'Resources',
 											...lodash.get(
 												jsonSchema,
-												'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources'
+												'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.resources'
 											),
 											properties: {
 												requests: {
-													...lodash.get(
-														jsonSchema,
-														'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources.properties.requests'
+													...lodash.omit(
+														lodash.get(
+															jsonSchema,
+															'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.resources.properties.requests'
+														),
+														['additionalProperties']
 													),
 													title: 'Requests',
-													additionalProperties: {
-														type: 'string'
+													properties: {
+														cpu: {
+															title: 'CPU',
+															type: 'string'
+														},
+														memory: {
+															title: 'Memory',
+															type: 'string'
+														},
+														'nvidia.com/gpu': {
+															title: 'GPU',
+															type: 'integer'
+														},
+														'nvidia.com/gpumem': {
+															title: 'GPU Memory',
+															type: 'string'
+														}
 													}
 												},
 												limits: {
-													...lodash.get(
-														jsonSchema,
-														'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources.properties.limits'
+													...lodash.omit(
+														lodash.get(
+															jsonSchema,
+															'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.resources.properties.limits'
+														),
+														['additionalProperties']
 													),
 													title: 'Limits',
-													additionalProperties: {
-														type: 'string'
+													properties: {
+														cpu: {
+															title: 'CPU',
+															type: 'string'
+														},
+														memory: {
+															title: 'Memory',
+															type: 'string'
+														},
+														'nvidia.com/gpu': {
+															title: 'GPU',
+															type: 'integer'
+														},
+														'nvidia.com/gpumem': {
+															title: 'GPU Memory',
+															type: 'string'
+														}
 													}
 												}
 											}
@@ -455,19 +491,29 @@
 								itemTitle: () => 'Container'
 							},
 							items: {
+								command: {
+									'ui:options': {
+										itemTitle: () => 'command'
+									}
+								},
 								args: {
-									items: {
-										'ui:components': {
-											textWidget: 'textareaWidget'
-										}
+									'ui:options': {
+										itemTitle: () => 'argument'
+									}
+								},
+								env: {
+									'ui:options': {
+										itemTitle: () => 'environment variable'
+									}
+								},
+								ports: {
+									'ui:options': {
+										itemTitle: () => 'port'
 									}
 								},
 								resources: {
 									requests: {
 										'ui:options': {
-											translations: {
-												'add-object-property': 'Add Request'
-											},
 											layouts: {
 												'object-properties': {
 													class: 'grid grid-cols-2 gap-3'
@@ -477,9 +523,6 @@
 									},
 									limits: {
 										'ui:options': {
-											translations: {
-												'add-object-property': 'Add Limit'
-											},
 											layouts: {
 												'object-properties': {
 													class: 'grid grid-cols-2 gap-3'

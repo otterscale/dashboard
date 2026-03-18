@@ -435,7 +435,8 @@
 							automaticLayout: true,
 							folding: true,
 							foldingStrategy: 'indentation',
-							showFoldingControls: 'always'
+							showFoldingControls: 'always',
+							scrollBeyondLastLine: false
 						}}
 						bind:value
 						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
