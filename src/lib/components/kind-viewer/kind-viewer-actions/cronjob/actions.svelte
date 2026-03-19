@@ -8,7 +8,7 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
-	import Log from './log.svelte';
+	import Log from '$lib/components/kind-viewer/kind-viewer-actions/default/log.svelte';
 
 	let {
 		schema,
@@ -65,6 +65,7 @@
 				<Log
 					{cluster}
 					{object}
+					{kind}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
 					}}
