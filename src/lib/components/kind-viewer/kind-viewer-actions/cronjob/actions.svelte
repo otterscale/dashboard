@@ -3,6 +3,7 @@
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
+	import Log from '$lib/components/kind-viewer/kind-viewer-actions/default/log.svelte';
 	import Update from '$lib/components/kind-viewer/kind-viewer-actions/default/update.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -54,6 +55,16 @@
 					{version}
 					{resource}
 					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Item onSelect={(e) => e.preventDefault()}>
+				<Log
+					{cluster}
+					{object}
+					{kind}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
 					}}

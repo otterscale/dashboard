@@ -1,147 +1,206 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { ArrowDownIcon, PauseIcon, PlayIcon, ScrollTextIcon } from '@lucide/svelte';
-	import { RuntimeService } from '@otterscale/api/runtime/v1';
-	import { getContext, tick } from 'svelte';
+	import { ScrollTextIcon } from '@lucide/svelte';
+	import { ResourceService } from '@otterscale/api/resource/v1';
+	import { getContext } from 'svelte';
 
-	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
-	import { Toggle } from '$lib/components/ui/toggle';
+
+	import LogViewer from './log-viewer.svelte';
 
 	let {
 		cluster,
 		object,
+		kind,
 		onOpenChangeComplete
 	}: {
 		cluster: string;
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		object: any;
+		kind: string;
 		onOpenChangeComplete?: () => void;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
-	const client = createClient(RuntimeService, transport);
+	const resourceClient = createClient(ResourceService, transport);
 
-	// Derived from the raw K8s object
 	const namespace: string = $derived(object?.metadata?.namespace ?? '');
-	const podName: string = $derived(object?.metadata?.name ?? '');
-	const containers: string[] = $derived(
+	const name: string = $derived(object?.metadata?.name ?? '');
+	const uid: string = $derived(object?.metadata?.uid ?? '');
+	const matchLabels: Record<string, string> = $derived(object?.spec?.selector?.matchLabels ?? {});
+
+	const containers: string[] = $derived(extractContainers(object, kind));
+
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	function extractContainers(obj: any, k: string): string[] {
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		((object?.spec?.containers || object?.spec?.template?.spec?.containers) as any[])?.map(
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			(c: any) => c.name as string
-		) ?? []
-	);
+		let specs: any[] | undefined;
+		if (k === 'Pod') {
+			specs = obj?.spec?.containers;
+		} else if (k === 'CronJob') {
+			specs = obj?.spec?.jobTemplate?.spec?.template?.spec?.containers;
+		} else {
+			specs = obj?.spec?.template?.spec?.containers;
+		}
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		return specs?.map((c: any) => c.name as string) ?? [];
+	}
 
-	let selectedContainer = $state(containers[0] ?? '');
-	let follow = $state(true);
-	let previous = $state(false);
 	let open = $state(false);
-	let logLines = $state<string[]>([]);
-	let abortController: AbortController | null = null;
-	let logContainer = $state<HTMLElement>();
-	let showScrollButton = $state(false);
-	let showAllData = $state(false);
+	let associatedJobs = $state<string[]>([]);
+	let selectedJob = $state('');
+	let associatedPods = $state<string[]>([]);
+	let selectedPod = $state('');
 
-	/** Check if the user is near the bottom of the log container */
-	function isNearBottom(): boolean {
-		if (!logContainer) return true;
-		return (
-			logContainer.scrollHeight - logContainer.scrollTop - logContainer.clientHeight <
-			logContainer.clientHeight / 3
-		);
+	const effectivePodName: string = $derived(kind === 'Pod' ? name : selectedPod);
+
+	function toLabelSelector(labels: Record<string, string>): string {
+		return Object.entries(labels)
+			.map(([k, v]) => `${k}=${v}`)
+			.join(',');
 	}
 
-	/** Smart auto-scroll: only scroll if user is near the bottom */
-	async function autoScrollToBottom() {
-		if (!logContainer) return;
-		if (isNearBottom()) {
-			await tick();
-			logContainer.scrollTop = logContainer.scrollHeight;
-		}
-	}
-
-	/** Force scroll to the bottom (manual trigger) */
-	async function scrollToBottom() {
-		await tick();
-		if (logContainer) {
-			logContainer.scrollTop = logContainer.scrollHeight;
-			showScrollButton = false;
-		}
-	}
-
-	/** Handle scroll events to show/hide the scroll-to-bottom button */
-	function handleScroll() {
-		showScrollButton = !isNearBottom();
-	}
-
-	/** Delay helper */
-	function delay(ms: number): Promise<void> {
-		return new Promise((resolve) => setTimeout(resolve, ms));
-	}
-
-	async function startStreaming() {
-		stopStreaming();
-		logLines = [];
-
-		abortController = new AbortController();
-
+	async function fetchAssociatedJobs() {
 		try {
-			const stream = client.podLog(
-				{
-					cluster,
-					namespace,
-					name: podName,
-					container: selectedContainer,
-					follow,
-					previous,
-					...(showAllData ? {} : { tailLines: BigInt(2000) })
-				},
-				{ signal: abortController.signal }
-			);
+			const response = await resourceClient.list({
+				cluster,
+				namespace,
+				group: 'batch',
+				version: 'v1',
+				resource: 'jobs'
+			});
+			associatedJobs = response.items
+				.filter((item) => {
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					const owners = (item.object as any)?.metadata?.ownerReferences as any[];
+					return owners?.some((ref) => ref.kind === 'CronJob' && ref.uid === uid);
+				})
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				.map((item) => (item.object as any)?.metadata?.name as string)
+				.filter(Boolean);
 
-			for await (const response of stream) {
-				if (response.data && response.data.length > 0) {
-					const text = new TextDecoder().decode(response.data);
-					const lines = text.split('\n').filter((l) => l.length > 0);
+			if (associatedJobs.length > 0 && !associatedJobs.includes(selectedJob)) {
+				selectedJob = associatedJobs[associatedJobs.length - 1];
+			}
+		} catch (e) {
+			console.error('Failed to fetch associated jobs:', e);
+			associatedJobs = [];
+		}
+	}
 
-					if (showAllData) {
-						logLines = [...logLines, ...lines];
-					} else {
-						const MAX_LINES = 2000;
-						if (logLines.length + lines.length > MAX_LINES) {
-							logLines = [...logLines, ...lines].slice(-MAX_LINES);
-						} else {
-							logLines = [...logLines, ...lines];
-						}
-					}
-
-					autoScrollToBottom();
-
-					// Throttle UI updates to avoid overwhelming the browser
-					await delay(100);
-				}
+	async function fetchPodsByJobName(jobName: string) {
+		if (!jobName) {
+			associatedPods = [];
+			return;
+		}
+		try {
+			const response = await resourceClient.list({
+				cluster,
+				namespace,
+				group: '',
+				version: 'v1',
+				resource: 'pods',
+				labelSelector: `job-name=${jobName}`
+			});
+			associatedPods = response.items
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				.map((item) => (item.object as any)?.metadata?.name as string)
+				.filter(Boolean);
+			if (associatedPods.length > 0 && !associatedPods.includes(selectedPod)) {
+				selectedPod = associatedPods[0];
 			}
 		} catch (error) {
-			if (abortController?.signal.aborted) return;
-			logLines = [...logLines, `[Error] Failed to stream logs: ${error}`];
+			console.error('Failed to fetch pods for job', jobName, error);
+			associatedPods = [];
 		}
 	}
 
-	function stopStreaming() {
-		if (abortController) {
-			abortController.abort();
-			abortController = null;
+	async function fetchPodsByOwnership() {
+		const selector = toLabelSelector(matchLabels);
+		if (!selector) {
+			associatedPods = [];
+			return;
+		}
+
+		try {
+			const response = await resourceClient.list({
+				cluster,
+				namespace,
+				group: '',
+				version: 'v1',
+				resource: 'pods',
+				labelSelector: selector
+			});
+
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const allPods = response.items.map((item) => item.object as any);
+
+			let ownerUids: Set<string>;
+
+			if (kind === 'Deployment') {
+				const rsResponse = await resourceClient.list({
+					cluster,
+					namespace,
+					group: 'apps',
+					version: 'v1',
+					resource: 'replicasets',
+					labelSelector: selector
+				});
+				ownerUids = new Set(
+					rsResponse.items
+						.filter((item) => {
+							// eslint-disable-next-line @typescript-eslint/no-explicit-any
+							const owners = (item.object as any)?.metadata?.ownerReferences as any[];
+							return owners?.some((ref) => ref.kind === 'Deployment' && ref.uid === uid);
+						})
+						// eslint-disable-next-line @typescript-eslint/no-explicit-any
+						.map((item) => (item.object as any)?.metadata?.uid as string)
+						.filter(Boolean)
+				);
+			} else {
+				ownerUids = new Set([uid]);
+			}
+
+			associatedPods = allPods
+				.filter((pod) => {
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					const owners = pod?.metadata?.ownerReferences as any[];
+					return owners?.some((ref) => ownerUids.has(ref.uid));
+				})
+				.map((pod) => pod?.metadata?.name as string)
+				.filter(Boolean);
+
+			if (associatedPods.length > 0 && !associatedPods.includes(selectedPod)) {
+				selectedPod = associatedPods[0];
+			}
+		} catch (error) {
+			console.error('Failed to fetch associated pods:', error);
+			associatedPods = [];
 		}
 	}
 
-	function handleOpenChange(isOpen: boolean) {
-		if (isOpen) {
-			startStreaming();
+	async function handleOpenChange(isOpen: boolean) {
+		if (!isOpen || kind === 'Pod') return;
+
+		if (kind === 'CronJob') {
+			await fetchAssociatedJobs();
+			if (selectedJob) {
+				await fetchPodsByJobName(selectedJob);
+			}
+		} else if (kind === 'Job') {
+			await fetchPodsByJobName(name);
 		} else {
-			stopStreaming();
+			await fetchPodsByOwnership();
 		}
+	}
+
+	async function handleJobChange(jobName: string) {
+		selectedJob = jobName;
+		selectedPod = '';
+		associatedPods = [];
+		await fetchPodsByJobName(jobName);
 	}
 </script>
 
@@ -158,115 +217,52 @@
 	</Dialog.Trigger>
 	<Dialog.Content class="flex h-fit max-h-[80vh] max-w-[70vw] min-w-[55vw] flex-col gap-3">
 		<Dialog.Header>
-			<Dialog.Title>Pod Logs — {podName}</Dialog.Title>
+			<Dialog.Title>Pod Logs — {effectivePodName || name}</Dialog.Title>
 			<Dialog.Description
 				>Streaming logs from namespace <strong>{namespace}</strong></Dialog.Description
 			>
 		</Dialog.Header>
-
-		<!-- Controls -->
-		<div class="flex items-center gap-2">
-			{#if containers.length > 1}
-				<Select
-					type="single"
-					value={selectedContainer}
-					onValueChange={(value) => {
-						selectedContainer = value;
-						if (open) startStreaming();
-					}}
-				>
-					<SelectTrigger class="w-48">
-						{selectedContainer || 'Select container'}
-					</SelectTrigger>
-					<SelectContent>
-						{#each containers as c (c)}
-							<SelectItem value={c}>{c}</SelectItem>
-						{/each}
-					</SelectContent>
-				</Select>
-			{:else}
-				<span class="text-xs text-muted-foreground">{selectedContainer}</span>
-			{/if}
-			<Toggle
-				size="sm"
-				pressed={follow}
-				onPressedChange={(v) => {
-					follow = v;
-					if (open) startStreaming();
-				}}
-				aria-label="Toggle follow"
-			>
-				{#if follow}
-					<PauseIcon size={14} />
-				{:else}
-					<PlayIcon size={14} />
+		<LogViewer {cluster} {namespace} podName={effectivePodName} {containers} active={open}>
+			{#snippet extraControls({ restart })}
+				{#if kind === 'CronJob' && associatedJobs.length > 0}
+					<Select
+						type="single"
+						value={selectedJob}
+						onValueChange={async (value) => {
+							await handleJobChange(value);
+							if (open) restart();
+						}}
+					>
+						<SelectTrigger class="w-56 max-w-64 min-w-0">
+							<span class="truncate">{selectedJob || 'Select job'}</span>
+						</SelectTrigger>
+						<SelectContent class="w-56 max-w-64">
+							{#each associatedJobs as j (j)}
+								<SelectItem value={j}>{j}</SelectItem>
+							{/each}
+						</SelectContent>
+					</Select>
 				{/if}
-				<span class="text-xs">{follow ? 'Following' : 'Paused'}</span>
-			</Toggle>
-			<Toggle
-				size="sm"
-				pressed={previous}
-				onPressedChange={(v) => {
-					previous = v;
-					if (open) startStreaming();
-				}}
-				aria-label="Toggle previous container"
-			>
-				<span class="text-xs">Previous</span>
-			</Toggle>
-			<Toggle
-				size="sm"
-				pressed={showAllData}
-				onPressedChange={(v) => {
-					showAllData = v;
-					if (open) startStreaming();
-				}}
-				aria-label="Toggle all data"
-			>
-				<span class="text-xs">All</span>
-			</Toggle>
-			<div class="ml-auto">
-				<Button
-					size="sm"
-					variant="outline"
-					onclick={() => {
-						if (open) startStreaming();
-					}}
-				>
-					Refresh
-				</Button>
-			</div>
-		</div>
-
-		<!-- Log output -->
-		<div class="relative">
-			<div
-				bind:this={logContainer}
-				onscroll={handleScroll}
-				class="h-[55vh] overflow-auto rounded-md border bg-muted p-3 font-mono text-xs leading-relaxed"
-			>
-				{#if logLines.length === 0}
-					<span class="text-muted-foreground">Waiting for log data...</span>
-				{:else}
-					{#each logLines as line, i (i)}
-						<div class="hover:bg-muted-foreground/10">{line}</div>
-					{/each}
+				{#if kind !== 'Pod' && associatedPods.length > 0}
+					<Select
+						type="single"
+						value={selectedPod}
+						onValueChange={(value) => {
+							selectedPod = value;
+							if (open) restart();
+						}}
+					>
+						<SelectTrigger class="w-64 max-w-64 min-w-0">
+							<span class="truncate">{selectedPod || 'Select pod'}</span>
+						</SelectTrigger>
+						<SelectContent class="w-64 max-w-64">
+							{#each associatedPods as p (p)}
+								<SelectItem value={p}>{p}</SelectItem>
+							{/each}
+						</SelectContent>
+					</Select>
 				{/if}
-			</div>
-
-			<!-- Scroll to bottom button -->
-			{#if showScrollButton}
-				<Button
-					onclick={() => {
-						scrollToBottom();
-					}}
-					variant="outline"
-					size="icon-sm"
-					class="absolute bottom-2 left-1/2 inline-flex -translate-x-1/2 transform rounded-full shadow-md"
-				>
-					<ArrowDownIcon size={14} />
-				</Button>
-			{/if}
-		</div>
+			{/snippet}
+		</LogViewer>
 	</Dialog.Content>
 </Dialog.Root>

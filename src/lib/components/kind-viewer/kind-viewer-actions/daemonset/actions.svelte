@@ -66,6 +66,7 @@
 				<Log
 					{cluster}
 					{object}
+					{kind}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
 					}}
