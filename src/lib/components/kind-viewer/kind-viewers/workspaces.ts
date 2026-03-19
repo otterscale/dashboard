@@ -4,8 +4,6 @@ import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 import type { Column, ColumnDef } from '@tanstack/table-core';
 import { type Row } from '@tanstack/table-core';
 
-import { resolve } from '$app/paths';
-import { page } from '$app/state';
 import { DynamicTableCell, DynamicTableHeader } from '$lib/components/dynamic-table';
 import type {
 	ArrayOfObjectItemType,
@@ -15,6 +13,8 @@ import type { LinkMetadata } from '$lib/components/dynamic-table/dynamic-table-c
 import type { QuantityMetadata } from '$lib/components/dynamic-table/dynamic-table-cells/quantity-cell.svelte';
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
+
+import { buildResourceDetailUrl } from './resource-url';
 
 type WorkspaceAttribute =
 	| 'Name'
@@ -63,7 +63,7 @@ function getWorkspaceData(
 function getWorkspaceUISchemas(): Record<WorkspaceAttribute, UISchemaType> {
 	return {
 		Name: 'link',
-		Namespace: 'link',
+		Namespace: 'text',
 		Members: 'array-of-object',
 		'CPU Limit': 'quantity',
 		'CPU Requests': 'quantity',
@@ -100,8 +100,9 @@ function getWorkspaceColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas,
 					metadata: {
-						hyperlink: resolve(
-							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original[column.id as WorkspaceAttribute]}?group=${apiResource.group}&version=${apiResource.version}&kind=${apiResource.kind}&resource=${apiResource.resource}&namespaced=${apiResource.namespaced}`
+						hyperlink: buildResourceDetailUrl(
+							apiResource,
+							row.original[column.id as WorkspaceAttribute] as string
 						)
 					} as LinkMetadata
 				}),
@@ -124,12 +125,7 @@ function getWorkspaceColumnDefinitions(
 				renderComponent(DynamicTableCell, {
 					row: row,
 					column: column,
-					uiSchemas: uiSchemas,
-					metadata: {
-						hyperlink: resolve(
-							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original['Namespace']}?group=&version=v1&kind=Namespace&resource=namespaces&namespaced=false`
-						)
-					} satisfies LinkMetadata
+					uiSchemas: uiSchemas
 				}),
 			accessorKey: 'Namespace'
 		},
