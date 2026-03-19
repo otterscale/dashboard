@@ -2,6 +2,7 @@
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
+	import Edit from '$lib/components/kind-viewer/kind-viewer-actions/default/edit.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
@@ -48,7 +49,7 @@
 			>
 				<View {schema} {object} />
 			</DropdownMenu.Item>
-			<!-- <DropdownMenu.Item
+			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
@@ -65,7 +66,7 @@
 						actionsOpen = false;
 					}}
 				/>
-			</DropdownMenu.Item> -->
+			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();

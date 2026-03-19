@@ -3,10 +3,10 @@
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
+	import Edit from '$lib/components/kind-viewer/kind-viewer-actions/default/edit.svelte';
 	import Log from '$lib/components/kind-viewer/kind-viewer-actions/default/log.svelte';
 	import Restart from '$lib/components/kind-viewer/kind-viewer-actions/default/restart.svelte';
 	import Terminal from '$lib/components/kind-viewer/kind-viewer-actions/default/terminal.svelte';
-	import Update from '$lib/components/kind-viewer/kind-viewer-actions/default/update.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
@@ -96,7 +96,7 @@
 				/>
 			</DropdownMenu.Item>
 			<DropdownMenu.Item onSelect={(e) => e.preventDefault()}>
-				<Update
+				<Edit
 					{schema}
 					{object}
 					{cluster}
