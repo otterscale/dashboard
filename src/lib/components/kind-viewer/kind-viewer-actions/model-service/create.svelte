@@ -92,7 +92,7 @@
 
 			timer = setTimeout(async () => {
 				try {
-					const response = await fetch(`/rest/harbor/models?project=${namespace}`);
+					const response = await fetch(`/bff/harbor/models?project=${namespace}`);
 					if (response.ok) {
 						const harborUrl = new SvelteURL(publicEnv.PUBLIC_HARBOR_URL ?? '');
 						const modelArtifacts: ArtifactType[] = await response.json();
