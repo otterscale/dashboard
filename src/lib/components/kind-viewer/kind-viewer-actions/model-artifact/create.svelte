@@ -189,7 +189,7 @@
 								registry: harborUrl.host,
 								repository: `${namespace}/${lodash.get(values, 'metadata.name')}`,
 								tag: 'latest',
-								credentialsSecretRef: { name: 'harbor-credential' },
+								credentialsSecretRef: { name: 'workspace-image-pull-secret' },
 								insecure: true
 							};
 
