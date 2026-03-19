@@ -12,6 +12,8 @@
 	import * as Item from '$lib/components/ui/item';
 	import { m } from '$lib/paraglide/messages';
 
+	let { namespace }: { namespace: string } = $props();
+
 	const harborUniformResourceLocator = new SvelteURL(publicEnv.PUBLIC_HARBOR_URL ?? '');
 </script>
 
@@ -39,7 +41,7 @@
 		</Item.Root>
 
 		<Item.Root class="w-full">
-			{@const command = `helm push <chart_package> oci://${harborUniformResourceLocator.host}/<namespace> --plain-http`}
+			{@const command = `helm push <chart_package> oci://${harborUniformResourceLocator.host}/${namespace} --plain-http`}
 			<Item.Media variant="icon">
 				<Icon icon="logos:helm" />
 			</Item.Media>

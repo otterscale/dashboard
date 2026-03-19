@@ -64,7 +64,9 @@ async function fetchSecretAuthHeader(
 
 	if (!secretResponse.ok) {
 		const errorText = await secretResponse.text();
-		console.log(`Secret Response NOT OK: ${secretResponse.status} ${secretResponse.statusText}\nBody: ${errorText}`);
+		console.log(
+			`Secret Response NOT OK: ${secretResponse.status} ${secretResponse.statusText}\nBody: ${errorText}`
+		);
 		return '';
 	}
 
@@ -94,7 +96,7 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 		const body = await request.json();
 
 		const { cluster, namespace, harborHost, apiPath, isInternal } = body;
-		let { secretName } = body;
+		const { secretName } = body;
 
 		if (!cluster || !namespace || !harborHost || !apiPath) {
 			error(400, 'Missing required fields: cluster, namespace, harborHost, apiPath');
@@ -179,4 +181,3 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 		error(500, `Failed to proxy Harbor request: ${error.message || 'Unknown error'}`);
 	}
 };
-

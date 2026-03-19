@@ -89,7 +89,7 @@
 		>;
 	} = $props();
 
-	let mode = $state<'table' | 'grid'>('table');
+	let mode = $state<'table' | 'grid'>(gridsLayout ? 'grid' : 'table');
 
 	const columns: ColumnDef<Record<string, JsonValue>>[] = [
 		{
