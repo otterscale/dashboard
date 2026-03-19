@@ -4,8 +4,6 @@ import type { RbacAuthorizationK8SIoV1ClusterRoleBinding } from '@otterscale/typ
 import type { Column, ColumnDef } from '@tanstack/table-core';
 import { type Row } from '@tanstack/table-core';
 
-import { resolve } from '$app/paths';
-import { page } from '$app/state';
 import { DynamicTableCell, DynamicTableHeader } from '$lib/components/dynamic-table';
 import {
 	type ArrayOfObjectItemsType,
@@ -14,6 +12,8 @@ import {
 import type { LinkMetadata } from '$lib/components/dynamic-table/dynamic-table-cells/link-cell.svelte';
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
+
+import { buildResourceDetailUrl } from './resource-url';
 
 // kubectl get clusterrolebinding -o wide
 // NAME   ROLE   AGE   USERS   GROUPS   SERVICEACCOUNTS
@@ -94,8 +94,9 @@ function getClusterRoleBindingColumnDefinitions(
 					column,
 					uiSchemas,
 					metadata: {
-						hyperlink: resolve(
-							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original[column.id as ClusterRoleBindingAttribute]}?group=${apiResource.group}&version=${apiResource.version}&kind=${apiResource.kind}&resource=${apiResource.resource}&namespaced=${apiResource.namespaced}`
+						hyperlink: buildResourceDetailUrl(
+							apiResource,
+							row.original[column.id as ClusterRoleBindingAttribute] as string
 						)
 					} satisfies LinkMetadata
 				}),

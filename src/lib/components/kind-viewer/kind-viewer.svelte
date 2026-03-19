@@ -25,29 +25,21 @@
 
 	let {
 		isClusterAdmin,
-		apiResource,
 		cluster,
-		group,
-		version,
-		kind,
-		resource,
-		namespace
+		namespace,
+		apiResource
 	}: {
 		isClusterAdmin: boolean;
-		apiResource: APIResource;
 		cluster: string;
-		group: string;
-		version: string;
-		kind: string;
-		resource: string;
 		namespace?: string;
+		apiResource: APIResource;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	const uiSchemas: Record<string, UISchemaType> = $derived(getUISchemas(kind));
-	const dataSchemas: Record<string, DataSchemaType> = $derived(getDataSchemas(kind));
+	const uiSchemas: Record<string, UISchemaType> = $derived(getUISchemas(apiResource.kind));
+	const dataSchemas: Record<string, DataSchemaType> = $derived(getDataSchemas(apiResource.kind));
 
 	// eslint-disable-next-line
 	let schema: any = $state({});
@@ -56,9 +48,9 @@
 		try {
 			const schemaResponse = await resourceClient.schema({
 				cluster: cluster,
-				group: group,
-				version: version,
-				kind: kind
+				group: apiResource.group,
+				version: apiResource.version,
+				kind: apiResource.kind
 			} as SchemaRequest);
 
 			schema = schemaResponse.schema ?? {};
@@ -89,9 +81,9 @@
 					{
 						cluster: cluster,
 						namespace: clustered ? undefined : apiResource.namespaced ? namespace : undefined,
-						group: group,
-						version: version,
-						resource: resource,
+						group: apiResource.group,
+						version: apiResource.version,
+						resource: apiResource.resource,
 						limit: BigInt(10),
 						continue: continueToken
 					} as ListRequest,
@@ -101,7 +93,7 @@
 				resourceVersion = response.resourceVersion;
 				continueToken = response.continue;
 
-				const newData = response.items.map((item) => getData(kind, apiResource, item.object));
+				const newData = response.items.map((item) => getData(apiResource, item.object));
 				dataset = [...dataset, ...newData];
 
 				if (listAbortController.signal.aborted) {
@@ -131,9 +123,9 @@
 				{
 					cluster: cluster,
 					namespace: clustered ? undefined : apiResource.namespaced ? namespace : undefined,
-					group: group,
-					version: version,
-					resource: resource,
+					group: apiResource.group,
+					version: apiResource.version,
+					resource: apiResource.resource,
 					resourceVersion: resourceVersion
 				} as WatchRequest,
 				{ signal: watchAbortController.signal }
@@ -155,7 +147,7 @@
 				resourceVersion = response.resource?.object?.metadata?.resourceVersion;
 
 				if (response.type === WatchEvent_Type.ADDED) {
-					const addedData = getData(kind, apiResource, response.resource?.object);
+					const addedData = getData(apiResource, response.resource?.object);
 
 					const index = dataset.findIndex((object) => {
 						if (apiResource.namespaced) {
@@ -169,7 +161,7 @@
 						dataset = [...dataset, addedData];
 					}
 				} else if (response.type === WatchEvent_Type.MODIFIED) {
-					const modifiedData = getData(kind, apiResource, response.resource?.object);
+					const modifiedData = getData(apiResource, response.resource?.object);
 
 					dataset = dataset.map((object) => {
 						if (
@@ -185,7 +177,7 @@
 						return object;
 					});
 				} else if (response.type === WatchEvent_Type.DELETED) {
-					const deletedData = getData(kind, apiResource, response.resource?.object);
+					const deletedData = getData(apiResource, response.resource?.object);
 					dataset = dataset.filter((object) => {
 						if (apiResource.namespaced) {
 							return object.Namespace === deletedData.Namespace && object.Name !== deletedData.Name;
@@ -202,7 +194,9 @@
 
 			console.error('Failed to watch resources:', error);
 		} finally {
-			toast.info(`Watching resource ${namespace} ${resource} was cancelled.`);
+			if (!isDestroyed) {
+				toast.info(`Watching resource ${namespace} ${apiResource.resource} was cancelled.`);
+			}
 
 			isWatching = false;
 			watchAbortController = null;
@@ -236,7 +230,7 @@
 	onMount(async () => {
 		await fetchSchema();
 		await listResources();
-		columnDefinitions = getColumnDefinitions(kind, apiResource, uiSchemas, dataSchemas);
+		columnDefinitions = getColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		watchResources();
 
 		isMounted = true;
@@ -264,8 +258,8 @@
 		}
 	}
 
-	const Create: CreateType = $derived(getCreate(kind));
-	const Actions: ActionsType = $derived(getActions(kind));
+	const Create: CreateType = $derived(getCreate(apiResource.kind));
+	const Actions: ActionsType = $derived(getActions(apiResource.kind));
 </script>
 
 {#if isMounted}
@@ -288,7 +282,15 @@
 				{/if}
 			{/snippet}
 			{#snippet create()}
-				<Create {schema} {cluster} {namespace} {group} {version} {kind} {resource} />
+				<Create
+					{schema}
+					{cluster}
+					{namespace}
+					group={apiResource.group}
+					version={apiResource.version}
+					kind={apiResource.kind}
+					resource={apiResource.resource}
+				/>
 			{/snippet}
 			{#snippet reload()}
 				<Button onclick={handleReload} variant="outline" size="icon">
@@ -305,10 +307,10 @@
 					{schema}
 					object={row.original.raw}
 					{cluster}
-					{group}
-					{version}
-					{kind}
-					{resource}
+					group={apiResource.group}
+					version={apiResource.version}
+					kind={apiResource.kind}
+					resource={apiResource.resource}
 					{namespace}
 				/>
 			{/snippet}

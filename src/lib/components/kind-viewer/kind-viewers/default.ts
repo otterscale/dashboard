@@ -3,13 +3,13 @@ import type { APIResource } from '@otterscale/api/resource/v1';
 import type { Column, ColumnDef } from '@tanstack/table-core';
 import { type Row } from '@tanstack/table-core';
 
-import { resolve } from '$app/paths';
-import { page } from '$app/state';
 import { DynamicTableCell, DynamicTableHeader } from '$lib/components/dynamic-table';
 import type { LinkMetadata } from '$lib/components/dynamic-table/dynamic-table-cells/link-cell.svelte';
 import type { ObjectOfKeyValueMetadata } from '$lib/components/dynamic-table/dynamic-table-cells/object-of-key-value-cell.svelte';
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
+
+import { buildResourceDetailUrl } from './resource-url';
 
 type DefaultAttribute =
 	| 'Name'
@@ -49,7 +49,7 @@ function getDefaultData(
 function getDefaultUISchemas(): Record<DefaultAttribute, UISchemaType> {
 	return {
 		Name: 'link',
-		Namespace: 'link',
+		Namespace: 'text',
 		Labels: 'object-of-key-value',
 		Annotations: 'object-of-key-value',
 		'Creation Timestamp': 'time',
@@ -82,8 +82,10 @@ function getDefaultColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas,
 					metadata: {
-						hyperlink: resolve(
-							`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original[column.id as DefaultAttribute]}?group=${apiResource.group}&version=${apiResource.version}&kind=${apiResource.kind}&resource=${apiResource.resource}&namespaced=${apiResource.namespaced}`
+						hyperlink: buildResourceDetailUrl(
+							apiResource,
+							row.original[column.id as DefaultAttribute] as string,
+							row.original['Namespace'] as string
 						)
 					} satisfies LinkMetadata
 				}),
@@ -107,12 +109,7 @@ function getDefaultColumnDefinitions(
 					renderComponent(DynamicTableCell, {
 						row: row,
 						column: column,
-						uiSchemas: uiSchemas,
-						metadata: {
-							hyperlink: resolve(
-								`/(auth)/${page.params.cluster}/${page.params.workspace}/${row.original['Namespace']}?group=&version=v1&kind=Namespace&resource=namespaces&namespaced=false`
-							)
-						} satisfies LinkMetadata
+						uiSchemas: uiSchemas
 					}),
 				accessorKey: 'Namespace'
 			}
