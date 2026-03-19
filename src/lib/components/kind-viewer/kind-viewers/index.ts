@@ -5,6 +5,12 @@ import type { ColumnDef } from '@tanstack/table-core';
 import type { DataSchemaType, UISchemaType } from '$lib/components/dynamic-table/utils.js';
 
 import {
+	getApplicationColumnDefinitions,
+	getApplicationData,
+	getApplicationDataSchemas,
+	getApplicationUISchemas
+} from './application.js';
+import {
 	getClusterRoleColumnDefinitions,
 	getClusterRoleData,
 	getClusterRoleDataSchemas,
@@ -189,6 +195,8 @@ import {
 
 function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 	switch (kind) {
+		case 'Application':
+			return getApplicationDataSchemas();
 		case 'CronJob':
 			return getCronJobDataSchemas();
 		case 'DaemonSet':
@@ -258,6 +266,8 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 
 function getData(apiResource: APIResource, object: any): Record<string, JsonValue> {
 	switch (apiResource.kind) {
+		case 'Application':
+			return getApplicationData(object);
 		case 'CronJob':
 			return getCronJobData(object);
 		case 'DaemonSet':
@@ -327,6 +337,8 @@ function getData(apiResource: APIResource, object: any): Record<string, JsonValu
 
 function getUISchemas(kind: string): Record<string, UISchemaType> {
 	switch (kind) {
+		case 'Application':
+			return getApplicationUISchemas();
 		case 'CronJob':
 			return getCronJobUISchemas();
 		case 'DaemonSet':
@@ -400,6 +412,8 @@ function getColumnDefinitions(
 	dataSchemas: Record<string, DataSchemaType>
 ): ColumnDef<Record<string, JsonValue>>[] {
 	switch (apiResource.kind) {
+		case 'Application':
+			return getApplicationColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'CronJob':
 			return getCronJobColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'DaemonSet':
