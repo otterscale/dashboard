@@ -17,8 +17,8 @@
 	} from '$lib/components/artifact-viewer/table-layout';
 	import {
 		encodeURIComponentWithSlashEscape,
-		parseProjectName,
-		parsetHarborHost
+		parseHarborHost,
+		parseProjectName
 	} from '$lib/components/artifact-viewer/utils.svelte.ts';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { m } from '$lib/paraglide/messages';
@@ -59,7 +59,7 @@
 		const helmRepositoryName = helmRepository.metadata?.name ?? 'unknown';
 		const isInternal =
 			helmRepository.metadata?.labels?.['tenant.otterscale.io/internal'] === 'true';
-		const harborHost = parsetHarborHost(helmRepository);
+		const harborHost = parseHarborHost(helmRepository);
 		const secretName = helmRepository.spec?.secretRef?.name ?? '';
 
 		const projectName = parseProjectName(helmRepository);

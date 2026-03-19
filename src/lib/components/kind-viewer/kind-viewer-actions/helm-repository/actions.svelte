@@ -7,8 +7,6 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
-	import Update from './update.svelte';
-
 	let {
 		schema,
 		object,
@@ -57,25 +55,6 @@
 				}}
 			>
 				<Edit
-					{schema}
-					{object}
-					{cluster}
-					{namespace}
-					{group}
-					{version}
-					{kind}
-					{resource}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
-			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<Update
 					{schema}
 					{object}
 					{cluster}

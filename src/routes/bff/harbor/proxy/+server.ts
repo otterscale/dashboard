@@ -1,42 +1,12 @@
 import { error, json } from '@sveltejs/kit';
 
+import { redis } from '$lib/server/redis';
+
 import type { RequestHandler } from './$types';
 
 const TimeToLiveSeconds = 5 * 60; // 5 minutes cache
 
-// In-memory cache for Kubernetes secrets
-interface CachedSecret {
-	authorizationHeader: string;
-	expiresAt: number;
-}
-
-const secretCache = new Map<string, CachedSecret>();
-
-function getCachedSecret(key: string): string | null {
-	const entry = secretCache.get(key);
-	if (!entry) return null;
-	if (Date.now() > entry.expiresAt) {
-		secretCache.delete(key);
-		return null;
-	}
-	return entry.authorizationHeader;
-}
-
-function setCachedSecret(key: string, authorizationHeader: string): void {
-	secretCache.set(key, {
-		authorizationHeader,
-		expiresAt: Date.now() + TimeToLiveSeconds * 1000
-	});
-}
-
-function clearExpiredEntries(): void {
-	const now = Date.now();
-	for (const [key, entry] of secretCache) {
-		if (now > entry.expiresAt) {
-			secretCache.delete(key);
-		}
-	}
-}
+const REDIS_PREFIX = 'harbor-proxy-secret:';
 
 async function fetchSecretAuthHeader(
 	fetchFn: typeof fetch,
@@ -89,7 +59,7 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 	console.log('[harbor-proxy] Handling request');
 	if (!locals.session) {
 		console.log('[harbor-proxy] Rejecting due to missing session');
-		error(403, 'Unauthorized dashboard session');
+		throw error(403, 'Unauthorized dashboard session');
 	}
 
 	try {
@@ -99,7 +69,7 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 		const { secretName } = body;
 
 		if (!cluster || !namespace || !harborHost || !apiPath) {
-			error(400, 'Missing required fields: cluster, namespace, harborHost, apiPath');
+			throw error(400, 'Missing required fields: cluster, namespace, harborHost, apiPath');
 		}
 
 		let authorizationHeader = '';
@@ -109,7 +79,8 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 			authorizationHeader = `Bearer ${locals.session.tokenSet.accessToken}`;
 		} else if (secretName) {
 			const cacheKey = `${cluster}/${namespace}/${secretName}`;
-			const cachedSecret = getCachedSecret(cacheKey);
+			const redisKey = REDIS_PREFIX + cacheKey;
+			const cachedSecret = await redis.get(redisKey);
 
 			if (cachedSecret) {
 				console.log(`[harbor-proxy] Using cached Secret for ${cacheKey}`);
@@ -118,12 +89,10 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 				console.log(`[harbor-proxy] Fetching Secret ${secretName}`);
 				authorizationHeader = await fetchSecretAuthHeader(fetch, cluster, namespace, secretName);
 				if (authorizationHeader) {
-					setCachedSecret(cacheKey, authorizationHeader);
+					await redis.set(redisKey, authorizationHeader, 'EX', TimeToLiveSeconds);
 					console.log(`[harbor-proxy] Cached Secret for ${cacheKey} (TTL: ${TimeToLiveSeconds}s)`);
 				}
 			}
-
-			clearExpiredEntries();
 		}
 
 		const targetUrl = `${harborHost}${apiPath}`;
@@ -140,19 +109,20 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 		// If Harbor returns 401 and we have a secret, re-fetch to check for updates
 		if (response.status === 401 && secretName) {
 			const cacheKey = `${cluster}/${namespace}/${secretName}`;
-			const wasCached = getCachedSecret(cacheKey) !== null;
+			const redisKey = REDIS_PREFIX + cacheKey;
+			const wasCached = (await redis.get(redisKey)) !== null;
 
 			console.log(`[harbor-proxy] Got 401, re-fetching Secret ${secretName} to check for updates`);
 			const freshAuthHeader = await fetchSecretAuthHeader(fetch, cluster, namespace, secretName);
 
 			if (freshAuthHeader && freshAuthHeader !== authorizationHeader) {
 				console.log(`[harbor-proxy] Secret changed! Retrying with updated credentials`);
-				setCachedSecret(cacheKey, freshAuthHeader);
+				await redis.set(redisKey, freshAuthHeader, 'EX', TimeToLiveSeconds);
 				authorizationHeader = freshAuthHeader;
 				response = await fetch(targetUrl, { headers: getHeaders(authorizationHeader) });
 			} else if (wasCached) {
 				console.log(`[harbor-proxy] Secret unchanged, evicting cache entry for ${cacheKey}`);
-				secretCache.delete(cacheKey);
+				await redis.del(redisKey);
 			}
 		}
 
@@ -176,8 +146,8 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 				}
 			});
 		}
-	} catch (error: any) {
-		console.error('[harbor-proxy] Failed to proxy request:', error);
-		error(500, `Failed to proxy Harbor request: ${error.message || 'Unknown error'}`);
+	} catch (err: any) {
+		console.error('[harbor-proxy] Failed to proxy request:', err);
+		throw error(500, `Failed to proxy Harbor request: ${err?.message || 'Unknown error'}`);
 	}
 };

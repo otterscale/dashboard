@@ -22,7 +22,7 @@
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import type { ArtifactType } from '$lib/server/harbor';
 
-	import { encodeURIComponentWithSlashEscape, parsetHarborHost } from '../utils.svelte';
+	import { encodeURIComponentWithSlashEscape, parseHarborHost } from '../utils.svelte';
 
 	let {
 		cluster,
@@ -121,7 +121,7 @@
 		latestChartArtifact.repository_name.split('/')
 	);
 	const repository = $derived(latestChartNameParts.join('/'));
-	const harborHost = $derived(parsetHarborHost(helmRepository));
+	const harborHost = $derived(parseHarborHost(helmRepository));
 	const secretName = $derived(helmRepository?.spec?.secretRef?.name ?? '');
 	const isInternal = $derived(
 		helmRepository?.metadata?.labels?.['tenant.otterscale.io/internal'] === 'true'
@@ -387,12 +387,15 @@
 						handleSubmit={{
 							posthook: () => {
 								handleNext();
+								try {
+									const structuredValues = load(lodash.get(values, 'spec.values') as string);
 
-								lodash.set(
-									values,
-									'spec.values',
-									load(lodash.get(values, 'spec.values') as string)
-								);
+									lodash.set(values, 'spec.values', structuredValues);
+								} catch (error) {
+									console.error('Failed to load values:', error);
+									toast.error('Failed to load values');
+									lodash.set(values, 'spec.values', {});
+								}
 							}
 						}}
 					>
@@ -435,7 +438,10 @@
 							isSubmitting = true;
 
 							const isValid = validate(load(value));
+
 							if (!isValid) {
+								console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
+								toast.error('Validation failed. Please check the YAML.');
 								isSubmitting = false;
 								return;
 							}

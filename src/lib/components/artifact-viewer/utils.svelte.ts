@@ -8,7 +8,7 @@ function encodeURIComponentWithSlashEscape(value: string): string {
 		: encodeURIComponent(value);
 }
 
-function parsetHarborHost(helmRepository: SourceToolkitFluxcdIoV1HelmRepository) {
+function parseHarborHost(helmRepository: SourceToolkitFluxcdIoV1HelmRepository) {
 	const url = new SvelteURL(helmRepository.spec?.url ?? '');
 	const insecure = helmRepository.spec?.insecure;
 	const protocol = insecure ? 'http' : 'https';
@@ -26,4 +26,4 @@ function parseProjectName(helmRepository: SourceToolkitFluxcdIoV1HelmRepository)
 	return project;
 }
 
-export { encodeURIComponentWithSlashEscape, parseProjectName, parsetHarborHost };
+export { encodeURIComponentWithSlashEscape, parseHarborHost, parseProjectName };
