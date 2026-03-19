@@ -232,8 +232,8 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 	}
 }
 
-function getData(kind: string, apiResource: APIResource, object: any): Record<string, JsonValue> {
-	switch (kind) {
+function getData(apiResource: APIResource, object: any): Record<string, JsonValue> {
+	switch (apiResource.kind) {
 		case 'CronJob':
 			return getCronJobData(object);
 		case 'DaemonSet':
@@ -359,12 +359,11 @@ function getUISchemas(kind: string): Record<string, UISchemaType> {
 }
 
 function getColumnDefinitions(
-	kind: string,
 	apiResource: APIResource,
 	uiSchemas: Record<string, UISchemaType>,
 	dataSchemas: Record<string, DataSchemaType>
 ): ColumnDef<Record<string, JsonValue>>[] {
-	switch (kind) {
+	switch (apiResource.kind) {
 		case 'CronJob':
 			return getCronJobColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'DaemonSet':

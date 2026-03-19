@@ -109,19 +109,11 @@
 		isMounted = true;
 	});
 
-	function resourceUrl(
-		group: string,
-		version: string,
-		kind: string,
-		resource: string,
-		namespaced: boolean = true
-	) {
+	function resourceUrl(group: string, version: string, kind: string, resource: string) {
 		const workspace = page.params.workspace ?? '_';
-		let query = `?group=${group}&version=${version}&kind=${kind}&resource=${resource}`;
-		if (!namespaced) {
-			query += `&namespaced=false`;
-		}
-		return resolve(`/(auth)/${activeCluster}/${workspace}${query}`);
+		return resolve(
+			`/(auth)/${activeCluster}/${workspace}?group=${group}&version=${version}&kind=${kind}&resource=${resource}`
+		);
 	}
 
 	const navData = $derived({
@@ -396,7 +388,7 @@
 				items: [
 					{
 						title: m.node(),
-						url: resourceUrl('', 'v1', 'Node', 'nodes', false)
+						url: resourceUrl('', 'v1', 'Node', 'nodes')
 					},
 					{
 						title: m.custom_resource_definition(),
@@ -404,19 +396,12 @@
 							'apiextensions.k8s.io',
 							'v1',
 							'CustomResourceDefinition',
-							'customresourcedefinitions',
-							false
+							'customresourcedefinitions'
 						)
 					},
 					{
 						title: m.cluster_role(),
-						url: resourceUrl(
-							'rbac.authorization.k8s.io',
-							'v1',
-							'ClusterRole',
-							'clusterroles',
-							false
-						)
+						url: resourceUrl('rbac.authorization.k8s.io', 'v1', 'ClusterRole', 'clusterroles')
 					},
 					{
 						title: m.cluster_role_binding(),
@@ -424,8 +409,7 @@
 							'rbac.authorization.k8s.io',
 							'v1',
 							'ClusterRoleBinding',
-							'clusterrolebindings',
-							false
+							'clusterrolebindings'
 						)
 					}
 				]

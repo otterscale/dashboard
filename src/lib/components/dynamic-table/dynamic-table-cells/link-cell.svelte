@@ -2,7 +2,7 @@
 	import type { JsonValue } from '@bufbuild/protobuf';
 
 	export type LinkMetadata = {
-		hyperlink: string;
+		hyperlink: string | (() => string);
 	};
 </script>
 
@@ -26,7 +26,11 @@
 	const data: JsonValue = $derived(row.original[column.id]);
 </script>
 
-<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
-<a href={metadata.hyperlink} class="hover:underline">
+<!-- eslint-disable svelte/no-navigation-without-resolve -->
+<a
+	href={typeof metadata.hyperlink === 'function' ? metadata.hyperlink() : metadata.hyperlink}
+	class="hover:underline"
+>
 	<p class="max-w-3xs truncate">{data}</p>
 </a>
+<!-- eslint-enable svelte/no-navigation-without-resolve -->
