@@ -1,30 +1,24 @@
 <script lang="ts">
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
+	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 
-	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
-	import Edit from '$lib/components/kind-viewer/kind-viewer-actions/default/update.svelte';
-	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import type { ArtifactType } from '$lib/server/harbor';
+
+	import Install from './install.svelte';
+	import View from './view.svelte';
 
 	let {
-		schema,
-		object,
 		cluster,
 		namespace,
-		group,
-		version,
-		kind,
-		resource
+		chartArtifact,
+		helmRepository
 	}: {
-		schema: any;
-		object: any;
 		cluster: string;
 		namespace: string;
-		group: string;
-		version: string;
-		kind: string;
-		resource: string;
+		chartArtifact: ArtifactType;
+		helmRepository: SourceToolkitFluxcdIoV1HelmRepository;
 	} = $props();
 
 	let actionsOpen = $state(false);
@@ -47,26 +41,7 @@
 					e.preventDefault();
 				}}
 			>
-				<View {schema} {object} />
-			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<Edit
-					{schema}
-					{object}
-					{cluster}
-					{namespace}
-					{group}
-					{version}
-					{kind}
-					{resource}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
+				<View {chartArtifact} />
 			</DropdownMenu.Item>
 
 			<DropdownMenu.Item
@@ -74,15 +49,11 @@
 					e.preventDefault();
 				}}
 			>
-				<Delete
-					{schema}
-					{object}
+				<Install
 					{cluster}
 					{namespace}
-					{group}
-					{version}
-					{kind}
-					{resource}
+					{chartArtifact}
+					{helmRepository}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
 					}}

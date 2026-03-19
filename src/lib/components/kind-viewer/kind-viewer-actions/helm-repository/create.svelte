@@ -91,7 +91,7 @@
 				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
-		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
+		<Tabs.Root value={currentStep}>
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
@@ -104,14 +104,18 @@
 							},
 							namespace: {
 								...lodash.get(jsonSchema, 'properties.metadata.properties.namespace'),
-								title: 'Namespace'
+								title: 'Namespace',
+								readOnly: true
 							},
 							labels: {
 								title: 'Labels',
-								...lodash.get(jsonSchema, 'properties.metadata.properties.labels'),
+								...lodash.omit(lodash.get(jsonSchema, 'properties.metadata.properties.labels'), [
+									'additionalProperties'
+								]),
 								properties: {
 									'tenant.otterscale.io/from-harbor': {
-										type: 'boolean'
+										type: 'boolean',
+										title: 'Harbor'
 									}
 								}
 							}
@@ -124,6 +128,9 @@
 							}
 						},
 						labels: {
+							'ui:options': {
+								addable: false
+							},
 							'tenant.otterscale.io/from-harbor': {
 								'ui:options': {
 									help: 'Indicates whether this repository originates from Harbor'
@@ -132,10 +139,9 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						name: null,
 						namespace: namespace,
 						labels: {
-							'tenant.otterscale.io/from-harbor': null
+							'tenant.otterscale.io/from-harbor': false
 						}
 					} as FormValue}
 					handleSubmit={{
@@ -181,13 +187,13 @@
 								...lodash.get(jsonSchema, 'properties.spec.properties.url'),
 								title: 'URL'
 							},
-							insecure: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.insecure'),
-								title: 'Insecure'
-							},
 							secretRef: {
 								...lodash.get(jsonSchema, 'properties.spec.properties.secretRef'),
 								title: 'Secret Reference'
+							},
+							insecure: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.insecure'),
+								title: 'Insecure'
 							},
 							certSecretRef: {
 								...lodash.get(jsonSchema, 'properties.spec.properties.certSecretRef'),
@@ -210,18 +216,10 @@
 									.get(jsonSchema, 'properties.spec.properties.type.enum')
 									.filter((type: string) => type !== 'oci')
 							}
-						},
-						secretRef: {
-							name: {
-								'ui:options': {
-									help: 'To connect to the internal Harbor service, use "harbor-credential" as the Secret name.'
-								}
-							}
 						}
 					} as UiSchemaRoot}
 					initialValue={{
 						type: 'oci',
-						url: '',
 						interval: '10m'
 					} as FormValue}
 					handleSubmit={{
@@ -246,9 +244,8 @@
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[2]}>
+			<Tabs.Content value={steps[2]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
-					<!-- <Code.Root lang="yaml" class="w-full" hideLines code={stringify(values, null, 2)} /> -->
 					<Monaco
 						options={{
 							language: 'yaml',

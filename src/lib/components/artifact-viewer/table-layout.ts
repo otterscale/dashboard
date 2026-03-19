@@ -1,4 +1,5 @@
 import { type JsonValue } from '@bufbuild/protobuf';
+import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 import type { Column, ColumnDef } from '@tanstack/table-core';
 import { type Row } from '@tanstack/table-core';
 
@@ -10,66 +11,68 @@ import { renderComponent } from '$lib/components/ui/data-table';
 import type { ArtifactType } from '$lib/server/harbor';
 
 type ArtifactAttribute =
+	| 'Helm Repository'
 	| 'Repository'
 	| 'Digest'
-	| 'Tags'
+	| 'Version'
 	| 'Size'
 	| 'Push Time'
 	| 'Pull Time'
 	| 'Type'
 	| 'Labels'
 	| 'helmRepository'
-	| 'raw';
+	| 'chartArtifact';
 
 function getArtifactDataSchemas(): Record<ArtifactAttribute, DataSchemaType> {
 	return {
+		'Helm Repository': 'text',
 		Repository: 'text',
 		Digest: 'text',
-		Tags: 'array',
+		Version: 'text',
 		Size: 'quantity',
 		'Push Time': 'time',
 		'Pull Time': 'time',
 		Type: 'text',
 		Labels: 'array',
 		helmRepository: 'object',
-		raw: 'object'
+		chartArtifact: 'object'
 	};
 }
 
 function getArtifactUISchemas(): Record<ArtifactAttribute, UISchemaType> {
 	return {
+		'Helm Repository': 'text',
 		Repository: 'text',
 		Digest: 'text',
-		Tags: 'array',
+		Version: 'text',
 		Size: 'quantity',
 		'Push Time': 'time',
 		'Pull Time': 'time',
 		Type: 'text',
 		Labels: 'array',
 		helmRepository: 'object',
-		raw: 'object'
+		chartArtifact: 'object'
 	};
 }
 
 function getArtifactData(
-	artifact: ArtifactType,
-	helmRepository: any
+	chartArtifact: ArtifactType,
+	helmRepository: SourceToolkitFluxcdIoV1HelmRepository
 ): Record<ArtifactAttribute, JsonValue> {
-	const tags = (artifact.tags ?? []).map((t) => t.name);
-
-	const { value: sizeValue, unit: sizeUnit } = formatWithBinarySuffix(BigInt(artifact.size));
+	const { value: sizeValue, unit: sizeUnit } = formatWithBinarySuffix(BigInt(chartArtifact.size));
 
 	return {
-		Repository: artifact.repository_name,
-		Digest: artifact.digest ? artifact.digest.slice(0, 19) : null,
-		Tags: tags as JsonValue,
+		'Helm Repository': helmRepository.metadata?.name ?? null,
+		Repository: chartArtifact.repository_name,
+		Digest: chartArtifact.digest ? chartArtifact.digest.slice(0, 19) : null,
+		Version: chartArtifact.extra_attrs?.version as JsonValue,
 		Size: `${sizeValue.toFixed(0)}${sizeUnit}`,
-		'Push Time': artifact.push_time ?? null,
-		'Pull Time': artifact.pull_time ?? null,
-		Type: artifact.type ?? null,
-		Labels: (artifact.labels ?? []).map((l) => l.name) as JsonValue,
+		'Push Time': chartArtifact.push_time ?? null,
+		'Pull Time': chartArtifact.pull_time ?? null,
+		Type: chartArtifact.type ?? null,
+		Labels: (chartArtifact.labels ?? []).map((l) => l.name) as JsonValue,
 		helmRepository: helmRepository as JsonValue,
-		raw: artifact as unknown as JsonValue
+		chartArtifact: chartArtifact as unknown as JsonValue
 	};
 }
 
@@ -81,11 +84,12 @@ function getArtifactColumnDefinitions(
 		'Repository',
 		'Digest',
 		'Type',
-		'Tags',
-		'Labels',
+		'Version',
 		'Size',
 		'Push Time',
-		'Pull Time'
+		'Pull Time',
+		'Labels',
+		'Helm Repository'
 	];
 
 	return columns.map((id) => {

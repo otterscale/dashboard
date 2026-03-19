@@ -160,7 +160,8 @@
 							},
 							namespace: {
 								...lodash.get(jsonSchema, 'properties.metadata.properties.namespace'),
-								title: 'Namespace'
+								title: 'Namespace',
+								readOnly: true
 							}
 						}
 					} as Schema}
