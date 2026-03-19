@@ -47,16 +47,16 @@
 	async function fetchChartsByHelmRepository(
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
 	) {
-		const fromHarbor = lodash.get(
-			helmRepository,
-			['metadata', 'labels', 'tenant.otterscale.io/from-harbor'],
-			'unknown'
-		);
+		const fromHarbor = lodash.get(helmRepository, [
+			'metadata',
+			'labels',
+			'tenant.otterscale.io/from-harbor'
+		]);
 
 		// Only support Harbor HelmRepository temporarily.
 		if (!fromHarbor) return;
 
-		const helmRepositoryName = helmRepository.metadata?.name ?? 'unknown';
+		const helmRepositoryName = helmRepository.metadata?.name;
 		const isInternal =
 			helmRepository.metadata?.labels?.['tenant.otterscale.io/internal'] === 'true';
 		const harborHost = parseHarborHost(helmRepository);
@@ -64,11 +64,7 @@
 
 		const projectName = parseProjectName(helmRepository);
 		try {
-			const encodedProject = encodeURIComponentWithSlashEscape(projectName);
-			const mediaTypeQuery = encodeURIComponentWithSlashEscape(
-				'media_type=application/vnd.cncf.helm.config.v1+json'
-			);
-			const artifactsUrl = `/api/v2.0/projects/${encodedProject}/artifacts?q=${mediaTypeQuery}&latest_in_repository=true`;
+			const artifactsUrl = `/api/v2.0/projects/${encodeURIComponentWithSlashEscape(projectName)}/artifacts?q=media_type=${encodeURIComponentWithSlashEscape('application/vnd.cncf.helm.config.v1+json')}&latest_in_repository=true`;
 			const response = await fetch('/bff/harbor/proxy', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },

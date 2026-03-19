@@ -284,7 +284,7 @@
 					options={{
 						automaticLayout: true,
 						language: 'yaml',
-						extraEditorClassName: 'h-full',
+						extraEditorClassName: 'h-full min-h-[33vh]',
 						folding: true,
 						padding: { top: 24 },
 						renderLineHighlight: 'all',

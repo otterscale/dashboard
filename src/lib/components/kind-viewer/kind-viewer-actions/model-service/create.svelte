@@ -53,8 +53,12 @@
 		spec: {
 			accelerator: {},
 			decode: {},
+			prefill: null,
 			engine: {},
-			model: {}
+			model: {},
+			routingProxy: {
+				image: 'ghcr.io/llm-d/llm-d-routing-sidecar:v0.4.0'
+			}
 		}
 	});
 	let value = $derived(stringify(values));
@@ -147,7 +151,7 @@
 				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
-		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
+		<Tabs.Root value={currentStep}>
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
@@ -362,19 +366,59 @@
 							title: 'Resources',
 							properties: {
 								requests: {
-									...(lodash.get(
-										jsonSchema,
-										'properties.spec.properties.prefill.properties.resources.properties.requests'
+									...(lodash.omit(
+										lodash.get(
+											jsonSchema,
+											'properties.spec.properties.decode.properties.resources.properties.requests'
+										),
+										'additionalProperties'
 									) as any),
-									additionalProperties: {
-										...(lodash.omit(
-											lodash.get(
-												jsonSchema,
-												'properties.spec.properties.prefill.properties.resources.properties.requests.additionalProperties'
-											),
-											'anyOf'
-										) as any),
-										type: 'string'
+									title: 'Requests',
+									properties: {
+										cpu: {
+											title: 'CPU',
+											type: 'string'
+										},
+										memory: {
+											title: 'Memory',
+											type: 'string'
+										},
+										'nvidia.com/gpu': {
+											title: 'GPU',
+											type: 'integer'
+										},
+										'nvidia.com/gpumem': {
+											title: 'GPU Memory',
+											type: 'string'
+										}
+									}
+								},
+								limits: {
+									...(lodash.omit(
+										lodash.get(
+											jsonSchema,
+											'properties.spec.properties.decode.properties.resources.properties.limits'
+										),
+										'additionalProperties'
+									) as any),
+									title: 'Limits',
+									properties: {
+										cpu: {
+											title: 'CPU',
+											type: 'string'
+										},
+										memory: {
+											title: 'Memory',
+											type: 'string'
+										},
+										'nvidia.com/gpu': {
+											title: 'GPU',
+											type: 'integer'
+										},
+										'nvidia.com/gpumem': {
+											title: 'GPU Memory',
+											type: 'string'
+										}
 									}
 								}
 							}
@@ -416,19 +460,59 @@
 							title: 'Resources',
 							properties: {
 								requests: {
-									...(lodash.get(
-										jsonSchema,
-										'properties.spec.properties.prefill.properties.resources.properties.requests'
+									...(lodash.omit(
+										lodash.get(
+											jsonSchema,
+											'properties.spec.properties.prefill.properties.resources.properties.requests'
+										),
+										'additionalProperties'
 									) as any),
-									additionalProperties: {
-										...(lodash.omit(
-											lodash.get(
-												jsonSchema,
-												'properties.spec.properties.prefill.properties.resources.properties.requests.additionalProperties'
-											),
-											'anyOf'
-										) as any),
-										type: 'string'
+									title: 'Requests',
+									properties: {
+										cpu: {
+											title: 'CPU',
+											type: 'string'
+										},
+										memory: {
+											title: 'Memory',
+											type: 'string'
+										},
+										'nvidia.com/gpu': {
+											title: 'GPU',
+											type: 'integer'
+										},
+										'nvidia.com/gpumem': {
+											title: 'GPU Memory',
+											type: 'string'
+										}
+									}
+								},
+								limits: {
+									...(lodash.omit(
+										lodash.get(
+											jsonSchema,
+											'properties.spec.properties.prefill.properties.resources.properties.limits'
+										),
+										'additionalProperties'
+									) as any),
+									title: 'Limits',
+									properties: {
+										cpu: {
+											title: 'CPU',
+											type: 'string'
+										},
+										memory: {
+											title: 'Memory',
+											type: 'string'
+										},
+										'nvidia.com/gpu': {
+											title: 'GPU',
+											type: 'integer'
+										},
+										'nvidia.com/gpumem': {
+											title: 'GPU Memory',
+											type: 'string'
+										}
 									}
 								}
 							}
@@ -504,35 +588,15 @@
 											'object-properties': {
 												class: 'grid grid-cols-2 gap-3'
 											}
-										},
-										translations: {
-											'additional-property': 'additional request',
-											'add-object-property': 'Add Request'
-										},
-										additionalPropertyKey: (key: string, attempt: number) => {
-											const index = attempt + 1;
-											switch (index) {
-												case 1: {
-													return `1st ${key}`;
-												}
-												case 2: {
-													return `2nd ${key}`;
-												}
-												case 3: {
-													return `3rd ${key}`;
-												}
-												default: {
-													return `${index}th ${key}`;
-												}
-											}
 										}
-									},
-									additionalProperties: {
-										'ui:options': {
-											translations: {
-												'key-input-title': 'request'
-											},
-											hideTitle: true
+									}
+								},
+								limits: {
+									'ui:options': {
+										layouts: {
+											'object-properties': {
+												class: 'grid grid-cols-2 gap-3'
+											}
 										}
 									}
 								}
@@ -546,35 +610,15 @@
 											'object-properties': {
 												class: 'grid grid-cols-2 gap-3'
 											}
-										},
-										translations: {
-											'additional-property': 'additional request',
-											'add-object-property': 'Add Request'
-										},
-										additionalPropertyKey: (key: string, attempt: number) => {
-											const index = attempt + 1;
-											switch (index) {
-												case 1: {
-													return `1st ${key}`;
-												}
-												case 2: {
-													return `2nd ${key}`;
-												}
-												case 3: {
-													return `3rd ${key}`;
-												}
-												default: {
-													return `${index}th ${key}`;
-												}
-											}
 										}
-									},
-									additionalProperties: {
-										'ui:options': {
-											translations: {
-												'key-input-title': 'request'
-											},
-											hideTitle: true
+									}
+								},
+								limits: {
+									'ui:options': {
+										layouts: {
+											'object-properties': {
+												class: 'grid grid-cols-2 gap-3'
+											}
 										}
 									}
 								}
@@ -582,21 +626,7 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						mode: 'Intelligent',
-						decode: {
-							replicas: '',
-							parallelism: { tensor: '' },
-							resources: {
-								requests: { cpu: '', memory: '' }
-							}
-						},
-						prefill: {
-							replicas: '',
-							parallelism: { tensor: '' },
-							resources: {
-								requests: { cpu: '', memory: '' }
-							}
-						}
+						mode: 'Intelligent'
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -604,6 +634,8 @@
 							lodash.set(values, 'spec.decode', lodash.get(mode, 'decode'));
 							if (lodash.get(mode, 'mode') === 'Disaggregation') {
 								lodash.set(values, 'spec.prefill', lodash.get(mode, 'prefill'));
+							} else {
+								lodash.set(values, 'spec.prefill', null);
 							}
 						}
 					}}
@@ -679,25 +711,12 @@
 						},
 						args: {
 							'ui:options': {
-								layouts: {
-									'array-items': { class: 'grid grid-cols-2 gap-3' }
-								},
-								itemTitle: (title, index) => {
-									switch (index) {
-										case 1: {
-											return `1st ${title}`;
-										}
-										case 2: {
-											return `2nd ${title}`;
-										}
-										case 3: {
-											return `3rd ${title}`;
-										}
-										default: {
-											return `${index}th ${title}`;
-										}
-									}
-								}
+								itemTitle: () => 'argument'
+							}
+						},
+						env: {
+							'ui:options': {
+								itemTitle: () => 'environment variable'
 							}
 						}
 					} as UiSchemaRoot}
@@ -732,7 +751,7 @@
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[5]}>
+			<Tabs.Content value={steps[5]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{
@@ -807,12 +826,3 @@
 		</Tabs.Root>
 	</AlertDialog.Content>
 </AlertDialog.Root>
-
-<style>
-	@reference '../../../../../app.css';
-
-	:global(.no-shiki-limit pre.shiki:not([data-code-overflow] *):not([data-code-overflow])) {
-		overflow-y: visible !important;
-		max-height: none !important;
-	}
-</style>

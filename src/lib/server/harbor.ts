@@ -1,4 +1,6 @@
 import { env as publicEnv } from '$env/dynamic/public';
+import { encodeURIComponentWithSlashEscape } from '$lib/components/artifact-viewer/utils.svelte';
+
 interface ProjectType {
 	project_id: number;
 	owner_id: number;
@@ -114,175 +116,34 @@ interface ArtifactType {
 
 export type { ArtifactType, ProjectType, RepositoryType };
 
-interface Options {
-	path: string;
-	responseType: 'json' | 'text' | 'auto';
-	accessToken: string;
-	headers: Record<string, string>;
-}
-
-function encodeURIComponentWithSlashEscape(url: string): string {
-	return url.includes('/') ? encodeURIComponent(encodeURIComponent(url)) : encodeURIComponent(url);
-}
-
-async function retrieve<T = unknown>(options: Options): Promise<T> {
-	const { path, accessToken, headers, responseType } = options;
-
-	const endpoint = publicEnv.PUBLIC_HARBOR_URL;
-	const url = new URL(path, endpoint);
-
-	const defaultHeaders: Record<string, string> = {
-		Authorization: `Bearer ${accessToken}`
-	};
-
-	if (responseType === 'json') {
-		defaultHeaders.Accept = 'application/json';
-	}
-
-	const response = await fetch(url.toString(), {
-		headers: { ...defaultHeaders, ...headers }
-	});
-
-	if (!response.ok) {
-		const text = await response.text();
-		console.error(`Harbor API error: ${response.status} ${response.statusText}`, text);
-		throw new Error(`Harbor API error: ${response.status} ${response.statusText}`);
-	}
-
-	switch (responseType) {
-		case 'json':
-			return response.json();
-
-		case 'text':
-			return response.text() as T;
-
-		case 'auto': {
-			const contentType = response.headers.get('content-type') ?? '';
-			if (contentType.includes('application/json')) {
-				return response.json();
-			}
-			return response.text() as T;
-		}
-
-		default:
-			throw new Error(`Unsupported response type: ${responseType}`);
-	}
-}
-
-export async function listProjects(accessToken: string): Promise<ProjectType[]> {
-	const projects = await retrieve<ProjectType[]>({
-		path: '/api/v2.0/projects',
-		accessToken,
-		responseType: 'json',
-		headers: {}
-	});
-
-	return projects ?? [];
-}
-
-export async function listRepositories(
-	projectName: string,
-	accessToken: string
-): Promise<RepositoryType[]> {
-	if (!projectName) throw new Error('projectName is required');
-
-	const repositories = await retrieve<RepositoryType[]>({
-		path: `/api/v2.0/projects/${encodeURIComponentWithSlashEscape(projectName)}/repositories`,
-		accessToken,
-		responseType: 'json',
-		headers: {}
-	});
-
-	return repositories ?? [];
-}
-
-export async function getLatestArtifact(
-	projectName: string,
-	repositoryName: string,
-	accessToken: string
-): Promise<ArtifactType> {
-	if (!projectName || !repositoryName)
-		throw new Error('projectName and repositoryName are required');
-
-	const artifact = await retrieve<ArtifactType>({
-		path: `/api/v2.0/projects/${encodeURIComponentWithSlashEscape(projectName)}/repositories/${encodeURIComponentWithSlashEscape(repositoryName)}/artifacts?sort=-push_time&page=1&page_size=1`,
-		accessToken,
-		responseType: 'json',
-		headers: {}
-	});
-	return artifact ?? {};
-}
-
-export async function listArtifacts(
-	projectName: string,
-	repositoryName: string,
-	accessToken: string
-): Promise<ArtifactType[]> {
-	if (!projectName || !repositoryName)
-		throw new Error('projectName and repositoryName are required');
-
-	const artifacts = await retrieve<ArtifactType[]>({
-		path: `/api/v2.0/projects/${encodeURIComponentWithSlashEscape(projectName)}/repositories/${encodeURIComponentWithSlashEscape(repositoryName)}/artifacts?with_label=true`,
-		accessToken,
-		responseType: 'json',
-		headers: {}
-	});
-	return artifacts ?? [];
-}
-
-export async function listAllLatestArtifacts(
-	projectName: string,
-	accessToken: string
-): Promise<ArtifactType[]> {
-	if (!projectName) throw new Error('projectName is required');
-
-	const artifacts = await retrieve<ArtifactType[]>({
-		path: `/api/v2.0/projects/${encodeURIComponentWithSlashEscape(projectName)}/artifacts?q=${encodeURIComponentWithSlashEscape('media_type=application/vnd.cncf.helm.config.v1+json')}&latest_in_repository=true`,
-		accessToken,
-		responseType: 'json',
-		headers: {}
-	});
-	return artifacts ?? [];
-}
-
 export async function listModelArtifacts(
 	projectName: string,
 	accessToken: string
 ): Promise<ArtifactType[]> {
-	const modelArtifacts: ArtifactType[] = [];
+	const endpoint = publicEnv.PUBLIC_HARBOR_URL;
+
+	const path = `/api/v2.0/projects/${encodeURIComponentWithSlashEscape(projectName)}/artifacts?q=media_type=${encodeURIComponentWithSlashEscape('application/vnd.cncf.model.config.v1+json')}&latest_in_repository=true`;
+
+	const url = new URL(path, endpoint);
+	const headers = {
+		Authorization: `Bearer ${accessToken}`,
+		Accept: 'application/json'
+	};
 
 	try {
-		const repositories = await listRepositories(projectName, accessToken);
+		const response = await fetch(url.toString(), {
+			headers: headers
+		});
 
-		for (const repository of repositories) {
-			const [projectName, ...repositoryName] = repository.name.split('/');
-
-			const artifacts = await listArtifacts(projectName, repositoryName.join('/'), accessToken);
-
-			modelArtifacts.push(...artifacts.filter((artifact) => artifact.type === 'MODEL'));
+		if (!response.ok) {
+			const text = await response.text();
+			console.error(`Harbor API error: ${response.status} ${response.statusText}`, text);
+			throw new Error(`Harbor API error: ${response.status} ${response.statusText}`);
 		}
+
+		return response.json();
 	} catch (error) {
-		console.error('Fail to fetch models:', error);
+		console.error('Fail to fetch model artifacts:', error);
 		throw error;
 	}
-
-	return modelArtifacts;
-}
-
-export async function getReferenceAddition(
-	projectName: string,
-	repositoryName: string,
-	reference: string,
-	addition: string,
-	accessToken: string
-): Promise<string | Record<string, unknown>> {
-	if (!projectName || !repositoryName || !reference || !addition)
-		throw new Error('projectName, repositoryName, reference and addition are required');
-
-	return retrieve<string | Record<string, unknown>>({
-		path: `/api/v2.0/projects/${encodeURIComponentWithSlashEscape(projectName)}/repositories/${encodeURIComponentWithSlashEscape(repositoryName)}/artifacts/${encodeURIComponentWithSlashEscape(reference)}/additions/${encodeURIComponentWithSlashEscape(addition)}`,
-		accessToken,
-		responseType: 'auto',
-		headers: {}
-	});
 }
