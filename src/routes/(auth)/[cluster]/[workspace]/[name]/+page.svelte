@@ -26,10 +26,10 @@
 		]);
 	});
 
-	const namespaced = $derived(page.url.searchParams.get('namespaced') !== 'false');
-
 	const cluster = $derived(page.params.cluster ?? '');
-	const namespace = $derived(namespaced ? (page.data.namespace ?? '') : '');
+	// Unlike other pages, namespace here is obtained from query params.
+	// This is because admins can query resources across different namespaces.
+	const namespace = $derived(page.url.searchParams.get('namespace') ?? '');
 	const name = $derived(page.params.name ?? '');
 	const group = $derived(page.url.searchParams.get('group') ?? '');
 	const version = $derived(page.url.searchParams.get('version') ?? '');

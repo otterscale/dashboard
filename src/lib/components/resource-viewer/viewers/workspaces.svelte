@@ -556,7 +556,7 @@
 						<Item.Root variant="outline">
 							{#snippet child({ props })}
 								{@const url = resolve(
-									`/(auth)/${page.params.cluster}/${page.params.workspace}/${ref.name}?group=${ref.group}&version=${ref.version}&kind=${ref.kind}&resource=${ref.resource}&namespaced=${ref.resource !== 'namespaces'}`
+									`/(auth)/${page.params.cluster}/${page.params.workspace}/${ref.name}?group=${ref.group}&version=${ref.version}&kind=${ref.kind}&resource=${ref.resource}`
 								)}
 								<a href={url} target="_blank" rel="noopener noreferrer" {...props}>
 									<Item.Content>

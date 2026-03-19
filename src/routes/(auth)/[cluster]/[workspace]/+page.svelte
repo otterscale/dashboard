@@ -98,16 +98,7 @@
 						apiResource.resource === resource
 				)}
 				{#if apiResource}
-					<KindViewer
-						{isClusterAdmin}
-						{apiResource}
-						{cluster}
-						{group}
-						{version}
-						{kind}
-						{resource}
-						{namespace}
-					/>
+					<KindViewer {isClusterAdmin} {cluster} {namespace} {apiResource} />
 				{/if}
 			{/key}
 		</div>
