@@ -3,12 +3,12 @@
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
+	import Log from '$lib/components/kind-viewer/kind-viewer-actions/default/log.svelte';
 	import Restart from '$lib/components/kind-viewer/kind-viewer-actions/default/restart.svelte';
 	import Scale from '$lib/components/kind-viewer/kind-viewer-actions/default/scale.svelte';
 	import Terminal from '$lib/components/kind-viewer/kind-viewer-actions/default/terminal.svelte';
 	import Update from '$lib/components/kind-viewer/kind-viewer-actions/default/update.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
-	import Log from '$lib/components/kind-viewer/kind-viewer-actions/default/log.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 

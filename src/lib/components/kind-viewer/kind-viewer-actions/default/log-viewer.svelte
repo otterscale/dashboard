@@ -8,6 +8,8 @@
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
 	import { Toggle } from '$lib/components/ui/toggle';
 
+	const MAX_LINES = 2000;
+
 	let {
 		cluster,
 		namespace,
@@ -27,9 +29,8 @@
 	const transport: Transport = getContext('transport');
 	const client = createClient(RuntimeService, transport);
 
-	let selectedContainer = $derived(containers[0] ?? '');
 	let overriddenContainer = $state<string | null>(null);
-	const effectiveContainer = $derived(overriddenContainer ?? selectedContainer);
+	const effectiveContainer = $derived(overriddenContainer ?? containers[0] ?? '');
 
 	let follow = $state(true);
 	let previous = $state(false);
@@ -40,7 +41,7 @@
 	let showAllData = $state(false);
 
 	$effect(() => {
-		if (active && podName) {
+		if (active) {
 			startStreaming();
 		}
 
@@ -99,7 +100,7 @@
 					container: effectiveContainer,
 					follow,
 					previous,
-					...(showAllData ? {} : { tailLines: BigInt(2000) })
+					...(showAllData ? {} : { tailLines: BigInt(MAX_LINES) })
 				},
 				{ signal: abortController.signal }
 			);
@@ -109,16 +110,8 @@
 					const text = new TextDecoder().decode(response.data);
 					const lines = text.split('\n').filter((l) => l.length > 0);
 
-					if (showAllData) {
-						logLines = [...logLines, ...lines];
-					} else {
-						const MAX_LINES = 2000;
-						if (logLines.length + lines.length > MAX_LINES) {
-							logLines = [...logLines, ...lines].slice(-MAX_LINES);
-						} else {
-							logLines = [...logLines, ...lines];
-						}
-					}
+					const newLogLines = [...logLines, ...lines];
+					logLines = showAllData ? newLogLines : newLogLines.slice(-MAX_LINES);
 
 					autoScrollToBottom();
 					await delay(100);

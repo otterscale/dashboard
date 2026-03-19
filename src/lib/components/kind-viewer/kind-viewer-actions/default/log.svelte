@@ -84,7 +84,8 @@
 			if (associatedJobs.length > 0 && !associatedJobs.includes(selectedJob)) {
 				selectedJob = associatedJobs[associatedJobs.length - 1];
 			}
-		} catch {
+		} catch (e) {
+			console.error('Failed to fetch associated jobs:', e);
 			associatedJobs = [];
 		}
 	}
@@ -110,7 +111,8 @@
 			if (associatedPods.length > 0 && !associatedPods.includes(selectedPod)) {
 				selectedPod = associatedPods[0];
 			}
-		} catch {
+		} catch (error) {
+			console.error('Failed to fetch pods for job', jobName, error);
 			associatedPods = [];
 		}
 	}
@@ -173,7 +175,8 @@
 			if (associatedPods.length > 0 && !associatedPods.includes(selectedPod)) {
 				selectedPod = associatedPods[0];
 			}
-		} catch {
+		} catch (error) {
+			console.error('Failed to fetch associated pods:', error);
 			associatedPods = [];
 		}
 	}
