@@ -76,10 +76,12 @@
 
 <AlertDialog.Root
 	bind:open
-	onOpenChange={() => {
-		reset();
+	onOpenChangeComplete={(isOpen) => {
+		onOpenChangeComplete?.();
+		if (!isOpen) {
+			reset();
+		}
 	}}
-	{onOpenChangeComplete}
 >
 	<AlertDialog.Trigger>
 		{#snippet child({ props })}

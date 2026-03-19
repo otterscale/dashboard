@@ -72,8 +72,10 @@
 
 <Dialog.Root
 	bind:open
-	onOpenChangeComplete={() => {
-		reset();
+	onOpenChangeComplete={(isOpen) => {
+		if (!isOpen) {
+			reset();
+		}
 	}}
 >
 	<Dialog.Trigger>

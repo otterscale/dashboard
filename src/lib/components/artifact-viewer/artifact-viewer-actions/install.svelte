@@ -216,10 +216,12 @@
 
 <Dialog.Root
 	bind:open
-	onOpenChange={() => {
-		reset();
+	onOpenChangeComplete={(isOpen) => {
+		onOpenChangeComplete?.();
+		if (!isOpen) {
+			reset();
+		}
 	}}
-	{onOpenChangeComplete}
 >
 	<Dialog.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
 		{#snippet child({ props })}
