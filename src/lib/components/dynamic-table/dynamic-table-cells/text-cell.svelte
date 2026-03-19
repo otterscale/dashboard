@@ -2,6 +2,8 @@
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import { type Column, type Row } from '@tanstack/table-core';
 
+	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+
 	let {
 		row,
 		column
@@ -10,9 +12,14 @@
 		column: Column<Record<string, JsonValue>>;
 	} = $props();
 
-	const data: JsonValue = $derived(row.original[column.id]);
+	const data = $derived(row.original[column.id] as unknown as string);
 </script>
 
-<p class="max-w-3xs truncate">
-	{data}
-</p>
+<Tooltip.Provider>
+	<Tooltip.Root>
+		<Tooltip.Trigger class="max-w-40 truncate">
+			{data}
+		</Tooltip.Trigger>
+		<Tooltip.Content>{data}</Tooltip.Content>
+	</Tooltip.Root>
+</Tooltip.Provider>

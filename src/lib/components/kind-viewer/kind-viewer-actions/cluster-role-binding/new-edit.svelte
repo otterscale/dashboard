@@ -183,9 +183,11 @@
 
 <AlertDialog.Root
 	bind:open
-	onOpenChangeComplete={() => {
+	onOpenChangeComplete={(isOpen) => {
 		onOpenChangeComplete?.();
-		reset();
+		if (!isOpen) {
+			reset();
+		}
 	}}
 >
 	<AlertDialog.Trigger>

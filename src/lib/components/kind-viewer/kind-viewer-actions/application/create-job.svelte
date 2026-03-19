@@ -79,10 +79,12 @@
 
 <Dialog.Root
 	bind:open
-	onOpenChange={() => {
-		reset();
+	onOpenChangeComplete={(isOpen) => {
+		onOpenChangeComplete?.();
+		if (!isOpen) {
+			reset();
+		}
 	}}
-	{onOpenChangeComplete}
 >
 	<Dialog.Trigger>
 		{#snippet child({ props })}

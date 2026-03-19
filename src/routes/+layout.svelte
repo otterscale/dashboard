@@ -54,7 +54,7 @@
 {/snippet}
 
 <ModeWatcher />
-<Toaster expand richColors {loadingIcon} />
+<Toaster toastOptions={{ class: '!pointer-events-auto' }} expand richColors {loadingIcon} />
 
 <div class="app">
 	<main>

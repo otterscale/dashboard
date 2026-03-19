@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { DownloadIcon } from '@lucide/svelte';
+	import { DownloadIcon, FileIcon } from '@lucide/svelte';
 	import { ResourceService, type SchemaRequest } from '@otterscale/api/resource/v1';
 	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 	import { type Schema, SubmitButton, type UiSchemaRoot } from '@sjsf/form';
@@ -18,6 +18,7 @@
 	import { buttonVariants } from '$lib/components/ui/button';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import type { ArtifactType } from '$lib/server/harbor';
@@ -215,10 +216,12 @@
 
 <Dialog.Root
 	bind:open
-	onOpenChange={() => {
-		reset();
+	onOpenChangeComplete={(isOpen) => {
+		onOpenChangeComplete?.();
+		if (!isOpen) {
+			reset();
+		}
 	}}
-	{onOpenChangeComplete}
 >
 	<Dialog.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
 		{#snippet child({ props })}
@@ -364,13 +367,23 @@
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[2]} class="min-h-[23vh]">
-				{#await getChartInformation(selectedChartArtifact.digest) then information}
+				{@const schema = {
+					...(lodash.get(jsonSchema, 'properties.spec.properties.values') as Schema),
+					type: 'string',
+					title: 'Values'
+				} as Schema}
+				{#await getChartInformation(selectedChartArtifact.digest)}
+					<Form {schema} initialValue={null} values={null}>
+						{#snippet actions()}
+							<div class="flex w-full items-center justify-between gap-3">
+								<Button disabled>Previous</Button>
+								<Button disabled>Next</Button>
+							</div>
+						{/snippet}
+					</Form>
+				{:then information}
 					<Form
-						schema={{
-							...(lodash.get(jsonSchema, 'properties.spec.properties.values') as Schema),
-							type: 'string',
-							title: 'Values'
-						} as Schema}
+						{schema}
 						uiSchema={{
 							'ui:options': {
 								translations: {
@@ -413,6 +426,18 @@
 							</div>
 						{/snippet}
 					</Form>
+				{:catch error}
+					<Empty.Root class="rounded-lg bg-muted">
+						<Empty.Header>
+							<Empty.Media variant="icon">
+								<FileIcon size={32} class="opacity-60" aria-hidden="true" />
+							</Empty.Media>
+							<Empty.Title>Failed to load chart information</Empty.Title>
+							<Empty.Description>
+								{error.message}
+							</Empty.Description>
+						</Empty.Header>
+					</Empty.Root>
 				{/await}
 			</Tabs.Content>
 

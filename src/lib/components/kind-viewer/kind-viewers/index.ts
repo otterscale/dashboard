@@ -5,6 +5,12 @@ import type { ColumnDef } from '@tanstack/table-core';
 import type { DataSchemaType, UISchemaType } from '$lib/components/dynamic-table/utils.js';
 
 import {
+	getApplicationColumnDefinitions,
+	getApplicationData,
+	getApplicationDataSchemas,
+	getApplicationUISchemas
+} from './application.js';
+import {
 	getClusterRoleColumnDefinitions,
 	getClusterRoleData,
 	getClusterRoleDataSchemas,
@@ -65,6 +71,18 @@ import {
 	getGatewayUISchemas
 } from './gateway.js';
 import {
+	getHelmReleaseColumnDefinitions,
+	getHelmReleaseData,
+	getHelmReleaseDataSchemas,
+	getHelmReleaseUISchemas
+} from './helm-release.js';
+import {
+	getHelmRepositoryColumnDefinitions,
+	getHelmRepositoryData,
+	getHelmRepositoryDataSchemas,
+	getHelmRepositoryUISchemas
+} from './helm-repository.js';
+import {
 	getHTTPRouteColumnDefinitions,
 	getHTTPRouteData,
 	getHTTPRouteDataSchemas,
@@ -77,6 +95,18 @@ import {
 	getLimitRangeDataSchemas,
 	getLimitRangeUISchemas
 } from './limitrange.js';
+import {
+	getModelArtifactColumnDefinitions,
+	getModelArtifactData,
+	getModelArtifactDataSchemas,
+	getModelArtifactUISchemas
+} from './model-artifact.js';
+import {
+	getModelServiceColumnDefinitions,
+	getModelServiceData,
+	getModelServiceDataSchemas,
+	getModelServiceUISchemas
+} from './model-service.js';
 import {
 	getNamespaceColumnDefinitions,
 	getNamespaceData,
@@ -145,12 +175,6 @@ import {
 	getServiceAccountUISchemas
 } from './serviceaccount.js';
 import {
-	getSimpleAppColumnDefinitions,
-	getSimpleAppData,
-	getSimpleAppDataSchemas,
-	getSimpleAppUISchemas
-} from './simple-app.js';
-import {
 	getStatefulSetColumnDefinitions,
 	getStatefulSetData,
 	getStatefulSetDataSchemas,
@@ -171,6 +195,8 @@ import {
 
 function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 	switch (kind) {
+		case 'Application':
+			return getApplicationDataSchemas();
 		case 'CronJob':
 			return getCronJobDataSchemas();
 		case 'DaemonSet':
@@ -221,12 +247,18 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 			return getResourceQuotaDataSchemas();
 		case 'Workspace':
 			return getWorkspaceDataSchemas();
-		case 'SimpleApp':
-			return getSimpleAppDataSchemas();
+		case 'HelmRepository':
+			return getHelmRepositoryDataSchemas();
+		case 'ModelService':
+			return getModelServiceDataSchemas();
+		case 'ModelArtifact':
+			return getModelArtifactDataSchemas();
 		case 'HTTPRoute':
 			return getHTTPRouteDataSchemas();
 		case 'Gateway':
 			return getGatewayDataSchemas();
+		case 'HelmRelease':
+			return getHelmReleaseDataSchemas();
 		default:
 			return getDefaultDataSchemas();
 	}
@@ -234,6 +266,8 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 
 function getData(apiResource: APIResource, object: any): Record<string, JsonValue> {
 	switch (apiResource.kind) {
+		case 'Application':
+			return getApplicationData(object);
 		case 'CronJob':
 			return getCronJobData(object);
 		case 'DaemonSet':
@@ -284,12 +318,18 @@ function getData(apiResource: APIResource, object: any): Record<string, JsonValu
 			return getResourceQuotaData(object);
 		case 'Workspace':
 			return getWorkspaceData(object);
-		case 'SimpleApp':
-			return getSimpleAppData(object);
+		case 'ModelService':
+			return getModelServiceData(object);
+		case 'HelmRepository':
+			return getHelmRepositoryData(object);
+		case 'ModelArtifact':
+			return getModelArtifactData(object);
 		case 'HTTPRoute':
 			return getHTTPRouteData(object);
 		case 'Gateway':
 			return getGatewayData(object);
+		case 'HelmRelease':
+			return getHelmReleaseData(object);
 		default:
 			return getDefaultData(apiResource, object);
 	}
@@ -297,6 +337,8 @@ function getData(apiResource: APIResource, object: any): Record<string, JsonValu
 
 function getUISchemas(kind: string): Record<string, UISchemaType> {
 	switch (kind) {
+		case 'Application':
+			return getApplicationUISchemas();
 		case 'CronJob':
 			return getCronJobUISchemas();
 		case 'DaemonSet':
@@ -347,12 +389,18 @@ function getUISchemas(kind: string): Record<string, UISchemaType> {
 			return getResourceQuotaUISchemas();
 		case 'Workspace':
 			return getWorkspaceUISchemas();
-		case 'SimpleApp':
-			return getSimpleAppUISchemas();
+		case 'HelmRepository':
+			return getHelmRepositoryUISchemas();
+		case 'ModelService':
+			return getModelServiceUISchemas();
+		case 'ModelArtifact':
+			return getModelArtifactUISchemas();
 		case 'HTTPRoute':
 			return getHTTPRouteUISchemas();
 		case 'Gateway':
 			return getGatewayUISchemas();
+		case 'HelmRelease':
+			return getHelmReleaseUISchemas();
 		default:
 			return getDefaultUISchemas();
 	}
@@ -364,6 +412,8 @@ function getColumnDefinitions(
 	dataSchemas: Record<string, DataSchemaType>
 ): ColumnDef<Record<string, JsonValue>>[] {
 	switch (apiResource.kind) {
+		case 'Application':
+			return getApplicationColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'CronJob':
 			return getCronJobColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'DaemonSet':
@@ -414,12 +464,18 @@ function getColumnDefinitions(
 			return getResourceQuotaColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'Workspace':
 			return getWorkspaceColumnDefinitions(apiResource, uiSchemas, dataSchemas);
-		case 'SimpleApp':
-			return getSimpleAppColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'HelmRepository':
+			return getHelmRepositoryColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'ModelService':
+			return getModelServiceColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'ModelArtifact':
+			return getModelArtifactColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'HTTPRoute':
 			return getHTTPRouteColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'Gateway':
 			return getGatewayColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'HelmRelease':
+			return getHelmReleaseColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		default:
 			return getDefaultColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 	}
