@@ -401,7 +401,7 @@
 										),
 										'additionalProperties'
 									) as any),
-									title: 'Requests',
+									title: 'Limits',
 									properties: {
 										cpu: {
 											title: 'CPU',
@@ -495,7 +495,7 @@
 										),
 										'additionalProperties'
 									) as any),
-									title: 'Requests',
+									title: 'Limits',
 									properties: {
 										cpu: {
 											title: 'CPU',
