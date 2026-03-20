@@ -205,7 +205,7 @@
 
 	const sleep = (ms: number = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
-	let clustered = $state(false);
+	let clustered = $derived(isClusterAdmin);
 
 	async function resetAndReload() {
 		if (listAbortController) {
