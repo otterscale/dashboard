@@ -4,30 +4,32 @@
 	import type { Row } from '@tanstack/table-core';
 
 	import Delete from '$lib/components/dynamic-form/resource-quota/delete-dialog.svelte';
-	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default//describe.svelte';
+	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import Edit from '$lib/components/kind-viewer/kind-viewer-actions/default/edit.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
 	let {
-		row,
-		schema,
-		object,
 		cluster,
 		namespace,
 		group,
 		version,
-		resource
+		kind,
+		resource,
+		row,
+		schema,
+		object
 	}: {
-		row: Row<Record<string, JsonValue>>;
-		schema: any;
-		object: any;
 		cluster: string;
 		namespace: string;
 		group: string;
 		version: string;
+		kind: string;
 		resource: string;
+		row: Row<Record<string, JsonValue>>;
+		schema: any;
+		object: any;
 	} = $props();
 
 	let actionsOpen = $state(false);
