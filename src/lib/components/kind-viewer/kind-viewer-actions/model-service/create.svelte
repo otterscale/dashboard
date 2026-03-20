@@ -53,7 +53,7 @@
 		spec: {
 			accelerator: {},
 			decode: {},
-			prefill: null,
+			prefill: {},
 			engine: {},
 			model: {},
 			routingProxy: {
@@ -335,7 +335,7 @@
 			<Tabs.Content value={steps[3]}>
 				{@const decodeSchema = {
 					...(lodash.omit(
-						lodash.get(jsonSchema, 'properties.spec.properties.decode.properties'),
+						lodash.get(jsonSchema, 'properties.spec.properties.decode'),
 						'properties'
 					) as any),
 					title: 'Decode',
@@ -343,9 +343,8 @@
 						parallelism: {
 							...(lodash.omit(
 								lodash.get(jsonSchema, 'properties.spec.properties.decode.properties.parallelism'),
-								'properties'
+								['description', 'properties']
 							) as any),
-							title: 'Parallelism',
 							properties: {
 								tensor: {
 									...lodash.get(
@@ -377,46 +376,6 @@
 									) as any),
 									title: 'Requests',
 									properties: {
-										cpu: {
-											title: 'CPU',
-											type: 'string'
-										},
-										memory: {
-											title: 'Memory',
-											type: 'string'
-										},
-										'nvidia.com/gpu': {
-											title: 'GPU',
-											type: 'integer'
-										},
-										'nvidia.com/gpumem': {
-											title: 'GPU Memory',
-											type: 'string'
-										}
-									}
-								},
-								limits: {
-									...(lodash.omit(
-										lodash.get(
-											jsonSchema,
-											'properties.spec.properties.decode.properties.resources.properties.limits'
-										),
-										'additionalProperties'
-									) as any),
-									title: 'Limits',
-									properties: {
-										cpu: {
-											title: 'CPU',
-											type: 'string'
-										},
-										memory: {
-											title: 'Memory',
-											type: 'string'
-										},
-										'nvidia.com/gpu': {
-											title: 'GPU',
-											type: 'integer'
-										},
 										'nvidia.com/gpumem': {
 											title: 'GPU Memory',
 											type: 'string'
@@ -429,7 +388,7 @@
 				}}
 				{@const prefillSchema = {
 					...(lodash.omit(
-						lodash.get(jsonSchema, 'properties.spec.properties.prefill.properties'),
+						lodash.get(jsonSchema, 'properties.spec.properties.prefill'),
 						'properties'
 					) as any),
 					title: 'Prefill',
@@ -437,9 +396,8 @@
 						parallelism: {
 							...(lodash.omit(
 								lodash.get(jsonSchema, 'properties.spec.properties.prefill.properties.parallelism'),
-								'properties'
+								['description', 'properties']
 							) as any),
-							title: 'Parallelism',
 							properties: {
 								tensor: {
 									...lodash.get(
@@ -471,46 +429,6 @@
 									) as any),
 									title: 'Requests',
 									properties: {
-										cpu: {
-											title: 'CPU',
-											type: 'string'
-										},
-										memory: {
-											title: 'Memory',
-											type: 'string'
-										},
-										'nvidia.com/gpu': {
-											title: 'GPU',
-											type: 'integer'
-										},
-										'nvidia.com/gpumem': {
-											title: 'GPU Memory',
-											type: 'string'
-										}
-									}
-								},
-								limits: {
-									...(lodash.omit(
-										lodash.get(
-											jsonSchema,
-											'properties.spec.properties.prefill.properties.resources.properties.limits'
-										),
-										'additionalProperties'
-									) as any),
-									title: 'Limits',
-									properties: {
-										cpu: {
-											title: 'CPU',
-											type: 'string'
-										},
-										memory: {
-											title: 'Memory',
-											type: 'string'
-										},
-										'nvidia.com/gpu': {
-											title: 'GPU',
-											type: 'integer'
-										},
 										'nvidia.com/gpumem': {
 											title: 'GPU Memory',
 											type: 'string'
@@ -583,50 +501,69 @@
 							}
 						},
 						decode: {
+							parallelism: {
+								'ui:options': {
+									hideTitle: true
+								}
+							},
 							resources: {
-								requests: {
-									'ui:options': {
-										layouts: {
-											'object-properties': {
-												class: 'grid grid-cols-2 gap-3'
-											}
-										}
-									}
-								},
-								limits: {
-									'ui:options': {
-										layouts: {
-											'object-properties': {
-												class: 'grid grid-cols-2 gap-3'
-											}
-										}
-									}
+								'ui:options': {
+									hideTitle: true
 								}
 							}
 						},
 						prefill: {
+							parallelism: {
+								'ui:options': {
+									hideTitle: true
+								}
+							},
 							resources: {
-								requests: {
-									'ui:options': {
-										layouts: {
-											'object-properties': {
-												class: 'grid grid-cols-2 gap-3'
-											}
-										}
-									}
-								},
-								limits: {
-									'ui:options': {
-										layouts: {
-											'object-properties': {
-												class: 'grid grid-cols-2 gap-3'
-											}
-										}
-									}
+								'ui:options': {
+									hideTitle: true
 								}
 							}
 						}
 					} as UiSchemaRoot}
+					transformer={(value: FormValue) => {
+						const formValue: any = value;
+						lodash.set(
+							formValue,
+							['decode', 'resources', 'requests', 'nvidia.com/gpu'],
+							lodash.get(formValue, 'decode.parallelism.tensor')
+						);
+						lodash.set(
+							formValue,
+							['decode', 'resources', 'limits', 'nvidia.com/gpu'],
+							lodash.get(formValue, ['decode', 'resources', 'requests', 'nvidia.com/gpu'])
+						);
+						lodash.set(
+							formValue,
+							['decode', 'resources', 'limits', 'nvidia.com/gpumem'],
+							lodash.get(formValue, ['decode', 'resources', 'requests', 'nvidia.com/gpumem'])
+						);
+
+						if (lodash.get(formValue, 'mode') === 'Disaggregation') {
+							lodash.set(
+								formValue,
+								['prefill', 'resources', 'requests', 'nvidia.com/gpu'],
+								lodash.get(formValue, 'prefill.parallelism.tensor')
+							);
+							lodash.set(
+								formValue,
+								['prefill', 'resources', 'limits', 'nvidia.com/gpu'],
+								lodash.get(formValue, ['prefill', 'resources', 'requests', 'nvidia.com/gpu'])
+							);
+							lodash.set(
+								formValue,
+								['prefill', 'resources', 'limits', 'nvidia.com/gpumem'],
+								lodash.get(formValue, ['prefill', 'resources', 'requests', 'nvidia.com/gpumem'])
+							);
+						} else {
+							lodash.set(values, 'spec.prefill.resources', {});
+						}
+						return formValue;
+					}}
 					initialValue={{
 						mode: 'Intelligent'
 					} as FormValue}
@@ -637,7 +574,7 @@
 							if (lodash.get(mode, 'mode') === 'Disaggregation') {
 								lodash.set(values, 'spec.prefill', lodash.get(mode, 'prefill'));
 							} else {
-								lodash.set(values, 'spec.prefill', null);
+								lodash.set(values, 'spec.prefill', {});
 							}
 						}
 					}}
@@ -719,18 +656,43 @@
 						env: {
 							'ui:options': {
 								itemTitle: () => 'environment variable'
+							},
+							items: {
+								'ui:options': {
+									layouts: {
+										'object-properties': {
+											class: 'grid grid-cols-2 gap-3'
+										}
+									}
+								}
 							}
 						}
 					} as UiSchemaRoot}
 					initialValue={{
 						args: [
+							'--max-model-len',
+							'8192',
 							'--kv-transfer-config',
 							`{"kv_connector":"NixlConnector", "kv_role":"kv_both"}`,
-							'--disable-uvicorn-access-log',
-							'--max-model-len',
-							'8192'
+							'--disable-uvicorn-access-log'
 						]
 					} as FormValue}
+					transformer={(value: FormValue) => {
+						const formValue: any = value;
+						lodash.set(formValue, 'env', [
+							{
+								name: 'VLLM_NIXL_SIDE_CHANNEL_HOST',
+								valueFrom: { fieldRef: { fieldPath: 'status.podIP' } }
+							},
+							{
+								name: 'VLLM_NIXL_SIDE_CHANNEL_PORT',
+								value: '5557'
+							},
+							{ name: 'UCX_TLS', value: 'cuda_ipc,cuda_copy,tcp' },
+							{ name: 'VLLM_LOGGING_LEVEL', value: 'INFO' }
+						]);
+						return formValue;
+					}}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
