@@ -206,7 +206,7 @@
 				<Item.Description>{lodash.get(jsonSchema, 'description', '')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
-		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
+		<Tabs.Root value={currentStep}>
 			<!-- Step 1: Name -->
 			<Tabs.Content value={steps[0]}>
 				<Form
@@ -446,7 +446,7 @@
 				{/if}
 			</Tabs.Content>
 			<!-- Step 5: Review & Create -->
-			<Tabs.Content value={steps[4]}>
+			<Tabs.Content value={steps[4]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Code.Root
 						lang="yaml"

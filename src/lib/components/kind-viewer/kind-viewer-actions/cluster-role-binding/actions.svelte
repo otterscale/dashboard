@@ -3,11 +3,12 @@
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
+	import Edit from '$lib/components/kind-viewer/kind-viewer-actions/default/edit.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
-	import Edit from './new-edit.svelte';
+	// import Edit from './new-edit.svelte';
 
 	let {
 		schema,
@@ -72,13 +73,13 @@
 				}}
 			>
 				<Edit
-					{schema}
-					{object}
 					{cluster}
 					{group}
 					{version}
 					{kind}
 					{resource}
+					{schema}
+					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
 					}}

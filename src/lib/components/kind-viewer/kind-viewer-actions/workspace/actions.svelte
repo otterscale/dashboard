@@ -71,13 +71,13 @@
 				}}
 			>
 				<Edit
-					{schema}
-					{object}
 					{cluster}
 					{group}
 					{version}
 					{kind}
 					{resource}
+					{schema}
+					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
 					}}

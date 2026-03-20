@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 	import type { ModelOtterscaleIoV1Alpha1ModelService } from '@otterscale/types';
+	import type { Schema } from 'ajv';
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
@@ -10,23 +11,23 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
 	let {
-		schema,
-		object,
 		cluster,
 		namespace,
 		group,
 		version,
 		kind,
-		resource
+		resource,
+		schema,
+		object
 	}: {
-		schema: any;
-		object: ModelOtterscaleIoV1Alpha1ModelService;
 		cluster: string;
 		namespace: string;
 		group: string;
 		version: string;
 		kind: string;
 		resource: string;
+		schema: Schema;
+		object: ModelOtterscaleIoV1Alpha1ModelService;
 	} = $props();
 
 	let actionsOpen = $state(false);
@@ -74,13 +75,14 @@
 				}}
 			>
 				<Edit
-					{schema}
-					{object}
 					{cluster}
+					{namespace}
 					{group}
 					{version}
 					{kind}
 					{resource}
+					{schema}
+					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
 					}}
@@ -92,14 +94,14 @@
 				}}
 			>
 				<Delete
-					{schema}
-					{object}
 					{cluster}
 					{namespace}
 					{group}
 					{version}
 					{kind}
 					{resource}
+					{schema}
+					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
 					}}

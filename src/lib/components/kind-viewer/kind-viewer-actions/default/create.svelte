@@ -3,6 +3,7 @@
 	import { Plus } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import Ajv from 'ajv';
+	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
 	import Monaco from 'svelte-monaco';
@@ -12,6 +13,7 @@
 	import SchemaViewer from '$lib/components/schema-viewer/schema-viewer.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import * as Item from '$lib/components/ui/item';
 	import { m } from '$lib/paraglide/messages';
 
 	let {
@@ -216,7 +218,15 @@ metadata:
 	</AlertDialog.Trigger>
 	<AlertDialog.Content class="min-w-[77vw]">
 		<AlertDialog.Header>
-			<AlertDialog.Title>Create Resource</AlertDialog.Title>
+			<Item.Root class="p-0">
+				<Item.Content class="text-left">
+					<Item.Title class="text-lg font-bold">{kind}</Item.Title>
+					<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
+				</Item.Content>
+				<Item.Actions>
+					{group ? String(group) : 'core'}/{version}
+				</Item.Actions>
+			</Item.Root>
 		</AlertDialog.Header>
 		<div class="grid grid-cols-2 gap-4 *:max-h-[62vh] *:min-h-[62vh]">
 			<SchemaViewer schema={jsonSchema} class="h-full max-h-screen min-h-0 overflow-auto" />
