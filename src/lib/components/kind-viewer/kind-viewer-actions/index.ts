@@ -3,7 +3,7 @@ import type { Component } from 'svelte';
 import ApplicationActions from './application/actions.svelte';
 import ApplicationCreate from './application/create.svelte';
 import ClusterRoleBindingActions from './cluster-role-binding/actions.svelte';
-import ClusterRoleBindingCreate from './cluster-role-binding/new-create.svelte';
+import ClusterRoleBindingCreate from './cluster-role-binding/create.svelte';
 import CronJobActions from './cronjob/actions.svelte';
 import DaemonSetActions from './daemonset/actions.svelte';
 import DefaultActions from './default/actions.svelte';

@@ -17,14 +17,15 @@ import { buildResourceDetailUrl } from './resource-url';
 
 // kubectl get clusterrolebinding -o wide
 // NAME   ROLE   AGE   USERS   GROUPS   SERVICEACCOUNTS
-type ClusterRoleBindingAttribute = 'Name' | 'Role' | 'Age' | 'Subjects' | 'raw';
+type ClusterRoleBindingAttribute = 'Name' | 'Role' | 'Kind' | 'Subjects' | 'Age' | 'raw';
 
 function getClusterRoleBindingDataSchemas(): Record<ClusterRoleBindingAttribute, DataSchemaType> {
 	return {
 		Name: 'text',
 		Role: 'text',
+		Kind: 'text',
+		Subjects: 'number',
 		Age: 'time',
-		Subjects: 'object',
 		raw: 'object'
 	};
 }
@@ -32,14 +33,12 @@ function getClusterRoleBindingDataSchemas(): Record<ClusterRoleBindingAttribute,
 function getClusterRoleBindingData(
 	object: RbacAuthorizationK8SIoV1ClusterRoleBinding
 ): Record<ClusterRoleBindingAttribute, JsonValue> {
-	const roleRef = object?.roleRef;
-	const roleDisplay = roleRef ? `${roleRef.kind}/${roleRef.name}` : null;
-
 	return {
 		Name: object?.metadata?.name ?? null,
-		Role: roleDisplay,
+		Role: object?.roleRef?.name,
+		Kind: object?.roleRef?.kind,
+		Subjects: (object?.subjects?.length as JsonValue) ?? null,
 		Age: object?.metadata?.creationTimestamp ?? null,
-		Subjects: (object?.subjects as JsonValue) ?? null,
 		raw: (object as JsonObject) ?? null
 	};
 }
@@ -48,8 +47,9 @@ function getClusterRoleBindingUISchemas(): Record<ClusterRoleBindingAttribute, U
 	return {
 		Name: 'link',
 		Role: 'text',
-		Age: 'time',
+		Kind: 'text',
 		Subjects: 'array-of-object',
+		Age: 'time',
 		raw: 'object'
 	};
 }
@@ -103,7 +103,7 @@ function getClusterRoleBindingColumnDefinitions(
 			accessorKey: 'Name'
 		},
 		simpleColumn('Role'),
-		simpleColumn('Age'),
+		simpleColumn('Kind'),
 		{
 			id: 'Subjects',
 			header: ({ column }: { column: Column<Record<ClusterRoleBindingAttribute, JsonValue>> }) =>
@@ -131,7 +131,8 @@ function getClusterRoleBindingColumnDefinitions(
 				}),
 			accessorKey: 'Subjects',
 			meta: { class: 'hidden xl:table-cell' }
-		}
+		},
+		simpleColumn('Age')
 	];
 }
 

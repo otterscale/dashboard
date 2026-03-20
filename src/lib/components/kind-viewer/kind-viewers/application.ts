@@ -162,42 +162,42 @@ function getApplicationColumnDefinitions(
 				column: Column<Record<ApplicationAttribute, JsonValue>>;
 				row: Row<Record<ApplicationAttribute, JsonValue>>;
 			}) => {
-				const app = row.original.raw as WorkloadOtterscaleIoV1Alpha1Application;
+				const application = row.original.raw as WorkloadOtterscaleIoV1Alpha1Application;
 				const items: ArrayOfObjectItemType[] = [];
 
-				if (app.status?.deploymentRef) {
+				if (application.status?.deploymentRef) {
 					items.push({
 						title: 'Deployment',
-						description: app.status.deploymentRef.name,
-						raw: app.status.deploymentRef as any
+						description: application.status.deploymentRef.name,
+						raw: application.status.deploymentRef as any
 					});
 				}
-				if (app.status?.cronJobRef) {
+				if (application.status?.cronJobRef) {
 					items.push({
 						title: 'CronJob',
-						description: app.status.cronJobRef.name,
-						raw: app.status.cronJobRef as any
+						description: application.status.cronJobRef.name,
+						raw: application.status.cronJobRef as any
 					});
 				}
-				if (app.status?.jobRef) {
+				if (application.status?.jobRef) {
 					items.push({
 						title: 'Job',
-						description: app.status.jobRef.name,
-						raw: app.status.jobRef as any
+						description: application.status.jobRef.name,
+						raw: application.status.jobRef as any
 					});
 				}
-				if (app.status?.serviceRef) {
+				if (application.status?.serviceRef) {
 					items.push({
 						title: 'Service',
-						description: app.status.serviceRef.name,
-						raw: app.status.serviceRef as any
+						description: application.status.serviceRef.name,
+						raw: application.status.serviceRef as any
 					});
 				}
-				if (app.status?.persistentVolumeClaimRef) {
+				if (application.status?.persistentVolumeClaimRef) {
 					items.push({
 						title: 'PVC',
-						description: app.status.persistentVolumeClaimRef.name,
-						raw: app.status.persistentVolumeClaimRef as any
+						description: application.status.persistentVolumeClaimRef.name,
+						raw: application.status.persistentVolumeClaimRef as any
 					});
 				}
 

@@ -4,8 +4,8 @@
 	import type { Row } from '@tanstack/table-core';
 
 	import Delete from '$lib/components/dynamic-form/resource-quota/delete-dialog.svelte';
-	import Edit from '$lib/components/dynamic-form/resource-quota/edit-sheet.svelte';
-	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
+	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default//describe.svelte';
+	import Edit from '$lib/components/kind-viewer/kind-viewer-actions/default/edit.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
@@ -77,13 +77,16 @@
 				}}
 			>
 				<Edit
-					name={String(row.original['Name'])}
+					{cluster}
+					{namespace}
+					{group}
+					{version}
+					{kind}
+					{resource}
 					{schema}
 					{object}
 					onOpenChangeComplete={() => {
-						if (actionsOpen) {
-							actionsOpen = false;
-						}
+						actionsOpen = false;
 					}}
 				/>
 			</DropdownMenu.Item>

@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { Eye } from '@lucide/svelte';
+	import { EyeIcon } from '@lucide/svelte';
+	import type { Schema } from 'ajv';
+	import lodash from 'lodash';
 	import { stringify } from 'yaml';
 
 	import * as Code from '$lib/components/custom/code';
@@ -7,34 +9,45 @@
 	import * as Item from '$lib/components/ui/item';
 
 	let {
-		schema: apiSchema,
+		schema,
 		object,
 		onOpenChangeComplete
 	}: {
-		schema: any;
+		schema: Schema;
 		object: Record<string, unknown>;
 		onOpenChangeComplete?: () => void;
 	} = $props();
 
 	let open = $state(false);
+
+	const [{ group, version, kind }] = $derived(
+		lodash.get(schema, 'x-kubernetes-group-version-kind')
+	);
 </script>
 
 <Dialog.Root bind:open {onOpenChangeComplete}>
 	<Dialog.Trigger class="w-full">
 		<Item.Root class="p-0 text-xs" size="sm">
 			<Item.Media>
-				<Eye />
+				<EyeIcon />
 			</Item.Media>
 			<Item.Content>
 				<Item.Title>View</Item.Title>
 			</Item.Content>
 		</Item.Root>
 	</Dialog.Trigger>
-	<Dialog.Content
-		class="flex h-fit max-h-[77vh] max-w-[62vw] min-w-[50vw] flex-col justify-between"
-	>
-		<Dialog.Header>Configuration</Dialog.Header>
-		<Dialog.Description>{apiSchema?.description}</Dialog.Description>
+	<Dialog.Content class="flex h-fit max-h-[95vh] min-w-[50vw] flex-col justify-between">
+		<Dialog.Header>
+			<Item.Root class="p-0">
+				<Item.Content class="text-left">
+					<Item.Title class="text-lg font-bold">{kind}</Item.Title>
+					<Item.Description>{lodash.get(schema, 'description')}</Item.Description>
+				</Item.Content>
+				<Item.Actions>
+					{group}/{version}
+				</Item.Actions>
+			</Item.Root>
+		</Dialog.Header>
 		<Code.Root
 			variant="secondary"
 			lang="yaml"
