@@ -47,6 +47,12 @@ import {
 	getDaemonSetUISchemas
 } from './daemonset.js';
 import {
+	getDataVolumeColumnDefinitions,
+	getDataVolumeData,
+	getDataVolumeDataSchemas,
+	getDataVolumeUISchemas
+} from './datavolume.js';
+import {
 	getDefaultColumnDefinitions,
 	getDefaultData,
 	getDefaultDataSchemas,
@@ -88,6 +94,12 @@ import {
 	getHTTPRouteDataSchemas,
 	getHTTPRouteUISchemas
 } from './httproute.js';
+import {
+	getVirtualMachineInstancetypeColumnDefinitions,
+	getVirtualMachineInstancetypeData,
+	getVirtualMachineInstancetypeDataSchemas,
+	getVirtualMachineInstancetypeUISchemas
+} from './instancetype.js';
 import { getJobColumnDefinitions, getJobData, getJobDataSchemas, getJobUISchemas } from './job.js';
 import {
 	getLimitRangeColumnDefinitions,
@@ -187,6 +199,12 @@ import {
 	getStorageClassUISchemas
 } from './storageclass.js';
 import {
+	getVirtualMachineColumnDefinitions,
+	getVirtualMachineData,
+	getVirtualMachineDataSchemas,
+	getVirtualMachineUISchemas
+} from './virtualmachine.js';
+import {
 	getWorkspaceColumnDefinitions,
 	getWorkspaceData,
 	getWorkspaceDataSchemas,
@@ -259,6 +277,12 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 			return getGatewayDataSchemas();
 		case 'HelmRelease':
 			return getHelmReleaseDataSchemas();
+		case 'VirtualMachine':
+			return getVirtualMachineDataSchemas();
+		case 'DataVolume':
+			return getDataVolumeDataSchemas();
+		case 'VirtualMachineInstancetype':
+			return getVirtualMachineInstancetypeDataSchemas();
 		default:
 			return getDefaultDataSchemas();
 	}
@@ -330,6 +354,12 @@ function getData(apiResource: APIResource, object: any): Record<string, JsonValu
 			return getGatewayData(object);
 		case 'HelmRelease':
 			return getHelmReleaseData(object);
+		case 'VirtualMachine':
+			return getVirtualMachineData(object);
+		case 'DataVolume':
+			return getDataVolumeData(object);
+		case 'VirtualMachineInstancetype':
+			return getVirtualMachineInstancetypeData(object);
 		default:
 			return getDefaultData(apiResource, object);
 	}
@@ -401,6 +431,12 @@ function getUISchemas(kind: string): Record<string, UISchemaType> {
 			return getGatewayUISchemas();
 		case 'HelmRelease':
 			return getHelmReleaseUISchemas();
+		case 'VirtualMachine':
+			return getVirtualMachineUISchemas();
+		case 'DataVolume':
+			return getDataVolumeUISchemas();
+		case 'VirtualMachineInstancetype':
+			return getVirtualMachineInstancetypeUISchemas();
 		default:
 			return getDefaultUISchemas();
 	}
@@ -476,6 +512,12 @@ function getColumnDefinitions(
 			return getGatewayColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'HelmRelease':
 			return getHelmReleaseColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'VirtualMachine':
+			return getVirtualMachineColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'DataVolume':
+			return getDataVolumeColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'VirtualMachineInstancetype':
+			return getVirtualMachineInstancetypeColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		default:
 			return getDefaultColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 	}
