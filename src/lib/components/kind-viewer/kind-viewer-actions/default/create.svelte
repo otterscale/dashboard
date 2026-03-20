@@ -5,11 +5,12 @@
 	import Ajv from 'ajv';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
-	import { getContext } from 'svelte';
+	import { getContext, onMount } from 'svelte';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
-	import { parseDocument } from 'yaml';
+	import { parseDocument, stringify } from 'yaml';
 
+	import { filterRequiredSchema, getInitialValues } from '$lib/components/dynamic-form/utils';
 	import SchemaViewer from '$lib/components/schema-viewer/schema-viewer.svelte';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -44,14 +45,9 @@
 	});
 	const validate = jsonSchemaValidator.compile(jsonSchema);
 
-	const initialValue = `\
-apiVersion: ""
-kind: ""
-metadata:
-  name: ""
-`;
+	let initialValue = $state('');
 
-	let value = $state(initialValue);
+	let value = $derived(initialValue);
 	let open = $state(false);
 	let isSubmitting = $state(false);
 	let editorInstance: import('monaco-editor').editor.IStandaloneCodeEditor | undefined =
@@ -127,7 +123,7 @@ metadata:
 							endLineNumber: end.lineNumber,
 							endColumn: model.getLineMaxColumn(end.lineNumber),
 							message: errorMessage,
-							severity: monaco.MarkerSeverity.Error
+							severity: monaco.MarkerSeverity.Hint
 						});
 					} else {
 						markers.push({
@@ -136,7 +132,7 @@ metadata:
 							endLineNumber: end.lineNumber,
 							endColumn: end.column,
 							message: errorMessage,
-							severity: monaco.MarkerSeverity.Error
+							severity: monaco.MarkerSeverity.Hint
 						});
 					}
 				} else {
@@ -146,7 +142,7 @@ metadata:
 						endLineNumber: 1,
 						endColumn: model.getLineMaxColumn(1),
 						message: errorMessage,
-						severity: monaco.MarkerSeverity.Error
+						severity: monaco.MarkerSeverity.Hint
 					});
 				}
 			});
@@ -198,6 +194,17 @@ metadata:
 			}
 		);
 	}
+
+	onMount(async () => {
+		let initialValues: any = await getInitialValues(filterRequiredSchema(jsonSchema));
+
+		lodash.set(initialValues, 'apiVersion', group ? `${group}/${version}` : version);
+		lodash.set(initialValues, 'kind', kind);
+		if (namespace) {
+			lodash.set(initialValues, 'metadata.namespace', namespace);
+		}
+		initialValue = stringify(initialValues);
+	});
 </script>
 
 <AlertDialog.Root
