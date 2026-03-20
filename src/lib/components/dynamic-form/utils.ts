@@ -2,24 +2,27 @@ import * as JSONSchemaFaker from 'json-schema-faker';
 import traverse from 'json-schema-traverse';
 import lodash from 'lodash';
 
+// Filter a schema to only include required fields, while preserving essential Kubernetes structures.
 function filterRequiredSchema(schema: any): any {
 	const requiredSchema = lodash.cloneDeep(schema);
 
 	traverse(requiredSchema, {
-		cb: (currentSchema, jsonPointer) => {
+		cb: (currentSchema: any, jsonPointer: string) => {
+			// Root object: preserve top-level structure but remove status
 			if (jsonPointer === '') {
-				delete currentSchema.properties.status;
-			} else if (jsonPointer === '/properties/metadata') {
-				Object.keys(currentSchema.properties).forEach((key) => {
-					const preservedProperties = ['name', 'labels', 'annotations', ''];
-					if (!preservedProperties.includes(key)) {
-						delete currentSchema.properties[key];
-					}
-				});
-			} else if (currentSchema.type === 'object' && currentSchema.properties) {
-				const requiredProperties = currentSchema.required || [];
+				if (currentSchema.properties) {
+					delete currentSchema.properties.status;
+				}
+				// Skip further filtering for the root object to preserve core blocks
+				return;
+			}
+
+			// Node objects: filter properties based on 'required' list
+			if (currentSchema.type === 'object' && currentSchema.properties) {
+				const requiredProperties = (currentSchema.required as string[]) || [];
 
 				if (requiredProperties.length === 0) return;
+
 				Object.keys(currentSchema.properties).forEach((key) => {
 					if (!requiredProperties.includes(key)) {
 						delete currentSchema.properties[key];
@@ -28,6 +31,7 @@ function filterRequiredSchema(schema: any): any {
 			}
 		}
 	});
+
 	return requiredSchema;
 }
 
@@ -36,7 +40,7 @@ async function getInitialValues(schema: any) {
 		const schemaWithDefaults = lodash.cloneDeep(schema);
 		traverse(schemaWithDefaults, {
 			allKeys: true,
-			cb: (currentSchema) => {
+			cb: (currentSchema: any) => {
 				if (currentSchema.default === undefined) {
 					switch (currentSchema.type) {
 						case 'null':

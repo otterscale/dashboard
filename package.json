@@ -107,6 +107,8 @@
 		"ioredis": "^5.10.0",
 		"isomorphic-dompurify": "^3.5.1",
 		"js-yaml": "^4.1.1",
+		"json-schema-faker": "^0.6.0",
+		"json-schema-traverse": "^1.0.0",
 		"lodash": "^4.17.23",
 		"monaco-editor": "^0.55.1",
 		"pluralize": "^8.0.0",
