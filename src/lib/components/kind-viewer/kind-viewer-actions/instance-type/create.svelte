@@ -52,33 +52,15 @@
 		apiVersion: group ? `${group}/${version}` : version,
 		kind,
 		metadata: { name: {} },
-		cpuGuest: 1,
-		memoryGuest: '1Gi'
+		spec: {
+			cpu: { guest: 1 },
+			memory: { guest: '1Gi' }
+		}
 	});
-
-	// Derived submission values
-	const submissionValues = $derived.by(() => {
-		return {
-			apiVersion: group ? `${group}/${version}` : version,
-			kind,
-			metadata: {
-				name: values.metadata.name,
-				namespace
-			},
-			spec: {
-				cpu: {
-					guest: Number(values.cpuGuest) || 1
-				},
-				memory: {
-					guest: String(values.memoryGuest) || '1Gi'
-				}
-			}
-		};
-	});
-	let value = $derived(stringify(submissionValues));
+	let value = $derived(stringify(values));
 
 	// Steps Manager
-	const steps = Array.from({ length: 3 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -158,48 +140,84 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 2: CPU & Memory -->
+			<!-- Step 2: CPU -->
 			<Tabs.Content value={steps[1]}>
-				<div class="flex flex-col gap-4">
-					<Form
-						schema={{
-							type: 'number',
-							title: 'CPU (Cores)',
-							minimum: 1
-						} as Schema}
-						uiSchema={{} as UiSchemaRoot}
-						initialValue={1 as FormValue}
-						bind:values={values['cpuGuest']}
-					/>
-					<Form
-						schema={{
-							type: 'string',
-							title: 'Memory (e.g. 1Gi, 512Mi)'
-						} as Schema}
-						uiSchema={{} as UiSchemaRoot}
-						initialValue={'1Gi' as FormValue}
-						bind:values={values['memoryGuest']}
-					/>
-					<div class="flex w-full items-center justify-between gap-3">
-						<Button
-							onclick={() => {
-								handlePrevious();
-							}}
-						>
-							Previous
-						</Button>
-						<Button
-							onclick={() => {
-								handleNext();
-							}}
-						>
-							Next
-						</Button>
-					</div>
-				</div>
+				<Form
+					schema={{
+						...lodash.get(jsonSchema, 'properties.spec.properties.cpu.properties.guest'),
+						title: 'CPU'
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={2 as FormValue}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					bind:values={values['spec']['cpu']['guest']}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+			<!-- Step 2: CPU -->
+			<Tabs.Content value={steps[2]}>
+				<Form
+					schema={{
+						...lodash.omit(
+							lodash.get(jsonSchema, 'properties.spec.properties.memory.properties.guest'),
+							'anyOf'
+						),
+						type: 'string',
+						title: 'Memory'
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={'4Gi' as FormValue}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					bind:values={values['spec']['memory']['guest']}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
 			</Tabs.Content>
 			<!-- Step 3: Review & Create -->
-			<Tabs.Content value={steps[2]} class="min-h-[77vh]">
+			<Tabs.Content value={steps[3]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{

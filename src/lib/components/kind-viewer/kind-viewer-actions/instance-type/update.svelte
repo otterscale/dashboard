@@ -3,6 +3,7 @@
 	import { FormIcon } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
+	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
 	import { load } from 'js-yaml';
 	import lodash from 'lodash';
@@ -44,6 +45,7 @@
 
 	// Extract existing values from object
 	const existingNamespace = lodash.get(object, 'metadata.namespace', '');
+	const existingName = lodash.get(object, 'metadata.name', '');
 	const existingCpuGuest = lodash.get(object, 'spec.cpu.guest', 1);
 	const existingMemoryGuest = lodash.get(object, 'spec.memory.guest', '1Gi');
 
@@ -51,38 +53,27 @@
 	let values: any = $state({
 		apiVersion: group ? `${group}/${version}` : version,
 		kind,
-		cpuGuest: existingCpuGuest,
-		memoryGuest: existingMemoryGuest
+		metadata: {
+			name: existingName,
+			namespace: existingNamespace
+		},
+		spec: {
+			cpu: { guest: existingCpuGuest },
+			memory: { guest: existingMemoryGuest }
+		}
 	});
-
-	// Derived submission values
-	const submissionValues = $derived.by(() => {
-		return {
-			apiVersion: group ? `${group}/${version}` : version,
-			kind,
-			metadata: {
-				name: lodash.get(object, 'metadata.name'),
-				namespace: existingNamespace
-			},
-			spec: {
-				cpu: {
-					guest: Number(values.cpuGuest) || 1
-				},
-				memory: {
-					guest: String(values.memoryGuest) || '1Gi'
-				}
-			}
-		};
-	});
-	let value = $derived(stringify(submissionValues));
+	let value = $derived(stringify(values));
 
 	// Steps Manager
-	const steps = Array.from({ length: 2 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 3 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
 	function handleNext() {
 		currentStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
+	}
+	function handlePrevious() {
+		currentStep = steps[Math.max(currentIndex - 1, 0)];
 	}
 	function reset() {
 		currentStep = firstStep;
@@ -123,41 +114,77 @@
 			</Item.Content>
 		</Item.Root>
 		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
-			<!-- Step 1: CPU & Memory -->
+			<!-- Step 1: CPU -->
 			<Tabs.Content value={steps[0]}>
-				<div class="flex flex-col gap-4">
-					<Form
-						schema={{
-							type: 'number',
-							title: 'CPU (Cores)',
-							minimum: 1
-						} as Schema}
-						uiSchema={{} as UiSchemaRoot}
-						initialValue={existingCpuGuest as FormValue}
-						bind:values={values['cpuGuest']}
-					/>
-					<Form
-						schema={{
-							type: 'string',
-							title: 'Memory (e.g. 1Gi, 512Mi)'
-						} as Schema}
-						uiSchema={{} as UiSchemaRoot}
-						initialValue={existingMemoryGuest as FormValue}
-						bind:values={values['memoryGuest']}
-					/>
-					<div class="flex w-full items-center justify-end gap-3">
-						<Button
-							onclick={() => {
-								handleNext();
-							}}
-						>
-							Next
-						</Button>
-					</div>
-				</div>
+				<Form
+					schema={{
+						...lodash.get(jsonSchema, 'properties.spec.properties.cpu.properties.guest'),
+						title: 'CPU'
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={existingCpuGuest as FormValue}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					bind:values={values['spec']['cpu']['guest']}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-end gap-3">
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
 			</Tabs.Content>
-			<!-- Step 2: Review & Apply -->
-			<Tabs.Content value={steps[1]} class="min-h-[77vh]">
+			<!-- Step 2: Memory -->
+			<Tabs.Content value={steps[1]}>
+				<Form
+					schema={{
+						...lodash.omit(
+							lodash.get(jsonSchema, 'properties.spec.properties.memory.properties.guest'),
+							'anyOf'
+						),
+						type: 'string',
+						title: 'Memory'
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={existingMemoryGuest as FormValue}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					bind:values={values['spec']['memory']['guest']}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+			<!-- Step 3: Review & Apply -->
+			<Tabs.Content value={steps[2]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{
