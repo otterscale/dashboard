@@ -149,6 +149,9 @@
 	function getKeycloakUser(username: string): KeycloakUser | undefined {
 		return usernameToKeycloakUser[username];
 	}
+	function isServiceAccount(username?: string): boolean | undefined {
+		return username?.startsWith('service-account-');
+	}
 
 	// Flag for Dialog
 	let isSubmitting = $state(false);
@@ -352,7 +355,8 @@
 							return {
 								...member,
 								subject: member.subject ?? keycloakUser?.id ?? null,
-								username: member.username ?? keycloakUser?.username ?? null
+								username: member.username ?? keycloakUser?.username ?? null,
+								serviceAccount: isServiceAccount(keycloakUser?.username)
 							};
 						});
 						return members;
