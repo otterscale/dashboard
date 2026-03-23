@@ -33,7 +33,8 @@
 		schema: jsonSchema,
 		object,
 		onOpenChangeComplete,
-		trigger
+		trigger,
+		onsuccess
 	}: {
 		cluster: string;
 		group: string;
@@ -44,6 +45,7 @@
 		object?: any;
 		onOpenChangeComplete?: () => void;
 		trigger?: Snippet<[Record<string, any>]>;
+		onsuccess?: () => void;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -532,6 +534,7 @@
 								{
 									loading: `Updating ${kind} ${name}...`,
 									success: () => {
+										onsuccess?.();
 										return `Successfully updated ${kind} ${name}`;
 									},
 									error: (error) => {

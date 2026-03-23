@@ -20,24 +20,13 @@
 		version: string;
 		kind: string;
 		resource: string;
-		schema?: any;
+		schema: any;
 		object?: any;
 		onsuccess?: () => void;
 	} = $props();
 </script>
 
-<Update
-	{cluster}
-	{group}
-	{version}
-	{kind}
-	{resource}
-	{schema}
-	{object}
-	onOpenChangeComplete={() => {
-		onsuccess?.();
-	}}
->
+<Update {cluster} {group} {version} {kind} {resource} {schema} {object} {onsuccess}>
 	{#snippet trigger(props)}
 		<button
 			{...props}
