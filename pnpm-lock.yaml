@@ -187,11 +187,11 @@ importers:
         specifier: ^0.577.0
         version: 0.577.0(svelte@5.54.0)
       '@otterscale/api':
-        specifier: ^0.9.1
-        version: 0.9.1
+        specifier: ^0.9.3
+        version: 0.9.3
       '@otterscale/types':
-        specifier: ^0.9.1
-        version: 0.9.1
+        specifier: ^0.9.3
+        version: 0.9.3
       '@playwright/test':
         specifier: ^1.58.2
         version: 1.58.2
@@ -737,11 +737,11 @@ packages:
   '@oslojs/jwt@0.2.0':
     resolution: {integrity: sha512-bLE7BtHrURedCn4Mco3ma9L4Y1GR2SMBuIvjWr7rmQ4/W/4Jy70TIAgZ+0nIlk0xHz1vNP8x8DCns45Sb2XRbg==}
 
-  '@otterscale/api@0.9.1':
-    resolution: {integrity: sha512-rJRonkB710UUyQpOzsQSfEHyJvGxDhvX5YiIuehpVqBZaTZyJTruPeLAa38Q8Opya2unhvCUdyjVjWFLAdLWKw==}
+  '@otterscale/api@0.9.3':
+    resolution: {integrity: sha512-hHS7KPfiyhYsHyGPmyIAUl4zpG6RHU/8tusHD/LVnBqdT/sgzL6SxWxLCTvTcQJcHX/PDUlooPZ59wmO0tHV1Q==}
 
-  '@otterscale/types@0.9.1':
-    resolution: {integrity: sha512-cyHk/liGgdkhFFcDwIFdO+d5yCht1AdLLIg5hwDSInYhY8RO2N23/XUQbhNPhTHneku5Oza5+uBEUB43czxNOA==}
+  '@otterscale/types@0.9.3':
+    resolution: {integrity: sha512-MTAq7zkSaNH+4AedmKzkutIIaWX89HrGl6K76YvV7PeirgT4sZfECmMHspKKumoiNRYuunn5tW17FPlo9bmT0Q==}
 
   '@playwright/test@1.58.2':
     resolution: {integrity: sha512-akea+6bHYBBfA9uQqSYmlJXn61cTa+jbO87xVLCWbTqbWadRVmhxlXATaOjOgcBaWU4ePo0wB41KMFv3o35IXA==}
@@ -3590,11 +3590,11 @@ snapshots:
     dependencies:
       '@oslojs/encoding': 0.4.1
 
-  '@otterscale/api@0.9.1':
+  '@otterscale/api@0.9.3':
     dependencies:
       '@bufbuild/protobuf': 2.11.0
 
-  '@otterscale/types@0.9.1': {}
+  '@otterscale/types@0.9.3': {}
 
   '@playwright/test@1.58.2':
     dependencies:
