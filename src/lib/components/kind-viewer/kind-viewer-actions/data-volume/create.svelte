@@ -309,7 +309,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={'blank' as FormValue}
+					initialValue={'http' as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
