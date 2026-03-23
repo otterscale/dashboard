@@ -530,9 +530,10 @@
 								<Item.Content>
 									<Item.Title>
 										{member.name}
-										<Badge>
-											{member.role}
-										</Badge>
+										<Badge>{member.role}</Badge>
+										{#if member.serviceAccount}
+											<Badge variant="destructive">service account</Badge>
+										{/if}
 									</Item.Title>
 									<Item.Description>
 										<span>{member.username}</span>
