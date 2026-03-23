@@ -311,7 +311,11 @@
 					</Sheet.Root>
 					{#if Editor}
 						<Editor
-							name={object?.metadata?.name}
+							{cluster}
+							{group}
+							{version}
+							{kind}
+							{resource}
 							{schema}
 							{object}
 							onsuccess={() => {
