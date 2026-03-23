@@ -113,7 +113,7 @@
 						async () => {
 							await resourceClient.delete({
 								cluster,
-								namespace,
+								namespace: namespace ? object?.metadata?.namespace : '',
 								group,
 								version,
 								resource,
