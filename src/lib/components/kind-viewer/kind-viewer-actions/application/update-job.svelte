@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { SquareIcon } from '@lucide/svelte';
+	import { FormIcon } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
-	import { load } from 'js-yaml';
+	import { JSON_SCHEMA, load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
+	import type { Snippet } from 'svelte';
 	import { getContext } from 'svelte';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
@@ -28,7 +29,10 @@
 		kind,
 		resource,
 		schema: jsonSchema,
-		onOpenChangeComplete
+		object,
+		onOpenChangeComplete,
+		trigger,
+		onsuccess
 	}: {
 		cluster: string;
 		namespace: string;
@@ -37,7 +41,10 @@
 		kind: string;
 		resource: string;
 		schema?: any;
-		onOpenChangeComplete: () => void;
+		object?: any;
+		onOpenChangeComplete?: () => void;
+		trigger?: Snippet<[Record<string, any>]>;
+		onsuccess?: () => void;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -53,15 +60,42 @@
 	let values: any = $state({
 		apiVersion: group ? `${group}/${version}` : version,
 		kind,
-		metadata: {},
-		spec: {
+		metadata: object?.metadata || {},
+		spec: object?.spec || {
 			workloadType: 'Job',
 			job: {}
 		}
 	});
-	let value = $derived(stringify(values));
 
-	let template = $state({});
+	const systemFields = [
+		'clusterName',
+		'creationTimestamp',
+		'deletionGracePeriodSeconds',
+		'deletionTimestamp',
+		'finalizers',
+		'generateName',
+		'generation',
+		'initializers',
+		'managedFields',
+		'ownerReferences',
+		'resourceVersion',
+		'relationships',
+		'selfLink',
+		'state',
+		'uid'
+	];
+
+	let value = $derived.by(() => {
+		const filtered = lodash.cloneDeep(values);
+		if (filtered.metadata) {
+			for (const field of systemFields) {
+				delete filtered.metadata[field];
+			}
+		}
+		return stringify(filtered);
+	});
+
+	let template = $state(lodash.get(object, 'spec.job.template.spec') || {});
 
 	// Steps Manager
 	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
@@ -94,14 +128,18 @@
 >
 	<Dialog.Trigger>
 		{#snippet child({ props })}
-			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
-				<Item.Media>
-					<SquareIcon />
-				</Item.Media>
-				<Item.Content>
-					<Item.Title>Job</Item.Title>
-				</Item.Content>
-			</Item.Root>
+			{#if trigger}
+				{@render trigger(props)}
+			{:else}
+				<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
+					<Item.Media>
+						<FormIcon />
+					</Item.Media>
+					<Item.Content>
+						<Item.Title>Update</Item.Title>
+					</Item.Content>
+				</Item.Root>
+			{/if}
 		{/snippet}
 	</Dialog.Trigger>
 	<Dialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
@@ -121,11 +159,13 @@
 						properties: {
 							name: {
 								...lodash.get(jsonSchema, 'properties.metadata.properties.name'),
-								title: 'Name'
+								title: 'Name',
+								readOnly: true
 							},
 							namespace: {
 								...lodash.get(jsonSchema, 'properties.metadata.properties.namespace'),
-								title: 'Namespace'
+								title: 'Namespace',
+								readOnly: true
 							}
 						}
 					} as Schema}
@@ -136,7 +176,12 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{ namespace: namespace }}
+					initialValue={lodash.get(object, 'metadata')
+						? {
+								name: lodash.get(object, 'metadata.name'),
+								namespace: lodash.get(object, 'metadata.namespace') || namespace
+							}
+						: { namespace: namespace }}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
@@ -222,12 +267,19 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{
-						completions: 1,
-						parallelism: 1,
-						backoffLimit: 6,
-						suspend: false
-					}}
+					initialValue={lodash.get(object, 'spec.job')
+						? {
+								completions: lodash.get(object, 'spec.job.completions') ?? 1,
+								parallelism: lodash.get(object, 'spec.job.parallelism') ?? 1,
+								backoffLimit: lodash.get(object, 'spec.job.backoffLimit') ?? 6,
+								suspend: lodash.get(object, 'spec.job.suspend') ?? false
+							}
+						: {
+								completions: 1,
+								parallelism: 1,
+								backoffLimit: 6,
+								suspend: false
+							}}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
@@ -476,7 +528,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{
+					initialValue={lodash.get(object, 'spec.job.template.spec') || {
 						restartPolicy: 'OnFailure',
 						containers: [
 							{
@@ -531,7 +583,9 @@
 
 							isSubmitting = true;
 
-							const isValid = validate(load(value));
+							const currentStructuredValue: any = load(value, { schema: JSON_SCHEMA });
+
+							const isValid = validate(currentStructuredValue);
 
 							if (!isValid) {
 								console.error('Validation errors:', validate.errors);
@@ -540,39 +594,42 @@
 								return;
 							}
 
-							const name = lodash.get(load(value), 'metadata.name');
+							const name = lodash.get(currentStructuredValue, 'metadata.name');
+							const manifest = new TextEncoder().encode(JSON.stringify(currentStructuredValue));
 
 							toast.promise(
 								async () => {
-									const manifest = new TextEncoder().encode(value);
-
-									await resourceClient.create({
+									await resourceClient.apply({
 										cluster,
 										namespace,
 										group,
 										version,
 										resource,
-										manifest
+										name,
+										manifest,
+										fieldManager: 'otterscale-web-ui',
+										force: true
 									});
 								},
 								{
-									loading: `Creating ${kind} ${name}...`,
+									loading: `Updating ${kind} ${name}...`,
 									success: () => {
-										open = false;
-										return `Successfully created ${kind} ${name}`;
+										onsuccess?.();
+										return `Successfully updated ${kind} ${name}`;
 									},
 									error: (error) => {
-										console.error(`Failed to create ${kind} ${name}:`, error);
-										return `Failed to create ${kind} ${name}: ${(error as ConnectError).message}`;
+										console.error(`Failed to update ${kind} ${name}:`, error);
+										return `Failed to update ${kind} ${name}: ${(error as ConnectError).message}`;
 									},
 									finally() {
 										isSubmitting = false;
+										open = false;
 									}
 								}
 							);
 						}}
 					>
-						Create
+						Update
 					</Button>
 				</div>
 			</Tabs.Content>
