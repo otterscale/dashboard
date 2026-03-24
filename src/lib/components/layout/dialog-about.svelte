@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { SiGithub } from '@icons-pack/svelte-simple-icons';
 	import BugIcon from '@lucide/svelte/icons/bug';
 
 	import { version } from '$app/environment';
@@ -41,7 +42,7 @@
 
 			<div class="flex w-full justify-center gap-2">
 				<Button variant="outline" size="icon" href="https://github.com/otterscale" target="_blank">
-					<!-- <GitHubIcon /> -->
+					<SiGithub />
 					<span class="sr-only">GitHub</span>
 				</Button>
 				<Button

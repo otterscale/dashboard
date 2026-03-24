@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	import Icon from '@iconify/svelte';
+	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
 	import { Collapsible as CollapsiblePrimitive } from 'bits-ui';
 	import type { Snippet } from 'svelte';
 
@@ -34,7 +34,7 @@
 			{@render descriptor?.({ open })}
 		</span>
 		<Button variant="ghost" size="icon" class=" absolute top-1/2 right-0 -translate-y-1/2">
-			<Icon icon="ph:caret-up-down" />
+			<ChevronsUpDownIcon class="size-4" />
 		</Button>
 	</Collapsible.Trigger>
 	<Collapsible.Content>

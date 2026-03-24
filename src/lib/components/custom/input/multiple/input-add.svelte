@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	import Icon from '@iconify/svelte';
+	import CirclePlusIcon from '@lucide/svelte/icons/circle-plus';
 	import { getContext } from 'svelte';
 
 	import { Button, type ButtonProps, buttonVariants } from '$lib/components/ui/button/index.js';
@@ -39,5 +39,5 @@
 	}}
 	{...restProps}
 >
-	<Icon icon="ph:plus-circle" class="size-5 text-primary" />
+	<CirclePlusIcon class="size-5 text-primary" />
 </Button>
