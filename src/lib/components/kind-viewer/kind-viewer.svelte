@@ -26,7 +26,7 @@
 	let {
 		isClusterAdmin,
 		cluster,
-		namespace,
+		namespace: namespaceProp,
 		apiResource
 	}: {
 		isClusterAdmin: boolean;
@@ -35,14 +35,18 @@
 		apiResource: APIResource;
 	} = $props();
 
+	let clustered = $derived(isClusterAdmin);
+	// eslint-disable-next-line
+	let schema: any = $state({});
+
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
 	const uiSchemas: Record<string, UISchemaType> = $derived(getUISchemas(apiResource.kind));
 	const dataSchemas: Record<string, DataSchemaType> = $derived(getDataSchemas(apiResource.kind));
-
-	// eslint-disable-next-line
-	let schema: any = $state({});
+	const namespace = $derived(
+		clustered ? undefined : apiResource.namespaced ? namespaceProp : undefined
+	);
 
 	async function fetchSchema() {
 		try {
@@ -80,7 +84,7 @@
 				const response = await resourceClient.list(
 					{
 						cluster: cluster,
-						namespace: clustered ? undefined : apiResource.namespaced ? namespace : undefined,
+						namespace: namespace,
 						group: apiResource.group,
 						version: apiResource.version,
 						resource: apiResource.resource,
@@ -122,7 +126,7 @@
 			const watchResourcesStream = resourceClient.watch(
 				{
 					cluster: cluster,
-					namespace: clustered ? undefined : apiResource.namespaced ? namespace : undefined,
+					namespace: namespace,
 					group: apiResource.group,
 					version: apiResource.version,
 					resource: apiResource.resource,
@@ -204,8 +208,6 @@
 	}
 
 	const sleep = (ms: number = 0) => new Promise((resolve) => setTimeout(resolve, ms));
-
-	let clustered = $derived(isClusterAdmin);
 
 	async function resetAndReload() {
 		if (listAbortController) {
