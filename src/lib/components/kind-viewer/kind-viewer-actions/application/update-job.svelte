@@ -1,21 +1,20 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { ClockIcon } from '@lucide/svelte';
+	import { FormIcon } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
-	import { load } from 'js-yaml';
+	import { JSON_SCHEMA, load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
+	import type { Snippet } from 'svelte';
 	import { getContext } from 'svelte';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
-	import { page } from '$app/stores';
 	import Form from '$lib/components/dynamic-form/form.svelte';
-	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
@@ -30,7 +29,10 @@
 		kind,
 		resource,
 		schema: jsonSchema,
-		onOpenChangeComplete
+		object,
+		onOpenChangeComplete,
+		trigger,
+		onsuccess
 	}: {
 		cluster: string;
 		namespace: string;
@@ -39,41 +41,58 @@
 		kind: string;
 		resource: string;
 		schema?: any;
-		onOpenChangeComplete: () => void;
+		object?: any;
+		onOpenChangeComplete?: () => void;
+		trigger?: Snippet<[Record<string, any>]>;
+		onsuccess?: () => void;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	// Timezone List
-	const timezones = $derived($page.data.timezones ?? []);
-
-	async function fetchTimezones(search: string): Promise<{ label: string; value: string }[]> {
-		return timezones
-			.filter((timezone: string) => timezone.toLowerCase().includes(search.toLowerCase()))
-			.map((timezone: string) => ({
-				label: timezone,
-				value: timezone
-			}));
-	}
-
 	// Container for Data
 	let values: any = $state({
 		apiVersion: group ? `${group}/${version}` : version,
 		kind,
-		metadata: {},
-		spec: {
-			workloadType: 'CronJob',
-			cronJob: {}
+		metadata: object?.metadata || {},
+		spec: object?.spec || {
+			workloadType: 'Job',
+			job: {}
 		}
 	});
-	let value = $derived(stringify(values));
 
-	let cronjobValues: any = $state({});
-	let jobValues: any = $state({});
+	const systemFields = [
+		'clusterName',
+		'creationTimestamp',
+		'deletionGracePeriodSeconds',
+		'deletionTimestamp',
+		'finalizers',
+		'generateName',
+		'generation',
+		'initializers',
+		'managedFields',
+		'ownerReferences',
+		'resourceVersion',
+		'relationships',
+		'selfLink',
+		'state',
+		'uid'
+	];
+
+	let value = $derived.by(() => {
+		const filtered = lodash.cloneDeep(values);
+		if (filtered.metadata) {
+			for (const field of systemFields) {
+				delete filtered.metadata[field];
+			}
+		}
+		return stringify(filtered);
+	});
+
+	let template = $state(lodash.get(object, 'spec.job.template.spec') || {});
 
 	// Steps Manager
-	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -103,14 +122,18 @@
 >
 	<Dialog.Trigger>
 		{#snippet child({ props })}
-			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
-				<Item.Media>
-					<ClockIcon />
-				</Item.Media>
-				<Item.Content>
-					<Item.Title>CronJob</Item.Title>
-				</Item.Content>
-			</Item.Root>
+			{#if trigger}
+				{@render trigger(props)}
+			{:else}
+				<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
+					<Item.Media>
+						<FormIcon />
+					</Item.Media>
+					<Item.Content>
+						<Item.Title>Update</Item.Title>
+					</Item.Content>
+				</Item.Root>
+			{/if}
 		{/snippet}
 	</Dialog.Trigger>
 	<Dialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
@@ -130,11 +153,13 @@
 						properties: {
 							name: {
 								...lodash.get(jsonSchema, 'properties.metadata.properties.name'),
-								title: 'Name'
+								title: 'Name',
+								readOnly: true
 							},
 							namespace: {
 								...lodash.get(jsonSchema, 'properties.metadata.properties.namespace'),
-								title: 'Namespace'
+								title: 'Namespace',
+								readOnly: true
 							}
 						}
 					} as Schema}
@@ -145,7 +170,12 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{ namespace: namespace }}
+					initialValue={lodash.get(object, 'metadata')
+						? {
+								name: lodash.get(object, 'metadata.name'),
+								namespace: lodash.get(object, 'metadata.namespace') || namespace
+							}
+						: { namespace: namespace }}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
@@ -168,51 +198,44 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-
 			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
-						title: 'Schedule',
-						...lodash.omit(lodash.get(jsonSchema, 'properties.spec.properties.cronJob'), [
-							'properties',
-							'required'
-						]),
+						title: 'Settings',
+						...lodash.omit(lodash.get(jsonSchema, 'properties.spec.properties.job'), 'properties'),
 						required: lodash
-							.get(jsonSchema, 'properties.spec.properties.cronJob.required')
-							.filter((require: string) => require !== 'jobTemplate'),
+							.get(jsonSchema, 'properties.spec.properties.job.required')
+							.filter((require: string) => require !== 'template'),
 						properties: {
-							schedule: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.cronJob.properties.schedule'),
-								title: 'Schedule'
+							completions: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.job.properties.completions'),
+								title: 'Completions'
 							},
-							timeZone: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.cronJob.properties.timeZone'),
-								title: 'Time Zone'
+							parallelism: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.job.properties.parallelism'),
+								title: 'Parallelism'
 							},
-							concurrencyPolicy: {
+							backoffLimit: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.job.properties.backoffLimit'),
+								title: 'Backoff Limit'
+							},
+							activeDeadlineSeconds: {
 								...lodash.get(
 									jsonSchema,
-									'properties.spec.properties.cronJob.properties.concurrencyPolicy'
+									'properties.spec.properties.job.properties.activeDeadlineSeconds'
 								),
-								title: 'Concurrency Policy'
+								title: 'Active Deadline Seconds'
+							},
+							ttlSecondsAfterFinished: {
+								...lodash.get(
+									jsonSchema,
+									'properties.spec.properties.job.properties.ttlSecondsAfterFinished'
+								),
+								title: 'TTL Seconds After Finished'
 							},
 							suspend: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.cronJob.properties.suspend'),
+								...lodash.get(jsonSchema, 'properties.spec.properties.job.properties.suspend'),
 								title: 'Suspend execution'
-							},
-							successfulJobsHistoryLimit: {
-								...lodash.get(
-									jsonSchema,
-									'properties.spec.properties.cronJob.properties.successfulJobsHistoryLimit'
-								),
-								title: 'Successful Jobs History Limit'
-							},
-							failedJobsHistoryLimit: {
-								...lodash.get(
-									jsonSchema,
-									'properties.spec.properties.cronJob.properties.failedJobsHistoryLimit'
-								),
-								title: 'Failed Jobs History Limit'
 							}
 						}
 					} as Schema}
@@ -220,43 +243,43 @@
 						'ui:options': {
 							translations: {
 								submit: 'Next'
-							}
-						},
-						timeZone: {
-							'ui:components': {
-								stringField: 'enumField',
-								selectWidget: ComboboxWidget
 							},
-							'ui:options': {
-								TailoredComboboxEnumerations: fetchTimezones,
-								TailoredComboboxVisibility: 10,
-								TailoredComboboxInput: {
-									placeholder: 'Select timezone...'
-								},
-								TailoredComboboxEmptyText: 'No timezones found.'
+							layouts: {
+								'object-properties': {
+									class: 'grid grid-cols-2 gap-3'
+								}
 							}
 						},
 						suspend: {
 							'ui:components': {
 								checkboxWidget: 'switchWidget'
+							},
+							'ui:options': {
+								layout: {
+									class: 'col-span-full'
+								}
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{
-						schedule: '0 0 * * *',
-						timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-						concurrencyPolicy: 'Allow',
-						suspend: false,
-						successfulJobsHistoryLimit: 3,
-						failedJobsHistoryLimit: 1
-					}}
+					initialValue={lodash.get(object, 'spec.job')
+						? {
+								completions: lodash.get(object, 'spec.job.completions') ?? 1,
+								parallelism: lodash.get(object, 'spec.job.parallelism') ?? 1,
+								backoffLimit: lodash.get(object, 'spec.job.backoffLimit') ?? 6,
+								suspend: lodash.get(object, 'spec.job.suspend') ?? false
+							}
+						: {
+								completions: 1,
+								parallelism: 1,
+								backoffLimit: 6,
+								suspend: false
+							}}
 					handleSubmit={{
 						posthook: () => {
-							lodash.set(values, 'spec.cronJob', cronjobValues);
 							handleNext();
 						}
 					}}
-					bind:values={cronjobValues}
+					bind:values={values['spec']['job']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -272,14 +295,13 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-
 			<Tabs.Content value={steps[2]}>
 				<Form
 					schema={{
 						...lodash.omit(
 							lodash.get(
 								jsonSchema,
-								'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec'
+								'properties.spec.properties.job.properties.template.properties.spec'
 							),
 							'properties'
 						),
@@ -288,7 +310,7 @@
 								title: 'Restart Policy',
 								...lodash.get(
 									jsonSchema,
-									'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.restartPolicy'
+									'properties.spec.properties.job.properties.template.properties.spec.properties.restartPolicy'
 								)
 							},
 							containers: {
@@ -296,7 +318,7 @@
 								...lodash.omit(
 									lodash.get(
 										jsonSchema,
-										'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers'
+										'properties.spec.properties.job.properties.template.properties.spec.properties.containers'
 									),
 									'items'
 								),
@@ -305,7 +327,7 @@
 									...lodash.omit(
 										lodash.get(
 											jsonSchema,
-											'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items'
+											'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items'
 										),
 										'properties'
 									),
@@ -313,28 +335,28 @@
 										name: {
 											...lodash.get(
 												jsonSchema,
-												'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.name'
+												'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.name'
 											),
 											title: 'Name'
 										},
 										image: {
 											...lodash.get(
 												jsonSchema,
-												'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.image'
+												'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.image'
 											),
 											title: 'Image'
 										},
 										command: {
 											...lodash.get(
 												jsonSchema,
-												'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.command'
+												'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.command'
 											),
 											title: 'Command'
 										},
 										args: {
 											...lodash.get(
 												jsonSchema,
-												'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.args'
+												'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.args'
 											),
 											title: 'Arguments'
 										},
@@ -342,7 +364,7 @@
 											...lodash.omit(
 												lodash.get(
 													jsonSchema,
-													'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.env'
+													'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.env'
 												),
 												'items'
 											),
@@ -351,7 +373,7 @@
 												...lodash.omit(
 													lodash.get(
 														jsonSchema,
-														'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.env.items'
+														'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.env.items'
 													),
 													'properties'
 												),
@@ -359,14 +381,14 @@
 													name: {
 														...lodash.get(
 															jsonSchema,
-															'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.name'
+															'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.name'
 														),
 														title: 'Name'
 													},
 													value: {
 														...lodash.get(
 															jsonSchema,
-															'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.value'
+															'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.env.items.properties.value'
 														),
 														title: 'Value'
 													}
@@ -377,14 +399,14 @@
 											title: 'Resources',
 											...lodash.get(
 												jsonSchema,
-												'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.resources'
+												'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources'
 											),
 											properties: {
 												requests: {
 													...lodash.omit(
 														lodash.get(
 															jsonSchema,
-															'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.resources.properties.requests'
+															'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources.properties.requests'
 														),
 														['additionalProperties']
 													),
@@ -412,7 +434,7 @@
 													...lodash.omit(
 														lodash.get(
 															jsonSchema,
-															'properties.spec.properties.cronJob.properties.jobTemplate.properties.spec.properties.template.properties.spec.properties.containers.items.properties.resources.properties.limits'
+															'properties.spec.properties.job.properties.template.properties.spec.properties.containers.items.properties.resources.properties.limits'
 														),
 														['additionalProperties']
 													),
@@ -500,7 +522,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{
+					initialValue={lodash.get(object, 'spec.job.template.spec') || {
 						restartPolicy: 'OnFailure',
 						containers: [
 							{
@@ -512,11 +534,11 @@
 					}}
 					handleSubmit={{
 						posthook: () => {
-							lodash.set(values, 'spec.cronJob.jobTemplate.spec.template.spec', jobValues);
+							lodash.set(values, 'spec.job.template.spec', template);
 							handleNext();
 						}
 					}}
-					bind:values={jobValues}
+					bind:values={template}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -542,7 +564,8 @@
 							automaticLayout: true,
 							folding: true,
 							foldingStrategy: 'indentation',
-							showFoldingControls: 'always'
+							showFoldingControls: 'always',
+							scrollBeyondLastLine: false
 						}}
 						bind:value
 						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
@@ -554,13 +577,15 @@
 
 							isSubmitting = true;
 
+							const currentStructuredValue: any = load(value, { schema: JSON_SCHEMA });
+
 							const jsonSchemaValidator = new Ajv({
 								allErrors: true,
 								strict: false
 							});
 							const validate = jsonSchemaValidator.compile(jsonSchema);
 
-							const isValid = validate(load(value));
+							const isValid = validate(currentStructuredValue);
 
 							if (!isValid) {
 								console.error('Validation errors:', validate.errors);
@@ -569,39 +594,42 @@
 								return;
 							}
 
-							const name = lodash.get(load(value), 'metadata.name');
+							const name = lodash.get(currentStructuredValue, 'metadata.name');
+							const manifest = new TextEncoder().encode(JSON.stringify(currentStructuredValue));
 
 							toast.promise(
 								async () => {
-									const manifest = new TextEncoder().encode(value);
-
-									await resourceClient.create({
+									await resourceClient.apply({
 										cluster,
 										namespace,
 										group,
 										version,
 										resource,
-										manifest
+										name,
+										manifest,
+										fieldManager: 'otterscale-web-ui',
+										force: true
 									});
 								},
 								{
-									loading: `Creating ${kind} ${name}...`,
+									loading: `Updating ${kind} ${name}...`,
 									success: () => {
-										open = false;
-										return `Successfully created ${kind} ${name}`;
+										onsuccess?.();
+										return `Successfully updated ${kind} ${name}`;
 									},
 									error: (error) => {
-										console.error(`Failed to create ${kind} ${name}:`, error);
-										return `Failed to create ${kind} ${name}: ${(error as ConnectError).message}`;
+										console.error(`Failed to update ${kind} ${name}:`, error);
+										return `Failed to update ${kind} ${name}: ${(error as ConnectError).message}`;
 									},
 									finally() {
 										isSubmitting = false;
+										open = false;
 									}
 								}
 							);
 						}}
 					>
-						Create
+						Update
 					</Button>
 				</div>
 			</Tabs.Content>

@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { ClockIcon } from '@lucide/svelte';
+	import { FormIcon } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
-	import { load } from 'js-yaml';
+	import { JSON_SCHEMA, load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
+	import type { Snippet } from 'svelte';
 	import { getContext } from 'svelte';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
@@ -30,7 +31,10 @@
 		kind,
 		resource,
 		schema: jsonSchema,
-		onOpenChangeComplete
+		object,
+		onOpenChangeComplete,
+		trigger,
+		onsuccess
 	}: {
 		cluster: string;
 		namespace: string;
@@ -39,7 +43,10 @@
 		kind: string;
 		resource: string;
 		schema?: any;
-		onOpenChangeComplete: () => void;
+		object?: any;
+		onOpenChangeComplete?: () => void;
+		trigger?: Snippet<[Record<string, any>]>;
+		onsuccess?: () => void;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -61,16 +68,49 @@
 	let values: any = $state({
 		apiVersion: group ? `${group}/${version}` : version,
 		kind,
-		metadata: {},
-		spec: {
+		metadata: object?.metadata || {},
+		spec: object?.spec || {
 			workloadType: 'CronJob',
 			cronJob: {}
 		}
 	});
-	let value = $derived(stringify(values));
 
-	let cronjobValues: any = $state({});
-	let jobValues: any = $state({});
+	const systemFields = [
+		'clusterName',
+		'creationTimestamp',
+		'deletionGracePeriodSeconds',
+		'deletionTimestamp',
+		'finalizers',
+		'generateName',
+		'generation',
+		'initializers',
+		'managedFields',
+		'ownerReferences',
+		'resourceVersion',
+		'relationships',
+		'selfLink',
+		'state',
+		'uid'
+	];
+
+	let value = $derived.by(() => {
+		const filtered = lodash.cloneDeep(values);
+		if (filtered.metadata) {
+			for (const field of systemFields) {
+				delete filtered.metadata[field];
+			}
+		}
+		return stringify(filtered);
+	});
+
+	let cronjobValues: any = $state(
+		lodash.get(object, 'spec.cronJob')
+			? lodash.omit(lodash.get(object, 'spec.cronJob'), ['jobTemplate'])
+			: {}
+	);
+	let jobValues: any = $state(
+		lodash.get(object, 'spec.cronJob.jobTemplate.spec.template.spec') || {}
+	);
 
 	// Steps Manager
 	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
@@ -103,14 +143,18 @@
 >
 	<Dialog.Trigger>
 		{#snippet child({ props })}
-			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
-				<Item.Media>
-					<ClockIcon />
-				</Item.Media>
-				<Item.Content>
-					<Item.Title>CronJob</Item.Title>
-				</Item.Content>
-			</Item.Root>
+			{#if trigger}
+				{@render trigger(props)}
+			{:else}
+				<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
+					<Item.Media>
+						<FormIcon />
+					</Item.Media>
+					<Item.Content>
+						<Item.Title>Update</Item.Title>
+					</Item.Content>
+				</Item.Root>
+			{/if}
 		{/snippet}
 	</Dialog.Trigger>
 	<Dialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
@@ -130,11 +174,13 @@
 						properties: {
 							name: {
 								...lodash.get(jsonSchema, 'properties.metadata.properties.name'),
-								title: 'Name'
+								title: 'Name',
+								readOnly: true
 							},
 							namespace: {
 								...lodash.get(jsonSchema, 'properties.metadata.properties.namespace'),
-								title: 'Namespace'
+								title: 'Namespace',
+								readOnly: true
 							}
 						}
 					} as Schema}
@@ -145,7 +191,12 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{ namespace: namespace }}
+					initialValue={lodash.get(object, 'metadata')
+						? {
+								name: lodash.get(object, 'metadata.name'),
+								namespace: lodash.get(object, 'metadata.namespace') || namespace
+							}
+						: { namespace: namespace }}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
@@ -242,14 +293,27 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{
-						schedule: '0 0 * * *',
-						timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-						concurrencyPolicy: 'Allow',
-						suspend: false,
-						successfulJobsHistoryLimit: 3,
-						failedJobsHistoryLimit: 1
-					}}
+					initialValue={lodash.get(object, 'spec.cronJob')
+						? {
+								schedule: lodash.get(object, 'spec.cronJob.schedule') || '0 0 * * *',
+								timeZone:
+									lodash.get(object, 'spec.cronJob.timeZone') ||
+									Intl.DateTimeFormat().resolvedOptions().timeZone,
+								concurrencyPolicy: lodash.get(object, 'spec.cronJob.concurrencyPolicy') || 'Allow',
+								suspend: lodash.get(object, 'spec.cronJob.suspend') ?? false,
+								successfulJobsHistoryLimit:
+									lodash.get(object, 'spec.cronJob.successfulJobsHistoryLimit') ?? 3,
+								failedJobsHistoryLimit:
+									lodash.get(object, 'spec.cronJob.failedJobsHistoryLimit') ?? 1
+							}
+						: {
+								schedule: '0 0 * * *',
+								timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+								concurrencyPolicy: 'Allow',
+								suspend: false,
+								successfulJobsHistoryLimit: 3,
+								failedJobsHistoryLimit: 1
+							}}
 					handleSubmit={{
 						posthook: () => {
 							lodash.set(values, 'spec.cronJob', cronjobValues);
@@ -500,7 +564,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{
+					initialValue={lodash.get(object, 'spec.cronJob.jobTemplate.spec.template.spec') || {
 						restartPolicy: 'OnFailure',
 						containers: [
 							{
@@ -542,7 +606,8 @@
 							automaticLayout: true,
 							folding: true,
 							foldingStrategy: 'indentation',
-							showFoldingControls: 'always'
+							showFoldingControls: 'always',
+							scrollBeyondLastLine: false
 						}}
 						bind:value
 						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
@@ -554,54 +619,59 @@
 
 							isSubmitting = true;
 
+							const currentStructuredValue: any = load(value, { schema: JSON_SCHEMA });
+
 							const jsonSchemaValidator = new Ajv({
 								allErrors: true,
 								strict: false
 							});
 							const validate = jsonSchemaValidator.compile(jsonSchema);
 
-							const isValid = validate(load(value));
+							const isValid = validate(currentStructuredValue);
 
 							if (!isValid) {
-								console.error('Validation errors:', validate.errors);
+								console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
 								toast.error('Validation failed. Please check the YAML.');
 								isSubmitting = false;
 								return;
 							}
 
-							const name = lodash.get(load(value), 'metadata.name');
+							const name = lodash.get(currentStructuredValue, 'metadata.name');
+							const manifest = new TextEncoder().encode(JSON.stringify(currentStructuredValue));
 
 							toast.promise(
 								async () => {
-									const manifest = new TextEncoder().encode(value);
-
-									await resourceClient.create({
+									await resourceClient.apply({
 										cluster,
 										namespace,
 										group,
 										version,
 										resource,
-										manifest
+										name,
+										manifest,
+										fieldManager: 'otterscale-web-ui',
+										force: true
 									});
 								},
 								{
-									loading: `Creating ${kind} ${name}...`,
+									loading: `Updating ${kind} ${name}...`,
 									success: () => {
-										open = false;
-										return `Successfully created ${kind} ${name}`;
+										onsuccess?.();
+										return `Successfully updated ${kind} ${name}`;
 									},
 									error: (error) => {
-										console.error(`Failed to create ${kind} ${name}:`, error);
-										return `Failed to create ${kind} ${name}: ${(error as ConnectError).message}`;
+										console.error(`Failed to update ${kind} ${name}:`, error);
+										return `Failed to update ${kind} ${name}: ${(error as ConnectError).message}`;
 									},
 									finally() {
 										isSubmitting = false;
+										open = false;
 									}
 								}
 							);
 						}}
 					>
-						Create
+						Update
 					</Button>
 				</div>
 			</Tabs.Content>
