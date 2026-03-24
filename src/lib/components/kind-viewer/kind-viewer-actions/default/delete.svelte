@@ -141,7 +141,6 @@
 		>
 			{#snippet actions()}
 				<div class="*:w-full">
-					ns: {namespace}
 					<SubmitButton />
 				</div>
 			{/snippet}
