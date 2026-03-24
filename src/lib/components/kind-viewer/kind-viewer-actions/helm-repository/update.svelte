@@ -253,7 +253,7 @@
 								async () => {
 									const manifest = new TextEncoder().encode(value);
 
-									await resourceClient.create({
+									await resourceClient.apply({
 										cluster,
 										namespace,
 										group,
