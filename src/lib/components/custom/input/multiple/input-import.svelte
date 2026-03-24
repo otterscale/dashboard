@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	import Icon from '@iconify/svelte';
+	import ImportIcon from '@lucide/svelte/icons/import';
 	import { getContext } from 'svelte';
 
 	import { Button, type ButtonProps, buttonVariants } from '$lib/components/ui/button/index.js';
@@ -36,5 +36,5 @@
 	}}
 	{...restProps}
 >
-	<Icon icon="ph:arrow-square-in" class="size-5 text-primary" />
+	<ImportIcon class="size-5 text-primary" />
 </Button>

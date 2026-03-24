@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	import Icon from '@iconify/svelte';
+	import InfoIcon from '@lucide/svelte/icons/info';
 	import { Label as LabelPrimitive } from 'bits-ui';
 	import type { Snippet } from 'svelte';
 
@@ -25,7 +25,7 @@
 	{#if information}
 		<Tooltip.Provider>
 			<Tooltip.Root>
-				<Tooltip.Trigger class="hover:cursor-pointer"><Icon icon="ph:info" /></Tooltip.Trigger>
+				<Tooltip.Trigger class="hover:cursor-pointer"><InfoIcon class="size-4" /></Tooltip.Trigger>
 				<Tooltip.Content class="select-none">{@render information()}</Tooltip.Content>
 			</Tooltip.Root>
 		</Tooltip.Provider>

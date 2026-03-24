@@ -1,12 +1,14 @@
+import type { Component } from 'svelte';
+
 import { typeToIcon } from '../single';
 import type { AccessorType, InputType } from './types';
 
 class InputManager {
 	input: any = $state();
 	type: InputType | undefined;
-	icon: string | undefined;
+	icon: Component | undefined;
 
-	constructor(type: InputType | undefined, icon: string | undefined) {
+	constructor(type: InputType | undefined, icon: Component | undefined) {
 		this.type = type ?? 'text';
 		this.icon = icon ?? typeToIcon[this.type];
 	}
