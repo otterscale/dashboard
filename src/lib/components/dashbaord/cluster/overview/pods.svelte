@@ -1,5 +1,7 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import BoxIcon from '@lucide/svelte/icons/box';
+	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
@@ -68,8 +70,7 @@
 </script>
 
 <Card.Root class="relative h-full min-h-[140px] gap-2 overflow-hidden">
-	<Icon
-		icon="ph:cube"
+	<BoxIcon
 		class="absolute -right-10 bottom-0 size-36 text-8xl tracking-tight text-nowrap text-primary/5 uppercase group-hover:hidden"
 	/>
 	<Card.Header>
@@ -80,11 +81,11 @@
 	</Card.Header>
 	{#if !isLoaded}
 		<div class="flex h-9 w-full items-center justify-center">
-			<Icon icon="svg-spinners:6-dots-rotate" class="size-10" />
+			<Loader2Icon class="size-10 animate-spin" />
 		</div>
 	{:else if !maxAllocatablePods && !runningPods && !pendingPods}
 		<div class="flex h-full w-full flex-col items-center justify-center">
-			<Icon icon="ph:chart-bar-fill" class="size-6 animate-pulse text-muted-foreground" />
+			<ChartColumnIcon class="size-6 animate-pulse text-muted-foreground" />
 			<p class="p-0 text-xs text-muted-foreground">{m.no_data_display()}</p>
 		</div>
 	{:else}

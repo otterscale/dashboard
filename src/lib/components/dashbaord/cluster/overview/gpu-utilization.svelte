@@ -1,5 +1,6 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { ArcChart, Text } from 'layerchart';
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
@@ -73,11 +74,11 @@
 	</Card.Header>
 	{#if !isLoaded}
 		<div class="flex h-9 w-full items-center justify-center">
-			<Icon icon="svg-spinners:6-dots-rotate" class="size-10" />
+			<Loader2Icon class="size-10 animate-spin" />
 		</div>
 	{:else if gpuUtilization === undefined || gpuUtilization === null}
 		<div class="flex h-full w-full flex-col items-center justify-center">
-			<Icon icon="ph:chart-bar-fill" class="size-6 animate-pulse text-muted-foreground" />
+			<ChartColumnIcon class="size-6 animate-pulse text-muted-foreground" />
 			<p class="p-0 text-xs text-muted-foreground">{m.no_data_display()}</p>
 		</div>
 	{:else}

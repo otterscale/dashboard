@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import { SiDocker, SiHelm } from '@icons-pack/svelte-simple-icons';
 	import { PlusIcon } from '@lucide/svelte';
 	import { SvelteURL } from 'svelte/reactivity';
 
@@ -29,7 +29,7 @@
 		<Item.Root class="w-full">
 			{@const command = `docker push ${harborUniformResourceLocator.host}/<repository>[:<tag>]`}
 			<Item.Media variant="icon">
-				<Icon icon="logos:docker-icon" />
+				<SiDocker class="size-4" />
 			</Item.Media>
 			<Item.Content class="flex flex-col items-start">
 				<Item.Description>{m.push_image_description()}</Item.Description>
@@ -43,7 +43,7 @@
 		<Item.Root class="w-full">
 			{@const command = `helm push <chart_package> oci://${harborUniformResourceLocator.host}/${namespace} --plain-http`}
 			<Item.Media variant="icon">
-				<Icon icon="logos:helm" />
+				<SiHelm class="size-4" />
 			</Item.Media>
 			<Item.Content class="flex flex-col items-start">
 				<Item.Description>{m.push_chart_description()}</Item.Description>

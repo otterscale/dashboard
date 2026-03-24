@@ -1,5 +1,6 @@
 <script lang="ts" module>
-	import Icon from '@iconify/svelte';
+	import EyeIcon from '@lucide/svelte/icons/eye';
+	import EyeOffIcon from '@lucide/svelte/icons/eye-off';
 	import type { WithElementRef } from 'bits-ui';
 	import type { HTMLInputAttributes } from 'svelte/elements';
 
@@ -48,6 +49,10 @@
 			passwordManager.disable();
 		}}
 	>
-		<Icon icon={passwordManager.isVisible ? 'ph:eye' : 'ph:eye-slash'} />
+		{#if passwordManager.isVisible}
+			<EyeIcon class="size-4" />
+		{:else}
+			<EyeOffIcon class="size-4" />
+		{/if}
 	</button>
 </div>

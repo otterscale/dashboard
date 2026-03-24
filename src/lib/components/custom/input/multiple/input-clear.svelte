@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	import Icon from '@iconify/svelte';
+	import CircleXIcon from '@lucide/svelte/icons/circle-x';
 	import { getContext } from 'svelte';
 
 	import { Button, type ButtonProps, buttonVariants } from '$lib/components/ui/button/index.js';
@@ -37,5 +37,5 @@
 	}}
 	{...restProps}
 >
-	<Icon icon="ph:x-circle" class="size-5 text-primary" />
+	<CircleXIcon class="size-5 text-primary" />
 </Button>

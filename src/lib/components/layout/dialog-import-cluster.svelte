@@ -1,5 +1,11 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
+	import CloudDownloadIcon from '@lucide/svelte/icons/cloud-download';
+	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
+	import ListChecksIcon from '@lucide/svelte/icons/list-checks';
+	import PencilLineIcon from '@lucide/svelte/icons/pencil-line';
+	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
+	import TerminalIcon from '@lucide/svelte/icons/terminal';
 
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -25,11 +31,11 @@
 	let stepIndex = $state(0);
 
 	const steps = [
-		{ icon: 'ph:list-checks', label: 'Provider' },
-		{ icon: 'ph:note-pencil', label: 'Info' },
-		{ icon: 'ph:terminal-window', label: 'Deploy' },
-		{ icon: 'ph:shield-check', label: 'Verify' }
-	] as const;
+		{ icon: ListChecksIcon, label: 'Provider' },
+		{ icon: PencilLineIcon, label: 'Info' },
+		{ icon: TerminalIcon, label: 'Deploy' },
+		{ icon: ShieldCheckIcon, label: 'Verify' }
+	];
 
 	function handleOpenChange(isOpen: boolean) {
 		open = isOpen;
@@ -79,7 +85,7 @@
 							<div
 								class="flex h-12 w-12 items-center justify-center rounded-lg bg-muted text-muted-foreground"
 							>
-								<Icon icon="ph:hard-drives" class="size-6" />
+								<HardDriveIcon class="size-6" />
 							</div>
 							<div>
 								<h4 class="font-semibold text-muted-foreground">Bare Metal</h4>
@@ -108,7 +114,7 @@
 						>
 							{#if providerType === 'external'}
 								<div class="absolute top-3 right-3">
-									<Icon icon="ph:check-circle-fill" class="size-5 text-primary" />
+									<CircleCheckIcon class="size-5 text-primary" />
 								</div>
 							{/if}
 							<div
@@ -119,7 +125,7 @@
 										: 'bg-muted text-muted-foreground group-hover:bg-background group-hover:text-foreground'
 								)}
 							>
-								<Icon icon="ph:cloud-arrow-down" class="size-6" />
+								<CloudDownloadIcon class="size-6" />
 							</div>
 							<div>
 								<h4 class="font-semibold">External K8s</h4>
