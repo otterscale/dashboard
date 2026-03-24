@@ -53,10 +53,7 @@
 		spec: {
 			accelerator: {},
 			decode: {},
-			prefill: {},
-			routingProxy: {
-				image: 'ghcr.io/llm-d/llm-d-routing-sidecar:v0.4.0'
-			}
+			prefill: {}
 		}
 	});
 
