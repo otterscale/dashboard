@@ -104,7 +104,7 @@
 		"fast-json-patch": "^3.1.1",
 		"filtrex": "^3.1.0",
 		"highlight.js": "^11.11.1",
-		"ioredis": "^5.10.0",
+		"ioredis": "^5.10.1",
 		"isomorphic-dompurify": "^3.5.1",
 		"js-yaml": "^4.1.1",
 		"json-schema-faker": "^0.6.0",
