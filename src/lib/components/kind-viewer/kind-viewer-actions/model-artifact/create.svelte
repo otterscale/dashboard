@@ -109,11 +109,6 @@
 							name: {
 								...lodash.get(jsonSchema, 'properties.metadata.properties.name'),
 								title: 'Name'
-							},
-							namespace: {
-								...lodash.get(jsonSchema, 'properties.metadata.properties.namespace'),
-								title: 'Namespace',
-								readOnly: true
 							}
 						}
 					} as Schema}

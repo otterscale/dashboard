@@ -1,28 +1,24 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { Plus } from '@lucide/svelte';
+	import { FormIcon } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
-	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
+	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
 	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
-	import { SvelteMap, SvelteURL } from 'svelte/reactivity';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
-	import { env as publicEnv } from '$env/dynamic/public';
 	import Form from '$lib/components/dynamic-form/form.svelte';
-	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
-	import type { ArtifactType } from '$lib/server/harbor';
 
 	let {
 		cluster,
@@ -31,7 +27,9 @@
 		version,
 		kind,
 		resource,
-		schema: jsonSchema
+		schema: jsonSchema,
+		object,
+		onOpenChangeComplete
 	}: {
 		cluster: string;
 		namespace: string;
@@ -40,6 +38,8 @@
 		kind: string;
 		resource: string;
 		schema: any;
+		object: any;
+		onOpenChangeComplete: () => void;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -49,24 +49,46 @@
 	let values: any = $state({
 		apiVersion: `${group}/${version}`,
 		kind,
-		metadata: {},
+		metadata: object.metadata,
 		spec: {
 			accelerator: {},
 			decode: {},
-			prefill: {},
-			engine: {},
-			model: {},
-			routingProxy: {
-				image: 'ghcr.io/llm-d/llm-d-routing-sidecar:v0.4.0'
-			}
+			prefill: {}
 		}
 	});
-	let value = $derived(stringify(values));
+
+	const systemFields = [
+		'clusterName',
+		'creationTimestamp',
+		'deletionGracePeriodSeconds',
+		'deletionTimestamp',
+		'finalizers',
+		'generateName',
+		'generation',
+		'initializers',
+		'managedFields',
+		'ownerReferences',
+		'resourceVersion',
+		'relationships',
+		'selfLink',
+		'state',
+		'uid'
+	];
+
+	let value = $derived.by(() => {
+		const filtered = lodash.cloneDeep(values);
+		if (filtered.metadata) {
+			for (const field of systemFields) {
+				delete filtered.metadata[field];
+			}
+		}
+		return stringify(filtered);
+	});
 
 	let mode: any = $state({});
 
 	// Steps Manager
-	const steps = Array.from({ length: 6 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -83,56 +105,12 @@
 	// Flag for Dialog
 	let open = $state(false);
 	let isSubmitting = $state(false);
-
-	const imageToArtifact = new SvelteMap<string, ArtifactType>();
-	let timer: ReturnType<typeof setTimeout> | null = null;
-	function fetchModelArtifacts(): Promise<{ label: string; value: string }[]> {
-		return new Promise((resolve) => {
-			if (timer) clearTimeout(timer);
-
-			timer = setTimeout(async () => {
-				try {
-					const response = await fetch(`/bff/harbor/models?project=${namespace}`);
-					if (response.ok) {
-						const harborUrl = new SvelteURL(publicEnv.PUBLIC_HARBOR_URL ?? '');
-						const modelArtifacts: ArtifactType[] = await response.json();
-
-						const modelRepositories: string[] = [];
-						modelArtifacts.forEach((artifact) => {
-							if (
-								Array.isArray(artifact.tags) &&
-								artifact.tags.some((tag) => tag.name === 'latest')
-							) {
-								imageToArtifact.set(
-									`${harborUrl.host}/${artifact.repository_name}:latest`,
-									artifact
-								);
-								modelRepositories.push(artifact.repository_name);
-							}
-						});
-
-						resolve(
-							modelRepositories.map((repositoryName: string) => ({
-								label: repositoryName,
-								value: `${harborUrl.host}/${repositoryName}:latest`
-							}))
-						);
-					} else {
-						console.error('Failed to fetch models:', response.statusText);
-						resolve([]);
-					}
-				} catch (error) {
-					console.error('Error fetching models:', error);
-					resolve([]);
-				}
-			}, 300);
-		});
-	}
 </script>
 
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
+		onOpenChangeComplete?.();
 		if (!isOpen) {
 			reset();
 		}
@@ -140,9 +118,14 @@
 >
 	<Dialog.Trigger>
 		{#snippet child({ props })}
-			<Button {...props} variant="outline" size="icon">
-				<Plus />
-			</Button>
+			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
+				<Item.Media>
+					<FormIcon />
+				</Item.Media>
+				<Item.Content>
+					<Item.Title>Update</Item.Title>
+				</Item.Content>
+			</Item.Root>
 		{/snippet}
 	</Dialog.Trigger>
 	<Dialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
@@ -155,130 +138,6 @@
 		</Item.Root>
 		<Tabs.Root value={currentStep}>
 			<Tabs.Content value={steps[0]}>
-				<Form
-					schema={{
-						...(lodash.omit(lodash.get(jsonSchema, 'properties.metadata'), 'properties') as any),
-						title: 'Metadata',
-						properties: {
-							name: {
-								...lodash.get(jsonSchema, 'properties.metadata.properties.name'),
-								title: 'Name'
-							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{
-						namespace: namespace
-					} as FormValue}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-					bind:values={values['metadata']}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-								disabled={currentIndex === 0}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-
-			<Tabs.Content value={steps[1]}>
-				<Form
-					schema={{
-						...(lodash.omit(lodash.get(jsonSchema, 'properties.spec.properties.model'), [
-							'required',
-							'properties'
-						]) as any),
-						title: 'Model',
-						properties: {
-							image: {
-								...(lodash.get(
-									jsonSchema,
-									'properties.spec.properties.model.properties.image'
-								) as any),
-								title: 'Image'
-							}
-						},
-						required: lodash
-							.get(jsonSchema, 'properties.spec.properties.model.required')
-							.filter((property: string) => property !== 'name')
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						},
-						image: {
-							'ui:components': {
-								textWidget: ComboboxWidget
-							},
-							'ui:options': {
-								TailoredComboboxEnumerations: fetchModelArtifacts,
-								TailoredComboboxVisibility: 10,
-								TailoredComboboxInput: {
-									placeholder: 'Name'
-								},
-								TailoredComboboxEmptyText: 'No names available.'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{
-						image: null
-					} as FormValue}
-					handleSubmit={{
-						posthook: (form) => {
-							handleNext();
-
-							const formValue = getValueSnapshot(form);
-							const image = String(lodash.get(formValue, 'image'));
-							const artifact = imageToArtifact.get(image) as ArtifactType;
-							if (artifact) {
-								const extraAttributes = artifact.extra_attrs;
-								const name = [
-									...(lodash.get(extraAttributes, 'descriptor.authors') as []),
-									lodash.get(extraAttributes, 'descriptor.name')
-								].join('/');
-
-								lodash.set(values, 'spec.model.name', name);
-							}
-						}
-					}}
-					bind:values={values['spec']['model']}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-
-			<Tabs.Content value={steps[2]}>
 				<Form
 					schema={{
 						...(lodash.get(jsonSchema, 'properties.spec.properties.accelerator') as any),
@@ -303,7 +162,7 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						type: 'nvidia'
+						type: object.spec.accelerator.type
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -327,7 +186,7 @@
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[3]}>
+			<Tabs.Content value={steps[1]}>
 				{@const decodeSchema = {
 					...(lodash.omit(
 						lodash.get(jsonSchema, 'properties.spec.properties.decode'),
@@ -437,14 +296,6 @@
 				<Form
 					schema={{
 						type: 'object',
-						properties: {
-							mode: {
-								title: 'Mode',
-								type: 'string',
-								enum: ['Intelligent', 'Disaggregation'],
-								default: 'Intelligent'
-							}
-						},
 						allOf: [
 							{
 								if: {
@@ -560,7 +411,9 @@
 						return formValue;
 					}}
 					initialValue={{
-						mode: 'Intelligent'
+						mode: object.spec.prefill ? 'Disaggregation' : 'Intelligent',
+						decode: { ...lodash.get(object, 'spec.decode') },
+						...(object.spec.prefill ? { prefill: { ...lodash.get(object, 'spec.prefill') } } : {})
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -590,127 +443,7 @@
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[4]}>
-				<Form
-					schema={{
-						...(lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.engine'),
-							'properties'
-						) as any),
-						title: 'Engine',
-						properties: {
-							args: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.engine.properties.args'),
-								title: 'Arguments'
-							},
-							env: {
-								...lodash.omit(
-									lodash.get(jsonSchema, 'properties.spec.properties.engine.properties.env'),
-									'items'
-								),
-								title: 'Environment Variables',
-								items: {
-									...lodash.omit(
-										lodash.get(
-											jsonSchema,
-											'properties.spec.properties.engine.properties.env.items'
-										),
-										'properties'
-									),
-									properties: {
-										name: {
-											...lodash.get(
-												jsonSchema,
-												'properties.spec.properties.engine.properties.env.items.properties.name'
-											),
-											title: 'Name'
-										},
-										value: {
-											...lodash.get(
-												jsonSchema,
-												'properties.spec.properties.engine.properties.env.items.properties.value'
-											),
-											title: 'Value'
-										}
-									}
-								}
-							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						},
-						args: {
-							'ui:options': {
-								itemTitle: () => 'argument'
-							}
-						},
-						env: {
-							'ui:options': {
-								itemTitle: () => 'environment variable'
-							},
-							items: {
-								'ui:options': {
-									layouts: {
-										'object-properties': {
-											class: 'grid grid-cols-2 gap-3'
-										}
-									}
-								}
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{
-						args: [
-							'--max-model-len',
-							'8192',
-							'--kv-transfer-config',
-							`{"kv_connector":"NixlConnector", "kv_role":"kv_both"}`,
-							'--disable-uvicorn-access-log'
-						]
-					} as FormValue}
-					transformer={(value: FormValue) => {
-						const formValue: any = value;
-						lodash.set(formValue, 'env', [
-							{
-								name: 'VLLM_NIXL_SIDE_CHANNEL_HOST',
-								valueFrom: { fieldRef: { fieldPath: 'status.podIP' } }
-							},
-							{
-								name: 'VLLM_NIXL_SIDE_CHANNEL_PORT',
-								value: '5557'
-							},
-							{ name: 'UCX_TLS', value: 'cuda_ipc,cuda_copy,tcp' },
-							{ name: 'VLLM_LOGGING_LEVEL', value: 'INFO' }
-						]);
-						return formValue;
-					}}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-					bind:values={values['spec']['engine']}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-
-			<Tabs.Content value={steps[5]} class="min-h-[77vh]">
+			<Tabs.Content value={steps[2]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{
@@ -752,7 +485,7 @@
 								async () => {
 									const manifest = new TextEncoder().encode(value);
 
-									await resourceClient.create({
+									await resourceClient.apply({
 										cluster,
 										namespace,
 										group,
@@ -778,7 +511,7 @@
 							);
 						}}
 					>
-						Create
+						Update
 					</Button>
 				</div>
 			</Tabs.Content>

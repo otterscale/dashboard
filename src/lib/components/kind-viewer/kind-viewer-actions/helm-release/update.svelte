@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { DownloadIcon, FileIcon } from '@lucide/svelte';
-	import { ResourceService, type SchemaRequest } from '@otterscale/api/resource/v1';
+	import { FileIcon, FormIcon } from '@lucide/svelte';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 	import { type Schema, SubmitButton, type UiSchemaRoot } from '@sjsf/form';
 	import Ajv from 'ajv';
@@ -13,6 +13,11 @@
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
+	import {
+		encodeURIComponentWithSlashEscape,
+		parseHarborHost,
+		parseProjectName
+	} from '$lib/components/artifact-viewer/utils.svelte';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import EditorWidget from '$lib/components/dynamic-form/widgets/editor.svelte';
 	import { buttonVariants } from '$lib/components/ui/button';
@@ -21,47 +26,51 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
-	import type { ArtifactType } from '$lib/server/harbor';
-
-	import { encodeURIComponentWithSlashEscape, parseHarborHost } from '../utils.svelte';
 
 	let {
 		cluster,
 		namespace,
-		chartArtifact: latestChartArtifact,
-		helmRepository,
+		schema: jsonSchema,
+		object,
 		onOpenChangeComplete
 	}: {
 		cluster: string;
 		namespace: string;
-		chartArtifact: ArtifactType;
-		helmRepository: SourceToolkitFluxcdIoV1HelmRepository;
+		schema: Schema;
+		object: any;
 		onOpenChangeComplete: () => void;
 	} = $props();
+
+	const transport: Transport = getContext('transport');
+	const resourceClient = createClient(ResourceService, transport);
 
 	const group = 'helm.toolkit.fluxcd.io';
 	const version = 'v2';
 	const kind = 'HelmRelease';
 	const resource = 'helmreleases';
 
-	const transport: Transport = getContext('transport');
-	const resourceClient = createClient(ResourceService, transport);
+	let helmRepository = $state<SourceToolkitFluxcdIoV1HelmRepository | undefined>(undefined);
+	async function fetchHelmRepository() {
+		const sourceRef = lodash.get(object, 'spec.chart.spec.sourceRef');
+		if (!sourceRef || sourceRef.kind !== 'HelmRepository') {
+			console.warn('fetchHelmRepository: sourceRef missing or not HelmRepository', sourceRef);
+			return;
+		}
+		console.log(sourceRef);
 
-	let jsonSchema: Schema | undefined = $state(undefined);
-
-	async function fetchSchema() {
 		try {
-			const schemaResponse = await resourceClient.schema({
+			const response = await resourceClient.get({
 				cluster,
-				group,
-				version,
-				kind
-			} as SchemaRequest);
-
-			jsonSchema = schemaResponse.schema;
+				namespace: sourceRef.namespace || namespace,
+				group: 'source.toolkit.fluxcd.io',
+				version: 'v1',
+				kind: 'HelmRepository',
+				name: sourceRef.name
+			} as any);
+			helmRepository = response?.object as SourceToolkitFluxcdIoV1HelmRepository;
+			console.log('fetchHelmRepository: success', helmRepository);
 		} catch (error) {
-			console.error('Failed to fetch schema:', error);
-			toast.error('Failed to fetch HelmRelease schema');
+			console.error('Failed to fetch HelmRepository:', error);
 		}
 	}
 
@@ -70,82 +79,62 @@
 		allErrors: true,
 		strict: false
 	});
-	const validate = $derived(jsonSchemaValidator.compile(jsonSchema ?? {}));
+	const validate = jsonSchemaValidator.compile(jsonSchema);
 
 	// Container for Data.
-	let values = $state({
-		apiVersion: `${group}/${version}`,
-		kind,
-		metadata: {},
-		spec: {
-			interval: '15m',
-			chart: {
-				spec: {}
+	let values = $state(
+		lodash.merge(
+			{
+				apiVersion: 'helm.toolkit.fluxcd.io/v2',
+				kind: 'HelmRelease',
+				spec: {
+					interval: '15m',
+					chart: {
+						spec: {}
+					},
+					values: {}
+				}
 			},
-			values: {}
-		}
-	});
-	let value = $derived(stringify(values));
+			lodash.cloneDeep(object)
+		)
+	);
+	const systemFields = [
+		'clusterName',
+		'creationTimestamp',
+		'deletionGracePeriodSeconds',
+		'deletionTimestamp',
+		'finalizers',
+		'generateName',
+		'generation',
+		'initializers',
+		'managedFields',
+		'ownerReferences',
+		'resourceVersion',
+		'relationships',
+		'selfLink',
+		'state',
+		'uid'
+	];
 
-	let artifacts: ArtifactType[] = $state([]);
-	async function fetchArtifacts() {
-		try {
-			const projectPath = encodeURIComponentWithSlashEscape(project);
-			const repositoryPath = encodeURIComponentWithSlashEscape(repository);
-			const artifactsUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts?with_label=true`;
-
-			const response = await fetch('/bff/harbor/proxy', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					cluster,
-					namespace,
-					harborHost,
-					secretName,
-					isInternal,
-					apiPath: artifactsUrl
-				})
-			});
-			if (!response.ok) {
-				console.error('Failed to fetch repository artifacts:', response.statusText);
-				return;
+	let value = $derived.by(() => {
+		const filtered = lodash.cloneDeep(values);
+		if (filtered.metadata) {
+			for (const field of systemFields) {
+				delete filtered.metadata[field];
 			}
-			artifacts = await response.json();
-		} catch (error) {
-			console.error('Error fetching repository artifacts:', error);
 		}
-	}
-
-	const [project, ...latestChartNameParts] = $derived(
-		latestChartArtifact.repository_name.split('/')
-	);
-	const repository = $derived(latestChartNameParts.join('/'));
-	const harborHost = $derived(parseHarborHost(helmRepository));
-	const secretName = $derived(helmRepository?.spec?.secretRef?.name ?? '');
-	const isInternal = $derived(
-		helmRepository?.metadata?.labels?.['tenant.otterscale.io/internal'] === 'true'
-	);
-
-	let selectedChartArtifact: ArtifactType = $derived(latestChartArtifact);
-	function getVersions() {
-		return artifacts.map(
-			(artifact) => lodash.get(artifact.extra_attrs, 'version') as unknown as string
-		);
-	}
-	function getSelectedChartArtifact(version: string) {
-		return (
-			artifacts.find((artifact) => lodash.get(artifact.extra_attrs, 'version') === version) ??
-			latestChartArtifact
-		);
-	}
-	$effect(() => {
-		const versionValue = lodash.get(values, 'spec.chart.spec.version') as unknown as string;
-		if (versionValue) {
-			selectedChartArtifact = getSelectedChartArtifact(versionValue);
-		}
+		return stringify(filtered);
 	});
+
+	const project = $derived(helmRepository ? parseProjectName(helmRepository) : '');
+	const repository = $derived(lodash.get(object, 'spec.chart.spec.chart') || '');
+	const harborHost = $derived(helmRepository ? parseHarborHost(helmRepository) : '');
+	const secretName = $derived(helmRepository ? (helmRepository.spec?.secretRef?.name ?? '') : '');
+	const isInternal = $derived(
+		helmRepository
+			? helmRepository.metadata?.labels?.['tenant.otterscale.io/internal'] === 'true'
+			: false
+	);
 
 	async function getReferenceAddition(reference: string, addition: string) {
 		const projectPath = encodeURIComponentWithSlashEscape(project);
@@ -155,6 +144,14 @@
 
 		const additionUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${referencePath}/additions/${additionPath}`;
 
+		console.log(
+			'getReferenceAddition: sending request for',
+			addition,
+			'with reference',
+			reference,
+			'harborHost',
+			harborHost
+		);
 		const response = await fetch('/bff/harbor/proxy', {
 			method: 'POST',
 			headers: {
@@ -191,7 +188,7 @@
 	}
 
 	// Steps Manager
-	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 3 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -210,7 +207,7 @@
 	let isSubmitting = $state(false);
 
 	onMount(async () => {
-		await Promise.all([fetchSchema(), fetchArtifacts()]);
+		await fetchHelmRepository();
 	});
 </script>
 
@@ -227,10 +224,10 @@
 		{#snippet child({ props })}
 			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
 				<Item.Media>
-					<DownloadIcon />
+					<FormIcon />
 				</Item.Media>
 				<Item.Content>
-					<Item.Title>Install</Item.Title>
+					<Item.Title>Update</Item.Title>
 				</Item.Content>
 			</Item.Root>
 		{/snippet}
@@ -246,52 +243,6 @@
 		</Item.Root>
 		<Tabs.Root value={currentStep}>
 			<Tabs.Content value={steps[0]}>
-				<Form
-					schema={{
-						...(lodash.omit(
-							lodash.get(jsonSchema, 'properties.metadata') as Schema,
-							'properties'
-						) as any),
-						title: 'Metadata',
-						properties: {
-							name: {
-								...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema),
-								title: 'Name'
-							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{ namespace: namespace }}
-					bind:values={values['metadata']}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-								disabled={currentIndex === 0}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-
-			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
 						...(lodash.omit(
@@ -311,8 +262,7 @@
 									jsonSchema,
 									'properties.spec.properties.chart.properties.spec.properties.version'
 								) as Schema),
-								title: 'Version',
-								enum: getVersions()
+								title: 'Version'
 							}
 						}
 					} as Schema}
@@ -321,16 +271,11 @@
 							translations: {
 								submit: 'Next'
 							}
-						},
-						version: {
-							'ui:components': {
-								stringField: 'enumField'
-							}
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						chart: lodash.get(latestChartArtifact.extra_attrs, 'name'),
-						version: lodash.get(latestChartArtifact.extra_attrs, 'version'),
+						chart: lodash.get(object, 'spec.chart.spec.chart'),
+						version: lodash.get(object, 'spec.chart.spec.version'),
 						sourceRef: {
 							apiVersion: helmRepository?.apiVersion,
 							kind: helmRepository?.kind,
@@ -360,83 +305,98 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-
-			<Tabs.Content value={steps[2]} class="min-h-[23vh]">
+			<Tabs.Content value={steps[1]}>
 				{@const schema = {
 					...(lodash.get(jsonSchema, 'properties.spec.properties.values') as Schema),
 					type: 'string',
 					title: 'Values'
 				} as Schema}
-				{#await getChartInformation(selectedChartArtifact.digest)}
-					<Form {schema} initialValue={null} values={null}>
-						{#snippet actions()}
-							<div class="flex w-full items-center justify-between gap-3">
-								<Button disabled>Previous</Button>
-								<Button disabled>Next</Button>
-							</div>
-						{/snippet}
-					</Form>
-				{:then information}
-					<Form
-						{schema}
-						uiSchema={{
-							'ui:options': {
-								translations: {
-									submit: 'Next'
+				{#if harborHost && (lodash.get(object, 'status.lastAttemptedConfigDigest') || lodash.get(object, 'status.lastAttemptedRevision'))}
+					{#await getChartInformation(lodash.get(object, 'status.lastAttemptedConfigDigest') || (lodash.get(object, 'status.lastAttemptedRevision') as string)
+								.split('@')
+								.pop() || '')}
+						<Form {schema} initialValue={null} values={null}>
+							{#snippet actions()}
+								<div class="flex w-full items-center justify-between gap-3">
+									<Button disabled>Previous</Button>
+									<Button disabled>Next</Button>
+								</div>
+							{/snippet}
+						</Form>
+					{:then information}
+						<Form
+							{schema}
+							uiSchema={{
+								'ui:options': {
+									translations: {
+										submit: 'Next'
+									},
+									TailoredEditorDocument: String(information.readme)
+										? information.readme
+										: undefined
 								},
-								TailoredEditorDocument: String(information.readme) ? information.readme : undefined
-							},
-							'ui:components': {
-								textWidget: EditorWidget
-							}
-						} as UiSchemaRoot}
-						initialValue={information.values}
-						bind:values={values['spec']['values']}
-						handleSubmit={{
-							posthook: () => {
-								handleNext();
-								try {
-									const structuredValues = load(lodash.get(values, 'spec.values') as string);
-
-									lodash.set(values, 'spec.values', structuredValues);
-								} catch (error) {
-									console.error('Failed to load values:', error);
-									toast.error('Failed to load values');
-									lodash.set(values, 'spec.values', {});
+								'ui:components': {
+									textWidget: EditorWidget
 								}
-							}
-						}}
-					>
-						{#snippet actions()}
-							<div class="flex w-full items-center justify-between gap-3">
-								<Button
-									onclick={() => {
-										handlePrevious();
-									}}
-									disabled={currentIndex === 0}
-								>
-									Previous
-								</Button>
-								<SubmitButton />
-							</div>
-						{/snippet}
-					</Form>
-				{:catch error}
-					<Empty.Root class="rounded-lg bg-muted">
-						<Empty.Header>
-							<Empty.Media variant="icon">
-								<FileIcon size={32} class="opacity-60" aria-hidden="true" />
-							</Empty.Media>
-							<Empty.Title>Failed to load chart information</Empty.Title>
-							<Empty.Description>
-								{error.message}
-							</Empty.Description>
-						</Empty.Header>
-					</Empty.Root>
-				{/await}
-			</Tabs.Content>
+							} as UiSchemaRoot}
+							initialValue={information.values}
+							bind:values={values['spec']['values']}
+							handleSubmit={{
+								posthook: () => {
+									handleNext();
+									try {
+										const structuredValues = load(lodash.get(values, 'spec.values') as string);
 
-			<Tabs.Content value={steps[3]} class="min-h-[77vh]">
+										lodash.set(values, 'spec.values', structuredValues);
+									} catch (error) {
+										console.error('Failed to load values:', error);
+										toast.error('Failed to load values');
+										lodash.set(values, 'spec.values', {});
+									}
+								}
+							}}
+						>
+							{#snippet actions()}
+								<div class="flex w-full items-center justify-between gap-3">
+									<Button
+										onclick={() => {
+											handlePrevious();
+										}}
+										disabled={currentIndex === 0}
+									>
+										Previous
+									</Button>
+									<SubmitButton />
+								</div>
+							{/snippet}
+						</Form>
+					{:catch error}
+						<Empty.Root class="rounded-lg bg-muted">
+							<Empty.Header>
+								<Empty.Media variant="icon">
+									<FileIcon size={32} class="opacity-60" aria-hidden="true" />
+								</Empty.Media>
+								<Empty.Title>Failed to load chart information</Empty.Title>
+								<Empty.Description>
+									{error.message}
+								</Empty.Description>
+							</Empty.Header>
+						</Empty.Root>
+					{/await}
+				{:else}
+					<div class="flex h-full items-center justify-center">
+						<div class="flex flex-col items-center gap-2">
+							<p class="text-sm text-muted-foreground">Waiting for chart information...</p>
+							{#if !harborHost}
+								<p class="text-xs text-muted-foreground opacity-70">
+									Waiting for HelmRepository...
+								</p>
+							{/if}
+						</div>
+					</div>
+				{/if}
+			</Tabs.Content>
+			<Tabs.Content value={steps[2]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{
@@ -472,23 +432,26 @@
 								async () => {
 									const manifest = new TextEncoder().encode(value);
 
-									await resourceClient.create({
+									await resourceClient.apply({
 										cluster,
 										namespace,
 										group,
 										version,
 										resource,
-										manifest
+										name,
+										manifest,
+										fieldManager: 'otterscale-web-ui',
+										force: true
 									});
 								},
 								{
-									loading: `Creating ${kind} ${name}...`,
+									loading: `Updating ${kind} ${name}...`,
 									success: () => {
-										return `Successfully created ${kind} ${name}`;
+										return `Successfully updated ${kind} ${name}`;
 									},
 									error: (error) => {
-										console.error(`Failed to create ${kind} ${name}:`, error);
-										return `Failed to create ${kind} ${name}: ${(error as ConnectError).message}`;
+										console.error(`Failed to update ${kind} ${name}:`, error);
+										return `Failed to update ${kind} ${name}: ${(error as ConnectError).message}`;
 									},
 									finally() {
 										isSubmitting = false;
@@ -498,7 +461,7 @@
 							);
 						}}
 					>
-						Create
+						Update
 					</Button>
 				</div>
 			</Tabs.Content>
