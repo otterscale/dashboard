@@ -12,17 +12,13 @@
 	let {
 		cluster,
 		namespace,
-		group,
 		version,
-		resource,
 		object,
 		onOpenChangeComplete
 	}: {
 		cluster: string;
 		namespace: string;
-		group: string;
 		version: string;
-		resource: string;
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		object: any;
 		onOpenChangeComplete?: () => void;
@@ -56,9 +52,9 @@
 			async () => {
 				await client.subResourceAction({
 					cluster,
-					group,
+					group: 'subresources.kubevirt.io',
 					version,
-					resource,
+					resource: 'virtualmachineinstances',
 					namespace,
 					name,
 					subresource: action,

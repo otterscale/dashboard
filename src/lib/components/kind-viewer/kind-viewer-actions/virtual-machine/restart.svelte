@@ -12,7 +12,6 @@
 	let {
 		cluster,
 		namespace,
-		group,
 		version,
 		resource,
 		object,
@@ -20,7 +19,6 @@
 	}: {
 		cluster: string;
 		namespace: string;
-		group: string;
 		version: string;
 		resource: string;
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -46,7 +44,7 @@
 			async () => {
 				await client.subResourceAction({
 					cluster,
-					group,
+					group: 'subresources.kubevirt.io',
 					version,
 					resource,
 					namespace,

@@ -82,7 +82,6 @@
 				<StartStop
 					{cluster}
 					{namespace}
-					{group}
 					{version}
 					{resource}
 					{object}
@@ -99,9 +98,7 @@
 				<PauseResume
 					{cluster}
 					{namespace}
-					{group}
 					{version}
-					{resource}
 					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
@@ -116,7 +113,6 @@
 				<Restart
 					{cluster}
 					{namespace}
-					{group}
 					{version}
 					{resource}
 					{object}
