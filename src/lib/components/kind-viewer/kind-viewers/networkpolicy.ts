@@ -30,7 +30,7 @@ function getNetworkPolicyDataSchemas(): Record<NetworkPolicyAttribute, DataSchem
 	return {
 		Name: 'text',
 		Namespace: 'text',
-		'Pod-Selector': 'object',
+		'Pod-Selector': 'number',
 		'Ingress Rules': 'number',
 		'Egress Rules': 'number',
 		Age: 'time',
@@ -44,7 +44,7 @@ function getNetworkPolicyData(
 	return {
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.metadata?.namespace ?? null,
-		'Pod-Selector': (object?.spec?.podSelector as JsonValue) ?? null,
+		'Pod-Selector': Object.keys(object?.spec?.podSelector?.matchLabels ?? {}).length,
 		'Ingress Rules': object?.spec?.ingress?.length ?? 0,
 		'Egress Rules': object?.spec?.egress?.length ?? 0,
 		Age: object?.metadata?.creationTimestamp ?? null,
