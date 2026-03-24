@@ -1,6 +1,5 @@
 <script lang="ts">
 	import BugIcon from '@lucide/svelte/icons/bug';
-	import GitHubIcon from '@lucide/svelte/icons/github';
 
 	import { version } from '$app/environment';
 	import LogoImage from '$lib/assets/logo.svg';
@@ -42,7 +41,7 @@
 
 			<div class="flex w-full justify-center gap-2">
 				<Button variant="outline" size="icon" href="https://github.com/otterscale" target="_blank">
-					<GitHubIcon />
+					<!-- <GitHubIcon /> -->
 					<span class="sr-only">GitHub</span>
 				</Button>
 				<Button
