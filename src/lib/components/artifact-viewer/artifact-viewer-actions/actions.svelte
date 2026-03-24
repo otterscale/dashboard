@@ -4,8 +4,8 @@
 
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
-	import type { ArtifactType } from '$lib/server/harbor';
 
+	import type { ChartArtifact } from '../types';
 	import Install from './install.svelte';
 	import View from './view.svelte';
 
@@ -17,7 +17,7 @@
 	}: {
 		cluster: string;
 		namespace: string;
-		chartArtifact: ArtifactType;
+		chartArtifact: ChartArtifact;
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository;
 	} = $props();
 

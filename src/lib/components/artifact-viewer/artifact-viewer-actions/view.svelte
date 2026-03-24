@@ -7,12 +7,13 @@
 	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
-	import type { ArtifactType } from '$lib/server/harbor';
+
+	import type { ChartArtifact } from '../types';
 
 	let {
 		chartArtifact
 	}: {
-		chartArtifact: ArtifactType;
+		chartArtifact: ChartArtifact;
 	} = $props();
 
 	let open = $state(false);

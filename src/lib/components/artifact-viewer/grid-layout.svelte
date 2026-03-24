@@ -9,10 +9,10 @@
 	import Badge from '$lib/components/ui/badge/badge.svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Item from '$lib/components/ui/item';
-	import type { ArtifactType } from '$lib/server/harbor';
 
 	import Actions from './artifact-viewer-actions/actions.svelte';
 	import type { ArtifactAttribute } from './table-layout';
+	import type { ChartArtifact } from './types';
 
 	let {
 		row,
@@ -24,7 +24,7 @@
 		namespace: string;
 	} = $props();
 
-	const latestChartArtifact = $derived(row.original.chartArtifact as unknown as ArtifactType);
+	const latestChartArtifact = $derived(row.original.chartArtifact as unknown as ChartArtifact);
 	const helmRepository = $derived(
 		row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository
 	);

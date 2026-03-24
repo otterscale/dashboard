@@ -2,6 +2,7 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { DownloadIcon, FileIcon } from '@lucide/svelte';
 	import { ResourceService, type SchemaRequest } from '@otterscale/api/resource/v1';
+	import { RuntimeService } from '@otterscale/api/runtime/v1';
 	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 	import { type Schema, SubmitButton, type UiSchemaRoot } from '@sjsf/form';
 	import Ajv from 'ajv';
@@ -21,9 +22,13 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
-	import type { ArtifactType } from '$lib/server/harbor';
 
 	import { encodeURIComponentWithSlashEscape, parseHarborHost } from '../utils.svelte';
+	import {
+		createHelmRepositoryChartArtifact,
+		isHelmRepositoryChartArtifact,
+		type ChartArtifact
+	} from '../types';
 
 	let {
 		cluster,
@@ -34,7 +39,7 @@
 	}: {
 		cluster: string;
 		namespace: string;
-		chartArtifact: ArtifactType;
+		chartArtifact: ChartArtifact;
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository;
 		onOpenChangeComplete: () => void;
 	} = $props();
@@ -46,6 +51,7 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
+	const runtimeClient = createClient(RuntimeService, transport);
 
 	let jsonSchema: Schema | undefined = $state(undefined);
 
@@ -87,8 +93,20 @@
 	});
 	let value = $derived(stringify(values));
 
-	let artifacts: ArtifactType[] = $state([]);
+	let artifacts: ChartArtifact[] = $state([]);
 	async function fetchArtifacts() {
+		if (isHelmRepositoryChartArtifact(latestChartArtifact)) {
+			artifacts = latestChartArtifact.versions.map((version) =>
+				createHelmRepositoryChartArtifact(
+					latestChartArtifact.repository_name,
+					version,
+					latestChartArtifact.versions,
+					latestChartArtifact.raw
+				)
+			);
+			return;
+		}
+
 		try {
 			const projectPath = encodeURIComponentWithSlashEscape(project);
 			const repositoryPath = encodeURIComponentWithSlashEscape(repository);
@@ -128,7 +146,7 @@
 		helmRepository?.metadata?.labels?.['tenant.otterscale.io/internal'] === 'true'
 	);
 
-	let selectedChartArtifact: ArtifactType = $derived(latestChartArtifact);
+	let selectedChartArtifact: ChartArtifact = $derived(latestChartArtifact);
 	function getVersions() {
 		return artifacts.map(
 			(artifact) => lodash.get(artifact.extra_attrs, 'version') as unknown as string
@@ -182,6 +200,19 @@
 	}
 
 	async function getChartInformation(digest: string) {
+		if (isHelmRepositoryChartArtifact(selectedChartArtifact)) {
+			const response = await runtimeClient.showChart({
+				repoUrl: helmRepository.spec?.url ?? '',
+				chartName: String(lodash.get(selectedChartArtifact.extra_attrs, 'name') ?? ''),
+				version: String(lodash.get(selectedChartArtifact.extra_attrs, 'version') ?? '')
+			});
+			const decoder = new TextDecoder();
+			return {
+				values: decoder.decode(response.values),
+				readme: decoder.decode(response.readme)
+			};
+		}
+
 		const [valuesData, readmeData] = await Promise.all([
 			getReferenceAddition(digest, 'values.yaml'),
 			getReferenceAddition(digest, 'readme.md')
@@ -212,6 +243,9 @@
 	onMount(async () => {
 		await Promise.all([fetchSchema(), fetchArtifacts()]);
 	});
+
+	const chartName = $derived(lodash.get(latestChartArtifact.extra_attrs, 'name') as string);
+	const defaultVersion = $derived(lodash.get(latestChartArtifact.extra_attrs, 'version') as string);
 </script>
 
 <Dialog.Root
@@ -329,8 +363,8 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						chart: lodash.get(latestChartArtifact.extra_attrs, 'name'),
-						version: lodash.get(latestChartArtifact.extra_attrs, 'version'),
+						chart: chartName,
+						version: defaultVersion,
 						sourceRef: {
 							apiVersion: helmRepository?.apiVersion,
 							kind: helmRepository?.kind,

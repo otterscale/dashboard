@@ -8,7 +8,8 @@ import type { QuantityMetadata } from '$lib/components/dynamic-table/dynamic-tab
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { formatWithBinarySuffix } from '$lib/components/dynamic-table/utils.ts';
 import { renderComponent } from '$lib/components/ui/data-table';
-import type { ArtifactType } from '$lib/server/harbor';
+
+import type { ChartArtifact } from './types';
 
 type ArtifactAttribute =
 	| 'Helm Repository'
@@ -56,17 +57,20 @@ function getArtifactUISchemas(): Record<ArtifactAttribute, UISchemaType> {
 }
 
 function getArtifactData(
-	chartArtifact: ArtifactType,
+	chartArtifact: ChartArtifact,
 	helmRepository: SourceToolkitFluxcdIoV1HelmRepository
 ): Record<ArtifactAttribute, JsonValue> {
-	const { value: sizeValue, unit: sizeUnit } = formatWithBinarySuffix(BigInt(chartArtifact.size));
+	const hasSize = chartArtifact.size > 0;
+	const { value: sizeValue, unit: sizeUnit } = hasSize
+		? formatWithBinarySuffix(BigInt(chartArtifact.size))
+		: { value: 0, unit: 'B' };
 
 	return {
 		'Helm Repository': helmRepository.metadata?.name ?? null,
 		Repository: chartArtifact.repository_name,
 		Digest: chartArtifact.digest ? chartArtifact.digest.slice(0, 19) : null,
 		Version: chartArtifact.extra_attrs?.version as JsonValue,
-		Size: `${sizeValue.toFixed(0)}${sizeUnit}`,
+		Size: hasSize ? `${sizeValue.toFixed(0)}${sizeUnit}` : null,
 		'Push Time': chartArtifact.push_time ?? null,
 		'Pull Time': chartArtifact.pull_time ?? null,
 		Type: chartArtifact.type ?? null,

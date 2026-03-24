@@ -9,7 +9,6 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
-	import type { ArtifactType } from '$lib/server/harbor';
 
 	import Actions from './artifact-viewer-actions/actions.svelte';
 	import Upload from './artifact-viewer-actions/upload.svelte';
@@ -20,6 +19,7 @@
 		getArtifactDataSchemas,
 		getArtifactUISchemas
 	} from './table-layout.ts';
+	import type { ChartArtifact } from './types';
 
 	let {
 		cluster,
@@ -79,7 +79,7 @@
 			<Actions
 				{cluster}
 				{namespace}
-				chartArtifact={row.original.chartArtifact as unknown as ArtifactType}
+				chartArtifact={row.original.chartArtifact as unknown as ChartArtifact}
 				helmRepository={row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository}
 			/>
 		{/snippet}
