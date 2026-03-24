@@ -1,14 +1,22 @@
 import type { Component } from 'svelte';
 
-import EditSheet from '$lib/components/dynamic-form/workspace/edit-sheet.svelte';
-
 import Default from './default.svelte';
+import Edit from './edit-workspace.svelte';
 import Workspaces from './workspaces.svelte';
 
 type ViewerProps = { object: any; schema?: any };
 type ViewerType = Component<ViewerProps>;
 
-type EditorProps = { name: string; schema?: any; object?: any; onsuccess?: () => void };
+type EditorProps = {
+	cluster: string;
+	group: string;
+	version: string;
+	kind: string;
+	resource: string;
+	schema?: any;
+	object?: any;
+	onsuccess?: () => void;
+};
 type EditorType = Component<EditorProps> | null;
 
 function getResourceViewer(resource: string): ViewerType {
@@ -20,7 +28,7 @@ function getResourceViewer(resource: string): ViewerType {
 
 function getEditor(resource: string): EditorType {
 	if (resource === 'workspaces') {
-		return EditSheet as unknown as EditorType;
+		return Edit as unknown as EditorType;
 	}
 	return null;
 }

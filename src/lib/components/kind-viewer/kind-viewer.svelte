@@ -311,7 +311,10 @@
 					version={apiResource.version}
 					kind={apiResource.kind}
 					resource={apiResource.resource}
-					{namespace}
+					namespace={namespace
+						? (row.original.raw as Record<string, Record<string, string>>)?.metadata?.namespace ||
+							namespace
+						: namespace}
 				/>
 			{/snippet}
 		</DynamicTable>

@@ -45,6 +45,12 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
+	const jsonSchemaValidator = new Ajv({
+		allErrors: true,
+		strict: false
+	});
+	const validate = jsonSchemaValidator.compile(jsonSchema);
+
 	// Timezone List
 	const timezones = $derived($page.data.timezones ?? []);
 
@@ -73,7 +79,7 @@
 	let jobValues: any = $state({});
 
 	// Steps Manager
-	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -533,7 +539,7 @@
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[3]} class="min-h-[7vh]">
+			<Tabs.Content value={steps[3]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{
@@ -553,12 +559,6 @@
 							if (isSubmitting) return;
 
 							isSubmitting = true;
-
-							const jsonSchemaValidator = new Ajv({
-								allErrors: true,
-								strict: false
-							});
-							const validate = jsonSchemaValidator.compile(jsonSchema);
 
 							const isValid = validate(load(value));
 

@@ -1,14 +1,15 @@
 <script lang="ts">
-	import { createClient, type Transport } from '@connectrpc/connect';
-	import { Plus } from '@lucide/svelte';
+	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
+	import { FormIcon } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import type { SchemaObjectValue } from '@sjsf/form/core';
 	import Ajv from 'ajv';
-	import { load } from 'js-yaml';
+	import { JSON_SCHEMA, load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
+	import type { Snippet } from 'svelte';
 	import { getContext } from 'svelte';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
@@ -17,8 +18,8 @@
 	import { page } from '$app/state';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
-	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
@@ -30,9 +31,10 @@
 		kind,
 		resource,
 		schema: jsonSchema,
-		onsuccess,
-		open = $bindable(false),
-		showTrigger = true
+		object,
+		onOpenChangeComplete,
+		trigger,
+		onsuccess
 	}: {
 		cluster: string;
 		group: string;
@@ -40,9 +42,10 @@
 		kind: string;
 		resource: string;
 		schema: any;
-		onsuccess?: (workspace?: any) => void;
-		open?: boolean;
-		showTrigger?: boolean;
+		object?: any;
+		onOpenChangeComplete?: () => void;
+		trigger?: Snippet<[Record<string, any>]>;
+		onsuccess?: () => void;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -59,8 +62,8 @@
 	let values: any = $state({
 		apiVersion: group ? `${group}/${version}` : version,
 		kind,
-		metadata: { name: null },
-		spec: {
+		metadata: object?.metadata || { name: null },
+		spec: object?.spec || {
 			members: {},
 			resourceQuota: {
 				hard: {
@@ -88,7 +91,34 @@
 			networkIsolation: {}
 		}
 	});
-	let value = $derived(stringify(values));
+
+	const systemFields = [
+		'clusterName',
+		'creationTimestamp',
+		'deletionGracePeriodSeconds',
+		'deletionTimestamp',
+		'finalizers',
+		'generateName',
+		'generation',
+		'initializers',
+		'managedFields',
+		'ownerReferences',
+		'resourceVersion',
+		'relationships',
+		'selfLink',
+		'state',
+		'uid'
+	];
+
+	let value = $derived.by(() => {
+		const filtered = lodash.cloneDeep(values);
+		if (filtered.metadata) {
+			for (const field of systemFields) {
+				delete filtered.metadata[field];
+			}
+		}
+		return stringify(filtered);
+	});
 
 	// TODO: Refactor into StepsManager.
 	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
@@ -154,27 +184,36 @@
 	}
 
 	// Flag for Dialog
+	let open = $state(false);
 	let isSubmitting = $state(false);
 </script>
 
-<Dialog.Root
+<AlertDialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
+		onOpenChangeComplete?.();
 		if (!isOpen) {
 			reset();
 		}
 	}}
 >
-	{#if showTrigger}
-		<Dialog.Trigger>
-			{#snippet child({ props })}
-				<Button {...props} variant="outline" size="icon">
-					<Plus />
-				</Button>
-			{/snippet}
-		</Dialog.Trigger>
-	{/if}
-	<Dialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
+	<AlertDialog.Trigger>
+		{#snippet child({ props })}
+			{#if trigger}
+				{@render trigger(props)}
+			{:else}
+				<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
+					<Item.Media>
+						<FormIcon />
+					</Item.Media>
+					<Item.Content>
+						<Item.Title>Update</Item.Title>
+					</Item.Content>
+				</Item.Root>
+			{/if}
+		{/snippet}
+	</AlertDialog.Trigger>
+	<AlertDialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
 		<Item.Root class="p-0">
 			<Progress value={currentIndex + 1} max={steps.length} />
 			<Item.Content class="text-left">
@@ -187,7 +226,8 @@
 				<Form
 					schema={{
 						...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as any),
-						title: 'Name'
+						title: 'Name',
+						readOnly: true
 					} as Schema}
 					uiSchema={{
 						'ui:options': {
@@ -196,7 +236,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={null as FormValue}
+					initialValue={lodash.get(object, 'metadata.name') as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
@@ -339,15 +379,14 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={[
-						// From login user information.
+					initialValue={(lodash.get(object, 'spec.members') || [
 						{
 							role: 'admin',
 							subject: page.data.user.sub,
 							username: page.data.user.username,
 							name: page.data.user.name
 						}
-					] as FormValue}
+					]) as FormValue}
 					transformer={(value: FormValue) => {
 						let members = value as SchemaObjectValue[];
 						members = members.map((member) => {
@@ -423,9 +462,9 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{
+					initialValue={(lodash.get(object, 'spec.networkIsolation') || {
 						enabled: false
-					} as FormValue}
+					}) as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
@@ -469,7 +508,9 @@
 
 							isSubmitting = true;
 
-							const isValid = validate(load(value));
+							const currentStructuredValue: any = load(value, { schema: JSON_SCHEMA });
+
+							const isValid = validate(currentStructuredValue);
 
 							if (!isValid) {
 								console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
@@ -478,29 +519,31 @@
 								return;
 							}
 
-							const name = lodash.get(values, 'metadata.name');
+							const name = lodash.get(currentStructuredValue, 'metadata.name');
+							const manifest = new TextEncoder().encode(JSON.stringify(currentStructuredValue));
 
 							toast.promise(
 								async () => {
-									const manifest = new TextEncoder().encode(value);
-
-									await resourceClient.create({
+									await resourceClient.apply({
 										cluster,
 										group,
 										version,
 										resource,
-										manifest
+										name,
+										manifest,
+										fieldManager: 'otterscale-web-ui',
+										force: true
 									});
 								},
 								{
-									loading: `Creating ${kind} ${name}...`,
+									loading: `Updating ${kind} ${name}...`,
 									success: () => {
-										onsuccess?.(values);
-										return `Successfully created ${kind} ${name}`;
+										onsuccess?.();
+										return `Successfully updated ${kind} ${name}`;
 									},
 									error: (error) => {
-										console.error(`Failed to create ${kind} ${name}:`, error);
-										return `Failed to create ${kind} ${name}: ${lodash.get(error, 'message')}`;
+										console.error(`Failed to update ${kind} ${name}:`, error);
+										return `Failed to update ${kind} ${name}: ${(error as ConnectError).message}`;
 									},
 									finally() {
 										isSubmitting = false;
@@ -510,10 +553,10 @@
 							);
 						}}
 					>
-						Create
+						Update
 					</Button>
 				</div>
 			</Tabs.Content>
 		</Tabs.Root>
-	</Dialog.Content>
-</Dialog.Root>
+	</AlertDialog.Content>
+</AlertDialog.Root>
