@@ -82,7 +82,7 @@
 {:else if trigger}
 	{@render trigger({})}
 {:else}
-	<Item.Root class="w-full p-0 text-xs" size="sm">
+	<Item.Root class="w-full p-0 text-xs" size="sm" style="opacity: 0.5; pointer-events: none;">
 		<Item.Media>
 			<FormIcon />
 		</Item.Media>

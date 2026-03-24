@@ -52,6 +52,12 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
+	const jsonSchemaValidator = new Ajv({
+		allErrors: true,
+		strict: false
+	});
+	const validate = jsonSchemaValidator.compile(jsonSchema);
+
 	// Timezone List
 	const timezones = $derived($page.data.timezones ?? []);
 
@@ -113,7 +119,7 @@
 	);
 
 	// Steps Manager
-	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -620,12 +626,6 @@
 							isSubmitting = true;
 
 							const currentStructuredValue: any = load(value, { schema: JSON_SCHEMA });
-
-							const jsonSchemaValidator = new Ajv({
-								allErrors: true,
-								strict: false
-							});
-							const validate = jsonSchemaValidator.compile(jsonSchema);
 
 							const isValid = validate(currentStructuredValue);
 

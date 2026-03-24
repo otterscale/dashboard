@@ -50,6 +50,12 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
+	const jsonSchemaValidator = new Ajv({
+		allErrors: true,
+		strict: false
+	});
+	const validate = jsonSchemaValidator.compile(jsonSchema);
+
 	// Container for Data
 	let values: any = $state({
 		apiVersion: group ? `${group}/${version}` : version,
@@ -578,12 +584,6 @@
 							isSubmitting = true;
 
 							const currentStructuredValue: any = load(value, { schema: JSON_SCHEMA });
-
-							const jsonSchemaValidator = new Ajv({
-								allErrors: true,
-								strict: false
-							});
-							const validate = jsonSchemaValidator.compile(jsonSchema);
 
 							const isValid = validate(currentStructuredValue);
 
