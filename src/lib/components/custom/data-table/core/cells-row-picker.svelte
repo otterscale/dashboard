@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Row } from '@tanstack/table-core';
+
 	import { Checkbox } from '$lib/components/ui/checkbox';
 
 	let { row }: { row: Row<unknown> } = $props();

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Check } from '@lucide/svelte';
 	import { getContext } from 'svelte';
+
 	import type { SelectOption } from './root.svelte';
 
 	let { option }: { option: SelectOption } = $props();

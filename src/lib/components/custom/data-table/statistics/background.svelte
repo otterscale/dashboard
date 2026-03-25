@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Component } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
+
 	import { cn } from '$lib/utils';
 
 	let {

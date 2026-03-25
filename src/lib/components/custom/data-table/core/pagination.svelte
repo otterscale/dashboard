@@ -1,7 +1,8 @@
 <script lang="ts">
+	import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from '@lucide/svelte';
 	import type { Table } from '@tanstack/table-core';
+
 	import { Button } from '$lib/components/ui/button';
-	import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from '@lucide/svelte';
 
 	let { table }: { table: Table<unknown> } = $props();
 

@@ -6,16 +6,16 @@
 	import { PrometheusDriver } from 'prometheus-query';
 	import { cubicInOut } from 'svelte/easing';
 
+	import * as Statistics from '$lib/components/custom/data-table/statistics/index';
+	import ChartContainer from '$lib/components/ui/chart/chart-container.svelte';
+	import * as Chart from '$lib/components/ui/chart/index.js';
 	import {
 		formatChartTimeRange as formatTimeRange,
 		formatChartXAxisDate as formatXAxisDate,
 		getChartXAxisTicks as getXAxisTicks
 	} from '$lib/formatter';
-	import * as Statistics from '$lib/components/custom/data-table/statistics/index';
-	import { fetchFlattenedRange, generateChartConfig, getSeries } from '$lib/prometheus';
-	import ChartContainer from '$lib/components/ui/chart/chart-container.svelte';
-	import * as Chart from '$lib/components/ui/chart/index.js';
 	import { m } from '$lib/paraglide/messages';
+	import { fetchFlattenedRange, generateChartConfig, getSeries } from '$lib/prometheus';
 
 	let { client, fqdn }: { client: PrometheusDriver; fqdn: string } = $props();
 
@@ -40,7 +40,7 @@
 		</Statistics.Title>
 	</Statistics.Header>
 	<Statistics.Content class="min-h-16">
-		{#await fetchFlattenedRange(client, query, startTime, endTime, STEP_SECONDS, 'Time')}
+		{#await fetchFlattenedRange(client, query, startTime, endTime, STEP_SECONDS)}
 			<div class="flex h-[250px] w-full items-center justify-center">
 				<LoaderCircle class="m-8 size-32 animate-spin text-muted-foreground/50" />
 			</div>

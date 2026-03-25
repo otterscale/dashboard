@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
+
 	import { cn } from '$lib/utils';
+
 	import type { SelectOption } from './root.svelte';
 
 	let {

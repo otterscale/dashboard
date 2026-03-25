@@ -6,10 +6,6 @@
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
-	import {
-		MOCK_MONTHLY_NODES,
-		MOCK_NODE_COUNT
-	} from '$lib/components/machines/dashboard/mock-data';
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
@@ -24,13 +20,10 @@
 		isReloading = $bindable()
 	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 
-	let totalNodes = $state(MOCK_NODE_COUNT);
-	let nodes = $state(
-		MOCK_MONTHLY_NODES.map((d: (typeof MOCK_MONTHLY_NODES)[number]) => ({
-			date: new Date(d.date + '-01'),
-			node: d.node
-		}))
-	);
+	type NodePoint = { date: Date; node: number };
+
+	let totalNodes = $state(0);
+	let nodes = $state<NodePoint[]>([]);
 
 	const nodesConfiguration = {
 		node: { label: 'Node', color: 'var(--chart-1)' }
@@ -44,7 +37,7 @@
 			const count = response.result?.[0]?.value?.value;
 			if (count !== undefined) totalNodes = Number(count);
 		} catch {
-			// Use mock
+			// keep prior values
 		}
 	}
 

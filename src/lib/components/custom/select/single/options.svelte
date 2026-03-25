@@ -1,7 +1,12 @@
 <script lang="ts">
-	let { children }: { children?: import('svelte').Snippet } = $props();
+	import { cn } from '$lib/utils';
+
+	let {
+		class: className = undefined,
+		children
+	}: { class?: string; children?: import('svelte').Snippet } = $props();
 </script>
 
-<div class="flex flex-col">
+<div class={cn('flex flex-col', className)}>
 	{@render children?.()}
 </div>

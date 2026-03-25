@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
+
 	import { cn } from '$lib/utils';
 
-	let { class: className, ...restProps } = $props();
+	let { class: className = undefined, ...restProps } = $props();
 
 	const ctx = getContext<{
 		getSearch: () => string;

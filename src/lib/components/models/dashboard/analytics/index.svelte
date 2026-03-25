@@ -5,8 +5,8 @@
 	import ChartRequests from './chart-requests.svelte';
 	import ChartRequestsWaiting from './chart-requests-waiting.svelte';
 	import ChartThroughput from './chart-throughput.svelte';
-	import ChartTtft from './chart-ttft.svelte';
 	import ChartTpot from './chart-tpot.svelte';
+	import ChartTtft from './chart-ttft.svelte';
 
 	let {
 		cluster,

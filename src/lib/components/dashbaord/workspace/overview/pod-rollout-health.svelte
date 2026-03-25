@@ -28,7 +28,7 @@
 		isReloading: boolean;
 	} = $props();
 
-	type Snapshot = {
+	type PodRolloutSnapshot = {
 		running: number;
 		unknown: number;
 		notReady: number;
@@ -47,7 +47,7 @@
 		oomKilled: number;
 	};
 
-	let snap: Snapshot | undefined = $state(undefined);
+	let snap: PodRolloutSnapshot | undefined = $state(undefined);
 
 	function num(v: SampleValue | undefined): number {
 		if (v?.value === undefined || v?.value === null) return 0;

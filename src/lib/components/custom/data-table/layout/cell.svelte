@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { HTMLTableCellElement } from 'svelte/elements';
 	import { cn } from '$lib/utils';
 
 	let {

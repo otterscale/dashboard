@@ -6,18 +6,17 @@
 	import { PrometheusDriver } from 'prometheus-query';
 	import { cubicInOut } from 'svelte/easing';
 
-	import {
-		formatChartTimeRange as formatTimeRange,
-		formatChartXAxisDate as formatXAxisDate,
-		getChartXAxisTicks as getXAxisTicks,
-		formatIO
-	} from '$lib/formatter';
 	import * as Statistics from '$lib/components/custom/data-table/statistics/index';
-	import { fetchFlattenedRange, generateChartConfig, getSeries } from '$lib/prometheus';
 	import ChartContainer from '$lib/components/ui/chart/chart-container.svelte';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import Input from '$lib/components/ui/input/input.svelte';
+	import {
+		formatChartTimeRange as formatTimeRange,
+		formatChartXAxisDate as formatXAxisDate,
+		formatIO,
+		getChartXAxisTicks as getXAxisTicks	} from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
+	import { fetchFlattenedRange, generateChartConfig, getSeries } from '$lib/prometheus';
 	import { cn } from '$lib/utils';
 
 	let { client, fqdn }: { client: PrometheusDriver; fqdn: string } = $props();

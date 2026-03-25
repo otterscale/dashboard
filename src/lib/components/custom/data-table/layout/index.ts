@@ -1,27 +1,26 @@
-import Root from './root.svelte';
-import Statistics from './statistics.svelte';
-import Controller from './controller.svelte';
-import ControllerFilter from './controller-filter.svelte';
-import ControllerAction from './controller-action.svelte';
-import Viewer from './viewer.svelte';
-import Footer from './footer.svelte';
 import Cell from './cell.svelte';
+import Controller from './controller.svelte';
+import ControllerAction from './controller-action.svelte';
+import ControllerFilter from './controller-filter.svelte';
+import Footer from './footer.svelte';
 import Header from './header.svelte';
 import HeaderController from './header-controller.svelte';
 import HeaderViewer from './header-viewer.svelte';
+import Root from './root.svelte';
+import Statistics from './statistics.svelte';
 import SubHeaderViewer from './sub-header-viewer.svelte';
+import Viewer from './viewer.svelte';
 
 export {
-	Root,
-	Statistics,
-	Controller,
-	ControllerFilter,
-	ControllerAction,
-	Viewer,
-	Footer,
 	Cell,
+	Controller,
+	ControllerAction,
+	ControllerFilter,
+	Footer,
 	Header,
 	HeaderController,
 	HeaderViewer,
-	SubHeaderViewer
-};
+	Root,
+	Statistics,
+	SubHeaderViewer,
+	Viewer};

@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { ChevronsUpDown } from '@lucide/svelte';
 	import { getContext } from 'svelte';
-	import * as Popover from '$lib/components/ui/popover';
+
 	import { Button } from '$lib/components/ui/button';
+	import * as Popover from '$lib/components/ui/popover';
 	import { cn } from '$lib/utils';
 
 	let { class: className = undefined, ...restProps } = $props();

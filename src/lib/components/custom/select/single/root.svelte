@@ -1,6 +1,7 @@
 <script lang="ts">
-	import type { Readable } from 'svelte/store';
 	import { setContext } from 'svelte';
+	import type { Readable } from 'svelte/store';
+
 	import * as Popover from '$lib/components/ui/popover';
 
 	export type SelectOption = {

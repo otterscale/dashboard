@@ -13,7 +13,7 @@
 
 	/** Indicator offset: 0 = full bar, 100 = empty (matches prior `null ?? 0` → translate -100%) */
 	const translateXPercent = $derived.by(() => {
-		if (value === null) return 100;
+		if (value === null || value === undefined) return 100;
 		const safeMax = max === 0 ? 1 : max;
 		const clamped = Math.min(safeMax, Math.max(min, value));
 		return 100 * (1 - clamped / safeMax);
@@ -35,6 +35,6 @@
 	<div
 		data-slot="progress-indicator"
 		class="size-full flex-1 bg-primary transition-all"
-		style="transform: translateX(-{100 - (100 * (value ?? 0)) / (max ?? 1)}%)"
+		style="transform: translateX(-{translateXPercent}%)"
 	></div>
 </ProgressPrimitive.Root>

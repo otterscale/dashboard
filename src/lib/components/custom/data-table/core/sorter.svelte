@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { ArrowUp, ArrowDown, ArrowUpDown } from '@lucide/svelte';
+	import { ArrowDown, ArrowUp, ArrowUpDown } from '@lucide/svelte';
 	import type { Column } from '@tanstack/table-core';
+
 	import { cn } from '$lib/utils';
 
 	let {

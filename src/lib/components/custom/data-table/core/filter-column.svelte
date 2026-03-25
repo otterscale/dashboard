@@ -1,8 +1,10 @@
 <script lang="ts">
 	import type { Table } from '@tanstack/table-core';
+
 	import { Button } from '$lib/components/ui/button';
-	import * as Popover from '$lib/components/ui/popover';
 	import { Checkbox } from '$lib/components/ui/checkbox';
+	import * as Popover from '$lib/components/ui/popover';
+
 	import type { FilterMessages } from './filter-string-fuzzy.svelte';
 
 	let {

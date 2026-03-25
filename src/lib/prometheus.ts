@@ -1,5 +1,6 @@
-import type { ChartConfig } from '$lib/components/ui/chart/index.js';
 import { type PrometheusDriver, RangeVector } from 'prometheus-query';
+
+import type { ChartConfig } from '$lib/components/ui/chart/index.js';
 
 /** Escape a value for use inside PromQL double-quoted string literals (e.g. `namespace="..."`). */
 export function escapePromqlStringLiteral(value: string): string {

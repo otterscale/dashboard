@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { PrometheusDriver } from 'prometheus-query';
 	import { LoaderCircle } from '@lucide/svelte';
+	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { Reloader } from '$lib/components/custom/reloader';
 	import { WidgetGrid } from '$lib/components/custom/widget-grid';
+	import { Dashboard } from '$lib/components/dashbaord/cluster/analytics';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/paraglide/messages';
 
-	import { Dashboard } from '$lib/components/dashbaord/cluster/analytics';
 	import { widgets } from './overview/widgets';
 
 	let { cluster }: { cluster: string } = $props();
