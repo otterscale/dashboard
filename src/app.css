@@ -1,19 +1,13 @@
 @import '@sjsf/shadcn4-theme/styles.css';
 @import 'tailwindcss';
 @import 'tw-animate-css';
-@import '@fontsource/geist';
-@import '@fontsource/geist-mono';
-@import '@fontsource/noto-sans-tc';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
+@import '@fontsource-variable/noto-sans-tc';
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
-	/* custom */
-	--healthy: oklch(12.003% 0.01406 153.448);
-	--warning: oklch(79.5% 0.184 86.047);
-	--error: oklch(57.7% 0.245 27.325);
-
-	/* shadcn */
 	--radius: 0.625rem;
 	--background: oklch(1 0 0);
 	--foreground: oklch(0.129 0.042 264.695);
@@ -49,12 +43,6 @@
 }
 
 .dark {
-	/* custom */
-	--healthy: oklch(79.2% 0.209 151.711);
-	--warning: oklch(85.2% 0.199 91.936);
-	--error: oklch(70.4% 0.191 22.216);
-
-	/* shadcn */
 	--background: oklch(0.129 0.042 264.695);
 	--foreground: oklch(0.984 0.003 247.858);
 	--card: oklch(0.208 0.042 265.755);
@@ -89,20 +77,8 @@
 }
 
 @theme inline {
-	/* font */
-	--font-sans: 'Geist', 'Noto Sans TC', sans-serif;
-	--font-mono: 'Geist Mono', monospace;
-
-	/* custom */
-	--color-healthy: var(--healthy);
-	--color-warning: var(--warning);
-	--color-error: var(--error);
-
-	/* shadcn */
-	--radius-sm: calc(var(--radius) - 4px);
-	--radius-md: calc(var(--radius) - 2px);
-	--radius-lg: var(--radius);
-	--radius-xl: calc(var(--radius) + 4px);
+	--font-sans: 'Inter Variable', 'Noto Sans TC Variable', sans-serif;
+	--font-mono: 'JetBrains Mono Variable', monospace;
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
 	--color-card: var(--card);
@@ -118,6 +94,7 @@
 	--color-accent: var(--accent);
 	--color-accent-foreground: var(--accent-foreground);
 	--color-destructive: var(--destructive);
+	--color-destructive-foreground: var(--destructive-foreground);
 	--color-border: var(--border);
 	--color-input: var(--input);
 	--color-ring: var(--ring);
@@ -134,6 +111,13 @@
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-ring: var(--sidebar-ring);
+	--radius-sm: calc(var(--radius) - 4px);
+	--radius-md: calc(var(--radius) - 2px);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) + 4px);
+	--radius-2xl: calc(var(--radius) + 8px);
+	--radius-3xl: calc(var(--radius) + 12px);
+	--radius-4xl: calc(var(--radius) + 16px);
 }
 
 @layer base {
@@ -142,5 +126,76 @@
 	}
 	body {
 		@apply bg-background text-foreground;
+	}
+	html {
+		@apply font-sans;
+	}
+}
+
+@custom-variant data-open {
+	&:where([data-state='open']),
+	&:where([data-open]:not([data-open='false'])) {
+		@slot;
+	}
+}
+
+@custom-variant data-closed {
+	&:where([data-state='closed']),
+	&:where([data-closed]:not([data-closed='false'])) {
+		@slot;
+	}
+}
+
+@custom-variant data-checked {
+	&:where([data-state='checked']),
+	&:where([data-checked]:not([data-checked='false'])) {
+		@slot;
+	}
+}
+
+@custom-variant data-unchecked {
+	&:where([data-state='unchecked']),
+	&:where([data-unchecked]:not([data-unchecked='false'])) {
+		@slot;
+	}
+}
+
+@custom-variant data-selected {
+	&:where([data-selected]) {
+		@slot;
+	}
+}
+
+@custom-variant data-disabled {
+	&:where([data-disabled='true']),
+	&:where([data-disabled]:not([data-disabled='false'])) {
+		@slot;
+	}
+}
+
+@custom-variant data-active {
+	&:where([data-state='active']),
+	&:where([data-active]:not([data-active='false'])) {
+		@slot;
+	}
+}
+
+@custom-variant data-horizontal {
+	&:where([data-orientation='horizontal']) {
+		@slot;
+	}
+}
+
+@custom-variant data-vertical {
+	&:where([data-orientation='vertical']) {
+		@slot;
+	}
+}
+
+@utility no-scrollbar {
+	-ms-overflow-style: none;
+	scrollbar-width: none;
+	&::-webkit-scrollbar {
+		display: none;
 	}
 }

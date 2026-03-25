@@ -49,13 +49,40 @@
 	let values: any = $state({
 		apiVersion: `${group}/${version}`,
 		kind,
-		metadata: {},
+		metadata: object.metadata,
 		spec: {}
 	});
-	let value = $derived(stringify(values));
+
+	const systemFields = [
+		'clusterName',
+		'creationTimestamp',
+		'deletionGracePeriodSeconds',
+		'deletionTimestamp',
+		'finalizers',
+		'generateName',
+		'generation',
+		'initializers',
+		'managedFields',
+		'ownerReferences',
+		'resourceVersion',
+		'relationships',
+		'selfLink',
+		'state',
+		'uid'
+	];
+
+	let value = $derived.by(() => {
+		const filtered = lodash.cloneDeep(values);
+		if (filtered.metadata) {
+			for (const field of systemFields) {
+				delete filtered.metadata[field];
+			}
+		}
+		return stringify(filtered);
+	});
 
 	// Steps Manager
-	const steps = Array.from({ length: 3 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 2 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -103,70 +130,8 @@
 				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
-		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
+		<Tabs.Root value={currentStep}>
 			<Tabs.Content value={steps[0]}>
-				<Form
-					schema={{
-						...(lodash.omit(lodash.get(jsonSchema, 'properties.metadata'), 'properties') as any),
-						title: 'Metadata',
-						properties: {
-							name: {
-								...lodash.get(jsonSchema, 'properties.metadata.properties.name'),
-								title: 'Name'
-							},
-							namespace: {
-								...lodash.get(jsonSchema, 'properties.metadata.properties.namespace'),
-								title: 'Namespace'
-							},
-							labels: {
-								title: 'Labels',
-								...lodash.get(jsonSchema, 'properties.metadata.properties.labels')
-							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{
-						name: lodash.get(object, 'metadata.name'),
-						namespace: lodash.get(object, 'metadata.namespace'),
-						labels: lodash.get(object, 'metadata.labels')
-					} as FormValue}
-					handleSubmit={{
-						posthook: () => {
-							lodash.set(
-								values,
-								['metadata', 'labels', 'tenant.otterscale.io/from-harbor'],
-								String(
-									lodash.get(values, ['metadata', 'labels', 'tenant.otterscale.io/from-harbor'])
-								)
-							);
-							handleNext();
-						}
-					}}
-					bind:values={values['metadata']}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-								disabled={currentIndex === 0}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-
-			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
 						...(lodash.omit(lodash.get(jsonSchema, 'properties.spec'), 'properties') as any),
@@ -246,9 +211,8 @@
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[2]}>
+			<Tabs.Content value={steps[1]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
-					<!-- <Code.Root lang="yaml" class="w-full" hideLines code={stringify(values, null, 2)} /> -->
 					<Monaco
 						options={{
 							language: 'yaml',
@@ -289,7 +253,7 @@
 								async () => {
 									const manifest = new TextEncoder().encode(value);
 
-									await resourceClient.create({
+									await resourceClient.apply({
 										cluster,
 										namespace,
 										group,
@@ -315,7 +279,7 @@
 							);
 						}}
 					>
-						Create
+						Update
 					</Button>
 				</div>
 			</Tabs.Content>

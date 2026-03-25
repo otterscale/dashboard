@@ -1,5 +1,6 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { BarChart, type ChartContextValue, Highlight } from 'layerchart';
 	import { PrometheusDriver, type SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
@@ -155,7 +156,7 @@
 		</Card.Header>
 		<Card.Content>
 			<div class="flex h-[200px] w-full items-center justify-center">
-				<Icon icon="svg-spinners:6-dots-rotate" class="size-12" />
+				<Loader2Icon class="size-12 animate-spin" />
 			</div>
 		</Card.Content>
 	</Card.Root>
@@ -169,7 +170,7 @@
 		</Card.Header>
 		<Card.Content>
 			<div class="flex h-[200px] w-full flex-col items-center justify-center">
-				<Icon icon="ph:chart-line-fill" class="size-50 animate-pulse text-muted-foreground" />
+				<ChartLineIcon class="size-50 animate-pulse text-muted-foreground" />
 				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
 			</div>
 		</Card.Content>

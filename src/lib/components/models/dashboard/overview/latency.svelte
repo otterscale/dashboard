@@ -1,5 +1,10 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
+	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
+	import ClockIcon from '@lucide/svelte/icons/clock';
+	import InfoIcon from '@lucide/svelte/icons/info';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { scaleUtc } from 'd3-scale';
 	import { curveLinear } from 'd3-shape';
 	import { LineChart } from 'layerchart';
@@ -104,13 +109,13 @@
 	<Card.Header>
 		<Card.Title class="flex flex-wrap items-center justify-between gap-6">
 			<div class="flex items-center gap-2 truncate text-sm font-medium tracking-tight">
-				<Icon icon="ph:clock" class="size-4.5" />
+				<ClockIcon class="size-4.5" />
 				{m.latency()}
 			</div>
 			<Tooltip.Provider>
 				<Tooltip.Root>
 					<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-						<Icon icon="ph:info" class="size-5 text-muted-foreground" />
+						<InfoIcon class="size-5 text-muted-foreground" />
 					</Tooltip.Trigger>
 					<Tooltip.Content>
 						<p>{m.llm_dashboard_latency_tooltip()}</p>
@@ -122,13 +127,13 @@
 	{#if !isLoaded}
 		<Card.Content>
 			<div class="flex h-9 w-full items-center justify-center">
-				<Icon icon="svg-spinners:6-dots-rotate" class="size-10" />
+				<Loader2Icon class="size-10 animate-spin" />
 			</div>
 		</Card.Content>
 	{:else if latestLatency == undefined}
 		<Card.Content>
 			<div class="flex h-full w-full flex-col items-center justify-center">
-				<Icon icon="ph:chart-bar-fill" class="size-6 animate-pulse text-muted-foreground" />
+				<ChartColumnIcon class="size-6 animate-pulse text-muted-foreground" />
 				<p class="p-0 text-xs text-muted-foreground">{m.no_data_display()}</p>
 			</div>
 		</Card.Content>
@@ -188,9 +193,9 @@
 		>
 			{Math.abs(trend).toFixed(2)} %
 			{#if trend >= 0}
-				<Icon icon="ph:caret-up" />
+				<ChevronUpIcon />
 			{:else}
-				<Icon icon="ph:caret-down" />
+				<ChevronDownIcon />
 			{/if}
 		</Card.Footer>
 	{/if}

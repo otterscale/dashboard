@@ -1,5 +1,10 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
+	import CheckIcon from '@lucide/svelte/icons/check';
+	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
+	import CircleHelpIcon from '@lucide/svelte/icons/circle-help';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import XIcon from '@lucide/svelte/icons/x';
 	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
@@ -30,23 +35,23 @@
 		0: {
 			label: 'HEALTHY',
 			color: 'text-healthy',
-			icon: 'ph:check-bold',
+			icon: CheckIcon,
 			iconClass: '-right-6 top-4'
 		},
 		1: {
 			label: 'WARNING',
 			color: 'text-warning',
-			icon: 'ph:exclamation-mark',
+			icon: CircleAlertIcon,
 			iconClass: '-right-3 top-2'
 		},
-		2: { label: 'ERROR', color: 'text-error', icon: 'ph:x-bold', iconClass: '-right-3 top-2' },
+		2: { label: 'ERROR', color: 'text-error', icon: XIcon, iconClass: '-right-3 top-2' },
 		null: {
 			label: 'ERROR',
 			color: 'text-muted-foreground',
-			icon: 'ph:question-bold',
+			icon: CircleHelpIcon,
 			iconClass: '-right-3 top-2'
 		}
-	} as const;
+	};
 
 	// Auto Update
 	let response = $state<number | null>(null);
@@ -95,7 +100,7 @@
 		</Card.Header>
 		<Card.Content class="text-3xl">
 			<div class="flex h-9 w-full items-center justify-center">
-				<Icon icon="svg-spinners:6-dots-rotate" class="size-10" />
+				<Loader2Icon class="size-10 animate-spin" />
 			</div>
 		</Card.Content>
 	</Card.Root>
@@ -107,7 +112,7 @@
 		</Card.Header>
 		<Card.Content class="text-3xl">
 			<div class="flex h-full w-full flex-col items-center justify-center">
-				<Icon icon="ph:chart-bar-fill" class="size-6 animate-pulse text-muted-foreground" />
+				<ChartColumnIcon class="size-6 animate-pulse text-muted-foreground" />
 				<p class="p-0 text-xs text-muted-foreground">{m.no_data_display()}</p>
 			</div>
 		</Card.Content>
@@ -115,8 +120,8 @@
 {:else}
 	<Card.Root class="relative h-full min-h-[140px] gap-2 overflow-hidden">
 		{@const healthStatus = HEALTH_STATUS[response as keyof typeof HEALTH_STATUS]}
-		<Icon
-			icon={healthStatus.icon}
+		{@const HealthIcon = healthStatus.icon}
+		<HealthIcon
 			class="absolute size-36 text-8xl tracking-tight text-nowrap text-primary/5 uppercase group-hover:hidden {healthStatus.iconClass}"
 		/>
 		<Card.Header class="items-center">

@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	import Icon from '@iconify/svelte';
+	import XIcon from '@lucide/svelte/icons/x';
 	import { Switch as SwitchPrimitive, type WithoutChildrenOrChild } from 'bits-ui';
 
 	import Badge from '$lib/components/ui/badge/badge.svelte';
@@ -100,7 +100,7 @@
 					checked = undefined;
 				}}
 			>
-				<Icon icon="ph:x" />
+				<XIcon class="size-4" />
 			</button>
 		{/if}
 		{#if checked === undefined}
