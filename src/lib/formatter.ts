@@ -158,3 +158,38 @@ export function formatSecond(second: number): { value: string; unit: string } {
 		return { value: `${Math.round(second * 100) / 100}`, unit: 's' };
 	}
 }
+
+// Chart time-axis helpers (used by analytics area charts)
+export type ChartTimeRange = '15m' | '30m' | '1h' | '3h' | '6h' | '12h' | '24h' | '7d';
+
+export function formatChartTimeRange(hours: number): ChartTimeRange {
+	if (hours <= 0.25) return '15m';
+	if (hours <= 0.5) return '30m';
+	if (hours <= 1) return '1h';
+	if (hours <= 3) return '3h';
+	if (hours <= 6) return '6h';
+	if (hours <= 12) return '12h';
+	if (hours <= 24) return '24h';
+	return '7d';
+}
+
+export function formatChartXAxisDate(date: Date, range: ChartTimeRange): string {
+	if (['15m', '30m', '1h', '3h', '6h', '12h', '24h'].includes(range)) {
+		return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+	}
+	return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+export function getChartXAxisTicks(range: ChartTimeRange): number {
+	const map: Record<ChartTimeRange, number> = {
+		'15m': 5,
+		'30m': 6,
+		'1h': 6,
+		'3h': 6,
+		'6h': 6,
+		'12h': 6,
+		'24h': 6,
+		'7d': 7
+	};
+	return map[range] ?? 6;
+}

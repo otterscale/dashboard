@@ -47,7 +47,8 @@
 				cluster: cluster,
 				group: 'model.otterscale.io',
 				version: 'v1alpha1',
-				resource: 'models',
+				resource: 'modelservices',
+				// Empty namespace means "all namespaces" for cluster admins
 				namespace: namespace
 			});
 			latestModels = response.items.length;
@@ -67,7 +68,7 @@
 	async function fetchAvailablePods() {
 		try {
 			const response = await prometheusDriver.rangeQuery(
-				`count by(endpoint) (vllm:cache_config_info{juju_model="${cluster}"})`,
+				`count by(endpoint) (vllm:cache_config_info{})`,
 				Date.now() - 24 * 60 * 60 * 1000,
 				Date.now(),
 				2 * 60
