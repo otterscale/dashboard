@@ -5,18 +5,27 @@
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Card from '$lib/components/ui/card';
+	import { escapePromqlStringLiteral } from '$lib/prometheus';
 	import { m } from '$lib/paraglide/messages';
 
 	let {
 		prometheusDriver,
 		cluster,
+		namespace = '',
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	}: {
+		prometheusDriver: PrometheusDriver;
+		cluster: string;
+		namespace?: string;
+		isReloading: boolean;
+	} = $props();
 
 	let deployments: SampleValue | undefined = $state(undefined);
 	async function fetchdeployments() {
+		const ns = (namespace ?? '').trim();
+		const nsFilter = ns ? `,namespace="${escapePromqlStringLiteral(ns)}"` : '';
 		const response = await prometheusDriver.instantQuery(
-			`count(kube_deployment_created{container!=""})`
+			`count(kube_deployment_created{container!=""${nsFilter}})`
 		);
 		deployments = response.result[0]?.value ?? undefined;
 	}

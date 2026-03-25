@@ -21,7 +21,7 @@
 	}: {
 		prometheusDriver: PrometheusDriver;
 		cluster: string;
-		namespace: string;
+		namespace: string | undefined;
 		selectedModel: string;
 		isReloading: boolean;
 	} = $props();

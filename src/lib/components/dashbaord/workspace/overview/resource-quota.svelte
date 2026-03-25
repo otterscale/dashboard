@@ -28,6 +28,10 @@
 	let cpuHard = $state<number | null>(null);
 	let memUsed = $state<number | null>(null);
 	let memHard = $state<number | null>(null);
+	let gpuUsed = $state<number | null>(null);
+	let gpuHard = $state<number | null>(null);
+	let gpuMemUsed = $state<number | null>(null);
+	let gpuMemHard = $state<number | null>(null);
 	let hasError = $state(false);
 
 	function instantScalar(r: Awaited<ReturnType<PrometheusDriver['instantQuery']>>): number | null {
@@ -43,17 +47,25 @@
 		const ns = escapePromqlStringLiteral(namespace);
 		const base = `kube_resourcequota{namespace="${ns}"`;
 
-		const [cpuU, cpuH, memU, memH] = await Promise.all([
+		const [cpuU, cpuH, memU, memH, gpuU, gpuH, gpuMemU, gpuMemH] = await Promise.all([
 			prometheusDriver.instantQuery(`sum(${base}, type="used", resource="requests.cpu"})`),
 			prometheusDriver.instantQuery(`sum(${base}, type="hard", resource="requests.cpu"})`),
 			prometheusDriver.instantQuery(`sum(${base}, type="used", resource="requests.memory"})`),
-			prometheusDriver.instantQuery(`sum(${base}, type="hard", resource="requests.memory"})`)
+			prometheusDriver.instantQuery(`sum(${base}, type="hard", resource="requests.memory"})`),
+			prometheusDriver.instantQuery(`sum(${base}, type="used", resource="requests.nvidia.com/gpu"})`),
+			prometheusDriver.instantQuery(`sum(${base}, type="hard", resource="requests.nvidia.com/gpu"})`),
+			prometheusDriver.instantQuery(`sum(${base}, type="used", resource="requests.nvidia.com/gpumem"})`),
+			prometheusDriver.instantQuery(`sum(${base}, type="hard", resource="requests.nvidia.com/gpumem"})`)
 		]);
 
 		cpuUsed = instantScalar(cpuU);
 		cpuHard = instantScalar(cpuH);
 		memUsed = instantScalar(memU);
 		memHard = instantScalar(memH);
+		gpuUsed = instantScalar(gpuU) ?? 0;
+		gpuHard = instantScalar(gpuH) ?? 0;
+		gpuMemUsed = instantScalar(gpuMemU) ?? 0;
+		gpuMemHard = instantScalar(gpuMemH) ?? 0;
 	}
 
 	async function fetch() {
@@ -63,7 +75,7 @@
 			await fetchQuota();
 		} catch (error) {
 			hasError = true;
-			cpuUsed = cpuHard = memUsed = memHard = null;
+			cpuUsed = cpuHard = memUsed = memHard = gpuUsed = gpuHard = gpuMemUsed = gpuMemHard = null;
 			console.error('Failed to fetch workspace resource quota:', error);
 		}
 	}
@@ -92,10 +104,11 @@
 	}
 </script>
 
-<Card.Root class="relative h-full min-h-[160px] gap-2 overflow-hidden">
+<Card.Root class="group relative h-full min-h-[160px] gap-2 overflow-hidden">
 	<Icon
 		icon="ph:gauge"
-		class="absolute -right-10 bottom-0 size-36 text-8xl tracking-tight text-nowrap text-primary/5 uppercase group-hover:hidden"
+		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"
+		aria-hidden="true"
 	/>
 	<Card.Header>
 		<Card.Title>{m.workspace_quota_usage_title()}</Card.Title>
@@ -107,7 +120,7 @@
 		<Card.Content class="text-sm text-muted-foreground">{m.workspace_namespace_unresolved()}</Card.Content>
 	{:else if !isLoaded}
 		<div class="flex h-9 w-full items-center justify-center">
-			<Icon icon="svg-spinners:6-dots-rotate" class="size-10" />
+			<Icon icon="svg-spinners:6-dots-rotate" class="size-10 text-muted-foreground" />
 		</div>
 	{:else}
 		<Card.Content class="grid gap-4 md:grid-cols-2">
@@ -152,16 +165,16 @@
 								tooltip={false}
 							>
 								{#snippet aboveMarks()}
-									{@const percentage = formatPercentage(cpuUsed, cpuHard, 1)}
-									<Text
-										value={`${percentage} %`}
-										textAnchor="middle"
-										verticalAnchor="middle"
-										class="fill-foreground text-3xl! font-bold"
-										dy={-12}
-									/>
-									<Text
-										value={`${formatCpuCores(cpuUsed)} / ${formatCpuCores(cpuHard)}`}
+								{@const percentage = formatPercentage(cpuUsed!, cpuHard!, 1)}
+								<Text
+									value={`${percentage} %`}
+									textAnchor="middle"
+									verticalAnchor="middle"
+									class="fill-foreground text-3xl! font-bold"
+									dy={-12}
+								/>
+								<Text
+									value={`${formatCpuCores(cpuUsed!)} / ${formatCpuCores(cpuHard!)}`}
 										textAnchor="middle"
 										verticalAnchor="middle"
 										class="text-md! font-normal text-muted-foreground"
@@ -216,9 +229,186 @@
 								tooltip={false}
 							>
 								{#snippet aboveMarks()}
-									{@const percentage = formatPercentage(memUsed, memHard, 1)}
-									{@const { value: usingValue, unit: usingUnit } = formatCapacity(memUsed)}
-									{@const { value: totalValue, unit: totalUnit } = formatCapacity(memHard)}
+								{@const percentage = formatPercentage(memUsed!, memHard!, 1)}
+								{@const { value: usingValue, unit: usingUnit } = formatCapacity(memUsed!)}
+								{@const { value: totalValue, unit: totalUnit } = formatCapacity(memHard!)}
+									<Text
+										value={`${percentage} %`}
+										textAnchor="middle"
+										verticalAnchor="middle"
+										class="fill-foreground text-3xl! font-bold"
+										dy={-15}
+									/>
+									<Text
+										value={`${usingValue} ${usingUnit}/${totalValue} ${totalUnit}`}
+										textAnchor="middle"
+										verticalAnchor="middle"
+										class="text-md! text-muted-foreground"
+										dy={15}
+									/>
+								{/snippet}
+							</ArcChart>
+						</Chart.Container>
+					{/if}
+				</Statistics.Content>
+			</Statistics.Root>
+
+			<!-- GPU: nvidia.com/gpu -->
+			<Statistics.Root type="ratio" class="border-0 bg-transparent p-0 shadow-none">
+				<Statistics.Header>
+					<div class="flex justify-between gap-4">
+						<Statistics.Title>GPU</Statistics.Title>
+						{#if gpuHard !== null}
+							<div class="flex items-center gap-1 text-xl">
+								<p class="font-bold">{gpuHard}</p>
+							</div>
+						{/if}
+					</div>
+				</Statistics.Header>
+				<Statistics.Content class="min-h-20">
+					{#if hasError || gpuUsed === null || gpuHard === null}
+						<div class="flex h-[168px] w-full flex-col items-center justify-center">
+							<Icon icon="ph:chart-bar-fill" class="size-16 animate-pulse text-muted-foreground" />
+							<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
+						</div>
+					{:else if gpuHard === 0}
+						{@const chartConfig = { data: { color: 'var(--chart-3)' } } satisfies Chart.ChartConfig}
+						{@const data = [{ value: 0 }]}
+						<Chart.Container
+							config={chartConfig}
+							class="mx-auto my-auto aspect-square h-[168px] w-full max-w-[220px]"
+						>
+							<ArcChart
+								{data}
+								innerRadius={-15}
+								cornerRadius={15}
+								range={[-120, 120]}
+								maxValue={1}
+								series={[{ key: 'data', color: chartConfig.data.color }]}
+								props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
+								tooltip={false}
+							>
+								{#snippet aboveMarks()}
+									<Text
+										value="0 / 0"
+										textAnchor="middle"
+										verticalAnchor="middle"
+										class="fill-foreground text-3xl! font-bold"
+										dy={0}
+									/>
+								{/snippet}
+							</ArcChart>
+						</Chart.Container>
+					{:else}
+						{@const chartConfig = { data: { color: 'var(--chart-3)' } } satisfies Chart.ChartConfig}
+						{@const ratio = gpuUsed / gpuHard}
+						{@const data = [{ value: ratio }]}
+						<Chart.Container
+							config={chartConfig}
+							class="mx-auto my-auto aspect-square h-[168px] w-full max-w-[220px]"
+						>
+							<ArcChart
+								{data}
+								innerRadius={-15}
+								cornerRadius={15}
+								range={[-120, 120]}
+								maxValue={1}
+								series={[{ key: 'data', color: chartConfig.data.color }]}
+								props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
+								tooltip={false}
+							>
+								{#snippet aboveMarks()}
+								{@const percentage = formatPercentage(gpuUsed!, gpuHard!, 1)}
+								<Text
+									value={`${percentage} %`}
+									textAnchor="middle"
+									verticalAnchor="middle"
+									class="fill-foreground text-3xl! font-bold"
+									dy={-12}
+								/>
+								<Text
+									value={`${gpuUsed!} / ${gpuHard!}`}
+										textAnchor="middle"
+										verticalAnchor="middle"
+										class="text-md! font-normal text-muted-foreground"
+										dy={14}
+									/>
+								{/snippet}
+							</ArcChart>
+						</Chart.Container>
+					{/if}
+				</Statistics.Content>
+			</Statistics.Root>
+
+			<!-- GPU Memory: nvidia.com/gpumem -->
+			<Statistics.Root type="ratio" class="border-0 bg-transparent p-0 shadow-none">
+				<Statistics.Header>
+					<div class="flex justify-between gap-4">
+						<Statistics.Title>GPU Memory</Statistics.Title>
+						{#if gpuMemHard !== null}
+							{@const { value, unit } = formatCapacity(gpuMemHard)}
+							<div class="flex items-center gap-1 text-xl">
+								<p class="font-bold">{value} {unit}</p>
+							</div>
+						{/if}
+					</div>
+				</Statistics.Header>
+				<Statistics.Content class="min-h-20">
+					{#if hasError || gpuMemUsed === null || gpuMemHard === null}
+						<div class="flex h-[168px] w-full flex-col items-center justify-center">
+							<Icon icon="ph:chart-bar-fill" class="size-16 animate-pulse text-muted-foreground" />
+							<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
+						</div>
+					{:else if gpuMemHard === 0}
+						{@const chartConfig = { data: { color: 'var(--chart-3)' } } satisfies Chart.ChartConfig}
+						{@const data = [{ value: 0 }]}
+						<Chart.Container
+							config={chartConfig}
+							class="mx-auto my-auto aspect-square h-[168px] w-full max-w-[220px]"
+						>
+							<ArcChart
+								{data}
+								innerRadius={-15}
+								cornerRadius={15}
+								range={[-120, 120]}
+								maxValue={1}
+								series={[{ key: 'data', color: chartConfig.data.color }]}
+								props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
+								tooltip={false}
+							>
+								{#snippet aboveMarks()}
+									<Text
+										value="0 / 0"
+										textAnchor="middle"
+										verticalAnchor="middle"
+										class="fill-foreground text-3xl! font-bold"
+										dy={0}
+									/>
+								{/snippet}
+							</ArcChart>
+						</Chart.Container>
+					{:else}
+						{@const chartConfig = { data: { color: 'var(--chart-3)' } } satisfies Chart.ChartConfig}
+						{@const ratio = gpuMemUsed / gpuMemHard}
+						{@const data = [{ value: ratio }]}
+						<Chart.Container
+							config={chartConfig}
+							class="mx-auto my-auto aspect-square h-[168px] w-full max-w-[220px]"
+						>
+							<ArcChart
+								{data}
+								innerRadius={-15}
+								cornerRadius={15}
+								range={[-120, 120]}
+								maxValue={1}
+								series={[{ key: 'data', color: chartConfig.data.color }]}
+								props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
+								tooltip={false}
+							>
+								{#snippet aboveMarks()}
+								{@const percentage = formatPercentage(gpuMemUsed!, gpuMemHard!, 1)}
+								{@const { value: usingValue, unit: usingUnit } = formatCapacity(gpuMemUsed!)}
+								{@const { value: totalValue, unit: totalUnit } = formatCapacity(gpuMemHard!)}
 									<Text
 										value={`${percentage} %`}
 										textAnchor="middle"

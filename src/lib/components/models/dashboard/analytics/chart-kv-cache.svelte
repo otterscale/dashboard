@@ -19,7 +19,7 @@
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
-		namespace: string;
+		namespace: string | undefined;
 		selectedModel: string;
 		isReloading: boolean;
 	} = $props();

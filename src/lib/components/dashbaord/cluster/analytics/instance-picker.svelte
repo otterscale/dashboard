@@ -28,19 +28,19 @@
 				return { value: instance, label: nodename, icon: 'ph:desktop' };
 			});
 			if (instances.length > 0) {
-				instances.push({ value: '.*', label: m.all_machines(), icon: 'ph:desktop-duotone' });
+				instances.push({ value: '.*', label: m.all_nodes(), icon: 'ph:desktop-duotone' });
 			}
 			instanceOptions.set(instances);
 			selectedInstance = instances[0]?.value;
 		} catch {
-			instanceOptions.set([{ value: '.*', label: m.all_machines(), icon: 'ph:desktop-duotone' }]);
-			selectedInstance = '.*';
+			instanceOptions.set([]);
+			selectedInstance = undefined;
 		}
 		isLoaded = true;
 	});
 </script>
 
-{#if isLoaded}
+{#if isLoaded && $instanceOptions.length > 0}
 	<SingleSelect.Root options={instanceOptions} bind:value={selectedInstance}>
 		<SingleSelect.Trigger />
 		<SingleSelect.Content>

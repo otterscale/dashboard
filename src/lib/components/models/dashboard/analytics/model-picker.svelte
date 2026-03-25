@@ -2,7 +2,7 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import Icon from '@iconify/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import { getContext, onMount } from 'svelte';
+	import { getContext } from 'svelte';
 	import { writable } from 'svelte/store';
 
 	import { Single as SingleSelect } from '$lib/components/custom/select';
@@ -33,48 +33,61 @@
 	}
 
 	let isLoaded = $state(false);
-	onMount(async () => {
-		const modelNames = new Set<string>();
-		const ns = (namespace ?? '').trim();
+
+	/** Re-fetch when cluster or workspace (namespace) changes — not only on first mount. */
+	$effect(() => {
 		const clusterId = (cluster ?? '').trim();
+		const ns = (namespace ?? '').trim();
+		let cancelled = false;
 
-		if (clusterId && ns) {
-			try {
-				const response = await resourceClient.list({
-					cluster: clusterId,
-					group: 'model.otterscale.io',
-					version: 'v1alpha1',
-					resource: 'modelservices',
-					namespace: ns
-				});
-				for (const item of response.items) {
-					const name = nameFromResourceItem(item);
-					if (name) modelNames.add(name);
+		(async () => {
+			isLoaded = false;
+			const modelNames = new Set<string>();
+
+			if (clusterId) {
+				try {
+					const response = await resourceClient.list({
+						cluster: clusterId,
+						group: 'model.otterscale.io',
+						version: 'v1alpha1',
+						resource: 'modelservices',
+						namespace: ns
+					});
+					for (const item of response.items) {
+						const name = nameFromResourceItem(item);
+						if (name) modelNames.add(name);
+					}
+				} catch (error) {
+					console.error('Failed to list ModelServices for analytics picker:', error);
 				}
-			} catch (error) {
-				console.error('Failed to list ModelServices for analytics picker:', error);
 			}
-		}
 
-		const models: ModelOption[] = [...modelNames]
-			.sort((a, b) => a.localeCompare(b))
-			.map((name) => ({
-				value: name,
-				label: name.length > 40 ? name.slice(0, 37) + '...' : name,
-				icon: 'ph:robot'
-			}));
+			if (cancelled) return;
 
-		const options =
-			models.length > 0
-				? [{ value: '.*', label: m.all_models(), icon: 'ph:robot-duotone' }, ...models]
-				: [{ value: '.*', label: m.all_models(), icon: 'ph:robot-duotone' }];
-		modelOptions.set(options);
-		selectedModel = options[0]?.value ?? '.*';
-		isLoaded = true;
+			const models: ModelOption[] = [...modelNames]
+				.sort((a, b) => a.localeCompare(b))
+				.map((name) => ({
+					value: name,
+					label: name.length > 40 ? name.slice(0, 37) + '...' : name,
+					icon: 'ph:robot'
+				}));
+
+			const options =
+				models.length > 0
+					? [{ value: '.*', label: m.all_models(), icon: 'ph:robot-duotone' }, ...models]
+					: [];
+			modelOptions.set(options);
+			selectedModel = models.length > 0 ? options[0]!.value : '.*';
+			isLoaded = true;
+		})();
+
+		return () => {
+			cancelled = true;
+		};
 	});
 </script>
 
-{#if isLoaded}
+{#if isLoaded && $modelOptions.length > 0}
 	<SingleSelect.Root options={modelOptions} bind:value={selectedModel}>
 		<SingleSelect.Trigger />
 		<SingleSelect.Content>

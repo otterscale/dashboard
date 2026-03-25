@@ -21,7 +21,7 @@
 	}: {
 		prometheusDriver: PrometheusDriver;
 		cluster: string;
-		namespace: string;
+		namespace: string | undefined;
 		selectedModel: string;
 		isReloading: boolean;
 	} = $props();
@@ -38,7 +38,7 @@
 
 	function getTpotQuery(quantile: number): string {
 		const bucket = vllmMetricWithSelector(
-			'vllm:inter_token_latency_seconds_bucket',
+			'vllm:time_per_output_token_seconds_bucket',
 			namespace,
 			selectedModel
 		);

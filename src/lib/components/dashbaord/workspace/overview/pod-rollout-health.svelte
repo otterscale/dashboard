@@ -155,10 +155,6 @@
 </script>
 
 <Card.Root class="group relative overflow-hidden border-border/80 bg-card/50 shadow-sm ring-1 ring-border/40">
-	<div
-		class="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary/50 via-primary/20 to-transparent"
-		aria-hidden="true"
-	></div>
 	<Icon
 		icon="ph:first-aid-kit"
 		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"

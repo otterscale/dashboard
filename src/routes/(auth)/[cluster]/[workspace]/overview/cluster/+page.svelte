@@ -62,7 +62,9 @@
 							<Tabs.Trigger value="overview">{m.overview()}</Tabs.Trigger>
 							<Tabs.Trigger value="analytics">{m.analytics()}</Tabs.Trigger>
 						</Tabs.List>
-						<Reloader bind:checked={isReloading} />
+						<div class="flex items-center gap-2">
+							<Reloader bind:checked={isReloading} />
+						</div>
 					</div>
 					<Tabs.Content value="overview">
 						<div
