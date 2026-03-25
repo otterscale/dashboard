@@ -14,7 +14,8 @@
 		formatChartTimeRange as formatTimeRange,
 		formatChartXAxisDate as formatXAxisDate,
 		formatIO,
-		getChartXAxisTicks as getXAxisTicks	} from '$lib/formatter';
+		getChartXAxisTicks as getXAxisTicks
+	} from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
 	import { fetchFlattenedRange, generateChartConfig, getSeries } from '$lib/prometheus';
 	import { cn } from '$lib/utils';

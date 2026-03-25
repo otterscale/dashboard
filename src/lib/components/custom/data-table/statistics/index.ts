@@ -5,4 +5,4 @@ import Progress from './progress.svelte';
 import Root from './root.svelte';
 import Title from './title.svelte';
 
-export { Background, Content, Header, Progress,Root, Title };
+export { Background, Content, Header, Progress, Root, Title };

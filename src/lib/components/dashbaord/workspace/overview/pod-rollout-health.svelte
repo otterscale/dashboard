@@ -55,9 +55,11 @@
 		return Number.isFinite(n) ? Math.round(n) : 0;
 	}
 
-	const containerIssueTotal = $derived(
-		snap ? snap.crashLoop + snap.imagePull + snap.configError + snap.oomKilled : 0
-	);
+	const containerIssueTotal = $derived.by(() => {
+		const s = snap;
+		if (s === undefined) return 0;
+		return s.crashLoop + s.imagePull + s.configError + s.oomKilled;
+	});
 
 	async function fetchAll(ns: string) {
 		const n = escapePromqlStringLiteral(ns);

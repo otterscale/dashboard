@@ -23,4 +23,5 @@ export {
 	Root,
 	Statistics,
 	SubHeaderViewer,
-	Viewer};
+	Viewer
+};

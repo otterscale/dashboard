@@ -10,7 +10,7 @@ import HeadersRowPicker from './headers-row-picker.svelte';
 import Pagination from './pagination.svelte';
 import Sorter from './sorter.svelte';
 
-export { Empty, Pagination,Sorter };
+export { Empty, Pagination, Sorter };
 
 export const Headers = {
 	RowPicker: HeadersRowPicker

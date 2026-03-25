@@ -9,4 +9,4 @@ import Options from './options.svelte';
 import Root from './root.svelte';
 import Trigger from './trigger.svelte';
 
-export { Check,Content, Empty, Group, Input, Item, List, Options, Root, Trigger };
+export { Check, Content, Empty, Group, Input, Item, List, Options, Root, Trigger };
