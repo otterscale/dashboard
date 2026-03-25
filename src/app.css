@@ -1,8 +1,8 @@
 @import '@sjsf/shadcn4-theme/styles.css';
 @import 'tailwindcss';
 @import 'tw-animate-css';
-@import '@fontsource-variable/geist';
-@import '@fontsource-variable/geist-mono';
+@import '@fontsource-variable/inter';
+@import '@fontsource-variable/jetbrains-mono';
 @import '@fontsource-variable/noto-sans-tc';
 
 @custom-variant dark (&:is(.dark *));
@@ -77,8 +77,8 @@
 }
 
 @theme inline {
-	--font-sans: 'Geist Variable', 'Noto Sans TC Variable', sans-serif;
-	--font-mono: 'Geist Mono Variable', monospace;
+	--font-sans: 'Inter Variable', 'Noto Sans TC Variable', sans-serif;
+	--font-mono: 'JetBrains Mono Variable', monospace;
 	--color-background: var(--background);
 	--color-foreground: var(--foreground);
 	--color-card: var(--card);
