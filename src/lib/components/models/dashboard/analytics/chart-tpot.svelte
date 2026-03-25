@@ -142,8 +142,7 @@
 									day: 'numeric',
 									hour: 'numeric',
 									minute: 'numeric'
-								})
-							}
+								})}
 						>
 							{#snippet formatter({ item, name, value })}
 								<div

@@ -68,7 +68,9 @@
 		<Statistics.Title>
 			<div class="flex flex-col gap-0.5">
 				{m.kv_cache_usage()}
-				<p class="text-sm font-normal text-muted-foreground">{m.llm_dashboard_kv_cache_tooltip()}</p>
+				<p class="text-sm font-normal text-muted-foreground">
+					{m.llm_dashboard_kv_cache_tooltip()}
+				</p>
 			</div>
 		</Statistics.Title>
 	</Statistics.Header>
@@ -83,14 +85,19 @@
 				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
 			</div>
 		{:else}
-			{@const data = cacheUsage.map((s) => ({ time: s.time, usage: !isNaN(Number(s.value)) ? Number(s.value) : 0 }))}
+			{@const data = cacheUsage.map((s) => ({
+				time: s.time,
+				usage: !isNaN(Number(s.value)) ? Number(s.value) : 0
+			}))}
 			<Chart.Container config={configuration} class="h-[200px] w-full">
 				<AreaChart
-					data={data}
+					{data}
 					x="time"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}
-					series={[{ key: 'usage', label: configuration.usage.label, color: configuration.usage.color }]}
+					series={[
+						{ key: 'usage', label: configuration.usage.label, color: configuration.usage.color }
+					]}
 					props={{
 						area: {
 							curve: curveMonotoneX,
@@ -115,8 +122,7 @@
 									day: 'numeric',
 									hour: 'numeric',
 									minute: 'numeric'
-								})
-							}
+								})}
 						>
 							{#snippet formatter({ item, name, value })}
 								<div

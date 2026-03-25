@@ -89,9 +89,7 @@
 	const bound = $derived(scalar(boundCount) ?? 0);
 	const pending = $derived(scalar(pendingCount) ?? 0);
 
-	const boundPercent = $derived(
-		total > 0 ? Math.min(100, Math.round((100 * bound) / total)) : 0
-	);
+	const boundPercent = $derived(total > 0 ? Math.min(100, Math.round((100 * bound) / total)) : 0);
 </script>
 
 <!-- 外框與 Workload health 一致；內容區維持 KPI + 掛載狀態區塊 -->
@@ -108,21 +106,23 @@
 		</Card.Description>
 	</Card.Header>
 	{#if !namespace}
-		<Card.Content class="text-sm text-muted-foreground">{m.workspace_namespace_unresolved()}</Card.Content>
+		<Card.Content class="text-sm text-muted-foreground"
+			>{m.workspace_namespace_unresolved()}</Card.Content
+		>
 	{:else if !isLoaded}
 		<div class="flex h-9 w-full items-center justify-center">
 			<Icon icon="svg-spinners:6-dots-rotate" class="size-10 text-muted-foreground" />
 		</div>
 	{:else}
-		<Card.Content class="relative space-y-4 px-4 pb-5 pt-0 sm:px-5">
+		<Card.Content class="relative space-y-4 px-4 pt-0 pb-5 sm:px-5">
 			<div
 				class="flex items-start justify-between gap-3 rounded-xl border border-border/70 bg-muted/20 px-4 py-3.5 ring-1 ring-border/30"
 			>
 				<div class="min-w-0 space-y-1">
-					<p class="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+					<p class="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
 						{m.workspace_pvc_requested()}
 					</p>
-					<p class="text-3xl font-semibold tabular-nums tracking-tight text-foreground">
+					<p class="text-3xl font-semibold tracking-tight text-foreground tabular-nums">
 						{capacity.value}
 						<span class="text-lg font-medium text-muted-foreground">{capacity.unit}</span>
 					</p>
@@ -136,13 +136,13 @@
 			</div>
 
 			<div class="space-y-3">
-				<p class="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+				<p class="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
 					{m.workspace_pvc_volume_status()}
 				</p>
 
 				<div class="flex items-end justify-between gap-2">
 					<div>
-						<p class="text-2xl font-semibold tabular-nums leading-none">{total}</p>
+						<p class="text-2xl leading-none font-semibold tabular-nums">{total}</p>
 						<p class="mt-1 text-xs text-muted-foreground">{m.workspace_pvc_total_count()}</p>
 					</div>
 					{#if total > 0}
@@ -169,7 +169,7 @@
 							<Icon icon="ph:check-circle" class="size-4" />
 						</span>
 						<div class="min-w-0">
-							<p class="text-lg font-semibold tabular-nums leading-none">{bound}</p>
+							<p class="text-lg leading-none font-semibold tabular-nums">{bound}</p>
 							<p class="truncate text-[11px] text-muted-foreground">
 								{m.workspace_pvc_bound_count()}
 							</p>
@@ -178,9 +178,7 @@
 					<div
 						class={cn(
 							'flex items-center gap-2 rounded-lg border px-3 py-2.5',
-							pending > 0
-								? 'border-amber-500/30 bg-amber-500/10'
-								: 'border-border/60 bg-muted/15'
+							pending > 0 ? 'border-amber-500/30 bg-amber-500/10' : 'border-border/60 bg-muted/15'
 						)}
 					>
 						<span
@@ -196,7 +194,7 @@
 						<div class="min-w-0">
 							<p
 								class={cn(
-									'text-lg font-semibold tabular-nums leading-none',
+									'text-lg leading-none font-semibold tabular-nums',
 									pending > 0 && 'text-amber-700 dark:text-amber-400'
 								)}
 							>

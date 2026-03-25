@@ -182,7 +182,14 @@ export function formatChartXAxisDate(date: Date, range: ChartTimeRange): string 
 
 export function getChartXAxisTicks(range: ChartTimeRange): number {
 	const map: Record<ChartTimeRange, number> = {
-		'15m': 5, '30m': 6, '1h': 6, '3h': 6, '6h': 6, '12h': 6, '24h': 6, '7d': 7
+		'15m': 5,
+		'30m': 6,
+		'1h': 6,
+		'3h': 6,
+		'6h': 6,
+		'12h': 6,
+		'24h': 6,
+		'7d': 7
 	};
 	return map[range] ?? 6;
 }

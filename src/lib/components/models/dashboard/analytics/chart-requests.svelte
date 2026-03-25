@@ -68,7 +68,9 @@
 		<Statistics.Title>
 			<div class="flex flex-col gap-0.5">
 				{m.requests()}
-				<p class="text-sm font-normal text-muted-foreground">{m.llm_dashboard_request_rate_tooltip()}</p>
+				<p class="text-sm font-normal text-muted-foreground">
+					{m.llm_dashboard_request_rate_tooltip()}
+				</p>
 			</div>
 		</Statistics.Title>
 	</Statistics.Header>
@@ -83,14 +85,23 @@
 				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
 			</div>
 		{:else}
-			{@const data = requestRates.map((s) => ({ time: s.time, requests: !isNaN(Number(s.value)) ? Number(s.value) : 0 }))}
+			{@const data = requestRates.map((s) => ({
+				time: s.time,
+				requests: !isNaN(Number(s.value)) ? Number(s.value) : 0
+			}))}
 			<Chart.Container config={configuration} class="h-[200px] w-full">
 				<AreaChart
-					data={data}
+					{data}
 					x="time"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}
-					series={[{ key: 'requests', label: configuration.requests.label, color: configuration.requests.color }]}
+					series={[
+						{
+							key: 'requests',
+							label: configuration.requests.label,
+							color: configuration.requests.color
+						}
+					]}
 					props={{
 						area: {
 							curve: curveMonotoneX,
@@ -115,8 +126,7 @@
 									day: 'numeric',
 									hour: 'numeric',
 									minute: 'numeric'
-								})
-							}
+								})}
 						>
 							{#snippet formatter({ item, name, value })}
 								<div

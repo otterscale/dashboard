@@ -116,7 +116,9 @@
 		</Card.Description>
 	</Card.Header>
 	{#if !namespace}
-		<Card.Content class="text-sm text-muted-foreground">{m.workspace_namespace_unresolved()}</Card.Content>
+		<Card.Content class="text-sm text-muted-foreground"
+			>{m.workspace_namespace_unresolved()}</Card.Content
+		>
 	{:else if !isLoaded}
 		<div class="flex h-9 w-full items-center justify-center">
 			<Icon icon="svg-spinners:6-dots-rotate" class="size-10 text-muted-foreground" />
@@ -124,14 +126,11 @@
 	{:else}
 		<Card.Content class="space-y-2.5">
 			{#each rows as row (row.label)}
-				{@const pct =
-					row.total > 0 ? Math.min(100, Math.round((100 * row.ready) / row.total)) : 0}
-				<div
-					class="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/15 px-3 py-2.5"
-				>
+				{@const pct = row.total > 0 ? Math.min(100, Math.round((100 * row.ready) / row.total)) : 0}
+				<div class="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/15 px-3 py-2.5">
 					<div class="flex items-center justify-between gap-2">
 						<span class="text-sm font-medium">{row.label}</span>
-						<span class="shrink-0 tabular-nums text-sm text-muted-foreground">
+						<span class="shrink-0 text-sm text-muted-foreground tabular-nums">
 							{m.workspace_workload_ready_ratio({
 								ready: String(row.ready),
 								total: String(row.total)

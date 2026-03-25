@@ -93,7 +93,9 @@
 		<Statistics.Title>
 			<div class="flex flex-col gap-0.5">
 				{m.time_to_first_token()}
-				<p class="text-sm font-normal text-muted-foreground">{m.llm_dashboard_time_to_first_token_tooltip()}</p>
+				<p class="text-sm font-normal text-muted-foreground">
+					{m.llm_dashboard_time_to_first_token_tooltip()}
+				</p>
 			</div>
 		</Statistics.Title>
 	</Statistics.Header>
@@ -142,8 +144,7 @@
 									day: 'numeric',
 									hour: 'numeric',
 									minute: 'numeric'
-								})
-							}
+								})}
 						>
 							{#snippet formatter({ item, name, value })}
 								<div

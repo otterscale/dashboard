@@ -59,10 +59,8 @@
 			<div class="flex justify-end gap-2">
 				<Reloader bind:checked={isReloading} />
 			</div>
-			<div
-				class="grid auto-rows-auto grid-cols-2 gap-4 pt-4 md:gap-6 lg:grid-cols-12"
-			>
-				<WidgetGrid widgets={widgets} {prometheusDriver} {cluster} bind:isReloading />
+			<div class="grid auto-rows-auto grid-cols-2 gap-4 pt-4 md:gap-6 lg:grid-cols-12">
+				<WidgetGrid {widgets} {prometheusDriver} {cluster} bind:isReloading />
 			</div>
 		{:else if cluster}
 			<div class="flex min-h-[400px] w-full items-center justify-center">

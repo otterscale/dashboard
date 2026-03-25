@@ -16,9 +16,7 @@
 	let uptime: SampleValue | undefined = $state(undefined);
 	let create_time: SampleValue | undefined = $state(undefined);
 	async function fetchUptime() {
-		const uptimeResponse = await prometheusDriver.instantQuery(
-			`time() - min(kube_node_created{})`
-		);
+		const uptimeResponse = await prometheusDriver.instantQuery(`time() - min(kube_node_created{})`);
 		const createTimeResponse = await prometheusDriver.instantQuery(
 			`min(kube_node_created{}) * 1000`
 		);

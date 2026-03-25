@@ -52,10 +52,18 @@
 			prometheusDriver.instantQuery(`sum(${base}, type="hard", resource="requests.cpu"})`),
 			prometheusDriver.instantQuery(`sum(${base}, type="used", resource="requests.memory"})`),
 			prometheusDriver.instantQuery(`sum(${base}, type="hard", resource="requests.memory"})`),
-			prometheusDriver.instantQuery(`sum(${base}, type="used", resource="requests.nvidia.com/gpu"})`),
-			prometheusDriver.instantQuery(`sum(${base}, type="hard", resource="requests.nvidia.com/gpu"})`),
-			prometheusDriver.instantQuery(`sum(${base}, type="used", resource="requests.nvidia.com/gpumem"})`),
-			prometheusDriver.instantQuery(`sum(${base}, type="hard", resource="requests.nvidia.com/gpumem"})`)
+			prometheusDriver.instantQuery(
+				`sum(${base}, type="used", resource="requests.nvidia.com/gpu"})`
+			),
+			prometheusDriver.instantQuery(
+				`sum(${base}, type="hard", resource="requests.nvidia.com/gpu"})`
+			),
+			prometheusDriver.instantQuery(
+				`sum(${base}, type="used", resource="requests.nvidia.com/gpumem"})`
+			),
+			prometheusDriver.instantQuery(
+				`sum(${base}, type="hard", resource="requests.nvidia.com/gpumem"})`
+			)
 		]);
 
 		cpuUsed = instantScalar(cpuU);
@@ -117,7 +125,9 @@
 		</Card.Description>
 	</Card.Header>
 	{#if !namespace}
-		<Card.Content class="text-sm text-muted-foreground">{m.workspace_namespace_unresolved()}</Card.Content>
+		<Card.Content class="text-sm text-muted-foreground"
+			>{m.workspace_namespace_unresolved()}</Card.Content
+		>
 	{:else if !isLoaded}
 		<div class="flex h-9 w-full items-center justify-center">
 			<Icon icon="svg-spinners:6-dots-rotate" class="size-10 text-muted-foreground" />
@@ -137,11 +147,7 @@
 					</div>
 				</Statistics.Header>
 				<Statistics.Content class="min-h-20">
-					{#if hasError ||
-						cpuUsed === null ||
-						cpuHard === null ||
-						cpuHard === 0 ||
-						formatPercentage(cpuUsed, cpuHard, 1) === null}
+					{#if hasError || cpuUsed === null || cpuHard === null || cpuHard === 0 || formatPercentage(cpuUsed, cpuHard, 1) === null}
 						<div class="flex h-[168px] w-full flex-col items-center justify-center">
 							<Icon icon="ph:chart-bar-fill" class="size-16 animate-pulse text-muted-foreground" />
 							<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
@@ -165,16 +171,16 @@
 								tooltip={false}
 							>
 								{#snippet aboveMarks()}
-								{@const percentage = formatPercentage(cpuUsed!, cpuHard!, 1)}
-								<Text
-									value={`${percentage} %`}
-									textAnchor="middle"
-									verticalAnchor="middle"
-									class="fill-foreground text-3xl! font-bold"
-									dy={-12}
-								/>
-								<Text
-									value={`${formatCpuCores(cpuUsed!)} / ${formatCpuCores(cpuHard!)}`}
+									{@const percentage = formatPercentage(cpuUsed!, cpuHard!, 1)}
+									<Text
+										value={`${percentage} %`}
+										textAnchor="middle"
+										verticalAnchor="middle"
+										class="fill-foreground text-3xl! font-bold"
+										dy={-12}
+									/>
+									<Text
+										value={`${formatCpuCores(cpuUsed!)} / ${formatCpuCores(cpuHard!)}`}
 										textAnchor="middle"
 										verticalAnchor="middle"
 										class="text-md! font-normal text-muted-foreground"
@@ -201,11 +207,7 @@
 					</div>
 				</Statistics.Header>
 				<Statistics.Content class="min-h-20">
-					{#if hasError ||
-						memUsed === null ||
-						memHard === null ||
-						memHard === 0 ||
-						formatPercentage(memUsed, memHard, 1) === null}
+					{#if hasError || memUsed === null || memHard === null || memHard === 0 || formatPercentage(memUsed, memHard, 1) === null}
 						<div class="flex h-[168px] w-full flex-col items-center justify-center">
 							<Icon icon="ph:chart-bar-fill" class="size-16 animate-pulse text-muted-foreground" />
 							<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
@@ -229,9 +231,9 @@
 								tooltip={false}
 							>
 								{#snippet aboveMarks()}
-								{@const percentage = formatPercentage(memUsed!, memHard!, 1)}
-								{@const { value: usingValue, unit: usingUnit } = formatCapacity(memUsed!)}
-								{@const { value: totalValue, unit: totalUnit } = formatCapacity(memHard!)}
+									{@const percentage = formatPercentage(memUsed!, memHard!, 1)}
+									{@const { value: usingValue, unit: usingUnit } = formatCapacity(memUsed!)}
+									{@const { value: totalValue, unit: totalUnit } = formatCapacity(memHard!)}
 									<Text
 										value={`${percentage} %`}
 										textAnchor="middle"
@@ -318,16 +320,16 @@
 								tooltip={false}
 							>
 								{#snippet aboveMarks()}
-								{@const percentage = formatPercentage(gpuUsed!, gpuHard!, 1)}
-								<Text
-									value={`${percentage} %`}
-									textAnchor="middle"
-									verticalAnchor="middle"
-									class="fill-foreground text-3xl! font-bold"
-									dy={-12}
-								/>
-								<Text
-									value={`${gpuUsed!} / ${gpuHard!}`}
+									{@const percentage = formatPercentage(gpuUsed!, gpuHard!, 1)}
+									<Text
+										value={`${percentage} %`}
+										textAnchor="middle"
+										verticalAnchor="middle"
+										class="fill-foreground text-3xl! font-bold"
+										dy={-12}
+									/>
+									<Text
+										value={`${gpuUsed!} / ${gpuHard!}`}
 										textAnchor="middle"
 										verticalAnchor="middle"
 										class="text-md! font-normal text-muted-foreground"
@@ -406,9 +408,9 @@
 								tooltip={false}
 							>
 								{#snippet aboveMarks()}
-								{@const percentage = formatPercentage(gpuMemUsed!, gpuMemHard!, 1)}
-								{@const { value: usingValue, unit: usingUnit } = formatCapacity(gpuMemUsed!)}
-								{@const { value: totalValue, unit: totalUnit } = formatCapacity(gpuMemHard!)}
+									{@const percentage = formatPercentage(gpuMemUsed!, gpuMemHard!, 1)}
+									{@const { value: usingValue, unit: usingUnit } = formatCapacity(gpuMemUsed!)}
+									{@const { value: totalValue, unit: totalUnit } = formatCapacity(gpuMemHard!)}
 									<Text
 										value={`${percentage} %`}
 										textAnchor="middle"

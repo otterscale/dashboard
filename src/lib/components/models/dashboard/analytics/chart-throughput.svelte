@@ -97,7 +97,9 @@
 		<Statistics.Title>
 			<div class="flex flex-col gap-0.5">
 				{m.throughput()}
-				<p class="text-sm font-normal text-muted-foreground">{m.llm_dashboard_throughputs_tooltip()}</p>
+				<p class="text-sm font-normal text-muted-foreground">
+					{m.llm_dashboard_throughputs_tooltip()}
+				</p>
 			</div>
 		</Statistics.Title>
 	</Statistics.Header>
@@ -120,7 +122,11 @@
 					yPadding={[0, 25]}
 					series={[
 						{ key: 'prompt', label: configuration.prompt.label, color: configuration.prompt.color },
-						{ key: 'generation', label: configuration.generation.label, color: configuration.generation.color }
+						{
+							key: 'generation',
+							label: configuration.generation.label,
+							color: configuration.generation.color
+						}
 					]}
 					props={{
 						area: {
@@ -146,8 +152,7 @@
 									day: 'numeric',
 									hour: 'numeric',
 									minute: 'numeric'
-								})
-							}
+								})}
 						>
 							{#snippet formatter({ item, name, value })}
 								<div

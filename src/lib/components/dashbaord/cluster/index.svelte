@@ -46,9 +46,7 @@
 			<div class="flex justify-end gap-2">
 				<Reloader bind:checked={isReloading} />
 			</div>
-			<div
-				class="grid auto-rows-auto grid-cols-2 gap-5 pt-4 md:grid-cols-4 lg:grid-cols-12"
-			>
+			<div class="grid auto-rows-auto grid-cols-2 gap-5 pt-4 md:grid-cols-4 lg:grid-cols-12">
 				<WidgetGrid {widgets} {prometheusDriver} {cluster} bind:isReloading />
 			</div>
 		{:else if cluster}

@@ -68,7 +68,9 @@
 		<Statistics.Title>
 			<div class="flex flex-col gap-0.5">
 				{m.requests_waiting()}
-				<p class="text-sm font-normal text-muted-foreground">{m.llm_dashboard_requests_waiting_tooltip()}</p>
+				<p class="text-sm font-normal text-muted-foreground">
+					{m.llm_dashboard_requests_waiting_tooltip()}
+				</p>
 			</div>
 		</Statistics.Title>
 	</Statistics.Header>
@@ -83,14 +85,23 @@
 				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
 			</div>
 		{:else}
-			{@const data = waitingData.map((s) => ({ time: s.time, waiting: !isNaN(Number(s.value)) ? Number(s.value) : 0 }))}
+			{@const data = waitingData.map((s) => ({
+				time: s.time,
+				waiting: !isNaN(Number(s.value)) ? Number(s.value) : 0
+			}))}
 			<Chart.Container config={configuration} class="h-[200px] w-full">
 				<AreaChart
-					data={data}
+					{data}
 					x="time"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}
-					series={[{ key: 'waiting', label: configuration.waiting.label, color: configuration.waiting.color }]}
+					series={[
+						{
+							key: 'waiting',
+							label: configuration.waiting.label,
+							color: configuration.waiting.color
+						}
+					]}
 					props={{
 						area: {
 							curve: curveMonotoneX,
@@ -115,8 +126,7 @@
 									day: 'numeric',
 									hour: 'numeric',
 									minute: 'numeric'
-								})
-							}
+								})}
 						>
 							{#snippet formatter({ item, name, value })}
 								<div

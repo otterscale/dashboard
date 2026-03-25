@@ -15,9 +15,7 @@
 
 	let consumption: string | undefined = $state(undefined);
 	async function fetchConsumption() {
-		const response = await prometheusDriver.instantQuery(
-			`sum(DCGM_FI_DEV_POWER_USAGE{})`
-		);
+		const response = await prometheusDriver.instantQuery(`sum(DCGM_FI_DEV_POWER_USAGE{})`);
 		consumption = response.result[0]?.value?.value ?? undefined;
 	}
 

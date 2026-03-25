@@ -25,9 +25,7 @@
 
 	let units: number | undefined = $state(undefined);
 	async function fetchGraphicCardUnits() {
-		const usageResponse = await prometheusDriver.instantQuery(
-			`count(DCGM_FI_DEV_GPU_UTIL{})`
-		);
+		const usageResponse = await prometheusDriver.instantQuery(`count(DCGM_FI_DEV_GPU_UTIL{})`);
 		units = usageResponse.result[0]?.value?.value ?? undefined;
 	}
 

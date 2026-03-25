@@ -15,9 +15,7 @@
 
 	let clusterNodes: SampleValue | undefined = $state(undefined);
 	async function fetchClusterNodes() {
-		const response = await prometheusDriver.instantQuery(
-			`count(kube_node_role{container!=""})`
-		);
+		const response = await prometheusDriver.instantQuery(`count(kube_node_role{container!=""})`);
 		clusterNodes = response.result[0]?.value ?? undefined;
 	}
 

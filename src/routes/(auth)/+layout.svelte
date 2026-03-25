@@ -134,13 +134,12 @@
 					},
 					{
 						title: m.cluster(),
-						url:
-							page.params.workspace
-								? resolve('/(auth)/[cluster]/[workspace]/overview/cluster', {
-										cluster: activeCluster,
-										workspace: page.params.workspace
-									})
-								: ''
+						url: page.params.workspace
+							? resolve('/(auth)/[cluster]/[workspace]/overview/cluster', {
+									cluster: activeCluster,
+									workspace: page.params.workspace
+								})
+							: ''
 					}
 				]
 			},

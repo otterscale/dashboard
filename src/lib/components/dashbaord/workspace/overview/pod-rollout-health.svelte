@@ -140,8 +140,16 @@
 		if (!snap) return [];
 		return [
 			{ label: m.workspace_pods_running(), value: snap.running, tone: 'success' },
-			{ label: m.workspace_pods_not_ready(), value: snap.notReady, tone: snap.notReady > 0 ? 'warn' : 'default' },
-			{ label: m.workspace_pod_rollout_kpi_issues(), value: containerIssueTotal, tone: containerIssueTotal > 0 ? 'danger' : 'default' },
+			{
+				label: m.workspace_pods_not_ready(),
+				value: snap.notReady,
+				tone: snap.notReady > 0 ? 'warn' : 'default'
+			},
+			{
+				label: m.workspace_pod_rollout_kpi_issues(),
+				value: containerIssueTotal,
+				tone: containerIssueTotal > 0 ? 'danger' : 'default'
+			},
 			{ label: m.workspace_pods_succeeded(), value: snap.succeeded, tone: 'default' }
 		];
 	});
@@ -154,7 +162,9 @@
 	};
 </script>
 
-<Card.Root class="group relative overflow-hidden border-border/80 bg-card/50 shadow-sm ring-1 ring-border/40">
+<Card.Root
+	class="group relative overflow-hidden border-border/80 bg-card/50 shadow-sm ring-1 ring-border/40"
+>
 	<Icon
 		icon="ph:first-aid-kit"
 		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"
@@ -169,7 +179,9 @@
 		</Card.Description>
 	</Card.Header>
 	{#if !namespace}
-		<Card.Content class="text-sm text-muted-foreground">{m.workspace_namespace_unresolved()}</Card.Content>
+		<Card.Content class="text-sm text-muted-foreground"
+			>{m.workspace_namespace_unresolved()}</Card.Content
+		>
 	{:else if !isLoaded}
 		<div class="flex min-h-[200px] w-full items-center justify-center py-10">
 			<Icon icon="svg-spinners:6-dots-rotate" class="size-10 text-muted-foreground" />
@@ -180,15 +192,19 @@
 			<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
 		</div>
 	{:else}
-		<Card.Content class="relative space-y-6 px-4 pb-6 pt-0 sm:px-6">
+		<Card.Content class="relative space-y-6 px-4 pt-0 pb-6 sm:px-6">
 			<!-- Quick scan: headline metrics -->
 			<div class="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
 				{#each kpis as k (k.label)}
 					<div
 						class="flex flex-col gap-1 rounded-xl border border-border/60 bg-muted/25 px-3 py-3 shadow-sm backdrop-blur-sm transition-colors hover:bg-muted/35"
 					>
-						<span class="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{k.label}</span>
-						<span class={cn('text-2xl font-semibold tabular-nums sm:text-3xl', toneClass[k.tone])}>{k.value}</span>
+						<span class="text-[11px] font-medium tracking-wider text-muted-foreground uppercase"
+							>{k.label}</span
+						>
+						<span class={cn('text-2xl font-semibold tabular-nums sm:text-3xl', toneClass[k.tone])}
+							>{k.value}</span
+						>
 					</div>
 				{/each}
 			</div>
@@ -204,12 +220,12 @@
 						>
 							<Icon icon="ph:circles-four" class="size-5" />
 						</span>
-						<h3 class="text-sm font-semibold leading-none">{m.workspace_health_section_pods()}</h3>
+						<h3 class="text-sm leading-none font-semibold">{m.workspace_health_section_pods()}</h3>
 					</div>
 					<ul class="divide-y divide-border/50 text-sm">
 						<li class="flex items-center justify-between gap-3 py-2.5 first:pt-0">
 							<span class="min-w-0 text-muted-foreground">{m.workspace_pods_running()}</span>
-							<span class="shrink-0 font-medium tabular-nums text-chart-2">{snap.running}</span>
+							<span class="shrink-0 font-medium text-chart-2 tabular-nums">{snap.running}</span>
 						</li>
 						<li class="flex items-center justify-between gap-3 py-2.5">
 							<span class="min-w-0 text-muted-foreground">{m.workspace_pods_unknown()}</span>
@@ -217,7 +233,9 @@
 						</li>
 						<li class="flex items-center justify-between gap-3 py-2.5">
 							<span class="min-w-0 text-muted-foreground">{m.workspace_pods_not_ready()}</span>
-							<span class="shrink-0 font-semibold tabular-nums text-amber-600 dark:text-amber-400">{snap.notReady}</span>
+							<span class="shrink-0 font-semibold text-amber-600 tabular-nums dark:text-amber-400"
+								>{snap.notReady}</span
+							>
 						</li>
 						<li class="flex items-center justify-between gap-3 py-2.5">
 							<span class="min-w-0 text-muted-foreground">{m.workspace_pods_succeeded()}</span>
@@ -235,18 +253,16 @@
 						>
 							<Icon icon="ph:warning-octagon" class="size-5" />
 						</span>
-						<h3 class="text-sm font-semibold leading-none">{m.workspace_health_section_containers()}</h3>
+						<h3 class="text-sm leading-none font-semibold">
+							{m.workspace_health_section_containers()}
+						</h3>
 					</div>
 					<ul class="divide-y divide-border/50 text-sm">
-						{#each [
-							{ label: m.workspace_containers_crashloop(), value: snap.crashLoop },
-							{ label: m.workspace_containers_image_pull(), value: snap.imagePull },
-							{ label: m.workspace_containers_config_error(), value: snap.configError },
-							{ label: m.workspace_containers_oom_killed(), value: snap.oomKilled }
-						] as row (row.label)}
+						{#each [{ label: m.workspace_containers_crashloop(), value: snap.crashLoop }, { label: m.workspace_containers_image_pull(), value: snap.imagePull }, { label: m.workspace_containers_config_error(), value: snap.configError }, { label: m.workspace_containers_oom_killed(), value: snap.oomKilled }] as row (row.label)}
 							<li class="flex items-center justify-between gap-3 py-2.5 first:pt-0">
 								<span class="min-w-0 truncate text-muted-foreground">{row.label}</span>
-								<span class="shrink-0 font-semibold tabular-nums text-destructive">{row.value}</span>
+								<span class="shrink-0 font-semibold text-destructive tabular-nums">{row.value}</span
+								>
 							</li>
 						{/each}
 					</ul>
@@ -261,28 +277,40 @@
 						>
 							<Icon icon="ph:rocket-launch" class="size-5" />
 						</span>
-						<h3 class="text-sm font-semibold leading-none">{m.workspace_health_section_rollouts()}</h3>
+						<h3 class="text-sm leading-none font-semibold">
+							{m.workspace_health_section_rollouts()}
+						</h3>
 					</div>
 					<ul class="divide-y divide-border/50 text-sm">
 						<li class="flex items-center justify-between gap-3 py-2.5 first:pt-0">
 							<span class="min-w-0 text-muted-foreground">{m.deployment()}</span>
-							<span class="shrink-0 font-medium tabular-nums">{ratio(snap.deployReady, snap.deployDesired)}</span>
+							<span class="shrink-0 font-medium tabular-nums"
+								>{ratio(snap.deployReady, snap.deployDesired)}</span
+							>
 						</li>
 						<li class="flex items-center justify-between gap-3 py-2.5">
 							<span class="min-w-0 text-muted-foreground">{m.stateful_set()}</span>
-							<span class="shrink-0 font-medium tabular-nums">{ratio(snap.stsReady, snap.stsDesired)}</span>
+							<span class="shrink-0 font-medium tabular-nums"
+								>{ratio(snap.stsReady, snap.stsDesired)}</span
+							>
 						</li>
 						<li class="flex items-center justify-between gap-3 py-2.5">
 							<span class="min-w-0 text-muted-foreground">{m.daemon_set()}</span>
-							<span class="shrink-0 font-medium tabular-nums">{ratio(snap.dsReady, snap.dsDesired)}</span>
+							<span class="shrink-0 font-medium tabular-nums"
+								>{ratio(snap.dsReady, snap.dsDesired)}</span
+							>
 						</li>
 						<li class="flex items-center justify-between gap-3 py-2.5">
 							<span class="min-w-0 text-muted-foreground">{m.workspace_pvc_pending()}</span>
-							<span class="shrink-0 font-semibold tabular-nums text-amber-600 dark:text-amber-400">{snap.pvcPending}</span>
+							<span class="shrink-0 font-semibold text-amber-600 tabular-nums dark:text-amber-400"
+								>{snap.pvcPending}</span
+							>
 						</li>
 						<li class="flex items-center justify-between gap-3 py-2.5">
 							<span class="min-w-0 text-muted-foreground">{m.workspace_job_failed_pods()}</span>
-							<span class="shrink-0 font-semibold tabular-nums text-destructive">{snap.jobFailed}</span>
+							<span class="shrink-0 font-semibold text-destructive tabular-nums"
+								>{snap.jobFailed}</span
+							>
 						</li>
 					</ul>
 				</section>
