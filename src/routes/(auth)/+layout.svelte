@@ -456,13 +456,6 @@
 						nativeLabel={m.native()}
 						nativeItems={navData.native}
 					/>
-				{:else if activeCluster}
-					<NavMain
-						managedLabel={m.native()}
-						managedItems={navData.native}
-						nativeLabel={m.native()}
-						nativeItems={navData.native}
-					/>
 				{:else}
 					{@render contentSkeleton(sidebarOpen)}
 				{/if}
