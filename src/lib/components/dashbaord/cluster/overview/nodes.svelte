@@ -14,6 +14,7 @@
 		cluster: _cluster,
 		isReloading = $bindable()
 	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	void _cluster;
 
 	let clusterNodes: SampleValue | undefined = $state(undefined);
 	async function fetchClusterNodes() {

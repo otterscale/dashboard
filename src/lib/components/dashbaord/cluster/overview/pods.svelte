@@ -21,6 +21,7 @@
 		namespace?: string;
 		isReloading: boolean;
 	} = $props();
+	void _cluster;
 
 	let maxAllocatablePods: SampleValue | undefined = $state(undefined);
 	let runningPods: SampleValue | undefined = $state(undefined);

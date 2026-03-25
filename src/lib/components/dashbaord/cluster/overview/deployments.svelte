@@ -21,6 +21,7 @@
 		namespace?: string;
 		isReloading: boolean;
 	} = $props();
+	void _cluster;
 
 	let deployments: SampleValue | undefined = $state(undefined);
 	async function fetchdeployments() {

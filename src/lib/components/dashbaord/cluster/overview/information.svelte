@@ -14,6 +14,7 @@
 		cluster: _cluster,
 		isReloading = $bindable()
 	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	void _cluster;
 
 	let version: string | undefined = $state(undefined);
 	let platform: string | undefined = $state(undefined);
