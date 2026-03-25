@@ -9,12 +9,10 @@
 
 	let {
 		columnId,
-		values,
 		messages,
 		table
 	}: {
 		columnId: string;
-		values: string[];
 		messages: FilterMessages;
 		table: Table<unknown>;
 	} = $props();

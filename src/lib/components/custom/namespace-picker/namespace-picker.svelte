@@ -3,6 +3,7 @@
 	import { Box, Globe } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext, onMount } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 	import { writable } from 'svelte/store';
 
 	import { Single as SingleSelect } from '$lib/components/custom/select';
@@ -37,7 +38,7 @@
 			return;
 		}
 
-		const nameToNs = new Map<string, string>();
+		const nameToNs = new SvelteMap<string, string>();
 		try {
 			const response = await resourceClient.list({
 				cluster,
