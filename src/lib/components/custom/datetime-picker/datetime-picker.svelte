@@ -38,9 +38,9 @@
 		to = $bindable(nowCalendarDateTime()),
 		toIsNow = $bindable(true)
 	}: {
-		from?: CalendarDateTime;
-		to?: CalendarDateTime;
-		toIsNow?: boolean;
+		from: CalendarDateTime;
+		to: CalendarDateTime;
+		toIsNow: boolean;
 	} = $props();
 
 	const presets = [

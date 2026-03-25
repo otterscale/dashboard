@@ -25,12 +25,21 @@
 	let isReloading = $state(true);
 	let prometheusDriver = $state<PrometheusDriver | null>(null);
 
-	let pickerFrom = $state<CalendarDateTime | undefined>();
-	let pickerTo = $state<CalendarDateTime | undefined>();
+	function nowCDT(): CalendarDateTime {
+		const d = new Date();
+		return new CalendarDateTime(d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes());
+	}
+	function minutesAgoCDT(min: number): CalendarDateTime {
+		const d = new Date(Date.now() - min * 60 * 1000);
+		return new CalendarDateTime(d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes());
+	}
+
+	let pickerFrom = $state<CalendarDateTime>(minutesAgoCDT(60));
+	let pickerTo = $state<CalendarDateTime>(nowCDT());
 	let pickerToIsNow = $state(true);
 
-	const start = $derived(pickerFrom ? pickerFrom.toDate(getLocalTimeZone()) : new Date(Date.now() - 60 * 60 * 1000));
-	const end = $derived(pickerToIsNow ? new Date() : pickerTo ? pickerTo.toDate(getLocalTimeZone()) : new Date());
+	const start = $derived(pickerFrom.toDate(getLocalTimeZone()));
+	const end = $derived(pickerToIsNow ? new Date() : pickerTo.toDate(getLocalTimeZone()));
 
 	const widgets = $derived(
 		workspaceOverviewWidgets.map((w) => ({
