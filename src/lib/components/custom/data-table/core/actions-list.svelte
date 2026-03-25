@@ -1,7 +1,7 @@
 <script lang="ts">
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { Button } from '$lib/components/ui/button';
-	import Icon from '@iconify/svelte';
+	import { EllipsisVertical } from '@lucide/svelte';
 
 	let {
 		open = $bindable(false),
@@ -16,7 +16,7 @@
 	<DropdownMenu.Trigger>
 		{#snippet child({ props })}
 			<Button variant="ghost" size="icon" class="size-8" {...props}>
-				<Icon icon="ph:dots-three-vertical" class="size-4" />
+				<EllipsisVertical class="size-4" />
 			</Button>
 		{/snippet}
 	</DropdownMenu.Trigger>

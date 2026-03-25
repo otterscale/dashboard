@@ -1,13 +1,13 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import type { Component } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 	import { cn } from '$lib/utils';
 
 	let {
-		icon,
+		icon: IconComponent,
 		class: className,
 		...restProps
-	}: HTMLAttributes<HTMLDivElement> & { icon: string } = $props();
+	}: HTMLAttributes<HTMLDivElement> & { icon?: Component } = $props();
 </script>
 
 <div
@@ -15,5 +15,7 @@
 	class={cn('pointer-events-none absolute right-2 bottom-2 text-muted-foreground/10', className)}
 	{...restProps}
 >
-	<Icon {icon} class="size-24" />
+	{#if IconComponent}
+		<IconComponent class="size-24" />
+	{/if}
 </div>

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import { ChartLine, Filter, LoaderCircle, Square } from '@lucide/svelte';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart } from 'layerchart';
@@ -101,7 +101,7 @@
 			</Statistics.Title>
 			<div class="relative ml-auto">
 				<span class="absolute top-1/2 left-3 -translate-y-1/2 items-center">
-					<Icon icon="ph:funnel-duotone" />
+					<Filter />
 				</span>
 				<Input type="number" bind:value={topk} min={0} step={5} class="h-8 w-22 pl-9 text-lg" />
 			</div>
@@ -111,11 +111,11 @@
 	<Statistics.Content class="min-h-16">
 		{#if isLoading}
 			<div class="flex h-[250px] w-full items-center justify-center">
-				<Icon icon="svg-spinners:blocks-wave" class="m-8 size-32 text-muted-foreground/50" />
+				<LoaderCircle class="m-8 size-32 text-muted-foreground/50 animate-spin" />
 			</div>
 		{:else if hasError || filteredData.length === 0}
 			<div class="flex h-[250px] w-full flex-col items-center justify-center">
-				<Icon icon="ph:chart-line-fill" class="size-60 animate-pulse text-muted-foreground" />
+				<ChartLine class="size-60 animate-pulse text-muted-foreground" />
 				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
 			</div>
 		{:else}
@@ -180,7 +180,7 @@
 								>
 									{#if value !== undefined && value !== null}
 										<span class="flex w-full items-center gap-1">
-											<Icon icon="ph:square-fill" class="text-(--color-bg)" />
+											<Square class="text-(--color-bg)" />
 											<p class={isTop ? 'font-bold text-destructive' : 'text-foreground'}>
 												{name}
 											</p>

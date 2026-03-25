@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { PrometheusDriver } from 'prometheus-query';
-	import Icon from '@iconify/svelte';
+	import { LoaderCircle } from '@lucide/svelte';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { Reloader } from '$lib/components/custom/reloader';
@@ -66,7 +66,7 @@
 			</Tabs.Root>
 		{:else if cluster}
 			<div class="flex min-h-[400px] w-full items-center justify-center">
-				<Icon icon="svg-spinners:6-dots-rotate" class="size-12 text-muted-foreground" />
+				<LoaderCircle class="size-12 text-muted-foreground animate-spin" />
 			</div>
 		{:else}
 			<div class="flex min-h-[400px] w-full items-center justify-center text-muted-foreground">

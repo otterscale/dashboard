@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import { Info, LoaderCircle, TrendingUp } from '@lucide/svelte';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { LineChart } from 'layerchart';
@@ -73,7 +73,7 @@
 			<div class="flex flex-col items-start gap-0.5 truncate text-sm font-medium tracking-tight">
 				<p class="text-xs text-muted-foreground uppercase">{m.last_6_months()}</p>
 				<div class="flex items-center gap-1 text-lg font-medium">
-					<Icon icon="ph:trend-up" class="size-4.5" />
+					<TrendingUp class="size-4.5" />
 					{#if totalNodes}
 						+{totalNodes}
 					{/if}
@@ -82,7 +82,7 @@
 			<Tooltip.Provider>
 				<Tooltip.Root>
 					<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-						<Icon icon="ph:info" class="size-5 text-muted-foreground" />
+						<Info class="size-5 text-muted-foreground" />
 					</Tooltip.Trigger>
 					<Tooltip.Content>
 						<p>{m.machine_dashboard_nodes_tooltip()}</p>
@@ -93,7 +93,7 @@
 	</Card.Header>
 	{#if !isLoaded}
 		<div class="flex h-[250px] w-full items-center justify-center">
-			<Icon icon="svg-spinners:6-dots-rotate" class="m-4 size-12" />
+			<LoaderCircle class="m-4 size-12 animate-spin" />
 		</div>
 	{:else}
 		<Card.Content>

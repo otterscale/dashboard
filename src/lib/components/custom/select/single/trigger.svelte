@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import { ChevronsUpDown } from '@lucide/svelte';
 	import { getContext } from 'svelte';
 	import * as Popover from '$lib/components/ui/popover';
 	import { Button } from '$lib/components/ui/button';
@@ -23,7 +23,7 @@
 			{...restProps}
 		>
 			<span class="truncate">{ctx.getCurrentLabel() || '…'}</span>
-			<Icon icon="ph:caret-up-down" class="size-4 shrink-0 opacity-50" />
+			<ChevronsUpDown class="size-4 shrink-0 opacity-50" />
 		</Button>
 	{/snippet}
 </Popover.Trigger>

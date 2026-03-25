@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import { ArrowUp, ArrowDown, ArrowUpDown } from '@lucide/svelte';
 	import type { Column } from '@tanstack/table-core';
 	import { cn } from '$lib/utils';
 
@@ -23,10 +23,10 @@
 >
 	{@render children?.()}
 	{#if sorted === 'asc'}
-		<Icon icon="ph:arrow-up" class="size-3" />
+		<ArrowUp class="size-3" />
 	{:else if sorted === 'desc'}
-		<Icon icon="ph:arrow-down" class="size-3" />
+		<ArrowDown class="size-3" />
 	{:else}
-		<Icon icon="ph:arrows-down-up" class="size-3 opacity-40" />
+		<ArrowUpDown class="size-3 opacity-40" />
 	{/if}
 </button>

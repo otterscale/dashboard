@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import { ChartBar, Gauge, LoaderCircle } from '@lucide/svelte';
 	import { ArcChart, Text } from 'layerchart';
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
@@ -113,11 +113,7 @@
 </script>
 
 <Card.Root class="group relative h-full min-h-[160px] gap-2 overflow-hidden">
-	<Icon
-		icon="ph:gauge"
-		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"
-		aria-hidden="true"
-	/>
+	<Gauge class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40" aria-hidden="true" />
 	<Card.Header>
 		<Card.Title>{m.workspace_quota_usage_title()}</Card.Title>
 		<Card.Description class="text-md flex min-h-6 items-center">
@@ -130,7 +126,7 @@
 		>
 	{:else if !isLoaded}
 		<div class="flex h-9 w-full items-center justify-center">
-			<Icon icon="svg-spinners:6-dots-rotate" class="size-10 text-muted-foreground" />
+			<LoaderCircle class="size-10 text-muted-foreground animate-spin" />
 		</div>
 	{:else}
 		<Card.Content class="grid gap-4 md:grid-cols-2">
@@ -149,7 +145,7 @@
 				<Statistics.Content class="min-h-20">
 					{#if hasError || cpuUsed === null || cpuHard === null || cpuHard === 0 || formatPercentage(cpuUsed, cpuHard, 1) === null}
 						<div class="flex h-[168px] w-full flex-col items-center justify-center">
-							<Icon icon="ph:chart-bar-fill" class="size-16 animate-pulse text-muted-foreground" />
+							<ChartBar class="size-16 animate-pulse text-muted-foreground" />
 							<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
 						</div>
 					{:else}
@@ -209,7 +205,7 @@
 				<Statistics.Content class="min-h-20">
 					{#if hasError || memUsed === null || memHard === null || memHard === 0 || formatPercentage(memUsed, memHard, 1) === null}
 						<div class="flex h-[168px] w-full flex-col items-center justify-center">
-							<Icon icon="ph:chart-bar-fill" class="size-16 animate-pulse text-muted-foreground" />
+							<ChartBar class="size-16 animate-pulse text-muted-foreground" />
 							<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
 						</div>
 					{:else}
@@ -270,7 +266,7 @@
 				<Statistics.Content class="min-h-20">
 					{#if hasError || gpuUsed === null || gpuHard === null}
 						<div class="flex h-[168px] w-full flex-col items-center justify-center">
-							<Icon icon="ph:chart-bar-fill" class="size-16 animate-pulse text-muted-foreground" />
+							<ChartBar class="size-16 animate-pulse text-muted-foreground" />
 							<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
 						</div>
 					{:else if gpuHard === 0}
@@ -358,7 +354,7 @@
 				<Statistics.Content class="min-h-20">
 					{#if hasError || gpuMemUsed === null || gpuMemHard === null}
 						<div class="flex h-[168px] w-full flex-col items-center justify-center">
-							<Icon icon="ph:chart-bar-fill" class="size-16 animate-pulse text-muted-foreground" />
+							<ChartBar class="size-16 animate-pulse text-muted-foreground" />
 							<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
 						</div>
 					{:else if gpuMemHard === 0}

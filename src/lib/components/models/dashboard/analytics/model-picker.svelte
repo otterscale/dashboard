@@ -1,13 +1,12 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import Icon from '@iconify/svelte';
+	import { Bot } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext } from 'svelte';
 	import { writable } from 'svelte/store';
 
 	import { Single as SingleSelect } from '$lib/components/custom/select';
 	import { m } from '$lib/paraglide/messages';
-	import { cn } from '$lib/utils';
 
 	let {
 		cluster,
@@ -22,7 +21,7 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	type ModelOption = { value: string; label: string; icon: string };
+	type ModelOption = { value: string; label: string };
 	const modelOptions = writable<ModelOption[]>([]);
 
 	function nameFromResourceItem(item: { object?: unknown }): string {
@@ -68,13 +67,10 @@
 				.sort((a, b) => a.localeCompare(b))
 				.map((name) => ({
 					value: name,
-					label: name.length > 40 ? name.slice(0, 37) + '...' : name,
-					icon: 'ph:robot'
-				}));
-
+										label: name.length > 40 ? name.slice(0, 37) + '...' : name
 			const options =
 				models.length > 0
-					? [{ value: '.*', label: m.all_models(), icon: 'ph:robot-duotone' }, ...models]
+						? [{ value: '.*', label: m.all_models() }, ...models]
 					: [];
 			modelOptions.set(options);
 			selectedModel = models.length > 0 ? options[0]!.value : '.*';
@@ -98,10 +94,7 @@
 					<SingleSelect.Group>
 						{#each $modelOptions as option (option.value)}
 							<SingleSelect.Item {option}>
-								<Icon
-									icon={option.icon ? option.icon : 'ph:empty'}
-									class={cn('size-5', option.icon ? 'visible' : 'invisible')}
-								/>
+								<Bot class="size-5" />
 								{option.label}
 								<SingleSelect.Check {option} />
 							</SingleSelect.Item>

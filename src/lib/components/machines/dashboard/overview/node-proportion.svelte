@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import { Box, LoaderCircle } from '@lucide/svelte';
 	import { PieChart, Text } from 'layerchart';
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
@@ -73,7 +73,7 @@
 	<Card.Header class="gap-0.5">
 		<Card.Title>
 			<div class="flex items-center gap-1 truncate text-sm font-medium tracking-tight">
-				<Icon icon="ph:cube" class="size-4.5" />
+				<Box class="size-4.5" />
 				{m.node_distribution()}
 			</div>
 		</Card.Title>
@@ -83,7 +83,7 @@
 	</Card.Header>
 	{#if !isLoaded}
 		<div class="flex h-[200px] w-full items-center justify-center">
-			<Icon icon="svg-spinners:6-dots-rotate" class="m-4 size-12" />
+			<LoaderCircle class="m-4 size-12 animate-spin" />
 		</div>
 	{:else}
 		<Card.Content class="flex-1">

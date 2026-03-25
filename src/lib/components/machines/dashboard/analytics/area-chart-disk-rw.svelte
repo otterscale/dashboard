@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import { ChartBar, ChartLine, LoaderCircle, Square } from '@lucide/svelte';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, ChartClipPath } from 'layerchart';
@@ -48,12 +48,12 @@
 	<Statistics.Content class="min-h-16">
 		{#await fetchMultipleFlattenedRange(client, query, startTime, endTime, STEP_SECONDS)}
 			<div class="flex h-[250px] w-full items-center justify-center">
-				<Icon icon="svg-spinners:blocks-wave" class="m-8 size-32 text-muted-foreground/50" />
+				<LoaderCircle class="m-8 size-32 text-muted-foreground/50 animate-spin" />
 			</div>
 		{:then response}
 			{#if response.length === 0}
 				<div class="flex h-[250px] w-full flex-col items-center justify-center">
-					<Icon icon="ph:chart-line-fill" class="size-60 animate-pulse text-muted-foreground" />
+					<ChartLine class="size-60 animate-pulse text-muted-foreground" />
 					<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
 				</div>
 			{:else}
@@ -129,7 +129,7 @@
 										{#if value !== undefined && value !== null}
 											{@const { value: ioValue, unit: ioUnit } = formatIO(Number(value))}
 											<span class="flex w-full items-center gap-1">
-												<Icon icon="ph:square-fill" class="text-(--color-bg)" />
+												<Square class="text-(--color-bg)" />
 												<p class="text-foreground">
 													{name}
 												</p>
@@ -150,7 +150,7 @@
 			{/if}
 		{:catch}
 			<div class="flex h-[250px] w-full flex-col items-center justify-center">
-				<Icon icon="ph:chart-bar-fill" class="size-24 animate-pulse text-muted-foreground" />
+				<ChartBar class="size-24 animate-pulse text-muted-foreground" />
 				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
 			</div>
 		{/await}

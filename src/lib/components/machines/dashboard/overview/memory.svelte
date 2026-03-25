@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import { ChevronDown, ChevronUp, Info, LoaderCircle, MemoryStick } from '@lucide/svelte';
 	import { scaleUtc } from 'd3-scale';
 	import { curveLinear } from 'd3-shape';
 	import { LineChart } from 'layerchart';
@@ -90,13 +90,13 @@
 	<Card.Header>
 		<Card.Title class="flex flex-wrap items-center justify-between gap-6">
 			<div class="flex flex-wrap items-center gap-2 truncate text-sm font-medium tracking-tight">
-				<Icon icon="ph:memory" class="size-4.5" />
+				<MemoryStick class="size-4.5" />
 				{m.memory()}
 			</div>
 			<Tooltip.Provider>
 				<Tooltip.Root>
 					<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-						<Icon icon="ph:info" class="size-5 text-muted-foreground" />
+						<Info class="size-5 text-muted-foreground" />
 					</Tooltip.Trigger>
 					<Tooltip.Content>
 						<p>{m.machine_dashboard_total_memory_tooltip()}</p>
@@ -107,7 +107,7 @@
 	</Card.Header>
 	{#if !isLoaded}
 		<div class="flex h-full w-full items-center justify-center">
-			<Icon icon="svg-spinners:6-dots-rotate" class="m-4 size-12" />
+			<LoaderCircle class="m-4 size-12 animate-spin" />
 		</div>
 	{:else}
 		<Card.Content class="flex flex-wrap items-center justify-between gap-6">
@@ -168,9 +168,9 @@
 		>
 			{Math.abs(memoryUsagesTrend).toFixed(2)} %
 			{#if memoryUsagesTrend >= 0}
-				<Icon icon="ph:caret-up" />
+				<ChevronUp />
 			{:else}
-				<Icon icon="ph:caret-down" />
+				<ChevronDown />
 			{/if}
 		</Card.Footer>
 	{/if}

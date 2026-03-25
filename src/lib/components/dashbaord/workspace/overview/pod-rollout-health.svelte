@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import { BriefcaseMedical, ChartBar, LayoutGrid, LoaderCircle, OctagonAlert, Rocket } from '@lucide/svelte';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
@@ -165,11 +165,7 @@
 <Card.Root
 	class="group relative overflow-hidden border-border/80 bg-card/50 shadow-sm ring-1 ring-border/40"
 >
-	<Icon
-		icon="ph:first-aid-kit"
-		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"
-		aria-hidden="true"
-	/>
+	<BriefcaseMedical class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40" aria-hidden="true" />
 	<Card.Header class="relative space-y-2 pb-2">
 		<Card.Title class="text-lg font-semibold tracking-tight md:text-xl">
 			{m.workspace_pod_rollout_health_title()}
@@ -184,11 +180,11 @@
 		>
 	{:else if !isLoaded}
 		<div class="flex min-h-[200px] w-full items-center justify-center py-10">
-			<Icon icon="svg-spinners:6-dots-rotate" class="size-10 text-muted-foreground" />
+			<LoaderCircle class="size-10 text-muted-foreground animate-spin" />
 		</div>
 	{:else if !snap}
 		<div class="flex flex-col items-center justify-center gap-2 py-12">
-			<Icon icon="ph:chart-bar-fill" class="size-8 text-muted-foreground/80" />
+			<ChartBar class="size-8 text-muted-foreground/80" />
 			<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
 		</div>
 	{:else}
@@ -218,7 +214,7 @@
 						<span
 							class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-chart-2/15 text-chart-2"
 						>
-							<Icon icon="ph:circles-four" class="size-5" />
+							<LayoutGrid class="size-5" />
 						</span>
 						<h3 class="text-sm leading-none font-semibold">{m.workspace_health_section_pods()}</h3>
 					</div>
@@ -251,7 +247,7 @@
 						<span
 							class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-destructive/15 text-destructive"
 						>
-							<Icon icon="ph:warning-octagon" class="size-5" />
+							<OctagonAlert class="size-5" />
 						</span>
 						<h3 class="text-sm leading-none font-semibold">
 							{m.workspace_health_section_containers()}
@@ -275,7 +271,7 @@
 						<span
 							class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary"
 						>
-							<Icon icon="ph:rocket-launch" class="size-5" />
+							<Rocket class="size-5" />
 						</span>
 						<h3 class="text-sm leading-none font-semibold">
 							{m.workspace_health_section_rollouts()}

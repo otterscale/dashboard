@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import { LoaderCircle } from '@lucide/svelte';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
@@ -93,7 +93,7 @@
 	</Card.Header>
 	{#if !isLoaded}
 		<div class="flex h-[250px] w-full items-center justify-center">
-			<Icon icon="svg-spinners:6-dots-rotate" class="m-4 size-12" />
+			<LoaderCircle class="m-4 size-12 animate-spin" />
 		</div>
 	{:else}
 		<Card.Content>

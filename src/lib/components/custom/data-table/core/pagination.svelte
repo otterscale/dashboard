@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Table } from '@tanstack/table-core';
 	import { Button } from '$lib/components/ui/button';
-	import Icon from '@iconify/svelte';
+	import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from '@lucide/svelte';
 
 	let { table }: { table: Table<unknown> } = $props();
 
@@ -23,7 +23,7 @@
 			disabled={!canPrev}
 			onclick={() => table.setPageIndex(0)}
 		>
-			<Icon icon="ph:caret-double-left" class="size-4" />
+			<ChevronsLeft class="size-4" />
 		</Button>
 		<Button
 			variant="outline"
@@ -32,7 +32,7 @@
 			disabled={!canPrev}
 			onclick={() => table.previousPage()}
 		>
-			<Icon icon="ph:caret-left" class="size-4" />
+			<ChevronLeft class="size-4" />
 		</Button>
 		<Button
 			variant="outline"
@@ -41,7 +41,7 @@
 			disabled={!canNext}
 			onclick={() => table.nextPage()}
 		>
-			<Icon icon="ph:caret-right" class="size-4" />
+			<ChevronRight class="size-4" />
 		</Button>
 		<Button
 			variant="outline"
@@ -50,7 +50,7 @@
 			disabled={!canNext}
 			onclick={() => table.setPageIndex(pageCount - 1)}
 		>
-			<Icon icon="ph:caret-double-right" class="size-4" />
+			<ChevronsRight class="size-4" />
 		</Button>
 	</div>
 </div>

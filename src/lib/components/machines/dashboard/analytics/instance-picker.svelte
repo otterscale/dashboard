@@ -1,6 +1,6 @@
 <script lang="ts">
+	import { Monitor } from '@lucide/svelte';
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import Icon from '@iconify/svelte';
 	import { getContext, onMount } from 'svelte';
 	import { type Writable, writable } from 'svelte/store';
 
@@ -25,13 +25,11 @@
 					)
 					.map((machine) => ({
 						value: machine.fqdn,
-						label: machine.fqdn,
-						icon: 'ph:desktop'
+						label: machine.fqdn
 					})),
 				{
 					value: '.*',
-					label: 'All Machines',
-					icon: 'ph:desktop-duotone'
+					label: 'All Machines'
 				}
 			]);
 			selectedInstance = $instanceOptions[0].value;
@@ -58,10 +56,7 @@
 					<SingleSelect.Group>
 						{#each $instanceOptions as option (option.value)}
 							<SingleSelect.Item {option}>
-								<Icon
-									icon={option.icon ? option.icon : 'ph:empty'}
-									class={cn('size-5', option.icon ? 'visible' : 'invisible')}
-								/>
+								<Monitor class="size-5" />
 								{option.label}
 								<SingleSelect.Check {option} />
 							</SingleSelect.Item>

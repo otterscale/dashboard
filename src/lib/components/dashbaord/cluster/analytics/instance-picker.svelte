@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import { Monitor } from '@lucide/svelte';
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { onMount } from 'svelte';
 	import { writable } from 'svelte/store';
@@ -13,7 +13,7 @@
 		selectedInstance = $bindable()
 	}: { prometheusDriver: PrometheusDriver; selectedInstance: string | undefined } = $props();
 
-	type InstanceOption = { value: string; label: string; icon: string };
+	type InstanceOption = { value: string; label: string };
 	const instanceOptions = writable<InstanceOption[]>([]);
 
 	let isLoaded = $state(false);
@@ -25,10 +25,10 @@
 				const labels = s.metric?.labels ?? {};
 				const instance = labels.instance ?? '';
 				const nodename = labels.nodename ?? instance;
-				return { value: instance, label: nodename, icon: 'ph:desktop' };
+				return { value: instance, label: nodename };
 			});
 			if (instances.length > 0) {
-				instances.push({ value: '.*', label: m.all_nodes(), icon: 'ph:desktop-duotone' });
+				instances.push({ value: '.*', label: m.all_nodes() });
 			}
 			instanceOptions.set(instances);
 			selectedInstance = instances[0]?.value;
@@ -51,10 +51,7 @@
 					<SingleSelect.Group>
 						{#each $instanceOptions as option (option.value)}
 							<SingleSelect.Item {option}>
-								<Icon
-									icon={option.icon ? option.icon : 'ph:empty'}
-									class={cn('size-5', option.icon ? 'visible' : 'invisible')}
-								/>
+								<Monitor class="size-5" />
 								{option.label}
 								<SingleSelect.Check {option} />
 							</SingleSelect.Item>

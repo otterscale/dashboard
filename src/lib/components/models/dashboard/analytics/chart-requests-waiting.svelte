@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import { ChartLine, LoaderCircle } from '@lucide/svelte';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
@@ -77,11 +77,11 @@
 	<Statistics.Content class="min-h-16">
 		{#if !isLoaded}
 			<div class="flex h-[200px] w-full items-center justify-center">
-				<Icon icon="svg-spinners:6-dots-rotate" class="size-12" />
+				<LoaderCircle class="size-12 animate-spin" />
 			</div>
 		{:else if waitingData.length === 0}
 			<div class="flex h-[200px] w-full flex-col items-center justify-center">
-				<Icon icon="ph:chart-line-fill" class="size-12 animate-pulse text-muted-foreground" />
+				<ChartLine class="size-12 animate-pulse text-muted-foreground" />
 				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
 			</div>
 		{:else}

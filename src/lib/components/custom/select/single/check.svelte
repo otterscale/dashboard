@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import { Check } from '@lucide/svelte';
 	import { getContext } from 'svelte';
 	import type { SelectOption } from './root.svelte';
 
@@ -9,7 +9,7 @@
 </script>
 
 {#if ctx.getValue() === option.value}
-	<Icon icon="ph:check" class="ml-auto size-4" />
+	<Check class="ml-auto size-4" />
 {:else}
 	<span class="ml-auto size-4"></span>
 {/if}

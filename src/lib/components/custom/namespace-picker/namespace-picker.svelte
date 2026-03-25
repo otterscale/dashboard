@@ -1,13 +1,12 @@
 <script lang="ts">
+	import { Box, Globe } from '@lucide/svelte';
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import Icon from '@iconify/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext, onMount } from 'svelte';
 	import { writable } from 'svelte/store';
 
 	import { Single as SingleSelect } from '$lib/components/custom/select';
 	import { m } from '$lib/paraglide/messages';
-	import { cn } from '$lib/utils';
 
 	let {
 		cluster,
@@ -27,7 +26,7 @@
 	const resourceClient = createClient(ResourceService, transport);
 
 	// value = namespace (for filtering), label = workspace name (shown in UI)
-	type WorkspaceOption = { value: string; label: string; icon: string };
+	type WorkspaceOption = { value: string; label: string };
 	const workspaceOptions = writable<WorkspaceOption[]>([]);
 
 	let isLoaded = $state(false);
@@ -63,11 +62,10 @@
 
 		const sorted = [...nameToNs.keys()].sort((a, b) => a.localeCompare(b));
 		const options: WorkspaceOption[] = [
-			{ value: '', label: m.all_namespaces(), icon: 'ph:globe-duotone' },
+			{ value: '', label: m.all_namespaces() },
 			...sorted.map((name) => ({
 				value: nameToNs.get(name)!,
-				label: name,
-				icon: 'ph:cube'
+				label: name
 			}))
 		];
 		workspaceOptions.set(options);
@@ -90,7 +88,11 @@
 					<SingleSelect.Group>
 						{#each $workspaceOptions as option (option.value + option.label)}
 							<SingleSelect.Item {option}>
-								<Icon icon={option.icon} class={cn('size-5')} />
+								{#if option.value === ''}
+									<Globe class="size-5" />
+								{:else}
+									<Box class="size-5" />
+								{/if}
 								{option.label}
 								<SingleSelect.Check {option} />
 							</SingleSelect.Item>

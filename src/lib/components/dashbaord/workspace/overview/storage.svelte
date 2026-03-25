@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import { Check, CheckCircle, Clock, Database, HardDrive, LoaderCircle } from '@lucide/svelte';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
@@ -94,11 +94,7 @@
 
 <!-- 外框與 Workload health 一致；內容區維持 KPI + 掛載狀態區塊 -->
 <Card.Root class="group relative h-full min-h-[280px] gap-2 overflow-hidden">
-	<Icon
-		icon="ph:hard-drives"
-		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"
-		aria-hidden="true"
-	/>
+	<HardDrive class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40" aria-hidden="true" />
 	<Card.Header>
 		<Card.Title>{m.workspace_storage_title()}</Card.Title>
 		<Card.Description class="text-md flex min-h-6 items-center">
@@ -111,7 +107,7 @@
 		>
 	{:else if !isLoaded}
 		<div class="flex h-9 w-full items-center justify-center">
-			<Icon icon="svg-spinners:6-dots-rotate" class="size-10 text-muted-foreground" />
+			<LoaderCircle class="size-10 text-muted-foreground animate-spin" />
 		</div>
 	{:else}
 		<Card.Content class="relative space-y-4 px-4 pt-0 pb-5 sm:px-5">
@@ -131,7 +127,7 @@
 					class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-chart-3/15 text-chart-3"
 					aria-hidden="true"
 				>
-					<Icon icon="ph:database" class="size-5" />
+					<Database class="size-5" />
 				</span>
 			</div>
 
@@ -166,7 +162,7 @@
 						<span
 							class="flex size-8 shrink-0 items-center justify-center rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
 						>
-							<Icon icon="ph:check-circle" class="size-4" />
+							<CheckCircle class="size-4" />
 						</span>
 						<div class="min-w-0">
 							<p class="text-lg leading-none font-semibold tabular-nums">{bound}</p>
@@ -189,7 +185,7 @@
 									: 'bg-muted text-muted-foreground'
 							)}
 						>
-							<Icon icon="ph:clock" class="size-4" />
+							<Clock class="size-4" />
 						</span>
 						<div class="min-w-0">
 							<p
