@@ -197,6 +197,8 @@
 	"application_hub": "Hub",
 	"block_pool": "Block Pool",
 	"object_store": "Object Store",
+	"object_store_user": "Object Store User",
+	"object_bucket": "Object Bucket",
 	"administration": "Administration",
 	"module": "Module",
 	"deployment": "Deployment",
