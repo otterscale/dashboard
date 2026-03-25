@@ -6,6 +6,7 @@
 	let {
 		class: className,
 		role = 'status',
+		name,
 		// we add color and stroke for compatibility with different icon libraries props
 		color,
 		stroke,
@@ -16,6 +17,7 @@
 
 <Loader2Icon
 	{role}
+	name={name === null ? undefined : name}
 	color={color === null ? undefined : color}
 	stroke={stroke === null ? undefined : stroke}
 	aria-label={ariaLabel}
