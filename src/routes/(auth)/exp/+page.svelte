@@ -4,12 +4,45 @@
 
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
 	import { m } from '$lib/paraglide/messages';
 	import { getLocale } from '$lib/paraglide/runtime';
 
 	import DatetimePicker from './datetime-picker.svelte';
 	import DatetimePresets from './datetime-presets.svelte';
+
+	const presets = [
+		{ label: () => m.last_1_minute(), minutes: 1 },
+		{ label: () => m.last_5_minutes(), minutes: 5 },
+		{ label: () => m.last_15_minutes(), minutes: 15 },
+		{ label: () => m.last_1_hour(), minutes: 60 },
+		{ label: () => m.last_3_hours(), minutes: 60 * 3 },
+		{ label: () => m.last_24_hours(), minutes: 60 * 24 },
+		{ label: () => m.last_7_days(), minutes: 60 * 24 * 7 },
+		{ label: () => m.last_30_days(), minutes: 60 * 24 * 30 }
+	];
+
+	function applyPreset(minutes: number) {
+		const now = new Date();
+		const past = new Date(now.getTime() - minutes * 60 * 1000);
+
+		to = new CalendarDateTime(
+			now.getFullYear(),
+			now.getMonth() + 1,
+			now.getDate(),
+			now.getHours(),
+			now.getMinutes()
+		);
+		from = new CalendarDateTime(
+			past.getFullYear(),
+			past.getMonth() + 1,
+			past.getDate(),
+			past.getHours(),
+			past.getMinutes()
+		);
+		toIsNow = true;
+	}
 
 	let from = $state<CalendarDateTime | undefined>(new CalendarDateTime(2025, 6, 12, 12, 0));
 	let to = $state<CalendarDateTime | undefined>(new CalendarDateTime(2025, 6, 12, 12, 0));
@@ -29,18 +62,26 @@
 
 <div class="flex justify-end">
 	<ButtonGroup.Root>
-		<Popover.Root>
-			<Popover.Trigger>
+		<DropdownMenu.Root>
+			<DropdownMenu.Trigger>
 				{#snippet child({ props })}
 					<Button {...props} variant="outline" size="icon" aria-label="Open Calendar">
 						<CalendarSearchIcon />
 					</Button>
 				{/snippet}
-			</Popover.Trigger>
-			<Popover.Content align="end" class="w-full rounded-lg p-0">
-				<DatetimePresets bind:from bind:to bind:toIsNow />
-			</Popover.Content>
-		</Popover.Root>
+			</DropdownMenu.Trigger>
+			<DropdownMenu.Content align="end" class="w-full rounded-lg p-0">
+				<DropdownMenu.Group>
+					<DropdownMenu.Label>{m.commonly_used()}</DropdownMenu.Label>
+					<DropdownMenu.Separator />
+					{#each presets as preset (preset.minutes)}
+						<DropdownMenu.Item onclick={() => applyPreset(preset.minutes)}>
+							{preset.label()}
+						</DropdownMenu.Item>
+					{/each}
+				</DropdownMenu.Group>
+			</DropdownMenu.Content>
+		</DropdownMenu.Root>
 		<Popover.Root>
 			<Popover.Trigger>
 				{#snippet child({ props })}

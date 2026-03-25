@@ -3,6 +3,7 @@
 
 	import { Button } from '$lib/components/ui/button/index.js';
 	import Calendar from '$lib/components/ui/calendar/calendar.svelte';
+	import { getLocale } from '$lib/paraglide/runtime';
 
 	let {
 		value = $bindable(),
@@ -14,7 +15,9 @@
 	);
 
 	let time = $state<string | null>(
-		value ? `${value.hour.toString().padStart(2, '0')}:${value.minute.toString().padStart(2, '0')}` : null
+		value
+			? `${value.hour.toString().padStart(2, '0')}:${value.minute.toString().padStart(2, '0')}`
+			: null
 	);
 
 	$effect(() => {
@@ -37,6 +40,7 @@
 	<div class="p-6">
 		<Calendar
 			type="single"
+			locale={getLocale()}
 			bind:value={date}
 			class="bg-transparent p-0 [--cell-size:--spacing(8)]"
 			weekdayFormat="short"
@@ -49,6 +53,7 @@
 			{#each timeSlots as slot (slot)}
 				<Button
 					variant={time === slot ? 'default' : 'outline'}
+					size="sm"
 					onclick={() => (time = slot)}
 					class="w-full shadow-none"
 				>

@@ -515,8 +515,8 @@
 					<DropdownMenu.Content class="w-40" align="end">
 						<DropdownMenu.Group>
 							<DropdownMenu.Label>{m.cluster()}</DropdownMenu.Label>
-							<DropdownMenu.Separator />
 							{#if links.length > 0}
+								<DropdownMenu.Separator />
 								<DropdownMenu.RadioGroup bind:value={activeCluster} onValueChange={onClusterChange}>
 									{#each links as link, index (index)}
 										<DropdownMenu.RadioItem value={link.cluster}
