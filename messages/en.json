@@ -296,5 +296,14 @@
 	"repository": "Repository",
 	"add_cluster": "Add Cluster",
 	"cluster_status": "Cluster Status",
-	"setting_up_environment": "Setting up your environment, please wait..."
+	"setting_up_environment": "Setting up your environment, please wait...",
+	"now": "Now",
+	"commonly_used": "Commonly used",
+	"last_1_minute": "Last 1 minute",
+	"last_5_minutes": "Last 5 minutes",
+	"last_15_minutes": "Last 15 minutes",
+	"last_1_hour": "Last 1 hour",
+	"last_3_hours": "Last 3 hours",
+	"last_24_hours": "Last 24 hours",
+	"last_30_days": "Last 30 days"
 }

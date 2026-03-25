@@ -5,6 +5,10 @@ import type { Component } from 'svelte';
 export type WidgetBaseProps = {
 	prometheusDriver: PrometheusDriver;
 	isReloading: boolean;
+	/** Query range start time, driven by the DatetimePicker. Defaults to 1 hour ago. */
+	start?: Date;
+	/** Query range end time, driven by the DatetimePicker. Defaults to now. */
+	end?: Date;
 };
 
 /** Widgets that use `juju_model` / cluster-scoped PromQL also receive `cluster` when `needsCluster` is set. */

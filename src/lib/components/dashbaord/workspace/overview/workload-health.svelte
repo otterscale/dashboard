@@ -24,10 +24,14 @@
 	let {
 		prometheusDriver,
 		namespace,
+		start = new Date(Date.now() - 60 * 60 * 1000),
+		end = new Date(),
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		namespace: string;
+		start?: Date;
+		end?: Date;
 		isReloading: boolean;
 	} = $props();
 
@@ -55,8 +59,8 @@
 		const readyQ = `count(kube_customresource_status_condition{namespace="${n}", group="${g}", kind="${k}", condition="Ready", status="true"})`;
 
 		const [totalR, readyR] = await Promise.all([
-			prometheusDriver.instantQuery(totalQ),
-			prometheusDriver.instantQuery(readyQ)
+			prometheusDriver.instantQuery(totalQ, end),
+			prometheusDriver.instantQuery(readyQ, end)
 		]);
 
 		return {
@@ -89,6 +93,12 @@
 		} else {
 			reloadManager.stop();
 		}
+	});
+
+	$effect(() => {
+		void start;
+		void end;
+		if (isLoaded) fetch();
 	});
 
 	let isLoaded = $state(false);
