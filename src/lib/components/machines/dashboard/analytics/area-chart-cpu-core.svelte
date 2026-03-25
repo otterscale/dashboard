@@ -7,17 +7,17 @@
 	import { cubicInOut } from 'svelte/easing';
 
 	import {
-		formatTimeRange,
-		formatXAxisDate,
-		getXAxisTicks
-	} from '$lib/components/custom/chart/units/formatter';
+		formatChartTimeRange as formatTimeRange,
+		formatChartXAxisDate as formatXAxisDate,
+		getChartXAxisTicks as getXAxisTicks
+	} from '$lib/formatter';
 	import * as Statistics from '$lib/components/custom/data-table/statistics/index';
 	import {
 		type DataPoint,
 		fetchFlattenedRange,
 		generateChartConfig,
 		getSeries
-	} from '$lib/components/custom/prometheus';
+	} from '$lib/prometheus';
 	import ChartContainer from '$lib/components/ui/chart/chart-container.svelte';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import Input from '$lib/components/ui/input/input.svelte';

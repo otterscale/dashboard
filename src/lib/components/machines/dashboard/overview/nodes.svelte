@@ -26,7 +26,10 @@
 
 	let totalNodes = $state(MOCK_NODE_COUNT);
 	let nodes = $state(
-		MOCK_MONTHLY_NODES.map((d) => ({ date: new Date(d.date + '-01'), node: d.node }))
+		MOCK_MONTHLY_NODES.map((d: (typeof MOCK_MONTHLY_NODES)[number]) => ({
+			date: new Date(d.date + '-01'),
+			node: d.node
+		}))
 	);
 
 	const nodesConfiguration = {

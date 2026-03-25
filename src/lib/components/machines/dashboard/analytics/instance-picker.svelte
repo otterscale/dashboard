@@ -1,51 +1,45 @@
 <script lang="ts">
 	import { Monitor } from '@lucide/svelte';
-	import { createClient, type Transport } from '@connectrpc/connect';
-	import { getContext, onMount } from 'svelte';
-	import { type Writable, writable } from 'svelte/store';
+	import type { PrometheusDriver } from 'prometheus-query';
+	import { onMount } from 'svelte';
+	import { writable } from 'svelte/store';
 
-	import { MachineService } from '$lib/api/machine/v1/machine_pb';
 	import { Single as SingleSelect } from '$lib/components/custom/select';
 	import { m } from '$lib/paraglide/messages';
-	import { cn } from '$lib/utils';
 
-	let { selectedInstance = $bindable() }: { selectedInstance: string | undefined } = $props();
+	let {
+		prometheusDriver,
+		selectedInstance = $bindable()
+	}: { prometheusDriver: PrometheusDriver; selectedInstance: string | undefined } = $props();
 
-	const transport: Transport = getContext('transport');
-	const machineClient = createClient(MachineService, transport);
-
-	const instanceOptions: Writable<SingleSelect.OptionType[]> = writable([]);
-	async function fetchOptions() {
-		try {
-			const response = await machineClient.listMachines({});
-			instanceOptions.set([
-				...response.machines
-					.filter((machine) =>
-						machine.workloadAnnotations?.['juju-machine-id']?.includes('-machine-')
-					)
-					.map((machine) => ({
-						value: machine.fqdn,
-						label: machine.fqdn
-					})),
-				{
-					value: '.*',
-					label: 'All Machines'
-				}
-			]);
-			selectedInstance = $instanceOptions[0].value;
-		} catch (error) {
-			console.error('Failed to fetch machines:', error);
-		}
-	}
+	type InstanceOption = { value: string; label: string };
+	const instanceOptions = writable<InstanceOption[]>([]);
 
 	let isLoaded = $state(false);
 	onMount(async () => {
-		await fetchOptions();
+		try {
+			const response = await prometheusDriver.instantQuery('node_uname_info');
+			const series = (response.result ?? []) as { metric: { labels: Record<string, string> } }[];
+			const instances: InstanceOption[] = series.map((s) => {
+				const labels = s.metric?.labels ?? {};
+				const instance = labels.instance ?? '';
+				const nodename = labels.nodename ?? instance;
+				return { value: instance, label: nodename };
+			});
+			if (instances.length > 0) {
+				instances.push({ value: '.*', label: m.all_nodes() });
+			}
+			instanceOptions.set(instances);
+			selectedInstance = instances[0]?.value;
+		} catch {
+			instanceOptions.set([]);
+			selectedInstance = undefined;
+		}
 		isLoaded = true;
 	});
 </script>
 
-{#if isLoaded}
+{#if isLoaded && $instanceOptions.length > 0}
 	<SingleSelect.Root options={instanceOptions} bind:value={selectedInstance}>
 		<SingleSelect.Trigger />
 		<SingleSelect.Content>

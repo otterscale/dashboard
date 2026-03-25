@@ -22,7 +22,7 @@
 
 <div class="flex flex-col gap-4">
 	<div class="ml-auto flex flex-wrap items-center gap-2">
-		<InstancePicker bind:selectedInstance />
+		<InstancePicker prometheusDriver={client} bind:selectedInstance />
 	</div>
 	{#if selectedInstance && selectedTab === 'analytics'}
 		{#key selectedInstance}

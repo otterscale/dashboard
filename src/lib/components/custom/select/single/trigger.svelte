@@ -5,7 +5,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { cn } from '$lib/utils';
 
-	let { class: className, ...restProps } = $props();
+	let { class: className = undefined, ...restProps } = $props();
 
 	const ctx = getContext<{
 		getCurrentLabel: () => string;

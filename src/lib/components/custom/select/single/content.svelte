@@ -3,7 +3,7 @@
 	import { cn } from '$lib/utils';
 
 	let {
-		class: className,
+		class: className = undefined,
 		children,
 		...restProps
 	}: { class?: string; children?: import('svelte').Snippet; [key: string]: unknown } = $props();
