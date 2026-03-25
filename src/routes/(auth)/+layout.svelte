@@ -96,7 +96,7 @@
 
 	async function onClusterChange(cluster: string) {
 		await fetchWorkspaces(cluster);
-		await goto(resolve('/(auth)/[cluster]/overview', { cluster: activeCluster }));
+		await goto(resolve('/(auth)/console'));
 		toast.success(m.switch_cluster({ name: cluster }));
 	}
 
@@ -120,28 +120,13 @@
 		managed: [
 			{
 				title: m.overview(),
-				icon: CompassIcon,
-				isActive: true,
-				items: [
-					{
-						title: m.workspace(),
-						url: page.params.workspace
-							? resolve('/(auth)/[cluster]/[workspace]/overview', {
-									cluster: activeCluster,
-									workspace: page.params.workspace
-								})
-							: ''
-					},
-					{
-						title: m.cluster(),
-						url: page.params.workspace
-							? resolve('/(auth)/[cluster]/[workspace]/overview/cluster', {
-									cluster: activeCluster,
-									workspace: page.params.workspace
-								})
-							: ''
-					}
-				]
+				url: page.params.workspace
+					? resolve('/(auth)/[cluster]/[workspace]/overview', {
+							cluster: activeCluster,
+							workspace: page.params.workspace
+						})
+					: '',
+				icon: CompassIcon
 			},
 			{
 				title: m.ai_studio(),
@@ -261,6 +246,15 @@
 							title: m.administration(),
 							icon: UserStarIcon,
 							items: [
+								{
+									title: m.cluster_status(),
+									url: page.params.workspace
+										? resolve('/(auth)/[cluster]/[workspace]/cluster-status', {
+												cluster: activeCluster,
+												workspace: page.params.workspace
+											})
+										: ''
+								},
 								{
 									title: m.workspace(),
 									url: resourceUrl('tenant.otterscale.io', 'v1alpha1', 'Workspace', 'workspaces')

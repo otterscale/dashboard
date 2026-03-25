@@ -55,8 +55,6 @@ export const load: PageServerLoad = async ({ parent, fetch }) => {
 				);
 			}
 		}
-
-		throw redirect(307, resolve('/(auth)/[cluster]/overview', { cluster }));
 	} catch (e) {
 		if (e && typeof e === 'object' && 'status' in e) throw e;
 		console.error('Failed to auto-select cluster/workspace:', e);
