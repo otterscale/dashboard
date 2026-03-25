@@ -11,14 +11,15 @@
 
 	let {
 		prometheusDriver,
-		cluster,
+		cluster: _cluster,
 		isReloading = $bindable()
 	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	void _cluster;
 
 	let nodeNotReady: SampleValue | undefined = $state(undefined);
 	async function fetchNodeStatus() {
 		const responseNotReadyNode = await prometheusDriver.instantQuery(
-			`sum(kube_node_status_condition{condition="Ready" , status="false", juju_model="${cluster}", container!=""})`
+			`sum(kube_node_status_condition{condition="Ready" , status="false", container!=""})`
 		);
 		nodeNotReady = responseNotReadyNode.result[0]?.value ?? undefined;
 	}

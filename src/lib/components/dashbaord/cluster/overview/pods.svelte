@@ -8,35 +8,46 @@
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Card from '$lib/components/ui/card';
 	import { m } from '$lib/paraglide/messages';
+	import { escapePromqlStringLiteral } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
-		cluster,
+		cluster: _cluster,
+		namespace = '',
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	}: {
+		prometheusDriver: PrometheusDriver;
+		cluster: string;
+		namespace?: string;
+		isReloading: boolean;
+	} = $props();
+	void _cluster;
 
 	let maxAllocatablePods: SampleValue | undefined = $state(undefined);
 	let runningPods: SampleValue | undefined = $state(undefined);
 	let pendingPods: SampleValue | undefined = $state(undefined);
 	let failedPods: SampleValue | undefined = $state(undefined);
 	async function fetchPods() {
+		const ns = (namespace ?? '').trim();
+		const nsFilter = ns ? `,namespace="${escapePromqlStringLiteral(ns)}"` : '';
+
 		const allocateResponse = await prometheusDriver.instantQuery(
-			`sum(kube_node_status_allocatable{resource="pods", juju_model="${cluster}", container!=""})`
+			`sum(kube_node_status_allocatable{resource="pods", container!=""})`
 		);
 		maxAllocatablePods = allocateResponse.result[0]?.value ?? undefined;
 
 		const runningResponse = await prometheusDriver.instantQuery(
-			`sum(kube_pod_status_phase{phase="Running", juju_model="${cluster}", container!=""})`
+			`sum(kube_pod_status_phase{phase="Running", container!=""${nsFilter}})`
 		);
 		runningPods = runningResponse.result[0]?.value ?? undefined;
 
 		const pendingResponse = await prometheusDriver.instantQuery(
-			`sum(kube_pod_status_phase{phase="Pending", juju_model="${cluster}", container!=""})`
+			`sum(kube_pod_status_phase{phase="Pending", container!=""${nsFilter}})`
 		);
 		pendingPods = pendingResponse.result[0]?.value ?? undefined;
 
 		const failedResponse = await prometheusDriver.instantQuery(
-			`sum(kube_pod_status_phase{phase="Failed", juju_model="${cluster}", container!=""})`
+			`sum(kube_pod_status_phase{phase="Failed", container!=""${nsFilter}})`
 		);
 		failedPods = failedResponse.result[0]?.value ?? undefined;
 	}

@@ -32,7 +32,7 @@
 	</div>
 
 	<div class="col-span-2 h-full">
-		<VGPU {prometheusDriver} {cluster} bind:isReloading />
+		<VGPU {prometheusDriver} bind:isReloading />
 	</div>
 
 	<div class="col-span-4">

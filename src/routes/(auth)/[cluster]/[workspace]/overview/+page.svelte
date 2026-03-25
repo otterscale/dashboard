@@ -1,19 +1,25 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import WorkspaceDashboard from '$lib/components/dashbaord/workspace/index.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { breadcrumbs } from '$lib/stores';
 
-	// Set breadcrumbs navigation
+	const cluster = $derived(page.params.cluster ?? '');
+	const workspace = $derived(page.params.workspace ?? '');
+	const namespace = $derived(page.data.namespace ?? '');
+
 	breadcrumbs.set([
 		{
 			title: m.workspace(),
 			url: resolve('/(auth)/[cluster]/[workspace]/overview', {
-				cluster: page.params.cluster!,
-				workspace: page.params.workspace!
+				cluster,
+				workspace
 			})
 		}
 	]);
 </script>
 
-Workspace Dashboard
+{#key cluster + workspace + namespace}
+	<WorkspaceDashboard {cluster} {namespace} />
+{/key}
