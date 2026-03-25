@@ -67,11 +67,10 @@
 				.sort((a, b) => a.localeCompare(b))
 				.map((name) => ({
 					value: name,
-										label: name.length > 40 ? name.slice(0, 37) + '...' : name
-			const options =
-				models.length > 0
-						? [{ value: '.*', label: m.all_models() }, ...models]
-					: [];
+					label: name.length > 40 ? name.slice(0, 37) + '...' : name
+				}));
+
+			const options = models.length > 0 ? [{ value: '.*', label: m.all_models() }, ...models] : [];
 			modelOptions.set(options);
 			selectedModel = models.length > 0 ? options[0]!.value : '.*';
 			isLoaded = true;

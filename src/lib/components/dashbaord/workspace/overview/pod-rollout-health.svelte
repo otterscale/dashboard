@@ -1,5 +1,12 @@
 <script lang="ts">
-	import { BriefcaseMedical, ChartBar, LayoutGrid, LoaderCircle, OctagonAlert, Rocket } from '@lucide/svelte';
+	import {
+		BriefcaseMedical,
+		ChartBar,
+		LayoutGrid,
+		LoaderCircle,
+		OctagonAlert,
+		Rocket
+	} from '@lucide/svelte';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
@@ -165,7 +172,10 @@
 <Card.Root
 	class="group relative overflow-hidden border-border/80 bg-card/50 shadow-sm ring-1 ring-border/40"
 >
-	<BriefcaseMedical class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40" aria-hidden="true" />
+	<BriefcaseMedical
+		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"
+		aria-hidden="true"
+	/>
 	<Card.Header class="relative space-y-2 pb-2">
 		<Card.Title class="text-lg font-semibold tracking-tight md:text-xl">
 			{m.workspace_pod_rollout_health_title()}
@@ -180,7 +190,7 @@
 		>
 	{:else if !isLoaded}
 		<div class="flex min-h-[200px] w-full items-center justify-center py-10">
-			<LoaderCircle class="size-10 text-muted-foreground animate-spin" />
+			<LoaderCircle class="size-10 animate-spin text-muted-foreground" />
 		</div>
 	{:else if !snap}
 		<div class="flex flex-col items-center justify-center gap-2 py-12">

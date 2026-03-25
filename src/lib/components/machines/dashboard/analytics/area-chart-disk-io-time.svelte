@@ -46,7 +46,7 @@
 	<Statistics.Content class="min-h-16">
 		{#await fetchFlattenedRange(client, query, startTime, endTime, STEP_SECONDS, 'Time')}
 			<div class="flex h-[250px] w-full items-center justify-center">
-				<LoaderCircle class="m-8 size-32 text-muted-foreground/50 animate-spin" />
+				<LoaderCircle class="m-8 size-32 animate-spin text-muted-foreground/50" />
 			</div>
 		{:then response}
 			{#if response.length === 0}

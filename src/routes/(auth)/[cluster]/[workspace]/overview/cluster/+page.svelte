@@ -80,7 +80,7 @@
 			</div>
 		{:else if cluster}
 			<div class="flex min-h-[400px] w-full items-center justify-center">
-				<LoaderCircle class="size-12 text-muted-foreground animate-spin" />
+				<LoaderCircle class="size-12 animate-spin text-muted-foreground" />
 			</div>
 		{:else}
 			<div class="flex min-h-[400px] w-full items-center justify-center text-muted-foreground">

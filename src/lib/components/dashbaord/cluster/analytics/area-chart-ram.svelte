@@ -62,7 +62,7 @@
 	<Statistics.Content class="min-h-16">
 		{#if isLoading}
 			<div class="flex h-[250px] w-full items-center justify-center">
-				<LoaderCircle class="m-8 size-32 text-muted-foreground/50 animate-spin" />
+				<LoaderCircle class="m-8 size-32 animate-spin text-muted-foreground/50" />
 			</div>
 		{:else if hasError || rawData.length === 0}
 			<div class="flex h-[250px] w-full flex-col items-center justify-center">

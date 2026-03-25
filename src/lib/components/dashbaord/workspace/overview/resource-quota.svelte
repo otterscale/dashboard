@@ -113,7 +113,10 @@
 </script>
 
 <Card.Root class="group relative h-full min-h-[160px] gap-2 overflow-hidden">
-	<Gauge class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40" aria-hidden="true" />
+	<Gauge
+		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"
+		aria-hidden="true"
+	/>
 	<Card.Header>
 		<Card.Title>{m.workspace_quota_usage_title()}</Card.Title>
 		<Card.Description class="text-md flex min-h-6 items-center">
@@ -126,7 +129,7 @@
 		>
 	{:else if !isLoaded}
 		<div class="flex h-9 w-full items-center justify-center">
-			<LoaderCircle class="size-10 text-muted-foreground animate-spin" />
+			<LoaderCircle class="size-10 animate-spin text-muted-foreground" />
 		</div>
 	{:else}
 		<Card.Content class="grid gap-4 md:grid-cols-2">
