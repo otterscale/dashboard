@@ -1,13 +1,29 @@
 <script lang="ts">
-	import { CalendarDate } from '@internationalized/date';
+	import { CalendarDate, CalendarDateTime } from '@internationalized/date';
 
 	import { Button } from '$lib/components/ui/button/index.js';
 	import Calendar from '$lib/components/ui/calendar/calendar.svelte';
 
 	let {
-		date = $bindable(),
-		time = $bindable()
-	}: { date: CalendarDate | undefined; time: string | null } = $props();
+		value = $bindable(),
+		onchange
+	}: { value: CalendarDateTime | undefined; onchange?: () => void } = $props();
+
+	let date = $state<CalendarDate | undefined>(
+		value ? new CalendarDate(value.year, value.month, value.day) : undefined
+	);
+
+	let time = $state<string | null>(
+		value ? `${value.hour.toString().padStart(2, '0')}:${value.minute.toString().padStart(2, '0')}` : null
+	);
+
+	$effect(() => {
+		if (date && time) {
+			const [hour, minute] = time.split(':').map(Number);
+			value = new CalendarDateTime(date.year, date.month, date.day, hour, minute);
+			onchange?.();
+		}
+	});
 
 	const timeSlots = Array.from({ length: 96 }, (_, i) => {
 		const totalMinutes = i * 15;

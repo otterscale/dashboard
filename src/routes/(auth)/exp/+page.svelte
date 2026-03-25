@@ -1,20 +1,30 @@
 <script lang="ts">
-	import { CalendarDate, getLocalTimeZone } from '@internationalized/date';
+	import { CalendarDateTime, getLocalTimeZone } from '@internationalized/date';
 	import { ArrowRightIcon, CalendarSearchIcon } from '@lucide/svelte';
 
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
+	import { m } from '$lib/paraglide/messages';
 	import { getLocale } from '$lib/paraglide/runtime';
 
 	import DatetimePicker from './datetime-picker.svelte';
 	import DatetimePresets from './datetime-presets.svelte';
 
-	let fromDate = $state<CalendarDate | undefined>(new CalendarDate(2025, 6, 12));
-	let fromTime = $state<string | null>('12:00');
+	let from = $state<CalendarDateTime | undefined>(new CalendarDateTime(2025, 6, 12, 12, 0));
+	let to = $state<CalendarDateTime | undefined>(new CalendarDateTime(2025, 6, 12, 12, 0));
+	let toIsNow = $state(false);
 
-	let toDate = $state<CalendarDate | undefined>(new CalendarDate(2025, 6, 12));
-	let toTime = $state<string | null>('12:00');
+	function formatDatetime(value: CalendarDateTime | undefined) {
+		if (!value) return '';
+		const dateStr = value.toDate(getLocalTimeZone()).toLocaleDateString(getLocale(), {
+			weekday: 'long',
+			day: 'numeric',
+			month: 'short'
+		});
+		const timeStr = `${value.hour.toString().padStart(2, '0')}:${value.minute.toString().padStart(2, '0')}`;
+		return `${dateStr} @ ${timeStr}`;
+	}
 </script>
 
 <div class="flex justify-end">
@@ -28,7 +38,7 @@
 				{/snippet}
 			</Popover.Trigger>
 			<Popover.Content align="end" class="w-full rounded-lg p-0">
-				<DatetimePresets />
+				<DatetimePresets bind:from bind:to bind:toIsNow />
 			</Popover.Content>
 		</Popover.Root>
 		<Popover.Root>
@@ -36,17 +46,13 @@
 				{#snippet child({ props })}
 					<Button {...props} variant="outline" class="border-r-0" aria-label="Open From">
 						<span class="font-medium">
-							{fromDate?.toDate(getLocalTimeZone()).toLocaleDateString(getLocale(), {
-								weekday: 'long',
-								day: 'numeric',
-								month: 'short'
-							})} @ {fromTime}
+							{formatDatetime(from)}
 						</span>
 					</Button>
 				{/snippet}
 			</Popover.Trigger>
 			<Popover.Content align="end" class="w-full rounded-lg p-0">
-				<DatetimePicker bind:date={fromDate} bind:time={fromTime} />
+				<DatetimePicker bind:value={from} />
 			</Popover.Content>
 		</Popover.Root>
 		<Button variant="outline" size="icon" class="border-r-0 disabled:opacity-100" disabled>
@@ -57,17 +63,13 @@
 				{#snippet child({ props })}
 					<Button {...props} variant="outline" aria-label="Open To">
 						<span class="font-medium">
-							{toDate?.toDate(getLocalTimeZone()).toLocaleDateString(getLocale(), {
-								weekday: 'long',
-								day: 'numeric',
-								month: 'short'
-							})} @ {toTime}
+							{toIsNow ? m.now() : formatDatetime(to)}
 						</span>
 					</Button>
 				{/snippet}
 			</Popover.Trigger>
 			<Popover.Content align="end" class="w-full rounded-lg p-0">
-				<DatetimePicker bind:date={toDate} bind:time={toTime} />
+				<DatetimePicker bind:value={to} onchange={() => (toIsNow = false)} />
 			</Popover.Content>
 		</Popover.Root>
 	</ButtonGroup.Root>
