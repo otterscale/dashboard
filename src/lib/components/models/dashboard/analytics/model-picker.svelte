@@ -3,6 +3,7 @@
 	import { Bot } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import { writable } from 'svelte/store';
 
 	import { Single as SingleSelect } from '$lib/components/custom/select';
@@ -41,7 +42,7 @@
 
 		(async () => {
 			isLoaded = false;
-			const modelNames = new Set<string>();
+			const modelNames = new SvelteSet<string>();
 
 			if (clusterId) {
 				try {

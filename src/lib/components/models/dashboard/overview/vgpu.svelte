@@ -14,7 +14,6 @@
 
 	let {
 		prometheusDriver,
-		cluster,
 		isReloading = $bindable()
 	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
 

@@ -12,10 +12,9 @@
 	import { m } from '$lib/paraglide/messages';
 
 	let {
-		cluster,
 		prometheusDriver,
 		isReloading = $bindable()
-	}: { cluster: string; prometheusDriver: PrometheusDriver; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; isReloading: boolean } = $props();
 
 	const systemLoadConfiguration = {
 		one: { label: '1 min', color: 'var(--chart-1)' },

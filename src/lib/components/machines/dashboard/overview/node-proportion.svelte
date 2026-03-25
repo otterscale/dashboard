@@ -11,9 +11,8 @@
 
 	let {
 		prometheusDriver,
-		cluster,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; isReloading: boolean } = $props();
 
 	let totalNodes = $state(0);
 	let nodeProportions = $state([

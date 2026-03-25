@@ -16,10 +16,9 @@
 	import { cn } from '$lib/utils';
 
 	let {
-		cluster,
 		prometheusDriver,
 		isReloading = $bindable()
-	}: { cluster: string; prometheusDriver: PrometheusDriver; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; isReloading: boolean } = $props();
 
 	let totalStorageBytes = $state(0);
 	let totalDisks = $state(0);

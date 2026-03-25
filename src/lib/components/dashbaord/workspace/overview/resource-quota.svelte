@@ -14,7 +14,6 @@
 
 	let {
 		prometheusDriver,
-		cluster: _cluster,
 		namespace,
 		isReloading = $bindable()
 	}: {
