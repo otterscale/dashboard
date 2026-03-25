@@ -126,7 +126,7 @@
 					{
 						title: m.workspace(),
 						url: page.params.workspace
-							? resolve('/(auth)/[cluster]/[workspace]/overview/workspace', {
+							? resolve('/(auth)/[cluster]/[workspace]/overview', {
 									cluster: activeCluster,
 									workspace: page.params.workspace
 								})

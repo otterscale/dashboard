@@ -51,7 +51,7 @@ export const load: PageServerLoad = async ({ parent, fetch }) => {
 			if (workspace) {
 				throw redirect(
 					307,
-					resolve('/(auth)/[cluster]/[workspace]/overview/workspace', { cluster, workspace })
+					resolve('/(auth)/[cluster]/[workspace]/overview', { cluster, workspace })
 				);
 			}
 		}

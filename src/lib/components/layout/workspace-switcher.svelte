@@ -157,7 +157,7 @@
 		createWorkspaceOpen = false;
 		if (workspace?.metadata?.name) {
 			onsuccess?.(workspace);
-			goto(resolve(`/(auth)/${cluster}/${workspace.metadata.name}/overview/workspace`));
+			goto(resolve(`/(auth)/${cluster}/${workspace.metadata.name}/overview`));
 		}
 	}
 
