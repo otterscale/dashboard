@@ -11,7 +11,7 @@
 		type WatchRequest
 	} from '@otterscale/api/resource/v1';
 	import type { ColumnDef } from '@tanstack/table-core';
-	import { getContext, onDestroy, onMount } from 'svelte';
+	import { getContext, onDestroy, onMount, tick } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import { DynamicTable } from '$lib/components/dynamic-table';
@@ -80,6 +80,7 @@
 		listAbortController = new AbortController();
 		try {
 			let continueToken: string | undefined = undefined;
+			let isFirstPage = true;
 			do {
 				const response = await resourceClient.list(
 					{
@@ -100,6 +101,14 @@
 				const newData = response.items.map((item) => getData(apiResource, item.object));
 				dataset = [...dataset, ...newData];
 
+				if (isFirstPage) {
+					isFirstPage = false;
+					if (!isMounted) {
+						isMounted = true;
+						await tick();
+					}
+				}
+
 				if (listAbortController.signal.aborted) {
 					break;
 				}
@@ -108,6 +117,10 @@
 			if (listAbortController.signal.aborted) return;
 
 			console.error('Failed to list resources:', error);
+			if (!isMounted) {
+				isMounted = true;
+				await tick();
+			}
 
 			return null;
 		} finally {
@@ -224,18 +237,21 @@
 
 		await sleep(500); // for smooth transition
 
-		await listResources();
-		watchResources();
+		void listResources().then(() => {
+			if (isDestroyed || !resourceVersion) return;
+			watchResources();
+		});
 	}
 
 	let isMounted = $state(false);
 	onMount(async () => {
 		await fetchSchema();
-		await listResources();
 		columnDefinitions = getColumnDefinitions(apiResource, uiSchemas, dataSchemas);
-		watchResources();
 
-		isMounted = true;
+		void listResources().then(() => {
+			if (isDestroyed || !resourceVersion) return;
+			watchResources();
+		});
 	});
 
 	let isDestroyed = false;
