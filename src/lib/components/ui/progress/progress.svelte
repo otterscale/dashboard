@@ -6,18 +6,9 @@
 		ref = $bindable(null),
 		class: className,
 		max = 100,
-		min = 0,
 		value,
 		...restProps
 	}: WithoutChildrenOrChild<ProgressPrimitive.RootProps> = $props();
-
-	/** Indicator offset: 0 = full bar, 100 = empty (matches prior `null ?? 0` → translate -100%) */
-	const translateXPercent = $derived.by(() => {
-		if (value === null || value === undefined) return 100;
-		const safeMax = max === 0 ? 1 : max;
-		const clamped = Math.min(safeMax, Math.max(min, value));
-		return 100 * (1 - clamped / safeMax);
-	});
 </script>
 
 <ProgressPrimitive.Root
@@ -29,12 +20,11 @@
 	)}
 	{value}
 	{max}
-	{min}
 	{...restProps}
 >
 	<div
 		data-slot="progress-indicator"
 		class="size-full flex-1 bg-primary transition-all"
-		style="transform: translateX(-{translateXPercent}%)"
+		style="transform: translateX(-{100 - (100 * (value ?? 0)) / (max ?? 1)}%)"
 	></div>
 </ProgressPrimitive.Root>
