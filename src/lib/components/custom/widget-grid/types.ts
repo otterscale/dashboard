@@ -13,7 +13,8 @@ export type WidgetWithClusterProps = WidgetBaseProps & { cluster: string };
 export type WidgetDefinition = {
 	key: string;
 	class: string;
-	component: Component<Record<string, unknown>>;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	component: Component<any>;
 	props?: Record<string, unknown>;
 	/** When true, WidgetGrid passes `cluster` into the widget. Omit or leave false for widgets that do not use it (avoids `svelte/no-unused-props`). */
 	needsCluster?: boolean;
