@@ -62,10 +62,10 @@
 		try {
 			const [limitsResponse, requestsResponse] = await Promise.all([
 				prometheusDriver.instantQuery(
-					`sum by (resource) (kube_pod_container_resource_limits{namespace="${namespace}"})`
+					`sum by (resource) (kube_pod_container_resource_limits{namespace="${namespace}"} and on (namespace, pod, container) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`
 				),
 				prometheusDriver.instantQuery(
-					`sum by (resource) (kube_pod_container_resource_requests{namespace="${namespace}"})`
+					`sum by (resource) (kube_pod_container_resource_requests{namespace="${namespace}"} and on (namespace, pod, container) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`
 				)
 			]);
 
