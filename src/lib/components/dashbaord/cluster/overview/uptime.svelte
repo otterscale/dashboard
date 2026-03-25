@@ -17,10 +17,10 @@
 	let create_time: SampleValue | undefined = $state(undefined);
 	async function fetchUptime() {
 		const uptimeResponse = await prometheusDriver.instantQuery(
-			`time() - min(kube_node_created{juju_model="${cluster}"})`
+			`time() - min(kube_node_created{})`
 		);
 		const createTimeResponse = await prometheusDriver.instantQuery(
-			`min(kube_node_created{juju_model="${cluster}"}) * 1000`
+			`min(kube_node_created{}) * 1000`
 		);
 		uptime = uptimeResponse.result[0]?.value ?? undefined;
 		create_time = createTimeResponse.result[0]?.value?.value ?? undefined;

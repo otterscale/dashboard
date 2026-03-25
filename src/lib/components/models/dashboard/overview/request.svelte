@@ -38,7 +38,7 @@
 	async function fetchNinetyFive() {
 		try {
 			const response = await prometheusDriver.rangeQuery(
-				`histogram_quantile(0.95, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket{juju_model="${cluster}"}[5m])))`,
+				`histogram_quantile(0.95, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket{}[5m])))`,
 				Date.now() - 24 * 60 * 60 * 1000,
 				Date.now(),
 				2 * 60
@@ -52,7 +52,7 @@
 	async function fetchNinetyNine() {
 		try {
 			const response = await prometheusDriver.rangeQuery(
-				`histogram_quantile(0.99, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket{juju_model="${cluster}"}[5m])))`,
+				`histogram_quantile(0.99, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket{}[5m])))`,
 				Date.now() - 24 * 60 * 60 * 1000,
 				Date.now(),
 				2 * 60

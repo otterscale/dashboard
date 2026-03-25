@@ -1,19 +1,17 @@
 <script lang="ts">
+	import { redirect } from '@sveltejs/kit';
+
 	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
-	import { m } from '$lib/paraglide/messages';
-	import { breadcrumbs } from '$lib/stores';
 
-	// Set breadcrumbs navigation
-	breadcrumbs.set([
-		{
-			title: m.workspace(),
-			url: resolve('/(auth)/[cluster]/[workspace]/overview', {
-				cluster: page.params.cluster!,
-				workspace: page.params.workspace!
+	import type { PageLoad } from './$types';
+
+	export const load: PageLoad = ({ params }) => {
+		throw redirect(
+			307,
+			resolve('/(auth)/[cluster]/[workspace]/overview/workspace', {
+				cluster: params.cluster!,
+				workspace: params.workspace!
 			})
-		}
-	]);
+		);
+	};
 </script>
-
-Workspace Dashboard

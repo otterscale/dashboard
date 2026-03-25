@@ -20,7 +20,6 @@ export const load: PageServerLoad = async ({ parent, fetch }) => {
 	const { user } = await parent();
 
 	try {
-		// Fetch available clusters
 		const linkRes = await fetch('/otterscale.link.v1.LinkService/ListLinks', {
 			method: 'POST',
 			headers: { 'x-proxy-target': 'api', 'Content-Type': 'application/json' },
@@ -34,7 +33,6 @@ export const load: PageServerLoad = async ({ parent, fetch }) => {
 
 		const cluster = links[0].cluster;
 
-		// Fetch workspaces for the first cluster
 		const wsRes = await fetch('/otterscale.resource.v1.ResourceService/List', {
 			method: 'POST',
 			headers: { 'x-proxy-target': 'api', 'Content-Type': 'application/json' },
@@ -53,15 +51,13 @@ export const load: PageServerLoad = async ({ parent, fetch }) => {
 			if (workspace) {
 				throw redirect(
 					307,
-					resolve('/(auth)/[cluster]/[workspace]/overview', { cluster, workspace })
+					resolve('/(auth)/[cluster]/[workspace]/overview/workspace', { cluster, workspace })
 				);
 			}
 		}
 
-		// Has cluster but no workspace
 		throw redirect(307, resolve('/(auth)/[cluster]/overview', { cluster }));
 	} catch (e) {
-		// Re-throw redirects
 		if (e && typeof e === 'object' && 'status' in e) throw e;
 		console.error('Failed to auto-select cluster/workspace:', e);
 	}

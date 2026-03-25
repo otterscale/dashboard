@@ -149,7 +149,7 @@
 
 		const workspace = workspaces[index];
 		const name = workspace.metadata?.name ?? '';
-		goto(resolve(`/(auth)/${cluster}/${name}/overview`));
+		goto(resolve(`/(auth)/${cluster}/${name}/overview/workspace`));
 		toast.success(m.switch_workspace({ name: name }));
 	}
 
@@ -157,7 +157,7 @@
 		createWorkspaceOpen = false;
 		if (workspace?.metadata?.name) {
 			onsuccess?.(workspace);
-			goto(resolve(`/(auth)/${cluster}/${workspace.metadata.name}/overview`));
+			goto(resolve(`/(auth)/${cluster}/${workspace.metadata.name}/overview/workspace`));
 		}
 	}
 

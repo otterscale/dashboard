@@ -18,7 +18,7 @@
 	let cpuUsage: SampleValue | undefined = $state(undefined);
 	async function fetchCPUUsage() {
 		const response = await prometheusDriver.instantQuery(
-			`100 * sum(rate(node_cpu_seconds_total{mode!="idle", juju_model="${cluster}", container!=""}[5m])) / sum(rate(node_cpu_seconds_total{juju_model="${cluster}", container!=""}[5m]))`
+			`100 * sum(rate(node_cpu_seconds_total{mode!="idle", container!=""}[5m])) / sum(rate(node_cpu_seconds_total{container!=""}[5m]))`
 		);
 		cpuUsage = response.result[0]?.value ?? undefined;
 	}
@@ -27,9 +27,9 @@
 	async function fetchCPURequest() {
 		const response = await prometheusDriver.instantQuery(
 			`
-			100 * sum(kube_pod_container_resource_requests{resource="cpu", unit="core", juju_model="${cluster}", container!=""})
+			100 * sum(kube_pod_container_resource_requests{resource="cpu", unit="core", container!=""})
 			/
-			sum (kube_node_status_allocatable{cluster!="", juju_model="${cluster}", resource="cpu"})
+			sum (kube_node_status_allocatable{cluster!="", resource="cpu"})
 			`
 		);
 		cpuRequest = response.result[0]?.value ?? undefined;
@@ -39,7 +39,7 @@
 	async function fetchAllocatableCPU() {
 		const response = await prometheusDriver.instantQuery(
 			`
-			sum(kube_node_status_allocatable{cluster!="", juju_model="${cluster}", resource="cpu"})
+			sum(kube_node_status_allocatable{resource="cpu"})
 			`
 		);
 		allocatableCPU = response.result[0]?.value?.value ?? undefined;

@@ -31,7 +31,7 @@
 		try {
 			const response = await prometheusDriver.instantQuery(
 				`
-				topk(10, avg by (nodeid) (nodeGPUMemoryPercentage{juju_model="${cluster}"}))
+				topk(10, avg by (nodeid) (nodeGPUMemoryPercentage{}))
 				`
 			);
 			const instanceVectors: InstantVector[] = response.result;

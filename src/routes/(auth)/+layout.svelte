@@ -120,13 +120,29 @@
 		managed: [
 			{
 				title: m.overview(),
-				url: page.params.workspace
-					? resolve('/(auth)/[cluster]/[workspace]/overview', {
-							cluster: activeCluster,
-							workspace: page.params.workspace
-						})
-					: '',
-				icon: CompassIcon
+				icon: CompassIcon,
+				isActive: true,
+				items: [
+					{
+						title: m.workspace(),
+						url: page.params.workspace
+							? resolve('/(auth)/[cluster]/[workspace]/overview/workspace', {
+									cluster: activeCluster,
+									workspace: page.params.workspace
+								})
+							: ''
+					},
+					{
+						title: m.cluster(),
+						url:
+							page.params.workspace
+								? resolve('/(auth)/[cluster]/[workspace]/overview/cluster', {
+										cluster: activeCluster,
+										workspace: page.params.workspace
+									})
+								: ''
+					}
+				]
 			},
 			{
 				title: m.ai_studio(),
@@ -171,10 +187,12 @@
 					},
 					{
 						title: m.application_hub(),
-						url: resolve('/(auth)/[cluster]/[workspace]/hub', {
-							cluster: activeCluster,
-							workspace: page.params.workspace!
-						})
+						url: page.params.workspace
+							? resolve('/(auth)/[cluster]/[workspace]/hub', {
+									cluster: activeCluster,
+									workspace: page.params.workspace
+								})
+							: ''
 					}
 				]
 			},
@@ -258,11 +276,6 @@
 				: [])
 		],
 		native: [
-			{
-				title: m.overview(),
-				url: resolve('/(auth)/[cluster]/overview', { cluster: activeCluster }),
-				icon: CompassIcon
-			},
 			{
 				title: m.workloads(),
 				icon: BoxIcon,
@@ -441,6 +454,13 @@
 					<NavMain
 						managedLabel={m.managed()}
 						managedItems={navData.managed}
+						nativeLabel={m.native()}
+						nativeItems={navData.native}
+					/>
+				{:else if activeCluster}
+					<NavMain
+						managedLabel={m.native()}
+						managedItems={navData.native}
 						nativeLabel={m.native()}
 						nativeItems={navData.native}
 					/>

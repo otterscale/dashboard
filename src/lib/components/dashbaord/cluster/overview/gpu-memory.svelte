@@ -21,9 +21,9 @@
 		const usageResponse = await prometheusDriver.instantQuery(
 			`
 			100 * 
-			sum(Device_memory_desc_of_container{juju_model="${cluster}"})
+			sum(Device_memory_desc_of_container{})
 			/
-			sum(GPUDeviceMemoryLimit{juju_model="${cluster}"})
+			sum(GPUDeviceMemoryLimit{})
 			`
 		);
 		memoryUsage = usageResponse.result[0]?.value ?? undefined;
@@ -33,9 +33,9 @@
 	async function fetchMemoryRequest() {
 		const response = await prometheusDriver.instantQuery(
 			`
-			100 * sum(vGPU_device_memory_limit_in_bytes{juju_model="${cluster}"})
+			100 * sum(vGPU_device_memory_limit_in_bytes{})
 			/
-			sum(GPUDeviceMemoryLimit{juju_model="${cluster}"})
+			sum(GPUDeviceMemoryLimit{})
 			`
 		);
 		memoryRequest = response.result[0]?.value ?? undefined;
@@ -45,7 +45,7 @@
 	async function fetchAllocatableMemory() {
 		const response = await prometheusDriver.instantQuery(
 			`
-			sum(GPUDeviceMemoryLimit{juju_model="${cluster}"})
+			sum(GPUDeviceMemoryLimit{})
 			`
 		);
 		allocatableMemory = response.result[0]?.value?.value ?? undefined;
