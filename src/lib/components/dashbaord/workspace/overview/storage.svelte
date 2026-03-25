@@ -40,16 +40,20 @@
 		const ns = escapePromqlStringLiteral(namespace);
 		const [reqRes, totalRes, boundRes, pendingRes] = await Promise.all([
 			prometheusDriver.instantQuery(
-				`sum(kube_persistentvolumeclaim_resource_requests_storage_bytes{namespace="${ns}"}) or vector(0)`, end
+				`sum(kube_persistentvolumeclaim_resource_requests_storage_bytes{namespace="${ns}"}) or vector(0)`,
+				end
 			),
 			prometheusDriver.instantQuery(
-				`count(kube_persistentvolumeclaim_info{namespace="${ns}"}) or vector(0)`, end
+				`count(kube_persistentvolumeclaim_info{namespace="${ns}"}) or vector(0)`,
+				end
 			),
 			prometheusDriver.instantQuery(
-				`count(kube_persistentvolumeclaim_status_phase{namespace="${ns}", phase="Bound"} == 1) or vector(0)`, end
+				`count(kube_persistentvolumeclaim_status_phase{namespace="${ns}", phase="Bound"} == 1) or vector(0)`,
+				end
 			),
 			prometheusDriver.instantQuery(
-				`count(kube_persistentvolumeclaim_status_phase{namespace="${ns}", phase="Pending"} == 1) or vector(0)`, end
+				`count(kube_persistentvolumeclaim_status_phase{namespace="${ns}", phase="Pending"} == 1) or vector(0)`,
+				end
 			)
 		]);
 		requestedBytes = reqRes.result[0]?.value;

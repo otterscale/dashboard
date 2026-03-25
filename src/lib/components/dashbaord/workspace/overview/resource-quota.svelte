@@ -55,16 +55,20 @@
 			prometheusDriver.instantQuery(`sum(${base}, type="used", resource="requests.memory"})`, end),
 			prometheusDriver.instantQuery(`sum(${base}, type="hard", resource="requests.memory"})`, end),
 			prometheusDriver.instantQuery(
-				`sum(${base}, type="used", resource="requests.nvidia.com/gpu"})`, end
+				`sum(${base}, type="used", resource="requests.nvidia.com/gpu"})`,
+				end
 			),
 			prometheusDriver.instantQuery(
-				`sum(${base}, type="hard", resource="requests.nvidia.com/gpu"})`, end
+				`sum(${base}, type="hard", resource="requests.nvidia.com/gpu"})`,
+				end
 			),
 			prometheusDriver.instantQuery(
-				`sum(${base}, type="used", resource="requests.nvidia.com/gpumem"})`, end
+				`sum(${base}, type="used", resource="requests.nvidia.com/gpumem"})`,
+				end
 			),
 			prometheusDriver.instantQuery(
-				`sum(${base}, type="hard", resource="requests.nvidia.com/gpumem"})`, end
+				`sum(${base}, type="hard", resource="requests.nvidia.com/gpumem"})`,
+				end
 			)
 		]);
 

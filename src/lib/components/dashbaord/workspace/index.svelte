@@ -27,11 +27,23 @@
 
 	function nowCDT(): CalendarDateTime {
 		const d = new Date();
-		return new CalendarDateTime(d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes());
+		return new CalendarDateTime(
+			d.getFullYear(),
+			d.getMonth() + 1,
+			d.getDate(),
+			d.getHours(),
+			d.getMinutes()
+		);
 	}
 	function minutesAgoCDT(min: number): CalendarDateTime {
 		const d = new Date(Date.now() - min * 60 * 1000);
-		return new CalendarDateTime(d.getFullYear(), d.getMonth() + 1, d.getDate(), d.getHours(), d.getMinutes());
+		return new CalendarDateTime(
+			d.getFullYear(),
+			d.getMonth() + 1,
+			d.getDate(),
+			d.getHours(),
+			d.getMinutes()
+		);
 	}
 
 	let pickerFrom = $state<CalendarDateTime>(minutesAgoCDT(60));
