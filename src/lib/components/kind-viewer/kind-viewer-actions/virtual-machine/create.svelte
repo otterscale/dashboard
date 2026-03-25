@@ -124,6 +124,20 @@
 		currentStep = firstStep;
 	}
 
+	function formatMemory(quantity: string): string {
+		if (!quantity) return quantity;
+		const giMatch = quantity.match(/^(\d+(?:\.\d+)?)Gi$/);
+		if (giMatch) return `${giMatch[1]} GB`;
+		const miMatch = quantity.match(/^(\d+(?:\.\d+)?)Mi$/);
+		if (miMatch) {
+			const mb = parseFloat(miMatch[1]);
+			return mb >= 1024 && mb % 1024 === 0 ? `${mb / 1024} GB` : `${mb} MB`;
+		}
+		const tiMatch = quantity.match(/^(\d+(?:\.\d+)?)Ti$/);
+		if (tiMatch) return `${tiMatch[1]} TB`;
+		return quantity;
+	}
+
 	// Fetch Instance Types
 	async function fetchInstanceTypesAsEnumerations(
 		search: string
@@ -144,10 +158,20 @@
 				listRequest.namespace = namespace;
 			}
 			const response = await resourceClient.list(listRequest);
-			const names = response.items
-				.map((item: any) => (item.object as any)?.metadata?.name as string)
-				.filter((name: string) => name && name.toLowerCase().includes(search.toLowerCase()));
-			return names.map((name: string) => ({ label: name, value: name }));
+			return response.items
+				.map((item: any) => {
+					const obj = item.object as any;
+					const name = obj?.metadata?.name as string;
+					if (!name || !name.toLowerCase().includes(search.toLowerCase())) return null;
+					const cpuCores = obj?.spec?.cpu?.guest;
+					const memoryRaw = obj?.spec?.memory?.guest;
+					const specs: string[] = [];
+					if (cpuCores) specs.push(`CPU: ${cpuCores} Core`);
+					if (memoryRaw) specs.push(`RAM: ${formatMemory(memoryRaw)}`);
+					const label = specs.length ? `${name} (${specs.join(' , ')})` : name;
+					return { label, value: name };
+				})
+				.filter((item): item is { label: string; value: string } => item !== null);
 		} catch (error) {
 			console.error('Error fetching instance types:', error);
 			return [];
@@ -303,7 +327,8 @@
 							TailoredComboboxInput: {
 								placeholder: 'Select Instance Type'
 							},
-							TailoredComboboxEmptyText: 'No Instance Types found.'
+							TailoredComboboxEmptyText: 'No Instance Types found.',
+							TailoredComboboxPopoverClass: 'w-[380px]'
 						}
 					} as UiSchemaRoot}
 					initialValue={null as FormValue}
