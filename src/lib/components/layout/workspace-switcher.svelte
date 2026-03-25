@@ -252,7 +252,7 @@
 										`/(auth)/${cluster}/${activeWorkspace.metadata?.name}/${activeWorkspace.metadata?.name}?group=tenant.otterscale.io&version=v1alpha1&kind=Workspace&resource=workspaces`
 									)
 								: undefined}
-							class="group/icon flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground transition"
+							class="group/icon flex aspect-square size-8.5 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground transition"
 							disabled={!activeWorkspace}
 						>
 							<ActiveIcon class="size-4 group-hover/icon:hidden" />
@@ -305,8 +305,8 @@
 				{#each workspaces as workspace, index (workspace.metadata?.name)}
 					{@const WorkspaceIcon = getWorkspaceIcon(workspace.metadata?.name)}
 					<DropdownMenu.Item onSelect={() => onSelect(index)} class="gap-2 p-2">
-						<div class="flex size-6 items-center justify-center rounded-md border">
-							<WorkspaceIcon class="size-3 shrink-0" />
+						<div class="flex size-7 items-center justify-center rounded-md border">
+							<WorkspaceIcon class="size-3.5 shrink-0" />
 						</div>
 						<div class="grid flex-1 text-start text-xs leading-tight">
 							<span class="truncate font-medium">{workspace.metadata?.name}</span>
@@ -326,7 +326,7 @@
 				{/each}
 				<DropdownMenu.Separator />
 				<DropdownMenu.Item class="gap-2 p-2" onSelect={() => (createWorkspaceOpen = true)}>
-					<div class="flex size-6 items-center justify-center rounded-md border bg-transparent">
+					<div class="flex size-7 items-center justify-center rounded-md border bg-transparent">
 						<PlusIcon class="size-3.5" />
 					</div>
 					<div class="text-xs font-medium text-muted-foreground">{m.add_workspace()}</div>
