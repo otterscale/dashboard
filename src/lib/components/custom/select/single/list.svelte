@@ -16,12 +16,10 @@
 		getSearch: () => string;
 	}>('single-select');
 
-	let filteredOptions = $state<SelectOption[]>([]);
-
 	$effect(() => {
 		const search = ctx.getSearch().toLowerCase();
-		const unsub = ctx.getOptions().subscribe((opts) => {
-			filteredOptions = search ? opts.filter((o) => o.label.toLowerCase().includes(search)) : opts;
+		const unsub = ctx.getOptions().subscribe((_opts) => {
+			_opts.filter((o) => o.label.toLowerCase().includes(search));
 		});
 		return unsub;
 	});

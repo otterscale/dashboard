@@ -15,7 +15,7 @@
 	let {
 		prometheusDriver,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; isReloading: boolean } = $props();
 
 	let memoryUsage: Record<string, number>[] = $state([]);
 

@@ -7,12 +7,12 @@
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Card from '$lib/components/ui/card';
-	import { escapePromqlStringLiteral } from '$lib/prometheus';
 	import { m } from '$lib/paraglide/messages';
+	import { escapePromqlStringLiteral } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
-		cluster,
+		cluster: _cluster,
 		namespace = '',
 		isReloading = $bindable()
 	}: {

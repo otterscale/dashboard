@@ -18,7 +18,6 @@
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
-		cluster: string;
 		namespace: string;
 		isReloading: boolean;
 	} = $props();

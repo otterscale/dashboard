@@ -6,7 +6,6 @@
 
 	import { Single as SingleSelect } from '$lib/components/custom/select';
 	import { m } from '$lib/paraglide/messages';
-	import { cn } from '$lib/utils';
 
 	let {
 		prometheusDriver,

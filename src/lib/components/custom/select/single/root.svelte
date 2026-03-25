@@ -13,13 +13,11 @@
 	let {
 		options,
 		value = $bindable(),
-		children,
-		...restProps
+		children
 	}: {
 		options: Readable<SelectOption[]>;
 		value?: string;
 		children?: import('svelte').Snippet;
-		[key: string]: unknown;
 	} = $props();
 
 	let open = $state(false);

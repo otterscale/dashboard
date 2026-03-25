@@ -15,7 +15,7 @@
 	import { default as UsageRateRootFS } from './usage-rate-chart-root-fs.svelte';
 	import { default as UsageRateSWAP } from './usage-rate-chart-swap.svelte';
 
-	let { cluster, client }: { cluster: string; client: PrometheusDriver } = $props();
+	let { client }: { cluster?: string; client: PrometheusDriver } = $props();
 
 	let selectedInstance = $state<string | undefined>(undefined);
 </script>

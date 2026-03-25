@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Check, CheckCircle, Clock, Database, HardDrive, LoaderCircle } from '@lucide/svelte';
+	import { CheckCircle, Clock, Database, HardDrive, LoaderCircle } from '@lucide/svelte';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
@@ -17,7 +17,6 @@
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
-		cluster: string;
 		namespace: string;
 		isReloading: boolean;
 	} = $props();

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { PrometheusDriver } from 'prometheus-query';
 	import { LoaderCircle } from '@lucide/svelte';
+	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { Reloader } from '$lib/components/custom/reloader';

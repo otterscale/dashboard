@@ -13,8 +13,8 @@
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Card from '$lib/components/ui/card';
 	import { m } from '$lib/paraglide/messages';
-	import { cn } from '$lib/utils';
 	import { escapePromqlStringLiteral } from '$lib/prometheus';
+	import { cn } from '$lib/utils';
 
 	let {
 		prometheusDriver,
@@ -22,7 +22,6 @@
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
-		cluster: string;
 		namespace: string;
 		isReloading: boolean;
 	} = $props();
