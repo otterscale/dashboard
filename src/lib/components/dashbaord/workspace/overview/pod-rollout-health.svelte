@@ -19,10 +19,14 @@
 	let {
 		prometheusDriver,
 		namespace,
+		start = new Date(Date.now() - 60 * 60 * 1000),
+		end = new Date(),
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		namespace: string;
+		start?: Date;
+		end?: Date;
 		isReloading: boolean;
 	} = $props();
 
@@ -82,7 +86,7 @@
 			`sum(kube_pod_container_status_last_terminated_reason{${base}, reason="OOMKilled"}) or vector(0)`
 		];
 
-		const results = await Promise.all(q.map((query) => prometheusDriver.instantQuery(query)));
+		const results = await Promise.all(q.map((query) => prometheusDriver.instantQuery(query, end)));
 
 		snap = {
 			running: num(results[0]?.result[0]?.value),
@@ -124,6 +128,12 @@
 		} else {
 			reloadManager.stop();
 		}
+	});
+
+	$effect(() => {
+		void start;
+		void end;
+		if (isLoaded) fetch();
 	});
 
 	let isLoaded = $state(false);

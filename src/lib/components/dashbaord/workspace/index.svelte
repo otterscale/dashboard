@@ -3,7 +3,11 @@
 	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
-	import { DatetimePicker } from '$lib/components/custom/datetime-picker';
+	import {
+		CalendarDateTime,
+		DatetimePicker,
+		getLocalTimeZone
+	} from '$lib/components/custom/datetime-picker';
 	import { Reloader } from '$lib/components/custom/reloader';
 	import { WidgetGrid } from '$lib/components/custom/widget-grid';
 	import { m } from '$lib/paraglide/messages';
@@ -20,6 +24,13 @@
 
 	let isReloading = $state(true);
 	let prometheusDriver = $state<PrometheusDriver | null>(null);
+
+	let pickerFrom = $state<CalendarDateTime | undefined>();
+	let pickerTo = $state<CalendarDateTime | undefined>();
+	let pickerToIsNow = $state(true);
+
+	const start = $derived(pickerFrom ? pickerFrom.toDate(getLocalTimeZone()) : new Date(Date.now() - 60 * 60 * 1000));
+	const end = $derived(pickerToIsNow ? new Date() : pickerTo ? pickerTo.toDate(getLocalTimeZone()) : new Date());
 
 	const widgets = $derived(
 		workspaceOverviewWidgets.map((w) => ({
@@ -57,12 +68,12 @@
 		</div>
 
 		{#if prometheusDriver}
-			<DatetimePicker />
+			<DatetimePicker bind:from={pickerFrom} bind:to={pickerTo} bind:toIsNow={pickerToIsNow} />
 			<div class="flex justify-end gap-2">
 				<Reloader bind:checked={isReloading} />
 			</div>
 			<div class="grid auto-rows-auto grid-cols-2 gap-4 pt-4 md:gap-6 lg:grid-cols-12">
-				<WidgetGrid {widgets} {prometheusDriver} {cluster} bind:isReloading />
+				<WidgetGrid {widgets} {prometheusDriver} {cluster} {start} {end} bind:isReloading />
 			</div>
 		{:else if cluster}
 			<div class="flex min-h-[400px] w-full items-center justify-center">

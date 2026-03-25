@@ -15,10 +15,14 @@
 	let {
 		prometheusDriver,
 		namespace,
+		start = new Date(Date.now() - 60 * 60 * 1000),
+		end = new Date(),
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		namespace: string;
+		start?: Date;
+		end?: Date;
 		isReloading: boolean;
 	} = $props();
 
@@ -46,21 +50,21 @@
 		const base = `kube_resourcequota{namespace="${ns}"`;
 
 		const [cpuU, cpuH, memU, memH, gpuU, gpuH, gpuMemU, gpuMemH] = await Promise.all([
-			prometheusDriver.instantQuery(`sum(${base}, type="used", resource="requests.cpu"})`),
-			prometheusDriver.instantQuery(`sum(${base}, type="hard", resource="requests.cpu"})`),
-			prometheusDriver.instantQuery(`sum(${base}, type="used", resource="requests.memory"})`),
-			prometheusDriver.instantQuery(`sum(${base}, type="hard", resource="requests.memory"})`),
+			prometheusDriver.instantQuery(`sum(${base}, type="used", resource="requests.cpu"})`, end),
+			prometheusDriver.instantQuery(`sum(${base}, type="hard", resource="requests.cpu"})`, end),
+			prometheusDriver.instantQuery(`sum(${base}, type="used", resource="requests.memory"})`, end),
+			prometheusDriver.instantQuery(`sum(${base}, type="hard", resource="requests.memory"})`, end),
 			prometheusDriver.instantQuery(
-				`sum(${base}, type="used", resource="requests.nvidia.com/gpu"})`
+				`sum(${base}, type="used", resource="requests.nvidia.com/gpu"})`, end
 			),
 			prometheusDriver.instantQuery(
-				`sum(${base}, type="hard", resource="requests.nvidia.com/gpu"})`
+				`sum(${base}, type="hard", resource="requests.nvidia.com/gpu"})`, end
 			),
 			prometheusDriver.instantQuery(
-				`sum(${base}, type="used", resource="requests.nvidia.com/gpumem"})`
+				`sum(${base}, type="used", resource="requests.nvidia.com/gpumem"})`, end
 			),
 			prometheusDriver.instantQuery(
-				`sum(${base}, type="hard", resource="requests.nvidia.com/gpumem"})`
+				`sum(${base}, type="hard", resource="requests.nvidia.com/gpumem"})`, end
 			)
 		]);
 
@@ -94,6 +98,13 @@
 		} else {
 			reloadManager.stop();
 		}
+	});
+
+	$effect(() => {
+		// Re-fetch when the time range changes
+		void start;
+		void end;
+		if (isLoaded) fetch();
 	});
 
 	let isLoaded = $state(false);

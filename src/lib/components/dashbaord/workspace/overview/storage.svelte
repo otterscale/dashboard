@@ -14,10 +14,14 @@
 	let {
 		prometheusDriver,
 		namespace,
+		start = new Date(Date.now() - 60 * 60 * 1000),
+		end = new Date(),
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		namespace: string;
+		start?: Date;
+		end?: Date;
 		isReloading: boolean;
 	} = $props();
 
@@ -36,16 +40,16 @@
 		const ns = escapePromqlStringLiteral(namespace);
 		const [reqRes, totalRes, boundRes, pendingRes] = await Promise.all([
 			prometheusDriver.instantQuery(
-				`sum(kube_persistentvolumeclaim_resource_requests_storage_bytes{namespace="${ns}"}) or vector(0)`
+				`sum(kube_persistentvolumeclaim_resource_requests_storage_bytes{namespace="${ns}"}) or vector(0)`, end
 			),
 			prometheusDriver.instantQuery(
-				`count(kube_persistentvolumeclaim_info{namespace="${ns}"}) or vector(0)`
+				`count(kube_persistentvolumeclaim_info{namespace="${ns}"}) or vector(0)`, end
 			),
 			prometheusDriver.instantQuery(
-				`count(kube_persistentvolumeclaim_status_phase{namespace="${ns}", phase="Bound"} == 1) or vector(0)`
+				`count(kube_persistentvolumeclaim_status_phase{namespace="${ns}", phase="Bound"} == 1) or vector(0)`, end
 			),
 			prometheusDriver.instantQuery(
-				`count(kube_persistentvolumeclaim_status_phase{namespace="${ns}", phase="Pending"} == 1) or vector(0)`
+				`count(kube_persistentvolumeclaim_status_phase{namespace="${ns}", phase="Pending"} == 1) or vector(0)`, end
 			)
 		]);
 		requestedBytes = reqRes.result[0]?.value;
@@ -71,6 +75,12 @@
 		} else {
 			reloadManager.stop();
 		}
+	});
+
+	$effect(() => {
+		void start;
+		void end;
+		if (isLoaded) fetch();
 	});
 
 	let isLoaded = $state(false);

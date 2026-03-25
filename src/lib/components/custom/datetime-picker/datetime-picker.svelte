@@ -11,6 +11,38 @@
 
 	import Calendar from './calendar.svelte';
 
+	function nowCalendarDateTime(): CalendarDateTime {
+		const d = new Date();
+		return new CalendarDateTime(
+			d.getFullYear(),
+			d.getMonth() + 1,
+			d.getDate(),
+			d.getHours(),
+			d.getMinutes()
+		);
+	}
+
+	function minutesAgoCalendarDateTime(minutes: number): CalendarDateTime {
+		const d = new Date(Date.now() - minutes * 60 * 1000);
+		return new CalendarDateTime(
+			d.getFullYear(),
+			d.getMonth() + 1,
+			d.getDate(),
+			d.getHours(),
+			d.getMinutes()
+		);
+	}
+
+	let {
+		from = $bindable(minutesAgoCalendarDateTime(60)),
+		to = $bindable(nowCalendarDateTime()),
+		toIsNow = $bindable(true)
+	}: {
+		from?: CalendarDateTime;
+		to?: CalendarDateTime;
+		toIsNow?: boolean;
+	} = $props();
+
 	const presets = [
 		{ label: () => m.last_1_minute(), minutes: 1 },
 		{ label: () => m.last_5_minutes(), minutes: 5 },
@@ -23,29 +55,10 @@
 	];
 
 	function applyPreset(minutes: number) {
-		const now = new Date();
-		const past = new Date(now.getTime() - minutes * 60 * 1000);
-
-		to = new CalendarDateTime(
-			now.getFullYear(),
-			now.getMonth() + 1,
-			now.getDate(),
-			now.getHours(),
-			now.getMinutes()
-		);
-		from = new CalendarDateTime(
-			past.getFullYear(),
-			past.getMonth() + 1,
-			past.getDate(),
-			past.getHours(),
-			past.getMinutes()
-		);
+		to = nowCalendarDateTime();
+		from = minutesAgoCalendarDateTime(minutes);
 		toIsNow = true;
 	}
-
-	let from = $state<CalendarDateTime | undefined>(new CalendarDateTime(2025, 6, 12, 12, 0));
-	let to = $state<CalendarDateTime | undefined>(new CalendarDateTime(2025, 6, 12, 12, 0));
-	let toIsNow = $state(false);
 
 	function formatDatetime(value: CalendarDateTime | undefined) {
 		if (!value) return '';
