@@ -9,8 +9,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import { getLocale } from '$lib/paraglide/runtime';
 
-	import DatetimePicker from './datetime-picker.svelte';
-	import DatetimePresets from './datetime-presets.svelte';
+	import Calendar from './calendar.svelte';
 
 	const presets = [
 		{ label: () => m.last_1_minute(), minutes: 1 },
@@ -93,7 +92,7 @@
 				{/snippet}
 			</Popover.Trigger>
 			<Popover.Content align="end" class="w-full rounded-lg p-0">
-				<DatetimePicker bind:value={from} />
+				<Calendar bind:value={from} />
 			</Popover.Content>
 		</Popover.Root>
 		<Button variant="outline" size="icon" class="border-r-0 disabled:opacity-100" disabled>
@@ -110,7 +109,7 @@
 				{/snippet}
 			</Popover.Trigger>
 			<Popover.Content align="end" class="w-full rounded-lg p-0">
-				<DatetimePicker bind:value={to} onchange={() => (toIsNow = false)} />
+				<Calendar bind:value={to} onchange={() => (toIsNow = false)} />
 			</Popover.Content>
 		</Popover.Root>
 	</ButtonGroup.Root>

@@ -3,6 +3,7 @@
 	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
+	import { DatetimePicker } from '$lib/components/custom/datetime-picker';
 	import { Reloader } from '$lib/components/custom/reloader';
 	import { WidgetGrid } from '$lib/components/custom/widget-grid';
 	import { m } from '$lib/paraglide/messages';
@@ -56,6 +57,7 @@
 		</div>
 
 		{#if prometheusDriver}
+			<DatetimePicker />
 			<div class="flex justify-end gap-2">
 				<Reloader bind:checked={isReloading} />
 			</div>
