@@ -88,16 +88,30 @@
 				resource: 'workspaces',
 				labelSelector: 'user.otterscale.io/' + data.user.sub
 			});
-			workspaces = response.items.map((item) => item.object as TenantOtterscaleIoV1Alpha1Workspace);
+			workspaces = response.items.map(
+				(item) => item.object as TenantOtterscaleIoV1Alpha1Workspace
+			);
+			return workspaces;
 		} catch (error) {
 			console.error('Failed to fetch workspaces:', error);
+			return [];
 		}
 	}
 
 	async function onClusterChange(cluster: string) {
-		await fetchWorkspaces(cluster);
+		const newWorkspaces = await resourceClient.list({
+			cluster: cluster,
+			group: 'tenant.otterscale.io',
+			version: 'v1alpha1',
+			resource: 'workspaces',
+			labelSelector: 'user.otterscale.io/' + data.user.sub
+		});
 
-		const firstWorkspace = workspaces[0]?.metadata?.name;
+		const items = newWorkspaces.items.map(
+			(item) => item.object as TenantOtterscaleIoV1Alpha1Workspace
+		);
+		const firstWorkspace = items[0]?.metadata?.name;
+
 		if (firstWorkspace) {
 			await goto(
 				resolve('/(auth)/[cluster]/[workspace]/overview', {
@@ -109,6 +123,7 @@
 			await goto(resolve('/(auth)/[cluster]/console', { cluster }));
 		}
 
+		workspaces = items;
 		toast.success(m.switch_cluster({ name: cluster }));
 	}
 
