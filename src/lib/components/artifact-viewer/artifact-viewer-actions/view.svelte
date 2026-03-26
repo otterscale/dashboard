@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { EyeIcon } from '@lucide/svelte';
-	import lodash from 'lodash';
 	import { stringify } from 'yaml';
 
 	import * as Code from '$lib/components/custom/code';
@@ -8,17 +7,15 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 
-	import type { ChartArtifact } from '../types';
+	import type { ChartType } from '../types';
 
 	let {
-		chartArtifact
+		chart
 	}: {
-		chartArtifact: ChartArtifact;
+		chart: ChartType;
 	} = $props();
 
 	let open = $state(false);
-
-	const extraAttributes = $derived(chartArtifact.extra_attrs);
 </script>
 
 <Dialog.Root bind:open>
@@ -39,18 +36,13 @@
 	>
 		<Dialog.Header>
 			<Dialog.Title class="capitalize">
-				{chartArtifact.repository_name}
-				{lodash.get(extraAttributes, 'name')}
+				{chart.repository_name}
+				{chart.name}
 			</Dialog.Title>
 			<Dialog.Description>
-				{lodash.get(extraAttributes, 'description')}
+				{chart.description}
 			</Dialog.Description>
 		</Dialog.Header>
-		<Code.Root
-			variant="secondary"
-			lang="yaml"
-			code={stringify(chartArtifact)}
-			class="w-full border-none"
-		/>
+		<Code.Root variant="secondary" lang="yaml" code={stringify(chart)} class="w-full border-none" />
 	</Dialog.Content>
 </Dialog.Root>

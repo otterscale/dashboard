@@ -5,19 +5,19 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
-	import type { ChartArtifact } from '../types';
+	import type { ChartType } from '../types';
 	import Install from './install.svelte';
 	import View from './view.svelte';
 
 	let {
 		cluster,
 		namespace,
-		chartArtifact,
+		chart,
 		helmRepository
 	}: {
 		cluster: string;
 		namespace: string;
-		chartArtifact: ChartArtifact;
+		chart: ChartType;
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository;
 	} = $props();
 
@@ -41,7 +41,7 @@
 					e.preventDefault();
 				}}
 			>
-				<View {chartArtifact} />
+				<View {chart} />
 			</DropdownMenu.Item>
 
 			<DropdownMenu.Item
@@ -52,7 +52,7 @@
 				<Install
 					{cluster}
 					{namespace}
-					{chartArtifact}
+					{chart}
 					{helmRepository}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;

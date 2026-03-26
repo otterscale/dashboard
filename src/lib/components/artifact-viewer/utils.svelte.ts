@@ -2,7 +2,7 @@ import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 import lodash from 'lodash';
 import { SvelteURL } from 'svelte/reactivity';
 
-function encodeURIComponentWithSlashEscape(value: string): string {
+function encodeHarborURIComponent(value: string): string {
 	return value.includes('/')
 		? encodeURIComponent(encodeURIComponent(value))
 		: encodeURIComponent(value);
@@ -15,7 +15,7 @@ function parseHarborHost(helmRepository: SourceToolkitFluxcdIoV1HelmRepository) 
 	return `${protocol}://${url.host}`;
 }
 
-function parseProjectName(helmRepository: SourceToolkitFluxcdIoV1HelmRepository): string {
+function parseHarborProjectName(helmRepository: SourceToolkitFluxcdIoV1HelmRepository): string {
 	const url = new SvelteURL(helmRepository.spec?.url ?? '');
 	if (!url) {
 		const name = helmRepository.metadata?.name;
@@ -26,4 +26,4 @@ function parseProjectName(helmRepository: SourceToolkitFluxcdIoV1HelmRepository)
 	return project;
 }
 
-export { encodeURIComponentWithSlashEscape, parseHarborHost, parseProjectName };
+export { encodeHarborURIComponent, parseHarborHost, parseHarborProjectName };

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import { SiHelm } from '@icons-pack/svelte-simple-icons';
-	import { BookmarkIcon, BoxesIcon, TagsIcon } from '@lucide/svelte';
+	import { BoxesIcon, TagsIcon } from '@lucide/svelte';
 	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 	import type { Row } from '@tanstack/table-core';
 
@@ -11,25 +11,23 @@
 	import * as Item from '$lib/components/ui/item';
 
 	import Actions from './artifact-viewer-actions/actions.svelte';
-	import type { ArtifactAttribute } from './table-layout';
-	import type { ChartArtifact } from './types';
+	import type { ChartAttribute } from './table-layout';
+	import type { ChartType } from './types';
 
 	let {
 		row,
 		cluster,
 		namespace
 	}: {
-		row: Row<Record<ArtifactAttribute, JsonValue>>;
+		row: Row<Record<ChartAttribute, JsonValue>>;
 		cluster: string;
 		namespace: string;
 	} = $props();
 
-	const latestChartArtifact = $derived(row.original.chartArtifact as unknown as ChartArtifact);
+	const chart = $derived(row.original.chart as ChartType);
 	const helmRepository = $derived(
 		row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository
 	);
-
-	const extraAttributes = $derived(latestChartArtifact.extra_attrs ?? {});
 </script>
 
 <Card.Root>
@@ -37,7 +35,7 @@
 		<Item.Root class="items-start p-0">
 			<Item.Media>
 				<Avatar.Root>
-					<Avatar.Image src={extraAttributes.icon as string} alt="helm" />
+					<Avatar.Image src={chart.icon as string} alt="helm" />
 					<Avatar.Fallback>
 						<SiHelm class="size-4" />
 					</Avatar.Fallback>
@@ -45,15 +43,15 @@
 			</Item.Media>
 			<Item.Content class="text-left">
 				<Item.Title class="font-bold">
-					{extraAttributes.name}
-					<Badge>{extraAttributes.version}</Badge>
+					{chart.name ?? chart.repository_name}
+					<Badge>{chart.version ?? chart.extra_attrs?.version}</Badge>
 				</Item.Title>
 				<Item.Description>
-					{latestChartArtifact.repository_name}
+					{chart.name ?? chart.repository_name}
 				</Item.Description>
 			</Item.Content>
 			<Item.Actions>
-				<Actions {cluster} {namespace} chartArtifact={latestChartArtifact} {helmRepository} />
+				<Actions {cluster} {namespace} {chart} {helmRepository} />
 			</Item.Actions>
 		</Item.Root>
 	</Card.Header>
@@ -61,7 +59,7 @@
 		<Item.Root class="col-span-2 items-start p-0">
 			<Item.Content class="text-left">
 				<Item.Description>
-					{extraAttributes.description}
+					{chart.description}
 				</Item.Description>
 			</Item.Content>
 		</Item.Root>
@@ -69,15 +67,10 @@
 	<Card.Footer class="flex gap-1 overflow-hidden text-xs text-gray-500">
 		<BoxesIcon size={12} />
 		{helmRepository?.metadata?.name}
-		{@const labels = latestChartArtifact.labels ?? []}
-		{@const tags = latestChartArtifact.tags ?? []}
-		{#each labels as label, index (index)}
-			<BookmarkIcon size={12} />
-			{label.name}
-		{/each}
-		{#each tags as tag, index (index)}
+		{@const keywords = chart.keywords ?? []}
+		{#each keywords.slice(0, 3) as keyword, index (index)}
 			<TagsIcon size={12} />
-			{tag.name}
+			{keyword}
 		{/each}
 	</Card.Footer>
 </Card.Root>

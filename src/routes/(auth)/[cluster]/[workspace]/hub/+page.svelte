@@ -12,14 +12,14 @@
 	import { page } from '$app/state';
 	import { ArtifactViewer } from '$lib/components/artifact-viewer';
 	import {
-		type ArtifactAttribute,
-		getArtifactData
+		type ChartAttribute,
+		getChartDataFromHarbor,
+		getChartDataFromIndex
 	} from '$lib/components/artifact-viewer/table-layout';
-	import { createHelmRepositoryChartArtifact } from '$lib/components/artifact-viewer/types';
 	import {
-		encodeURIComponentWithSlashEscape,
+		encodeHarborURIComponent,
 		parseHarborHost,
-		parseProjectName
+		parseHarborProjectName
 	} from '$lib/components/artifact-viewer/utils.svelte.ts';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { m } from '$lib/paraglide/messages';
@@ -43,30 +43,26 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	let charts: Record<ArtifactAttribute, JsonValue>[] = $state([]);
+	let charts: Record<ChartAttribute, JsonValue>[] = $state([]);
 
 	async function fetchChartsByHelmRepository(
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
 	) {
-		const fromHarbor = lodash.get(helmRepository, [
-			'metadata',
-			'labels',
-			'tenant.otterscale.io/from-harbor'
-		]);
-		const helmRepositoryName = helmRepository.metadata?.name ?? 'unknown';
+		const fromHarbor =
+			lodash.get(helmRepository, ['metadata', 'labels', 'tenant.otterscale.io/from-harbor']) ===
+			'true';
+		const helmRepositoryName = helmRepository.metadata?.name ?? '';
 		const repositoryUrl = helmRepository.spec?.url ?? '';
 		const secretName = helmRepository.spec?.secretRef?.name ?? '';
 
 		try {
-			let data: Record<ArtifactAttribute, JsonValue>[] = [];
+			let chartsByHelmRepository: Record<ChartAttribute, JsonValue>[] = [];
 
 			if (fromHarbor) {
-				const isInternal =
-					helmRepository.metadata?.labels?.['tenant.otterscale.io/internal'] === 'true';
 				const harborHost = parseHarborHost(helmRepository);
-				const projectName = parseProjectName(helmRepository);
-				const artifactsUrl = `/api/v2.0/projects/${encodeURIComponentWithSlashEscape(projectName)}/artifacts?q=media_type=${encodeURIComponentWithSlashEscape('application/vnd.cncf.helm.config.v1+json')}&latest_in_repository=true`;
-				const response = await fetch('/bff/harbor/proxy', {
+				const harborProjectName = parseHarborProjectName(helmRepository);
+				const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')}&latest_in_repository=true`;
+				const response = await fetch('/bff/helm/repository/harbor', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
@@ -74,7 +70,6 @@
 						namespace,
 						harborHost,
 						secretName,
-						isInternal,
 						apiPath: artifactsUrl
 					})
 				});
@@ -83,8 +78,10 @@
 				}
 
 				const artifacts: ArtifactType[] = await response.json();
-				data = artifacts.map((artifact) => getArtifactData(artifact, helmRepository));
-			} else if (helmRepository.spec?.type !== 'oci' && repositoryUrl) {
+				chartsByHelmRepository = artifacts.map((artifact) =>
+					getChartDataFromHarbor(artifact, helmRepository)
+				);
+			} else {
 				const response = await fetch('/bff/helm/repository/index', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
@@ -98,50 +95,13 @@
 				if (!response.ok) {
 					throw new Error(`Helm repository index error: ${response.status} ${response.statusText}`);
 				}
-
-				const payload = (await response.json()) as {
-					entries: Array<{
-						chartName: string;
-						latest: {
-							name: string;
-							version: string;
-							appVersion?: string;
-							created?: string;
-							description?: string;
-							digest?: string;
-							home?: string;
-							icon?: string;
-							urls: string[];
-							raw?: Record<string, unknown>;
-						};
-						versions: Array<{
-							name: string;
-							version: string;
-							appVersion?: string;
-							created?: string;
-							description?: string;
-							digest?: string;
-							home?: string;
-							icon?: string;
-							urls: string[];
-						}>;
-					}>;
-				};
-
-				data = payload.entries.map((entry) =>
-					getArtifactData(
-						createHelmRepositoryChartArtifact(
-							entry.chartName,
-							entry.latest,
-							entry.versions,
-							entry.latest.raw
-						),
-						helmRepository
-					)
+				const charts: any[] = await response.json();
+				chartsByHelmRepository = charts.map((chart) =>
+					getChartDataFromIndex(chart, helmRepository)
 				);
 			}
 
-			charts = [...charts, ...data];
+			charts = [...charts, ...chartsByHelmRepository];
 		} catch (error) {
 			console.error(`HelmRepository "${helmRepositoryName}": error fetching charts:`, error);
 			toast.error(`HelmRepository "${helmRepositoryName}": unable to reach repository`);

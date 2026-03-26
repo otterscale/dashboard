@@ -14,12 +14,12 @@
 	import Upload from './artifact-viewer-actions/upload.svelte';
 	import Grid from './grid-layout.svelte';
 	import {
-		type ArtifactAttribute,
-		getArtifactColumnDefinitions,
-		getArtifactDataSchemas,
-		getArtifactUISchemas
+		type ChartAttribute,
+		getChartColumnDefinitions,
+		getChartDataSchemas,
+		getChartUISchemas
 	} from './table-layout.ts';
-	import type { ChartArtifact } from './types';
+	import type { ChartType } from './types.ts';
 
 	let {
 		cluster,
@@ -28,10 +28,10 @@
 		reload
 	}: { cluster: string; namespace: string; charts: any[]; reload: any } = $props();
 
-	const uiSchemas: Record<string, UISchemaType> = getArtifactUISchemas();
-	const dataSchemas: Record<string, DataSchemaType> = getArtifactDataSchemas();
-	const columnDefinitions: ColumnDef<Record<ArtifactAttribute, JsonValue>>[] =
-		getArtifactColumnDefinitions(uiSchemas, dataSchemas);
+	const uiSchemas: Record<string, UISchemaType> = getChartUISchemas();
+	const dataSchemas: Record<string, DataSchemaType> = getChartDataSchemas();
+	const columnDefinitions: ColumnDef<Record<ChartAttribute, JsonValue>>[] =
+		getChartColumnDefinitions(uiSchemas, dataSchemas);
 </script>
 
 <div class="space-y-4">
@@ -79,7 +79,7 @@
 			<Actions
 				{cluster}
 				{namespace}
-				chartArtifact={row.original.chartArtifact as unknown as ChartArtifact}
+				chart={row.original.chart as ChartType}
 				helmRepository={row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository}
 			/>
 		{/snippet}

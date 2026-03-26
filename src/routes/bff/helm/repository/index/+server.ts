@@ -1,39 +1,20 @@
 import { error, json, type RequestHandler } from '@sveltejs/kit';
 import { load } from 'js-yaml';
 
-interface HelmRepositoryIndexEntry {
-	name?: string;
-	version?: string;
-	appVersion?: string;
-	created?: string;
-	description?: string;
-	digest?: string;
-	home?: string;
-	icon?: string;
-	urls?: string[];
-	[key: string]: unknown;
-}
-
-function normalizeRepositoryUrl(repositoryUrl: string): URL {
-	try {
-		return new URL(repositoryUrl);
-	} catch {
-		throw error(400, `Invalid repository URL: ${repositoryUrl}`);
-	}
-}
+import type { ChartType } from '$lib/components/artifact-viewer/types';
 
 function getIndexUrl(repositoryUrl: string): URL {
-	const baseUrl = normalizeRepositoryUrl(repositoryUrl);
-	if (baseUrl.pathname.endsWith('/index.yaml') || baseUrl.pathname.endsWith('/index.yml')) {
-		return baseUrl;
+	const url = new URL(repositoryUrl);
+	if (url.pathname.endsWith('/index.yaml') || url.pathname.endsWith('/index.yml')) {
+		return url;
 	}
-	if (!baseUrl.pathname.endsWith('/')) {
-		baseUrl.pathname = `${baseUrl.pathname}/`;
+	if (!url.pathname.endsWith('/')) {
+		url.pathname = `${url.pathname}/`;
 	}
-	return new URL('index.yaml', baseUrl);
+	return new URL('index.yaml', url);
 }
 
-async function fetchSecretAuthHeader(
+async function fetchSecretAuthorityHeader(
 	fetchFn: typeof fetch,
 	cluster: string,
 	namespace: string,
@@ -58,6 +39,10 @@ async function fetchSecretAuthHeader(
 	});
 
 	if (!secretResponse.ok) {
+		const errorText = await secretResponse.text();
+		console.error(
+			`Secret Response NOT OK: ${secretResponse.status} ${secretResponse.statusText}\nBody: ${errorText}`
+		);
 		return '';
 	}
 
@@ -95,7 +80,7 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 		}
 
 		const authorizationHeader = secretName
-			? await fetchSecretAuthHeader(fetch, cluster, namespace, secretName)
+			? await fetchSecretAuthorityHeader(fetch, cluster, namespace, secretName)
 			: '';
 		const indexUrl = getIndexUrl(repositoryUrl);
 		const response = await fetch(indexUrl, {
@@ -111,47 +96,35 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 		}
 
 		const document = load(await response.text()) as {
-			entries?: Record<string, HelmRepositoryIndexEntry[]>;
+			entries?: Record<string, ChartType[]>;
 		};
-		const entries = Object.entries(document?.entries ?? {}).flatMap(([chartName, versions]) => {
-			const normalizedVersions = (versions ?? [])
-				.filter((version): version is HelmRepositoryIndexEntry => Boolean(version?.version))
-				.map((version) => ({
-					name: String(version.name ?? chartName),
-					version: String(version.version),
-					appVersion: typeof version.appVersion === 'string' ? version.appVersion : undefined,
-					created: typeof version.created === 'string' ? version.created : undefined,
-					description: typeof version.description === 'string' ? version.description : undefined,
-					digest: typeof version.digest === 'string' ? version.digest : undefined,
-					home: typeof version.home === 'string' ? version.home : undefined,
-					icon: typeof version.icon === 'string' ? version.icon : undefined,
-					urls: Array.isArray(version.urls)
-						? version.urls
-								.filter((url): url is string => typeof url === 'string')
-								.map((url) => new URL(url, indexUrl).toString())
-						: [],
-					raw: version
-				}));
 
-			if (normalizedVersions.length === 0) {
-				return [];
-			}
+		const entries = Object.entries(document?.entries ?? {}).flatMap(([chartName, versions]) =>
+			versions.map((version) => ({
+				chartname: chartName,
+				apiVersion: version.apiVersion,
+				appVersion: version.appVersion,
+				created: version.created,
+				description: version.description,
+				digest: version.digest,
+				home: version.home,
+				icon: version.icon,
+				keywords: version.keywords,
+				maintainers: version.maintainers,
+				name: version.name,
+				type: version.type,
+				version: version.version,
+				urls: version.urls,
+				raw: version
+			}))
+		);
 
-			return [
-				{
-					chartName,
-					latest: normalizedVersions[0],
-					versions: normalizedVersions
-				}
-			];
-		});
-
-		return json({ entries });
-	} catch (err: any) {
-		console.error('[helm-repository-index] Failed to fetch repository index:', err);
+		return json(entries);
+	} catch (error: any) {
+		console.error('[helm-repository-index] Failed to fetch repository index:', error);
 		throw error(
-			err?.status ?? 500,
-			`Failed to fetch Helm repository index: ${err?.message || 'Unknown error'}`
+			error?.status ?? 500,
+			`Failed to fetch Helm repository index: ${error?.message || 'Unknown error'}`
 		);
 	}
 };
