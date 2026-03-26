@@ -8,52 +8,33 @@ interface LinkResponse {
 	links: { cluster: string }[];
 }
 
-interface WorkspaceItem {
-	object?: { metadata?: { name?: string } };
+async function fetchLinks(fetch: typeof globalThis.fetch) {
+	const res = await fetch('/otterscale.link.v1.LinkService/ListLinks', {
+		method: 'POST',
+		headers: {
+			'x-proxy-target': 'api',
+			'Content-Type': 'application/json'
+		},
+		body: JSON.stringify({})
+	});
+
+	if (!res.ok) return [];
+
+	const { links } = (await res.json()) as LinkResponse;
+	return links;
 }
 
-interface ListResponse {
-	items: WorkspaceItem[];
-}
-
-export const load: PageServerLoad = async ({ parent, fetch }) => {
-	const { user } = await parent();
-
+export const load: PageServerLoad = async ({ fetch, url }) => {
 	try {
-		const linkRes = await fetch('/otterscale.link.v1.LinkService/ListLinks', {
-			method: 'POST',
-			headers: { 'x-proxy-target': 'api', 'Content-Type': 'application/json' },
-			body: JSON.stringify({})
-		});
+		const links = await fetchLinks(fetch);
+		if (links.length === 0) {
+			return;
+		}
 
-		if (!linkRes.ok) return;
+		const cluster = url.searchParams.get('cluster') ?? links[0].cluster;
 
-		const { links } = (await linkRes.json()) as LinkResponse;
-		if (links.length === 0) return;
-
-		const cluster = links[0].cluster;
-
-		const wsRes = await fetch('/otterscale.resource.v1.ResourceService/List', {
-			method: 'POST',
-			headers: { 'x-proxy-target': 'api', 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				cluster,
-				group: 'tenant.otterscale.io',
-				version: 'v1alpha1',
-				resource: 'workspaces',
-				labelSelector: 'user.otterscale.io/' + user.sub
-			})
-		});
-
-		if (wsRes.ok) {
-			const { items } = (await wsRes.json()) as ListResponse;
-			const workspace = items[0]?.object?.metadata?.name;
-			if (workspace) {
-				throw redirect(
-					307,
-					resolve('/(auth)/[cluster]/[workspace]/overview', { cluster, workspace })
-				);
-			}
+		if (cluster) {
+			redirect(307, resolve('/(auth)/[cluster]/console', { cluster }));
 		}
 	} catch (e) {
 		if (e && typeof e === 'object' && 'status' in e) throw e;

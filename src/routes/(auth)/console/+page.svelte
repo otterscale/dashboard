@@ -60,8 +60,6 @@
 
 	<div class="space-y-2 text-center">
 		<p class="text-lg font-semibold tracking-tight">{m.console_title()}</p>
-		<p class="max-w-md text-sm text-muted-foreground">
-			{m.console_description()}
-		</p>
+		<p class="max-w-md text-sm text-muted-foreground">{m.console_description()}</p>
 	</div>
 </div>

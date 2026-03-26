@@ -96,7 +96,7 @@
 
 	async function onClusterChange(cluster: string) {
 		await fetchWorkspaces(cluster);
-		await goto(resolve('/(auth)/console'));
+		await goto(resolve(`/(auth)/console?cluster=${cluster}`));
 		toast.success(m.switch_cluster({ name: cluster }));
 	}
 
