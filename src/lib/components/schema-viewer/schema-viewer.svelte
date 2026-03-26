@@ -120,10 +120,10 @@
 	<!-- Properties List -->
 	{#if entries.length > 0}
 		<div class="divide-y divide-border rounded-lg border">
-			{#each entries as entry}
+			{#each entries as entry, index (index)}
 				{@const constraints = getConstraints(entry.schema)}
 				<Button
-					class="h-full w-full rounded-none border-none text-start shadow-none first:rounded-t-lg last:rounded-b-lg"
+					class="h-full min-h-13 w-full overflow-hidden rounded-none border-none p-4 text-start shadow-none first:rounded-t-lg last:rounded-b-lg"
 					variant="ghost"
 					onclick={() => navigateTo(entry.key)}
 				>
@@ -137,7 +137,7 @@
 							</Item.Description>
 							{#if Object.keys(constraints).length > 0}
 								<div class="flex flex-wrap gap-1">
-									{#each Object.entries(constraints) as [key, value]}
+									{#each Object.entries(constraints) as [key, value], index (index)}
 										<HoverCard.Root>
 											<HoverCard.Trigger>
 												<Badge variant="outline">

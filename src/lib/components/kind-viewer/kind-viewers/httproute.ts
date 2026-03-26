@@ -23,8 +23,8 @@ function getHTTPRouteDataSchemas(): Record<HTTPRouteAttribute, DataSchemaType> {
 	return {
 		Name: 'text',
 		Namespace: 'text',
-		Hostnames: 'object',
-		Parent: 'object',
+		Hostnames: 'number',
+		Parent: 'number',
 		Age: 'time',
 		raw: 'object'
 	};
@@ -36,8 +36,8 @@ function getHTTPRouteData(
 	return {
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.metadata?.namespace ?? null,
-		Hostnames: (object?.spec?.hostnames as JsonValue) ?? null,
-		Parent: (object?.spec?.parentRefs as JsonValue) ?? null,
+		Hostnames: object?.spec?.hostnames?.length ?? 0,
+		Parent: object?.spec?.parentRefs?.length ?? 0,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
 	};

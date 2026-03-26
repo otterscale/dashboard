@@ -44,9 +44,13 @@
 
 	const uiSchemas: Record<string, UISchemaType> = $derived(getUISchemas(apiResource.kind));
 	const dataSchemas: Record<string, DataSchemaType> = $derived(getDataSchemas(apiResource.kind));
-	const namespace = $derived(
-		clustered ? undefined : apiResource.namespaced ? namespaceProp : undefined
-	);
+	const namespace = $derived.by(() => {
+		if (apiResource.kind === 'CephObjectStore') {
+			return 'rook-ceph';
+		}
+
+		return apiResource.namespaced ? namespaceProp : undefined;
+	});
 
 	async function fetchSchema() {
 		try {
@@ -94,7 +98,7 @@
 				const response = await resourceClient.list(
 					{
 						cluster: cluster,
-						namespace: namespace,
+						namespace: !clustered ? namespace : undefined,
 						group: apiResource.group,
 						version: apiResource.version,
 						resource: apiResource.resource,
@@ -146,7 +150,7 @@
 			const watchResourcesStream = resourceClient.watch(
 				{
 					cluster: cluster,
-					namespace: namespace,
+					namespace: !clustered ? namespace : undefined,
 					group: apiResource.group,
 					version: apiResource.version,
 					resource: apiResource.resource,

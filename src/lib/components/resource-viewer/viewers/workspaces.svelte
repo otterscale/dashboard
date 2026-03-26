@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { createClient, type Transport } from '@connectrpc/connect';
 	import {
 		Box,
 		CircleCheck,
@@ -13,14 +12,9 @@
 		Users,
 		Zap
 	} from '@lucide/svelte';
-	import {
-		type DiscoveryRequest,
-		type GetRequest,
-		ResourceService
-	} from '@otterscale/api/resource/v1';
-	import type { CoreV1ResourceQuota, TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
-	import { getContext, onDestroy } from 'svelte';
-	import { SvelteMap } from 'svelte/reactivity';
+	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
+	import { InstantVector, PrometheusDriver } from 'prometheus-query';
+	import { onMount } from 'svelte';
 
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -38,78 +32,82 @@
 
 	let { object }: { object: TenantOtterscaleIoV1Alpha1Workspace } = $props();
 
-	const transport: Transport = getContext('transport');
-	const resourceClient = createClient(ResourceService, transport);
+	let resourceQuotaUsed: Record<string, string> = $state({});
+	let isLoaded = $state(false);
 
-	let getAbortController: AbortController | null = null;
-	let mapper = new SvelteMap<string, { group: string; version: string; resource: string }>();
-	async function GetResourceQuota(): Promise<CoreV1ResourceQuota> {
-		getAbortController = new AbortController();
+	function formatResourceValue(key: string, value: number): string {
+		if (key.includes('cpu')) {
+			return value < 1 ? `${Math.round(value * 1000)}m` : `${value}`;
+		}
+		if (key.includes('memory')) {
+			const gi = value / 1024 ** 3;
+			if (gi >= 1) return `${Math.round(gi * 10) / 10}Gi`;
+			const mi = value / 1024 ** 2;
+			if (mi >= 1) return `${Math.round(mi)}Mi`;
+			return `${Math.round(value / 1024)}Ki`;
+		}
+		return String(Math.round(value));
+	}
+
+	async function fetchResourceQuotaMetrics() {
+		const namespace = object.status?.resourceQuotaRef?.namespace ?? '';
+		if (!namespace) return;
+
+		const prometheusDriver = new PrometheusDriver({
+			endpoint: `/proxy/${page.params.cluster}/prometheus`,
+			baseURL: '/api/v1',
+			headers: { 'x-proxy-target': 'api' }
+		});
+
 		try {
-			const discovery = await resourceClient.discovery(
-				{
-					cluster: page.params.cluster
-				} as DiscoveryRequest,
-				{ signal: getAbortController.signal }
-			);
+			const [limitsResponse, requestsResponse] = await Promise.all([
+				prometheusDriver.instantQuery(
+					`sum by (resource) (kube_pod_container_resource_limits{namespace="${namespace}"} and on (namespace, pod, container) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`
+				),
+				prometheusDriver.instantQuery(
+					`sum by (resource) (kube_pod_container_resource_requests{namespace="${namespace}"} and on (namespace, pod, container) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`
+				)
+			]);
 
-			for (const apiResource of discovery.apiResources ?? []) {
-				if (apiResource.resource.indexOf('/') >= 0) continue;
-
-				const apiVersion = apiResource.group
-					? `${apiResource.group}/${apiResource.version}`
-					: apiResource.version;
-
-				mapper.set(`${apiVersion}/${apiResource.kind}`, {
-					group: apiResource.group,
-					version: apiResource.version,
-					resource: apiResource.resource
-				});
+			const usedMap: Record<string, string> = {};
+			for (const v of limitsResponse.result as InstantVector[]) {
+				const resource = (v.metric.labels as Record<string, string>).resource;
+				if (resource) {
+					usedMap[`limits.${resource}`] = formatResourceValue(`limits.${resource}`, v.value.value);
+				}
 			}
-
-			const resourceQuotaResponse = await resourceClient.get(
-				{
-					cluster: page.params.cluster,
-					namespace: object.status?.resourceQuotaRef?.namespace ?? '',
-					group: '',
-					version: 'v1',
-					resource: 'resourcequotas',
-					name: object.status?.resourceQuotaRef?.name ?? ''
-				} as GetRequest,
-				{ signal: getAbortController.signal }
-			);
-
-			return resourceQuotaResponse.object as CoreV1ResourceQuota;
-		} catch {
-			return {} as CoreV1ResourceQuota;
-		} finally {
-			if (getAbortController) {
-				getAbortController.abort();
+			for (const v of requestsResponse.result as InstantVector[]) {
+				const resource = (v.metric.labels as Record<string, string>).resource;
+				if (resource) {
+					usedMap[`requests.${resource}`] = formatResourceValue(
+						`requests.${resource}`,
+						v.value.value
+					);
+				}
 			}
+			resourceQuotaUsed = usedMap;
+		} catch (error) {
+			console.error('Failed to fetch ResourceQuota metrics from Prometheus:', error);
 		}
 	}
 
-	onDestroy(() => {
-		if (getAbortController) {
-			getAbortController.abort();
-		}
+	onMount(async () => {
+		await fetchResourceQuotaMetrics();
+		isLoaded = true;
 	});
 
 	function getGridLayout(key: string) {
 		if (key === 'limits.cpu') return 'md:row-start-1 2xl:row-start-1';
 		if (key === 'limits.memory') return 'md:row-start-2 2xl:row-start-1';
-		if (key === 'limits.otterscale.com/vgpu') return 'md:row-start-3 2xl:row-start-1';
-		if (key === 'limits.otterscale.com/vgpumem') return 'md:row-start-4 2xl:row-start-1';
-		if (key === 'limits.otterscale.com/vgpumem-percentage') return 'md:row-start-5 2xl:row-start-1';
+		if (key === 'limits.nvidia.com/gpu') return 'md:row-start-3 2xl:row-start-1';
+		if (key === 'limits.nvidia.com/gpumem') return 'md:row-start-4 2xl:row-start-1';
 
 		if (key === 'requests.cpu') return 'md:row-start-1 2xl:row-start-2';
 		if (key === 'requests.memory') return 'md:row-start-2 2xl:row-start-2';
-		if (key === 'requests.otterscale.com/vgpu') return 'md:row-start-3 2xl:row-start-2';
-		if (key === 'requests.otterscale.com/vgpumem') return 'md:row-start-4 2xl:row-start-2';
-		if (key === 'requests.otterscale.com/vgpumem-percentage')
-			return 'md:row-start-5 2xl:row-start-2';
+		if (key === 'requests.nvidia.com/gpu') return 'md:row-start-3 2xl:row-start-2';
+		if (key === 'requests.nvidia.com/gpumem') return 'md:row-start-4 2xl:row-start-2';
 
-		return '2xl:row-start-3 md:row-start-6';
+		return '2xl:row-start-3 md:row-start-5';
 	}
 
 	let isResourceQuotasGrid = $state(false);
@@ -204,7 +202,7 @@
 	});
 </script>
 
-{#await GetResourceQuota()}
+{#if !isLoaded}
 	<Field.Group class="pb-8">
 		<Field.Set>
 			{#each Array(13).keys() as index (index)}
@@ -232,7 +230,7 @@
 			{/each}
 		</Field.Set>
 	</Field.Group>
-{:then resourceQuota}
+{:else}
 	<Field.Group class="pb-8">
 		<!-- Spec Section -->
 		<Field.Set class="grid grid-cols-1 gap-0 rounded-lg bg-muted/50">
@@ -306,7 +304,6 @@
 			<!-- Resource Quota -->
 			<Card.Root class="flex h-full flex-col border-0 bg-transparent shadow-none">
 				{@const resourceQuotaHard = object.spec?.resourceQuota?.hard ?? {}}
-				{@const resourceQuotaUsed: any = resourceQuota?.status?.used ?? {}}
 				<Card.Header>
 					<Card.Title>
 						<Item.Root class="p-0">
@@ -589,4 +586,4 @@
 			{/if}
 		</Field.Set>
 	</Field.Group>
-{/await}
+{/if}

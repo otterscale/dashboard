@@ -476,7 +476,7 @@
 						<br />
 
 						<h3 class="font-semibold">Note</h3>
-						<div class="p-4 font-mono text-warning">
+						<div class="text-warning p-4 font-mono">
 							<p>
 								Operations between quantities with units (e.g., <code>Mi</code>, <code>k</code>) are
 								<b>not supported yet</b>.

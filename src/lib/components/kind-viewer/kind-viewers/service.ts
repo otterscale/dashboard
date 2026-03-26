@@ -35,9 +35,9 @@ function getServiceDataSchemas(): Record<ServiceAttribute, DataSchemaType> {
 		Type: 'text',
 		'Cluster-IP': 'text',
 		'External-IP': 'text',
-		'Port(s)': 'object',
+		'Port(s)': 'number',
 		Age: 'time',
-		Selector: 'object',
+		Selector: 'number',
 		raw: 'object'
 	};
 }
@@ -58,9 +58,9 @@ function getServiceData(object: CoreV1Service): Record<ServiceAttribute, JsonVal
 		Type: object?.spec?.type ?? null,
 		'Cluster-IP': object?.spec?.clusterIP ?? null,
 		'External-IP': externalIP,
-		'Port(s)': (object?.spec?.ports as JsonValue) ?? null,
+		'Port(s)': object?.spec?.ports?.length ?? 0,
 		Age: object?.metadata?.creationTimestamp ?? null,
-		Selector: (object?.spec?.selector as JsonValue) ?? null,
+		Selector: Object.keys(object?.spec?.selector ?? {}).length,
 		raw: (object as JsonObject) ?? null
 	};
 }

@@ -13,15 +13,40 @@ import Pods from './pods.svelte';
 import Uptime from './uptime.svelte';
 
 export const widgets = [
-	{ key: 'health', class: 'col-span-1 row-span-1', component: Health },
-	{ key: 'uptime', class: 'col-span-1 row-span-1', component: Uptime },
-	{ key: 'information', class: 'col-span-1 row-span-1', component: Information },
-	{ key: 'consumption', class: 'col-span-1 row-span-1', component: Consumption },
-	{ key: 'nodes', class: 'col-span-1 row-span-1', component: Nodes },
-	{ key: 'deployments', class: 'col-span-1 row-span-1', component: Deployments },
-	{ key: 'pods', class: 'col-span-2 row-span-1', component: Pods },
-	{ key: 'cpu', class: 'col-span-1 row-span-2', component: CpuUsage },
-	{ key: 'memory', class: 'col-span-1 row-span-2', component: MemoryUsage },
-	{ key: 'gpu-memory', class: 'col-span-1 row-span-2', component: GPUMemoryUsage },
-	{ key: 'gpu-utilization', class: 'col-span-1 row-span-2', component: GPUUtilization }
+	{ key: 'health', class: 'col-span-1 row-span-1', component: Health, needsCluster: true },
+	{ key: 'uptime', class: 'col-span-1 row-span-1', component: Uptime, needsCluster: true },
+	{
+		key: 'information',
+		class: 'col-span-1 row-span-1',
+		component: Information,
+		needsCluster: true
+	},
+	{
+		key: 'consumption',
+		class: 'col-span-1 row-span-1',
+		component: Consumption,
+		needsCluster: true
+	},
+	{ key: 'nodes', class: 'col-span-1 row-span-1', component: Nodes, needsCluster: true },
+	{
+		key: 'deployments',
+		class: 'col-span-1 row-span-1',
+		component: Deployments,
+		needsCluster: true
+	},
+	{ key: 'pods', class: 'col-span-2 row-span-1', component: Pods, needsCluster: true },
+	{ key: 'cpu', class: 'col-span-1 row-span-2', component: CpuUsage, needsCluster: true },
+	{ key: 'memory', class: 'col-span-1 row-span-2', component: MemoryUsage, needsCluster: true },
+	{
+		key: 'gpu-memory',
+		class: 'col-span-1 row-span-2',
+		component: GPUMemoryUsage,
+		needsCluster: true
+	},
+	{
+		key: 'gpu-utilization',
+		class: 'col-span-1 row-span-2',
+		component: GPUUtilization,
+		needsCluster: true
+	}
 ] satisfies WidgetDefinition[];
