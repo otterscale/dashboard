@@ -257,19 +257,19 @@
 						>
 							<ActiveIcon class="size-4 group-hover/icon:hidden" />
 							<Settings2Icon class="hidden size-4 group-hover/icon:block" />
-							{#if !activeWorkspace}
-								<span
-									class="absolute flex size-3 transition-all {sidebar.open
-										? 'top-1 left-8'
-										: '-top-1 left-6'}"
-								>
-									<span
-										class="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"
-									></span>
-									<span class="relative inline-flex size-3 rounded-full bg-blue-500"></span>
-								</span>
-							{/if}
 						</Button>
+						{#if !activeWorkspace}
+							<span
+								class="pointer-events-none absolute flex size-3 transition-all {sidebar.open
+									? 'top-1 left-8'
+									: '-top-1 left-6'}"
+							>
+								<span
+									class="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"
+								></span>
+								<span class="relative inline-flex size-3 rounded-full bg-blue-500"></span>
+							</span>
+						{/if}
 						<div {...props} class="flex h-12 w-full items-center">
 							<div class="grid flex-1 text-start text-sm leading-tight">
 								{#if activeWorkspace}

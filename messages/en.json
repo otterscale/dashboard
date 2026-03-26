@@ -212,6 +212,8 @@
 	"no_workspace_selected": "No workspace selected",
 	"console_guide_cluster": "Select a Cluster",
 	"console_guide_cluster_description": "Start here by selecting your target Cluster environment to initialize the dashboard.",
+	"console_description_add_workspace": "No workspace found in cluster {cluster}. Please create a new workspace to get started.",
+	"console_title_add_workspace": "Create a Workspace",
 	"console_guide_workspace": "Switch Workspaces",
 	"console_guide_workspace_description": "Once a cluster is selected, use this dropdown to navigate between different Workspaces.",
 	"console_guide_sidebar": "Sidebar Navigation",

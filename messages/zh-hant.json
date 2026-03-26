@@ -212,6 +212,8 @@
 	"no_workspace_selected": "尚未選擇工作區",
 	"console_guide_cluster": "選擇叢集",
 	"console_guide_cluster_description": "請先選擇目標叢集環境以初始化儀表板。",
+	"console_description_add_workspace": "在叢集 {cluster} 中找不到工作區，請新增工作區以開始使用。",
+	"console_title_add_workspace": "新增工作區",
 	"console_guide_workspace": "切換工作區",
 	"console_guide_workspace_description": "選擇叢集後，可由此下拉選單切換不同工作區。",
 	"console_guide_sidebar": "側邊欄導覽",
