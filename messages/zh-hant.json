@@ -268,6 +268,7 @@
 	"application_hub": "應用中心",
 	"block_pool": "區塊儲存池",
 	"object_store": "物件儲存",
+	"object_bucket_claim": "物件儲存桶宣告",
 	"administration": "管理",
 	"module": "模組",
 	"deployment": "部署",

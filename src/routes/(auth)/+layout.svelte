@@ -230,13 +230,22 @@
 						title: m.block_pool(),
 						url: resourceUrl('ceph.rook.io', 'v1', 'CephBlockPool', 'cephblockpools')
 					},
-					{
-						title: m.file_system(),
-						url: resourceUrl('ceph.rook.io', 'v1', 'CephFilesystem', 'cephfilesystems')
-					},
+					// {
+					// 	title: m.file_system(),
+					// 	url: resourceUrl('ceph.rook.io', 'v1', 'CephFilesystem', 'cephfilesystems')
+					// },
 					{
 						title: m.object_store(),
 						url: resourceUrl('ceph.rook.io', 'v1', 'CephObjectStore', 'cephobjectstores')
+					},
+					{
+						title: m.object_bucket_claim(),
+						url: resourceUrl(
+							'objectbucket.io',
+							'v1alpha1',
+							'ObjectBucketClaim',
+							'objectbucketclaims'
+						)
 					}
 				]
 			},

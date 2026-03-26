@@ -53,7 +53,7 @@
 		spec: {
 			accelerator: {},
 			decode: {},
-			prefill: {}
+			prefill: lodash.get(object, 'spec.prefill') ? {} : undefined
 		}
 	});
 
@@ -405,8 +405,6 @@
 								['prefill', 'resources', 'limits', 'nvidia.com/gpumem'],
 								lodash.get(formValue, ['prefill', 'resources', 'requests', 'nvidia.com/gpumem'])
 							);
-						} else {
-							lodash.set(values, 'spec.prefill.resources', {});
 						}
 						return formValue;
 					}}
@@ -421,9 +419,10 @@
 							lodash.set(values, 'spec.decode', lodash.get(mode, 'decode'));
 							if (lodash.get(mode, 'mode') === 'Disaggregation') {
 								lodash.set(values, 'spec.prefill', lodash.get(mode, 'prefill'));
-							} else {
-								lodash.set(values, 'spec.prefill', {});
 							}
+
+							lodash.set(values, 'spec.engine', lodash.get(object, 'spec.engine'));
+							lodash.set(values, 'spec.model', lodash.get(object, 'spec.model'));
 						}
 					}}
 					bind:values={mode}
@@ -488,20 +487,23 @@
 									await resourceClient.apply({
 										cluster,
 										namespace,
+										name,
 										group,
 										version,
 										resource,
-										manifest
+										manifest,
+										fieldManager: 'otterscale-web-ui',
+										force: true
 									});
 								},
 								{
-									loading: `Creating ${kind} ${name}...`,
+									loading: `Updating ${kind} ${name}...`,
 									success: () => {
-										return `Successfully created ${kind} ${name}`;
+										return `Successfully updated ${kind} ${name}`;
 									},
 									error: (error) => {
-										console.error(`Failed to create ${kind} ${name}:`, error);
-										return `Failed to create ${kind} ${name}: ${(error as ConnectError).message}`;
+										console.error(`Failed to update ${kind} ${name}:`, error);
+										return `Failed to update ${kind} ${name}: ${(error as ConnectError).message}`;
 									},
 									finally() {
 										isSubmitting = false;

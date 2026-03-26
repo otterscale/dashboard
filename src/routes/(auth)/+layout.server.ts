@@ -35,7 +35,6 @@ async function verifyClusterAdminStatus(
 			}
 		})
 	);
-
 	const response = await svelteFetch('/otterscale.resource.v1.ResourceService/Create', {
 		method: 'POST',
 		headers: {
