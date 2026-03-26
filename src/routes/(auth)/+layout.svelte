@@ -96,7 +96,19 @@
 
 	async function onClusterChange(cluster: string) {
 		await fetchWorkspaces(cluster);
-		await goto(resolve(`/(auth)/console?cluster=${cluster}`));
+
+		const firstWorkspace = workspaces[0]?.metadata?.name;
+		if (firstWorkspace) {
+			await goto(
+				resolve('/(auth)/[cluster]/[workspace]/overview', {
+					cluster,
+					workspace: firstWorkspace
+				})
+			);
+		} else {
+			await goto(resolve('/(auth)/[cluster]/console', { cluster }));
+		}
+
 		toast.success(m.switch_cluster({ name: cluster }));
 	}
 
