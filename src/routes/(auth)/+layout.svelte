@@ -70,16 +70,17 @@
 	let aboutOpen = $state(false);
 	let importOpen = $state(false);
 
-	async function fetchClusters() {
+	async function fetchClusters(): Promise<Link[]> {
 		try {
 			const response = await linkClient.listLinks({});
-			links = response.links;
+			return response.links;
 		} catch (error) {
 			console.error('Failed to fetch links:', error);
+			return [];
 		}
 	}
 
-	async function fetchWorkspaces(cluster: string) {
+	async function fetchWorkspaces(cluster: string): Promise<TenantOtterscaleIoV1Alpha1Workspace[]> {
 		try {
 			const response = await resourceClient.list({
 				cluster: cluster,
@@ -88,10 +89,7 @@
 				resource: 'workspaces',
 				labelSelector: 'user.otterscale.io/' + data.user.sub
 			});
-			workspaces = response.items.map(
-				(item) => item.object as TenantOtterscaleIoV1Alpha1Workspace
-			);
-			return workspaces;
+			return response.items.map((item) => item.object as TenantOtterscaleIoV1Alpha1Workspace);
 		} catch (error) {
 			console.error('Failed to fetch workspaces:', error);
 			return [];
@@ -99,39 +97,24 @@
 	}
 
 	async function onClusterChange(cluster: string) {
-		const newWorkspaces = await resourceClient.list({
-			cluster: cluster,
-			group: 'tenant.otterscale.io',
-			version: 'v1alpha1',
-			resource: 'workspaces',
-			labelSelector: 'user.otterscale.io/' + data.user.sub
-		});
+		const newWorkspaces = await fetchWorkspaces(cluster);
+		const workspace = newWorkspaces[0]?.metadata?.name;
 
-		const items = newWorkspaces.items.map(
-			(item) => item.object as TenantOtterscaleIoV1Alpha1Workspace
-		);
-		const firstWorkspace = items[0]?.metadata?.name;
-
-		if (firstWorkspace) {
-			await goto(
-				resolve('/(auth)/[cluster]/[workspace]/overview', {
-					cluster,
-					workspace: firstWorkspace
-				})
-			);
+		if (workspace) {
+			await goto(resolve('/(auth)/[cluster]/[workspace]/overview', { cluster, workspace }));
 		} else {
 			await goto(resolve('/(auth)/[cluster]/console', { cluster }));
 		}
 
-		workspaces = items;
+		workspaces = newWorkspaces;
 		toast.success(m.switch_cluster({ name: cluster }));
 	}
 
 	let isMounted = $state(false);
 	onMount(async () => {
-		await fetchClusters();
+		links = await fetchClusters();
 		if (activeCluster) {
-			await fetchWorkspaces(activeCluster);
+			workspaces = await fetchWorkspaces(activeCluster);
 		}
 		isMounted = true;
 	});
@@ -466,7 +449,7 @@
 					{workspaces}
 					user={data.user}
 					workspace={page.params.workspace}
-					onsuccess={() => fetchWorkspaces(activeCluster)}
+					onsuccess={async () => (workspaces = await fetchWorkspaces(activeCluster))}
 				/>
 			</Sidebar.Header>
 			<Sidebar.Content class="gap-2">
@@ -568,7 +551,12 @@
 						</DropdownMenu.Group>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
-				<DialogImportCluster bind:open={importOpen} onsuccess={fetchClusters} />
+				<DialogImportCluster
+					bind:open={importOpen}
+					onsuccess={async () => {
+						links = await fetchClusters();
+					}}
+				/>
 			</div>
 		</header>
 		<main class="flex flex-1 flex-col px-2 md:px-4 lg:px-8">
