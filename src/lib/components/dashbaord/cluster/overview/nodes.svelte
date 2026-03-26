@@ -11,15 +11,14 @@
 
 	let {
 		prometheusDriver,
-		cluster,
+		cluster: _cluster,
 		isReloading = $bindable()
 	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	void _cluster;
 
 	let clusterNodes: SampleValue | undefined = $state(undefined);
 	async function fetchClusterNodes() {
-		const response = await prometheusDriver.instantQuery(
-			`count(kube_node_role{juju_model="${cluster}", container!=""})`
-		);
+		const response = await prometheusDriver.instantQuery(`count(kube_node_role{container!=""})`);
 		clusterNodes = response.result[0]?.value ?? undefined;
 	}
 

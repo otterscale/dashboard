@@ -25,7 +25,7 @@ function getGatewayDataSchemas(): Record<GatewayAttribute, DataSchemaType> {
 		Namespace: 'text',
 		Class: 'text',
 		Listeners: 'number',
-		Addresses: 'object',
+		Addresses: 'number',
 		Age: 'time',
 		raw: 'object'
 	};
@@ -43,7 +43,7 @@ function getGatewayData(
 		Namespace: object?.metadata?.namespace ?? null,
 		Class: object?.spec?.gatewayClassName ?? null,
 		Listeners: object?.spec?.listeners?.length ?? 0,
-		Addresses: (addresses as JsonValue) ?? null,
+		Addresses: addresses.length,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
 	};

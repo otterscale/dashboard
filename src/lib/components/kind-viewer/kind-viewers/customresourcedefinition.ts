@@ -25,7 +25,7 @@ function getCRDDataSchemas(): Record<CRDAttribute, DataSchemaType> {
 		Group: 'text',
 		Kind: 'text',
 		Scope: 'text',
-		Versions: 'object',
+		Versions: 'number',
 		Age: 'time',
 		raw: 'object'
 	};
@@ -41,7 +41,7 @@ function getCRDData(
 		Group: object?.spec?.group ?? null,
 		Kind: object?.spec?.names?.kind ?? null,
 		Scope: object?.spec?.scope ?? null,
-		Versions: versions as JsonValue,
+		Versions: versions.length,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
 	};

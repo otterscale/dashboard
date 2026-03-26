@@ -36,7 +36,7 @@
 	async function fetchPrompts() {
 		try {
 			const response = await prometheusDriver.rangeQuery(
-				`sum(rate(vllm:prompt_tokens_total{juju_model="${cluster}"}[2m]))`,
+				`sum(rate(vllm:prompt_tokens_total{}[2m]))`,
 				Date.now() - 24 * 60 * 60 * 1000,
 				Date.now(),
 				2 * 60
@@ -50,7 +50,7 @@
 	async function fetchGenerations() {
 		try {
 			const response = await prometheusDriver.rangeQuery(
-				`sum(rate(vllm:generation_tokens_total{juju_model="${cluster}"}[2m]))`,
+				`sum(rate(vllm:generation_tokens_total{}[2m]))`,
 				Date.now() - 24 * 60 * 60 * 1000,
 				Date.now(),
 				2 * 60

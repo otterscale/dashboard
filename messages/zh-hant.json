@@ -297,5 +297,14 @@
 	"repository": "倉儲",
 	"add_cluster": "新增叢集",
 	"cluster_status": "叢集狀態",
-	"setting_up_environment": "正在設定您的環境，請稍候..."
+	"setting_up_environment": "正在設定您的環境，請稍候...",
+	"now": "現在",
+	"commonly_used": "常用時間",
+	"last_1_minute": "最近 1 分鐘",
+	"last_5_minutes": "最近 5 分鐘",
+	"last_15_minutes": "最近 15 分鐘",
+	"last_1_hour": "最近 1 小時",
+	"last_3_hours": "最近 3 小時",
+	"last_24_hours": "最近 24 小時",
+	"last_30_days": "最近 30 天"
 }
