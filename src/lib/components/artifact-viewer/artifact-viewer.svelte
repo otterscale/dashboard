@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import { Columns3Icon, EraserIcon } from '@lucide/svelte';
-	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 	import type { ColumnDef } from '@tanstack/table-core';
 
 	import { DynamicTable } from '$lib/components/dynamic-table';
@@ -19,7 +18,6 @@
 		getChartDataSchemas,
 		getChartUISchemas
 	} from './table-layout.ts';
-	import type { ChartType } from './types.ts';
 
 	let {
 		cluster,
@@ -76,12 +74,7 @@
 			<Upload {namespace} />
 		{/snippet}
 		{#snippet rowActions({ row })}
-			<Actions
-				{cluster}
-				{namespace}
-				chart={row.original.chart as ChartType}
-				helmRepository={row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository}
-			/>
+			<Actions {row} {cluster} {namespace} />
 		{/snippet}
 	</DynamicTable>
 </div>

@@ -7,26 +7,32 @@ import { DynamicTableCell, DynamicTableHeader } from '$lib/components/dynamic-ta
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
 
-import type { ChartArtifact, ChartType } from './types';
+import type { ArtifactChartType, IndexChartType } from './types';
 
 type ChartAttribute =
 	| 'Helm Repository'
-	| 'Repository'
+	| 'Chart Name'
+	| 'Description'
 	| 'Digest'
 	| 'Version'
 	| 'Type'
 	| 'Labels'
+	| 'Source'
+	| 'icon'
 	| 'helmRepository'
 	| 'chart';
 
 function getChartDataSchemas(): Record<ChartAttribute, DataSchemaType> {
 	return {
 		'Helm Repository': 'text',
-		Repository: 'text',
+		'Chart Name': 'text',
+		Description: 'text',
 		Digest: 'text',
 		Version: 'text',
 		Type: 'text',
 		Labels: 'array',
+		Source: 'text',
+		icon: 'text',
 		helmRepository: 'object',
 		chart: 'object'
 	};
@@ -35,45 +41,54 @@ function getChartDataSchemas(): Record<ChartAttribute, DataSchemaType> {
 function getChartUISchemas(): Record<ChartAttribute, UISchemaType> {
 	return {
 		'Helm Repository': 'text',
-		Repository: 'text',
+		'Chart Name': 'text',
+		Description: 'text',
 		Digest: 'text',
 		Version: 'text',
 		Type: 'text',
 		Labels: 'array',
+		Source: 'text',
+		icon: 'text',
 		helmRepository: 'object',
 		chart: 'object'
 	};
 }
 
 function getChartDataFromHarbor(
-	chartArtifact: ChartArtifact,
+	artifactChart: ArtifactChartType,
 	helmRepository: SourceToolkitFluxcdIoV1HelmRepository
 ): Record<ChartAttribute, JsonValue> {
 	return {
 		'Helm Repository': helmRepository.metadata?.name ?? null,
-		Repository: chartArtifact.repository_name ?? null,
-		Digest: chartArtifact.digest ?? null,
-		Version: chartArtifact.extra_attrs?.version as JsonValue,
-		Type: chartArtifact.type ?? null,
-		Labels: (chartArtifact.labels ?? []) as JsonValue,
+		'Chart Name': artifactChart.repository_name ?? null,
+		Description: artifactChart.extra_attrs?.description as JsonValue,
+		Digest: artifactChart.digest ?? null,
+		Version: artifactChart.extra_attrs?.version as JsonValue,
+		Type: artifactChart.type ?? null,
+		Labels: (artifactChart.labels ?? []) as JsonValue,
+		Source: 'harbor',
+		icon: artifactChart.extra_attrs?.icon as JsonValue,
 		helmRepository: helmRepository as JsonValue,
-		chart: chartArtifact as unknown as JsonValue
+		chart: artifactChart as unknown as JsonValue,
 	};
 }
 
 function getChartDataFromIndex(
-	chart: ChartType,
+	indexChart: IndexChartType,
 	helmRepository: SourceToolkitFluxcdIoV1HelmRepository
 ): Record<ChartAttribute, JsonValue> {
 	return {
 		'Helm Repository': helmRepository.metadata?.name ?? null,
-		Repository: chart.name ?? null,
-		Digest: chart.digest ?? null,
-		Version: chart.version as JsonValue,
-		Type: chart.type ?? null,
-		Labels: (chart.keywords ?? []) as JsonValue,
+		'Chart Name': indexChart.chartName ?? null,
+		Description: indexChart.description as JsonValue,
+		Digest: indexChart.digest ?? null,
+		Version: indexChart.version as JsonValue,
+		Type: indexChart.type ?? null,
+		Labels: (indexChart.keywords ?? []) as JsonValue,
+		Source: 'index',
+		icon: indexChart.icon as JsonValue,
 		helmRepository: helmRepository as JsonValue,
-		chart: chart as unknown as JsonValue
+		chart: indexChart as unknown as JsonValue
 	};
 }
 
@@ -82,11 +97,13 @@ function getChartColumnDefinitions(
 	dataSchemas: Record<ChartAttribute, DataSchemaType>
 ): ColumnDef<Record<ChartAttribute, JsonValue>>[] {
 	const columns: ChartAttribute[] = [
-		'Repository',
+		'Chart Name',
+		'Description',
 		'Digest',
 		'Type',
 		'Version',
 		'Labels',
+		'Source',
 		'Helm Repository'
 	];
 
@@ -116,10 +133,10 @@ function getChartColumnDefinitions(
 }
 
 export {
-	type ChartAttribute,
 	getChartColumnDefinitions,
 	getChartDataFromHarbor,
 	getChartDataFromIndex,
 	getChartDataSchemas,
-	getChartUISchemas
+	getChartUISchemas, type ChartAttribute
 };
+

@@ -3,7 +3,6 @@ import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 import type { ArtifactType } from '$lib/server/harbor';
 
 interface ChartType {
-	chartName: string;
 	apiVersion: string;
 	appVersion: string;
 	created: string;
@@ -20,8 +19,11 @@ interface ChartType {
 	type: string;
 	urls: string[];
 	version: string;
-	helmRepository: SourceToolkitFluxcdIoV1HelmRepository;
-	[key: string]: unknown;
+}
+
+interface IndexChartType extends ChartType {
+	chartName: string;
+	versions: ChartType[]
 }
 
 interface HelmRepositoryChartVersion {
@@ -101,7 +103,8 @@ function createHelmRepositoryChartArtifact(
 
 export {
 	type ChartArtifact,
-	type ChartType,
+	type IndexChartType,
+	type ArtifactType as ArtifactChartType,
 	createHelmRepositoryChartArtifact,
 	type HelmRepositoryChartArtifact,
 	type HelmRepositoryChartVersion,

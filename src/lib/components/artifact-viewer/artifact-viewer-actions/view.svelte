@@ -7,12 +7,14 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 
-	import type { ChartType } from '../types';
+	import type { JsonValue } from '@bufbuild/protobuf';
+	import type { Row } from '@tanstack/table-core';
+	import type { ChartAttribute } from '../table-layout';
 
 	let {
-		chart
+		row
 	}: {
-		chart: ChartType;
+		row: Row<Record<ChartAttribute, JsonValue>>;
 	} = $props();
 
 	let open = $state(false);
@@ -36,13 +38,17 @@
 	>
 		<Dialog.Header>
 			<Dialog.Title class="capitalize">
-				{chart.repository_name}
-				{chart.name}
+				{row.original['Helm Repository']}
 			</Dialog.Title>
 			<Dialog.Description>
-				{chart.description}
+				{row.original['Helm Repository']}
 			</Dialog.Description>
 		</Dialog.Header>
-		<Code.Root variant="secondary" lang="yaml" code={stringify(chart)} class="w-full border-none" />
+		<Code.Root
+			variant="secondary"
+			lang="yaml"
+			code={stringify(row.original.chart)}
+			class="w-full border-none"
+		/>
 	</Dialog.Content>
 </Dialog.Root>

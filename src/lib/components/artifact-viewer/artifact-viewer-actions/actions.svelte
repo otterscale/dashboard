@@ -8,17 +8,18 @@
 	import type { ChartType } from '../types';
 	import Install from './install.svelte';
 	import View from './view.svelte';
+	import type { Row } from '@tanstack/table-core';
+	import type { JsonValue } from '@bufbuild/protobuf';
+	import type { ChartAttribute } from '../table-layout';
 
 	let {
+		row,
 		cluster,
-		namespace,
-		chart,
-		helmRepository
+		namespace
 	}: {
+		row: Row<Record<ChartAttribute, JsonValue>>;
 		cluster: string;
 		namespace: string;
-		chart: ChartType;
-		helmRepository: SourceToolkitFluxcdIoV1HelmRepository;
 	} = $props();
 
 	let actionsOpen = $state(false);
@@ -41,7 +42,7 @@
 					e.preventDefault();
 				}}
 			>
-				<View {chart} />
+				<View {row} />
 			</DropdownMenu.Item>
 
 			<DropdownMenu.Item
@@ -50,10 +51,9 @@
 				}}
 			>
 				<Install
+					{row}
 					{cluster}
 					{namespace}
-					{chart}
-					{helmRepository}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
 					}}

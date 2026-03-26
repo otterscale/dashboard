@@ -12,7 +12,6 @@
 
 	import Actions from './artifact-viewer-actions/actions.svelte';
 	import type { ChartAttribute } from './table-layout';
-	import type { ChartType } from './types';
 
 	let {
 		row,
@@ -24,7 +23,6 @@
 		namespace: string;
 	} = $props();
 
-	const chart = $derived(row.original.chart as ChartType);
 	const helmRepository = $derived(
 		row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository
 	);
@@ -35,7 +33,7 @@
 		<Item.Root class="items-start p-0">
 			<Item.Media>
 				<Avatar.Root>
-					<Avatar.Image src={chart.icon as string} alt="helm" />
+					<Avatar.Image src={row.original.icon as string} alt="helm" />
 					<Avatar.Fallback>
 						<SiHelm class="size-4" />
 					</Avatar.Fallback>
@@ -43,15 +41,15 @@
 			</Item.Media>
 			<Item.Content class="text-left">
 				<Item.Title class="font-bold">
-					{chart.name ?? chart.repository_name}
-					<Badge>{chart.version ?? chart.extra_attrs?.version}</Badge>
+					{row.original['Chart Name']}
+					<Badge>{row.original.Version}</Badge>
 				</Item.Title>
 				<Item.Description>
-					{chart.name ?? chart.repository_name}
+					{row.original['Helm Repository']}
 				</Item.Description>
 			</Item.Content>
 			<Item.Actions>
-				<Actions {cluster} {namespace} {chart} {helmRepository} />
+				<Actions {row} {cluster} {namespace} />
 			</Item.Actions>
 		</Item.Root>
 	</Card.Header>
@@ -59,18 +57,16 @@
 		<Item.Root class="col-span-2 items-start p-0">
 			<Item.Content class="text-left">
 				<Item.Description>
-					{chart.description}
+					{row.original['Description']}
 				</Item.Description>
 			</Item.Content>
 		</Item.Root>
 	</Card.Content>
 	<Card.Footer class="flex gap-1 overflow-hidden text-xs text-gray-500">
 		<BoxesIcon size={12} />
-		{helmRepository?.metadata?.name}
-		{@const keywords = chart.keywords ?? []}
-		{#each keywords.slice(0, 3) as keyword, index (index)}
+		{#each (row.original.Labels as string[]) ?? [] as label, index (index)}
 			<TagsIcon size={12} />
-			{keyword}
+			{label}
 		{/each}
 	</Card.Footer>
 </Card.Root>

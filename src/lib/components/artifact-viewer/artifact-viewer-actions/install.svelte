@@ -24,24 +24,25 @@
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
 	import {
-		type ChartArtifact,
-		type ChartType,
+		type ArtifactChartType,
+		type IndexChartType,
 		createHelmRepositoryChartArtifact,
 		isHelmRepositoryChartArtifact
 	} from '../types';
 	import { encodeHarborURIComponent, parseHarborHost } from '../utils.svelte';
+	import type { Row } from '@tanstack/table-core';
+	import type { ChartAttribute } from '../table-layout';
+	import type { JsonValue } from '@bufbuild/protobuf';
 
 	let {
+		row,
 		cluster,
 		namespace,
-		chart,
-		helmRepository,
 		onOpenChangeComplete
 	}: {
+		row: Row<Record<ChartAttribute, JsonValue>>;
 		cluster: string;
 		namespace: string;
-		chart: ChartType;
-		helmRepository: SourceToolkitFluxcdIoV1HelmRepository;
 		onOpenChangeComplete: () => void;
 	} = $props();
 
@@ -94,69 +95,75 @@
 	});
 	let value = $derived(stringify(values));
 
-	let chartArtifacts: ChartArtifact[] = $state([]);
+	const isHarbor = $derived(row.original.Source === 'harbor');
+	const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
+
+	let artifacCharts: ArtifactChartType[] = $state([]);
 	async function fetchChartArtifacts() {
-		if (chart.helmRepository?.metadata?.labels?.['tenant.otterscale.io/from-harbor'] === 'true') {
-			const chartArtifact = chart.raw as unknown as ChartArtifact;
+		const artifacChart = row.original.chart as unknown as ArtifactChartType;
 
-			const [project, ...latestChartNameParts] = $derived(chartArtifact.repository_name.split('/'));
-			const repository = $derived(latestChartNameParts.join('/'));
-			const harborHost = $derived(parseHarborHost(helmRepository));
-			const secretName = $derived(helmRepository?.spec?.secretRef?.name ?? '');
-			const isInternal = $derived(
-				helmRepository?.metadata?.labels?.['tenant.otterscale.io/internal'] === 'true'
-			);
+		const [project, ...latestChartNameParts] = $derived(artifacChart.repository_name.split('/'));
+		const repository = $derived(latestChartNameParts.join('/'));
+		const harborHost = $derived(parseHarborHost(helmRepository));
+		const secretName = $derived(helmRepository?.spec?.secretRef?.name ?? '');
 
-			try {
-				const projectPath = encodeHarborURIComponent(project);
-				const repositoryPath = encodeHarborURIComponent(repository);
-				const artifactsUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts?with_label=true`;
+		try {
+			const projectPath = encodeHarborURIComponent(project);
+			const repositoryPath = encodeHarborURIComponent(repository);
+			const artifactsUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts?with_label=true`;
 
-				const response = await fetch('/bff/harbor/proxy', {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					body: JSON.stringify({
-						cluster,
-						namespace,
-						harborHost,
-						secretName,
-						isInternal,
-						apiPath: artifactsUrl
-					})
-				});
-				if (!response.ok) {
-					console.error('Failed to fetch repository artifacts:', response.statusText);
-					return;
-				}
-				chartArtifacts = await response.json();
-			} catch (error) {
-				console.error('Error fetching repository artifacts:', error);
+			const response = await fetch('/bff/helm/repository/harbor', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					cluster,
+					namespace,
+					harborHost,
+					secretName,
+					apiPath: artifactsUrl
+				})
+			});
+			if (!response.ok) {
+				console.error('Failed to fetch repository artifacts:', response.statusText);
+				return;
 			}
+			artifacCharts = await response.json();
+		} catch (error) {
+			console.error('Error fetching repository artifacts:', error);
 		}
 	}
+	// fetch index charts
 
-	let selectedChart: ChartType = $derived(chart);
-	// function getVersions() {
-	// 	return chartArtifacts.map(
-	// 		(artifact) => lodash.get(artifact.extra_attrs, 'version') as unknown as string
-	// 	);
-	// }
-	// function getSelectedChartArtifact(version: string) {
-	// 	return (
-	// 		chartArtifacts.find((artifact) => lodash.get(artifact.extra_attrs, 'version') === version) ??
-	// 		chart
-	// 	);
-	// }
-	// $effect(() => {
-	// 	const versionValue = lodash.get(values, 'spec.chart.spec.version') as unknown as string;
-	// 	if (versionValue) {
-	// 		selectedChart = getSelectedChartArtifact(versionValue);
-	// 	}
-	// });
+	let selectedChart: ArtifactChartType | IndexChartType = $derived(artifacCharts[0]);
+	function getVersions() {
+		return artifacCharts.map(
+			(artifacChart) => lodash.get(artifacChart.extra_attrs, 'version') as unknown as string
+		);
+	}
+	function getSelectedChart(version: string) {
+		return (
+			artifacCharts.find(
+				(artifacChart) => lodash.get(artifacChart.extra_attrs, 'version') === version
+			) ?? artifacCharts[0]
+		);
+	}
+	$effect(() => {
+		const version = lodash.get(values, 'spec.chart.spec.version') as unknown as string;
+		if (version) {
+			selectedChart = getSelectedChart(version);
+		}
+	});
 
 	async function getReferenceAddition(reference: string, addition: string) {
+		const artifacChart = row.original.chart as unknown as ArtifactChartType;
+
+		const [project, ...latestChartNameParts] = $derived(artifacChart.repository_name.split('/'));
+		const repository = $derived(latestChartNameParts.join('/'));
+		const harborHost = $derived(parseHarborHost(helmRepository));
+		const secretName = $derived(helmRepository?.spec?.secretRef?.name ?? '');
+
 		const projectPath = encodeHarborURIComponent(project);
 		const repositoryPath = encodeHarborURIComponent(repository);
 		const referencePath = encodeHarborURIComponent(reference);
@@ -164,7 +171,7 @@
 
 		const additionUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${referencePath}/additions/${additionPath}`;
 
-		const response = await fetch('/bff/harbor/proxy', {
+		const response = await fetch('/bff/helm/repository/harbor', {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json'
@@ -174,7 +181,6 @@
 				namespace,
 				harborHost,
 				secretName,
-				isInternal,
 				apiPath: additionUrl
 			})
 		});
@@ -191,7 +197,7 @@
 	}
 
 	async function getChartInformation(digest: string) {
-		if (isHelmRepositoryChartArtifact(selectedChart)) {
+		if (!isHarbor) {
 			const response = await runtimeClient.showChart({
 				repoUrl: helmRepository.spec?.url ?? '',
 				chartName: String(lodash.get(selectedChart.extra_attrs, 'name') ?? ''),

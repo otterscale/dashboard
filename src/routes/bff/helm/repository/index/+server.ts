@@ -1,7 +1,7 @@
 import { error, json, type RequestHandler } from '@sveltejs/kit';
 import { load } from 'js-yaml';
 
-import type { ChartType } from '$lib/components/artifact-viewer/types';
+import type { IndexChartType } from '$lib/components/artifact-viewer/types';
 
 function getIndexUrl(repositoryUrl: string): URL {
 	const url = new URL(repositoryUrl);
@@ -96,27 +96,30 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 		}
 
 		const document = load(await response.text()) as {
-			entries?: Record<string, ChartType[]>;
+			entries?: Record<string, IndexChartType[]>;
 		};
 
-		const entries = Object.entries(document?.entries ?? {}).flatMap(([chartName, versions]) =>
-			versions.map((version) => ({
-				chartname: chartName,
-				apiVersion: version.apiVersion,
-				appVersion: version.appVersion,
-				created: version.created,
-				description: version.description,
-				digest: version.digest,
-				home: version.home,
-				icon: version.icon,
-				keywords: version.keywords,
-				maintainers: version.maintainers,
-				name: version.name,
-				type: version.type,
-				version: version.version,
-				urls: version.urls,
-				raw: version
-			}))
+		const entries = Object.entries(document?.entries ?? {}).map(([chartName, versions]) =>
+			{
+				const [latestVersion] = versions
+				return {
+					apiVersion: latestVersion.apiVersion,
+					appVersion: latestVersion.appVersion,
+					created: latestVersion.created,
+					description: latestVersion.description,
+					digest: latestVersion.digest,
+					home: latestVersion.home,
+					icon: latestVersion.icon,
+					keywords: latestVersion.keywords,
+					maintainers: latestVersion.maintainers,
+					name: latestVersion.name,
+					type: latestVersion.type,
+					version: latestVersion.version,
+					urls: latestVersion.urls,
+					chartname: chartName,
+					versions: versions
+				}
+			}
 		);
 
 		return json(entries);

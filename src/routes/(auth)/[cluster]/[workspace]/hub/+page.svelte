@@ -25,6 +25,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import type { ArtifactType } from '$lib/server/harbor';
 	import { breadcrumbs } from '$lib/stores';
+	import type { ArtifactChartType } from '$lib/components/artifact-viewer/types';
 
 	// Set breadcrumbs navigation
 	breadcrumbs.set([
@@ -77,9 +78,9 @@
 					throw new Error(`Harbor API error: ${response.status} ${response.statusText}`);
 				}
 
-				const artifacts: ArtifactType[] = await response.json();
-				chartsByHelmRepository = artifacts.map((artifact) =>
-					getChartDataFromHarbor(artifact, helmRepository)
+				const artifactCharts: ArtifactChartType[] = await response.json();
+				chartsByHelmRepository = artifactCharts.map((artifactChart) =>
+					getChartDataFromHarbor(artifactChart, helmRepository)
 				);
 			} else {
 				const response = await fetch('/bff/helm/repository/index', {
