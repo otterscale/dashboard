@@ -21,10 +21,10 @@
 </script>
 
 <script lang="ts">
-	import PlusIcon from '@lucide/svelte/icons/plus';
-	import SearchXIcon from '@lucide/svelte/icons/search-x';
 	import Check from '@lucide/svelte/icons/check';
 	import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down';
+	import PlusIcon from '@lucide/svelte/icons/plus';
+	import SearchXIcon from '@lucide/svelte/icons/search-x';
 	import {
 		ariaInvalidProp,
 		type ComponentProps,
