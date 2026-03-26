@@ -54,7 +54,7 @@
 	const existingInstanceTypeName = lodash.get(object, 'spec.instancetype.name', '');
 	const existingVolumes: any[] = lodash.get(object, 'spec.template.spec.volumes', []);
 	const allDataVolumeEntries = existingVolumes.filter((v: any) => v.dataVolume);
-	const existingRootDisk = allDataVolumeEntries[0]?.dataVolume?.name ?? '';
+	const existingBootDisk = allDataVolumeEntries[0]?.dataVolume?.name ?? '';
 	const existingAdditionalDisks = allDataVolumeEntries.slice(1).map((v: any) => v.dataVolume.name);
 	const existingCloudInit =
 		existingVolumes.find((v: any) => v.cloudInitNoCloud)?.cloudInitNoCloud?.userData ?? '';
@@ -64,31 +64,34 @@
 		apiVersion: group ? `${group}/${version}` : version,
 		kind,
 		spec: {
-			running: lodash.get(object, 'spec.running', true),
+			runStrategy: lodash.get(object, 'spec.runStrategy', 'Halted'),
 			instancetype: {
 				kind: {},
 				name: {}
 			}
 		},
 		// UI-only fields (not in API schema)
-		diskConfig: {},
+		diskConfig: {
+			bootDisk: null,
+			additionalDisks: []
+		},
 		cloudInit: {}
 	});
 
 	// Build disks and volumes from UI-only diskConfig and cloudInit
 	function buildDisksAndVolumes(): { disks: any[]; volumes: any[] } {
 		const diskConfig = values.diskConfig ?? {};
-		const rootDiskName = typeof diskConfig.rootDisk === 'string' ? diskConfig.rootDisk : '';
+		const bootDiskName = typeof diskConfig.bootDisk === 'string' ? diskConfig.bootDisk : '';
 		const additionalDiskNames: string[] = Array.isArray(diskConfig.additionalDisks)
 			? diskConfig.additionalDisks
 			: [];
 
-		const disks: any[] = [{ name: 'rootdisk', disk: { bus: 'virtio' }, bootOrder: 1 }];
-		const volumes: any[] = [{ name: 'rootdisk', dataVolume: { name: rootDiskName } }];
+		const disks: any[] = [{ name: 'os-disk', disk: { bus: 'virtio' }, bootOrder: 1 }];
+		const volumes: any[] = [{ name: 'os-disk', dataVolume: { name: bootDiskName } }];
 
 		additionalDiskNames.forEach((dvName: any, index: number) => {
 			if (typeof dvName === 'string' && dvName.trim()) {
-				const diskName = `datadisk-${index + 1}`;
+				const diskName = `data-disk-${index + 1}`;
 				disks.push({ name: diskName, disk: { bus: 'virtio' } });
 				volumes.push({ name: diskName, dataVolume: { name: dvName } });
 			}
@@ -96,9 +99,9 @@
 
 		const cloudInitData = typeof values.cloudInit === 'string' ? values.cloudInit : '';
 		if (cloudInitData.trim()) {
-			disks.push({ name: 'cloudinitdisk', disk: { bus: 'virtio' } });
+			disks.push({ name: 'cloud-init-disk', disk: { bus: 'virtio' } });
 			volumes.push({
-				name: 'cloudinitdisk',
+				name: 'cloud-init-disk',
 				cloudInitNoCloud: { userData: cloudInitData }
 			});
 		}
@@ -115,10 +118,13 @@
 			kind,
 			metadata: {
 				name: lodash.get(object, 'metadata.name'),
-				namespace: existingNamespace
+				namespace: existingNamespace,
+				annotations: {
+					'kubevirt.io/allow-pod-bridge-network-live-migration': 'true'
+				}
 			},
 			spec: {
-				running: values.spec.running,
+				runStrategy: values.spec.runStrategy,
 				instancetype: values.spec.instancetype,
 				template: {
 					metadata: {
@@ -130,10 +136,10 @@
 						domain: {
 							devices: {
 								disks,
-								interfaces: [{ name: 'default', masquerade: {} }]
+								interfaces: [{ name: 'nic1', bridge: {} }]
 							}
 						},
-						networks: [{ name: 'default', pod: {} }],
+						networks: [{ name: 'nic1', pod: {} }],
 						volumes
 					}
 				}
@@ -352,16 +358,17 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 3: DataVolume -->
+			<!-- Step 3: Disks -->
 			<Tabs.Content value={steps[2]}>
 				<Form
 					schema={{
 						type: 'object',
 						title: 'Disks',
 						properties: {
-							rootDisk: {
+							bootDisk: {
 								type: 'string',
-								title: 'Root Disk (Boot Disk)'
+								title: 'Boot Disk (DataVolume)',
+								readOnly: true
 							},
 							additionalDisks: {
 								type: 'array',
@@ -372,23 +379,9 @@
 								}
 							}
 						},
-						required: ['rootDisk']
+						required: ['bootDisk']
 					} as Schema}
 					uiSchema={{
-						rootDisk: {
-							'ui:components': {
-								stringField: 'enumField',
-								selectWidget: ComboboxWidget
-							},
-							'ui:options': {
-								TailoredComboboxEnumerations: fetchDataVolumesAsEnumerations,
-								TailoredComboboxVisibility: 10,
-								TailoredComboboxInput: {
-									placeholder: 'Select DataVolume'
-								},
-								TailoredComboboxEmptyText: 'No DataVolumes found.'
-							}
-						},
 						additionalDisks: {
 							'ui:options': {
 								addable: true,
@@ -416,7 +409,10 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{ rootDisk: existingRootDisk || null, additionalDisks: existingAdditionalDisks } as FormValue}
+					initialValue={{
+						bootDisk: existingBootDisk || null,
+						additionalDisks: existingAdditionalDisks
+					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();

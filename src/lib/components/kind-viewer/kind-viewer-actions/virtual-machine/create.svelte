@@ -54,31 +54,64 @@
 		kind,
 		metadata: { name: {} },
 		spec: {
-			running: true,
 			instancetype: {
 				kind: {},
 				name: {}
 			}
 		},
 		// UI-only fields (not in API schema)
-		diskConfig: {},
-		cloudInit: {}
+		diskConfig: {
+			bootDisk: null,
+			additionalDisks: []
+		},
+		cloudInit: {},
+		// PVC info inherited from selected boot DV
+		bootDvPvcInfo: {
+			accessModes: ['ReadWriteOnce'],
+			volumeMode: 'Filesystem',
+			storage: ''
+		}
 	});
 
-	// Build disks and volumes from UI-only diskConfig and cloudInit
+	// Fetch PVC spec from selected boot DataVolume to inherit into dataVolumeTemplates
+	async function fetchBootDvPvcInfo(dvName: string | null): Promise<void> {
+		if (!dvName || typeof dvName !== 'string') return;
+		try {
+			const response = await resourceClient.get({
+				cluster,
+				namespace,
+				group: 'cdi.kubevirt.io',
+				version: 'v1beta1',
+				resource: 'datavolumes',
+				name: dvName
+			});
+			const dv = response.object as any;
+			const pvcSpec = lodash.get(dv, 'spec.pvc');
+			if (pvcSpec) {
+				values.bootDvPvcInfo = {
+					accessModes: pvcSpec.accessModes ?? ['ReadWriteOnce'],
+					volumeMode: pvcSpec.volumeMode ?? 'Filesystem',
+					storage: lodash.get(pvcSpec, 'resources.requests.storage', '')
+				};
+			}
+		} catch (error) {
+			console.error('Error fetching DataVolume PVC info, using defaults:', error);
+		}
+	}
+
+	// Build disks and volumes
 	function buildDisksAndVolumes(): { disks: any[]; volumes: any[] } {
-		const diskConfig = values.diskConfig ?? {};
-		const rootDiskName = typeof diskConfig.rootDisk === 'string' ? diskConfig.rootDisk : '';
-		const additionalDiskNames: string[] = Array.isArray(diskConfig.additionalDisks)
-			? diskConfig.additionalDisks
+		const vmName = typeof values.metadata.name === 'string' ? values.metadata.name : '';
+
+		const disks: any[] = [{ name: 'os-disk', disk: { bus: 'virtio' }, bootOrder: 1 }];
+		const volumes: any[] = [{ name: 'os-disk', dataVolume: { name: vmName } }];
+
+		const additionalDvNames: string[] = Array.isArray(values.diskConfig?.additionalDisks)
+			? values.diskConfig.additionalDisks
 			: [];
-
-		const disks: any[] = [{ name: 'rootdisk', disk: { bus: 'virtio' }, bootOrder: 1 }];
-		const volumes: any[] = [{ name: 'rootdisk', dataVolume: { name: rootDiskName } }];
-
-		additionalDiskNames.forEach((dvName: any, index: number) => {
+		additionalDvNames.forEach((dvName: any, index: number) => {
 			if (typeof dvName === 'string' && dvName.trim()) {
-				const diskName = `datadisk-${index + 1}`;
+				const diskName = `data-disk-${index + 1}`;
 				disks.push({ name: diskName, disk: { bus: 'virtio' } });
 				volumes.push({ name: diskName, dataVolume: { name: dvName } });
 			}
@@ -86,14 +119,44 @@
 
 		const cloudInitData = typeof values.cloudInit === 'string' ? values.cloudInit : '';
 		if (cloudInitData.trim()) {
-			disks.push({ name: 'cloudinitdisk', disk: { bus: 'virtio' } });
+			disks.push({ name: 'cloud-init-disk', disk: { bus: 'virtio' } });
 			volumes.push({
-				name: 'cloudinitdisk',
+				name: 'cloud-init-disk',
 				cloudInitNoCloud: { userData: cloudInitData }
 			});
 		}
 
 		return { disks, volumes };
+	}
+
+	// Build dataVolumeTemplates to clone the selected boot DV
+	function buildDataVolumeTemplates(): any[] {
+		const vmName = typeof values.metadata.name === 'string' ? values.metadata.name : '';
+		const bootDvName = typeof values.diskConfig?.bootDisk === 'string' ? values.diskConfig.bootDisk : '';
+		const { accessModes, volumeMode, storage } = values.bootDvPvcInfo;
+
+		return [
+			{
+				metadata: { name: vmName },
+				spec: {
+					source: {
+						pvc: {
+							namespace,
+							name: bootDvName
+						}
+					},
+					pvc: {
+						accessModes,
+						volumeMode,
+						resources: {
+							requests: {
+								storage
+							}
+						}
+					}
+				}
+			}
+		];
 	}
 
 	// Derived submission values (proper VirtualMachine structure)
@@ -105,11 +168,15 @@
 			kind,
 			metadata: {
 				name: values.metadata.name,
-				namespace
+				namespace,
+				annotations: {
+					'kubevirt.io/allow-pod-bridge-network-live-migration': 'true'
+				}
 			},
 			spec: {
-				running: values.spec.running,
+				runStrategy: 'Halted',
 				instancetype: values.spec.instancetype,
+				dataVolumeTemplates: buildDataVolumeTemplates(),
 				template: {
 					metadata: {
 						labels: {
@@ -120,10 +187,10 @@
 						domain: {
 							devices: {
 								disks,
-								interfaces: [{ name: 'default', masquerade: {} }]
+								interfaces: [{ name: 'nic1', bridge: {} }]
 							}
 						},
-						networks: [{ name: 'default', pod: {} }],
+						networks: [{ name: 'nic1', pod: {} }],
 						volumes
 					}
 				}
@@ -380,16 +447,16 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 4: DataVolume -->
+			<!-- Step 4: Disks -->
 			<Tabs.Content value={steps[3]}>
 				<Form
 					schema={{
 						type: 'object',
 						title: 'Disks',
 						properties: {
-							rootDisk: {
+							bootDisk: {
 								type: 'string',
-								title: 'Root Disk (Boot Disk)'
+								title: 'Boot Disk (DataVolume to Clone)'
 							},
 							additionalDisks: {
 								type: 'array',
@@ -400,10 +467,10 @@
 								}
 							}
 						},
-						required: ['rootDisk']
+						required: ['bootDisk']
 					} as Schema}
 					uiSchema={{
-						rootDisk: {
+						bootDisk: {
 							'ui:components': {
 								stringField: 'enumField',
 								selectWidget: ComboboxWidget
@@ -412,9 +479,10 @@
 								TailoredComboboxEnumerations: fetchDataVolumesAsEnumerations,
 								TailoredComboboxVisibility: 10,
 								TailoredComboboxInput: {
-									placeholder: 'Select DataVolume'
+									placeholder: 'Select Boot DataVolume'
 								},
-								TailoredComboboxEmptyText: 'No DataVolumes found.'
+								TailoredComboboxEmptyText: 'No DataVolumes found.',
+								TailoredComboboxPopoverClass: 'w-[380px]'
 							}
 						},
 						additionalDisks: {
@@ -444,9 +512,10 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{ rootDisk: null, additionalDisks: [] } as FormValue}
+					initialValue={{ bootDisk: null, additionalDisks: [] } as FormValue}
 					handleSubmit={{
-						posthook: () => {
+						posthook: async () => {
+							await fetchBootDvPvcInfo(values.diskConfig?.bootDisk ?? null);
 							handleNext();
 						}
 					}}
