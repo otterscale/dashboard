@@ -41,7 +41,7 @@ function getRoleBindingData(
 		Namespace: object?.metadata?.namespace ?? null,
 		Role: roleDisplay,
 		Age: object?.metadata?.creationTimestamp ?? null,
-		Subjects: (object?.subjects as JsonValue) ?? null,
+		Subjects: object?.subjects?.length ?? 0,
 		raw: (object as JsonObject) ?? null
 	};
 }
