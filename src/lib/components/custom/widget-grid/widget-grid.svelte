@@ -7,11 +7,15 @@
 		widgets,
 		prometheusDriver,
 		cluster,
+		start,
+		end,
 		isReloading = $bindable()
 	}: {
 		widgets: WidgetDefinition[];
 		prometheusDriver: PrometheusDriver;
 		cluster: string;
+		start?: Date;
+		end?: Date;
 		isReloading: boolean;
 	} = $props();
 </script>
@@ -20,6 +24,12 @@
 	{@const Component = widget.component}
 	{@const props = widget.props ?? {}}
 	<div class={widget.class}>
-		<Component {prometheusDriver} {cluster} bind:isReloading {...props} />
+		<Component
+			{prometheusDriver}
+			bind:isReloading
+			{...start != null && end != null ? { start, end } : {}}
+			{...widget.needsCluster ? { cluster } : {}}
+			{...props}
+		/>
 	</div>
 {/each}

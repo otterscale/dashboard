@@ -1,7 +1,5 @@
 <script lang="ts" module>
-	import Icon from '@iconify/svelte';
 	import type { WithElementRef } from 'bits-ui';
-	import { getContext, hasContext } from 'svelte';
 	import type { HTMLInputAttributes } from 'svelte/elements';
 
 	import { Input } from '$lib/components/ui/input';
@@ -76,9 +74,12 @@
 <div>
 	<div class="relative">
 		{#if type}
-			<span class="absolute top-1/2 left-3 -translate-y-1/2 items-center">
-				<Icon icon={hasContext('icon') ? getContext('icon') : typeToIcon[type]} />
-			</span>
+			{@const IconComponent = typeToIcon[type]}
+			{#if IconComponent}
+				<span class="absolute top-1/2 left-3 -translate-y-1/2 items-center">
+					<IconComponent class="size-4" />
+				</span>
+			{/if}
 		{/if}
 
 		<Input

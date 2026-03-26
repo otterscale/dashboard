@@ -39,7 +39,7 @@
 		version: string;
 		kind: string;
 		resource: string;
-		schema?: any;
+		schema: any;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -163,11 +163,6 @@
 							name: {
 								...lodash.get(jsonSchema, 'properties.metadata.properties.name'),
 								title: 'Name'
-							},
-							namespace: {
-								...lodash.get(jsonSchema, 'properties.metadata.properties.namespace'),
-								title: 'Namespace',
-								readOnly: true
 							}
 						}
 					} as Schema}

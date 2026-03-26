@@ -1,5 +1,6 @@
 <script lang="ts" module>
 	import type { WithElementRef } from 'bits-ui';
+	import type { Component } from 'svelte';
 	import { setContext } from 'svelte';
 	import type { HTMLAttributes } from 'svelte/elements';
 
@@ -25,7 +26,7 @@
 		values?: any[];
 		required?: boolean;
 		type?: InputType;
-		icon?: string;
+		icon?: Component;
 		invalid?: boolean | null | undefined;
 	} = $props();
 	const inputManager = new InputManager(type, icon);

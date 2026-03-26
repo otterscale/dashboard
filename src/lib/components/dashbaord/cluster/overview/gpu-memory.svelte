@@ -1,5 +1,6 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { ArcChart, Text } from 'layerchart';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
@@ -12,18 +13,19 @@
 
 	let {
 		prometheusDriver,
-		cluster,
+		cluster: _cluster,
 		isReloading = $bindable()
 	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	void _cluster;
 
 	let memoryUsage: SampleValue | undefined = $state(undefined);
 	async function fetchMemoryUsage() {
 		const usageResponse = await prometheusDriver.instantQuery(
 			`
 			100 * 
-			sum(Device_memory_desc_of_container{juju_model="${cluster}"})
+			sum(Device_memory_desc_of_container{})
 			/
-			sum(GPUDeviceMemoryLimit{juju_model="${cluster}"})
+			sum(GPUDeviceMemoryLimit{})
 			`
 		);
 		memoryUsage = usageResponse.result[0]?.value ?? undefined;
@@ -33,9 +35,9 @@
 	async function fetchMemoryRequest() {
 		const response = await prometheusDriver.instantQuery(
 			`
-			100 * sum(vGPU_device_memory_limit_in_bytes{juju_model="${cluster}"})
+			100 * sum(vGPU_device_memory_limit_in_bytes{})
 			/
-			sum(GPUDeviceMemoryLimit{juju_model="${cluster}"})
+			sum(GPUDeviceMemoryLimit{})
 			`
 		);
 		memoryRequest = response.result[0]?.value ?? undefined;
@@ -45,7 +47,7 @@
 	async function fetchAllocatableMemory() {
 		const response = await prometheusDriver.instantQuery(
 			`
-			sum(GPUDeviceMemoryLimit{juju_model="${cluster}"})
+			sum(GPUDeviceMemoryLimit{})
 			`
 		);
 		allocatableMemory = response.result[0]?.value?.value ?? undefined;
@@ -93,11 +95,11 @@
 	</Card.Header>
 	{#if !isLoaded}
 		<div class="flex h-9 w-full items-center justify-center">
-			<Icon icon="svg-spinners:6-dots-rotate" class="size-10" />
+			<Loader2Icon class="size-10 animate-spin" />
 		</div>
 	{:else if memoryUsage === undefined || memoryUsage === null}
 		<div class="flex h-full w-full flex-col items-center justify-center">
-			<Icon icon="ph:chart-bar-fill" class="size-6 animate-pulse text-muted-foreground" />
+			<ChartColumnIcon class="size-6 animate-pulse text-muted-foreground" />
 			<p class="p-0 text-xs text-muted-foreground">{m.no_data_display()}</p>
 		</div>
 	{:else}

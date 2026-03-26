@@ -257,11 +257,6 @@
 							name: {
 								...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema),
 								title: 'Name'
-							},
-							namespace: {
-								...(lodash.get(jsonSchema, 'properties.metadata.properties.namespace') as Schema),
-								title: 'Namespace',
-								readOnly: true
 							}
 						}
 					} as Schema}

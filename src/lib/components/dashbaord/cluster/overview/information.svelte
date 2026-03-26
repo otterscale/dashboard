@@ -1,5 +1,7 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
+	import InfoIcon from '@lucide/svelte/icons/info';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
@@ -9,16 +11,15 @@
 
 	let {
 		prometheusDriver,
-		cluster,
+		cluster: _cluster,
 		isReloading = $bindable()
 	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	void _cluster;
 
 	let version: string | undefined = $state(undefined);
 	let platform: string | undefined = $state(undefined);
 	async function fetchBuildInformation() {
-		const response = await prometheusDriver.instantQuery(
-			`kubernetes_build_info{juju_model="${cluster}", job="apiserver"}`
-		);
+		const response = await prometheusDriver.instantQuery(`kubernetes_build_info{job="apiserver"}`);
 		version = response.result[0]?.metric?.labels?.git_version ?? undefined;
 		platform = response.result[0]?.metric?.labels?.platform ?? undefined;
 	}
@@ -52,8 +53,7 @@
 </script>
 
 <Card.Root class="relative h-full min-h-[140px] gap-2 overflow-hidden">
-	<Icon
-		icon="ph:info"
+	<InfoIcon
 		class="absolute -right-10 bottom-0 size-36 text-8xl tracking-tight text-nowrap text-primary/5 uppercase group-hover:hidden"
 	/>
 	<Card.Header>
@@ -62,11 +62,11 @@
 	</Card.Header>
 	{#if !isLoaded}
 		<div class="flex h-9 w-full items-center justify-center">
-			<Icon icon="svg-spinners:6-dots-rotate" class="size-10" />
+			<Loader2Icon class="size-10 animate-spin" />
 		</div>
 	{:else if !version}
 		<div class="flex h-full w-full flex-col items-center justify-center">
-			<Icon icon="ph:chart-bar-fill" class="size-6 animate-pulse text-muted-foreground" />
+			<ChartColumnIcon class="size-6 animate-pulse text-muted-foreground" />
 			<p class="p-0 text-xs text-muted-foreground">{m.no_data_display()}</p>
 		</div>
 	{:else}

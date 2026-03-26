@@ -1,5 +1,5 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { scaleBand } from 'd3-scale';
 	import { BarChart, type ChartContextValue, Highlight } from 'layerchart';
 	import { InstantVector, PrometheusDriver } from 'prometheus-query';
@@ -14,9 +14,8 @@
 
 	let {
 		prometheusDriver,
-		cluster,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; isReloading: boolean } = $props();
 
 	let memoryUsage: Record<string, number>[] = $state([]);
 
@@ -31,7 +30,7 @@
 		try {
 			const response = await prometheusDriver.instantQuery(
 				`
-				topk(10, avg by (nodeid) (nodeGPUMemoryPercentage{juju_model="${cluster}"}))
+				topk(10, avg by (nodeid) (nodeGPUMemoryPercentage{}))
 				`
 			);
 			const instanceVectors: InstantVector[] = response.result;
@@ -78,7 +77,7 @@
 		</Card.Header>
 		<Card.Content>
 			<div class="flex h-[230px] w-full items-center justify-center">
-				<Icon icon="svg-spinners:6-dots-rotate" class="size-12" />
+				<Loader2Icon class="size-12 animate-spin" />
 			</div>
 		</Card.Content>
 	</Card.Root>

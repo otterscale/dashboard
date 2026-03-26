@@ -96,7 +96,7 @@
 
 	async function onClusterChange(cluster: string) {
 		await fetchWorkspaces(cluster);
-		await goto(resolve('/(auth)/[cluster]/overview', { cluster: activeCluster }));
+		await goto(resolve('/(auth)/console'));
 		toast.success(m.switch_cluster({ name: cluster }));
 	}
 
@@ -171,10 +171,12 @@
 					},
 					{
 						title: m.application_hub(),
-						url: resolve('/(auth)/[cluster]/[workspace]/hub', {
-							cluster: activeCluster,
-							workspace: page.params.workspace!
-						})
+						url: page.params.workspace
+							? resolve('/(auth)/[cluster]/[workspace]/hub', {
+									cluster: activeCluster,
+									workspace: page.params.workspace
+								})
+							: ''
 					}
 				]
 			},
@@ -245,6 +247,15 @@
 							icon: UserStarIcon,
 							items: [
 								{
+									title: m.cluster_status(),
+									url: page.params.workspace
+										? resolve('/(auth)/[cluster]/[workspace]/cluster-status', {
+												cluster: activeCluster,
+												workspace: page.params.workspace
+											})
+										: ''
+								},
+								{
 									title: m.workspace(),
 									url: resourceUrl('tenant.otterscale.io', 'v1alpha1', 'Workspace', 'workspaces')
 								},
@@ -258,11 +269,6 @@
 				: [])
 		],
 		native: [
-			{
-				title: m.overview(),
-				url: resolve('/(auth)/[cluster]/overview', { cluster: activeCluster }),
-				icon: CompassIcon
-			},
 			{
 				title: m.workloads(),
 				icon: BoxIcon,
@@ -515,8 +521,8 @@
 					<DropdownMenu.Content class="w-40" align="end">
 						<DropdownMenu.Group>
 							<DropdownMenu.Label>{m.cluster()}</DropdownMenu.Label>
-							<DropdownMenu.Separator />
 							{#if links.length > 0}
+								<DropdownMenu.Separator />
 								<DropdownMenu.RadioGroup bind:value={activeCluster} onValueChange={onClusterChange}>
 									{#each links as link, index (index)}
 										<DropdownMenu.RadioItem value={link.cluster}
