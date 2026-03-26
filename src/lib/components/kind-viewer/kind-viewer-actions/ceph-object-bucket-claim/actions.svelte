@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { EllipsisIcon } from '@lucide/svelte';
+	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
@@ -35,8 +35,8 @@
 	<DropdownMenu.Trigger>
 		{#snippet child({ props })}
 			<div class="flex justify-end">
-				<Button size="icon" variant="ghost" class="shadow-none" aria-label="Edit item" {...props}>
-					<EllipsisIcon size={16} aria-hidden="true" />
+				<Button size="icon" variant="ghost" class="shadow-none" aria-label="Actions" {...props}>
+					<Ellipsis size={16} aria-hidden="true" />
 				</Button>
 			</div>
 		{/snippet}
@@ -93,9 +93,9 @@
 			>
 				<Delete
 					{schema}
+					{namespace}
 					{object}
 					{cluster}
-					{namespace}
 					{group}
 					{version}
 					{kind}
