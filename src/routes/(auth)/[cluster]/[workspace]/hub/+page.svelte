@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { RefreshCwIcon } from '@lucide/svelte';
+	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import { type ListRequest, ResourceService } from '@otterscale/api/resource/v1';
 	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 	import lodash from 'lodash';

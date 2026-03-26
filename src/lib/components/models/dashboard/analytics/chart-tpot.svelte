@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { ChartLine, LoaderCircle } from '@lucide/svelte';
+	import ChartLine from '@lucide/svelte/icons/chart-line';
+	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';

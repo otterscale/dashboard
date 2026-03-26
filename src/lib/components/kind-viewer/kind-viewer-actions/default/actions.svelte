@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { EllipsisIcon } from '@lucide/svelte';
+	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';

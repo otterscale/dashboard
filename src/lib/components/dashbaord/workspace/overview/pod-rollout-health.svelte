@@ -1,12 +1,10 @@
 <script lang="ts">
-	import {
-		BriefcaseMedical,
-		ChartBar,
-		LayoutGrid,
-		LoaderCircle,
-		OctagonAlert,
-		Rocket
-	} from '@lucide/svelte';
+	import BriefcaseMedical from '@lucide/svelte/icons/briefcase-medical';
+	import ChartBar from '@lucide/svelte/icons/chart-bar';
+	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
+	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+	import OctagonAlert from '@lucide/svelte/icons/octagon-alert';
+	import Rocket from '@lucide/svelte/icons/rocket';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { Plus } from '@lucide/svelte';
+	import Plus from '@lucide/svelte/icons/plus';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import Ajv from 'ajv';
 	import lodash from 'lodash';

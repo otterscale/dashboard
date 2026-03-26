@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { ChartBar, Loader2 } from '@lucide/svelte';
+	import ChartBar from '@lucide/svelte/icons/chart-bar';
+	import Loader2 from '@lucide/svelte/icons/loader-2';
 	import { PrometheusDriver } from 'prometheus-query';
 
 	import * as Statistics from '$lib/components/custom/data-table/statistics/index';

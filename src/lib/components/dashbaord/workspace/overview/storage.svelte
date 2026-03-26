@@ -1,5 +1,9 @@
 <script lang="ts">
-	import { CheckCircle, Clock, Database, HardDrive, LoaderCircle } from '@lucide/svelte';
+	import CheckCircle from '@lucide/svelte/icons/check-circle';
+	import Clock from '@lucide/svelte/icons/clock';
+	import Database from '@lucide/svelte/icons/database';
+	import HardDrive from '@lucide/svelte/icons/hard-drive';
+	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 

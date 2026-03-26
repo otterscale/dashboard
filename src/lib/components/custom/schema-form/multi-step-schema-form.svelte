@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Check } from '@lucide/svelte';
+	import Check from '@lucide/svelte/icons/check';
 	import type { FormState } from '@sjsf/form';
 	import { createForm, getValueSnapshot } from '@sjsf/form';
 	import yaml from 'js-yaml';

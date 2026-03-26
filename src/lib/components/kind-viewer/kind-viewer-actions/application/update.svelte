@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { FormIcon } from '@lucide/svelte';
+	import FormIcon from '@lucide/svelte/icons/form';
 	import type { Snippet } from 'svelte';
 
 	import * as Item from '$lib/components/ui/item';

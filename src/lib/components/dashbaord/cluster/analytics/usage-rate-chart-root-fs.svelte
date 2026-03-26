@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { ChartBar, LoaderCircle } from '@lucide/svelte';
+	import ChartBar from '@lucide/svelte/icons/chart-bar';
+	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import { ArcChart, Text } from 'layerchart';
 	import { PrometheusDriver } from 'prometheus-query';
 	import { onMount } from 'svelte';

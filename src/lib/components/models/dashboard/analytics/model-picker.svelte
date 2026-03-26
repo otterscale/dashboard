@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { Bot } from '@lucide/svelte';
+	import Bot from '@lucide/svelte/icons/bot';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';

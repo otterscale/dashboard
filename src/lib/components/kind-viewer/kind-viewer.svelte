@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { type JsonValue } from '@bufbuild/protobuf';
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { CableIcon, UnplugIcon, UsersRoundIcon } from '@lucide/svelte';
+	import CableIcon from '@lucide/svelte/icons/cable';
+	import UnplugIcon from '@lucide/svelte/icons/unplug';
+	import UsersRoundIcon from '@lucide/svelte/icons/users-round';
 	import {
 		type APIResource,
 		type ListRequest,

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { PencilIcon } from '@lucide/svelte';
+	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import Ajv, { type Schema } from 'ajv';
 	import * as jsonpatch from 'fast-json-patch';

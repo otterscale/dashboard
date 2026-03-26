@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { Check, ChevronsUpDown, User } from '@lucide/svelte';
+	import Check from '@lucide/svelte/icons/check';
+	import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down';
+	import User from '@lucide/svelte/icons/user';
 	import type { ComponentProps } from '@sjsf/form';
 	import { onMount } from 'svelte';
 

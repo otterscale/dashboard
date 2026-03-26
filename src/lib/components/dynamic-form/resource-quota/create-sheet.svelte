@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Plus } from '@lucide/svelte';
+	import Plus from '@lucide/svelte/icons/plus';
 	import { type CoreV1ResourceQuota } from '@otterscale/types';
 
 	import Button from '$lib/components/ui/button/button.svelte';
