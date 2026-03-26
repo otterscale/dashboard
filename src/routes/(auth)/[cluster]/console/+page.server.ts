@@ -31,7 +31,7 @@ async function fetchFirstWorkspace(fetch: typeof globalThis.fetch, cluster: stri
 	if (!res.ok) return undefined;
 
 	const { items } = (await res.json()) as ListResponse;
-	return items[0]?.object?.metadata?.name;
+	return items?.[0]?.object?.metadata?.name;
 }
 
 export const load: PageServerLoad = async ({ parent, fetch, params }) => {
