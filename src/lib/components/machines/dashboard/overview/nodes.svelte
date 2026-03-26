@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { Info, LoaderCircle, TrendingUp } from '@lucide/svelte';
+	import Info from '@lucide/svelte/icons/info';
+	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+	import TrendingUp from '@lucide/svelte/icons/trending-up';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { LineChart } from 'layerchart';

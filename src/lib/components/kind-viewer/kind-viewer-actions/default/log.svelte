@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { ScrollTextIcon } from '@lucide/svelte';
+	import ScrollTextIcon from '@lucide/svelte/icons/scroll-text';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext } from 'svelte';
 

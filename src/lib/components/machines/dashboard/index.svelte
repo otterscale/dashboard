@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { LoaderCircle } from '@lucide/svelte';
+	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 

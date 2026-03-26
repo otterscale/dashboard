@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ChevronsUpDown } from '@lucide/svelte';
+	import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down';
 	import { getContext } from 'svelte';
 
 	import { Button } from '$lib/components/ui/button';

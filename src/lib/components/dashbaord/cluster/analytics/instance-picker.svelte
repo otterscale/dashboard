@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Monitor } from '@lucide/svelte';
+	import Monitor from '@lucide/svelte/icons/monitor';
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { onMount } from 'svelte';
 	import { writable } from 'svelte/store';

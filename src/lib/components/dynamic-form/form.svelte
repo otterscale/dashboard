@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { FileCodeCornerIcon, FormIcon } from '@lucide/svelte';
+	import FileCodeCornerIcon from '@lucide/svelte/icons/file-code-corner';
+	import FormIcon from '@lucide/svelte/icons/form';
 	import {
 		Content,
 		createForm,

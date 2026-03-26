@@ -1,7 +1,8 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { DownloadIcon, FileIcon } from '@lucide/svelte';
+	import DownloadIcon from '@lucide/svelte/icons/download';
+	import FileIcon from '@lucide/svelte/icons/file';
 	import { ResourceService, type SchemaRequest } from '@otterscale/api/resource/v1';
 	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 	import { type Schema, SubmitButton, type UiSchemaRoot } from '@sjsf/form';

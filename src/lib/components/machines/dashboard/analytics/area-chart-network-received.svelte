@@ -1,5 +1,9 @@
 <script lang="ts">
-	import { ChartBar, ChartLine, Filter, LoaderCircle, Square } from '@lucide/svelte';
+	import ChartBar from '@lucide/svelte/icons/chart-bar';
+	import ChartLine from '@lucide/svelte/icons/chart-line';
+	import Filter from '@lucide/svelte/icons/filter';
+	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+	import Square from '@lucide/svelte/icons/square';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, ChartClipPath } from 'layerchart';

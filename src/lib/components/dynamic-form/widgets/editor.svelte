@@ -2,7 +2,7 @@
 	import '@sjsf/form/fields/extra-widgets/combobox';
 	import 'highlight.js/styles/github.css';
 
-	import { FileTextIcon } from '@lucide/svelte';
+	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import shell from 'highlight.js/lib/languages/shell';
 	import yaml from 'highlight.js/lib/languages/yaml';
 	import { mode as themeMode } from 'mode-watcher';

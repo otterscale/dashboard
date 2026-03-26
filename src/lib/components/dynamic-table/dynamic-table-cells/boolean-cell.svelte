@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
-	import { CircleIcon, XIcon } from '@lucide/svelte';
+	import CircleIcon from '@lucide/svelte/icons/circle';
+	import XIcon from '@lucide/svelte/icons/x';
 	import { type Column, type Row } from '@tanstack/table-core';
 
 	let {

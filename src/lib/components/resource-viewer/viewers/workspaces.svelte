@@ -1,17 +1,15 @@
 <script lang="ts">
-	import {
-		Box,
-		CircleCheck,
-		CircleX,
-		ExternalLinkIcon,
-		Gauge,
-		Grid,
-		HeartPulse,
-		Network,
-		Shield,
-		Users,
-		Zap
-	} from '@lucide/svelte';
+	import Box from '@lucide/svelte/icons/box';
+	import CircleCheck from '@lucide/svelte/icons/circle-check';
+	import CircleX from '@lucide/svelte/icons/circle-x';
+	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
+	import Gauge from '@lucide/svelte/icons/gauge';
+	import Grid from '@lucide/svelte/icons/grid';
+	import HeartPulse from '@lucide/svelte/icons/heart-pulse';
+	import Network from '@lucide/svelte/icons/network';
+	import Shield from '@lucide/svelte/icons/shield';
+	import Users from '@lucide/svelte/icons/users';
+	import Zap from '@lucide/svelte/icons/zap';
 	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import { InstantVector, PrometheusDriver } from 'prometheus-query';
 	import { onMount } from 'svelte';

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Pencil } from '@lucide/svelte';
+	import Pencil from '@lucide/svelte/icons/pencil';
 
 	import type { K8sOpenAPISchema } from '$lib/components/custom/schema-form';
 	import * as Item from '$lib/components/ui/item';

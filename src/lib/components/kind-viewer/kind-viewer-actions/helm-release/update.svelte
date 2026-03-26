@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { FileIcon, FormIcon } from '@lucide/svelte';
+	import FileIcon from '@lucide/svelte/icons/file';
+	import FormIcon from '@lucide/svelte/icons/form';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 	import { type Schema, SubmitButton, type UiSchemaRoot } from '@sjsf/form';

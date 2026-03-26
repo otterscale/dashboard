@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { HeartPulse, LoaderCircle } from '@lucide/svelte';
+	import HeartPulse from '@lucide/svelte/icons/heart-pulse';
+	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 

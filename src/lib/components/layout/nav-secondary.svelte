@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { BookOpenIcon, PackageIcon } from '@lucide/svelte';
+	import BookOpenIcon from '@lucide/svelte/icons/book-open';
+	import PackageIcon from '@lucide/svelte/icons/package';
 	import type { ComponentProps } from 'svelte';
 
 	import * as Sidebar from '$lib/components/ui/sidebar';

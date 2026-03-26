@@ -1,5 +1,8 @@
 <script lang="ts">
-	import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from '@lucide/svelte';
+	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
+	import ChevronRight from '@lucide/svelte/icons/chevron-right';
+	import ChevronsLeft from '@lucide/svelte/icons/chevrons-left';
+	import ChevronsRight from '@lucide/svelte/icons/chevrons-right';
 	import type { Table } from '@tanstack/table-core';
 
 	import { Button } from '$lib/components/ui/button';

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { TerminalSquareIcon } from '@lucide/svelte';
+	import TerminalSquareIcon from '@lucide/svelte/icons/terminal-square';
 
 	import { Terminal } from '$lib/components/applications/terminal';
 	import * as Dialog from '$lib/components/ui/dialog';

@@ -1,42 +1,40 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import {
-		ActivityIcon,
-		ApertureIcon,
-		AudioWaveformIcon,
-		BlocksIcon,
-		BoxIcon,
-		BriefcaseIcon,
-		ChartPieIcon,
-		ChevronsUpDownIcon,
-		CircleDashedIcon,
-		CommandIcon,
-		ComponentIcon,
-		CrownIcon,
-		CylinderIcon,
-		DiamondIcon,
-		DiscIcon,
-		DnaIcon,
-		FrameIcon,
-		GalleryVerticalEndIcon,
-		GemIcon,
-		GlobeIcon,
-		GridIcon,
-		HashIcon,
-		HexagonIcon,
-		LayersIcon,
-		LayoutGridIcon,
-		LibraryIcon,
-		MedalIcon,
-		MountainIcon,
-		PackageIcon,
-		PlusIcon,
-		PyramidIcon,
-		RadarIcon,
-		Settings2Icon,
-		ShieldIcon,
-		ZapIcon
-	} from '@lucide/svelte';
+	import ActivityIcon from '@lucide/svelte/icons/activity';
+	import ApertureIcon from '@lucide/svelte/icons/aperture';
+	import AudioWaveformIcon from '@lucide/svelte/icons/audio-waveform';
+	import BlocksIcon from '@lucide/svelte/icons/blocks';
+	import BoxIcon from '@lucide/svelte/icons/box';
+	import BriefcaseIcon from '@lucide/svelte/icons/briefcase';
+	import ChartPieIcon from '@lucide/svelte/icons/chart-pie';
+	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
+	import CircleDashedIcon from '@lucide/svelte/icons/circle-dashed';
+	import CommandIcon from '@lucide/svelte/icons/command';
+	import ComponentIcon from '@lucide/svelte/icons/component';
+	import CrownIcon from '@lucide/svelte/icons/crown';
+	import CylinderIcon from '@lucide/svelte/icons/cylinder';
+	import DiamondIcon from '@lucide/svelte/icons/diamond';
+	import DiscIcon from '@lucide/svelte/icons/disc';
+	import DnaIcon from '@lucide/svelte/icons/dna';
+	import FrameIcon from '@lucide/svelte/icons/frame';
+	import GalleryVerticalEndIcon from '@lucide/svelte/icons/gallery-vertical-end';
+	import GemIcon from '@lucide/svelte/icons/gem';
+	import GlobeIcon from '@lucide/svelte/icons/globe';
+	import GridIcon from '@lucide/svelte/icons/grid';
+	import HashIcon from '@lucide/svelte/icons/hash';
+	import HexagonIcon from '@lucide/svelte/icons/hexagon';
+	import LayersIcon from '@lucide/svelte/icons/layers';
+	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
+	import LibraryIcon from '@lucide/svelte/icons/library';
+	import MedalIcon from '@lucide/svelte/icons/medal';
+	import MountainIcon from '@lucide/svelte/icons/mountain';
+	import PackageIcon from '@lucide/svelte/icons/package';
+	import PlusIcon from '@lucide/svelte/icons/plus';
+	import PyramidIcon from '@lucide/svelte/icons/pyramid';
+	import RadarIcon from '@lucide/svelte/icons/radar';
+	import Settings2Icon from '@lucide/svelte/icons/settings-2';
+	import ShieldIcon from '@lucide/svelte/icons/shield';
+	import ZapIcon from '@lucide/svelte/icons/zap';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { type TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import { type Component, getContext, onMount } from 'svelte';

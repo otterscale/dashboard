@@ -1,7 +1,8 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
-	import { SiHelm } from '@icons-pack/svelte-simple-icons';
-	import { TagIcon, TagsIcon } from '@lucide/svelte';
+	import SiHelm from '@icons-pack/svelte-simple-icons/icons/SiHelm';
+	import { TagIcon } from '@lucide/svelte';
+	import TagsIcon from '@lucide/svelte/icons/tags';
 	import type { Row } from '@tanstack/table-core';
 
 	import * as Avatar from '$lib/components/ui/avatar/index.js';

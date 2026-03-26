@@ -2,22 +2,20 @@
 	import 'driver.js/dist/driver.css';
 
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import {
-		BotIcon,
-		BoxIcon,
-		BracesIcon,
-		CircleQuestionMarkIcon,
-		CompassIcon,
-		CpuIcon,
-		FileTextIcon,
-		HardDriveIcon,
-		InfoIcon,
-		LayersIcon,
-		LayoutGridIcon,
-		NetworkIcon,
-		PlusIcon,
-		UserStarIcon
-	} from '@lucide/svelte';
+	import BotIcon from '@lucide/svelte/icons/bot';
+	import BoxIcon from '@lucide/svelte/icons/box';
+	import BracesIcon from '@lucide/svelte/icons/braces';
+	import CircleQuestionMarkIcon from '@lucide/svelte/icons/circle-question-mark';
+	import CompassIcon from '@lucide/svelte/icons/compass';
+	import CpuIcon from '@lucide/svelte/icons/cpu';
+	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
+	import InfoIcon from '@lucide/svelte/icons/info';
+	import LayersIcon from '@lucide/svelte/icons/layers';
+	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
+	import NetworkIcon from '@lucide/svelte/icons/network';
+	import PlusIcon from '@lucide/svelte/icons/plus';
+	import UserStarIcon from '@lucide/svelte/icons/user-star';
 	import { type Link, LinkService } from '@otterscale/api/link/v1';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';

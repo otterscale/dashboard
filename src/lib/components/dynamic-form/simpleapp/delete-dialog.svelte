@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { ConnectError } from '@connectrpc/connect';
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { Trash2 } from '@lucide/svelte';
+	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';

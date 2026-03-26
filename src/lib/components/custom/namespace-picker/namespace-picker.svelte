@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { Box, Globe } from '@lucide/svelte';
+	import Box from '@lucide/svelte/icons/box';
+	import Globe from '@lucide/svelte/icons/globe';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext, onMount } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';

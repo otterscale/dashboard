@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { ScalingIcon } from '@lucide/svelte';
+	import ScalingIcon from '@lucide/svelte/icons/scaling';
 	import { RuntimeService } from '@otterscale/api/runtime/v1';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';

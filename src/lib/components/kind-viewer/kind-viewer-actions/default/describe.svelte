@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { FileJsonIcon, FileSearchIcon } from '@lucide/svelte';
+	import FileJsonIcon from '@lucide/svelte/icons/file-json';
+	import FileSearchIcon from '@lucide/svelte/icons/file-search';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext } from 'svelte';
 

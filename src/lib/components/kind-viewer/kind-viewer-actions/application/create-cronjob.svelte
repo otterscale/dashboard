@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { ClockIcon } from '@lucide/svelte';
+	import ClockIcon from '@lucide/svelte/icons/clock';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
