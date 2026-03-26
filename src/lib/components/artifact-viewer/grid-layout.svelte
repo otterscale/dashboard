@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
-	import SiHelm from '@icons-pack/svelte-simple-icons/icons/SiHelm.svelte';
+	import SiHelm from '@icons-pack/svelte-simple-icons/icons/SiHelm';
 	import BookmarkIcon from '@lucide/svelte/icons/bookmark';
 	import BoxesIcon from '@lucide/svelte/icons/boxes';
 	import TagsIcon from '@lucide/svelte/icons/tags';

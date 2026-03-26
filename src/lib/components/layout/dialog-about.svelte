@@ -1,5 +1,5 @@
 <script lang="ts">
-	import SiGithub from '@icons-pack/svelte-simple-icons/icons/SiGithub.svelte';
+	import SiGithub from '@icons-pack/svelte-simple-icons/icons/SiGithub';
 	import BugIcon from '@lucide/svelte/icons/bug';
 
 	import { version } from '$app/environment';

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import SiDocker from '@icons-pack/svelte-simple-icons/icons/SiDocker.svelte';
-	import SiHelm from '@icons-pack/svelte-simple-icons/icons/SiHelm.svelte';
+	import SiDocker from '@icons-pack/svelte-simple-icons/icons/SiDocker';
+	import SiHelm from '@icons-pack/svelte-simple-icons/icons/SiHelm';
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import { SvelteURL } from 'svelte/reactivity';
 
