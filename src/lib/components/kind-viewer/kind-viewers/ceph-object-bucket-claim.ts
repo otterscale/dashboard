@@ -129,56 +129,6 @@ function getObjectBucketClaimColumnDefinitions(
 			};
 		}
 	});
-	const simpleColumn = (
-		id: ObjectBucketClaimAttribute
-	): ColumnDef<Record<ObjectBucketClaimAttribute, JsonValue>> => ({
-		id,
-		header: ({ column }: { column: Column<Record<ObjectBucketClaimAttribute, JsonValue>> }) =>
-			renderComponent(DynamicTableHeader, { column, dataSchemas }),
-		cell: ({
-			column,
-			row
-		}: {
-			column: Column<Record<ObjectBucketClaimAttribute, JsonValue>>;
-			row: Row<Record<ObjectBucketClaimAttribute, JsonValue>>;
-		}) => renderComponent(DynamicTableCell, { row, column, uiSchemas }),
-		accessorKey: id
-	});
-
-	return [
-		{
-			id: 'Name',
-			header: ({ column }: { column: Column<Record<ObjectBucketClaimAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, { column, dataSchemas }),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<ObjectBucketClaimAttribute, JsonValue>>;
-				row: Row<Record<ObjectBucketClaimAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row,
-					column,
-					uiSchemas,
-					metadata: {
-						hyperlink: buildResourceDetailUrl(
-							apiResource,
-							row.original[column.id as ObjectBucketClaimAttribute] as string,
-							row.original['Namespace'] as string
-						)
-					} satisfies LinkMetadata
-				}),
-			accessorKey: 'Name'
-		},
-		simpleColumn('Namespace'),
-		simpleColumn('Storage Class'),
-		simpleColumn('Bucket Name'),
-		simpleColumn('Bucket Owner'),
-		simpleColumn('Bucket Policy'),
-		simpleColumn('Phase'),
-		simpleColumn('Age')
-	];
 }
 
 export {

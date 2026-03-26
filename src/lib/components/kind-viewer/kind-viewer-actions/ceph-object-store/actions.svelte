@@ -12,6 +12,7 @@
 		schema,
 		object,
 		cluster,
+		namespace,
 		group,
 		version,
 		resource
@@ -19,6 +20,7 @@
 		schema: any;
 		object: any;
 		cluster: string;
+		namespace: string;
 		group: string;
 		version: string;
 		resource: string;
@@ -67,6 +69,7 @@
 			>
 				<Describe
 					{cluster}
+					{namespace}
 					{group}
 					{version}
 					{resource}

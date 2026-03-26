@@ -69,7 +69,7 @@ function getCreate(kind: string): CreateType {
 		case 'Workspace':
 			return WorkspaceCreate as CreateType;
 		case 'CephObjectStore':
-			return CephObjectStoreCreate as ActionsType;
+			return CephObjectStoreCreate as CreateType;
 		case 'ObjectBucketClaim':
 			return ObjectBucketClaimCreate as CreateType;
 		default:
