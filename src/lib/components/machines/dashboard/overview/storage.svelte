@@ -1,5 +1,9 @@
 <script lang="ts">
-	import { ChevronDown, ChevronUp, HardDrive, Info, LoaderCircle } from '@lucide/svelte';
+	import ChevronDown from '@lucide/svelte/icons/chevron-down';
+	import ChevronUp from '@lucide/svelte/icons/chevron-up';
+	import HardDrive from '@lucide/svelte/icons/hard-drive';
+	import Info from '@lucide/svelte/icons/info';
+	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import { scaleUtc } from 'd3-scale';
 	import { curveLinear } from 'd3-shape';
 	import { LineChart } from 'layerchart';

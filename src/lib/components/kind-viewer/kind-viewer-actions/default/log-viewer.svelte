@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { ArrowDownIcon, PauseIcon, PlayIcon } from '@lucide/svelte';
+	import ArrowDownIcon from '@lucide/svelte/icons/arrow-down';
+	import PauseIcon from '@lucide/svelte/icons/pause';
+	import PlayIcon from '@lucide/svelte/icons/play';
 	import { RuntimeService } from '@otterscale/api/runtime/v1';
 	import { getContext, type Snippet, tick } from 'svelte';
 

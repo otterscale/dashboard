@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { BanIcon } from '@lucide/svelte';
+	import BanIcon from '@lucide/svelte/icons/ban';
 	import {
 		type APIResource,
 		type DiscoveryRequest,

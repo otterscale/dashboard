@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Pencil } from '@lucide/svelte';
+	import Pencil from '@lucide/svelte/icons/pencil';
 
 	import Update from '$lib/components/kind-viewer/kind-viewer-actions/workspace/update.svelte';
 	import { buttonVariants } from '$lib/components/ui/button';

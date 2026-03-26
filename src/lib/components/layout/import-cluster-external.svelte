@@ -1,12 +1,10 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import {
-		ChevronDownIcon,
-		CircleCheckIcon,
-		FileCodeIcon,
-		LoaderCircleIcon,
-		TerminalIcon
-	} from '@lucide/svelte';
+	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
+	import FileCodeIcon from '@lucide/svelte/icons/file-code';
+	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
+	import TerminalIcon from '@lucide/svelte/icons/terminal';
 	import { type Link, LinkService } from '@otterscale/api/link/v1';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext, onDestroy } from 'svelte';

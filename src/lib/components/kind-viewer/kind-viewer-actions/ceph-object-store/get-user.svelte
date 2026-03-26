@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { UserIcon } from '@lucide/svelte';
+	import UserIcon from '@lucide/svelte/icons/user';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { CoreV1Secret } from '@otterscale/types';
 	import lodash from 'lodash';

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { RotateCcwIcon } from '@lucide/svelte';
+	import RotateCcwIcon from '@lucide/svelte/icons/rotate-ccw';
 	import { RuntimeService } from '@otterscale/api/runtime/v1';
 	import type { FormValue, Schema } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';

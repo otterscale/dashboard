@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { CalendarDateTime, getLocalTimeZone } from '@internationalized/date';
-	import { ArrowRightIcon, CalendarSearchIcon } from '@lucide/svelte';
+	import ArrowRightIcon from '@lucide/svelte/icons/arrow-right';
+	import CalendarSearchIcon from '@lucide/svelte/icons/calendar-search';
 
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';

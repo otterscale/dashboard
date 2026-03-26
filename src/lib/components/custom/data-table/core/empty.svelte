@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Search } from '@lucide/svelte';
+	import Search from '@lucide/svelte/icons/search';
 	import type { Table } from '@tanstack/table-core';
 
 	let { table }: { table: Table<unknown> } = $props();

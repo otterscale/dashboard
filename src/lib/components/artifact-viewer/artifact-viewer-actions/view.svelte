@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { EyeIcon } from '@lucide/svelte';
+	import EyeIcon from '@lucide/svelte/icons/eye';
 	import lodash from 'lodash';
 	import { stringify } from 'yaml';
 

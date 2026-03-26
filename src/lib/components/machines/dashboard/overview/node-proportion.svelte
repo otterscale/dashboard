@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { Box, LoaderCircle } from '@lucide/svelte';
+	import Box from '@lucide/svelte/icons/box';
+	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import { PieChart, Text } from 'layerchart';
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
