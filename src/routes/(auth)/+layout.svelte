@@ -237,7 +237,7 @@
 						url: resourceUrl('ceph.rook.io', 'v1', 'CephObjectStore', 'cephobjectstores')
 					},
 					{
-						title: m.object_bucket(),
+						title: m.object_bucket_claim(),
 						url: resourceUrl(
 							'objectbucket.io',
 							'v1alpha1',

@@ -11,6 +11,18 @@ import {
 	getApplicationUISchemas
 } from './application.js';
 import {
+	getObjectBucketClaimColumnDefinitions,
+	getObjectBucketClaimData,
+	getObjectBucketClaimDataSchemas,
+	getObjectBucketClaimUISchemas
+} from './ceph-object-bucket-claim.js';
+import {
+	getCephObjectStoreColumnDefinitions,
+	getCephObjectStoreData,
+	getCephObjectStoreDataSchemas,
+	getCephObjectStoreUISchemas
+} from './ceph-object-store.js';
+import {
 	getClusterRoleColumnDefinitions,
 	getClusterRoleData,
 	getClusterRoleDataSchemas,
@@ -259,6 +271,10 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 			return getGatewayDataSchemas();
 		case 'HelmRelease':
 			return getHelmReleaseDataSchemas();
+		case 'CephObjectStore':
+			return getCephObjectStoreDataSchemas();
+		case 'ObjectBucketClaim':
+			return getObjectBucketClaimDataSchemas();
 		default:
 			return getDefaultDataSchemas();
 	}
@@ -330,6 +346,10 @@ function getData(apiResource: APIResource, object: any): Record<string, JsonValu
 			return getGatewayData(object);
 		case 'HelmRelease':
 			return getHelmReleaseData(object);
+		case 'CephObjectStore':
+			return getCephObjectStoreData(object);
+		case 'ObjectBucketClaim':
+			return getObjectBucketClaimData(object);
 		default:
 			return getDefaultData(apiResource, object);
 	}
@@ -401,6 +421,10 @@ function getUISchemas(kind: string): Record<string, UISchemaType> {
 			return getGatewayUISchemas();
 		case 'HelmRelease':
 			return getHelmReleaseUISchemas();
+		case 'CephObjectStore':
+			return getCephObjectStoreUISchemas();
+		case 'ObjectBucketClaim':
+			return getObjectBucketClaimUISchemas();
 		default:
 			return getDefaultUISchemas();
 	}
@@ -476,6 +500,10 @@ function getColumnDefinitions(
 			return getGatewayColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'HelmRelease':
 			return getHelmReleaseColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'CephObjectStore':
+			return getCephObjectStoreColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'ObjectBucketClaim':
+			return getObjectBucketClaimColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		default:
 			return getDefaultColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 	}
