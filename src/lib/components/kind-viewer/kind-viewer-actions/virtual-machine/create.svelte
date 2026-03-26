@@ -53,15 +53,20 @@
 		apiVersion: group ? `${group}/${version}` : version,
 		kind,
 		metadata: { name: {} },
-		instanceTypeKind: {},
-		instanceTypeName: {},
+		spec: {
+			running: true,
+			instancetype: {
+				kind: {},
+				name: {}
+			}
+		},
+		// UI-only fields (not in API schema)
 		diskConfig: {},
-		cloudInit: {},
-		running: true
+		cloudInit: {}
 	});
 
-	// Derived submission values (proper VirtualMachine structure)
-	const submissionValues = $derived.by(() => {
+	// Build disks and volumes from UI-only diskConfig and cloudInit
+	function buildDisksAndVolumes(): { disks: any[]; volumes: any[] } {
 		const diskConfig = values.diskConfig ?? {};
 		const rootDiskName = typeof diskConfig.rootDisk === 'string' ? diskConfig.rootDisk : '';
 		const additionalDiskNames: string[] = Array.isArray(diskConfig.additionalDisks)
@@ -88,6 +93,13 @@
 			});
 		}
 
+		return { disks, volumes };
+	}
+
+	// Derived submission values (proper VirtualMachine structure)
+	const submissionValues = $derived.by(() => {
+		const { disks, volumes } = buildDisksAndVolumes();
+
 		return {
 			apiVersion: group ? `${group}/${version}` : version,
 			kind,
@@ -96,11 +108,8 @@
 				namespace
 			},
 			spec: {
-				running: values.running,
-				instancetype: {
-					kind: values.instanceTypeKind,
-					name: values.instanceTypeName
-				},
+				running: values.spec.running,
+				instancetype: values.spec.instancetype,
 				template: {
 					metadata: {
 						labels: {
@@ -157,7 +166,7 @@
 		search: string
 	): Promise<{ label: string; value: string }[]> {
 		try {
-			const itKind = values.instanceTypeKind as string;
+			const itKind = values.spec.instancetype.kind as string;
 			if (typeof itKind !== 'string' || !itKind) return [];
 			const isClusterScoped = itKind === 'VirtualMachineClusterInstancetype';
 			const listRequest: any = {
@@ -284,7 +293,9 @@
 			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
-						type: 'string',
+						...lodash.get(jsonSchema, 'properties.spec.properties.instancetype.properties.kind', {
+							type: 'string'
+						}),
 						title: 'Instance Type Kind',
 						enum: ['VirtualMachineInstancetype', 'VirtualMachineClusterInstancetype']
 					} as Schema}
@@ -304,7 +315,7 @@
 							handleNext();
 						}
 					}}
-					bind:values={values['instanceTypeKind']}
+					bind:values={values['spec']['instancetype']['kind']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -324,7 +335,9 @@
 			<Tabs.Content value={steps[2]}>
 				<Form
 					schema={{
-						type: 'string',
+						...lodash.get(jsonSchema, 'properties.spec.properties.instancetype.properties.name', {
+							type: 'string'
+						}),
 						title: 'Instance Type'
 					} as Schema}
 					uiSchema={{
@@ -351,7 +364,7 @@
 							handleNext();
 						}
 					}}
-					bind:values={values['instanceTypeName']}
+					bind:values={values['spec']['instancetype']['name']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
