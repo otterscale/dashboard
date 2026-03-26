@@ -55,15 +55,29 @@
 		metadata: { name: {} },
 		instanceTypeKind: {},
 		instanceTypeName: {},
-		dataVolumeName: {},
+		diskConfig: {},
 		cloudInit: {},
 		running: true
 	});
 
 	// Derived submission values (proper VirtualMachine structure)
 	const submissionValues = $derived.by(() => {
-		const disks: any[] = [{ name: 'rootdisk', disk: { bus: 'virtio' } }];
-		const volumes: any[] = [{ name: 'rootdisk', dataVolume: { name: values.dataVolumeName } }];
+		const diskConfig = values.diskConfig ?? {};
+		const rootDiskName = typeof diskConfig.rootDisk === 'string' ? diskConfig.rootDisk : '';
+		const additionalDiskNames: string[] = Array.isArray(diskConfig.additionalDisks)
+			? diskConfig.additionalDisks
+			: [];
+
+		const disks: any[] = [{ name: 'rootdisk', disk: { bus: 'virtio' }, bootOrder: 1 }];
+		const volumes: any[] = [{ name: 'rootdisk', dataVolume: { name: rootDiskName } }];
+
+		additionalDiskNames.forEach((dvName: any, index: number) => {
+			if (typeof dvName === 'string' && dvName.trim()) {
+				const diskName = `datadisk-${index + 1}`;
+				disks.push({ name: diskName, disk: { bus: 'virtio' } });
+				volumes.push({ name: diskName, dataVolume: { name: dvName } });
+			}
+		});
 
 		const cloudInitData = typeof values.cloudInit === 'string' ? values.cloudInit : '';
 		if (cloudInitData.trim()) {
@@ -357,33 +371,73 @@
 			<Tabs.Content value={steps[3]}>
 				<Form
 					schema={{
-						type: 'string',
-						title: 'DataVolume'
+						type: 'object',
+						title: 'Disks',
+						properties: {
+							rootDisk: {
+								type: 'string',
+								title: 'Root Disk (Boot Disk)'
+							},
+							additionalDisks: {
+								type: 'array',
+								title: 'Additional Data Disks',
+								items: {
+									type: 'string',
+									title: 'Data Disk'
+								}
+							}
+						},
+						required: ['rootDisk']
 					} as Schema}
 					uiSchema={{
-						'ui:components': {
-							stringField: 'enumField',
-							selectWidget: ComboboxWidget
+						rootDisk: {
+							'ui:components': {
+								stringField: 'enumField',
+								selectWidget: ComboboxWidget
+							},
+							'ui:options': {
+								TailoredComboboxEnumerations: fetchDataVolumesAsEnumerations,
+								TailoredComboboxVisibility: 10,
+								TailoredComboboxInput: {
+									placeholder: 'Select DataVolume'
+								},
+								TailoredComboboxEmptyText: 'No DataVolumes found.'
+							}
+						},
+						additionalDisks: {
+							'ui:options': {
+								addable: true,
+								removable: true,
+								orderable: false
+							},
+							items: {
+								'ui:components': {
+									stringField: 'enumField',
+									selectWidget: ComboboxWidget
+								},
+								'ui:options': {
+									TailoredComboboxEnumerations: fetchDataVolumesAsEnumerations,
+									TailoredComboboxVisibility: 10,
+									TailoredComboboxInput: {
+										placeholder: 'Select DataVolume'
+									},
+									TailoredComboboxEmptyText: 'No DataVolumes found.'
+								}
+							}
 						},
 						'ui:options': {
 							translations: {
 								submit: 'Next'
-							},
-							TailoredComboboxEnumerations: fetchDataVolumesAsEnumerations,
-							TailoredComboboxVisibility: 10,
-							TailoredComboboxInput: {
-								placeholder: 'Select DataVolume'
-							},
-							TailoredComboboxEmptyText: 'No DataVolumes found.'
+							}
 						}
 					} as UiSchemaRoot}
-					initialValue={null as FormValue}
+					initialValue={{ rootDisk: null, additionalDisks: [] } as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
 						}
 					}}
-					bind:values={values['dataVolumeName']}
+					bind:values={values['diskConfig']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
