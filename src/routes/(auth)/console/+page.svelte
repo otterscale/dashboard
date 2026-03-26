@@ -1,5 +1,5 @@
 <script lang="ts">
-	import LayersIcon from '@lucide/svelte/icons/layers';
+	import CompassIcon from '@lucide/svelte/icons/compass';
 	import { onMount } from 'svelte';
 
 	import { resolve } from '$app/paths';
@@ -56,7 +56,7 @@
 		</p>
 	</div>
 
-	<LayersIcon class="size-10" />
+	<CompassIcon class="size-10" />
 
 	<div class="space-y-2 text-center">
 		<p class="text-lg font-semibold tracking-tight">{m.console_title()}</p>

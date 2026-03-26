@@ -1,5 +1,5 @@
 <script lang="ts">
-	import LayersIcon from '@lucide/svelte/icons/layers';
+	import FolderPlusIcon from '@lucide/svelte/icons/folder-plus';
 
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -25,7 +25,7 @@
 		sidebar.open ? 'ml-(--sidebar-width)' : ''
 	)}
 >
-	<LayersIcon class="size-10" />
+	<FolderPlusIcon class="size-10" />
 
 	<div class="space-y-2 text-center">
 		<p class="text-lg font-semibold tracking-tight">{m.console_title_add_workspace()}</p>
