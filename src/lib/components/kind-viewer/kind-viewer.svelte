@@ -66,21 +66,30 @@
 
 	let dataset: Record<string, JsonValue>[] = $state([]);
 	let columnDefinitions: ColumnDef<Record<string, JsonValue>>[] | undefined = $state(undefined);
+	let totalCount: number | undefined = $state(undefined);
 
 	let listAbortController: AbortController | null = null;
 	let watchAbortController: AbortController | null = null;
 
 	let resourceVersion: string | undefined = $state(undefined);
 
+	async function ensureMounted() {
+		if (!isMounted) {
+			isMounted = true;
+			await tick();
+		}
+	}
+
 	let isListing = $state(false);
-	async function listResources() {
-		if (isListing || isWatching || isDestroyed) return;
+	async function listResources(): Promise<string | null> {
+		if (isListing || isWatching || isDestroyed) return null;
 
 		isListing = true;
 		listAbortController = new AbortController();
 		try {
 			let continueToken: string | undefined = undefined;
 			let isFirstPage = true;
+			let finalResourceVersion: string | undefined = undefined;
 			do {
 				const response = await resourceClient.list(
 					{
@@ -96,6 +105,7 @@
 				);
 
 				resourceVersion = response.resourceVersion;
+				finalResourceVersion = response.resourceVersion;
 				continueToken = response.continue;
 
 				const newData = response.items.map((item) => getData(apiResource, item.object));
@@ -103,24 +113,21 @@
 
 				if (isFirstPage) {
 					isFirstPage = false;
-					if (!isMounted) {
-						isMounted = true;
-						await tick();
-					}
+					// Calculate total count from first page: current items + remaining items
+					totalCount = response.items.length + Number(response.remainingItemCount);
+					await ensureMounted();
 				}
 
 				if (listAbortController.signal.aborted) {
-					break;
+					return null;
 				}
 			} while (continueToken);
+			return finalResourceVersion ?? null;
 		} catch (error) {
-			if (listAbortController.signal.aborted) return;
+			if (listAbortController.signal.aborted) return null;
 
 			console.error('Failed to list resources:', error);
-			if (!isMounted) {
-				isMounted = true;
-				await tick();
-			}
+			await ensureMounted();
 
 			return null;
 		} finally {
@@ -231,14 +238,15 @@
 		}
 
 		dataset = [];
+		totalCount = undefined;
 		resourceVersion = undefined;
 		isListing = false;
 		isWatching = false;
 
 		await sleep(500); // for smooth transition
 
-		void listResources().then(() => {
-			if (isDestroyed || !resourceVersion) return;
+		void listResources().then((finalVersion) => {
+			if (isDestroyed || !finalVersion) return;
 			watchResources();
 		});
 	}
@@ -248,8 +256,8 @@
 		await fetchSchema();
 		columnDefinitions = getColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 
-		void listResources().then(() => {
-			if (isDestroyed || !resourceVersion) return;
+		void listResources().then((finalVersion) => {
+			if (isDestroyed || !finalVersion) return;
 			watchResources();
 		});
 	});
@@ -282,7 +290,7 @@
 
 {#if isMounted}
 	{#if columnDefinitions}
-		<DynamicTable {dataset} {columnDefinitions} {uiSchemas}>
+		<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {totalCount}>
 			{#snippet accessReview()}
 				{#if isClusterAdmin}
 					<Toggle

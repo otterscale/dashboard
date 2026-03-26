@@ -63,6 +63,7 @@
 		columnDefinitions,
 		uiSchemas,
 		// dataSchemas,
+		totalCount,
 		accessReview,
 		create,
 		bulkDelete,
@@ -74,6 +75,7 @@
 		columnDefinitions: ColumnDef<Record<string, JsonValue>>[];
 		uiSchemas: Record<string, UISchemaType>;
 		// dataSchemas: Record<string, DataSchemaType>;
+		totalCount?: number;
 		accessReview?: Snippet;
 		create?: Snippet;
 		bulkDelete?: Snippet<[{ table: TanStackTabke<Record<string, JsonValue>> }]>;
@@ -248,6 +250,9 @@
 			}
 		}
 	});
+
+	// Use totalCount if provided, otherwise fall back to actual dataset length
+	const displayRowCount = $derived(totalCount ?? table.getRowCount());
 
 	function getAlignment(uiSchema: UISchemaType): 'start' | 'center' | 'end' {
 		const map: Record<NonNullable<UISchemaType>, 'start' | 'center' | 'end'> = {
@@ -550,19 +555,19 @@
 								table.getState().pagination.pageSize,
 							0
 						),
-						table.getRowCount()
+						displayRowCount
 					)}
 				</span>
 				of
 				<span class="text-foreground">
-					{table.getRowCount().toString()}
+					{displayRowCount.toString()}
 				</span>
 			</p>
 		</div>
 
 		<!-- Controller -->
 		<div>
-			<Pagination.Root count={table.getRowCount()}>
+			<Pagination.Root count={displayRowCount}>
 				<Pagination.Content>
 					<!-- First page button -->
 					<Pagination.Item>
