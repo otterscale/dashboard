@@ -54,18 +54,22 @@
 		kind,
 		metadata: { name: {} },
 		sourceType: 'blank',
-		// Source details
-		sourceUrl: '',
-		sourceSecretRef: '',
-		sourceCertConfigMap: '',
-		sourcePvcName: '',
-		sourcePvcNamespace: '',
-		registryPullMethod: '',
 		// Storage config
 		storageSize: '10Gi',
-		accessMode: 'ReadWriteOnce',
-		storageClassName: '',
-		volumeMode: 'Filesystem'
+		spec: {
+			source: {
+				http: {},
+				registry: {},
+				pvc: {},
+				s3: {},
+				gcs: {}
+			},
+			pvc: {
+				accessModes: '',
+				storageClassName: '',
+				volumeMode: ''
+			}
+		}
 	});
 
 	// Build source object based on selected source type
@@ -76,74 +80,43 @@
 				return { blank: {} };
 			case 'upload':
 				return { upload: {} };
-			case 'http': {
-				const src: any = { url: values.sourceUrl };
-				if (values.sourceSecretRef) src.secretRef = values.sourceSecretRef;
-				if (values.sourceCertConfigMap) src.certConfigMap = values.sourceCertConfigMap;
-				return { http: src };
-			}
-			case 'registry': {
-				const src: any = { url: values.sourceUrl };
-				if (values.sourceSecretRef) src.secretRef = values.sourceSecretRef;
-				if (values.registryPullMethod) src.pullMethod = values.registryPullMethod;
-				return { registry: src };
-			}
+			case 'http':
+				return { http: values.spec.source.http };
+			case 'registry':
+				return { registry: values.spec.source.registry };
 			case 'pvc':
-				return {
-					pvc: {
-						name: values.sourcePvcName,
-						namespace: values.sourcePvcNamespace || namespace
-					}
-				};
-			case 's3': {
-				const src: any = { url: values.sourceUrl };
-				if (values.sourceSecretRef) src.secretRef = values.sourceSecretRef;
-				return { s3: src };
-			}
-			case 'gcs': {
-				const src: any = { url: values.sourceUrl };
-				if (values.sourceSecretRef) src.secretRef = values.sourceSecretRef;
-				return { gcs: src };
-			}
+				return { pvc: values.spec.source.pvc };
+			case 's3':
+				return { s3: values.spec.source.s3 };
+			case 'gcs':
+				return { gcs: values.spec.source.gcs };
 			default:
 				return { blank: {} };
 		}
 	}
 
 	// Derived submission values
-	const submissionValues = $derived.by(() => {
-		const pvc: any = {
-			accessModes: values.accessMode ? [values.accessMode] : ['ReadWriteOnce'],
-			resources: {
-				requests: {
-					storage: values.storageSize || '10Gi'
-				}
+	const submissionValues = $derived.by(() => ({
+		apiVersion: group ? `${group}/${version}` : version,
+		kind,
+		metadata: {
+			name: values.metadata.name,
+			namespace
+		},
+		spec: {
+			source: buildSource(),
+			pvc: {
+				resources: { requests: { storage: values.storageSize } },
+				accessModes: [values.spec.pvc.accessModes],
+				storageClassName: values.spec.pvc.storageClassName,
+				volumeMode: values.spec.pvc.volumeMode
 			}
-		};
-		if (values.storageClassName) {
-			pvc.storageClassName = values.storageClassName;
 		}
-		if (values.volumeMode) {
-			pvc.volumeMode = values.volumeMode;
-		}
-
-		return {
-			apiVersion: group ? `${group}/${version}` : version,
-			kind,
-			metadata: {
-				name: values.metadata.name,
-				namespace
-			},
-			spec: {
-				source: buildSource(),
-				pvc
-			}
-		};
-	});
+	}));
 	let value = $derived(stringify(submissionValues));
 
 	// Steps Manager
-	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 6 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -183,7 +156,7 @@
 		search: string
 	): Promise<{ label: string; value: string }[]> {
 		try {
-			const ns = (values.sourcePvcNamespace as string) || namespace;
+			const ns = (values.spec.source.pvc.namespace as string) || namespace;
 			const response = await resourceClient.list({
 				cluster,
 				namespace: ns,
@@ -362,14 +335,20 @@
 				{:else if sourceType === 'http'}
 					<Form
 						schema={{
-							type: 'object',
-							title: 'HTTP Source',
-							required: ['url'],
+							...lodash.omit(
+								lodash.get(jsonSchema, 'properties.spec.properties.source.properties.http'),
+								'properties'
+							),
 							properties: {
-								url: { type: 'string', title: 'URL' },
-								secretRef: { type: 'string', title: 'Secret Reference' },
-								certConfigMap: { type: 'string', title: 'Certificate ConfigMap' }
-							}
+								...lodash.pick(
+									lodash.get(
+										jsonSchema,
+										'properties.spec.properties.source.properties.http.properties'
+									),
+									['url', 'secretRef', 'certConfigMap']
+								)
+							},
+							title: 'HTTP'
 						} as Schema}
 						uiSchema={{
 							'ui:options': {
@@ -387,24 +366,13 @@
 								}
 							}
 						} as UiSchemaRoot}
-						initialValue={{ url: '', secretRef: '', certConfigMap: '' } as FormValue}
+						initialValue={null as FormValue}
 						handleSubmit={{
 							posthook: () => {
 								handleNext();
 							}
 						}}
-						bind:values={
-							() => ({
-								url: values.sourceUrl,
-								secretRef: values.sourceSecretRef,
-								certConfigMap: values.sourceCertConfigMap
-							}),
-							(v: any) => {
-								values.sourceUrl = v.url;
-								values.sourceSecretRef = v.secretRef;
-								values.sourceCertConfigMap = v.certConfigMap;
-							}
-						}
+						bind:values={values['spec']['source']['http']}
 					>
 						{#snippet actions()}
 							<div class="flex w-full items-center justify-between gap-3">
@@ -422,18 +390,20 @@
 				{:else if sourceType === 'registry'}
 					<Form
 						schema={{
-							type: 'object',
-							title: 'Registry Source',
-							required: ['url'],
+							...lodash.omit(
+								lodash.get(jsonSchema, 'properties.spec.properties.source.properties.registry'),
+								'properties'
+							),
 							properties: {
-								url: { type: 'string', title: 'Image URL' },
-								secretRef: { type: 'string', title: 'Secret Reference' },
-								pullMethod: {
-									type: 'string',
-									title: 'Pull Method',
-									enum: ['node', 'pod']
-								}
-							}
+								...lodash.pick(
+									lodash.get(
+										jsonSchema,
+										'properties.spec.properties.source.properties.registry.properties'
+									),
+									['url', 'secretRef', 'pullMethod']
+								)
+							},
+							title: 'Registry'
 						} as Schema}
 						uiSchema={{
 							'ui:options': {
@@ -447,24 +417,13 @@
 								}
 							}
 						} as UiSchemaRoot}
-						initialValue={{ url: '', secretRef: '', pullMethod: '' } as FormValue}
+						initialValue={null as FormValue}
 						handleSubmit={{
 							posthook: () => {
 								handleNext();
 							}
 						}}
-						bind:values={
-							() => ({
-								url: values.sourceUrl,
-								secretRef: values.sourceSecretRef,
-								pullMethod: values.registryPullMethod
-							}),
-							(v: any) => {
-								values.sourceUrl = v.url;
-								values.sourceSecretRef = v.secretRef;
-								values.registryPullMethod = v.pullMethod;
-							}
-						}
+						bind:values={values['spec']['source']['registry']}
 					>
 						{#snippet actions()}
 							<div class="flex w-full items-center justify-between gap-3">
@@ -482,13 +441,20 @@
 				{:else if sourceType === 'pvc'}
 					<Form
 						schema={{
-							type: 'object',
-							title: 'PVC Source',
-							required: ['name'],
+							...lodash.omit(
+								lodash.get(jsonSchema, 'properties.spec.properties.source.properties.pvc'),
+								'properties'
+							),
 							properties: {
-								namespace: { type: 'string', title: 'Source Namespace' },
-								name: { type: 'string', title: 'PVC Name' }
-							}
+								...lodash.pick(
+									lodash.get(
+										jsonSchema,
+										'properties.spec.properties.source.properties.pvc.properties'
+									),
+									['name', 'namespace']
+								)
+							},
+							title: 'PVC'
 						} as Schema}
 						uiSchema={{
 							'ui:options': {
@@ -521,22 +487,13 @@
 								}
 							}
 						} as UiSchemaRoot}
-						initialValue={{ namespace: namespace, name: '' } as FormValue}
+						initialValue={{ namespace: namespace } as FormValue}
 						handleSubmit={{
 							posthook: () => {
 								handleNext();
 							}
 						}}
-						bind:values={
-							() => ({
-								namespace: values.sourcePvcNamespace,
-								name: values.sourcePvcName
-							}),
-							(v: any) => {
-								values.sourcePvcNamespace = v.namespace;
-								values.sourcePvcName = v.name;
-							}
-						}
+						bind:values={values['spec']['source']['pvc']}
 					>
 						{#snippet actions()}
 							<div class="flex w-full items-center justify-between gap-3">
@@ -551,16 +508,23 @@
 							</div>
 						{/snippet}
 					</Form>
-				{:else if sourceType === 's3' || sourceType === 'gcs'}
+				{:else if sourceType === 's3'}
 					<Form
 						schema={{
-							type: 'object',
-							title: `${(sourceType ?? '').toUpperCase()} Source`,
-							required: ['url'],
+							...lodash.omit(
+								lodash.get(jsonSchema, 'properties.spec.properties.source.properties.s3'),
+								'properties'
+							),
 							properties: {
-								url: { type: 'string', title: 'URL' },
-								secretRef: { type: 'string', title: 'Secret Reference' }
-							}
+								...lodash.pick(
+									lodash.get(
+										jsonSchema,
+										'properties.spec.properties.source.properties.s3.properties'
+									),
+									['url', 'secretRef']
+								)
+							},
+							title: 'S3'
 						} as Schema}
 						uiSchema={{
 							'ui:options': {
@@ -569,22 +533,59 @@
 								}
 							}
 						} as UiSchemaRoot}
-						initialValue={{ url: '', secretRef: '' } as FormValue}
+						initialValue={null as FormValue}
 						handleSubmit={{
 							posthook: () => {
 								handleNext();
 							}
 						}}
-						bind:values={
-							() => ({
-								url: values.sourceUrl,
-								secretRef: values.sourceSecretRef
-							}),
-							(v: any) => {
-								values.sourceUrl = v.url;
-								values.sourceSecretRef = v.secretRef;
+						bind:values={values['spec']['source']['s3']}
+					>
+						{#snippet actions()}
+							<div class="flex w-full items-center justify-between gap-3">
+								<Button
+									onclick={() => {
+										handlePrevious();
+									}}
+								>
+									Previous
+								</Button>
+								<SubmitButton />
+							</div>
+						{/snippet}
+					</Form>
+				{:else if sourceType === 'gcs'}
+					<Form
+						schema={{
+							...lodash.omit(
+								lodash.get(jsonSchema, 'properties.spec.properties.source.properties.gcs'),
+								'properties'
+							),
+							properties: {
+								...lodash.pick(
+									lodash.get(
+										jsonSchema,
+										'properties.spec.properties.source.properties.gcs.properties'
+									),
+									['url', 'secretRef']
+								)
+							},
+							title: 'GCS'
+						} as Schema}
+						uiSchema={{
+							'ui:options': {
+								translations: {
+									submit: 'Next'
+								}
 							}
-						}
+						} as UiSchemaRoot}
+						initialValue={null as FormValue}
+						handleSubmit={{
+							posthook: () => {
+								handleNext();
+							}
+						}}
+						bind:values={values['spec']['source']['gcs']}
 					>
 						{#snippet actions()}
 							<div class="flex w-full items-center justify-between gap-3">
@@ -601,38 +602,89 @@
 					</Form>
 				{/if}
 			</Tabs.Content>
-			<!-- Step 4: Storage Configuration -->
+			<!-- Step 4: Storage Size -->
 			<Tabs.Content value={steps[3]}>
-				<div class="flex flex-col gap-4">
-					<Form
-						schema={{
-							type: 'string',
-							title: 'Size (e.g. 10Gi)'
-						} as Schema}
-						uiSchema={{} as UiSchemaRoot}
-						initialValue={'10Gi' as FormValue}
-						bind:values={values['storageSize']}
-					/>
-					<Form
-						schema={{
-							type: 'string',
-							title: 'Access Mode',
-							enum: ['ReadWriteOnce', 'ReadWriteMany', 'ReadOnlyMany']
-						} as Schema}
-						uiSchema={{
+				<Form
+					schema={{
+						...lodash.omit(
+							lodash.get(
+								jsonSchema,
+								'properties.spec.properties.pvc.properties.resources.properties.requests'
+							),
+							'anyOf'
+						),
+						type: 'string',
+						title: 'Storage'
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={'10Gi' as FormValue}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					bind:values={values['storageSize']}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+			<!-- Step 5: Storage Configuration -->
+			<Tabs.Content value={steps[4]}>
+				<Form
+					schema={{
+						...lodash.omit(lodash.get(jsonSchema, 'properties.spec.properties.pvc'), 'properties'),
+						title: 'Storage',
+						properties: {
+							accessModes: {
+								...lodash.omit(
+									lodash.get(jsonSchema, 'properties.spec.properties.pvc.properties.accessModes'),
+									['items', 'type']
+								),
+								enum: ['ReadWriteOnce', 'ReadWriteMany', 'ReadOnlyMany'],
+								title: 'Access Modes'
+							},
+							storageClassName: {
+								...lodash.get(
+									jsonSchema,
+									'properties.spec.properties.pvc.properties.storageClassName'
+								)
+							},
+							volumeMode: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.pvc.properties.volumeMode'),
+								enum: ['Filesystem', 'Block'],
+								title: 'Volume Mode'
+							}
+						}
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						},
+						accessModes: {
 							'ui:components': {
 								stringField: 'enumField'
 							}
-						} as UiSchemaRoot}
-						initialValue={'ReadWriteOnce' as FormValue}
-						bind:values={values['accessMode']}
-					/>
-					<Form
-						schema={{
-							type: 'string',
-							title: 'Storage Class'
-						} as Schema}
-						uiSchema={{
+						},
+						storageClassName: {
 							'ui:components': {
 								stringField: 'enumField',
 								selectWidget: ComboboxWidget
@@ -645,44 +697,40 @@
 								},
 								TailoredComboboxEmptyText: 'No Storage Classes found.'
 							}
-						} as UiSchemaRoot}
-						initialValue={null as FormValue}
-						bind:values={values['storageClassName']}
-					/>
-					<Form
-						schema={{
-							type: 'string',
-							title: 'Volume Mode',
-							enum: ['Filesystem', 'Block']
-						} as Schema}
-						uiSchema={{
+						},
+						volumeMode: {
 							'ui:components': {
 								stringField: 'enumField'
 							}
-						} as UiSchemaRoot}
-						initialValue={'Filesystem' as FormValue}
-						bind:values={values['volumeMode']}
-					/>
-					<div class="flex w-full items-center justify-between gap-3">
-						<Button
-							onclick={() => {
-								handlePrevious();
-							}}
-						>
-							Previous
-						</Button>
-						<Button
-							onclick={() => {
-								handleNext();
-							}}
-						>
-							Next
-						</Button>
-					</div>
-				</div>
+						}
+					} as UiSchemaRoot}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					initialValue={{
+						accessModes: 'ReadWriteOnce',
+						volumeMode: 'Filesystem'
+					} as FormValue}
+					bind:values={values['spec']['pvc']}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
 			</Tabs.Content>
-			<!-- Step 5: Review & Create -->
-			<Tabs.Content value={steps[4]} class="min-h-[77vh]">
+			<!-- Step 6: Review & Create -->
+			<Tabs.Content value={steps[5]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{
