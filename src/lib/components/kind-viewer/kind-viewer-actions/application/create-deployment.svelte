@@ -589,12 +589,7 @@
 									'properties.spec.properties.deploymentConfig.properties.persistentVolumeClaim.properties.accessModes.items'
 								),
 								title: 'Access Mode',
-								enum: [
-									'ReadWriteOnce',
-									'ReadOnlyMany',
-									'ReadWriteMany',
-									'ReadWriteOncePod'
-								],
+								enum: ['ReadWriteOnce', 'ReadOnlyMany', 'ReadWriteMany', 'ReadWriteOncePod'],
 								default: 'ReadWriteOnce'
 							},
 							resources: {
@@ -656,11 +651,7 @@
 						lodash.unset(formValue, 'resources.requests.mountPath');
 						const accessMode = lodash.get(formValue, 'accessMode') as string | undefined;
 						lodash.unset(formValue, 'accessMode');
-						lodash.set(
-							formValue,
-							'accessModes',
-							accessMode ? [accessMode] : ['ReadWriteOnce']
-						);
+						lodash.set(formValue, 'accessModes', accessMode ? [accessMode] : ['ReadWriteOnce']);
 						return formValue;
 					}}
 					handleSubmit={{
@@ -677,11 +668,7 @@
 								'spec.deploymentConfig.deployment.template.metadata.labels.app',
 								label
 							);
-							lodash.set(
-								values,
-								'spec.deploymentConfig.service.selector.app',
-								label
-							);
+							lodash.set(values, 'spec.deploymentConfig.service.selector.app', label);
 							handleNext();
 						}
 					}}
