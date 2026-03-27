@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { SquareIcon } from '@lucide/svelte';
+	import SquareIcon from '@lucide/svelte/icons/square';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
@@ -42,6 +42,12 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
+
+	const jsonSchemaValidator = new Ajv({
+		allErrors: true,
+		strict: false
+	});
+	const validate = jsonSchemaValidator.compile(jsonSchema);
 
 	// Container for Data
 	let values: any = $state({
@@ -524,12 +530,6 @@
 							if (isSubmitting) return;
 
 							isSubmitting = true;
-
-							const jsonSchemaValidator = new Ajv({
-								allErrors: true,
-								strict: false
-							});
-							const validate = jsonSchemaValidator.compile(jsonSchema);
 
 							const isValid = validate(load(value));
 

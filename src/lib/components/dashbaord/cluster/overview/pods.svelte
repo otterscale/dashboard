@@ -1,40 +1,53 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import BoxIcon from '@lucide/svelte/icons/box';
+	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Card from '$lib/components/ui/card';
 	import { m } from '$lib/paraglide/messages';
+	import { escapePromqlStringLiteral } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
-		cluster,
+		cluster: _cluster,
+		namespace = '',
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	}: {
+		prometheusDriver: PrometheusDriver;
+		cluster: string;
+		namespace?: string;
+		isReloading: boolean;
+	} = $props();
+	void _cluster;
 
 	let maxAllocatablePods: SampleValue | undefined = $state(undefined);
 	let runningPods: SampleValue | undefined = $state(undefined);
 	let pendingPods: SampleValue | undefined = $state(undefined);
 	let failedPods: SampleValue | undefined = $state(undefined);
 	async function fetchPods() {
+		const ns = (namespace ?? '').trim();
+		const nsFilter = ns ? `,namespace="${escapePromqlStringLiteral(ns)}"` : '';
+
 		const allocateResponse = await prometheusDriver.instantQuery(
-			`sum(kube_node_status_allocatable{resource="pods", juju_model="${cluster}", container!=""})`
+			`sum(kube_node_status_allocatable{resource="pods", container!=""})`
 		);
 		maxAllocatablePods = allocateResponse.result[0]?.value ?? undefined;
 
 		const runningResponse = await prometheusDriver.instantQuery(
-			`sum(kube_pod_status_phase{phase="Running", juju_model="${cluster}", container!=""})`
+			`sum(kube_pod_status_phase{phase="Running", container!=""${nsFilter}})`
 		);
 		runningPods = runningResponse.result[0]?.value ?? undefined;
 
 		const pendingResponse = await prometheusDriver.instantQuery(
-			`sum(kube_pod_status_phase{phase="Pending", juju_model="${cluster}", container!=""})`
+			`sum(kube_pod_status_phase{phase="Pending", container!=""${nsFilter}})`
 		);
 		pendingPods = pendingResponse.result[0]?.value ?? undefined;
 
 		const failedResponse = await prometheusDriver.instantQuery(
-			`sum(kube_pod_status_phase{phase="Failed", juju_model="${cluster}", container!=""})`
+			`sum(kube_pod_status_phase{phase="Failed", container!=""${nsFilter}})`
 		);
 		failedPods = failedResponse.result[0]?.value ?? undefined;
 	}
@@ -68,8 +81,7 @@
 </script>
 
 <Card.Root class="relative h-full min-h-[140px] gap-2 overflow-hidden">
-	<Icon
-		icon="ph:cube"
+	<BoxIcon
 		class="absolute -right-10 bottom-0 size-36 text-8xl tracking-tight text-nowrap text-primary/5 uppercase group-hover:hidden"
 	/>
 	<Card.Header>
@@ -80,11 +92,11 @@
 	</Card.Header>
 	{#if !isLoaded}
 		<div class="flex h-9 w-full items-center justify-center">
-			<Icon icon="svg-spinners:6-dots-rotate" class="size-10" />
+			<Loader2Icon class="size-10 animate-spin" />
 		</div>
 	{:else if !maxAllocatablePods && !runningPods && !pendingPods}
 		<div class="flex h-full w-full flex-col items-center justify-center">
-			<Icon icon="ph:chart-bar-fill" class="size-6 animate-pulse text-muted-foreground" />
+			<ChartColumnIcon class="size-6 animate-pulse text-muted-foreground" />
 			<p class="p-0 text-xs text-muted-foreground">{m.no_data_display()}</p>
 		</div>
 	{:else}

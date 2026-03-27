@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
-	import { Columns3Icon, EraserIcon } from '@lucide/svelte';
+	import Columns3Icon from '@lucide/svelte/icons/columns-3';
+	import EraserIcon from '@lucide/svelte/icons/eraser';
 	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 	import type { ColumnDef } from '@tanstack/table-core';
 

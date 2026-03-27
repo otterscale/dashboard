@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { Ban, Braces } from '@lucide/svelte';
+	import Ban from '@lucide/svelte/icons/ban';
+	import Braces from '@lucide/svelte/icons/braces';
 	import File from '@lucide/svelte/icons/file';
 	import Layers from '@lucide/svelte/icons/layers';
 	import {
@@ -311,7 +312,11 @@
 					</Sheet.Root>
 					{#if Editor}
 						<Editor
-							name={object?.metadata?.name}
+							{cluster}
+							{group}
+							{version}
+							{kind}
+							{resource}
 							{schema}
 							{object}
 							onsuccess={() => {

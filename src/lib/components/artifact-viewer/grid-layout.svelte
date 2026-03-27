@@ -1,7 +1,9 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
-	import Icon from '@iconify/svelte';
-	import { BookmarkIcon, BoxesIcon, TagsIcon } from '@lucide/svelte';
+	import SiHelm from '@icons-pack/svelte-simple-icons/icons/SiHelm';
+	import BookmarkIcon from '@lucide/svelte/icons/bookmark';
+	import BoxesIcon from '@lucide/svelte/icons/boxes';
+	import TagsIcon from '@lucide/svelte/icons/tags';
 	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 	import type { Row } from '@tanstack/table-core';
 
@@ -39,7 +41,7 @@
 				<Avatar.Root>
 					<Avatar.Image src={extraAttributes.icon as string} alt="helm" />
 					<Avatar.Fallback>
-						<Icon icon="logos:helm" />
+						<SiHelm class="size-4" />
 					</Avatar.Fallback>
 				</Avatar.Root>
 			</Item.Media>

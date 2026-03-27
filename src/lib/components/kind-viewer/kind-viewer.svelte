@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { type JsonValue } from '@bufbuild/protobuf';
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { CableIcon, UnplugIcon, UsersRoundIcon } from '@lucide/svelte';
+	import CableIcon from '@lucide/svelte/icons/cable';
+	import UnplugIcon from '@lucide/svelte/icons/unplug';
+	import UsersRoundIcon from '@lucide/svelte/icons/users-round';
 	import {
 		type APIResource,
 		type ListRequest,
@@ -26,7 +28,7 @@
 	let {
 		isClusterAdmin,
 		cluster,
-		namespace,
+		namespace: namespaceProp,
 		apiResource
 	}: {
 		isClusterAdmin: boolean;
@@ -35,14 +37,22 @@
 		apiResource: APIResource;
 	} = $props();
 
+	let clustered = $derived(isClusterAdmin);
+	// eslint-disable-next-line
+	let schema: any = $state({});
+
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
 	const uiSchemas: Record<string, UISchemaType> = $derived(getUISchemas(apiResource.kind));
 	const dataSchemas: Record<string, DataSchemaType> = $derived(getDataSchemas(apiResource.kind));
+	const namespace = $derived.by(() => {
+		if (apiResource.kind === 'CephObjectStore') {
+			return 'rook-ceph';
+		}
 
-	// eslint-disable-next-line
-	let schema: any = $state({});
+		return apiResource.namespaced ? namespaceProp : undefined;
+	});
 
 	async function fetchSchema() {
 		try {
@@ -80,7 +90,7 @@
 				const response = await resourceClient.list(
 					{
 						cluster: cluster,
-						namespace: clustered ? undefined : apiResource.namespaced ? namespace : undefined,
+						namespace: !clustered ? namespace : undefined,
 						group: apiResource.group,
 						version: apiResource.version,
 						resource: apiResource.resource,
@@ -122,7 +132,7 @@
 			const watchResourcesStream = resourceClient.watch(
 				{
 					cluster: cluster,
-					namespace: clustered ? undefined : apiResource.namespaced ? namespace : undefined,
+					namespace: !clustered ? namespace : undefined,
 					group: apiResource.group,
 					version: apiResource.version,
 					resource: apiResource.resource,
@@ -204,8 +214,6 @@
 	}
 
 	const sleep = (ms: number = 0) => new Promise((resolve) => setTimeout(resolve, ms));
-
-	let clustered = $derived(isClusterAdmin);
 
 	async function resetAndReload() {
 		if (listAbortController) {
@@ -311,7 +319,10 @@
 					version={apiResource.version}
 					kind={apiResource.kind}
 					resource={apiResource.resource}
-					{namespace}
+					namespace={namespace
+						? (row.original.raw as Record<string, Record<string, string>>)?.metadata?.namespace ||
+							namespace
+						: namespace}
 				/>
 			{/snippet}
 		</DynamicTable>

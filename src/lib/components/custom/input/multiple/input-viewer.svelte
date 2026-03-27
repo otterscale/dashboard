@@ -1,5 +1,6 @@
 <script lang="ts" module>
-	import Icon from '@iconify/svelte';
+	import BoxIcon from '@lucide/svelte/icons/box';
+	import CircleXIcon from '@lucide/svelte/icons/circle-x';
 	import type { WithElementRef } from 'bits-ui';
 	import { getContext } from 'svelte';
 	import type { HTMLAnchorAttributes } from 'svelte/elements';
@@ -32,6 +33,7 @@
 	<div class="flex flex-wrap gap-1">
 		{#each valuesManager.values as value (value)}
 			{#if !(value == undefined || value == null)}
+				{@const ItemIcon = inputManager.icon ?? BoxIcon}
 				<Badge
 					{href}
 					bind:ref
@@ -41,7 +43,7 @@
 					{variant}
 				>
 					<span class="flex items-center gap-1">
-						<Icon icon={inputManager.icon ?? 'ph:cube'} />
+						<ItemIcon class="size-4" />
 						{value}
 					</span>
 					<Button
@@ -54,7 +56,7 @@
 							valuesManager.remove(value);
 						}}
 					>
-						<Icon icon="ph:x-circle" class="text-muted-foreground" />
+						<CircleXIcon class="size-4 text-muted-foreground" />
 					</Button>
 				</Badge>
 			{/if}

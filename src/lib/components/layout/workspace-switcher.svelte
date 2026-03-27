@@ -1,42 +1,40 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import {
-		ActivityIcon,
-		ApertureIcon,
-		AudioWaveformIcon,
-		BlocksIcon,
-		BoxIcon,
-		BriefcaseIcon,
-		ChartPieIcon,
-		ChevronsUpDownIcon,
-		CircleDashedIcon,
-		CommandIcon,
-		ComponentIcon,
-		CrownIcon,
-		CylinderIcon,
-		DiamondIcon,
-		DiscIcon,
-		DnaIcon,
-		FrameIcon,
-		GalleryVerticalEndIcon,
-		GemIcon,
-		GlobeIcon,
-		GridIcon,
-		HashIcon,
-		HexagonIcon,
-		LayersIcon,
-		LayoutGridIcon,
-		LibraryIcon,
-		MedalIcon,
-		MountainIcon,
-		PackageIcon,
-		PlusIcon,
-		PyramidIcon,
-		RadarIcon,
-		Settings2Icon,
-		ShieldIcon,
-		ZapIcon
-	} from '@lucide/svelte';
+	import ActivityIcon from '@lucide/svelte/icons/activity';
+	import ApertureIcon from '@lucide/svelte/icons/aperture';
+	import AudioWaveformIcon from '@lucide/svelte/icons/audio-waveform';
+	import BlocksIcon from '@lucide/svelte/icons/blocks';
+	import BoxIcon from '@lucide/svelte/icons/box';
+	import BriefcaseIcon from '@lucide/svelte/icons/briefcase';
+	import ChartPieIcon from '@lucide/svelte/icons/chart-pie';
+	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
+	import CircleDashedIcon from '@lucide/svelte/icons/circle-dashed';
+	import CommandIcon from '@lucide/svelte/icons/command';
+	import ComponentIcon from '@lucide/svelte/icons/component';
+	import CrownIcon from '@lucide/svelte/icons/crown';
+	import CylinderIcon from '@lucide/svelte/icons/cylinder';
+	import DiamondIcon from '@lucide/svelte/icons/diamond';
+	import DiscIcon from '@lucide/svelte/icons/disc';
+	import DnaIcon from '@lucide/svelte/icons/dna';
+	import FrameIcon from '@lucide/svelte/icons/frame';
+	import GalleryVerticalEndIcon from '@lucide/svelte/icons/gallery-vertical-end';
+	import GemIcon from '@lucide/svelte/icons/gem';
+	import GlobeIcon from '@lucide/svelte/icons/globe';
+	import GridIcon from '@lucide/svelte/icons/grid';
+	import HashIcon from '@lucide/svelte/icons/hash';
+	import HexagonIcon from '@lucide/svelte/icons/hexagon';
+	import LayersIcon from '@lucide/svelte/icons/layers';
+	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
+	import LibraryIcon from '@lucide/svelte/icons/library';
+	import MedalIcon from '@lucide/svelte/icons/medal';
+	import MountainIcon from '@lucide/svelte/icons/mountain';
+	import PackageIcon from '@lucide/svelte/icons/package';
+	import PlusIcon from '@lucide/svelte/icons/plus';
+	import PyramidIcon from '@lucide/svelte/icons/pyramid';
+	import RadarIcon from '@lucide/svelte/icons/radar';
+	import Settings2Icon from '@lucide/svelte/icons/settings-2';
+	import ShieldIcon from '@lucide/svelte/icons/shield';
+	import ZapIcon from '@lucide/svelte/icons/zap';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { type TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import { type Component, getContext, onMount } from 'svelte';
@@ -252,24 +250,24 @@
 										`/(auth)/${cluster}/${activeWorkspace.metadata?.name}/${activeWorkspace.metadata?.name}?group=tenant.otterscale.io&version=v1alpha1&kind=Workspace&resource=workspaces`
 									)
 								: undefined}
-							class="group/icon flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground transition"
+							class="group/icon flex aspect-square size-8.5 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground transition"
 							disabled={!activeWorkspace}
 						>
 							<ActiveIcon class="size-4 group-hover/icon:hidden" />
 							<Settings2Icon class="hidden size-4 group-hover/icon:block" />
-							{#if !activeWorkspace}
-								<span
-									class="absolute flex size-3 transition-all {sidebar.open
-										? 'top-1 left-8'
-										: '-top-1 left-6'}"
-								>
-									<span
-										class="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"
-									></span>
-									<span class="relative inline-flex size-3 rounded-full bg-blue-500"></span>
-								</span>
-							{/if}
 						</Button>
+						{#if !activeWorkspace}
+							<span
+								class="pointer-events-none absolute flex size-3 transition-all {sidebar.open
+									? 'top-1 left-8'
+									: '-top-1 left-6'}"
+							>
+								<span
+									class="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"
+								></span>
+								<span class="relative inline-flex size-3 rounded-full bg-blue-500"></span>
+							</span>
+						{/if}
 						<div {...props} class="flex h-12 w-full items-center">
 							<div class="grid flex-1 text-start text-sm leading-tight">
 								{#if activeWorkspace}
@@ -305,8 +303,8 @@
 				{#each workspaces as workspace, index (workspace.metadata?.name)}
 					{@const WorkspaceIcon = getWorkspaceIcon(workspace.metadata?.name)}
 					<DropdownMenu.Item onSelect={() => onSelect(index)} class="gap-2 p-2">
-						<div class="flex size-6 items-center justify-center rounded-md border">
-							<WorkspaceIcon class="size-3 shrink-0" />
+						<div class="flex size-7 items-center justify-center rounded-md border">
+							<WorkspaceIcon class="size-3.5 shrink-0" />
 						</div>
 						<div class="grid flex-1 text-start text-xs leading-tight">
 							<span class="truncate font-medium">{workspace.metadata?.name}</span>
@@ -326,7 +324,7 @@
 				{/each}
 				<DropdownMenu.Separator />
 				<DropdownMenu.Item class="gap-2 p-2" onSelect={() => (createWorkspaceOpen = true)}>
-					<div class="flex size-6 items-center justify-center rounded-md border bg-transparent">
+					<div class="flex size-7 items-center justify-center rounded-md border bg-transparent">
 						<PlusIcon class="size-3.5" />
 					</div>
 					<div class="text-xs font-medium text-muted-foreground">{m.add_workspace()}</div>

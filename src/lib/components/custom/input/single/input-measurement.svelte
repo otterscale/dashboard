@@ -1,5 +1,5 @@
 <script lang="ts" module>
-	import Icon from '@iconify/svelte';
+	import ScaleIcon from '@lucide/svelte/icons/scale';
 	import type { WithElementRef } from 'bits-ui';
 	import { onMount } from 'svelte';
 	import type { HTMLInputAttributes } from 'svelte/elements';
@@ -79,7 +79,8 @@
 						);
 					}}
 				>
-					<Icon icon={option.icon ?? 'ph:scales'} class={cn('size-4')} />
+					{@const OptionIcon = option.icon ?? ScaleIcon}
+					<OptionIcon class={cn('size-4')} />
 					{option.label}
 				</Select.Item>
 			{/each}

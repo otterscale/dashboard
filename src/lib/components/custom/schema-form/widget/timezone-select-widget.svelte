@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { Check, ChevronsUpDown, Globe } from '@lucide/svelte';
+	import Check from '@lucide/svelte/icons/check';
+	import ChevronsUpDown from '@lucide/svelte/icons/chevrons-up-down';
+	import Globe from '@lucide/svelte/icons/globe';
 	import type { ComponentProps } from '@sjsf/form';
 	import { onMount } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';

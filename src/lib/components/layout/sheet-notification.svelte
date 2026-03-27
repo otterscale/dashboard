@@ -1,5 +1,10 @@
 <script lang="ts">
-	import Icon from '@iconify/svelte';
+	import ArchiveIcon from '@lucide/svelte/icons/archive';
+	import ArchiveRestoreIcon from '@lucide/svelte/icons/archive-restore';
+	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
+	import MailIcon from '@lucide/svelte/icons/mail';
+	import MailOpenIcon from '@lucide/svelte/icons/mail-open';
+	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
@@ -75,7 +80,7 @@
 									<div class="ml-auto text-xs [&_svg]:size-5">
 										<DropdownMenu.Root>
 											<DropdownMenu.Trigger>
-												<Icon icon="ph:dots-three" />
+												<EllipsisIcon />
 											</DropdownMenu.Trigger>
 											<DropdownMenu.Content side="left" align="start">
 												<DropdownMenu.Group>
@@ -85,7 +90,7 @@
 																unreadNotifition(notification.id);
 															}}
 														>
-															<Icon icon="ph:envelope-simple-bold" />
+															<MailIcon />
 															<span>{m.mark_as_unread()}</span>
 														</DropdownMenu.Item>
 													{:else}
@@ -94,7 +99,7 @@
 																readNotifition(notification.id);
 															}}
 														>
-															<Icon icon="ph:envelope-simple-open-bold" />
+															<MailOpenIcon />
 															<span>{m.mark_as_read()}</span>
 														</DropdownMenu.Item>
 													{/if}
@@ -104,7 +109,7 @@
 																unarchiveNotifition(notification.id);
 															}}
 														>
-															<Icon icon="ph:box-arrow-up-bold" />
+															<ArchiveRestoreIcon />
 															<span>{m.mark_as_unarchived()}</span>
 														</DropdownMenu.Item>
 													{:else}
@@ -113,7 +118,7 @@
 																archiveNotifition(notification.id);
 															}}
 														>
-															<Icon icon="ph:box-arrow-down-bold" />
+															<ArchiveIcon />
 															<span>{m.mark_as_archived()}</span>
 														</DropdownMenu.Item>
 													{/if}
@@ -123,7 +128,7 @@
 															deleteNotifition(notification.id);
 														}}
 													>
-														<Icon icon="ph:trash-bold" class="text-red-500" />
+														<Trash2Icon class="text-red-500" />
 														<span class="text-red-500">{m.delete()}</span>
 													</DropdownMenu.Item>
 												</DropdownMenu.Group>

@@ -2,22 +2,20 @@
 	import 'driver.js/dist/driver.css';
 
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import {
-		BotIcon,
-		BoxIcon,
-		BracesIcon,
-		CircleQuestionMarkIcon,
-		CompassIcon,
-		CpuIcon,
-		FileTextIcon,
-		HardDriveIcon,
-		InfoIcon,
-		LayersIcon,
-		LayoutGridIcon,
-		NetworkIcon,
-		PlusIcon,
-		UserStarIcon
-	} from '@lucide/svelte';
+	import BotIcon from '@lucide/svelte/icons/bot';
+	import BoxIcon from '@lucide/svelte/icons/box';
+	import BracesIcon from '@lucide/svelte/icons/braces';
+	import CircleQuestionMarkIcon from '@lucide/svelte/icons/circle-question-mark';
+	import CompassIcon from '@lucide/svelte/icons/compass';
+	import CpuIcon from '@lucide/svelte/icons/cpu';
+	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
+	import InfoIcon from '@lucide/svelte/icons/info';
+	import LayersIcon from '@lucide/svelte/icons/layers';
+	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
+	import NetworkIcon from '@lucide/svelte/icons/network';
+	import PlusIcon from '@lucide/svelte/icons/plus';
+	import UserStarIcon from '@lucide/svelte/icons/user-star';
 	import { type Link, LinkService } from '@otterscale/api/link/v1';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
@@ -70,16 +68,17 @@
 	let aboutOpen = $state(false);
 	let importOpen = $state(false);
 
-	async function fetchClusters() {
+	async function fetchClusters(): Promise<Link[]> {
 		try {
 			const response = await linkClient.listLinks({});
-			links = response.links;
+			return response.links;
 		} catch (error) {
 			console.error('Failed to fetch links:', error);
+			return [];
 		}
 	}
 
-	async function fetchWorkspaces(cluster: string) {
+	async function fetchWorkspaces(cluster: string): Promise<TenantOtterscaleIoV1Alpha1Workspace[]> {
 		try {
 			const response = await resourceClient.list({
 				cluster: cluster,
@@ -88,23 +87,32 @@
 				resource: 'workspaces',
 				labelSelector: 'user.otterscale.io/' + data.user.sub
 			});
-			workspaces = response.items.map((item) => item.object as TenantOtterscaleIoV1Alpha1Workspace);
+			return response.items.map((item) => item.object as TenantOtterscaleIoV1Alpha1Workspace);
 		} catch (error) {
 			console.error('Failed to fetch workspaces:', error);
+			return [];
 		}
 	}
 
 	async function onClusterChange(cluster: string) {
-		await fetchWorkspaces(cluster);
-		await goto(resolve('/(auth)/[cluster]/overview', { cluster: activeCluster }));
+		const newWorkspaces = await fetchWorkspaces(cluster);
+		const workspace = newWorkspaces[0]?.metadata?.name;
+
+		if (workspace) {
+			await goto(resolve('/(auth)/[cluster]/[workspace]/overview', { cluster, workspace }));
+		} else {
+			await goto(resolve('/(auth)/[cluster]/console', { cluster }));
+		}
+
+		workspaces = newWorkspaces;
 		toast.success(m.switch_cluster({ name: cluster }));
 	}
 
 	let isMounted = $state(false);
 	onMount(async () => {
-		await fetchClusters();
+		links = await fetchClusters();
 		if (activeCluster) {
-			await fetchWorkspaces(activeCluster);
+			workspaces = await fetchWorkspaces(activeCluster);
 		}
 		isMounted = true;
 	});
@@ -171,10 +179,12 @@
 					},
 					{
 						title: m.application_hub(),
-						url: resolve('/(auth)/[cluster]/[workspace]/hub', {
-							cluster: activeCluster,
-							workspace: page.params.workspace!
-						})
+						url: page.params.workspace
+							? resolve('/(auth)/[cluster]/[workspace]/hub', {
+									cluster: activeCluster,
+									workspace: page.params.workspace
+								})
+							: ''
 					}
 				]
 			},
@@ -228,13 +238,22 @@
 						title: m.block_pool(),
 						url: resourceUrl('ceph.rook.io', 'v1', 'CephBlockPool', 'cephblockpools')
 					},
-					{
-						title: m.file_system(),
-						url: resourceUrl('ceph.rook.io', 'v1', 'CephFilesystem', 'cephfilesystems')
-					},
+					// {
+					// 	title: m.file_system(),
+					// 	url: resourceUrl('ceph.rook.io', 'v1', 'CephFilesystem', 'cephfilesystems')
+					// },
 					{
 						title: m.object_store(),
 						url: resourceUrl('ceph.rook.io', 'v1', 'CephObjectStore', 'cephobjectstores')
+					},
+					{
+						title: m.object_bucket_claim(),
+						url: resourceUrl(
+							'objectbucket.io',
+							'v1alpha1',
+							'ObjectBucketClaim',
+							'objectbucketclaims'
+						)
 					}
 				]
 			},
@@ -244,6 +263,15 @@
 							title: m.administration(),
 							icon: UserStarIcon,
 							items: [
+								{
+									title: m.cluster_status(),
+									url: page.params.workspace
+										? resolve('/(auth)/[cluster]/[workspace]/cluster-status', {
+												cluster: activeCluster,
+												workspace: page.params.workspace
+											})
+										: ''
+								},
 								{
 									title: m.workspace(),
 									url: resourceUrl('tenant.otterscale.io', 'v1alpha1', 'Workspace', 'workspaces')
@@ -258,11 +286,6 @@
 				: [])
 		],
 		native: [
-			{
-				title: m.overview(),
-				url: resolve('/(auth)/[cluster]/overview', { cluster: activeCluster }),
-				icon: CompassIcon
-			},
 			{
 				title: m.workloads(),
 				icon: BoxIcon,
@@ -433,7 +456,7 @@
 					{workspaces}
 					user={data.user}
 					workspace={page.params.workspace}
-					onsuccess={() => fetchWorkspaces(activeCluster)}
+					onsuccess={async () => (workspaces = await fetchWorkspaces(activeCluster))}
 				/>
 			</Sidebar.Header>
 			<Sidebar.Content class="gap-2">
@@ -515,8 +538,8 @@
 					<DropdownMenu.Content class="w-40" align="end">
 						<DropdownMenu.Group>
 							<DropdownMenu.Label>{m.cluster()}</DropdownMenu.Label>
-							<DropdownMenu.Separator />
 							{#if links.length > 0}
+								<DropdownMenu.Separator />
 								<DropdownMenu.RadioGroup bind:value={activeCluster} onValueChange={onClusterChange}>
 									{#each links as link, index (index)}
 										<DropdownMenu.RadioItem value={link.cluster}
@@ -535,7 +558,12 @@
 						</DropdownMenu.Group>
 					</DropdownMenu.Content>
 				</DropdownMenu.Root>
-				<DialogImportCluster bind:open={importOpen} onsuccess={fetchClusters} />
+				<DialogImportCluster
+					bind:open={importOpen}
+					onsuccess={async () => {
+						links = await fetchClusters();
+					}}
+				/>
 			</div>
 		</header>
 		<main class="flex flex-1 flex-col px-2 md:px-4 lg:px-8">

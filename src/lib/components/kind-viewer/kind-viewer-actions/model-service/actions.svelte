@@ -10,6 +10,8 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
+	import Update from './update.svelte';
+
 	let {
 		cluster,
 		namespace,
@@ -63,6 +65,25 @@
 					{group}
 					{version}
 					{resource}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Update
+					{cluster}
+					{namespace}
+					{group}
+					{version}
+					{kind}
+					{resource}
+					{schema}
 					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;

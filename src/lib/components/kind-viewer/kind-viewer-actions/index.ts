@@ -2,6 +2,10 @@ import type { Component } from 'svelte';
 
 import ApplicationActions from './application/actions.svelte';
 import ApplicationCreate from './application/create.svelte';
+import ObjectBucketClaimActions from './ceph-object-bucket-claim/actions.svelte';
+import ObjectBucketClaimCreate from './ceph-object-bucket-claim/create.svelte';
+import CephObjectStoreActions from './ceph-object-store/actions.svelte';
+import CephObjectStoreCreate from './ceph-object-store/create.svelte';
 import ClusterRoleBindingActions from './cluster-role-binding/actions.svelte';
 import ClusterRoleBindingCreate from './cluster-role-binding/create.svelte';
 import CronJobActions from './cronjob/actions.svelte';
@@ -76,6 +80,10 @@ function getCreate(kind: string): CreateType {
 			return DataVolumeCreate as CreateType;
 		case 'VirtualMachineInstancetype':
 			return InstanceTypeCreate as CreateType;
+		case 'CephObjectStore':
+			return CephObjectStoreCreate as CreateType;
+		case 'ObjectBucketClaim':
+			return ObjectBucketClaimCreate as CreateType;
 		default:
 			return DefaultCreate as CreateType;
 	}
@@ -117,6 +125,10 @@ function getActions(kind: string): ActionsType {
 			return DataVolumeActions as ActionsType;
 		case 'VirtualMachineInstancetype':
 			return InstanceTypeActions as ActionsType;
+		case 'CephObjectStore':
+			return CephObjectStoreActions as ActionsType;
+		case 'ObjectBucketClaim':
+			return ObjectBucketClaimActions as ActionsType;
 		default:
 			return DefaultActions as ActionsType;
 	}

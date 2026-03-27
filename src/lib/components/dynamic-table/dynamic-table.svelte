@@ -1,20 +1,18 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
-	import {
-		BookIcon,
-		CheckIcon,
-		ChevronDownIcon,
-		ChevronFirstIcon,
-		ChevronLastIcon,
-		ChevronLeftIcon,
-		ChevronRightIcon,
-		ChevronUpIcon,
-		CodeIcon,
-		Columns3Icon,
-		EraserIcon,
-		LayoutGridIcon,
-		SheetIcon
-	} from '@lucide/svelte';
+	import BookIcon from '@lucide/svelte/icons/book';
+	import CheckIcon from '@lucide/svelte/icons/check';
+	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import ChevronFirstIcon from '@lucide/svelte/icons/chevron-first';
+	import ChevronLastIcon from '@lucide/svelte/icons/chevron-last';
+	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
+	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
+	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
+	import CodeIcon from '@lucide/svelte/icons/code';
+	import Columns3Icon from '@lucide/svelte/icons/columns-3';
+	import EraserIcon from '@lucide/svelte/icons/eraser';
+	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
+	import SheetIcon from '@lucide/svelte/icons/sheet';
 	import {
 		type ColumnDef,
 		type ColumnFiltersState,
@@ -470,7 +468,7 @@
 						<br />
 
 						<h3 class="font-semibold">Note</h3>
-						<div class="p-4 font-mono text-warning">
+						<div class="text-warning p-4 font-mono">
 							<p>
 								Operations between quantities with units (e.g., <code>Mi</code>, <code>k</code>) are
 								<b>not supported yet</b>.

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { Plus } from '@lucide/svelte';
+	import Plus from '@lucide/svelte/icons/plus';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
@@ -109,11 +109,6 @@
 							name: {
 								...lodash.get(jsonSchema, 'properties.metadata.properties.name'),
 								title: 'Name'
-							},
-							namespace: {
-								...lodash.get(jsonSchema, 'properties.metadata.properties.namespace'),
-								title: 'Namespace',
-								readOnly: true
 							}
 						}
 					} as Schema}
