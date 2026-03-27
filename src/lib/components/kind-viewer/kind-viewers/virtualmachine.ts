@@ -12,6 +12,7 @@ import type { LinkMetadata } from '$lib/components/dynamic-table/dynamic-table-c
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
 
+import VmServicePortsCell from '../kind-viewer-actions/virtual-machine-service/vm-service-ports-cell.svelte';
 import { buildResourceDetailUrl } from './resource-url';
 
 // kubectl get vm -o wide
@@ -25,6 +26,7 @@ type VirtualMachineAttribute =
 	| 'Instance Type'
 	| 'Age'
 	| 'Volumes'
+	| 'Ports'
 	| 'raw';
 
 function getVirtualMachineDataSchemas(): Record<VirtualMachineAttribute, DataSchemaType> {
@@ -37,6 +39,7 @@ function getVirtualMachineDataSchemas(): Record<VirtualMachineAttribute, DataSch
 		'Instance Type': 'text',
 		Age: 'time',
 		Volumes: 'number',
+		Ports: 'number',
 		raw: 'object'
 	};
 }
@@ -56,6 +59,7 @@ function getVirtualMachineData(object: any): Record<VirtualMachineAttribute, Jso
 		'Instance Type': instanceTypeDisplay,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		Volumes: object?.spec?.template?.spec?.volumes.length ?? null,
+		Ports: 0,
 		raw: (object as JsonObject) ?? null
 	};
 }
@@ -70,6 +74,7 @@ function getVirtualMachineUISchemas(): Record<VirtualMachineAttribute, UISchemaT
 		'Instance Type': 'text',
 		Age: 'time',
 		Volumes: 'array-of-object',
+		Ports: 'number',
 		raw: 'object'
 	};
 }
@@ -77,7 +82,8 @@ function getVirtualMachineUISchemas(): Record<VirtualMachineAttribute, UISchemaT
 function getVirtualMachineColumnDefinitions(
 	apiResource: APIResource,
 	uiSchemas: Record<VirtualMachineAttribute, UISchemaType>,
-	dataSchemas: Record<VirtualMachineAttribute, DataSchemaType>
+	dataSchemas: Record<VirtualMachineAttribute, DataSchemaType>,
+	cluster?: string
 ): ColumnDef<Record<VirtualMachineAttribute, JsonValue>>[] {
 	const simpleColumn = (
 		id: VirtualMachineAttribute,
@@ -175,6 +181,24 @@ function getVirtualMachineColumnDefinitions(
 					} satisfies ArrayOfObjectMetadata
 				}),
 			accessorKey: 'Volumes',
+			meta: { class: 'hidden xl:table-cell' }
+		},
+		{
+			id: 'Ports',
+			header: ({ column }: { column: Column<Record<VirtualMachineAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, { column, dataSchemas }),
+			cell: ({
+				row
+			}: {
+				column: Column<Record<VirtualMachineAttribute, JsonValue>>;
+				row: Row<Record<VirtualMachineAttribute, JsonValue>>;
+			}) =>
+				renderComponent(VmServicePortsCell, {
+					vmName: row.original['Name'] as string,
+					vmNamespace: row.original['Namespace'] as string,
+					cluster: cluster ?? ''
+				}),
+			accessorKey: 'Ports',
 			meta: { class: 'hidden xl:table-cell' }
 		}
 	];

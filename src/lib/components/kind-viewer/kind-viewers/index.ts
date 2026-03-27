@@ -469,7 +469,8 @@ function getUISchemas(kind: string): Record<string, UISchemaType> {
 function getColumnDefinitions(
 	apiResource: APIResource,
 	uiSchemas: Record<string, UISchemaType>,
-	dataSchemas: Record<string, DataSchemaType>
+	dataSchemas: Record<string, DataSchemaType>,
+	cluster?: string
 ): ColumnDef<Record<string, JsonValue>>[] {
 	switch (apiResource.kind) {
 		case 'Application':
@@ -537,7 +538,7 @@ function getColumnDefinitions(
 		case 'HelmRelease':
 			return getHelmReleaseColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'VirtualMachine':
-			return getVirtualMachineColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+			return getVirtualMachineColumnDefinitions(apiResource, uiSchemas, dataSchemas, cluster);
 		case 'DataVolume':
 			return getDataVolumeColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'VirtualMachineInstancetype':
