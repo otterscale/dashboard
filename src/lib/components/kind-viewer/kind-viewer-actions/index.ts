@@ -25,6 +25,7 @@ import PodActions from './pod/actions.svelte';
 import ResourceQuotaActions from './resource-quota/actions.svelte';
 import ResourceQuotaCreate from './resource-quota/create.svelte';
 import StatefulSetActions from './statefulset/actions.svelte';
+import VirtualMachineActions from './virtual-machine/actions.svelte';
 import WorkspaceActions from './workspace/actions.svelte';
 import WorkspaceCreate from './workspace/create.svelte';
 
@@ -111,6 +112,8 @@ function getActions(kind: string): ActionsType {
 			return CephObjectStoreActions as ActionsType;
 		case 'ObjectBucketClaim':
 			return ObjectBucketClaimActions as ActionsType;
+		case 'VirtualMachine':
+			return VirtualMachineActions as ActionsType;
 		default:
 			return DefaultActions as ActionsType;
 	}
