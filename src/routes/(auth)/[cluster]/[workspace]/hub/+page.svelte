@@ -16,6 +16,7 @@
 		getChartDataFromHarbor,
 		getChartDataFromIndex
 	} from '$lib/components/artifact-viewer/table-layout';
+	import type { ArtifactChartType } from '$lib/components/artifact-viewer/types';
 	import {
 		encodeHarborURIComponent,
 		parseHarborHost,
@@ -23,9 +24,7 @@
 	} from '$lib/components/artifact-viewer/utils.svelte.ts';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { m } from '$lib/paraglide/messages';
-	import type { ArtifactType } from '$lib/server/harbor';
 	import { breadcrumbs } from '$lib/stores';
-	import type { ArtifactChartType } from '$lib/components/artifact-viewer/types';
 
 	// Set breadcrumbs navigation
 	breadcrumbs.set([
@@ -74,14 +73,13 @@
 						apiPath: artifactsUrl
 					})
 				});
-				if (!response.ok) {
-					throw new Error(`Harbor API error: ${response.status} ${response.statusText}`);
-				}
 
-				const artifactCharts: ArtifactChartType[] = await response.json();
-				chartsByHelmRepository = artifactCharts.map((artifactChart) =>
-					getChartDataFromHarbor(artifactChart, helmRepository)
-				);
+				if (response.ok) {
+					const artifactCharts: ArtifactChartType[] = await response.json();
+					chartsByHelmRepository = artifactCharts.map((artifactChart) =>
+						getChartDataFromHarbor(artifactChart, helmRepository)
+					);
+				}
 			} else {
 				const response = await fetch('/bff/helm/repository/index', {
 					method: 'POST',
@@ -93,16 +91,17 @@
 						secretName
 					})
 				});
-				if (!response.ok) {
-					throw new Error(`Helm repository index error: ${response.status} ${response.statusText}`);
+				if (response.ok) {
+					const charts: any[] = await response.json();
+					chartsByHelmRepository = charts.map((chart) =>
+						getChartDataFromIndex(chart, helmRepository)
+					);
 				}
-				const charts: any[] = await response.json();
-				chartsByHelmRepository = charts.map((chart) =>
-					getChartDataFromIndex(chart, helmRepository)
-				);
 			}
 
 			charts = [...charts, ...chartsByHelmRepository];
+
+			console.log(charts);
 		} catch (error) {
 			console.error(`HelmRepository "${helmRepositoryName}": error fetching charts:`, error);
 			toast.error(`HelmRepository "${helmRepositoryName}": unable to reach repository`);
@@ -128,19 +127,32 @@
 
 			const helmRepositories: (SourceToolkitFluxcdIoV1HelmRepository | undefined)[] =
 				response.items.map((item) => item.object);
-			const validHelmRepositories = helmRepositories.filter(
-				(item): item is SourceToolkitFluxcdIoV1HelmRepository => Boolean(item)
-			);
 
-			if (validHelmRepositories.length === 0) {
+			if (helmRepositories.length === 0) {
 				toast.info('No HelmRepository resources found in this namespace');
 				isFetching = false;
 				return;
 			}
 
-			await Promise.allSettled(
-				validHelmRepositories.map((helmRepository) => fetchChartsByHelmRepository(helmRepository))
-			);
+			helmRepositories.forEach((helmRepository) => {
+				if (helmRepository) {
+					fetchChartsByHelmRepository(helmRepository);
+				}
+			});
+
+			// const validHelmRepositories = helmRepositories.filter(
+			// 	(item): item is SourceToolkitFluxcdIoV1HelmRepository => Boolean(item)
+			// );
+
+			// if (validHelmRepositories.length === 0) {
+			// 	toast.info('No HelmRepository resources found in this namespace');
+			// 	isFetching = false;
+			// 	return;
+			// }
+
+			// await Promise.allSettled(
+			// 	validHelmRepositories.map((helmRepository) => fetchChartsByHelmRepository(helmRepository))
+			// );
 			isFetching = false;
 		} catch (error) {
 			console.error('Failed to list HelmRepositories:', error);

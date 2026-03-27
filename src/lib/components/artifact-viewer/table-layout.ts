@@ -69,7 +69,7 @@ function getChartDataFromHarbor(
 		Source: 'harbor',
 		icon: artifactChart.extra_attrs?.icon as JsonValue,
 		helmRepository: helmRepository as JsonValue,
-		chart: artifactChart as unknown as JsonValue,
+		chart: artifactChart as unknown as JsonValue
 	};
 }
 
@@ -79,7 +79,7 @@ function getChartDataFromIndex(
 ): Record<ChartAttribute, JsonValue> {
 	return {
 		'Helm Repository': helmRepository.metadata?.name ?? null,
-		'Chart Name': indexChart.chartName ?? null,
+		'Chart Name': indexChart.name ?? null,
 		Description: indexChart.description as JsonValue,
 		Digest: indexChart.digest ?? null,
 		Version: indexChart.version as JsonValue,
@@ -133,10 +133,10 @@ function getChartColumnDefinitions(
 }
 
 export {
+	type ChartAttribute,
 	getChartColumnDefinitions,
 	getChartDataFromHarbor,
 	getChartDataFromIndex,
 	getChartDataSchemas,
-	getChartUISchemas, type ChartAttribute
+	getChartUISchemas
 };
-

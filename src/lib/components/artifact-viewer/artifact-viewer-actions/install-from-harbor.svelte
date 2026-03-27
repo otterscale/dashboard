@@ -1,10 +1,11 @@
 <script lang="ts">
+	import type { JsonValue } from '@bufbuild/protobuf';
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { DownloadIcon, FileIcon } from '@lucide/svelte';
 	import { ResourceService, type SchemaRequest } from '@otterscale/api/resource/v1';
-	import { RuntimeService } from '@otterscale/api/runtime/v1';
 	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 	import { type Schema, SubmitButton, type UiSchemaRoot } from '@sjsf/form';
+	import type { Row } from '@tanstack/table-core';
 	import Ajv from 'ajv';
 	import { load } from 'js-yaml';
 	import lodash from 'lodash';
@@ -23,16 +24,9 @@
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
-	import {
-		type ArtifactChartType,
-		type IndexChartType,
-		createHelmRepositoryChartArtifact,
-		isHelmRepositoryChartArtifact
-	} from '../types';
-	import { encodeHarborURIComponent, parseHarborHost } from '../utils.svelte';
-	import type { Row } from '@tanstack/table-core';
 	import type { ChartAttribute } from '../table-layout';
-	import type { JsonValue } from '@bufbuild/protobuf';
+	import { type ArtifactChartType } from '../types';
+	import { encodeHarborURIComponent, parseHarborHost } from '../utils.svelte';
 
 	let {
 		row,
@@ -53,7 +47,6 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-	const runtimeClient = createClient(RuntimeService, transport);
 
 	let jsonSchema: Schema | undefined = $state(undefined);
 
@@ -95,14 +88,13 @@
 	});
 	let value = $derived(stringify(values));
 
-	const isHarbor = $derived(row.original.Source === 'harbor');
 	const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
 
-	let artifacCharts: ArtifactChartType[] = $state([]);
-	async function fetchChartArtifacts() {
-		const artifacChart = row.original.chart as unknown as ArtifactChartType;
+	let charts: ArtifactChartType[] = $state([]);
+	async function fetchCharts() {
+		const chart = row.original.chart as unknown as ArtifactChartType;
 
-		const [project, ...latestChartNameParts] = $derived(artifacChart.repository_name.split('/'));
+		const [project, ...latestChartNameParts] = $derived(chart.repository_name.split('/'));
 		const repository = $derived(latestChartNameParts.join('/'));
 		const harborHost = $derived(parseHarborHost(helmRepository));
 		const secretName = $derived(helmRepository?.spec?.secretRef?.name ?? '');
@@ -129,24 +121,19 @@
 				console.error('Failed to fetch repository artifacts:', response.statusText);
 				return;
 			}
-			artifacCharts = await response.json();
+			charts = await response.json();
 		} catch (error) {
 			console.error('Error fetching repository artifacts:', error);
 		}
 	}
-	// fetch index charts
 
-	let selectedChart: ArtifactChartType | IndexChartType = $derived(artifacCharts[0]);
+	let selectedChart: ArtifactChartType = $derived(charts[0]);
 	function getVersions() {
-		return artifacCharts.map(
-			(artifacChart) => lodash.get(artifacChart.extra_attrs, 'version') as unknown as string
-		);
+		return charts.map((chart) => lodash.get(chart.extra_attrs, 'version') as unknown as string);
 	}
 	function getSelectedChart(version: string) {
 		return (
-			artifacCharts.find(
-				(artifacChart) => lodash.get(artifacChart.extra_attrs, 'version') === version
-			) ?? artifacCharts[0]
+			charts.find((chart) => lodash.get(chart.extra_attrs, 'version') === version) ?? charts[0]
 		);
 	}
 	$effect(() => {
@@ -156,7 +143,7 @@
 		}
 	});
 
-	async function getReferenceAddition(reference: string, addition: string) {
+	async function getDocument(reference: string, addition: string) {
 		const artifacChart = row.original.chart as unknown as ArtifactChartType;
 
 		const [project, ...latestChartNameParts] = $derived(artifacChart.repository_name.split('/'));
@@ -196,26 +183,13 @@
 		return response.text();
 	}
 
-	async function getChartInformation(digest: string) {
-		if (!isHarbor) {
-			const response = await runtimeClient.showChart({
-				repoUrl: helmRepository.spec?.url ?? '',
-				chartName: String(lodash.get(selectedChart.extra_attrs, 'name') ?? ''),
-				version: String(lodash.get(selectedChart.extra_attrs, 'version') ?? '')
-			});
-			const decoder = new TextDecoder();
-			return {
-				values: decoder.decode(response.values),
-				readme: decoder.decode(response.readme)
-			};
-		}
-
-		const [valuesData, readmeData] = await Promise.all([
-			getReferenceAddition(digest, 'values.yaml'),
-			getReferenceAddition(digest, 'readme.md')
+	async function getDocuments(digest: string) {
+		const [values, readme] = await Promise.all([
+			getDocument(digest, 'values.yaml'),
+			getDocument(digest, 'readme.md')
 		]);
 
-		return { values: valuesData, readme: readmeData };
+		return { values: values, readme: readme };
 	}
 
 	// Steps Manager
@@ -238,11 +212,11 @@
 	let isSubmitting = $state(false);
 
 	onMount(async () => {
-		await Promise.all([fetchSchema(), fetchChartArtifacts()]);
+		await Promise.all([fetchSchema(), fetchCharts()]);
 	});
 
-	const chartName = $derived(chart.name);
-	const defaultVersion = $derived(chart.version);
+	const chartName = $derived(selectedChart.repository_name);
+	const defaultVersion = $derived(lodash.get(selectedChart.extra_attrs, 'version') as string);
 </script>
 
 <Dialog.Root
@@ -398,7 +372,7 @@
 					type: 'string',
 					title: 'Values'
 				} as Schema}
-				{#await getChartInformation(selectedChart.digest)}
+				{#await getDocuments(selectedChart.digest)}
 					<Form {schema} initialValue={null} values={null}>
 						{#snippet actions()}
 							<div class="flex w-full items-center justify-between gap-3">
@@ -407,7 +381,7 @@
 							</div>
 						{/snippet}
 					</Form>
-				{:then information}
+				{:then documents}
 					<Form
 						{schema}
 						uiSchema={{
@@ -415,13 +389,13 @@
 								translations: {
 									submit: 'Next'
 								},
-								TailoredEditorDocument: String(information.readme) ? information.readme : undefined
+								TailoredEditorDocument: String(documents.readme) ? documents.readme : undefined
 							},
 							'ui:components': {
 								textWidget: EditorWidget
 							}
 						} as UiSchemaRoot}
-						initialValue={information.values}
+						initialValue={documents.values}
 						bind:values={values['spec']['values']}
 						handleSubmit={{
 							posthook: () => {
@@ -529,7 +503,7 @@
 							);
 						}}
 					>
-						Create
+						Install
 					</Button>
 				</div>
 			</Tabs.Content>

@@ -99,35 +99,32 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 			entries?: Record<string, IndexChartType[]>;
 		};
 
-		const entries = Object.entries(document?.entries ?? {}).map(([chartName, versions]) =>
-			{
-				const [latestVersion] = versions
-				return {
-					apiVersion: latestVersion.apiVersion,
-					appVersion: latestVersion.appVersion,
-					created: latestVersion.created,
-					description: latestVersion.description,
-					digest: latestVersion.digest,
-					home: latestVersion.home,
-					icon: latestVersion.icon,
-					keywords: latestVersion.keywords,
-					maintainers: latestVersion.maintainers,
-					name: latestVersion.name,
-					type: latestVersion.type,
-					version: latestVersion.version,
-					urls: latestVersion.urls,
-					chartname: chartName,
-					versions: versions
-				}
-			}
-		);
+		const entries = Object.values(document?.entries ?? {}).map((versions) => {
+			const [latestVersion] = versions;
+			return {
+				apiVersion: latestVersion.apiVersion,
+				appVersion: latestVersion.appVersion,
+				created: latestVersion.created,
+				description: latestVersion.description,
+				digest: latestVersion.digest,
+				home: latestVersion.home,
+				icon: latestVersion.icon,
+				keywords: latestVersion.keywords,
+				maintainers: latestVersion.maintainers,
+				name: latestVersion.name,
+				type: latestVersion.type,
+				version: latestVersion.version,
+				urls: latestVersion.urls,
+				versions: versions
+			};
+		});
 
 		return json(entries);
-	} catch (error: any) {
-		console.error('[helm-repository-index] Failed to fetch repository index:', error);
+	} catch (err: any) {
+		console.error('[helm-repository-index] Failed to fetch repository index:', err);
 		throw error(
-			error?.status ?? 500,
-			`Failed to fetch Helm repository index: ${error?.message || 'Unknown error'}`
+			err?.status ?? 500,
+			`Failed to fetch Helm repository index: ${err?.message || 'Unknown error'}`
 		);
 	}
 };

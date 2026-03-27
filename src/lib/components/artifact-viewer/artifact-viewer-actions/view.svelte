@@ -1,5 +1,7 @@
 <script lang="ts">
+	import type { JsonValue } from '@bufbuild/protobuf';
 	import { EyeIcon } from '@lucide/svelte';
+	import type { Row } from '@tanstack/table-core';
 	import { stringify } from 'yaml';
 
 	import * as Code from '$lib/components/custom/code';
@@ -7,8 +9,6 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 
-	import type { JsonValue } from '@bufbuild/protobuf';
-	import type { Row } from '@tanstack/table-core';
 	import type { ChartAttribute } from '../table-layout';
 
 	let {
@@ -41,7 +41,7 @@
 				{row.original['Helm Repository']}
 			</Dialog.Title>
 			<Dialog.Description>
-				{row.original['Helm Repository']}
+				{row.original['Description']}
 			</Dialog.Description>
 		</Dialog.Header>
 		<Code.Root

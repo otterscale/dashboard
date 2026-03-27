@@ -1,16 +1,15 @@
 <script lang="ts">
+	import type { JsonValue } from '@bufbuild/protobuf';
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
-	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
+	import type { Row } from '@tanstack/table-core';
 
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
-	import type { ChartType } from '../types';
-	import Install from './install.svelte';
-	import View from './view.svelte';
-	import type { Row } from '@tanstack/table-core';
-	import type { JsonValue } from '@bufbuild/protobuf';
 	import type { ChartAttribute } from '../table-layout';
+	import InstallFromHarbor from './install-from-harbor.svelte';
+	import InstallFromIndex from './install-from-index.svelte';
+	import View from './view.svelte';
 
 	let {
 		row,
@@ -23,6 +22,8 @@
 	} = $props();
 
 	let actionsOpen = $state(false);
+	const isHarbor = $derived(row.original.Source === 'harbor');
+	const isIndex = $derived(!isHarbor);
 </script>
 
 <DropdownMenu.Root bind:open={actionsOpen}>
@@ -44,21 +45,38 @@
 			>
 				<View {row} />
 			</DropdownMenu.Item>
-
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<Install
-					{row}
-					{cluster}
-					{namespace}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
+			{#if isHarbor}
+				<DropdownMenu.Item
+					onSelect={(e) => {
+						e.preventDefault();
 					}}
-				/>
-			</DropdownMenu.Item>
+				>
+					<InstallFromHarbor
+						{row}
+						{cluster}
+						{namespace}
+						onOpenChangeComplete={() => {
+							actionsOpen = false;
+						}}
+					/>
+				</DropdownMenu.Item>
+			{/if}
+			{#if isIndex}
+				<DropdownMenu.Item
+					onSelect={(e) => {
+						e.preventDefault();
+					}}
+				>
+					<InstallFromIndex
+						{row}
+						{cluster}
+						{namespace}
+						onOpenChangeComplete={() => {
+							actionsOpen = false;
+						}}
+					/>
+				</DropdownMenu.Item>
+			{/if}
 		</DropdownMenu.Group>
 	</DropdownMenu.Content>
 </DropdownMenu.Root>
