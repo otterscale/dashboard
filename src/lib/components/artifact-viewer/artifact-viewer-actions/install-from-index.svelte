@@ -95,7 +95,7 @@
 		lodash.get(row.original.chart, 'versions', {}) as IndexChartType[]
 	);
 
-	let selectedChart: IndexChartType = $derived(charts[0]);
+	let selectedChart: IndexChartType = $derived(charts[0] || ({} as IndexChartType));
 	function getVersions() {
 		return charts.map((chart) => chart.version);
 	}

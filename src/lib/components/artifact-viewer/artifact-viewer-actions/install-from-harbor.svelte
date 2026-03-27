@@ -128,7 +128,7 @@
 		}
 	}
 
-	let selectedChart: ArtifactChartType = $derived(charts[0]);
+	let selectedChart: ArtifactChartType = $derived(charts[0] || ({} as ArtifactChartType));
 	function getVersions() {
 		return charts.map((chart) => lodash.get(chart.extra_attrs, 'version') as unknown as string);
 	}
@@ -147,10 +147,10 @@
 	async function getDocument(reference: string, addition: string) {
 		const artifacChart = row.original.chart as unknown as ArtifactChartType;
 
-		const [project, ...latestChartNameParts] = $derived(artifacChart.repository_name.split('/'));
-		const repository = $derived(latestChartNameParts.join('/'));
-		const harborHost = $derived(parseHarborHost(helmRepository));
-		const secretName = $derived(helmRepository?.spec?.secretRef?.name ?? '');
+		const [project, ...latestChartNameParts] = artifacChart.repository_name.split('/');
+		const repository = latestChartNameParts.join('/');
+		const harborHost = parseHarborHost(helmRepository);
+		const secretName = helmRepository?.spec?.secretRef?.name ?? '';
 
 		const projectPath = encodeHarborURIComponent(project);
 		const repositoryPath = encodeHarborURIComponent(repository);

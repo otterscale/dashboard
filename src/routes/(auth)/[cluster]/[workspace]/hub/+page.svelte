@@ -137,23 +137,9 @@
 			helmRepositories.forEach((helmRepository) => {
 				if (helmRepository) {
 					fetchChartsByHelmRepository(helmRepository);
+					isFetching = false;
 				}
 			});
-
-			// const validHelmRepositories = helmRepositories.filter(
-			// 	(item): item is SourceToolkitFluxcdIoV1HelmRepository => Boolean(item)
-			// );
-
-			// if (validHelmRepositories.length === 0) {
-			// 	toast.info('No HelmRepository resources found in this namespace');
-			// 	isFetching = false;
-			// 	return;
-			// }
-
-			// await Promise.allSettled(
-			// 	validHelmRepositories.map((helmRepository) => fetchChartsByHelmRepository(helmRepository))
-			// );
-			isFetching = false;
 		} catch (error) {
 			console.error('Failed to list HelmRepositories:', error);
 			toast.error('Failed to list HelmRepository resources');
