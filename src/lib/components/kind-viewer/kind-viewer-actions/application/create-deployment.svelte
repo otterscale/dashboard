@@ -62,7 +62,7 @@
 					template: { spec: { containers: {} } }
 				},
 				service: {},
-				persistentVolumeClaim: { accessMode: 'ReadWriteOnce', resources: { requests: {} } },
+				persistentVolumeClaim: { resources: { requests: {} } },
 				mountPath: {}
 			}
 		}
