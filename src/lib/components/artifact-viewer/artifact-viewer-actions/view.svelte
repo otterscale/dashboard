@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import EyeIcon from '@lucide/svelte/icons/eye';
-	import type { RowModel } from '@tanstack/table-core';
+	import type { Row } from '@tanstack/table-core';
 	import { stringify } from 'yaml';
 
 	import * as Code from '$lib/components/custom/code';
@@ -14,7 +14,7 @@
 	let {
 		row
 	}: {
-		row: RowModel<Record<ChartAttribute, JsonValue>>;
+		row: Row<Record<ChartAttribute, JsonValue>>;
 	} = $props();
 
 	let open = $state(false);
