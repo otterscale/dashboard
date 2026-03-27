@@ -2,7 +2,6 @@
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import Columns3Icon from '@lucide/svelte/icons/columns-3';
 	import EraserIcon from '@lucide/svelte/icons/eraser';
-	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 	import type { ColumnDef } from '@tanstack/table-core';
 
 	import { DynamicTable } from '$lib/components/dynamic-table';
@@ -10,16 +9,15 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
-	import type { ArtifactType } from '$lib/server/harbor';
 
 	import Actions from './artifact-viewer-actions/actions.svelte';
 	import Upload from './artifact-viewer-actions/upload.svelte';
 	import Grid from './grid-layout.svelte';
 	import {
-		type ArtifactAttribute,
-		getArtifactColumnDefinitions,
-		getArtifactDataSchemas,
-		getArtifactUISchemas
+		type ChartAttribute,
+		getChartColumnDefinitions,
+		getChartDataSchemas,
+		getChartUISchemas
 	} from './table-layout.ts';
 
 	let {
@@ -29,10 +27,10 @@
 		reload
 	}: { cluster: string; namespace: string; charts: any[]; reload: any } = $props();
 
-	const uiSchemas: Record<string, UISchemaType> = getArtifactUISchemas();
-	const dataSchemas: Record<string, DataSchemaType> = getArtifactDataSchemas();
-	const columnDefinitions: ColumnDef<Record<ArtifactAttribute, JsonValue>>[] =
-		getArtifactColumnDefinitions(uiSchemas, dataSchemas);
+	const uiSchemas: Record<string, UISchemaType> = getChartUISchemas();
+	const dataSchemas: Record<string, DataSchemaType> = getChartDataSchemas();
+	const columnDefinitions: ColumnDef<Record<ChartAttribute, JsonValue>>[] =
+		getChartColumnDefinitions(uiSchemas, dataSchemas);
 </script>
 
 <div class="space-y-4">
@@ -77,12 +75,7 @@
 			<Upload {namespace} />
 		{/snippet}
 		{#snippet rowActions({ row })}
-			<Actions
-				{cluster}
-				{namespace}
-				chartArtifact={row.original.chartArtifact as unknown as ArtifactType}
-				helmRepository={row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository}
-			/>
+			<Actions {row} {cluster} {namespace} />
 		{/snippet}
 	</DynamicTable>
 </div>

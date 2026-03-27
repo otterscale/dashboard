@@ -158,7 +158,7 @@
 	let columnFilters = $state<ColumnFiltersState>([]);
 	let columnVisibility = $state<VisibilityState>({});
 	let sorting = $state<SortingState>([]);
-	let pagination = $state<PaginationState>({ pageIndex: 0, pageSize: 10 });
+	let pagination = $state<PaginationState>({ pageIndex: 0, pageSize: gridsLayout ? 9 : 10 });
 
 	let table = createSvelteTable<Record<string, JsonValue>>({
 		columns,
