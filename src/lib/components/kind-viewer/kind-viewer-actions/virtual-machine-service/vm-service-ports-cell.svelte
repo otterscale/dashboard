@@ -61,14 +61,11 @@
 				namespace: vmNamespace,
 				group: '',
 				version: 'v1',
-				resource: 'services'
+				resource: 'services',
+				labelSelector: `otterscale.com/virtual-machine.name=${vmName}`
 			});
 
-			// Filter services with matching label
-			const matchedService = response.items.find((item: any) => {
-				const labels = (item.object as any)?.metadata?.labels ?? {};
-				return labels['otterscale.com/virtual-machine.name'] === vmName;
-			});
+			const matchedService = response.items[0] ?? null;
 
 			if (matchedService) {
 				service = matchedService.object;
