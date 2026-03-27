@@ -1,5 +1,5 @@
 import { env as publicEnv } from '$env/dynamic/public';
-import { encodeURIComponentWithSlashEscape } from '$lib/components/artifact-viewer/utils.svelte';
+import { encodeHarborURIComponent } from '$lib/components/artifact-viewer/utils.svelte';
 
 interface ProjectType {
 	project_id: number;
@@ -122,7 +122,7 @@ export async function listModelArtifacts(
 ): Promise<ArtifactType[]> {
 	const endpoint = publicEnv.PUBLIC_HARBOR_URL;
 
-	const path = `/api/v2.0/projects/${encodeURIComponentWithSlashEscape(projectName)}/artifacts?q=media_type=${encodeURIComponentWithSlashEscape('application/vnd.cncf.model.config.v1+json')}&latest_in_repository=true`;
+	const path = `/api/v2.0/projects/${encodeHarborURIComponent(projectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.model.config.v1+json')}&latest_in_repository=true`;
 
 	const url = new URL(path, endpoint);
 	const headers = {

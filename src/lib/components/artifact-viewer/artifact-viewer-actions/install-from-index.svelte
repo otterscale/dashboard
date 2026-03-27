@@ -1,10 +1,12 @@
 <script lang="ts">
+	import type { JsonValue } from '@bufbuild/protobuf';
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import DownloadIcon from '@lucide/svelte/icons/download';
-	import FileIcon from '@lucide/svelte/icons/file';
+	import { DownloadIcon, FileIcon } from '@lucide/svelte';
 	import { ResourceService, type SchemaRequest } from '@otterscale/api/resource/v1';
+	import { RuntimeService } from '@otterscale/api/runtime/v1';
 	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 	import { type Schema, SubmitButton, type UiSchemaRoot } from '@sjsf/form';
+	import type { Row } from '@tanstack/table-core';
 	import Ajv from 'ajv';
 	import { load } from 'js-yaml';
 	import lodash from 'lodash';
@@ -22,21 +24,19 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
-	import type { ArtifactType } from '$lib/server/harbor';
 
-	import { encodeURIComponentWithSlashEscape, parseHarborHost } from '../utils.svelte';
+	import type { ChartAttribute } from '../table-layout';
+	import { type IndexChartType } from '../types';
 
 	let {
+		row,
 		cluster,
 		namespace,
-		chartArtifact: latestChartArtifact,
-		helmRepository,
 		onOpenChangeComplete
 	}: {
+		row: Row<Record<ChartAttribute, JsonValue>>;
 		cluster: string;
 		namespace: string;
-		chartArtifact: ArtifactType;
-		helmRepository: SourceToolkitFluxcdIoV1HelmRepository;
 		onOpenChangeComplete: () => void;
 	} = $props();
 
@@ -47,6 +47,7 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
+	const runtimeClient = createClient(RuntimeService, transport);
 
 	let jsonSchema: Schema | undefined = $state(undefined);
 
@@ -88,107 +89,34 @@
 	});
 	let value = $derived(stringify(values));
 
-	let artifacts: ArtifactType[] = $state([]);
-	async function fetchArtifacts() {
-		try {
-			const projectPath = encodeURIComponentWithSlashEscape(project);
-			const repositoryPath = encodeURIComponentWithSlashEscape(repository);
-			const artifactsUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts?with_label=true`;
+	const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
 
-			const response = await fetch('/bff/harbor/proxy', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					cluster,
-					namespace,
-					harborHost,
-					secretName,
-					isInternal,
-					apiPath: artifactsUrl
-				})
-			});
-			if (!response.ok) {
-				console.error('Failed to fetch repository artifacts:', response.statusText);
-				return;
-			}
-			artifacts = await response.json();
-		} catch (error) {
-			console.error('Error fetching repository artifacts:', error);
-		}
-	}
-
-	const [project, ...latestChartNameParts] = $derived(
-		latestChartArtifact.repository_name.split('/')
-	);
-	const repository = $derived(latestChartNameParts.join('/'));
-	const harborHost = $derived(parseHarborHost(helmRepository));
-	const secretName = $derived(helmRepository?.spec?.secretRef?.name ?? '');
-	const isInternal = $derived(
-		helmRepository?.metadata?.labels?.['tenant.otterscale.io/internal'] === 'true'
+	let charts: IndexChartType[] = $derived(
+		lodash.get(row.original.chart, 'versions', {}) as IndexChartType[]
 	);
 
-	let selectedChartArtifact: ArtifactType = $derived(latestChartArtifact);
+	let selectedChart: IndexChartType = $derived(charts[0]);
 	function getVersions() {
-		return artifacts.map(
-			(artifact) => lodash.get(artifact.extra_attrs, 'version') as unknown as string
-		);
+		return charts.map((chart) => chart.version);
 	}
-	function getSelectedChartArtifact(version: string) {
-		return (
-			artifacts.find((artifact) => lodash.get(artifact.extra_attrs, 'version') === version) ??
-			latestChartArtifact
-		);
+	function getSelectedChart(version: string) {
+		return charts.find((chart) => chart.version === version) ?? charts[0];
 	}
 	$effect(() => {
-		const versionValue = lodash.get(values, 'spec.chart.spec.version') as unknown as string;
-		if (versionValue) {
-			selectedChartArtifact = getSelectedChartArtifact(versionValue);
+		const version = lodash.get(values, 'spec.chart.spec.version') as unknown as string;
+		if (version) {
+			selectedChart = getSelectedChart(version);
 		}
 	});
 
-	async function getReferenceAddition(reference: string, addition: string) {
-		const projectPath = encodeURIComponentWithSlashEscape(project);
-		const repositoryPath = encodeURIComponentWithSlashEscape(repository);
-		const referencePath = encodeURIComponentWithSlashEscape(reference);
-		const additionPath = encodeURIComponentWithSlashEscape(addition);
-
-		const additionUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${referencePath}/additions/${additionPath}`;
-
-		const response = await fetch('/bff/harbor/proxy', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify({
-				cluster,
-				namespace,
-				harborHost,
-				secretName,
-				isInternal,
-				apiPath: additionUrl
-			})
+	async function getDocuments() {
+		const response = await runtimeClient.showChart({
+			repoUrl: helmRepository.spec?.url ?? '',
+			chartName: selectedChart.name ?? '',
+			version: selectedChart.version ?? ''
 		});
-		if (!response.ok) {
-			console.error('Failed to fetch Harbor addition:', response.statusText);
-			throw new Error('Failed to fetch Harbor addition');
-		}
-
-		const contentType = response.headers.get('content-type') ?? '';
-		if (contentType.includes('application/json')) {
-			return response.json();
-		}
-		return response.text();
-	}
-
-	async function getChartInformation(digest: string) {
-		const [valuesData, readmeData] = await Promise.all([
-			getReferenceAddition(digest, 'values.yaml'),
-			getReferenceAddition(digest, 'readme.md')
-		]);
-
-		return { values: valuesData, readme: readmeData };
+		const decoder = new TextDecoder();
+		return { values: decoder.decode(response.values), readme: decoder.decode(response.readme) };
 	}
 
 	// Steps Manager
@@ -211,8 +139,11 @@
 	let isSubmitting = $state(false);
 
 	onMount(async () => {
-		await Promise.all([fetchSchema(), fetchArtifacts()]);
+		await fetchSchema();
 	});
+
+	const chartName = $derived(selectedChart.name);
+	const defaultVersion = $derived(selectedChart.version);
 </script>
 
 <Dialog.Root
@@ -330,8 +261,8 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						chart: lodash.get(latestChartArtifact.extra_attrs, 'name'),
-						version: lodash.get(latestChartArtifact.extra_attrs, 'version'),
+						chart: chartName,
+						version: defaultVersion,
 						sourceRef: {
 							apiVersion: helmRepository?.apiVersion,
 							kind: helmRepository?.kind,
@@ -368,7 +299,7 @@
 					type: 'string',
 					title: 'Values'
 				} as Schema}
-				{#await getChartInformation(selectedChartArtifact.digest)}
+				{#await getDocuments()}
 					<Form {schema} initialValue={null} values={null}>
 						{#snippet actions()}
 							<div class="flex w-full items-center justify-between gap-3">
@@ -377,7 +308,7 @@
 							</div>
 						{/snippet}
 					</Form>
-				{:then information}
+				{:then documents}
 					<Form
 						{schema}
 						uiSchema={{
@@ -385,13 +316,13 @@
 								translations: {
 									submit: 'Next'
 								},
-								TailoredEditorDocument: String(information.readme) ? information.readme : undefined
+								TailoredEditorDocument: String(documents.readme) ? documents.readme : undefined
 							},
 							'ui:components': {
 								textWidget: EditorWidget
 							}
 						} as UiSchemaRoot}
-						initialValue={information.values}
+						initialValue={documents.values}
 						bind:values={values['spec']['values']}
 						handleSubmit={{
 							posthook: () => {
@@ -499,7 +430,7 @@
 							);
 						}}
 					>
-						Create
+						Install
 					</Button>
 				</div>
 			</Tabs.Content>
