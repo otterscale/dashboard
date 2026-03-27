@@ -53,7 +53,7 @@
 		spec: {
 			accelerator: {},
 			decode: {},
-			prefill: lodash.get(object, 'spec.prefill') ? {} : undefined
+			...(lodash.get(object, 'spec.prefill') ? { prefill: {} } : {})
 		}
 	});
 
@@ -419,6 +419,8 @@
 							lodash.set(values, 'spec.decode', lodash.get(mode, 'decode'));
 							if (lodash.get(mode, 'mode') === 'Disaggregation') {
 								lodash.set(values, 'spec.prefill', lodash.get(mode, 'prefill'));
+							} else {
+								lodash.unset(values, 'spec.prefill');
 							}
 
 							lodash.set(values, 'spec.engine', lodash.get(object, 'spec.engine'));
