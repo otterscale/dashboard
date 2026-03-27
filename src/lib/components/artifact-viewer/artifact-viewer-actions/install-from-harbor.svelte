@@ -1,10 +1,12 @@
 <script lang="ts">
+	import type { JsonValue } from '@bufbuild/protobuf';
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import DownloadIcon from '@lucide/svelte/icons/download';
 	import FileIcon from '@lucide/svelte/icons/file';
 	import { ResourceService, type SchemaRequest } from '@otterscale/api/resource/v1';
 	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 	import { type Schema, SubmitButton, type UiSchemaRoot } from '@sjsf/form';
+	import type { Row } from '@tanstack/table-core';
 	import Ajv from 'ajv';
 	import { load } from 'js-yaml';
 	import lodash from 'lodash';
@@ -22,21 +24,20 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
-	import type { ArtifactType } from '$lib/server/harbor';
 
-	import { encodeURIComponentWithSlashEscape, parseHarborHost } from '../utils.svelte';
+	import type { ChartAttribute } from '../table-layout';
+	import { type ArtifactChartType } from '../types';
+	import { encodeHarborURIComponent, parseHarborHost } from '../utils.svelte';
 
 	let {
+		row,
 		cluster,
 		namespace,
-		chartArtifact: latestChartArtifact,
-		helmRepository,
 		onOpenChangeComplete
 	}: {
+		row: Row<Record<ChartAttribute, JsonValue>>;
 		cluster: string;
 		namespace: string;
-		chartArtifact: ArtifactType;
-		helmRepository: SourceToolkitFluxcdIoV1HelmRepository;
 		onOpenChangeComplete: () => void;
 	} = $props();
 
@@ -88,14 +89,23 @@
 	});
 	let value = $derived(stringify(values));
 
-	let artifacts: ArtifactType[] = $state([]);
-	async function fetchArtifacts() {
+	const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
+
+	let charts: ArtifactChartType[] = $state([]);
+	async function fetchCharts() {
+		const chart = row.original.chart as unknown as ArtifactChartType;
+
+		const [project, ...latestChartNameParts] = $derived(chart.repository_name.split('/'));
+		const repository = $derived(latestChartNameParts.join('/'));
+		const harborHost = $derived(parseHarborHost(helmRepository));
+		const secretName = $derived(helmRepository?.spec?.secretRef?.name ?? '');
+
 		try {
-			const projectPath = encodeURIComponentWithSlashEscape(project);
-			const repositoryPath = encodeURIComponentWithSlashEscape(repository);
+			const projectPath = encodeHarborURIComponent(project);
+			const repositoryPath = encodeHarborURIComponent(repository);
 			const artifactsUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts?with_label=true`;
 
-			const response = await fetch('/bff/harbor/proxy', {
+			const response = await fetch('/bff/helm/repository/harbor', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
@@ -105,7 +115,6 @@
 					namespace,
 					harborHost,
 					secretName,
-					isInternal,
 					apiPath: artifactsUrl
 				})
 			});
@@ -113,50 +122,44 @@
 				console.error('Failed to fetch repository artifacts:', response.statusText);
 				return;
 			}
-			artifacts = await response.json();
+			charts = await response.json();
 		} catch (error) {
 			console.error('Error fetching repository artifacts:', error);
 		}
 	}
 
-	const [project, ...latestChartNameParts] = $derived(
-		latestChartArtifact.repository_name.split('/')
-	);
-	const repository = $derived(latestChartNameParts.join('/'));
-	const harborHost = $derived(parseHarborHost(helmRepository));
-	const secretName = $derived(helmRepository?.spec?.secretRef?.name ?? '');
-	const isInternal = $derived(
-		helmRepository?.metadata?.labels?.['tenant.otterscale.io/internal'] === 'true'
-	);
-
-	let selectedChartArtifact: ArtifactType = $derived(latestChartArtifact);
+	let selectedChart: ArtifactChartType = $derived(charts[0] || ({} as ArtifactChartType));
 	function getVersions() {
-		return artifacts.map(
-			(artifact) => lodash.get(artifact.extra_attrs, 'version') as unknown as string
-		);
+		return charts.map((chart) => lodash.get(chart.extra_attrs, 'version') as unknown as string);
 	}
-	function getSelectedChartArtifact(version: string) {
+	function getSelectedChart(version: string) {
 		return (
-			artifacts.find((artifact) => lodash.get(artifact.extra_attrs, 'version') === version) ??
-			latestChartArtifact
+			charts.find((chart) => lodash.get(chart.extra_attrs, 'version') === version) ?? charts[0]
 		);
 	}
 	$effect(() => {
-		const versionValue = lodash.get(values, 'spec.chart.spec.version') as unknown as string;
-		if (versionValue) {
-			selectedChartArtifact = getSelectedChartArtifact(versionValue);
+		const version = lodash.get(values, 'spec.chart.spec.version') as unknown as string;
+		if (version) {
+			selectedChart = getSelectedChart(version);
 		}
 	});
 
-	async function getReferenceAddition(reference: string, addition: string) {
-		const projectPath = encodeURIComponentWithSlashEscape(project);
-		const repositoryPath = encodeURIComponentWithSlashEscape(repository);
-		const referencePath = encodeURIComponentWithSlashEscape(reference);
-		const additionPath = encodeURIComponentWithSlashEscape(addition);
+	async function getDocument(reference: string, addition: string) {
+		const artifacChart = row.original.chart as unknown as ArtifactChartType;
+
+		const [project, ...latestChartNameParts] = artifacChart.repository_name.split('/');
+		const repository = latestChartNameParts.join('/');
+		const harborHost = parseHarborHost(helmRepository);
+		const secretName = helmRepository?.spec?.secretRef?.name ?? '';
+
+		const projectPath = encodeHarborURIComponent(project);
+		const repositoryPath = encodeHarborURIComponent(repository);
+		const referencePath = encodeHarborURIComponent(reference);
+		const additionPath = encodeHarborURIComponent(addition);
 
 		const additionUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${referencePath}/additions/${additionPath}`;
 
-		const response = await fetch('/bff/harbor/proxy', {
+		const response = await fetch('/bff/helm/repository/harbor', {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json'
@@ -166,7 +169,6 @@
 				namespace,
 				harborHost,
 				secretName,
-				isInternal,
 				apiPath: additionUrl
 			})
 		});
@@ -182,13 +184,13 @@
 		return response.text();
 	}
 
-	async function getChartInformation(digest: string) {
-		const [valuesData, readmeData] = await Promise.all([
-			getReferenceAddition(digest, 'values.yaml'),
-			getReferenceAddition(digest, 'readme.md')
+	async function getDocuments(digest: string) {
+		const [values, readme] = await Promise.all([
+			getDocument(digest, 'values.yaml'),
+			getDocument(digest, 'readme.md')
 		]);
 
-		return { values: valuesData, readme: readmeData };
+		return { values: values, readme: readme };
 	}
 
 	// Steps Manager
@@ -211,8 +213,11 @@
 	let isSubmitting = $state(false);
 
 	onMount(async () => {
-		await Promise.all([fetchSchema(), fetchArtifacts()]);
+		await Promise.all([fetchSchema(), fetchCharts()]);
 	});
+
+	const chartName = $derived(selectedChart.repository_name);
+	const defaultVersion = $derived(lodash.get(selectedChart.extra_attrs, 'version') as string);
 </script>
 
 <Dialog.Root
@@ -330,8 +335,8 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						chart: lodash.get(latestChartArtifact.extra_attrs, 'name'),
-						version: lodash.get(latestChartArtifact.extra_attrs, 'version'),
+						chart: chartName,
+						version: defaultVersion,
 						sourceRef: {
 							apiVersion: helmRepository?.apiVersion,
 							kind: helmRepository?.kind,
@@ -368,7 +373,7 @@
 					type: 'string',
 					title: 'Values'
 				} as Schema}
-				{#await getChartInformation(selectedChartArtifact.digest)}
+				{#await getDocuments(selectedChart.digest)}
 					<Form {schema} initialValue={null} values={null}>
 						{#snippet actions()}
 							<div class="flex w-full items-center justify-between gap-3">
@@ -377,7 +382,7 @@
 							</div>
 						{/snippet}
 					</Form>
-				{:then information}
+				{:then documents}
 					<Form
 						{schema}
 						uiSchema={{
@@ -385,13 +390,13 @@
 								translations: {
 									submit: 'Next'
 								},
-								TailoredEditorDocument: String(information.readme) ? information.readme : undefined
+								TailoredEditorDocument: String(documents.readme) ? documents.readme : undefined
 							},
 							'ui:components': {
 								textWidget: EditorWidget
 							}
 						} as UiSchemaRoot}
-						initialValue={information.values}
+						initialValue={documents.values}
 						bind:values={values['spec']['values']}
 						handleSubmit={{
 							posthook: () => {
@@ -499,7 +504,7 @@
 							);
 						}}
 					>
-						Create
+						Install
 					</Button>
 				</div>
 			</Tabs.Content>

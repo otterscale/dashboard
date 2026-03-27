@@ -15,9 +15,9 @@
 	import { stringify } from 'yaml';
 
 	import {
-		encodeURIComponentWithSlashEscape,
+		encodeHarborURIComponent,
 		parseHarborHost,
-		parseProjectName
+		parseHarborProjectName
 	} from '$lib/components/artifact-viewer/utils.svelte';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import EditorWidget from '$lib/components/dynamic-form/widgets/editor.svelte';
@@ -127,7 +127,7 @@
 		return stringify(filtered);
 	});
 
-	const project = $derived(helmRepository ? parseProjectName(helmRepository) : '');
+	const project = $derived(helmRepository ? parseHarborProjectName(helmRepository) : '');
 	const repository = $derived(lodash.get(object, 'spec.chart.spec.chart') || '');
 	const harborHost = $derived(helmRepository ? parseHarborHost(helmRepository) : '');
 	const secretName = $derived(helmRepository ? (helmRepository.spec?.secretRef?.name ?? '') : '');
@@ -138,10 +138,10 @@
 	);
 
 	async function getReferenceAddition(reference: string, addition: string) {
-		const projectPath = encodeURIComponentWithSlashEscape(project);
-		const repositoryPath = encodeURIComponentWithSlashEscape(repository);
-		const referencePath = encodeURIComponentWithSlashEscape(reference);
-		const additionPath = encodeURIComponentWithSlashEscape(addition);
+		const projectPath = encodeHarborURIComponent(project);
+		const repositoryPath = encodeHarborURIComponent(repository);
+		const referencePath = encodeHarborURIComponent(reference);
+		const additionPath = encodeHarborURIComponent(addition);
 
 		const additionUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${referencePath}/additions/${additionPath}`;
 
