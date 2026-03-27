@@ -132,7 +132,8 @@
 	// Build dataVolumeTemplates to clone the selected boot DV
 	function buildDataVolumeTemplates(): any[] {
 		const vmName = typeof values.metadata.name === 'string' ? values.metadata.name : '';
-		const bootDvName = typeof values.diskConfig?.bootDisk === 'string' ? values.diskConfig.bootDisk : '';
+		const bootDvName =
+			typeof values.diskConfig?.bootDisk === 'string' ? values.diskConfig.bootDisk : '';
 		const { accessModes, volumeMode, storage } = values.bootDvPvcInfo;
 
 		return [
