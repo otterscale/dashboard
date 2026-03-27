@@ -58,7 +58,7 @@ function getVirtualMachineData(object: any): Record<VirtualMachineAttribute, Jso
 		Running: object?.spec?.running != null ? String(object.spec.running) : null,
 		'Instance Type': instanceTypeDisplay,
 		Age: object?.metadata?.creationTimestamp ?? null,
-		Volumes: object?.spec?.template?.spec?.volumes.length ?? null,
+		Volumes: object?.spec?.template?.spec?.volumes?.length ?? null,
 		Ports: 0,
 		raw: (object as JsonObject) ?? null
 	};
