@@ -62,7 +62,7 @@
 					template: { spec: { containers: {} } }
 				},
 				service: {},
-				persistentVolumeClaim: { resources: { requests: {} } },
+				persistentVolumeClaim: { accessMode: 'ReadWriteOnce', resources: { requests: {} } },
 				mountPath: {}
 			}
 		}
@@ -74,6 +74,17 @@
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
+
+	// Form uses accessMode (single select); submit keeps accessModes only. When navigating back, hydrate accessMode from accessModes[0].
+	$effect(() => {
+		if (currentStep !== steps[4]) return;
+		const pvc = values?.spec?.deploymentConfig?.persistentVolumeClaim;
+		if (!pvc?.accessModes?.[0] || pvc.accessMode != null) return;
+		values.spec.deploymentConfig.persistentVolumeClaim = {
+			...pvc,
+			accessMode: pvc.accessModes[0]
+		};
+	});
 	function handleNext() {
 		currentStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
 	}
@@ -570,27 +581,51 @@
 				<Form
 					schema={{
 						title: 'Persistent Volume Claim',
-						...lodash.omit(
-							lodash.get(
-								jsonSchema,
-								'properties.spec.properties.deploymentConfig.properties.persistentVolumeClaim.properties.resources.properties.requests'
-							),
-							'additionalProperties'
-						),
+						type: 'object',
 						properties: {
-							storage: {
-								type: 'string'
-							}
-						},
-						dependencies: {
-							storage: {
+							accessMode: {
+								...lodash.get(
+									jsonSchema,
+									'properties.spec.properties.deploymentConfig.properties.persistentVolumeClaim.properties.accessModes.items'
+								),
+								title: 'Access Mode',
+								enum: [
+									'ReadWriteOnce',
+									'ReadOnlyMany',
+									'ReadWriteMany',
+									'ReadWriteOncePod'
+								],
+								default: 'ReadWriteOnce'
+							},
+							resources: {
+								type: 'object',
 								properties: {
-									mountPath: {
-										title: 'Mount Path',
-										...lodash.get(
-											jsonSchema,
-											'properties.spec.properties.deploymentConfig.properties.mountPath'
-										)
+									requests: {
+										...lodash.omit(
+											lodash.get(
+												jsonSchema,
+												'properties.spec.properties.deploymentConfig.properties.persistentVolumeClaim.properties.resources.properties.requests'
+											),
+											'additionalProperties'
+										),
+										properties: {
+											storage: {
+												type: 'string'
+											}
+										},
+										dependencies: {
+											storage: {
+												properties: {
+													mountPath: {
+														title: 'Mount Path',
+														...lodash.get(
+															jsonSchema,
+															'properties.spec.properties.deploymentConfig.properties.mountPath'
+														)
+													}
+												}
+											}
+										}
 									}
 								}
 							}
@@ -603,6 +638,11 @@
 								'additional-property': 'additional request',
 								'add-object-property': 'Add Request'
 							}
+						},
+						accessMode: {
+							'ui:components': {
+								stringField: 'enumField'
+							}
 						}
 					} as UiSchemaRoot}
 					initialValue={null}
@@ -611,13 +651,21 @@
 						lodash.set(
 							values,
 							'spec.deploymentConfig.mountPath',
-							lodash.get(formValue, 'mountPath')
+							lodash.get(formValue, 'resources.requests.mountPath')
 						);
-						lodash.unset(formValue, 'mountPath');
+						lodash.unset(formValue, 'resources.requests.mountPath');
+						const accessMode = lodash.get(formValue, 'accessMode') as string | undefined;
+						lodash.unset(formValue, 'accessMode');
+						lodash.set(
+							formValue,
+							'accessModes',
+							accessMode ? [accessMode] : ['ReadWriteOnce']
+						);
 						return formValue;
 					}}
 					handleSubmit={{
 						posthook: () => {
+							lodash.unset(values, 'spec.deploymentConfig.persistentVolumeClaim.accessMode');
 							const label = `app-${lodash.get(values, 'metadata.name')}`;
 							lodash.set(
 								values,
@@ -629,12 +677,15 @@
 								'spec.deploymentConfig.deployment.template.metadata.labels.app',
 								label
 							);
+							lodash.set(
+								values,
+								'spec.deploymentConfig.service.selector.app',
+								label
+							);
 							handleNext();
 						}
 					}}
-					bind:values={
-						values['spec']['deploymentConfig']['persistentVolumeClaim']['resources']['requests']
-					}
+					bind:values={values['spec']['deploymentConfig']['persistentVolumeClaim']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
