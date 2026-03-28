@@ -1,3 +1,25 @@
+<script lang="ts" module>
+	type ModelServiceComponentType = 'decode' | 'prefill' | 'epp';
+
+	type ModelServiceComponentIdentifier = {
+		type: ModelServiceComponentType;
+		component: string;
+	};
+
+	type ModelServiceComponent = ModelServiceComponentIdentifier & {
+		selector: string;
+		deployments: AppsV1Deployment[];
+		pods: CoreV1Pod[];
+		error: string | null;
+	};
+
+	const modelServicesComponentIdentifiers: ModelServiceComponentIdentifier[] = [
+		{ type: 'decode', component: 'model-decode' },
+		{ type: 'prefill', component: 'model-prefill' },
+		{ type: 'epp', component: 'model-epp' }
+	];
+</script>
+
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import Box from '@lucide/svelte/icons/box';
@@ -28,39 +50,16 @@
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { cn } from '$lib/utils';
 
-	type WorkloadKind = 'decode' | 'prefill' | 'epp';
-
-	type WorkloadConfig = {
-		id: WorkloadKind;
-		title: string;
-		component: string;
-	};
-
-	type WorkloadResources = WorkloadConfig & {
-		selector: string;
-		deployments: AppsV1Deployment[];
-		pods: CoreV1Pod[];
-		error: string | null;
-	};
-
-	const workloadConfigs: WorkloadConfig[] = [
-		{ id: 'decode', title: 'Decode', component: 'model-decode' },
-		{ id: 'prefill', title: 'Prefill', component: 'model-prefill' },
-		{ id: 'epp', title: 'EPP', component: 'model-epp' }
-	];
-
 	let { object }: { object: ModelOtterscaleIoV1Alpha1ModelService } = $props();
+
+	const cluster = $derived(page.params.cluster ?? '');
+	const namespace = $derived(object?.metadata?.namespace ?? '');
+	const modelServiceName = $derived(object?.metadata?.name ?? '');
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	let workloadResources = $state<WorkloadResources[]>([]);
-	let isResourcesLoaded = $state(false);
-	let resourcesError = $state<string | null>(null);
-
-	const namespace = $derived(object?.metadata?.namespace ?? '');
-	const modelServiceName = $derived(object?.metadata?.name ?? '');
-	const cluster = $derived(page.params.cluster ?? '');
+	let modelServiceComponents = $state<ModelServiceComponent[]>([]);
 
 	function buildLabelSelector(labels: Record<string, string>): string {
 		return Object.entries(labels)
@@ -70,25 +69,29 @@
 
 	function getWorkloadSelector(component: string): string {
 		if (!modelServiceName) return '';
-		return buildLabelSelector({
-			'app.kubernetes.io/component': component,
+
+		const labelSelector = buildLabelSelector({
 			'app.kubernetes.io/managed-by': 'model-operator',
+			'app.kubernetes.io/component': component,
 			'app.kubernetes.io/name': modelServiceName
 		});
+		return labelSelector;
 	}
 
-	function getReadyText(pod: CoreV1Pod): string {
-		const containerStatuses = pod?.status?.containerStatuses ?? [];
+	function getReady(pod: CoreV1Pod): string {
 		const totalContainers = pod?.spec?.containers?.length ?? 0;
+
+		const containerStatuses = pod?.status?.containerStatuses ?? [];
 		const readyContainers = containerStatuses.filter(
 			(containerStatus) => containerStatus.ready
 		).length;
+
 		return `${readyContainers}/${totalContainers}`;
 	}
 
-	function getRestartCount(pod: CoreV1Pod): number {
+	function getRestart(pod: CoreV1Pod): number {
 		return (pod?.status?.containerStatuses ?? []).reduce(
-			(sum, containerStatus) => sum + (containerStatus.restartCount ?? 0),
+			(a, containerStatus) => a + (containerStatus.restartCount ?? 0),
 			0
 		);
 	}
@@ -97,11 +100,17 @@
 		const waitingReason = pod?.status?.containerStatuses?.find(
 			(containerStatus) => containerStatus.state?.waiting
 		)?.state?.waiting?.reason;
+
 		const terminatedReason = pod?.status?.containerStatuses?.find(
 			(containerStatus) => containerStatus.state?.terminated
 		)?.state?.terminated?.reason;
+
 		return waitingReason ?? terminatedReason ?? pod?.status?.phase ?? 'Unknown';
 	}
+
+	let totalPods = $derived.by(() =>
+		modelServiceComponents.reduce((a, workload) => a + workload.pods.length, 0)
+	);
 
 	function buildResourceUrl(
 		name: string,
@@ -109,27 +118,26 @@
 		version: string,
 		kind: string,
 		resource: string,
-		resourceNamespace?: string
+		namespace?: string
 	): string {
-		let query = `?group=${group}&version=${version}&kind=${kind}&resource=${resource}`;
-		if (resourceNamespace) {
-			query += `&namespace=${resourceNamespace}`;
-		}
-		return resolve(`/(auth)/${page.params.cluster}/${page.params.workspace}/${name}${query}`);
+		return resolve(
+			`/(auth)/${page.params.cluster}/${page.params.workspace}/${name}?group=${group}&version=${version}&kind=${kind}&resource=${resource}&namespace=${namespace}`
+		);
 	}
 
-	async function fetchWorkloadResources(config: WorkloadConfig): Promise<WorkloadResources> {
-		const selector = getWorkloadSelector(config.component);
-		const emptyResult: WorkloadResources = {
-			...config,
-			selector,
-			deployments: [],
-			pods: [],
-			error: null
-		};
+	async function fetchRelatedWorkloads(
+		identifier: ModelServiceComponentIdentifier
+	): Promise<ModelServiceComponent> {
+		const selector = getWorkloadSelector(identifier.component);
 
 		if (!cluster || !namespace || !modelServiceName || !selector) {
-			return emptyResult;
+			return {
+				...identifier,
+				selector,
+				deployments: [],
+				pods: [],
+				error: null
+			};
 		}
 
 		try {
@@ -153,29 +161,37 @@
 			]);
 
 			return {
-				...config,
+				...identifier,
 				selector,
 				deployments: deploymentResponse.items.map((item) => item.object as AppsV1Deployment),
 				pods: podResponse.items.map((item) => item.object as CoreV1Pod),
 				error: null
 			};
 		} catch (error) {
-			console.error(`Failed to fetch ${config.title} resources for ${modelServiceName}:`, error);
+			console.error(
+				`Failed to fetch ${identifier.component} resources for ${modelServiceName}:`,
+				error
+			);
 			return {
-				...config,
+				...identifier,
 				selector,
 				deployments: [],
 				pods: [],
-				error: error instanceof Error ? error.message : `Failed to fetch ${config.title} resources.`
+				error:
+					error instanceof Error
+						? error.message
+						: `Failed to fetch ${identifier.component} resources.`
 			};
 		}
 	}
 
+	let isResourcesLoaded = $state(false);
+	let resourcesError = $state<string | null>(null);
 	async function fetchResources() {
 		if (!cluster || !namespace || !modelServiceName) {
-			workloadResources = workloadConfigs.map((config) => ({
-				...config,
-				selector: getWorkloadSelector(config.component),
+			modelServiceComponents = modelServicesComponentIdentifiers.map((component) => ({
+				...component,
+				selector: getWorkloadSelector(component.component),
 				deployments: [],
 				pods: [],
 				error: null
@@ -184,12 +200,11 @@
 			return;
 		}
 
-		isResourcesLoaded = false;
-		resourcesError = null;
-
 		try {
-			workloadResources = await Promise.all(workloadConfigs.map(fetchWorkloadResources));
-			if (workloadResources.every((workload) => workload.error)) {
+			modelServiceComponents = await Promise.all(
+				modelServicesComponentIdentifiers.map(fetchRelatedWorkloads)
+			);
+			if (modelServiceComponents.every((workload) => workload.error)) {
 				resourcesError = 'Failed to load any related deployments or pods for this model service.';
 			}
 		} finally {
@@ -197,28 +212,24 @@
 		}
 	}
 
-	onMount(async () => {
-		await fetchResources();
-	});
-
-	let relatedResources = $derived.by(() =>
-		workloadResources.flatMap((workload) =>
-			workload.deployments.map((deployment) => ({
-				title: workload.title,
+	let relatedDeployments = $derived.by(() =>
+		modelServiceComponents.flatMap((component) =>
+			component.deployments.map((deployment) => ({
+				title: component.component,
 				name: deployment.metadata?.name ?? '',
 				namespace: deployment.metadata?.namespace ?? namespace,
 				group: 'apps',
 				version: 'v1',
 				kind: 'Deployment',
 				resource: 'deployments',
-				selector: workload.selector
+				selector: component.selector
 			}))
 		)
 	);
 
-	let totalPods = $derived.by(() =>
-		workloadResources.reduce((total, workload) => total + workload.pods.length, 0)
-	);
+	onMount(async () => {
+		await fetchResources();
+	});
 
 	let summaryItems = $derived.by(() => [
 		{ name: 'Model Name', information: object?.spec?.model?.name ?? '-' },
@@ -237,14 +248,14 @@
 		},
 		{
 			name: 'Deployments',
-			information: workloadResources
-				.map((workload) => `${workload.title}:${workload.deployments.length}`)
+			information: modelServiceComponents
+				.map((workload) => `${workload.component}:${workload.deployments.length}`)
 				.join(' / ')
 		},
 		{
 			name: 'Pods',
-			information: workloadResources
-				.map((workload) => `${workload.title}:${workload.pods.length}`)
+			information: modelServiceComponents
+				.map((workload) => `${workload.component}:${workload.pods.length}`)
 				.join(' / ')
 		},
 		{ name: 'Total Pods', information: isResourcesLoaded ? String(totalPods) : 'Loading' }
@@ -358,9 +369,9 @@
 					</div>
 				{/each}
 			</div>
-		{:else if relatedResources.length > 0}
+		{:else if relatedDeployments.length > 0}
 			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-				{#each relatedResources as ref (`${ref.title}-${ref.name}`)}
+				{#each relatedDeployments as ref (`${ref.title}-${ref.name}`)}
 					<Item.Root variant="outline">
 						{#snippet child({ props })}
 							<a
@@ -434,14 +445,14 @@
 			</div>
 		{:else}
 			<div class="grid gap-6">
-				{#each workloadResources as workload (workload.id)}
+				{#each modelServiceComponents as workload (workload.type)}
 					<Card.Root class="border bg-muted/20 shadow-none">
 						<Card.Header>
 							<Card.Title>
 								<Item.Root class="p-0">
 									<Item.Content>
 										<Item.Title class={typographyVariants({ variant: 'h6' })}>
-											{workload.title}
+											{workload.component}
 										</Item.Title>
 										<Item.Description class="font-mono text-xs">
 											{workload.selector || '-'}
@@ -460,7 +471,7 @@
 										<Empty.Media variant="icon">
 											<Box />
 										</Empty.Media>
-										<Empty.Title>Failed to Load {workload.title}</Empty.Title>
+										<Empty.Title>Failed to Load {workload.component}</Empty.Title>
 										<Empty.Description>{workload.error}</Empty.Description>
 									</Empty.Header>
 								</Empty.Root>
@@ -470,7 +481,7 @@
 										<Item.Root variant="outline" class="items-start gap-4 bg-background">
 											<Item.Content class="w-full">
 												<Item.Description>
-													<Badge variant="outline">{workload.title}</Badge>
+													<Badge variant="outline">{workload.component}</Badge>
 													<Badge variant="outline">{getPodStatus(pod)}</Badge>
 													{pod.metadata?.namespace}
 												</Item.Description>
@@ -493,13 +504,13 @@
 													<Item.Root class="p-0">
 														<Item.Content>
 															<Item.Description>Ready</Item.Description>
-															<Item.Title>{getReadyText(pod)}</Item.Title>
+															<Item.Title>{getReady(pod)}</Item.Title>
 														</Item.Content>
 													</Item.Root>
 													<Item.Root class="p-0">
 														<Item.Content>
 															<Item.Description>Restarts</Item.Description>
-															<Item.Title>{getRestartCount(pod)}</Item.Title>
+															<Item.Title>{getRestart(pod)}</Item.Title>
 														</Item.Content>
 													</Item.Root>
 													<Item.Root class="p-0">
@@ -553,7 +564,7 @@
 										<Empty.Media variant="icon">
 											<Box />
 										</Empty.Media>
-										<Empty.Title>No {workload.title} Pods Found</Empty.Title>
+										<Empty.Title>No {workload.component} Pods Found</Empty.Title>
 										<Empty.Description>
 											No pods matched the selector <strong>{workload.selector}</strong>.
 										</Empty.Description>

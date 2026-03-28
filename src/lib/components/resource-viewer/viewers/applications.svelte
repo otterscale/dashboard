@@ -1,3 +1,17 @@
+<script lang="ts" module>
+	type RelatedResource = {
+		name: string;
+		namespace?: string;
+		group: string;
+		version: string;
+		kind: string;
+		resource: string;
+		title: string;
+	};
+
+	type ResourceRef = { name: string; namespace?: string } | null | undefined;
+</script>
+
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import Box from '@lucide/svelte/icons/box';
@@ -24,42 +38,31 @@
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { cn } from '$lib/utils';
 
-	type RelatedResource = {
-		name: string;
-		namespace?: string;
-		group: string;
-		version: string;
-		kind: string;
-		resource: string;
-		title: string;
-	};
-
-	type ResourceRef = { name: string; namespace?: string } | null | undefined;
-
 	let { object }: { object: WorkloadOtterscaleIoV1Alpha1Application } = $props();
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
 	let pods = $state<CoreV1Pod[]>([]);
-	let isPodsLoaded = $state(false);
-	let podsError = $state<string | null>(null);
 
+	const cluster = $derived(page.params.cluster ?? '');
 	const namespace = $derived(object?.metadata?.namespace ?? '');
 	const applicationName = $derived(object?.metadata?.name ?? '');
-	const cluster = $derived(page.params.cluster ?? '');
+
 	const podLabelSelector = $derived(applicationName ? `app=app-${applicationName}` : '');
 
-	function getReadyText(pod: CoreV1Pod): string {
-		const containerStatuses = pod?.status?.containerStatuses ?? [];
+	function getReady(pod: CoreV1Pod): string {
 		const totalContainers = pod?.spec?.containers?.length ?? 0;
+
+		const containerStatuses = pod?.status?.containerStatuses ?? [];
 		const readyContainers = containerStatuses.filter(
 			(containerStatus) => containerStatus.ready
 		).length;
+
 		return `${readyContainers}/${totalContainers}`;
 	}
 
-	function getRestartCount(pod: CoreV1Pod): number {
+	function getRestart(pod: CoreV1Pod): number {
 		return (pod?.status?.containerStatuses ?? []).reduce(
 			(sum, containerStatus) => sum + (containerStatus.restartCount ?? 0),
 			0
@@ -70,9 +73,11 @@
 		const waitingReason = pod?.status?.containerStatuses?.find(
 			(containerStatus) => containerStatus.state?.waiting
 		)?.state?.waiting?.reason;
+
 		const terminatedReason = pod?.status?.containerStatuses?.find(
 			(containerStatus) => containerStatus.state?.terminated
 		)?.state?.terminated?.reason;
+
 		return waitingReason ?? terminatedReason ?? pod?.status?.phase ?? 'Unknown';
 	}
 
@@ -91,15 +96,14 @@
 		return resolve(`/(auth)/${page.params.cluster}/${page.params.workspace}/${name}${query}`);
 	}
 
+	let isPodsLoaded = $state(false);
+	let podsError = $state<string | null>(null);
 	async function fetchPods() {
 		if (!cluster || !namespace || !applicationName || !podLabelSelector) {
 			pods = [];
 			isPodsLoaded = true;
 			return;
 		}
-
-		isPodsLoaded = false;
-		podsError = null;
 
 		try {
 			const response = await resourceClient.list({
@@ -399,13 +403,13 @@
 								<Item.Root class="p-0">
 									<Item.Content>
 										<Item.Description>Ready</Item.Description>
-										<Item.Title>{getReadyText(pod)}</Item.Title>
+										<Item.Title>{getReady(pod)}</Item.Title>
 									</Item.Content>
 								</Item.Root>
 								<Item.Root class="p-0">
 									<Item.Content>
 										<Item.Description>Restarts</Item.Description>
-										<Item.Title>{getRestartCount(pod)}</Item.Title>
+										<Item.Title>{getRestart(pod)}</Item.Title>
 									</Item.Content>
 								</Item.Root>
 								<Item.Root class="p-0">
