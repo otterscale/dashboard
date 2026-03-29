@@ -42,6 +42,7 @@
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { shortcut } from '$lib/actions/shortcut.svelte';
 	import Create from '$lib/components/kind-viewer/kind-viewer-actions/workspace/create.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -222,6 +223,7 @@
 
 {#if workspaceSchema}
 	<Create
+		role={page.data.isClusterAdmin === true ? 'Cluster Admin' : undefined}
 		bind:open={createWorkspaceOpen}
 		showTrigger={false}
 		group="tenant.otterscale.io"

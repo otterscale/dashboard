@@ -367,7 +367,7 @@
 					}
 				}
 			}
-		].filter(() => role !== 'Cluster Admin')
+		].filter(() => role === 'Cluster Admin')
 	];
 
 	// TODO: Refactor into StepsManager.
