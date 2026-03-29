@@ -75,12 +75,12 @@
 					{
 						type: 'Container',
 						default: {
-							cpu: '1',
-							memory: '2Gi'
+							cpu: '4',
+							memory: '8Gi'
 						},
 						defaultRequest: {
-							cpu: '1',
-							memory: '2Gi'
+							cpu: '0.5',
+							memory: '1Gi'
 						}
 					}
 				]
