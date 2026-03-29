@@ -4,150 +4,139 @@ import type { Column, ColumnDef } from '@tanstack/table-core';
 import { type Row } from '@tanstack/table-core';
 
 import { DynamicTableCell, DynamicTableHeader } from '$lib/components/dynamic-table';
-import type { QuantityMetadata } from '$lib/components/dynamic-table/dynamic-table-cells/quantity-cell.svelte';
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
-import { formatWithBinarySuffix } from '$lib/components/dynamic-table/utils.ts';
 import { renderComponent } from '$lib/components/ui/data-table';
-import type { ArtifactType } from '$lib/server/harbor';
 
-type ArtifactAttribute =
+import type { ArtifactChartType, IndexChartType } from './types';
+
+type ChartAttribute =
 	| 'Helm Repository'
-	| 'Repository'
+	| 'Chart Name'
+	| 'Description'
 	| 'Digest'
 	| 'Version'
-	| 'Size'
-	| 'Push Time'
-	| 'Pull Time'
 	| 'Type'
 	| 'Labels'
+	| 'Source'
+	| 'icon'
 	| 'helmRepository'
-	| 'chartArtifact';
+	| 'chart';
 
-function getArtifactDataSchemas(): Record<ArtifactAttribute, DataSchemaType> {
+function getChartDataSchemas(): Record<ChartAttribute, DataSchemaType> {
 	return {
 		'Helm Repository': 'text',
-		Repository: 'text',
+		'Chart Name': 'text',
+		Description: 'text',
 		Digest: 'text',
 		Version: 'text',
-		Size: 'quantity',
-		'Push Time': 'time',
-		'Pull Time': 'time',
 		Type: 'text',
 		Labels: 'array',
+		Source: 'text',
+		icon: 'text',
 		helmRepository: 'object',
-		chartArtifact: 'object'
+		chart: 'object'
 	};
 }
 
-function getArtifactUISchemas(): Record<ArtifactAttribute, UISchemaType> {
+function getChartUISchemas(): Record<ChartAttribute, UISchemaType> {
 	return {
 		'Helm Repository': 'text',
-		Repository: 'text',
+		'Chart Name': 'text',
+		Description: 'text',
 		Digest: 'text',
 		Version: 'text',
-		Size: 'quantity',
-		'Push Time': 'time',
-		'Pull Time': 'time',
 		Type: 'text',
 		Labels: 'array',
+		Source: 'text',
+		icon: 'text',
 		helmRepository: 'object',
-		chartArtifact: 'object'
+		chart: 'object'
 	};
 }
 
-function getArtifactData(
-	chartArtifact: ArtifactType,
+function getChartDataFromHarbor(
+	artifactChart: ArtifactChartType,
 	helmRepository: SourceToolkitFluxcdIoV1HelmRepository
-): Record<ArtifactAttribute, JsonValue> {
-	const { value: sizeValue, unit: sizeUnit } = formatWithBinarySuffix(BigInt(chartArtifact.size));
-
+): Record<ChartAttribute, JsonValue> {
 	return {
 		'Helm Repository': helmRepository.metadata?.name ?? null,
-		Repository: chartArtifact.repository_name,
-		Digest: chartArtifact.digest ? chartArtifact.digest.slice(0, 19) : null,
-		Version: chartArtifact.extra_attrs?.version as JsonValue,
-		Size: `${sizeValue.toFixed(0)}${sizeUnit}`,
-		'Push Time': chartArtifact.push_time ?? null,
-		'Pull Time': chartArtifact.pull_time ?? null,
-		Type: chartArtifact.type ?? null,
-		Labels: (chartArtifact.labels ?? []).map((l) => l.name) as JsonValue,
+		'Chart Name': artifactChart.repository_name ?? null,
+		Description: artifactChart.extra_attrs?.description as JsonValue,
+		Digest: artifactChart.digest ?? null,
+		Version: artifactChart.extra_attrs?.version as JsonValue,
+		Type: artifactChart.type ?? null,
+		Labels: (artifactChart.labels ?? []) as JsonValue,
+		Source: 'harbor',
+		icon: artifactChart.extra_attrs?.icon as JsonValue,
 		helmRepository: helmRepository as JsonValue,
-		chartArtifact: chartArtifact as unknown as JsonValue
+		chart: artifactChart as unknown as JsonValue
 	};
 }
 
-function getArtifactColumnDefinitions(
-	uiSchemas: Record<ArtifactAttribute, UISchemaType>,
-	dataSchemas: Record<ArtifactAttribute, DataSchemaType>
-): ColumnDef<Record<ArtifactAttribute, JsonValue>>[] {
-	const columns: ArtifactAttribute[] = [
-		'Repository',
+function getChartDataFromIndex(
+	indexChart: IndexChartType,
+	helmRepository: SourceToolkitFluxcdIoV1HelmRepository
+): Record<ChartAttribute, JsonValue> {
+	return {
+		'Helm Repository': helmRepository.metadata?.name ?? null,
+		'Chart Name': indexChart.name ?? null,
+		Description: indexChart.description as JsonValue,
+		Digest: indexChart.digest ?? null,
+		Version: indexChart.version as JsonValue,
+		Type: indexChart.type ?? null,
+		Labels: (indexChart.keywords ?? []) as JsonValue,
+		Source: 'index',
+		icon: indexChart.icon as JsonValue,
+		helmRepository: helmRepository as JsonValue,
+		chart: indexChart as unknown as JsonValue
+	};
+}
+
+function getChartColumnDefinitions(
+	uiSchemas: Record<ChartAttribute, UISchemaType>,
+	dataSchemas: Record<ChartAttribute, DataSchemaType>
+): ColumnDef<Record<ChartAttribute, JsonValue>>[] {
+	const columns: ChartAttribute[] = [
+		'Chart Name',
+		'Description',
 		'Digest',
 		'Type',
 		'Version',
-		'Size',
-		'Push Time',
-		'Pull Time',
 		'Labels',
+		'Source',
 		'Helm Repository'
 	];
 
 	return columns.map((id) => {
-		if (id === 'Size') {
-			return {
-				id,
-				header: ({ column }: { column: Column<Record<ArtifactAttribute, JsonValue>> }) =>
-					renderComponent(DynamicTableHeader, {
-						column,
-						dataSchemas
-					}),
-				cell: ({
+		return {
+			id,
+			header: ({ column }: { column: Column<Record<ChartAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
 					column,
-					row
-				}: {
-					column: Column<Record<ArtifactAttribute, JsonValue>>;
-					row: Row<Record<ArtifactAttribute, JsonValue>>;
-				}) =>
-					renderComponent(DynamicTableCell, {
-						row,
-						column,
-						uiSchemas,
-						metadata: {
-							type: 'discrete'
-						} satisfies QuantityMetadata
-					}),
-				accessorKey: id
-			};
-		} else {
-			return {
-				id,
-				header: ({ column }: { column: Column<Record<ArtifactAttribute, JsonValue>> }) =>
-					renderComponent(DynamicTableHeader, {
-						column,
-						dataSchemas
-					}),
-				cell: ({
+					dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<ChartAttribute, JsonValue>>;
+				row: Row<Record<ChartAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row,
 					column,
-					row
-				}: {
-					column: Column<Record<ArtifactAttribute, JsonValue>>;
-					row: Row<Record<ArtifactAttribute, JsonValue>>;
-				}) =>
-					renderComponent(DynamicTableCell, {
-						row,
-						column,
-						uiSchemas
-					}),
-				accessorKey: id
-			};
-		}
+					uiSchemas
+				}),
+			accessorKey: id
+		};
 	});
 }
 
 export {
-	type ArtifactAttribute,
-	getArtifactColumnDefinitions,
-	getArtifactData,
-	getArtifactDataSchemas,
-	getArtifactUISchemas
+	type ChartAttribute,
+	getChartColumnDefinitions,
+	getChartDataFromHarbor,
+	getChartDataFromIndex,
+	getChartDataSchemas,
+	getChartUISchemas
 };

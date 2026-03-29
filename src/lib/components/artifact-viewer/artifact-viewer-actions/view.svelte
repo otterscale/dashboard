@@ -1,23 +1,23 @@
 <script lang="ts">
+	import type { JsonValue } from '@bufbuild/protobuf';
 	import EyeIcon from '@lucide/svelte/icons/eye';
-	import lodash from 'lodash';
+	import type { Row } from '@tanstack/table-core';
 	import { stringify } from 'yaml';
 
 	import * as Code from '$lib/components/custom/code';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
-	import type { ArtifactType } from '$lib/server/harbor';
+
+	import type { ChartAttribute } from '../table-layout';
 
 	let {
-		chartArtifact
+		row
 	}: {
-		chartArtifact: ArtifactType;
+		row: Row<Record<ChartAttribute, JsonValue>>;
 	} = $props();
 
 	let open = $state(false);
-
-	const extraAttributes = $derived(chartArtifact.extra_attrs);
 </script>
 
 <Dialog.Root bind:open>
@@ -38,17 +38,16 @@
 	>
 		<Dialog.Header>
 			<Dialog.Title class="capitalize">
-				{chartArtifact.repository_name}
-				{lodash.get(extraAttributes, 'name')}
+				{row.original['Helm Repository']}
 			</Dialog.Title>
 			<Dialog.Description>
-				{lodash.get(extraAttributes, 'description')}
+				{row.original['Description']}
 			</Dialog.Description>
 		</Dialog.Header>
 		<Code.Root
 			variant="secondary"
 			lang="yaml"
-			code={stringify(chartArtifact)}
+			code={stringify(row.original.chart)}
 			class="w-full border-none"
 		/>
 	</Dialog.Content>

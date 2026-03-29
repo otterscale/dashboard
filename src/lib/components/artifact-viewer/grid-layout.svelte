@@ -1,37 +1,27 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import SiHelm from '@icons-pack/svelte-simple-icons/icons/SiHelm';
-	import BookmarkIcon from '@lucide/svelte/icons/bookmark';
-	import BoxesIcon from '@lucide/svelte/icons/boxes';
+	import TagIcon from '@lucide/svelte/icons/tag';
 	import TagsIcon from '@lucide/svelte/icons/tags';
-	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 	import type { Row } from '@tanstack/table-core';
 
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import Badge from '$lib/components/ui/badge/badge.svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Item from '$lib/components/ui/item';
-	import type { ArtifactType } from '$lib/server/harbor';
 
 	import Actions from './artifact-viewer-actions/actions.svelte';
-	import type { ArtifactAttribute } from './table-layout';
+	import type { ChartAttribute } from './table-layout';
 
 	let {
 		row,
 		cluster,
 		namespace
 	}: {
-		row: Row<Record<ArtifactAttribute, JsonValue>>;
+		row: Row<Record<ChartAttribute, JsonValue>>;
 		cluster: string;
 		namespace: string;
 	} = $props();
-
-	const latestChartArtifact = $derived(row.original.chartArtifact as unknown as ArtifactType);
-	const helmRepository = $derived(
-		row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository
-	);
-
-	const extraAttributes = $derived(latestChartArtifact.extra_attrs ?? {});
 </script>
 
 <Card.Root>
@@ -39,7 +29,7 @@
 		<Item.Root class="items-start p-0">
 			<Item.Media>
 				<Avatar.Root>
-					<Avatar.Image src={extraAttributes.icon as string} alt="helm" />
+					<Avatar.Image src={row.original.icon as string} alt="helm" />
 					<Avatar.Fallback>
 						<SiHelm class="size-4" />
 					</Avatar.Fallback>
@@ -47,39 +37,50 @@
 			</Item.Media>
 			<Item.Content class="text-left">
 				<Item.Title class="font-bold">
-					{extraAttributes.name}
-					<Badge>{extraAttributes.version}</Badge>
+					{row.original['Chart Name']}
+					<Badge variant="outline">{row.original.Version}</Badge>
 				</Item.Title>
 				<Item.Description>
-					{latestChartArtifact.repository_name}
+					{row.original['Helm Repository']}
 				</Item.Description>
 			</Item.Content>
 			<Item.Actions>
-				<Actions {cluster} {namespace} chartArtifact={latestChartArtifact} {helmRepository} />
+				<Actions {row} {cluster} {namespace} />
 			</Item.Actions>
 		</Item.Root>
 	</Card.Header>
-	<Card.Content>
+	<Card.Content class="flex flex-1">
 		<Item.Root class="col-span-2 items-start p-0">
 			<Item.Content class="text-left">
 				<Item.Description>
-					{extraAttributes.description}
+					{row.original['Description']}
 				</Item.Description>
 			</Item.Content>
 		</Item.Root>
 	</Card.Content>
-	<Card.Footer class="flex gap-1 overflow-hidden text-xs text-gray-500">
-		<BoxesIcon size={12} />
-		{helmRepository?.metadata?.name}
-		{@const labels = latestChartArtifact.labels ?? []}
-		{@const tags = latestChartArtifact.tags ?? []}
-		{#each labels as label, index (index)}
-			<BookmarkIcon size={12} />
-			{label.name}
-		{/each}
-		{#each tags as tag, index (index)}
-			<TagsIcon size={12} />
-			{tag.name}
-		{/each}
+	<Card.Footer class="text-xs text-gray-500">
+		{@const tags: string[] = row.original.Labels as string[]}
+		{#if tags.length}
+			<div class="flex h-full gap-2 overflow-hidden">
+				{#each tags.slice(0, 3) as tag, index (index)}
+					<span class="flex items-center gap-1">
+						<TagIcon size={12} />
+						{tag}
+					</span>
+				{/each}
+				{#if tags.length > 3}
+					<span class="flex items-center gap-1">
+						<TagsIcon size={12} />
+						more
+					</span>
+				{/if}
+			</div>
+		{:else}
+			{@const type = row.original.Type as string}
+			<span class="flex items-center gap-1">
+				<TagIcon size={12} />
+				{type}
+			</span>
+		{/if}
 	</Card.Footer>
 </Card.Root>
