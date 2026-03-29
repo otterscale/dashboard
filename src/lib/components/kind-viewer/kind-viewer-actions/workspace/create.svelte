@@ -2,8 +2,8 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
-	import { SubmitButton } from '@sjsf/form';
+	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
+	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import type { SchemaObjectValue } from '@sjsf/form/core';
 	import Ajv from 'ajv';
 	import { load } from 'js-yaml';
@@ -24,6 +24,7 @@
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
 	let {
+		role,
 		cluster,
 		group,
 		version,
@@ -34,6 +35,7 @@
 		open = $bindable(false),
 		showTrigger = true
 	}: {
+		role?: string;
 		cluster: string;
 		group: string;
 		version: string;
@@ -45,53 +47,331 @@
 		showTrigger?: boolean;
 	} = $props();
 
-	const transport: Transport = getContext('transport');
-	const resourceClient = createClient(ResourceService, transport);
-
-	// Validation
-	const jsonSchemaValidator = new Ajv({
-		allErrors: true,
-		strict: false
-	});
-	const validate = jsonSchemaValidator.compile(jsonSchema);
-
 	// Container for Data.
-	let values: any = $state({
-		apiVersion: group ? `${group}/${version}` : version,
-		kind,
-		metadata: { name: null },
-		spec: {
-			members: {},
-			resourceQuota: {
-				hard: {
-					'requests.cpu': '16',
-					'requests.memory': '32Gi',
-					'limits.cpu': '16',
-					'limits.memory': '32Gi'
-				}
-			},
-			limitRange: {
-				limits: [
-					{
-						type: 'Container',
-						default: {
-							cpu: '4',
-							memory: '8Gi'
-						},
-						defaultRequest: {
-							cpu: '0.5',
-							memory: '1Gi'
-						}
-					}
-				]
-			},
-			networkIsolation: {}
-		}
-	});
+	let values: any = $state({});
 	let value = $derived(stringify(values));
 
+	const forms = [
+		{
+			schema: {
+				...(lodash.omit(
+					lodash.get(jsonSchema, 'properties.metadata') as Schema,
+					'properties'
+				) as any),
+				title: 'Metadata',
+				properties: {
+					name: {
+						...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema),
+						title: 'Name'
+					}
+				}
+			} as Schema,
+			uiSchema: {
+				'ui:options': {
+					translations: {
+						submit: 'Next'
+					}
+				}
+			} as UiSchemaRoot,
+			initialValue: null as FormValue,
+			handleSubmit: {
+				posthook: (form: FormState<FormValue>) => {
+					handleNext();
+
+					const formVale = getValueSnapshot(form);
+					lodash.set(values, 'metadata', formVale);
+				}
+			}
+		},
+		{
+			schema: {
+				...lodash.omit(
+					lodash.get(jsonSchema, 'properties.spec.properties.members') as any,
+					'items'
+				),
+				title: 'Members',
+				items: [
+					{
+						...lodash.omit(
+							lodash.get(jsonSchema, 'properties.spec.properties.members.items') as any,
+							['properties', 'required']
+						),
+						required: [
+							...(lodash.get(
+								jsonSchema,
+								'properties.spec.properties.members.items.required'
+							) as any),
+							'name'
+						],
+						properties: {
+							name: {
+								...(lodash.get(
+									jsonSchema,
+									'properties.spec.properties.members.items.properties.name'
+								) as any),
+								title: 'Name',
+								readOnly: true
+							},
+							role: {
+								...(lodash.get(
+									jsonSchema,
+									'properties.spec.properties.members.items.properties.role'
+								) as any),
+								title: 'Role',
+								readOnly: true
+							}
+						}
+					}
+				],
+				additionalItems: {
+					...lodash.omit(
+						lodash.get(jsonSchema, 'properties.spec.properties.members.items') as any,
+						['properties', 'required']
+					),
+					required: [
+						...(lodash.get(jsonSchema, 'properties.spec.properties.members.items.required') as any),
+						'name'
+					],
+					properties: {
+						name: {
+							...(lodash.get(
+								jsonSchema,
+								'properties.spec.properties.members.items.properties.name'
+							) as any),
+							title: 'Name'
+						},
+						role: {
+							...(lodash.get(
+								jsonSchema,
+								'properties.spec.properties.members.items.properties.role'
+							) as any),
+							title: 'Role'
+						}
+					}
+				}
+			} as Schema,
+			uiSchema: {
+				'ui:options': {
+					itemTitle: () => 'Member',
+					translations: {
+						submit: 'Next',
+						'add-array-item': 'Add Member'
+					}
+				},
+				items: {
+					'ui:options': {
+						layouts: {
+							'object-properties': {
+								class: 'grid grid-cols-2 gap-3'
+							}
+						}
+					}
+				},
+				additionalItems: {
+					'ui:options': {
+						layouts: {
+							'object-properties': {
+								class: 'grid grid-cols-2 gap-3'
+							}
+						}
+					},
+					name: {
+						'ui:components': {
+							stringField: 'enumField',
+							selectWidget: ComboboxWidget
+						},
+						'ui:options': {
+							TailoredComboboxEnumerations: fetchUsersAsEnumerations,
+							TailoredComboboxVisibility: 10,
+							TailoredComboboxInput: {
+								placeholder: 'Name'
+							},
+							TailoredComboboxEmptyText: 'No names available.'
+						}
+					},
+					role: {
+						'ui:components': {
+							stringField: 'enumField',
+							selectWidget: 'comboboxWidget'
+						},
+						'ui:options': {
+							disabledEnumValues: ['admin']
+						}
+					}
+				}
+			} as UiSchemaRoot,
+			initialValue: [
+				// From login user information.
+				{
+					role: 'admin',
+					subject: page.data.user.sub,
+					username: page.data.user.username,
+					name: page.data.user.name
+				}
+			] as FormValue,
+			transformer: (value: FormValue) => {
+				let members = value as SchemaObjectValue[];
+				members = members.map((member) => {
+					const keycloakUser = getKeycloakUser(member.name as string);
+					return {
+						...member,
+						subject: member.subject ?? keycloakUser?.id ?? null,
+						username: member.username ?? keycloakUser?.username ?? null,
+						serviceAccount: isServiceAccount(keycloakUser?.username)
+					};
+				});
+				return members;
+			},
+			handleSubmit: {
+				posthook: (form: FormState<FormValue>) => {
+					handleNext();
+
+					const formVale = getValueSnapshot(form);
+					lodash.set(values, 'spec.members', formVale);
+				}
+			}
+		},
+		{
+			schema: {
+				...lodash.omit(lodash.get(jsonSchema, 'properties.spec.properties.networkIsolation'), [
+					'properties'
+				]),
+				title: 'Network Isolation',
+				properties: {
+					allowedNamespaces: {
+						title: 'Allowed Namespaces',
+						...lodash.get(
+							jsonSchema,
+							'properties.spec.properties.networkIsolation.properties.allowedNamespaces'
+						)
+					},
+					...lodash.omit(
+						lodash.get(jsonSchema, 'properties.spec.properties.networkIsolation.properties'),
+						['allowedNamespaces']
+					)
+				}
+			} as Schema,
+			uiSchema: {
+				'ui:options': {
+					translations: {
+						submit: 'Next'
+					}
+				},
+				allowedNamespaces: {
+					'ui:options': {
+						itemTitle: () => 'Allowed Namespace',
+						layouts: {
+							'array-items': {
+								class: 'grid grid-cols-2 gap-3'
+							}
+						},
+						translations: {
+							'add-array-item': 'Add Namespace'
+						}
+					}
+				}
+			} as UiSchemaRoot,
+			initialValue: {
+				enabled: false
+			} as FormValue,
+			handleSubmit: {
+				posthook: (form: FormState<FormValue>) => {
+					handleNext();
+
+					const formVale = getValueSnapshot(form);
+					lodash.set(values, 'spec.networkIsolation', formVale);
+				}
+			}
+		},
+		...[
+			{
+				schema: {
+					...lodash.omit(lodash.get(jsonSchema, 'properties.spec.properties.resourceQuota'), [
+						'properties'
+					]),
+					title: 'Resource Quota',
+					properties: {
+						hard: {
+							title: 'Hard',
+							...lodash.omit(
+								lodash.get(jsonSchema, 'properties.spec.properties.resourceQuota.properties.hard'),
+								['additionalProperties']
+							),
+							properties: {
+								'requests.cpu': {
+									title: 'CPU Request',
+									type: 'string'
+								},
+								'requests.memory': {
+									title: 'Memory Request',
+									type: 'string'
+								},
+								'requests.nvidia.com/gpu': {
+									title: 'GPU Request',
+									type: 'integer'
+								},
+								'requests.nvidia.com/gpumem': {
+									title: 'GPU Memory Request',
+									type: 'string'
+								},
+								'limits.cpu': {
+									title: 'CPU Limit',
+									type: 'string'
+								},
+								'limits.memory': {
+									title: 'Memory Limit',
+									type: 'string'
+								},
+								'limits.nvidia.com/gpu': {
+									title: 'GPU Limit',
+									type: 'integer'
+								},
+								'limits.nvidia.com/gpumem': {
+									title: 'GPU Memory Limit',
+									type: 'string'
+								}
+							}
+						}
+					}
+				} as Schema,
+				uiSchema: {
+					'ui:options': {
+						translations: {
+							submit: 'Next'
+						}
+					},
+					hard: {
+						'ui:options': {
+							layouts: {
+								'object-properties': {
+									class: 'grid grid-cols-2 gap-3'
+								}
+							}
+						}
+					}
+				} as UiSchemaRoot,
+				initialValue: {
+					hard: {
+						'requests.cpu': '16',
+						'requests.memory': '32Gi',
+						'limits.cpu': '16',
+						'limits.memory': '32Gi'
+					}
+				} as FormValue,
+				handleSubmit: {
+					posthook: (form: FormState<FormValue>) => {
+						handleNext();
+
+						const formVale = getValueSnapshot(form);
+						lodash.set(values, 'spec.resourceQuota', formVale);
+					}
+				}
+			}
+		].filter(() => role !== 'Cluster Admin')
+	];
+
 	// TODO: Refactor into StepsManager.
-	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: forms.length + 1 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -183,271 +463,31 @@
 			</Item.Content>
 		</Item.Root>
 		<Tabs.Root value={currentStep}>
-			<Tabs.Content value={steps[0]}>
-				<Form
-					schema={{
-						...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as any),
-						title: 'Name'
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={null as FormValue}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-					bind:values={values['metadata']['name']}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-			<Tabs.Content value={steps[1]}>
-				<Form
-					schema={{
-						...lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.members') as any,
-							'items'
-						),
-						title: 'Members',
-						items: [
-							{
-								...lodash.omit(
-									lodash.get(jsonSchema, 'properties.spec.properties.members.items') as any,
-									['properties', 'required']
-								),
-								required: [
-									...(lodash.get(
-										jsonSchema,
-										'properties.spec.properties.members.items.required'
-									) as any),
-									'name'
-								],
-								properties: {
-									name: {
-										...(lodash.get(
-											jsonSchema,
-											'properties.spec.properties.members.items.properties.name'
-										) as any),
-										title: 'Name',
-										readOnly: true
-									},
-									role: {
-										...(lodash.get(
-											jsonSchema,
-											'properties.spec.properties.members.items.properties.role'
-										) as any),
-										title: 'Role',
-										readOnly: true
-									}
-								}
-							}
-						],
-						additionalItems: {
-							...lodash.omit(
-								lodash.get(jsonSchema, 'properties.spec.properties.members.items') as any,
-								['properties', 'required']
-							),
-							required: [
-								...(lodash.get(
-									jsonSchema,
-									'properties.spec.properties.members.items.required'
-								) as any),
-								'name'
-							],
-							properties: {
-								name: {
-									...(lodash.get(
-										jsonSchema,
-										'properties.spec.properties.members.items.properties.name'
-									) as any),
-									title: 'Name'
-								},
-								role: {
-									...(lodash.get(
-										jsonSchema,
-										'properties.spec.properties.members.items.properties.role'
-									) as any),
-									title: 'Role'
-								}
-							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							itemTitle: () => 'Member',
-							translations: {
-								submit: 'Next',
-								'add-array-item': 'Add Member'
-							}
-						},
-						items: {
-							'ui:options': {
-								layouts: {
-									'object-properties': {
-										class: 'grid grid-cols-2 gap-3'
-									}
-								}
-							}
-						},
-						additionalItems: {
-							'ui:options': {
-								layouts: {
-									'object-properties': {
-										class: 'grid grid-cols-2 gap-3'
-									}
-								}
-							},
-							name: {
-								'ui:components': {
-									stringField: 'enumField',
-									selectWidget: ComboboxWidget
-								},
-								'ui:options': {
-									TailoredComboboxEnumerations: fetchUsersAsEnumerations,
-									TailoredComboboxVisibility: 10,
-									TailoredComboboxInput: {
-										placeholder: 'Name'
-									},
-									TailoredComboboxEmptyText: 'No names available.'
-								}
-							},
-							role: {
-								'ui:components': {
-									stringField: 'enumField',
-									selectWidget: 'comboboxWidget'
-								},
-								'ui:options': {
-									disabledEnumValues: ['admin']
-								}
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={[
-						// From login user information.
-						{
-							role: 'admin',
-							subject: page.data.user.sub,
-							username: page.data.user.username,
-							name: page.data.user.name
-						}
-					] as FormValue}
-					transformer={(value: FormValue) => {
-						let members = value as SchemaObjectValue[];
-						members = members.map((member) => {
-							const keycloakUser = getKeycloakUser(member.name as string);
-							return {
-								...member,
-								subject: member.subject ?? keycloakUser?.id ?? null,
-								username: member.username ?? keycloakUser?.username ?? null,
-								serviceAccount: isServiceAccount(keycloakUser?.username)
-							};
-						});
-						return members;
-					}}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-					bind:values={values['spec']['members']}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-			<Tabs.Content value={steps[2]}>
-				<Form
-					schema={{
-						...lodash.omit(lodash.get(jsonSchema, 'properties.spec.properties.networkIsolation'), [
-							'properties'
-						]),
-						title: 'Network Isolation',
-						properties: {
-							allowedNamespaces: {
-								title: 'Allowed Namespaces',
-								...lodash.get(
-									jsonSchema,
-									'properties.spec.properties.networkIsolation.properties.allowedNamespaces'
-								)
-							},
-							...lodash.omit(
-								lodash.get(jsonSchema, 'properties.spec.properties.networkIsolation.properties'),
-								['allowedNamespaces']
-							)
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						},
-						allowedNamespaces: {
-							'ui:options': {
-								itemTitle: () => 'Allowed Namespace',
-								layouts: {
-									'array-items': {
-										class: 'grid grid-cols-2 gap-3'
-									}
-								},
-								translations: {
-									'add-array-item': 'Add Namespace'
-								}
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{
-						enabled: false
-					} as FormValue}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-					bind:values={values['spec']['networkIsolation']}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-			<Tabs.Content value={steps[3]} class="min-h-[77vh]">
+			{#each forms as form, index (index)}
+				<Tabs.Content value={steps[index]}>
+					<Form
+						schema={form.schema}
+						uiSchema={form.uiSchema}
+						initialValue={form.initialValue}
+						transformer={form.transformer}
+						handleSubmit={form.handleSubmit}
+					>
+						{#snippet actions()}
+							<div class="flex w-full items-center justify-between gap-3">
+								<Button
+									onclick={() => {
+										handlePrevious();
+									}}
+								>
+									Previous
+								</Button>
+								<SubmitButton />
+							</div>
+						{/snippet}
+					</Form>
+				</Tabs.Content>
+			{/each}
+			<Tabs.Content value={steps[forms.length]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{
@@ -460,6 +500,10 @@
 							scrollBeyondLastLine: false
 						}}
 						bind:value
+						on:ready={() => {
+							lodash.set(values, 'apiVersion', `${group}/${version}`);
+							lodash.set(values, 'kind', kind);
+						}}
 						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
 					/>
 					<Button
@@ -468,6 +512,15 @@
 							if (isSubmitting) return;
 
 							isSubmitting = true;
+
+							const transport: Transport = getContext('transport');
+							const resourceClient = createClient(ResourceService, transport);
+
+							const jsonSchemaValidator = new Ajv({
+								allErrors: true,
+								strict: false
+							});
+							const validate = jsonSchemaValidator.compile(jsonSchema);
 
 							const isValid = validate(load(value));
 

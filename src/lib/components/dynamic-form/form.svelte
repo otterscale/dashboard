@@ -59,7 +59,7 @@
 			posthook?: (form: FormState<FormValue>) => void;
 		};
 		actions?: Snippet;
-		values: FormValue;
+		values?: FormValue;
 		class?: string;
 	} = $props();
 	// Clean schema from unnecessary keywords to JSON Schema Draft-07.
