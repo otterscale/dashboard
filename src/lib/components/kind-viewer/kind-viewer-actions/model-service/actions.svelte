@@ -46,8 +46,22 @@
 			</div>
 		{/snippet}
 	</DropdownMenu.Trigger>
-	<DropdownMenu.Content align="end">
+	<DropdownMenu.Content align="end" class="w-full">
 		<DropdownMenu.Group>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<GpuAllocation
+					{cluster}
+					{namespace}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
@@ -66,20 +80,6 @@
 					{group}
 					{version}
 					{resource}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
-			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<GpuAllocation
-					{cluster}
-					{namespace}
 					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
