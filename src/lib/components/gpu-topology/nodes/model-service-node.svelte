@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Handle, Position } from '@xyflow/svelte';
-	import BrainCircuit from '@lucide/svelte/icons/brain-circuit';
+	import Bot from '@lucide/svelte/icons/bot';
 
 	import type { NodeProps } from '@xyflow/svelte';
 
@@ -14,7 +14,7 @@
 >
 	<div class="flex items-center gap-2 border-b border-border px-3 py-2">
 		<div class="flex size-6 items-center justify-center rounded-md bg-primary/10">
-			<BrainCircuit size={14} class="text-primary" />
+			<Bot size={14} class="text-primary" />
 		</div>
 		<span class="truncate text-sm font-semibold">ModelService</span>
 	</div>
