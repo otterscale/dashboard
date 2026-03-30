@@ -1,6 +1,5 @@
 <script lang="ts">
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
-	import type { ModelOtterscaleIoV1Alpha1ModelService } from '@otterscale/types';
 	import type { Schema } from 'ajv';
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
@@ -11,7 +10,6 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
 	import GpuTopology from './gpu-topology.svelte';
-	import Update from './update.svelte';
 
 	let {
 		cluster,
@@ -30,7 +28,8 @@
 		kind: string;
 		resource: string;
 		schema: Schema;
-		object: ModelOtterscaleIoV1Alpha1ModelService;
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		object: any;
 	} = $props();
 
 	let actionsOpen = $state(false);
@@ -79,26 +78,6 @@
 			>
 				<GpuTopology
 					{cluster}
-					{namespace}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
-			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<Update
-					{cluster}
-					{namespace}
-					{group}
-					{version}
-					{kind}
-					{resource}
-					{schema}
 					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;

@@ -20,6 +20,7 @@ import JobActions from './job/actions.svelte';
 import ModelArtifactActions from './model-artifact/actions.svelte';
 import ModelArtifactCreate from './model-artifact/create.svelte';
 import ModelServiceActions from './model-service/actions.svelte';
+import NodeActions from './node/actions.svelte';
 import ModelServiceCreate from './model-service/create.svelte';
 import PodActions from './pod/actions.svelte';
 import ResourceQuotaActions from './resource-quota/actions.svelte';
@@ -102,6 +103,8 @@ function getActions(kind: string): ActionsType {
 			return HelmRepositoryActions as ActionsType;
 		case 'ModelService':
 			return ModelServiceActions as ActionsType;
+		case 'Node':
+			return NodeActions as ActionsType;
 		case 'ModelArtifact':
 			return ModelArtifactActions as ActionsType;
 		case 'ResourceQuota':
