@@ -5,6 +5,8 @@
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
+	import { canStartOrStop } from './vm-status';
+
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Item from '$lib/components/ui/item';
@@ -32,8 +34,7 @@
 	const name: string = $derived(object?.metadata?.name ?? '');
 	const printableStatus: string = $derived(object?.status?.printableStatus ?? '');
 	const isRunning = $derived(printableStatus === 'Running');
-
-	const isStarting = $derived(printableStatus === 'Starting' || printableStatus === 'Provisioning');
+	const isActionAllowed = $derived(canStartOrStop(printableStatus));
 
 	let open = $state(false);
 	let isSubmitting = $state(false);
@@ -81,7 +82,11 @@
 <AlertDialog.Root bind:open {onOpenChangeComplete}>
 	<AlertDialog.Trigger>
 		{#snippet child({ props })}
-			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
+			<Item.Root
+				{...props}
+				class="w-full p-0 text-xs {!isActionAllowed ? 'pointer-events-none opacity-50' : ''}"
+				size="sm"
+			>
 				<Item.Media>
 					<PowerIcon />
 				</Item.Media>
@@ -106,7 +111,7 @@
 		</Item.Root>
 		<div class="flex justify-end gap-2">
 			<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
-			<Button disabled={isSubmitting || isStarting} onclick={() => handleAction()}>
+			<Button disabled={isSubmitting || !isActionAllowed} onclick={() => handleAction()}>
 				{#if isSubmitting}
 					Processing...
 				{:else}

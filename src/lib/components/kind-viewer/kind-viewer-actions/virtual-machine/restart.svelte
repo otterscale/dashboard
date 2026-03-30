@@ -5,6 +5,8 @@
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
+	import { canRestart } from './vm-status';
+
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Item from '$lib/components/ui/item';
@@ -32,6 +34,7 @@
 	const name: string = $derived(object?.metadata?.name ?? '');
 	const printableStatus: string = $derived(object?.status?.printableStatus ?? '');
 	const isRunning = $derived(printableStatus === 'Running');
+	const isActionAllowed = $derived(canRestart(printableStatus));
 
 	let open = $state(false);
 	let isSubmitting = $state(false);
@@ -77,7 +80,7 @@
 		{#snippet child({ props })}
 			<Item.Root
 				{...props}
-				class="w-full p-0 text-xs {!isRunning ? 'pointer-events-none opacity-50' : ''}"
+				class="w-full p-0 text-xs {!isActionAllowed ? 'pointer-events-none opacity-50' : ''}"
 				size="sm"
 			>
 				<Item.Media>
@@ -101,7 +104,7 @@
 		</Item.Root>
 		<div class="flex justify-end gap-2">
 			<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
-			<Button disabled={isSubmitting || !isRunning} onclick={() => handleRestart()}>
+			<Button disabled={isSubmitting || !isActionAllowed} onclick={() => handleRestart()}>
 				{#if isSubmitting}
 					Restarting...
 				{:else}
