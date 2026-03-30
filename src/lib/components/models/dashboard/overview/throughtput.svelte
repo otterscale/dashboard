@@ -15,8 +15,18 @@
 	let {
 		prometheusDriver,
 		cluster,
+		start,
+		end,
+		endIsNow,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	}: {
+		prometheusDriver: PrometheusDriver;
+		cluster: string;
+		start: Date;
+		end: Date;
+		endIsNow: boolean;
+		isReloading: boolean;
+	} = $props();
 
 	let prompts = $state([] as SampleValue[]);
 	let generations = $state([] as SampleValue[]);
@@ -37,8 +47,8 @@
 		try {
 			const response = await prometheusDriver.rangeQuery(
 				`sum(rate(vllm:prompt_tokens_total{}[2m]))`,
-				Date.now() - 24 * 60 * 60 * 1000,
-				Date.now(),
+				start.getTime(),
+				endIsNow ? Date.now() : end.getTime(),
 				2 * 60
 			);
 			prompts = response.result[0]?.values ?? [];
@@ -51,8 +61,8 @@
 		try {
 			const response = await prometheusDriver.rangeQuery(
 				`sum(rate(vllm:generation_tokens_total{}[2m]))`,
-				Date.now() - 24 * 60 * 60 * 1000,
-				Date.now(),
+				start.getTime(),
+				endIsNow ? Date.now() : end.getTime(),
 				2 * 60
 			);
 			generations = response.result[0]?.values ?? [];

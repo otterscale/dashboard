@@ -12,11 +12,17 @@
 		prometheusDriver,
 		cluster,
 		namespace,
+		start,
+		end,
+		endIsNow,
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		cluster: string;
 		namespace: string;
+		start: Date;
+		end: Date;
+		endIsNow: boolean;
 		isReloading: boolean;
 	} = $props();
 </script>
@@ -24,10 +30,10 @@
 <div class="grid auto-rows-auto grid-cols-2 gap-5 pt-4 md:grid-cols-4 lg:grid-cols-8">
 	<div class="col-span-2 grid gap-5">
 		<div class="col-span-2">
-			<Model {prometheusDriver} {namespace} {cluster} bind:isReloading />
+			<Model {prometheusDriver} {namespace} {cluster} {start} {end} {endIsNow} bind:isReloading />
 		</div>
 		<div class="col-span-2">
-			<Latency {prometheusDriver} {cluster} bind:isReloading />
+			<Latency {prometheusDriver} {cluster} {start} {end} {endIsNow} bind:isReloading />
 		</div>
 	</div>
 
@@ -36,12 +42,12 @@
 	</div>
 
 	<div class="col-span-4">
-		<TimeToFirstToken {prometheusDriver} {cluster} bind:isReloading />
+		<TimeToFirstToken {prometheusDriver} {cluster} {start} {end} {endIsNow} bind:isReloading />
 	</div>
 	<div class="col-span-4 row-start-2">
-		<Throughput {prometheusDriver} {cluster} bind:isReloading />
+		<Throughput {prometheusDriver} {cluster} {start} {end} {endIsNow} bind:isReloading />
 	</div>
 	<div class="col-span-4 row-start-2">
-		<Request {prometheusDriver} {cluster} bind:isReloading />
+		<Request {prometheusDriver} {cluster} {start} {end} {endIsNow} bind:isReloading />
 	</div>
 </div>

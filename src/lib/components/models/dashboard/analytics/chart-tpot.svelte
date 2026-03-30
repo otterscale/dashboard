@@ -18,28 +18,34 @@
 		cluster,
 		namespace,
 		selectedModel,
+		start,
+		end,
+		endIsNow,
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		cluster: string;
 		namespace: string | undefined;
 		selectedModel: string;
+		start: Date;
+		end: Date;
+		endIsNow: boolean;
 		isReloading: boolean;
 	} = $props();
 
-	let p50 = $state([] as SampleValue[]);
-	let p99 = $state([] as SampleValue[]);
+	let ninety_fives = $state([] as SampleValue[]);
+	let ninety_nines = $state([] as SampleValue[]);
 	const tpotData = $derived(
-		p50.map((sample, index) => ({
+		ninety_fives.map((sample, index) => ({
 			time: sample.time,
-			p50: !isNaN(Number(sample.value)) ? Number(sample.value) : 0,
-			p99: !isNaN(Number(p99[index]?.value)) ? Number(p99[index]?.value) : 0
+			p95: !isNaN(Number(sample.value)) ? Number(sample.value) : 0,
+			p99: !isNaN(Number(ninety_nines[index]?.value)) ? Number(ninety_nines[index]?.value) : 0
 		}))
 	);
 
 	function getTpotQuery(quantile: number): string {
 		const bucket = vllmMetricWithSelector(
-			'vllm:time_per_output_token_seconds_bucket',
+			'vllm:request_time_per_output_token_seconds_bucket',
 			namespace,
 			selectedModel
 		);
@@ -47,7 +53,7 @@
 	}
 
 	const configuration = {
-		p50: { label: 'P50', color: 'var(--chart-1)' },
+		p95: { label: 'P95', color: 'var(--chart-1)' },
 		p99: { label: 'P99', color: 'var(--chart-2)' }
 	} satisfies Chart.ChartConfig;
 
@@ -55,21 +61,21 @@
 		try {
 			const response = await prometheusDriver.rangeQuery(
 				getTpotQuery(quantile),
-				Date.now() - 24 * 60 * 60 * 1000,
-				Date.now(),
+				start.getTime(),
+				endIsNow ? Date.now() : end.getTime(),
 				2 * 60
 			);
-			if (quantile === 0.5) p50 = response.result[0]?.values ?? [];
-			else if (quantile === 0.99) p99 = response.result[0]?.values ?? [];
+			if (quantile === 0.95) ninety_fives = response.result[0]?.values ?? [];
+			else if (quantile === 0.99) ninety_nines = response.result[0]?.values ?? [];
 		} catch {
-			if (quantile === 0.5) p50 = [];
-			else if (quantile === 0.99) p99 = [];
+			if (quantile === 0.95) ninety_fives = [];
+			else if (quantile === 0.99) ninety_nines = [];
 		}
 	}
 
 	async function fetch() {
 		try {
-			await Promise.all([fetchTpot(0.5), fetchTpot(0.99)]);
+			await Promise.all([fetchTpot(0.95), fetchTpot(0.99)]);
 		} catch (error) {
 			console.error(`Fail to fetch TPOT data in cluster ${cluster}:`, error);
 		}
@@ -92,9 +98,11 @@
 <Statistics.Root type="count" class="overflow-visible">
 	<Statistics.Header>
 		<Statistics.Title>
-			<div class="flex flex-col gap-0.5">
-				{m.time_per_output_token()}
-				<p class="text-sm font-normal text-muted-foreground">{m.llm_dashboard_tpot_tooltip()}</p>
+			<div class="flex min-h-[4.5rem] flex-col gap-0.5">
+				<span class="line-clamp-1">{m.time_per_output_token()}</span>
+				<p class="line-clamp-2 text-sm font-normal text-muted-foreground">
+					{m.llm_dashboard_tpot_tooltip()}
+				</p>
 			</div>
 		</Statistics.Title>
 	</Statistics.Header>
@@ -116,7 +124,7 @@
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}
 					series={[
-						{ key: 'p50', label: configuration.p50.label, color: configuration.p50.color },
+						{ key: 'p95', label: configuration.p95.label, color: configuration.p95.color },
 						{ key: 'p99', label: configuration.p99.label, color: configuration.p99.color }
 					]}
 					props={{

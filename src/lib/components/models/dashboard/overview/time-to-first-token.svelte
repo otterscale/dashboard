@@ -15,8 +15,18 @@
 	let {
 		prometheusDriver,
 		cluster,
+		start,
+		end,
+		endIsNow,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	}: {
+		prometheusDriver: PrometheusDriver;
+		cluster: string;
+		start: Date;
+		end: Date;
+		endIsNow: boolean;
+		isReloading: boolean;
+	} = $props();
 
 	let ninety_fives = $state([] as SampleValue[]);
 	let ninety_nines = $state([] as SampleValue[]);
@@ -38,8 +48,8 @@
 	async function fetchTimesToFirstToken(quantile: number) {
 		const response = await prometheusDriver.rangeQuery(
 			`histogram_quantile(${quantile}, sum by(le) (rate(vllm:time_to_first_token_seconds_bucket{}[5m])))`,
-			Date.now() - 24 * 60 * 60 * 1000,
-			Date.now(),
+			start.getTime(),
+			endIsNow ? Date.now() : end.getTime(),
 			2 * 60
 		);
 		if (quantile === 0.95) {

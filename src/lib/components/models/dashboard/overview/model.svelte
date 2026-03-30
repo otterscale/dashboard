@@ -25,11 +25,17 @@
 		prometheusDriver,
 		cluster,
 		namespace,
+		start,
+		end,
+		endIsNow,
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		cluster: string;
 		namespace: string;
+		start: Date;
+		end: Date;
+		endIsNow: boolean;
 		isReloading: boolean;
 	} = $props();
 
@@ -69,8 +75,8 @@
 		try {
 			const response = await prometheusDriver.rangeQuery(
 				`count by(endpoint) (vllm:cache_config_info{})`,
-				Date.now() - 24 * 60 * 60 * 1000,
-				Date.now(),
+				start.getTime(),
+				endIsNow ? Date.now() : end.getTime(),
 				2 * 60
 			);
 			availablePods = response.result[0]?.values ?? [];

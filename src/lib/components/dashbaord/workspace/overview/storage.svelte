@@ -18,14 +18,10 @@
 	let {
 		prometheusDriver,
 		namespace,
-		start = new Date(Date.now() - 60 * 60 * 1000),
-		end = new Date(),
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		namespace: string;
-		start?: Date;
-		end?: Date;
 		isReloading: boolean;
 	} = $props();
 
@@ -42,22 +38,23 @@
 
 	async function fetchStorage() {
 		const ns = escapePromqlStringLiteral(namespace);
+		const evalAt = new Date();
 		const [reqRes, totalRes, boundRes, pendingRes] = await Promise.all([
 			prometheusDriver.instantQuery(
 				`sum(kube_persistentvolumeclaim_resource_requests_storage_bytes{namespace="${ns}"}) or vector(0)`,
-				end
+				evalAt
 			),
 			prometheusDriver.instantQuery(
 				`count(kube_persistentvolumeclaim_info{namespace="${ns}"}) or vector(0)`,
-				end
+				evalAt
 			),
 			prometheusDriver.instantQuery(
 				`count(kube_persistentvolumeclaim_status_phase{namespace="${ns}", phase="Bound"} == 1) or vector(0)`,
-				end
+				evalAt
 			),
 			prometheusDriver.instantQuery(
 				`count(kube_persistentvolumeclaim_status_phase{namespace="${ns}", phase="Pending"} == 1) or vector(0)`,
-				end
+				evalAt
 			)
 		]);
 		requestedBytes = reqRes.result[0]?.value;
@@ -85,12 +82,6 @@
 		}
 	});
 
-	$effect(() => {
-		void start;
-		void end;
-		if (isLoaded) fetch();
-	});
-
 	let isLoaded = $state(false);
 	onMount(async () => {
 		await fetch();
@@ -108,7 +99,7 @@
 	const boundPercent = $derived(total > 0 ? Math.min(100, Math.round((100 * bound) / total)) : 0);
 </script>
 
-<!-- 外框與 Workload health 一致；內容區維持 KPI + 掛載狀態區塊 -->
+<!-- Shell matches Workload health; content keeps KPI + mount status blocks. -->
 <Card.Root class="group relative h-full min-h-[280px] gap-2 overflow-hidden">
 	<HardDrive
 		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"
