@@ -6,7 +6,9 @@
 		type DiscoveryRequest,
 		ResourceService
 	} from '@otterscale/api/resource/v1';
-	import { getContext } from 'svelte';
+	import type { CoreV1Node, CoreV1Service } from '@otterscale/types';
+	import { getContext, onMount } from 'svelte';
+	import { toast } from 'svelte-sonner';
 
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -57,6 +59,60 @@
 		);
 		return apiResources;
 	}
+
+	let serviceUrl = $state('');
+	async function fetchServiceUrl() {
+		try {
+			const nodeResponse = await client.list({
+				cluster,
+				group: '',
+				version: 'v1',
+				resource: 'nodes'
+			});
+
+			const nodes = nodeResponse.items.map((item) => item.object as CoreV1Node);
+			const [node] = nodes;
+
+			const addresses = node?.status?.addresses ?? [];
+			const internalIPAddress = addresses.find((address) => address.type === 'InternalIP');
+
+			if (kind === 'ModelService') {
+				const serviceResponse = await client.get({
+					cluster,
+					namespace: 'llm-d',
+					name: 'llm-d-infra-inference-gateway-istio',
+					group: '',
+					version: 'v1',
+					resource: 'services'
+				});
+				const service = serviceResponse.object as CoreV1Service;
+				const port = service?.spec?.ports?.find((port) => port.name === 'default');
+				serviceUrl = `${internalIPAddress?.address}:${port?.port}`;
+			} else if (kind === 'CephObjectStore') {
+				const serviceResponse = await client.get({
+					cluster,
+					namespace: 'rook-ceph',
+					name: 'rook-ceph-rgw-ceph-objectstore-external',
+					group: '',
+					version: 'v1',
+					resource: 'services'
+				});
+				const service = serviceResponse.object as CoreV1Service;
+				const port = service?.spec?.ports?.find((port) => port.nodePort);
+				console.log(port);
+				serviceUrl = `${internalIPAddress?.address}:${port?.nodePort}`;
+			} else {
+				serviceUrl = internalIPAddress?.address ?? '';
+			}
+		} catch (error) {
+			console.error('Failed to fetch service URL:', error);
+			toast.error('Failed to fetch service URL');
+		}
+	}
+
+	onMount(async () => {
+		await fetchServiceUrl();
+	});
 </script>
 
 {#key cluster + group + version + kind}
@@ -86,6 +142,7 @@
 							{!group ? 'core' : group}/{version}
 						</Item.Description>
 					</Item.Content>
+					<Item.Actions><p class="text-base">{serviceUrl}</p></Item.Actions>
 				</Item.Root>
 			</div>
 			{#key resource + namespace}

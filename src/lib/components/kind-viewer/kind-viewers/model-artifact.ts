@@ -19,7 +19,7 @@ type ModelArtifactAttribute =
 	| 'Start Time'
 	| 'Completion Time'
 	| 'Format'
-	| 'Phase'
+	| 'Status'
 	| 'Age'
 	| 'raw';
 
@@ -32,7 +32,7 @@ function getModelArtifactDataSchemas(): Record<ModelArtifactAttribute, DataSchem
 		'Start Time': 'time',
 		'Completion Time': 'time',
 		Format: 'text',
-		Phase: 'text',
+		Status: 'text',
 		Age: 'time',
 		raw: 'object'
 	};
@@ -41,6 +41,9 @@ function getModelArtifactDataSchemas(): Record<ModelArtifactAttribute, DataSchem
 function getModelArtifactData(
 	object: ModelOtterscaleIoV1Alpha1ModelArtifact
 ): Record<ModelArtifactAttribute, JsonValue> {
+	const readyCondition = object?.status?.conditions?.find(
+		(condition) => condition.type === 'Ready'
+	);
 	return {
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.metadata?.namespace ?? null,
@@ -49,7 +52,7 @@ function getModelArtifactData(
 		'Start Time': object?.status?.startTime ?? null,
 		'Completion Time': object?.status?.completionTime ?? null,
 		Format: object?.spec?.format ?? null,
-		Phase: object?.status?.phase ?? null,
+		Status: readyCondition?.status === 'True' ? 'Ready' : 'Not Ready',
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
 	};
@@ -64,7 +67,7 @@ function getModelArtifactUISchemas(): Record<ModelArtifactAttribute, UISchemaTyp
 		'Start Time': 'time',
 		'Completion Time': 'time',
 		Format: 'text',
-		Phase: 'text',
+		Status: 'text',
 		Age: 'time',
 		raw: 'object'
 	};
@@ -196,7 +199,7 @@ function getModelArtifactColumnDefinitions(
 			accessorKey: 'Format'
 		},
 		{
-			id: 'Phase',
+			id: 'Status',
 			header: ({ column }: { column: Column<Record<ModelArtifactAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
@@ -214,7 +217,7 @@ function getModelArtifactColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'Phase'
+			accessorKey: 'Status'
 		},
 		{
 			id: 'Start Time',

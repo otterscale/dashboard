@@ -48,7 +48,7 @@ function getHelmRepositoryData(
 		Type: object?.spec?.type ?? null,
 		URL: object?.spec?.url ?? null,
 		Interval: object?.spec?.interval ?? null,
-		Status: readyCondition?.status ?? null,
+		Status: readyCondition?.status === 'True' ? 'Ready' : 'Not Ready',
 		Reason: readyCondition?.reason ?? null,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
