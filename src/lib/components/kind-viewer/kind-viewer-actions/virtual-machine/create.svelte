@@ -105,7 +105,7 @@
 	}
 
 	// Build disks and volumes
-	function buildDisksAndVolumes(): { disks: any[]; volumes: any[] } {
+	function buildDisksAndVolumes(): { disks: any[]; volumes: any[]; isContainerDisk: boolean } {
 		const vmName = typeof values.metadata.name === 'string' ? values.metadata.name : '';
 		const isContainerDisk = values.diskSourceType === 'containerDisk';
 
@@ -143,7 +143,7 @@
 			});
 		}
 
-		return { disks, volumes };
+		return { disks, volumes, isContainerDisk };
 	}
 
 	// Build dataVolumeTemplates to clone the selected boot DV
@@ -179,8 +179,7 @@
 
 	// Derived submission values (proper VirtualMachine structure)
 	const submissionValues = $derived.by(() => {
-		const { disks, volumes } = buildDisksAndVolumes();
-		const isContainerDisk = values.diskSourceType === 'containerDisk';
+		const { disks, volumes, isContainerDisk } = buildDisksAndVolumes();
 
 		return {
 			apiVersion: group ? `${group}/${version}` : version,
@@ -534,8 +533,7 @@
 							containerDiskImage: {
 								'ui:options': {
 									shadcn4Text: {
-										placeholder:
-											'e.g. quay.io/kubevirt/fedora-cloud-container-disk-demo:latest'
+										placeholder: 'e.g. quay.io/kubevirt/fedora-cloud-container-disk-demo:latest'
 									}
 								}
 							},
