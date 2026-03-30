@@ -3,7 +3,7 @@
 	import Gauge from '@lucide/svelte/icons/gauge';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import { ArcChart, Text } from 'layerchart';
-	import { ResponseType, type PrometheusDriver } from 'prometheus-query';
+	import { type PrometheusDriver,ResponseType } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import * as Statistics from '$lib/components/custom/data-table/statistics/index';
