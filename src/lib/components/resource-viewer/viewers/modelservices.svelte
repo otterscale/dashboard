@@ -1,19 +1,3 @@
-<script lang="ts" module>
-	type ModelServiceComponentType = 'decode' | 'prefill' | 'epp';
-
-	type ModelServiceComponentIdentifier = {
-		type: ModelServiceComponentType;
-		component: string;
-	};
-
-	type ModelServiceComponent = ModelServiceComponentIdentifier & {
-		selector: string;
-		deployments: AppsV1Deployment[];
-		pods: CoreV1Pod[];
-		error: string | null;
-	};
-</script>
-
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import {
