@@ -1,18 +1,17 @@
 <script lang="ts">
-	import { Handle, Position } from '@xyflow/svelte';
 	import Server from '@lucide/svelte/icons/server';
-
 	import type { NodeProps } from '@xyflow/svelte';
+	import { Handle, Position } from '@xyflow/svelte';
 
 	let { data, selected }: NodeProps = $props();
 </script>
 
 {#if data.hasTargetEdge}
-	<Handle type="target" position={Position.Top} class="!bg-chart-3" />
+	<Handle type="target" position={Position.Top} class="bg-chart-3!" />
 {/if}
 
 <div
-	class="w-[220px] rounded-lg border border-border bg-card text-card-foreground shadow-sm transition-all duration-200 hover:border-primary/50 hover:shadow-md {selected
+	class="w-55 rounded-lg border border-border bg-card text-card-foreground shadow-sm transition-all duration-200 hover:border-primary/50 hover:shadow-md {selected
 		? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
 		: ''}"
 >

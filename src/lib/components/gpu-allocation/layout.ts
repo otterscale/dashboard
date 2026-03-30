@@ -10,10 +10,7 @@ const NODE_DIMENSIONS: Record<string, { width: number; height: number }> = {
 
 const DEFAULT_DIMENSION = { width: 220, height: 100 };
 
-export function computeLayout(
-	nodes: Node[],
-	edges: Edge[]
-): { nodes: Node[]; edges: Edge[] } {
+export function computeLayout(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges: Edge[] } {
 	const g = new dagre.graphlib.Graph();
 	g.setDefaultEdgeLabel(() => ({}));
 	g.setGraph({ rankdir: 'TB', nodesep: 60, ranksep: 100, edgesep: 30 });

@@ -3,11 +3,11 @@
 
 	import {
 		Background,
+		BackgroundVariant,
 		Controls,
 		type Edge,
 		type Node,
 		type NodeTypes,
-		Position,
 		SvelteFlow
 	} from '@xyflow/svelte';
 
@@ -209,8 +209,16 @@
 </script>
 
 <div class="gpu-allocation-flow h-full w-full">
-	<SvelteFlow bind:nodes bind:edges {nodeTypes} fitView minZoom={0.3} maxZoom={2} proOptions={{ hideAttribution: true }}>
-		<Background variant="dots" gap={20} />
+	<SvelteFlow
+		bind:nodes
+		bind:edges
+		{nodeTypes}
+		fitView
+		minZoom={0.3}
+		maxZoom={2}
+		proOptions={{ hideAttribution: true }}
+	>
+		<Background variant={'dots' as BackgroundVariant} gap={20} />
 		<Controls />
 	</SvelteFlow>
 </div>

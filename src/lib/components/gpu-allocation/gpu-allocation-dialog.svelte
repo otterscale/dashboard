@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import NetworkIcon from '@lucide/svelte/icons/network';
+	import GpuIcon from '@lucide/svelte/icons/gpu';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext } from 'svelte';
 
@@ -71,7 +71,7 @@
 	<Dialog.Trigger class="w-full">
 		<Item.Root class="flex-nowrap p-0 text-xs" size="sm">
 			<Item.Media>
-				<NetworkIcon />
+				<GpuIcon />
 			</Item.Media>
 			<Item.Content>
 				<Item.Title>{m.gpu_allocation()}</Item.Title>

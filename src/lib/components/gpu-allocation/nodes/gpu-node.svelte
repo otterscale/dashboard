@@ -1,8 +1,7 @@
 <script lang="ts">
-	import { Handle, Position } from '@xyflow/svelte';
-	import Cpu from '@lucide/svelte/icons/cpu';
-
+	import Gpu from '@lucide/svelte/icons/gpu';
 	import type { NodeProps } from '@xyflow/svelte';
+	import { Handle, Position } from '@xyflow/svelte';
 
 	let { data, selected }: NodeProps = $props();
 
@@ -12,17 +11,17 @@
 </script>
 
 {#if data.hasTargetEdge}
-	<Handle type="target" position={Position.Top} class="!bg-chart-4" />
+	<Handle type="target" position={Position.Top} class="bg-chart-4!" />
 {/if}
 
 <div
-	class="w-[190px] rounded-lg border border-border bg-card text-card-foreground shadow-sm transition-all duration-200 hover:border-primary/50 hover:shadow-md {selected
+	class="w-47.5 rounded-lg border border-border bg-card text-card-foreground shadow-sm transition-all duration-200 hover:border-primary/50 hover:shadow-md {selected
 		? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
 		: ''}"
 >
 	<div class="flex items-center gap-2 border-b border-border px-3 py-2">
 		<div class="flex size-6 items-center justify-center rounded-md bg-chart-4/10">
-			<Cpu size={14} class="text-chart-4" />
+			<Gpu size={14} class="text-chart-4" />
 		</div>
 		<span class="truncate text-sm font-semibold">GPU #{data.index}</span>
 		<span
@@ -37,14 +36,11 @@
 			{data.usedMem} / {data.totalMem} MiB
 		</div>
 		<div class="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-			<div
-				class="h-full rounded-full bg-chart-4 transition-all"
-				style="width: {usedMemPct}%"
-			></div>
+			<div class="h-full rounded-full bg-chart-4 transition-all" style="width: {usedMemPct}%"></div>
 		</div>
 	</div>
 </div>
 
 {#if data.hasSourceEdge}
-	<Handle type="source" position={Position.Bottom} class="!bg-chart-4" />
+	<Handle type="source" position={Position.Bottom} class="bg-chart-4!" />
 {/if}

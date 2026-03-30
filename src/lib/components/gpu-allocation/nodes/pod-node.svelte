@@ -1,8 +1,7 @@
 <script lang="ts">
-	import { Handle, Position } from '@xyflow/svelte';
 	import Box from '@lucide/svelte/icons/box';
-
 	import type { NodeProps } from '@xyflow/svelte';
+	import { Handle, Position } from '@xyflow/svelte';
 
 	let { data, selected }: NodeProps = $props();
 
@@ -16,11 +15,11 @@
 </script>
 
 {#if data.hasTargetEdge}
-	<Handle type="target" position={Position.Top} class="!bg-chart-2" />
+	<Handle type="target" position={Position.Top} class="bg-chart-2!" />
 {/if}
 
 <div
-	class="w-[200px] rounded-lg border border-border bg-card text-card-foreground shadow-sm transition-all duration-200 hover:border-primary/50 hover:shadow-md {selected
+	class="w-50 rounded-lg border border-border bg-card text-card-foreground shadow-sm transition-all duration-200 hover:border-primary/50 hover:shadow-md {selected
 		? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
 		: ''}"
 >
@@ -43,5 +42,5 @@
 </div>
 
 {#if data.hasSourceEdge}
-	<Handle type="source" position={Position.Bottom} class="!bg-chart-2" />
+	<Handle type="source" position={Position.Bottom} class="bg-chart-2!" />
 {/if}

@@ -85,7 +85,5 @@ export function parsePodGpuAllocations(annotationValue: string | undefined): Gpu
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getPodNodeName(pod: any): string {
-	return (
-		pod?.metadata?.annotations?.[ANNOTATION_VGPU_NODE] ?? pod?.spec?.nodeName ?? ''
-	);
+	return pod?.metadata?.annotations?.[ANNOTATION_VGPU_NODE] ?? pod?.spec?.nodeName ?? '';
 }

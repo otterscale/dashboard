@@ -1,14 +1,13 @@
 <script lang="ts">
-	import { Handle, Position } from '@xyflow/svelte';
 	import Bot from '@lucide/svelte/icons/bot';
-
 	import type { NodeProps } from '@xyflow/svelte';
+	import { Handle, Position } from '@xyflow/svelte';
 
 	let { data, selected }: NodeProps = $props();
 </script>
 
 <div
-	class="w-[200px] rounded-lg border border-border bg-card text-card-foreground shadow-sm transition-all duration-200 hover:border-primary/50 hover:shadow-md {selected
+	class="w-50 rounded-lg border border-border bg-card text-card-foreground shadow-sm transition-all duration-200 hover:border-primary/50 hover:shadow-md {selected
 		? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
 		: ''}"
 >
@@ -25,5 +24,5 @@
 </div>
 
 {#if data.hasSourceEdge}
-	<Handle type="source" position={Position.Bottom} class="!bg-primary" />
+	<Handle type="source" position={Position.Bottom} class="bg-primary!" />
 {/if}
