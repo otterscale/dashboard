@@ -20,6 +20,6 @@
 	const namespace = $derived(page.data.namespace ?? '');
 </script>
 
-{#key cluster}
+{#key `${cluster}:${namespace}`}
 	<Dashboard {cluster} {namespace} />
 {/key}

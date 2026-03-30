@@ -13,7 +13,6 @@
 
 	let isReloading = $state(true);
 	let prometheusDriver = $state<PrometheusDriver | null>(null);
-	console.log('cluster: ', cluster, '; namespace: ', namespace);
 
 	onMount(async () => {
 		try {
