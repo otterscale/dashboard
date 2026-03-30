@@ -1,9 +1,10 @@
 <script lang="ts">
-	import Ellipsis from '@lucide/svelte/icons/ellipsis';
+	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
+	import Vnc from '$lib/components/kind-viewer/kind-viewer-actions/default/vnc.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
@@ -40,7 +41,7 @@
 		{#snippet child({ props })}
 			<div class="flex justify-end">
 				<Button size="icon" variant="ghost" class="shadow-none" aria-label="Actions" {...props}>
-					<Ellipsis size={16} aria-hidden="true" />
+					<EllipsisIcon size={16} aria-hidden="true" />
 				</Button>
 			</div>
 		{/snippet}
@@ -74,6 +75,19 @@
 		</DropdownMenu.Group>
 		<DropdownMenu.Separator />
 		<DropdownMenu.Group>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Vnc
+					{cluster}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();

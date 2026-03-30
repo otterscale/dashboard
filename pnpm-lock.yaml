@@ -26,6 +26,9 @@ importers:
       '@monaco-editor/loader':
         specifier: ^1.7.0
         version: 1.7.0
+      '@novnc/novnc':
+        specifier: ^1.7.0-beta
+        version: 1.7.0-beta
       '@oslojs/crypto':
         specifier: ^1.0.1
         version: 1.0.1
@@ -178,8 +181,8 @@ importers:
         specifier: ^0.577.0
         version: 0.577.0(svelte@5.55.0)
       '@otterscale/api':
-        specifier: ^0.9.3
-        version: 0.9.3
+        specifier: ^1.0.0-beta.1
+        version: 1.0.0-beta.1
       '@otterscale/types':
         specifier: ^0.9.3
         version: 0.9.3
@@ -700,6 +703,9 @@ packages:
   '@monaco-editor/loader@1.7.0':
     resolution: {integrity: sha512-gIwR1HrJrrx+vfyOhYmCZ0/JcWqG5kbfG7+d3f/C1LXk2EvzAbHSg3MQ5lO2sMlo9izoAZ04shohfKLVT6crVA==}
 
+  '@novnc/novnc@1.7.0-beta':
+    resolution: {integrity: sha512-h1NihPIO1bo023eL5b8OCSJarVOngWmCYQIN0jZfjgvP/s9ZKQZVsrH8pwVqB8zCkqmqzSSEOTN0mHtLp7u7gg==}
+
   '@oslojs/asn1@1.0.0':
     resolution: {integrity: sha512-zw/wn0sj0j0QKbIXfIlnEcTviaCzYOY3V5rAyjR6YtOByFtJiT574+8p9Wlach0lZH9fddD4yb9laEAIl4vXQA==}
 
@@ -718,8 +724,8 @@ packages:
   '@oslojs/jwt@0.2.0':
     resolution: {integrity: sha512-bLE7BtHrURedCn4Mco3ma9L4Y1GR2SMBuIvjWr7rmQ4/W/4Jy70TIAgZ+0nIlk0xHz1vNP8x8DCns45Sb2XRbg==}
 
-  '@otterscale/api@0.9.3':
-    resolution: {integrity: sha512-hHS7KPfiyhYsHyGPmyIAUl4zpG6RHU/8tusHD/LVnBqdT/sgzL6SxWxLCTvTcQJcHX/PDUlooPZ59wmO0tHV1Q==}
+  '@otterscale/api@1.0.0-beta.1':
+    resolution: {integrity: sha512-cC0CSC84FHcnV05R5pr9PdHsiog8M4lidwlTVxKMIYA9ORSKs05wY7lKG243vRcEnXvfpNPn8Or89Q1VfbcA2Q==}
 
   '@otterscale/types@0.9.3':
     resolution: {integrity: sha512-MTAq7zkSaNH+4AedmKzkutIIaWX89HrGl6K76YvV7PeirgT4sZfECmMHspKKumoiNRYuunn5tW17FPlo9bmT0Q==}
@@ -3538,6 +3544,8 @@ snapshots:
     dependencies:
       state-local: 1.0.7
 
+  '@novnc/novnc@1.7.0-beta': {}
+
   '@oslojs/asn1@1.0.0':
     dependencies:
       '@oslojs/binary': 1.0.0
@@ -3557,7 +3565,7 @@ snapshots:
     dependencies:
       '@oslojs/encoding': 0.4.1
 
-  '@otterscale/api@0.9.3':
+  '@otterscale/api@1.0.0-beta.1':
     dependencies:
       '@bufbuild/protobuf': 2.11.0
 

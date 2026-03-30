@@ -129,6 +129,8 @@ function getActions(kind: string): ActionsType {
 			return CephObjectStoreActions as ActionsType;
 		case 'ObjectBucketClaim':
 			return ObjectBucketClaimActions as ActionsType;
+		case 'VirtualMachine':
+			return VirtualMachineActions as ActionsType;
 		default:
 			return DefaultActions as ActionsType;
 	}
