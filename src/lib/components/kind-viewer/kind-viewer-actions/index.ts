@@ -38,6 +38,7 @@ import WorkspaceCreate from './workspace/create.svelte';
 type RoleType = 'admin' | 'edit' | 'view';
 
 type CreateType = Component<{
+	role?: string;
 	cluster?: string;
 	namespace?: string;
 	group?: string;
