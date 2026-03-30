@@ -1,41 +1,41 @@
-<script lang="ts" module>
-	type RelatedResource = {
-		name: string;
-		namespace?: string;
-		group: string;
-		version: string;
-		kind: string;
-		resource: string;
-		title: string;
-	};
-
-	type ResourceRef = { name: string; namespace?: string } | null | undefined;
-</script>
-
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
+	import {
+		CircleIcon,
+		FileSearchIcon,
+		ScrollTextIcon,
+		TerminalSquareIcon,
+		XIcon
+	} from '@lucide/svelte';
 	import Box from '@lucide/svelte/icons/box';
-	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import HeartPulse from '@lucide/svelte/icons/heart-pulse';
 	import Layers from '@lucide/svelte/icons/layers';
-	import type { CoreV1Pod, WorkloadOtterscaleIoV1Alpha1Application } from '@otterscale/types';
 	import { ResourceService } from '@otterscale/api/resource/v1';
+	import type {
+		AppsV1Deployment,
+		BatchV1CronJob,
+		BatchV1Job,
+		CoreV1PersistentVolumeClaim,
+		CoreV1Pod,
+		CoreV1Service,
+		WorkloadOtterscaleIoV1Alpha1Application
+	} from '@otterscale/types';
+	import lodash from 'lodash';
 	import { getContext, onMount } from 'svelte';
 
-	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import Log from '$lib/components/kind-viewer/kind-viewer-actions/default/log.svelte';
-	import TerminalAction from '$lib/components/kind-viewer/kind-viewer-actions/default/terminal.svelte';
+	import Terminal from '$lib/components/kind-viewer/kind-viewer-actions/default/terminal.svelte';
 	import { typographyVariants } from '$lib/components/typography/index.ts';
 	import { Badge } from '$lib/components/ui/badge';
+	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
+	import * as Dialog from '$lib/components/ui/dialog/index.ts';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import Label from '$lib/components/ui/label/label.svelte';
-	import Separator from '$lib/components/ui/separator/separator.svelte';
-	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { cn } from '$lib/utils';
 
 	let { object }: { object: WorkloadOtterscaleIoV1Alpha1Application } = $props();
@@ -43,28 +43,22 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	let pods = $state<CoreV1Pod[]>([]);
-
 	const cluster = $derived(page.params.cluster ?? '');
 	const namespace = $derived(object?.metadata?.namespace ?? '');
 	const applicationName = $derived(object?.metadata?.name ?? '');
 
-	const podLabelSelector = $derived(applicationName ? `app=app-${applicationName}` : '');
-
-	function getReady(pod: CoreV1Pod): string {
-		const totalContainers = pod?.spec?.containers?.length ?? 0;
-
+	function getContainerReadies(pod: CoreV1Pod): number {
 		const containerStatuses = pod?.status?.containerStatuses ?? [];
 		const readyContainers = containerStatuses.filter(
 			(containerStatus) => containerStatus.ready
 		).length;
 
-		return `${readyContainers}/${totalContainers}`;
+		return readyContainers;
 	}
 
-	function getRestart(pod: CoreV1Pod): number {
+	function getContainerRestarts(pod: CoreV1Pod): number {
 		return (pod?.status?.containerStatuses ?? []).reduce(
-			(sum, containerStatus) => sum + (containerStatus.restartCount ?? 0),
+			(a, containerStatus) => a + (containerStatus.restartCount ?? 0),
 			0
 		);
 	}
@@ -81,27 +75,12 @@
 		return waitingReason ?? terminatedReason ?? pod?.status?.phase ?? 'Unknown';
 	}
 
-	function buildResourceUrl(
-		name: string,
-		group: string,
-		version: string,
-		kind: string,
-		resource: string,
-		resourceNamespace?: string
-	): string {
-		let query = `?group=${group}&version=${version}&kind=${kind}&resource=${resource}`;
-		if (resourceNamespace) {
-			query += `&namespace=${resourceNamespace}`;
-		}
-		return resolve(`/(auth)/${page.params.cluster}/${page.params.workspace}/${name}${query}`);
-	}
+	let pods = $state<CoreV1Pod[]>([]);
 
-	let isPodsLoaded = $state(false);
-	let podsError = $state<string | null>(null);
 	async function fetchPods() {
-		if (!cluster || !namespace || !applicationName || !podLabelSelector) {
-			pods = [];
-			isPodsLoaded = true;
+		pods = [];
+
+		if (!cluster || !namespace || !applicationName) {
 			return;
 		}
 
@@ -112,108 +91,95 @@
 				group: '',
 				version: 'v1',
 				resource: 'pods',
-				labelSelector: podLabelSelector
+				labelSelector: `app=app-${applicationName}`
 			});
 
 			pods = response.items.map((item) => item.object as CoreV1Pod);
 		} catch (error) {
 			console.error(`Failed to fetch pods for application ${applicationName}:`, error);
-			pods = [];
-			podsError = error instanceof Error ? error.message : 'Failed to fetch pods.';
-		} finally {
-			isPodsLoaded = true;
+		}
+	}
+
+	let relatedResources = $state({});
+
+	async function fetchRelatedResources() {
+		if (!cluster || !namespace || !applicationName) {
+			return;
+		}
+
+		try {
+			const deploymentResponse = await resourceClient.get({
+				cluster: cluster,
+				name: object?.status?.deploymentRef?.name,
+				namespace: object?.status?.deploymentRef?.namespace,
+				group: 'apps',
+				version: 'v1',
+				resource: 'deployments'
+			});
+
+			lodash.set(relatedResources, 'Deployment', deploymentResponse.object as AppsV1Deployment);
+
+			const serviceResponse = await resourceClient.get({
+				cluster: cluster,
+				name: object?.status?.serviceRef?.name,
+				namespace: object?.status?.serviceRef?.namespace,
+				group: '',
+				version: 'v1',
+				resource: 'services'
+			});
+
+			lodash.set(relatedResources, 'Service', serviceResponse.object as CoreV1Service);
+
+			const persistentVolumeClaimResponse = await resourceClient.get({
+				cluster: cluster,
+				name: object?.status?.persistentVolumeClaimRef?.name,
+				namespace: object?.status?.persistentVolumeClaimRef?.namespace,
+				group: '',
+				version: 'v1',
+				resource: 'persistentvolumeclaims'
+			});
+
+			lodash.set(
+				relatedResources,
+				'PersistentVolumeClaim',
+				persistentVolumeClaimResponse.object as CoreV1PersistentVolumeClaim
+			);
+
+			const cronJobResponse = await resourceClient.get({
+				cluster: cluster,
+				name: object?.status?.cronJobRef?.name,
+				namespace: object?.status?.cronJobRef?.namespace,
+				group: 'batch',
+				version: 'v1',
+				resource: 'cronjobs'
+			});
+
+			lodash.set(relatedResources, 'Cronjob', cronJobResponse.object as BatchV1CronJob);
+
+			const jobResponse = await resourceClient.get({
+				cluster: cluster,
+				name: object?.status?.jobRef?.name,
+				namespace: object?.status?.jobRef?.namespace,
+				group: 'batch',
+				version: 'v1',
+				resource: 'jobs'
+			});
+
+			lodash.set(relatedResources, 'Job', jobResponse.object as BatchV1Job);
+		} catch (error) {
+			console.error(`Failed to fetch pods for application ${applicationName}:`, error);
 		}
 	}
 
 	onMount(async () => {
 		await fetchPods();
+		await fetchRelatedResources();
 	});
-
-	let relatedResources = $derived.by(() => {
-		const refs: RelatedResource[] = [];
-		const status = object?.status;
-		const objectNamespace = object?.metadata?.namespace;
-		if (!status) return refs;
-
-		const singleRefs: {
-			ref: ResourceRef;
-			group: string;
-			version: string;
-			kind: string;
-			resource: string;
-			title: string;
-		}[] = [
-			{
-				ref: status.deploymentRef as ResourceRef,
-				group: 'apps',
-				version: 'v1',
-				kind: 'Deployment',
-				resource: 'deployments',
-				title: 'Deployment'
-			},
-			{
-				ref: status.cronJobRef as ResourceRef,
-				group: 'batch',
-				version: 'v1',
-				kind: 'CronJob',
-				resource: 'cronjobs',
-				title: 'CronJob'
-			},
-			{
-				ref: status.jobRef as ResourceRef,
-				group: 'batch',
-				version: 'v1',
-				kind: 'Job',
-				resource: 'jobs',
-				title: 'Job'
-			},
-			{
-				ref: status.serviceRef as ResourceRef,
-				group: '',
-				version: 'v1',
-				kind: 'Service',
-				resource: 'services',
-				title: 'Service'
-			},
-			{
-				ref: status.persistentVolumeClaimRef as ResourceRef,
-				group: '',
-				version: 'v1',
-				kind: 'PersistentVolumeClaim',
-				resource: 'persistentvolumeclaims',
-				title: 'PVC'
-			}
-		];
-
-		for (const { ref, group, version, kind, resource, title } of singleRefs) {
-			if (ref?.name) {
-				refs.push({
-					name: ref.name,
-					namespace: ref.namespace ?? objectNamespace,
-					group,
-					version,
-					kind,
-					resource,
-					title
-				});
-			}
-		}
-
-		return refs;
-	});
-
-	let summaryItems = $derived.by(() => [
-		{ name: 'Workload Type', information: object?.spec?.workloadType ?? 'Unknown' },
-		{ name: 'Namespace', information: namespace || '-' },
-		{ name: 'Pod Selector', information: podLabelSelector || '-' },
-		{ name: 'Related Resources', information: String(relatedResources.length) },
-		{ name: 'Pods', information: isPodsLoaded ? String(pods.length) : 'Loading' }
-	]);
 </script>
 
 <Field.Group class="pb-8">
-	<Field.Set class="grid grid-cols-1 gap-0 rounded-lg bg-muted/50">
-		<Card.Root class="flex h-full flex-col border-0 bg-transparent shadow-none">
+	<Field.Set>
+		<Card.Root class="flex h-full flex-col border-0 bg-muted/50 shadow-none">
 			{@const conditions = object.status?.conditions ?? []}
 			{@const readyCondition = conditions.find((condition) => condition.type === 'Ready')}
 			{@const isReady = readyCondition?.status === 'True'}
@@ -277,11 +243,7 @@
 			</Card.Content>
 		</Card.Root>
 
-		<div class="px-4">
-			<Separator class="py-px" />
-		</div>
-
-		<Card.Root class="flex h-full flex-col border-0 bg-transparent shadow-none">
+		<Card.Root class="flex h-full flex-col border-0 bg-muted/50 shadow-none">
 			<Card.Header>
 				<Card.Title>
 					<Item.Root class="p-0">
@@ -295,7 +257,14 @@
 				</Card.Title>
 			</Card.Header>
 			<Card.Content class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-				{#each summaryItems as item, index (index)}
+				{@const summaries = [
+					{ name: 'Name', information: object?.metadata?.name },
+					{ name: 'Namespace', information: object?.metadata?.namespace },
+					{ name: 'Type', information: object?.spec?.workloadType },
+					{ name: 'Related Resources', information: Object.keys(relatedResources).length },
+					{ name: 'Pods', information: pods.length }
+				]}
+				{#each summaries as item, index (index)}
 					<Item.Root class="p-0">
 						<Item.Content>
 							<Item.Description>{item.name}</Item.Description>
@@ -309,40 +278,294 @@
 
 	<Field.Set>
 		<Label class={typographyVariants({ variant: 'h4' })}>Related Resources</Label>
-		{#if relatedResources.length > 0}
+		{#if Object.keys(relatedResources).length > 0}
 			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-				{#each relatedResources as ref (ref.kind + ref.name)}
-					<Item.Root variant="outline">
-						{#snippet child({ props })}
-							<a
-								href={buildResourceUrl(
-									ref.name,
-									ref.group,
-									ref.version,
-									ref.kind,
-									ref.resource,
-									ref.namespace
-								)}
-								target="_blank"
-								rel="noopener noreferrer"
-								{...props}
-							>
-								<Item.Content>
-									<Item.Description>
-										<Badge variant="outline">{ref.title}</Badge>
-										{ref.namespace}
-									</Item.Description>
-									<Item.Title>{ref.name}</Item.Title>
-									<Item.Description>
-										{ref.resource}.{ref.group ? `${ref.group}/${ref.version}` : ref.version}
-									</Item.Description>
-								</Item.Content>
-								<Item.Actions>
-									<ExternalLinkIcon class="size-4" />
-								</Item.Actions>
-							</a>
-						{/snippet}
-					</Item.Root>
+				{#each Object.entries(relatedResources) as [kind, resource], index (index)}
+					{#if kind === 'Deployment'}
+						{@const deployment = resource as AppsV1Deployment}
+						<Card.Root>
+							<Card.Header>
+								<Card.Title>{deployment?.metadata?.name}</Card.Title>
+								<Card.Description>
+									{@const availability = deployment.status?.conditions?.find(
+										(condition) => condition.type === 'Available'
+									)}
+									{#if availability?.status === 'True'}
+										<Badge>Available</Badge>
+									{:else}
+										<Badge variant="destructive">Unavailable</Badge>
+									{/if}
+								</Card.Description>
+								<Card.Action>
+									<Describe
+										{cluster}
+										namespace={deployment?.metadata?.namespace ?? namespace}
+										group="apps"
+										version="v1"
+										resource="deployments"
+										object={deployment}
+									>
+										{#snippet trigger()}
+											<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost' }))}>
+												<FileSearchIcon />
+											</Dialog.Trigger>
+										{/snippet}
+									</Describe>
+								</Card.Action>
+							</Card.Header>
+							<Card.Content class="flex flex-col gap-2">
+								{@const conditions = deployment?.status?.conditions ?? []}
+								{#each conditions as condition, index (index)}
+									<Item.Root class="p-0">
+										<Item.Media>
+											{#if condition.status === 'True'}
+												<CircleIcon />
+											{:else}
+												<XIcon />
+											{/if}
+										</Item.Media>
+										<Item.Content>
+											<Item.Title>{condition.type}</Item.Title>
+											<Item.Description>{condition.reason}</Item.Description>
+											{condition.message}
+										</Item.Content>
+										<Item.Actions>{condition.lastUpdateTime}</Item.Actions>
+									</Item.Root>
+								{/each}
+							</Card.Content>
+						</Card.Root>
+					{:else if kind === 'Service'}
+						{@const service = resource as CoreV1Service}
+						<Card.Root>
+							<Card.Header>
+								<Card.Title>{service?.metadata?.name}</Card.Title>
+								<Card.Description>
+									<Badge>{service?.spec?.type}</Badge>
+								</Card.Description>
+								<Card.Action>
+									<Describe
+										{cluster}
+										namespace={service?.metadata?.namespace ?? namespace}
+										group=""
+										version="v1"
+										resource="services"
+										object={service}
+									>
+										{#snippet trigger()}
+											<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost' }))}>
+												<FileSearchIcon />
+											</Dialog.Trigger>
+										{/snippet}
+									</Describe>
+								</Card.Action>
+							</Card.Header>
+							<Card.Content class="flex flex-col gap-2">
+								{@const ports = service?.spec?.ports ?? []}
+								{#each ports as port, index (index)}
+									{#if port.name}
+										<Item.Root class="p-0">
+											<Item.Content>
+												<Item.Title>Name</Item.Title>
+												<Item.Description>{port.name}</Item.Description>
+											</Item.Content>
+										</Item.Root>
+									{/if}
+									{#if port.protocol}
+										<Item.Root class="p-0">
+											<Item.Content>
+												<Item.Title>Protocol</Item.Title>
+												<Item.Description>{port.protocol}</Item.Description>
+											</Item.Content>
+										</Item.Root>
+									{/if}
+									{#if port.nodePort}
+										<Item.Root class="p-0">
+											<Item.Content>
+												<Item.Title>Node Port</Item.Title>
+												<Item.Description>{port.nodePort}</Item.Description>
+											</Item.Content>
+										</Item.Root>
+									{/if}
+									{#if port.port}
+										<Item.Root class="p-0">
+											<Item.Content>
+												<Item.Title>Port</Item.Title>
+												<Item.Description>{port.port}</Item.Description>
+											</Item.Content>
+										</Item.Root>
+									{/if}
+									{#if port.targetPort}
+										<Item.Root class="p-0">
+											<Item.Content>
+												<Item.Title>Target Port</Item.Title>
+												<Item.Description>{port.targetPort}</Item.Description>
+											</Item.Content>
+										</Item.Root>
+									{/if}
+								{/each}
+							</Card.Content>
+						</Card.Root>
+					{:else if kind === 'PersistentVolumeClaim'}
+						{@const persistentVolumeClaim = resource as CoreV1PersistentVolumeClaim}
+						<Card.Root>
+							<Card.Header>
+								<Card.Title>{persistentVolumeClaim?.metadata?.name}</Card.Title>
+								<Card.Description>
+									<Badge>{persistentVolumeClaim?.status?.phase}</Badge>
+								</Card.Description>
+								<Card.Action>
+									<Describe
+										{cluster}
+										namespace={persistentVolumeClaim?.metadata?.namespace ?? namespace}
+										group=""
+										version="v1"
+										resource="persistentvolumeclaims"
+										object={persistentVolumeClaim}
+									>
+										{#snippet trigger()}
+											<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost' }))}>
+												<FileSearchIcon />
+											</Dialog.Trigger>
+										{/snippet}
+									</Describe>
+								</Card.Action>
+							</Card.Header>
+							<Card.Content class="flex flex-col gap-2">
+								{@const accessModes = persistentVolumeClaim?.status?.accessModes ?? []}
+								<p class="text-xl">{persistentVolumeClaim?.status?.capacity?.storage}</p>
+								{#each accessModes as accessMode, index (index)}
+									<Item.Root class="p-0">
+										<Item.Content>
+											<Item.Title>Access Mode</Item.Title>
+											<Item.Description>{accessMode}</Item.Description>
+										</Item.Content>
+									</Item.Root>
+								{/each}
+							</Card.Content>
+						</Card.Root>
+					{:else if kind === 'Cronjob'}
+						{@const cronjob = resource as BatchV1CronJob}
+						<Card.Root>
+							<Card.Header>
+								<Card.Title>{cronjob?.metadata?.name}</Card.Title>
+								<Card.Description>
+									<Badge>{cronjob?.status?.phase}</Badge>
+								</Card.Description>
+								<Card.Action>
+									<Describe
+										{cluster}
+										namespace={cronjob?.metadata?.namespace ?? namespace}
+										group="batch"
+										version="v1"
+										resource="cronjobs"
+										object={cronjob}
+									>
+										{#snippet trigger()}
+											<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost' }))}>
+												<FileSearchIcon />
+											</Dialog.Trigger>
+										{/snippet}
+									</Describe>
+								</Card.Action>
+							</Card.Header>
+							<Card.Content class="flex flex-col gap-2">
+								{#if cronjob.spec?.schedule}
+									<Item.Root class="p-0">
+										<Item.Content>
+											<Item.Title>Schedule</Item.Title>
+											<Item.Description>{cronjob.spec?.schedule}</Item.Description>
+										</Item.Content>
+									</Item.Root>
+								{/if}
+								{#if cronjob?.spec?.timeZone}
+									<Item.Root class="p-0">
+										<Item.Content>
+											<Item.Title>Time Zone</Item.Title>
+											<Item.Description>{cronjob.spec?.timeZone}</Item.Description>
+										</Item.Content>
+									</Item.Root>
+								{/if}
+								{#if cronjob?.status?.active}
+									<Item.Root class="p-0">
+										<Item.Content>
+											<Item.Title>Active</Item.Title>
+											<Item.Description>{cronjob.status?.active?.length}</Item.Description>
+										</Item.Content>
+									</Item.Root>
+								{/if}
+								{#if cronjob?.status?.lastScheduleTime}
+									<Item.Root class="p-0">
+										<Item.Content>
+											<Item.Title>Last Schedule Time</Item.Title>
+											<Item.Description>{cronjob.status?.lastScheduleTime}</Item.Description>
+										</Item.Content>
+									</Item.Root>
+								{/if}
+								{#if cronjob?.status?.lastSuccessfulTime}
+									<Item.Root class="p-0">
+										<Item.Content>
+											<Item.Title>Last Successful Time</Item.Title>
+											<Item.Description>{cronjob.status?.lastSuccessfulTime}</Item.Description>
+										</Item.Content>
+									</Item.Root>
+								{/if}
+							</Card.Content>
+						</Card.Root>
+					{:else if kind === 'Job'}
+						{@const job = resource as BatchV1Job}
+						<Card.Root>
+							<Card.Header>
+								<Card.Title>{job?.metadata?.name}</Card.Title>
+								<Card.Description>
+									{@const completeCondition = job?.status?.conditions?.find(
+										(condition) => condition.type === 'Complete'
+									)}
+									{@const isComplete = completeCondition?.status === 'True'}
+									{#if completeCondition}
+										<Badge variant={isComplete ? 'default' : 'destructive'}>
+											{isComplete ? 'Complete' : 'Incomplete'}
+										</Badge>
+									{/if}
+								</Card.Description>
+								<Card.Action>
+									<Describe
+										{cluster}
+										namespace={job?.metadata?.namespace ?? namespace}
+										group="batch"
+										version="v1"
+										resource="jobs"
+										object={job}
+									>
+										{#snippet trigger()}
+											<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost' }))}>
+												<FileSearchIcon />
+											</Dialog.Trigger>
+										{/snippet}
+									</Describe>
+								</Card.Action>
+							</Card.Header>
+							<Card.Content class="flex flex-col gap-2">
+								{@const conditions = job?.status?.conditions ?? []}
+								{#each conditions as condition, index (index)}
+									<Item.Root class="p-0">
+										<Item.Media>
+											{#if condition.status === 'True'}
+												<CircleIcon />
+											{:else}
+												<XIcon />
+											{/if}
+										</Item.Media>
+										<Item.Content>
+											<Item.Title>{condition.type}</Item.Title>
+											<Item.Description>{condition.reason}</Item.Description>
+											{condition.message}
+										</Item.Content>
+										<Item.Actions>{condition.lastUpdateTime}</Item.Actions>
+									</Item.Root>
+								{/each}
+							</Card.Content>
+						</Card.Root>
+					{/if}
 				{/each}
 			</div>
 		{:else}
@@ -362,97 +585,51 @@
 
 	<Field.Set>
 		<Label class={typographyVariants({ variant: 'h4' })}>Pods</Label>
-		{#if !isPodsLoaded}
-			<div class="grid gap-4">
-				{#each Array(3) as _, index (index)}
-					<div class="rounded-lg border p-4">
-						<Skeleton class="h-5 w-1/3" />
-						<div class="mt-4 grid gap-3 md:grid-cols-3">
-							<Skeleton class="h-4 w-full" />
-							<Skeleton class="h-4 w-full" />
-							<Skeleton class="h-4 w-full" />
-						</div>
-					</div>
-				{/each}
-			</div>
-		{:else if pods.length > 0}
-			<div class="grid gap-4">
-				{#each pods as pod (pod.metadata?.uid ?? pod.metadata?.name ?? '')}
-					<Item.Root variant="outline" class="items-start gap-4">
-						<Item.Content class="w-full">
-							<Item.Description>
-								<Badge variant="outline">{getPodStatus(pod)}</Badge>
-								{pod.metadata?.namespace}
-							</Item.Description>
-							<Item.Title>
-								<a
-									class="transition-colors hover:text-primary"
-									href={buildResourceUrl(
-										pod.metadata?.name ?? '',
-										'',
-										'v1',
-										'Pod',
-										'pods',
-										pod.metadata?.namespace ?? namespace
-									)}
+		{#if pods.length > 0}
+			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+				{#each pods as pod (pod.type)}
+					<Card.Root>
+						<Card.Header>
+							<Card.Title>{pod?.metadata?.name}</Card.Title>
+							<Card.Description>
+								<Badge>{getPodStatus(pod)}</Badge>
+							</Card.Description>
+							<Card.Action class="flex-items flex">
+								<Describe
+									{cluster}
+									namespace={pod?.metadata?.namespace ?? namespace}
+									group="apps"
+									version="v1"
+									resource="deployments"
+									object={pod}
 								>
-									{pod.metadata?.name}
-								</a>
-							</Item.Title>
-							<Item.Footer class="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-5">
-								<Item.Root class="p-0">
-									<Item.Content>
-										<Item.Description>Ready</Item.Description>
-										<Item.Title>{getReady(pod)}</Item.Title>
-									</Item.Content>
-								</Item.Root>
-								<Item.Root class="p-0">
-									<Item.Content>
-										<Item.Description>Restarts</Item.Description>
-										<Item.Title>{getRestart(pod)}</Item.Title>
-									</Item.Content>
-								</Item.Root>
-								<Item.Root class="p-0">
-									<Item.Content>
-										<Item.Description>Node</Item.Description>
-										<Item.Title>{pod.spec?.nodeName ?? '-'}</Item.Title>
-									</Item.Content>
-								</Item.Root>
-								<Item.Root class="p-0">
-									<Item.Content>
-										<Item.Description>Pod IP</Item.Description>
-										<Item.Title>{pod.status?.podIP ?? '-'}</Item.Title>
-									</Item.Content>
-								</Item.Root>
-								<Item.Root class="p-0">
-									<Item.Content>
-										<Item.Description>Selector</Item.Description>
-										<Item.Title>{podLabelSelector}</Item.Title>
-									</Item.Content>
-								</Item.Root>
-							</Item.Footer>
-						</Item.Content>
-						<Item.Actions class="w-full max-w-sm self-stretch lg:w-auto">
-							<div class="grid gap-2 rounded-lg border bg-muted/30 p-2 sm:grid-cols-3 lg:w-[320px]">
-								<div class="rounded-md bg-background px-2 py-1">
-									<Describe
-										{cluster}
-										namespace={pod.metadata?.namespace ?? namespace}
-										group=""
-										version="v1"
-										resource="pods"
-										object={pod}
-									/>
-								</div>
-								<div class="rounded-md bg-background px-2 py-1">
-									<Log {cluster} object={pod} kind="Pod" />
-								</div>
-								<div class="rounded-md bg-background px-2 py-1">
-									<TerminalAction {cluster} object={pod} />
-								</div>
-							</div>
-						</Item.Actions>
-					</Item.Root>
+									{#snippet trigger()}
+										<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost' }))}>
+											<FileSearchIcon />
+										</Dialog.Trigger>
+									{/snippet}
+								</Describe>
+								<Log {cluster} object={pod} kind="Pod">
+									{#snippet trigger()}
+										<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost' }))}>
+											<ScrollTextIcon />
+										</Dialog.Trigger>
+									{/snippet}
+								</Log>
+								<Terminal {cluster} object={pod}>
+									{#snippet trigger()}
+										<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost' }))}>
+											<TerminalSquareIcon />
+										</Dialog.Trigger>
+									{/snippet}
+								</Terminal>
+							</Card.Action>
+						</Card.Header>
+						<Card.Content class="flex items-center gap-4 text-lg">
+							<p>{getContainerRestarts(pod)} Restart</p>
+							<p>{getContainerReadies(pod)} Ready</p>
+						</Card.Content>
+					</Card.Root>
 				{/each}
 			</div>
 		{:else}
@@ -461,14 +638,8 @@
 					<Empty.Media variant="icon">
 						<Box />
 					</Empty.Media>
-					<Empty.Title>{podsError ? 'Failed to Load Pods' : 'No Pods Found'}</Empty.Title>
-					<Empty.Description>
-						{#if podsError}
-							{podsError}
-						{:else}
-							No pods matched the selector <strong>{podLabelSelector}</strong> for this application.
-						{/if}
-					</Empty.Description>
+					<Empty.Title>No Pods Found</Empty.Title>
+					<Empty.Description>No pods matched the selector for this application.</Empty.Description>
 				</Empty.Header>
 			</Empty.Root>
 		{/if}
