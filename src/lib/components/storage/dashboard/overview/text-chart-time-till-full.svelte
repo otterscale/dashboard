@@ -29,7 +29,7 @@
 		deriv(ceph_pool_stored{job=~".+",}[6h])
 	) 
 	* 
-	on(pool_id) group_left(instance, name) ceph_pool_metadata{job=~".+",,name=~".mgr"} > 0
+	on(pool_id) group_left(instance, name) ceph_pool_metadata{job=~".+",name=~".mgr"} > 0
 	`
 	);
 
