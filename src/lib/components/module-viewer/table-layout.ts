@@ -69,6 +69,9 @@ function getChartData(
 ): Record<ModuleAttribute, JsonValue> {
 	const prerequisite = (module.annotations?.['module.otterscale.io/depends-on']?.split(',') ??
 		[]) as string[];
+	console.log('---------------------------------------');
+	console.log(module.name, installedModules, prerequisite);
+	console.log('---------------------------------------');
 	return {
 		'Helm Repository': helmRepository.metadata?.name ?? null,
 		'Chart Name': module.name ?? null,

@@ -28,7 +28,7 @@
 		cluster: string;
 		namespace: string;
 		modules: any[];
-		reload: any;
+		reload: () => void;
 	} = $props();
 
 	const uiSchemas: Record<string, UISchemaType> = getChartUISchemas();
@@ -41,7 +41,7 @@
 	<div class="flex items-end justify-between gap-4">
 		<Item.Root class="p-0">
 			<Item.Content class="text-left">
-				<Item.Title class="text-xl font-bold">Hub</Item.Title>
+				<Item.Title class="text-xl font-bold">Module</Item.Title>
 				<Item.Description class="text-base">{cluster}/{namespace}</Item.Description>
 			</Item.Content>
 		</Item.Root>

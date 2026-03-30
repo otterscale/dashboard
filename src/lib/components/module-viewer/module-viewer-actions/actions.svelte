@@ -41,7 +41,7 @@
 			>
 				<View {row} />
 			</DropdownMenu.Item>
-			{#if row.original['Chart Name'] === 'otterscale-rook-ceph-cluster'}
+			{#if row.original.installable && row.original['Chart Name'] === 'otterscale-rook-ceph-cluster'}
 				<DropdownMenu.Item
 					onSelect={(e) => {
 						e.preventDefault();
@@ -55,7 +55,7 @@
 						}}
 					/>
 				</DropdownMenu.Item>
-			{:else}
+			{:else if row.original.installable}
 				<DropdownMenu.Item
 					onSelect={(e) => {
 						e.preventDefault();

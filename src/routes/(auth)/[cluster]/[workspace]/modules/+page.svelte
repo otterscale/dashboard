@@ -7,7 +7,6 @@
 		HelmToolkitFluxcdIoV2HelmRelease,
 		SourceToolkitFluxcdIoV1HelmRepository
 	} from '@otterscale/types';
-	import lodash from 'lodash';
 	import { getContext, onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
@@ -115,39 +114,30 @@
 
 	let isReleaseFetching = $state(false);
 
-	async function fetchInstalledModules(modules: ModuleType[]) {
+	async function fetchInstalledModules() {
 		if (isReleaseFetching) return;
 
 		isReleaseFetching = true;
 
-		const moduleNamespaces: string[] = modules.map(
-			(module) => lodash.get(module?.annotations, 'module.otterscale.io/namespace') as string
-		);
-
 		const releases: HelmToolkitFluxcdIoV2HelmRelease[] = [];
 
 		try {
-			for (const namespace of moduleNamespaces) {
-				if (!namespace) {
-					continue;
-				}
-				const response = await resourceClient.list({
-					cluster,
-					namespace,
-					group: 'helm.toolkit.fluxcd.io',
-					version: 'v2',
-					resource: 'helmreleases'
-				});
-				releases.push(
-					...response.items.map((item) => item.object as HelmToolkitFluxcdIoV2HelmRelease)
-				);
-			}
+			const response = await resourceClient.list({
+				cluster,
+				namespace: 'otterscale-system',
+				group: 'helm.toolkit.fluxcd.io',
+				version: 'v2',
+				resource: 'helmreleases'
+			});
+			releases.push(
+				...response.items.map((item) => item.object as HelmToolkitFluxcdIoV2HelmRelease)
+			);
 		} catch (error) {
 			console.error(
-				'OtterScale Charts Helm Releases was not found in namespace ottersacle-system.:',
+				'OtterScale Charts Helm Releases was not found in namespace otterscale-system.:',
 				error
 			);
-			toast.error('OtterScale Charts Helm Releases was not found in namespace ottersacle-system.');
+			toast.error('OtterScale Charts Helm Releases was not found in namespace otterscale-system.');
 		} finally {
 			isReleaseFetching = false;
 		}
@@ -156,7 +146,7 @@
 		) as Set<string>;
 	}
 
-	async function handleReload() {
+	async function fetchData() {
 		if (!namespace) return;
 
 		const helmRepository = await fetchHelmRepository();
@@ -165,21 +155,18 @@
 		const modules = await fetchModules(helmRepository);
 		if (!modules) return;
 
-		const installedModules = (await fetchInstalledModules(modules)) ?? new Set();
-		data = modules.map((module) => getChartData(module, installedModules, helmRepository));
+		const installedModules = (await fetchInstalledModules()) ?? new Set();
+		data = modules
+			.filter((module) => module.name.startsWith('otterscale-'))
+			.map((module) => getChartData(module, installedModules, helmRepository));
+	}
+
+	async function handleReload() {
+		await fetchData();
 	}
 
 	onMount(async () => {
-		if (!namespace) return;
-
-		const helmRepository = await fetchHelmRepository();
-		if (!helmRepository) return;
-
-		const modules = await fetchModules(helmRepository);
-		if (!modules) return;
-
-		const installedModules = (await fetchInstalledModules(modules)) ?? new Set();
-		data = modules.map((module) => getChartData(module, installedModules, helmRepository));
+		await fetchData();
 	});
 </script>
 

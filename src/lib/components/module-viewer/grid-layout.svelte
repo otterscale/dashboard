@@ -4,6 +4,7 @@
 	import TagIcon from '@lucide/svelte/icons/tag';
 	import TagsIcon from '@lucide/svelte/icons/tags';
 	import type { Row } from '@tanstack/table-core';
+	import lodash from 'lodash';
 
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import Badge from '$lib/components/ui/badge/badge.svelte';
@@ -39,7 +40,29 @@
 					<Badge variant="outline">{row.original.Version}</Badge>
 				</Item.Title>
 				<Item.Description>
-					{row.original.Description}
+					{@const tags: string[] = row.original.Labels as string[]}
+					{#if tags.length}
+						<div class="flex h-full gap-2 overflow-hidden">
+							{#each tags.slice(0, 3) as tag, index (index)}
+								<span class="flex items-center gap-1">
+									<TagIcon size={12} />
+									{tag}
+								</span>
+							{/each}
+							{#if tags.length > 3}
+								<span class="flex items-center gap-1">
+									<TagsIcon size={12} />
+									+{tags.length - 3} tags
+								</span>
+							{/if}
+						</div>
+					{:else}
+						{@const type = row.original.Type as string}
+						<span class="flex items-center gap-1">
+							<TagIcon size={12} />
+							{type}
+						</span>
+					{/if}
 				</Item.Description>
 			</Item.Content>
 			<Item.Actions>
@@ -56,30 +79,20 @@
 			</Item.Content>
 		</Item.Root>
 	</Card.Content>
-	<Card.Footer class="text-xs text-gray-500">
-		{@const tags: string[] = row.original.Labels as string[]}
-		{#if tags.length}
-			<div class="flex h-full gap-2 overflow-hidden">
-				{#each tags.slice(0, 3) as tag, index (index)}
-					<span class="flex items-center gap-1">
-						<TagIcon size={12} />
-						{tag}
-					</span>
+	<Card.Footer class="items-between flex gap-4 text-xs text-gray-500">
+		{@const dependsOn = lodash.get(
+			row.original.annotations,
+			'module.otterscale.io/depends-on',
+			''
+		) as string}
+		{@const dependencies = dependsOn.split(',')}
+		<div class="flex items-center gap-2">
+			{#if dependsOn}
+				{#each dependencies as dependency, index (index)}
+					<Badge variant="outline">{dependency}</Badge>
 				{/each}
-				{#if tags.length > 3}
-					<span class="flex items-center gap-1">
-						<TagsIcon size={12} />
-						more
-					</span>
-				{/if}
-			</div>
-		{:else}
-			{@const type = row.original.Type as string}
-			<span class="flex items-center gap-1">
-				<TagIcon size={12} />
-				{type}
-			</span>
-		{/if}
+			{/if}
+		</div>
 		<div class="ml-auto">
 			{#if row.original.Installed}
 				<Badge>Installed</Badge>

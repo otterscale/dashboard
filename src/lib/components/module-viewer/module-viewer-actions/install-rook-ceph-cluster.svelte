@@ -5,7 +5,14 @@
 	import { ResourceService, type SchemaRequest } from '@otterscale/api/resource/v1';
 	import { RuntimeService } from '@otterscale/api/runtime/v1';
 	import type { CoreV1Node, SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
-	import { type Schema, SubmitButton, type UiSchemaRoot } from '@sjsf/form';
+	import {
+		type FormState,
+		type FormValue,
+		getValueSnapshot,
+		type Schema,
+		SubmitButton,
+		type UiSchemaRoot
+	} from '@sjsf/form';
 	import type { Row } from '@tanstack/table-core';
 	import Ajv from 'ajv';
 	import { load } from 'js-yaml';
@@ -17,6 +24,7 @@
 	import { stringify } from 'yaml';
 
 	import Form from '$lib/components/dynamic-form/form.svelte';
+	import CheckboxesWidget from '$lib/components/dynamic-form/widgets/checkboxes.svelte';
 	import EditorWidget from '$lib/components/dynamic-form/widgets/editor.svelte';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -40,8 +48,6 @@
 
 	const chart: ModuleType = row.original.chart as unknown as ModuleType;
 
-	const namespace = lodash.get(chart, ['annotations', 'module.otterscale.io/namespace']);
-
 	const group = 'helm.toolkit.fluxcd.io';
 	const version = 'v2';
 	const kind = 'HelmRelease';
@@ -53,8 +59,7 @@
 
 	let jsonSchema: Schema | undefined = $state(undefined);
 
-	let disks: Record<string, Record<string, Record<string, string>>> = $state({});
-
+	let nodeFeatureDiscoveries: Record<string, Record<string, Record<string, string>>> = $state({});
 	let nodes: any = $state({});
 
 	async function fetchNodes() {
@@ -78,17 +83,7 @@
 
 						const featureName = featureParts.join('-');
 
-						if (!disks[nodeName]) {
-							disks[nodeName] = {};
-						}
-
-						if (!disks[nodeName][diskName]) {
-							disks[nodeName][diskName] = {};
-						}
-
-						disks[nodeName][diskName][featureName] = value as string;
-
-						console.log(disks);
+						lodash.set(nodeFeatureDiscoveries, [nodeName, diskName, featureName], value);
 					}
 				})
 			);
@@ -127,6 +122,8 @@
 		kind,
 		metadata: {},
 		spec: {
+			targetNamespace: lodash.get(chart, ['annotations', 'module.otterscale.io/namespace']),
+			install: { createNamespace: true },
 			interval: '15m',
 			chart: {
 				spec: {}
@@ -156,14 +153,31 @@
 		}
 	});
 
-	async function getDocuments() {
+	async function getDocuments(nodes: any) {
 		const response = await runtimeClient.showChart({
 			repoUrl: helmRepository.spec?.url ?? '',
 			chartName: selectedChart.name ?? '',
 			version: selectedChart.version ?? ''
 		});
 		const decoder = new TextDecoder();
-		return { values: decoder.decode(response.values), readme: decoder.decode(response.readme) };
+
+		const helmReleaseValues = load(decoder.decode(response.values)) as object;
+		if (nodes.length > 0) {
+			lodash.set(
+				helmReleaseValues,
+				['rook-ceph-cluster', 'cephClusterSpec', 'storage', 'useAllNodes'],
+				false
+			);
+			lodash.set(
+				helmReleaseValues,
+				['rook-ceph-cluster', 'cephClusterSpec', 'storage', 'nodes'],
+				nodes
+			);
+		}
+		return {
+			values: stringify(helmReleaseValues),
+			readme: decoder.decode(response.readme)
+		};
 	}
 
 	// Steps Manager
@@ -248,7 +262,7 @@
 					} as UiSchemaRoot}
 					initialValue={{
 						name: chart.name,
-						namespace: namespace
+						namespace: 'otterscale-system'
 					}}
 					bind:values={values['metadata']}
 					handleSubmit={{
@@ -346,25 +360,25 @@
 			<Tabs.Content value={steps[2]}>
 				<Form
 					schema={{
-						title: 'Nodes',
-						type: 'array',
-						items: {
-							type: 'object',
-							properties: {
-								'kubeadmin-site4': {
+						type: 'object',
+						properties: Object.fromEntries(
+							Object.entries(nodeFeatureDiscoveries).map(([node, disks]) => [
+								[node],
+								{
 									type: 'array',
-									description: 'ip',
+									minIems: 1,
 									items: {
-										type: 'string',
-										enum: [
-											{ name: 'sdb', ip: '192.168.1.1' },
-											{ name: 'sdc', ip: '192.168.1.2' },
-											{ name: 'sdd', ip: '192.168.1.3' }
-										]
+										type: 'object',
+										enum: Object.entries(disks).map(([disk, features]) => ({
+											label: disk,
+											description: `${features['size-gb']}GB, ${features['model']} ${features['type'].toUpperCase()}`,
+											value: `/dev/${disk}`,
+											disabled: features['fw'].startsWith('EIFZ')
+										}))
 									}
 								}
-							}
-						}
+							])
+						)
 					} as Schema}
 					uiSchema={{
 						'ui:options': {
@@ -373,19 +387,29 @@
 							},
 							itemTitle: () => ''
 						},
-						items: {
-							'kubeadmin-site4': {
-								'ui:components': {
-									arrayField: 'multiEnumField'
+						...Object.fromEntries(
+							Object.keys(nodeFeatureDiscoveries).map((node) => [
+								[node],
+								{
+									'ui:components': {
+										arrayField: 'multiEnumField',
+										checkboxesWidget: CheckboxesWidget
+									}
 								}
-							}
-						}
+							])
+						)
 					} as UiSchemaRoot}
-					initialValue={[]}
-					bind:values={nodes}
+					initialValue={{}}
+					values={{}}
 					handleSubmit={{
-						posthook: () => {
+						posthook: (form: FormState<FormValue>) => {
 							handleNext();
+
+							const formValue = getValueSnapshot(form) as Record<string, any[]>;
+							nodes = Object.entries(formValue).map(([node, disks]) => ({
+								name: node,
+								devices: disks.map((disk) => ({ name: disk.value }))
+							}));
 						}
 					}}
 				>
@@ -411,7 +435,7 @@
 					type: 'string',
 					title: 'Values'
 				} as Schema}
-				{#await getDocuments()}
+				{#await getDocuments(nodes)}
 					<Form {schema} initialValue={null} values={null}>
 						{#snippet actions()}
 							<div class="flex w-full items-center justify-between gap-3">
@@ -516,11 +540,9 @@
 								async () => {
 									const manifest = new TextEncoder().encode(value);
 
-									console.log(value);
-
 									await resourceClient.create({
 										cluster,
-										namespace,
+										namespace: 'otterscale-system',
 										group,
 										version,
 										resource,

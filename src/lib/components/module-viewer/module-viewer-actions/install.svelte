@@ -40,8 +40,6 @@
 
 	const chart: ModuleType = row.original.chart as unknown as ModuleType;
 
-	const namespace = lodash.get(chart, 'module.otterscale.io/namespace');
-
 	const group = 'helm.toolkit.fluxcd.io';
 	const version = 'v2';
 	const kind = 'HelmRelease';
@@ -82,6 +80,8 @@
 		kind,
 		metadata: {},
 		spec: {
+			targetNamespace: lodash.get(chart, ['annotations', 'module.otterscale.io/namespace']),
+			install: { createNamespace: true },
 			interval: '15m',
 			chart: {
 				spec: {}
@@ -201,7 +201,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{ name: chart.name, namespace: namespace }}
+					initialValue={{ name: chart.name, namespace: 'otterscale-system' }}
 					bind:values={values['metadata']}
 					handleSubmit={{
 						posthook: () => {
@@ -408,7 +408,7 @@
 
 									await resourceClient.create({
 										cluster,
-										namespace,
+										namespace: 'otterscale-system',
 										group,
 										version,
 										resource,
