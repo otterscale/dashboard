@@ -27,15 +27,13 @@
 			<Box size={14} class="text-chart-2" />
 		</div>
 		<span class="truncate text-sm font-semibold">Pod</span>
+		<span
+			class="ml-auto inline-block size-2 shrink-0 rounded-full {statusColor[data.status] ??
+				statusColor.Unknown}"
+		></span>
 	</div>
 	<div class="space-y-1 px-3 py-2">
-		<div class="flex items-center gap-1.5">
-			<span
-				class="inline-block size-2 shrink-0 rounded-full {statusColor[data.status] ??
-					statusColor.Unknown}"
-			></span>
-			<span class="truncate text-xs font-medium">{data.name}</span>
-		</div>
+		<div class="truncate text-xs font-medium">{data.name}</div>
 		<div class="text-xs text-muted-foreground">
 			{data.gpuCount} GPU{data.gpuCount !== 1 ? 's' : ''} allocated
 		</div>
