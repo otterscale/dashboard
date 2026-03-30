@@ -73,7 +73,7 @@
 				<NetworkIcon />
 			</Item.Media>
 			<Item.Content>
-				<Item.Title>GPU Topology</Item.Title>
+				<Item.Title class="whitespace-nowrap">GPU Topology</Item.Title>
 			</Item.Content>
 		</Item.Root>
 	</Dialog.Trigger>
