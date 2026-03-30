@@ -12,9 +12,10 @@
 	// Props
 	let {
 		client,
-		cluster,
+		cluster: _,
 		isReloading = $bindable()
 	}: { client: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	void _;
 
 	// Constants
 	const CHART_TITLE = m.quorum_status();
@@ -22,9 +23,9 @@
 
 	// Queries
 	const queries = $derived({
-		in: `sum(ceph_mon_quorum_status{juju_model="${cluster}"})`,
+		in: `sum(ceph_mon_quorum_status{})`,
 		total: `
-		count(ceph_mon_quorum_status{juju_model="${cluster}"})
+		count(ceph_mon_quorum_status{})
 		`
 	});
 

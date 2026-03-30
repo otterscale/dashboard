@@ -12,9 +12,10 @@
 	// Props
 	let {
 		client,
-		cluster,
+		cluster: _,
 		isReloading = $bindable()
 	}: { client: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	void _;
 
 	// Constants
 	const CHART_TITLE = m.osds();
@@ -22,9 +23,9 @@
 
 	// Queries
 	const queries = $derived({
-		in: `sum(ceph_osd_in{juju_model="${cluster}"})`,
-		up: `sum(ceph_osd_up{juju_model="${cluster}"})`,
-		total: `count(ceph_osd_metadata{juju_model="${cluster}"})`
+		in: `sum(ceph_osd_in{})`,
+		up: `sum(ceph_osd_up{})`,
+		total: `count(ceph_osd_metadata{})`
 	});
 
 	// Auto Update
