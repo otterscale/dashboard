@@ -489,18 +489,10 @@
 		</ButtonGroup.Root>
 		<!-- Accessors -->
 		<div class="ml-auto flex items-center gap-2">
-			{#if accessReview}
-				{@render accessReview?.()}
-			{/if}
-			{#if create}
-				{@render create?.()}
-			{/if}
-			{#if bulkDelete}
-				{@render bulkDelete?.({ table })}
-			{/if}
-			{#if reload}
-				{@render reload()}
-			{/if}
+			{@render accessReview?.()}
+			{@render create?.()}
+			{@render bulkDelete?.({ table })}
+			{@render reload?.()}
 		</div>
 	</div>
 	{#if globalFilterError}

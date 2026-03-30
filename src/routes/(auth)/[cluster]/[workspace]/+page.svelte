@@ -105,8 +105,8 @@
 				serviceUrl = internalIPAddress?.address ?? '';
 			}
 		} catch (error) {
-			console.error('Failed to fetch nodes:', error);
-			toast.error('Failed to fetch nodes');
+			console.error('Failed to fetch service URL:', error);
+			toast.error('Failed to fetch service URL');
 		}
 	}
 
