@@ -20,7 +20,7 @@
 {/if}
 
 <div
-	class="w-50 rounded-lg border border-border bg-card text-card-foreground shadow-sm transition-all duration-200 hover:border-primary/50 hover:shadow-md {selected
+	class="w-55 rounded-lg border border-border bg-card text-card-foreground shadow-sm transition-all duration-200 hover:border-primary/50 hover:shadow-md {selected
 		? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
 		: ''}"
 >
