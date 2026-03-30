@@ -6,19 +6,24 @@ const ANNOTATION_DEVICES_ALLOCATED = 'hami.io/vgpu-devices-allocated';
 
 export { ANNOTATION_DEVICES_ALLOCATED, ANNOTATION_NODE_REGISTER, ANNOTATION_VGPU_NODE };
 
+/**
+ * Parse `hami.io/node-nvidia-register` annotation.
+ * Format: JSON array of device objects with lowercase field names.
+ * Example: [{"id":"GPU-xxx","index":3,"count":10,"devmem":24564,"devcore":100,"type":"NVIDIA GeForce RTX 4090","health":true,...}]
+ */
 export function parseNodeGpuDevices(annotationValue: string | undefined): GpuDevice[] {
 	if (!annotationValue) return [];
 	try {
 		const raw = JSON.parse(annotationValue);
 		if (!Array.isArray(raw)) return [];
 		return raw.map((d: Record<string, unknown>) => ({
-			id: String(d.ID ?? d.id ?? ''),
-			index: Number(d.Index ?? d.index ?? 0),
-			count: Number(d.Count ?? d.count ?? 0),
-			devcore: Number(d.Devcore ?? d.devcore ?? 0),
-			devmem: Number(d.Devmem ?? d.devmem ?? 0),
-			type: String(d.Type ?? d.type ?? ''),
-			health: Boolean(d.Health ?? d.health ?? false)
+			id: String(d.id ?? d.ID ?? ''),
+			index: Number(d.index ?? d.Index ?? 0),
+			count: Number(d.count ?? d.Count ?? 0),
+			devcore: Number(d.devcore ?? d.Devcore ?? 0),
+			devmem: Number(d.devmem ?? d.Devmem ?? 0),
+			type: String(d.type ?? d.Type ?? ''),
+			health: Boolean(d.health ?? d.Health ?? false)
 		}));
 	} catch (e) {
 		console.warn('Failed to parse node GPU devices annotation:', e);
@@ -26,52 +31,56 @@ export function parseNodeGpuDevices(annotationValue: string | undefined): GpuDev
 	}
 }
 
+/**
+ * Parse `hami.io/vgpu-devices-allocated` annotation.
+ *
+ * Format is a custom delimited string (NOT JSON):
+ *   - Semicolon (;) separates containers
+ *   - Colon (:) separates devices within a container
+ *   - Comma (,) separates fields within a device
+ *
+ * Device fields: UUID,Type,Usedmem,Usedcores
+ * Example: "GPU-c15ecdf3-...,NVIDIA,8192,0:GPU-abc...,NVIDIA,4096,50;GPU-def...,NVIDIA,2048,25"
+ *
+ * Trailing colons/semicolons and empty segments are common and must be tolerated.
+ */
 export function parsePodGpuAllocations(annotationValue: string | undefined): GpuAllocation[] {
 	if (!annotationValue) return [];
 	try {
-		const raw = JSON.parse(annotationValue);
 		const allocations: GpuAllocation[] = [];
 
-		// The structure can be nested: { "nvidia": { "<containerName>": [devices...] } }
-		// or a flat array of devices. Handle both.
-		if (Array.isArray(raw)) {
-			for (const d of raw) {
-				allocations.push(parseDevice(d));
-			}
-		} else if (typeof raw === 'object' && raw !== null) {
-			// Nested structure: iterate through device types and containers
-			for (const deviceType of Object.values(raw)) {
-				if (typeof deviceType === 'object' && deviceType !== null && !Array.isArray(deviceType)) {
-					for (const containers of Object.values(
-						deviceType as Record<string, unknown>
-					)) {
-						if (Array.isArray(containers)) {
-							for (const d of containers) {
-								allocations.push(parseDevice(d));
-							}
-						}
-					}
-				} else if (Array.isArray(deviceType)) {
-					for (const d of deviceType) {
-						allocations.push(parseDevice(d));
-					}
+		// Split by semicolon to get per-container entries
+		const containers = annotationValue.split(';');
+		for (const container of containers) {
+			const trimmed = container.trim();
+			if (!trimmed) continue;
+
+			// Split by colon to get individual device entries
+			const devices = trimmed.split(':');
+			for (const deviceStr of devices) {
+				const dt = deviceStr.trim();
+				if (!dt) continue;
+
+				// Split by comma to get fields: UUID, Type, Usedmem, Usedcores
+				const fields = dt.split(',');
+				if (fields.length < 4) continue;
+
+				const uuid = fields[0].trim();
+				// fields[1] is the device type (e.g. "NVIDIA"), skip it
+				const usedMem = parseInt(fields[2], 10) || 0;
+				const usedCores = parseInt(fields[3], 10) || 0;
+
+				if (uuid) {
+					allocations.push({ uuid, usedCores, usedMem });
 				}
 			}
 		}
 
-		return allocations.filter((a) => a.uuid);
+		return allocations;
 	} catch (e) {
 		console.warn('Failed to parse pod GPU allocations annotation:', e);
 		return [];
 	}
-}
-
-function parseDevice(d: Record<string, unknown>): GpuAllocation {
-	return {
-		uuid: String(d.UUID ?? d.uuid ?? d.Id ?? d.id ?? ''),
-		usedCores: Number(d.Usedcores ?? d.usedcores ?? d.UsedCores ?? 0),
-		usedMem: Number(d.Usedmem ?? d.usedmem ?? d.UsedMem ?? 0)
-	};
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

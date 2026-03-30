@@ -53,7 +53,7 @@ export async function fetchModelServiceTopology(
 		});
 	}
 
-	// 3. Fetch nodes in parallel
+	// 3. Fetch nodes in parallel (fresh GET to ensure full annotations)
 	const nodeEntries = await Promise.all(
 		[...nodeNames].map(async (name) => {
 			try {
@@ -110,7 +110,24 @@ export async function fetchNodeTopology(
 	nodeObject: any
 ): Promise<TopologyData> {
 	const nodeName: string = nodeObject?.metadata?.name ?? '';
-	const annotations = getAnnotations(nodeObject);
+
+	// Fetch node fresh to ensure we have full annotations
+	let fullNodeObj = nodeObject;
+	try {
+		const res = await client.get({
+			cluster,
+			group: '',
+			version: 'v1',
+			resource: 'nodes',
+			namespace: '',
+			name: nodeName
+		});
+		fullNodeObj = res.object;
+	} catch {
+		console.warn(`Failed to fetch node ${nodeName}, using list object`);
+	}
+
+	const annotations = getAnnotations(fullNodeObj);
 
 	// 1. Parse GPU devices from node
 	const devices = parseNodeGpuDevices(annotations[ANNOTATION_NODE_REGISTER]);
@@ -121,7 +138,7 @@ export async function fetchNodeTopology(
 		allocatedBy: []
 	}));
 
-	// 2. List pods on this node
+	// 2. List all pods on this node (across all namespaces)
 	const podResponse = await client.list({
 		cluster,
 		group: '',
