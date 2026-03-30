@@ -7,6 +7,7 @@
 		widgets,
 		prometheusDriver,
 		cluster,
+		namespace,
 		start,
 		end,
 		isReloading = $bindable()
@@ -14,6 +15,7 @@
 		widgets: WidgetDefinition[];
 		prometheusDriver: PrometheusDriver;
 		cluster: string;
+		namespace?: string;
 		start?: Date;
 		end?: Date;
 		isReloading: boolean;
@@ -29,6 +31,7 @@
 			bind:isReloading
 			{...start != null && end != null ? { start, end } : {}}
 			{...widget.needsCluster ? { cluster } : {}}
+			{...widget.needsNamespace ? { namespace } : {}}
 			{...props}
 		/>
 	</div>

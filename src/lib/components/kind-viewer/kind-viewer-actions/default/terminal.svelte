@@ -1,5 +1,6 @@
 <script lang="ts">
 	import TerminalSquareIcon from '@lucide/svelte/icons/terminal-square';
+	import type { Snippet } from 'svelte';
 
 	import { Terminal } from '$lib/components/applications/terminal';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -9,11 +10,13 @@
 	let {
 		cluster,
 		object,
-		onOpenChangeComplete
+		onOpenChangeComplete,
+		trigger
 	}: {
 		cluster: string;
 		object: any;
 		onOpenChangeComplete?: () => void;
+		trigger?: Snippet;
 	} = $props();
 
 	// Derived from the raw K8s object
@@ -41,16 +44,20 @@
 </script>
 
 <Dialog.Root bind:open {onOpenChangeComplete} onOpenChange={handleOpenChange}>
-	<Dialog.Trigger class="w-full">
-		<Item.Root class="p-0 text-xs" size="sm">
-			<Item.Media>
-				<TerminalSquareIcon />
-			</Item.Media>
-			<Item.Content>
-				<Item.Title>Terminal</Item.Title>
-			</Item.Content>
-		</Item.Root>
-	</Dialog.Trigger>
+	{#if trigger}
+		{@render trigger()}
+	{:else}
+		<Dialog.Trigger class="w-full">
+			<Item.Root class="p-0 text-xs" size="sm">
+				<Item.Media>
+					<TerminalSquareIcon />
+				</Item.Media>
+				<Item.Content>
+					<Item.Title>Terminal</Item.Title>
+				</Item.Content>
+			</Item.Root>
+		</Dialog.Trigger>
+	{/if}
 	<Dialog.Content class="flex h-fit max-h-[80vh] max-w-[70vw] min-w-[55vw] flex-col gap-3">
 		<Dialog.Header>
 			<Dialog.Title>Terminal — {podName}</Dialog.Title>

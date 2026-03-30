@@ -3,11 +3,15 @@
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
-	import Edit from '$lib/components/kind-viewer/kind-viewer-actions/default/edit.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
-	import Vnc from '$lib/components/kind-viewer/kind-viewer-actions/default/vnc.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+
+	import PauseResume from './pause-resume.svelte';
+	import Restart from './restart.svelte';
+	import StartStop from './start-stop.svelte';
+	import Edit from './update.svelte';
+	import Vnc from './vnc.svelte';
 
 	let {
 		schema,
@@ -49,19 +53,6 @@
 					e.preventDefault();
 				}}
 			>
-				<Vnc
-					{cluster}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
-			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
 				<View {schema} {object} />
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
@@ -81,20 +72,85 @@
 					}}
 				/>
 			</DropdownMenu.Item>
+		</DropdownMenu.Group>
+		<DropdownMenu.Separator />
+		<DropdownMenu.Group>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Vnc
+					{cluster}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<StartStop
+					{cluster}
+					{namespace}
+					{version}
+					{resource}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<PauseResume
+					{cluster}
+					{namespace}
+					{version}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Restart
+					{cluster}
+					{namespace}
+					{version}
+					{resource}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
+		</DropdownMenu.Group>
+		<DropdownMenu.Separator />
+		<DropdownMenu.Group>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
 			>
 				<Edit
+					{schema}
+					{object}
 					{cluster}
-					{namespace}
 					{group}
 					{version}
 					{kind}
 					{resource}
-					{schema}
-					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
 					}}

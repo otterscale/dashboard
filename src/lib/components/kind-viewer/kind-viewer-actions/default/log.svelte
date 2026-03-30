@@ -2,7 +2,7 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import ScrollTextIcon from '@lucide/svelte/icons/scroll-text';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import { getContext } from 'svelte';
+	import { getContext, type Snippet } from 'svelte';
 
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
@@ -14,13 +14,15 @@
 		cluster,
 		object,
 		kind,
-		onOpenChangeComplete
+		onOpenChangeComplete,
+		trigger
 	}: {
 		cluster: string;
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		object: any;
 		kind: string;
 		onOpenChangeComplete?: () => void;
+		trigger?: Snippet;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -205,16 +207,20 @@
 </script>
 
 <Dialog.Root bind:open {onOpenChangeComplete} onOpenChange={handleOpenChange}>
-	<Dialog.Trigger class="w-full">
-		<Item.Root class="p-0 text-xs" size="sm">
-			<Item.Media>
-				<ScrollTextIcon />
-			</Item.Media>
-			<Item.Content>
-				<Item.Title>Logs</Item.Title>
-			</Item.Content>
-		</Item.Root>
-	</Dialog.Trigger>
+	{#if trigger}
+		{@render trigger()}
+	{:else}
+		<Dialog.Trigger class="w-full">
+			<Item.Root class="p-0 text-xs" size="sm">
+				<Item.Media>
+					<ScrollTextIcon />
+				</Item.Media>
+				<Item.Content>
+					<Item.Title>Logs</Item.Title>
+				</Item.Content>
+			</Item.Root>
+		</Dialog.Trigger>
+	{/if}
 	<Dialog.Content class="flex h-fit max-h-[80vh] max-w-[70vw] min-w-[55vw] flex-col gap-3">
 		<Dialog.Header>
 			<Dialog.Title>Pod Logs — {effectivePodName || name}</Dialog.Title>

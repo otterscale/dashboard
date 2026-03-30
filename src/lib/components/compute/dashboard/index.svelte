@@ -9,7 +9,7 @@
 
 	import { widgets } from './overview/widgets';
 
-	let { cluster }: { cluster: string } = $props();
+	let { cluster, namespace }: { cluster: string; namespace: string } = $props();
 
 	let isReloading = $state(true);
 	let prometheusDriver = $state<PrometheusDriver | null>(null);
@@ -55,7 +55,7 @@
 					value="overview"
 					class="grid auto-rows-auto grid-cols-2 gap-5 pt-4 md:grid-cols-4 lg:grid-cols-12"
 				>
-					<WidgetGrid {widgets} {prometheusDriver} {cluster} bind:isReloading />
+					<WidgetGrid {widgets} {prometheusDriver} {cluster} {namespace} bind:isReloading />
 				</Tabs.Content>
 				<Tabs.Content value="analytics"></Tabs.Content>
 			</Tabs.Root>

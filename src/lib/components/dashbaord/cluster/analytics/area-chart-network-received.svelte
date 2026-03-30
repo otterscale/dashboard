@@ -54,7 +54,7 @@
 	}
 
 	$effect(() => {
-		const t = topk; // 追蹤 topk 變化
+		const t = topk; // track topk for effect deps
 		untrack(() => loadData(t));
 	});
 
