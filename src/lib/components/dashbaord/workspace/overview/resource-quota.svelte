@@ -3,7 +3,7 @@
 	import Gauge from '@lucide/svelte/icons/gauge';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import { ArcChart, Text } from 'layerchart';
-	import { type PrometheusDriver,ResponseType } from 'prometheus-query';
+	import { type PrometheusDriver, ResponseType } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import * as Statistics from '$lib/components/custom/data-table/statistics/index';
@@ -56,7 +56,8 @@
 
 	function extractValue(raw: unknown): unknown {
 		if (Array.isArray(raw) && raw.length >= 2) return raw[1];
-		if (typeof raw === 'object' && raw !== null && 'value' in raw) return (raw as Record<string, unknown>).value;
+		if (typeof raw === 'object' && raw !== null && 'value' in raw)
+			return (raw as Record<string, unknown>).value;
 		return raw;
 	}
 
