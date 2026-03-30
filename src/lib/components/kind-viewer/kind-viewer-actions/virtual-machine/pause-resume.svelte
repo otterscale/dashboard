@@ -9,6 +9,8 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Item from '$lib/components/ui/item';
 
+	import { canPauseOrResume } from './vm-status';
+
 	let {
 		cluster,
 		namespace,
@@ -30,11 +32,7 @@
 	const name: string = $derived(object?.metadata?.name ?? '');
 	const printableStatus: string = $derived(object?.status?.printableStatus ?? '');
 	const isPaused = $derived(printableStatus === 'Paused');
-	const isStopped = $derived(
-		printableStatus === 'Stopped' ||
-			printableStatus === 'Stopped (Unschedulable)' ||
-			printableStatus === ''
-	);
+	const isActionAllowed = $derived(canPauseOrResume(printableStatus));
 
 	let open = $state(false);
 	let isSubmitting = $state(false);
@@ -85,7 +83,7 @@
 		{#snippet child({ props })}
 			<Item.Root
 				{...props}
-				class="w-full p-0 text-xs {isStopped ? 'pointer-events-none opacity-50' : ''}"
+				class="w-full p-0 text-xs {!isActionAllowed ? 'pointer-events-none opacity-50' : ''}"
 				size="sm"
 			>
 				<Item.Media>
@@ -116,7 +114,7 @@
 		</Item.Root>
 		<div class="flex justify-end gap-2">
 			<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
-			<Button disabled={isSubmitting || isStopped} onclick={() => handleAction()}>
+			<Button disabled={isSubmitting || !isActionAllowed} onclick={() => handleAction()}>
 				{#if isSubmitting}
 					Processing...
 				{:else}

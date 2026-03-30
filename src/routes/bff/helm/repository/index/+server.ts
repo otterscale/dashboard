@@ -20,6 +20,10 @@ async function fetchSecretAuthorityHeader(
 	namespace: string,
 	secretName: string
 ): Promise<string> {
+	if (!cluster || !namespace || !secretName) {
+		return '';
+	}
+
 	const payload = {
 		cluster,
 		namespace,
@@ -75,12 +79,12 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 			secretName?: string;
 		};
 
-		if (!cluster || !namespace || !repositoryUrl) {
-			throw error(400, 'Missing required fields: cluster, namespace, repositoryUrl');
+		if (!repositoryUrl) {
+			throw error(400, 'Missing required fields: repositoryUrl');
 		}
 
 		const authorizationHeader = secretName
-			? await fetchSecretAuthorityHeader(fetch, cluster, namespace, secretName)
+			? await fetchSecretAuthorityHeader(fetch, cluster ?? '', namespace ?? '', secretName ?? '')
 			: '';
 		const indexUrl = getIndexUrl(repositoryUrl);
 		const response = await fetch(indexUrl, {
@@ -102,19 +106,7 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 		const entries = Object.values(document?.entries ?? {}).map((versions) => {
 			const [latestVersion] = versions;
 			return {
-				apiVersion: latestVersion.apiVersion,
-				appVersion: latestVersion.appVersion,
-				created: latestVersion.created,
-				description: latestVersion.description,
-				digest: latestVersion.digest,
-				home: latestVersion.home,
-				icon: latestVersion.icon,
-				keywords: latestVersion.keywords,
-				maintainers: latestVersion.maintainers,
-				name: latestVersion.name,
-				type: latestVersion.type,
-				version: latestVersion.version,
-				urls: latestVersion.urls,
+				...latestVersion,
 				versions: versions
 			};
 		});

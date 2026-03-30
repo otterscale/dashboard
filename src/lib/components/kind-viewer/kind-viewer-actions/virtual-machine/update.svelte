@@ -53,9 +53,16 @@
 	);
 	const existingInstanceTypeName = lodash.get(object, 'spec.instancetype.name', '');
 	const existingVolumes: any[] = lodash.get(object, 'spec.template.spec.volumes', []);
-	const allDataVolumeEntries = existingVolumes.filter((v: any) => v.dataVolume);
-	const existingBootDisk = allDataVolumeEntries[0]?.dataVolume?.name ?? '';
-	const existingAdditionalDisks = allDataVolumeEntries.slice(1).map((v: any) => v.dataVolume.name);
+	const existingDisks: any[] = lodash.get(object, 'spec.template.spec.domain.devices.disks', []);
+
+	// Detect boot disk: find the os-disk (first volume) — could be containerDisk or dataVolume
+	const existingBootVolume =
+		existingVolumes.find((v: any) => v.name === 'os-disk') ?? existingVolumes[0];
+	const existingBootDisk = existingDisks.find((d: any) => d.name === 'os-disk') ?? existingDisks[0];
+	// Extract additional disks (all dataVolume entries except the boot one)
+	const existingAdditionalDisks = existingVolumes
+		.filter((v: any) => v.dataVolume && v.name !== (existingBootVolume?.name ?? 'os-disk'))
+		.map((v: any) => v.dataVolume.name);
 	const existingCloudInit =
 		existingVolumes.find((v: any) => v.cloudInitNoCloud)?.cloudInitNoCloud?.userData ?? '';
 
@@ -70,24 +77,24 @@
 				name: {}
 			}
 		},
-		// UI-only fields (not in API schema)
-		diskConfig: {
-			bootDisk: null,
-			additionalDisks: []
-		},
+		// UI-only fields (not in API schema) — boot disk is immutable, only additionalDisks editable
+		additionalDisks: [] as string[],
 		cloudInit: {}
 	});
 
-	// Build disks and volumes from UI-only diskConfig and cloudInit
+	// Build disks and volumes — boot disk is preserved from existing object
 	function buildDisksAndVolumes(): { disks: any[]; volumes: any[] } {
-		const diskConfig = values.diskConfig ?? {};
-		const bootDiskName = typeof diskConfig.bootDisk === 'string' ? diskConfig.bootDisk : '';
-		const additionalDiskNames: string[] = Array.isArray(diskConfig.additionalDisks)
-			? diskConfig.additionalDisks
-			: [];
+		// Start with the immutable boot disk/volume from the existing object
+		const disks: any[] = [
+			existingBootDisk
+				? { ...existingBootDisk }
+				: { name: 'os-disk', disk: { bus: 'virtio' }, bootOrder: 1 }
+		];
+		const volumes: any[] = [existingBootVolume ? { ...existingBootVolume } : { name: 'os-disk' }];
 
-		const disks: any[] = [{ name: 'os-disk', disk: { bus: 'virtio' }, bootOrder: 1 }];
-		const volumes: any[] = [{ name: 'os-disk', dataVolume: { name: bootDiskName } }];
+		const additionalDiskNames: string[] = Array.isArray(values.additionalDisks)
+			? values.additionalDisks
+			: [];
 
 		additionalDiskNames.forEach((dvName: any, index: number) => {
 			if (typeof dvName === 'string' && dvName.trim()) {
@@ -358,67 +365,48 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 3: Disks -->
+			<!-- Step 3: Additional Disks -->
 			<Tabs.Content value={steps[2]}>
 				<Form
 					schema={{
-						type: 'object',
-						title: 'Disks',
-						properties: {
-							bootDisk: {
-								type: 'string',
-								title: 'Boot Disk (DataVolume)',
-								readOnly: true
-							},
-							additionalDisks: {
-								type: 'array',
-								title: 'Additional Data Disks',
-								items: {
-									type: 'string',
-									title: 'Data Disk'
-								}
-							}
-						},
-						required: ['bootDisk']
+						type: 'array',
+						title: 'Additional Data Disks',
+						items: {
+							type: 'string',
+							title: 'Data Disk'
+						}
 					} as Schema}
 					uiSchema={{
-						additionalDisks: {
-							'ui:options': {
-								addable: true,
-								removable: true,
-								orderable: false
-							},
-							items: {
-								'ui:components': {
-									stringField: 'enumField',
-									selectWidget: ComboboxWidget
-								},
-								'ui:options': {
-									TailoredComboboxEnumerations: fetchDataVolumesAsEnumerations,
-									TailoredComboboxVisibility: 10,
-									TailoredComboboxInput: {
-										placeholder: 'Select DataVolume'
-									},
-									TailoredComboboxEmptyText: 'No DataVolumes found.'
-								}
-							}
-						},
 						'ui:options': {
+							addable: true,
+							removable: true,
+							orderable: false,
 							translations: {
 								submit: 'Next'
 							}
+						},
+						items: {
+							'ui:components': {
+								stringField: 'enumField',
+								selectWidget: ComboboxWidget
+							},
+							'ui:options': {
+								TailoredComboboxEnumerations: fetchDataVolumesAsEnumerations,
+								TailoredComboboxVisibility: 10,
+								TailoredComboboxInput: {
+									placeholder: 'Select DataVolume'
+								},
+								TailoredComboboxEmptyText: 'No DataVolumes found.'
+							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{
-						bootDisk: existingBootDisk || null,
-						additionalDisks: existingAdditionalDisks
-					} as FormValue}
+					initialValue={existingAdditionalDisks as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
 						}
 					}}
-					bind:values={values['diskConfig']}
+					bind:values={values['additionalDisks']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
