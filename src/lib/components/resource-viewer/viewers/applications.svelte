@@ -587,20 +587,20 @@
 		<Label class={typographyVariants({ variant: 'h4' })}>Pods</Label>
 		{#if pods.length > 0}
 			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-				{#each pods as pod (pod.type)}
+				{#each pods as pod, index (index)}
 					<Card.Root>
 						<Card.Header>
 							<Card.Title>{pod?.metadata?.name}</Card.Title>
 							<Card.Description>
 								<Badge>{getPodStatus(pod)}</Badge>
 							</Card.Description>
-							<Card.Action class="flex-items flex">
+							<Card.Action class="flex items-center">
 								<Describe
 									{cluster}
 									namespace={pod?.metadata?.namespace ?? namespace}
-									group="apps"
+									group=""
 									version="v1"
-									resource="deployments"
+									resource="pods"
 									object={pod}
 								>
 									{#snippet trigger()}
