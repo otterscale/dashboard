@@ -34,7 +34,7 @@
 	const transport = createConnectTransport({
 		baseUrl: '/',
 		interceptors: [proxyHeaderInterceptor, unauthenticatedInterceptor],
-		fetch
+		fetch: (input, init) => globalThis.fetch(input, init)
 	});
 
 	setContext('transport', transport);
