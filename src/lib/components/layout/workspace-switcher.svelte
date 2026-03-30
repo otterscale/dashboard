@@ -42,8 +42,9 @@
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { shortcut } from '$lib/actions/shortcut.svelte';
-	import NewCreate from '$lib/components/kind-viewer/kind-viewer-actions/workspace/create.svelte';
+	import Create from '$lib/components/kind-viewer/kind-viewer-actions/workspace/create.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
@@ -221,7 +222,8 @@
 />
 
 {#if workspaceSchema}
-	<NewCreate
+	<Create
+		role={page.data.isClusterAdmin === true ? 'Cluster Admin' : undefined}
 		bind:open={createWorkspaceOpen}
 		showTrigger={false}
 		group="tenant.otterscale.io"

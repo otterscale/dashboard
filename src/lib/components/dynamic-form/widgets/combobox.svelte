@@ -1,13 +1,13 @@
 <script lang="ts" module>
 	import '@sjsf/form/fields/extra-widgets/combobox';
 
+	import type { EnumOption, SchemaValue } from '@sjsf/form/core';
 	import type { Command } from 'bits-ui';
+	import type { Snippet } from 'svelte';
 
 	import type { ButtonProps } from '$lib/components/ui/button/button.svelte';
-	export type ComboboxEnumeration = {
-		label: string;
-		value: string;
-		disabled?: boolean;
+	export type ComboboxEnumeration = EnumOption<SchemaValue> & {
+		description?: Snippet;
 	};
 	declare module '@sjsf/form' {
 		interface UiOptions {
@@ -44,6 +44,7 @@
 
 	import CommandSeparator from '$lib/components/ui/command/command-separator.svelte';
 	import * as Empty from '$lib/components/ui/empty/index.js';
+	import * as Item from '$lib/components/ui/item';
 	import { cn } from '$lib/utils.js';
 	const ctx = getFormContext();
 	const themeCtx = getThemeContext();
@@ -89,13 +90,17 @@
 
 	const optionsProxy = $derived(
 		enumerations
-			? enumerations.map((enumeration, index) => ({
-					id: getPseudoId(ctx, config.path, index),
-					label: enumeration.label,
-					value: enumeration.value,
-					disabled: enumeration.disabled ?? false
-				}))
-			: options
+			? enumerations.map(
+					(enumeration, index) =>
+						({
+							id: getPseudoId(ctx, config.path, index),
+							label: enumeration.label,
+							description: enumeration.description,
+							value: enumeration.value,
+							disabled: enumeration.disabled ?? false
+						}) as ComboboxEnumeration
+				)
+			: (options as ComboboxEnumeration[])
 	);
 	const optionsManager = singleOption({
 		mapper: () => idMapper(optionsProxy),
@@ -118,9 +123,6 @@
 	});
 
 	const attributes = $derived(inputAttributes(ctx, config, 'TailoredComboboxInput', handlers, {}));
-	const triggerContent = $derived(
-		optionsProxy.find((option) => option.value === value)?.label ?? value ?? attributes.placeholder
-	);
 
 	const emptyText = $derived(retrieveUiOption(ctx, config, 'TailoredComboboxEmptyText'));
 	const popoverClass = $derived(
@@ -160,7 +162,9 @@
 				)}
 			>
 				<span>
-					{triggerContent}
+					{optionsProxy.find((option) => option.value === value)?.label ??
+						value ??
+						attributes.placeholder}
 				</span>
 				<ChevronsUpDown class="ml-2 size-4 shrink-0 opacity-50" />
 			</Button>
@@ -198,7 +202,14 @@
 									optionsManager.current !== option.id && 'text-transparent'
 								)}
 							/>
-							{option.label}
+							<Item.Root class="w-full p-0">
+								<Item.Content class="text-start">
+									<Item.Title>{option.label}</Item.Title>
+									{#if option?.description}
+										<Item.Description>{option.description()}</Item.Description>
+									{/if}
+								</Item.Content>
+							</Item.Root>
 						</CommandItem>
 					{/each}
 				</CommandGroup>

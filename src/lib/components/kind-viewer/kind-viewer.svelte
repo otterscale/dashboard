@@ -291,6 +291,7 @@
 			{/snippet}
 			{#snippet create()}
 				<Create
+					role={isClusterAdmin ? 'Cluster Admin' : undefined}
 					{schema}
 					{cluster}
 					{namespace}
