@@ -84,7 +84,7 @@
 		"@shikijs/themes": "^4.0.2",
 		"@sjsf/ajv8-validator": "^3.3.1",
 		"@sjsf/basic-theme": "^3.3.1",
-		"@sjsf/form": "^3.3.1",
+		"@sjsf/form": "^3.3.2",
 		"@sjsf/lucide-icons": "^3.3.1",
 		"@sjsf/shadcn4-theme": "^3.3.1",
 		"@xterm/addon-clipboard": "^0.2.0",
