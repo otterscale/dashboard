@@ -6,6 +6,7 @@
 
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
+	import { m } from '$lib/paraglide/messages';
 
 	import { fetchModelServiceTopology, fetchNodeTopology } from './fetch-topology';
 	import GpuTopologyDiagram from './gpu-topology-diagram.svelte';
@@ -48,8 +49,8 @@
 				topologyData = await fetchNodeTopology(client, cluster, object);
 			}
 		} catch (err) {
-			console.error('Failed to fetch GPU topology:', err);
-			error = `Failed to fetch GPU topology: ${(err as ConnectError).message}`;
+			console.error('Failed to fetch GPU allocation:', err);
+			error = m.gpu_allocation_fetch_error({ message: (err as ConnectError).message });
 		} finally {
 			isLoading = false;
 		}
@@ -73,20 +74,20 @@
 				<NetworkIcon />
 			</Item.Media>
 			<Item.Content>
-				<Item.Title>GPU Topology</Item.Title>
+				<Item.Title>{m.gpu_allocation()}</Item.Title>
 			</Item.Content>
 		</Item.Root>
 	</Dialog.Trigger>
 	<Dialog.Content class="flex h-[85vh] max-h-[85vh] max-w-[90vw] min-w-[70vw] flex-col gap-3">
 		<Dialog.Header>
 			<Dialog.Title>
-				GPU Topology &mdash; {name}
+				{m.gpu_allocation_title({ name })}
 			</Dialog.Title>
 			<Dialog.Description>
 				{#if view === 'model-service'}
-					ModelService &rarr; GPU &rarr; Node relationship diagram
+					{m.gpu_allocation_model_description()}
 				{:else}
-					Pod &rarr; GPU &rarr; Node relationship diagram
+					{m.gpu_allocation_node_description()}
 				{/if}
 			</Dialog.Description>
 		</Dialog.Header>
@@ -96,7 +97,7 @@
 				<div
 					class="flex h-full items-center justify-center rounded-md border bg-muted text-xs text-muted-foreground"
 				>
-					Loading GPU topology...
+					{m.gpu_allocation_loading()}
 				</div>
 			{:else if error}
 				<div
@@ -109,9 +110,9 @@
 					class="flex h-full items-center justify-center rounded-md border bg-muted text-xs text-muted-foreground"
 				>
 					{#if view === 'model-service'}
-						No GPU devices found for this model. Pods may not have HAMi vGPU allocations.
+						{m.gpu_allocation_empty_model()}
 					{:else}
-						No GPU devices registered on this node.
+						{m.gpu_allocation_empty_node()}
 					{/if}
 				</div>
 			{:else if topologyData}
