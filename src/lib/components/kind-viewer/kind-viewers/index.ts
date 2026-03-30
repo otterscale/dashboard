@@ -59,6 +59,12 @@ import {
 	getDaemonSetUISchemas
 } from './daemonset.js';
 import {
+	getDataVolumeColumnDefinitions,
+	getDataVolumeData,
+	getDataVolumeDataSchemas,
+	getDataVolumeUISchemas
+} from './datavolume.js';
+import {
 	getDefaultColumnDefinitions,
 	getDefaultData,
 	getDefaultDataSchemas,
@@ -100,6 +106,12 @@ import {
 	getHTTPRouteDataSchemas,
 	getHTTPRouteUISchemas
 } from './httproute.js';
+import {
+	getVirtualMachineInstancetypeColumnDefinitions,
+	getVirtualMachineInstancetypeData,
+	getVirtualMachineInstancetypeDataSchemas,
+	getVirtualMachineInstancetypeUISchemas
+} from './instancetype.js';
 import { getJobColumnDefinitions, getJobData, getJobDataSchemas, getJobUISchemas } from './job.js';
 import {
 	getLimitRangeColumnDefinitions,
@@ -199,6 +211,12 @@ import {
 	getStorageClassUISchemas
 } from './storageclass.js';
 import {
+	getVirtualMachineColumnDefinitions,
+	getVirtualMachineData,
+	getVirtualMachineDataSchemas,
+	getVirtualMachineUISchemas
+} from './virtualmachine.js';
+import {
 	getWorkspaceColumnDefinitions,
 	getWorkspaceData,
 	getWorkspaceDataSchemas,
@@ -271,6 +289,12 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 			return getGatewayDataSchemas();
 		case 'HelmRelease':
 			return getHelmReleaseDataSchemas();
+		case 'VirtualMachine':
+			return getVirtualMachineDataSchemas();
+		case 'DataVolume':
+			return getDataVolumeDataSchemas();
+		case 'VirtualMachineInstancetype':
+			return getVirtualMachineInstancetypeDataSchemas();
 		case 'CephObjectStore':
 			return getCephObjectStoreDataSchemas();
 		case 'ObjectBucketClaim':
@@ -346,6 +370,12 @@ function getData(apiResource: APIResource, object: any): Record<string, JsonValu
 			return getGatewayData(object);
 		case 'HelmRelease':
 			return getHelmReleaseData(object);
+		case 'VirtualMachine':
+			return getVirtualMachineData(object);
+		case 'DataVolume':
+			return getDataVolumeData(object);
+		case 'VirtualMachineInstancetype':
+			return getVirtualMachineInstancetypeData(object);
 		case 'CephObjectStore':
 			return getCephObjectStoreData(object);
 		case 'ObjectBucketClaim':
@@ -421,6 +451,12 @@ function getUISchemas(kind: string): Record<string, UISchemaType> {
 			return getGatewayUISchemas();
 		case 'HelmRelease':
 			return getHelmReleaseUISchemas();
+		case 'VirtualMachine':
+			return getVirtualMachineUISchemas();
+		case 'DataVolume':
+			return getDataVolumeUISchemas();
+		case 'VirtualMachineInstancetype':
+			return getVirtualMachineInstancetypeUISchemas();
 		case 'CephObjectStore':
 			return getCephObjectStoreUISchemas();
 		case 'ObjectBucketClaim':
@@ -433,7 +469,8 @@ function getUISchemas(kind: string): Record<string, UISchemaType> {
 function getColumnDefinitions(
 	apiResource: APIResource,
 	uiSchemas: Record<string, UISchemaType>,
-	dataSchemas: Record<string, DataSchemaType>
+	dataSchemas: Record<string, DataSchemaType>,
+	cluster?: string
 ): ColumnDef<Record<string, JsonValue>>[] {
 	switch (apiResource.kind) {
 		case 'Application':
@@ -500,6 +537,12 @@ function getColumnDefinitions(
 			return getGatewayColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'HelmRelease':
 			return getHelmReleaseColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'VirtualMachine':
+			return getVirtualMachineColumnDefinitions(apiResource, uiSchemas, dataSchemas, cluster);
+		case 'DataVolume':
+			return getDataVolumeColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'VirtualMachineInstancetype':
+			return getVirtualMachineInstancetypeColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'CephObjectStore':
 			return getCephObjectStoreColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'ObjectBucketClaim':

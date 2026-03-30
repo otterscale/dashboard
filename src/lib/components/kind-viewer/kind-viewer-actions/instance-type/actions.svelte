@@ -1,36 +1,32 @@
 <script lang="ts">
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
-	import type { ModelOtterscaleIoV1Alpha1ModelService } from '@otterscale/types';
-	import type { Schema } from 'ajv';
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
-	import Edit from '$lib/components/kind-viewer/kind-viewer-actions/default/edit.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
-	import GpuAllocation from './gpu-allocation.svelte';
-	import Update from './update.svelte';
+	import Edit from './update.svelte';
 
 	let {
+		schema,
+		object,
 		cluster,
 		namespace,
 		group,
 		version,
 		kind,
-		resource,
-		schema,
-		object
+		resource
 	}: {
+		schema: any;
+		object: any;
 		cluster: string;
 		namespace: string;
 		group: string;
 		version: string;
 		kind: string;
 		resource: string;
-		schema: Schema;
-		object: ModelOtterscaleIoV1Alpha1ModelService;
 	} = $props();
 
 	let actionsOpen = $state(false);
@@ -46,22 +42,8 @@
 			</div>
 		{/snippet}
 	</DropdownMenu.Trigger>
-	<DropdownMenu.Content align="end" class="w-full">
+	<DropdownMenu.Content align="end">
 		<DropdownMenu.Group>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<GpuAllocation
-					{cluster}
-					{namespace}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
-			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
@@ -91,34 +73,14 @@
 					e.preventDefault();
 				}}
 			>
-				<Update
-					{cluster}
-					{namespace}
-					{group}
-					{version}
-					{kind}
-					{resource}
-					{schema}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
-			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
 				<Edit
+					{schema}
+					{object}
 					{cluster}
-					{namespace}
 					{group}
 					{version}
 					{kind}
 					{resource}
-					{schema}
-					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
 					}}
@@ -130,14 +92,14 @@
 				}}
 			>
 				<Delete
+					{schema}
+					{object}
 					{cluster}
 					{namespace}
 					{group}
 					{version}
 					{kind}
 					{resource}
-					{schema}
-					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
 					}}
