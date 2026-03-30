@@ -68,12 +68,12 @@
 
 <Dialog.Root bind:open {onOpenChangeComplete} onOpenChange={handleOpenChange}>
 	<Dialog.Trigger class="w-full">
-		<Item.Root class="p-0 text-xs" size="sm">
+		<Item.Root class="flex-nowrap p-0 text-xs" size="sm">
 			<Item.Media>
 				<NetworkIcon />
 			</Item.Media>
 			<Item.Content>
-				<Item.Title class="whitespace-nowrap">GPU Topology</Item.Title>
+				<Item.Title>GPU Topology</Item.Title>
 			</Item.Content>
 		</Item.Root>
 	</Dialog.Trigger>
