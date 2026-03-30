@@ -208,7 +208,7 @@
 	});
 </script>
 
-<div class="gpu-topology-flow h-full w-full">
+<div class="gpu-allocation-flow h-full w-full">
 	<SvelteFlow bind:nodes bind:edges {nodeTypes} fitView minZoom={0.3} maxZoom={2} proOptions={{ hideAttribution: true }}>
 		<Background variant="dots" gap={20} />
 		<Controls />
@@ -216,7 +216,7 @@
 </div>
 
 <style>
-	.gpu-topology-flow :global(.svelte-flow) {
+	.gpu-allocation-flow :global(.svelte-flow) {
 		--xy-background-color: var(--background);
 		--xy-node-border-radius: var(--radius);
 		--xy-edge-stroke: var(--border);
@@ -228,22 +228,22 @@
 		--xy-controls-button-background-color-hover: var(--muted);
 	}
 
-	.gpu-topology-flow :global(.svelte-flow__edge-path) {
+	.gpu-allocation-flow :global(.svelte-flow__edge-path) {
 		stroke: var(--border);
 		stroke-width: 1.5;
 	}
 
-	.gpu-topology-flow :global(.svelte-flow__edge.selected .svelte-flow__edge-path) {
+	.gpu-allocation-flow :global(.svelte-flow__edge.selected .svelte-flow__edge-path) {
 		stroke: var(--primary);
 	}
 
-	.gpu-topology-flow :global(.svelte-flow__handle) {
+	.gpu-allocation-flow :global(.svelte-flow__handle) {
 		width: 8px;
 		height: 8px;
 		border: 2px solid var(--background);
 	}
 
-	.gpu-topology-flow :global(.svelte-flow__background) {
+	.gpu-allocation-flow :global(.svelte-flow__background) {
 		--xy-background-pattern-color: var(--border);
 	}
 </style>

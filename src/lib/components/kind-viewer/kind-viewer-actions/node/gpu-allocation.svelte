@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { GpuTopologyDialog } from '$lib/components/gpu-topology';
+	import { GpuAllocationDialog } from '$lib/components/gpu-allocation';
 
 	let {
 		cluster,
@@ -13,4 +13,4 @@
 	} = $props();
 </script>
 
-<GpuTopologyDialog {cluster} view="node" {object} {onOpenChangeComplete} />
+<GpuAllocationDialog {cluster} view="node" {object} {onOpenChangeComplete} />

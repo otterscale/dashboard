@@ -9,7 +9,7 @@
 	import { m } from '$lib/paraglide/messages';
 
 	import { fetchModelServiceTopology, fetchNodeTopology } from './fetch-topology';
-	import GpuTopologyDiagram from './gpu-topology-diagram.svelte';
+	import GpuAllocationDiagram from './gpu-allocation-diagram.svelte';
 	import type { TopologyData, TopologyView } from './types';
 
 	let {
@@ -116,7 +116,7 @@
 					{/if}
 				</div>
 			{:else if topologyData}
-				<GpuTopologyDiagram {topologyData} {view} />
+				<GpuAllocationDiagram {topologyData} {view} />
 			{/if}
 		</div>
 	</Dialog.Content>

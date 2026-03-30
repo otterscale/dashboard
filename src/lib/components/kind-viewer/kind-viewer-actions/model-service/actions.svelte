@@ -10,7 +10,7 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
-	import GpuTopology from './gpu-topology.svelte';
+	import GpuAllocation from './gpu-allocation.svelte';
 	import Update from './update.svelte';
 
 	let {
@@ -77,7 +77,7 @@
 					e.preventDefault();
 				}}
 			>
-				<GpuTopology
+				<GpuAllocation
 					{cluster}
 					{namespace}
 					{object}
