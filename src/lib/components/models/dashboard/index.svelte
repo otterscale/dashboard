@@ -3,6 +3,11 @@
 	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
+	import {
+		CalendarDateTime,
+		DatetimePicker,
+		getLocalTimeZone
+	} from '$lib/components/custom/datetime-picker';
 	import { NamespacePicker } from '$lib/components/custom/namespace-picker';
 	import { Reloader } from '$lib/components/custom/reloader';
 	import { Dashboard } from '$lib/components/models/dashboard/analytics';
@@ -34,6 +39,40 @@
 	);
 	/** vLLM analytics model filter; lives next to NamespacePicker so chart grid does not shift vertically */
 	let selectedModel = $state<string | undefined>(undefined);
+
+	function nowCDT(): CalendarDateTime {
+		const d = new Date();
+		return new CalendarDateTime(
+			d.getFullYear(),
+			d.getMonth() + 1,
+			d.getDate(),
+			d.getHours(),
+			d.getMinutes()
+		);
+	}
+	function minutesAgoCDT(min: number): CalendarDateTime {
+		const d = new Date(Date.now() - min * 60 * 1000);
+		return new CalendarDateTime(
+			d.getFullYear(),
+			d.getMonth() + 1,
+			d.getDate(),
+			d.getHours(),
+			d.getMinutes()
+		);
+	}
+
+	let pickerFrom = $state<CalendarDateTime>(minutesAgoCDT(60));
+	let pickerTo = $state<CalendarDateTime>(nowCDT());
+	let pickerToIsNow = $state(true);
+
+	const start = $derived(pickerFrom.toDate(getLocalTimeZone()));
+	const end = $derived(pickerToIsNow ? new Date() : pickerTo.toDate(getLocalTimeZone()));
+
+	const dashboardTimeRangeKey = $derived(
+		`${pickerFrom.toDate(getLocalTimeZone()).getTime()}-${
+			pickerToIsNow ? 'now' : pickerTo.toDate(getLocalTimeZone()).getTime()
+		}-${pickerToIsNow}`
+	);
 
 	onMount(async () => {
 		try {
@@ -71,25 +110,39 @@
 						<Tabs.Trigger value="analytics">{m.analytics()}</Tabs.Trigger>
 					</Tabs.List>
 					<div class="flex flex-wrap items-center justify-end gap-2">
-						{#if selectedTab === 'analytics'}
+						<div
+							class="flex min-h-9 min-w-[11rem] shrink-0 items-center justify-end sm:min-w-[12rem] {selectedTab !==
+							'analytics'
+								? 'pointer-events-none invisible select-none'
+								: ''}"
+							aria-hidden={selectedTab !== 'analytics'}
+						>
 							<ModelPicker {cluster} namespace={selectedNamespace} bind:selectedModel />
-						{/if}
+						</div>
 						<NamespacePicker
 							{cluster}
 							{isClusterAdmin}
 							{currentWorkspace}
 							bind:namespace={selectedNamespace}
 						/>
+						<DatetimePicker
+							bind:from={pickerFrom}
+							bind:to={pickerTo}
+							bind:toIsNow={pickerToIsNow}
+						/>
 						<Reloader bind:checked={isReloading} />
 					</div>
 				</div>
 				<Tabs.Content value="overview">
 					{#if selectedTab === 'overview'}
-						{#key selectedNamespace}
+						{#key `${selectedNamespace ?? ''}-${dashboardTimeRangeKey}`}
 							<Overview
 								{prometheusDriver}
 								namespace={selectedNamespace ?? ''}
 								{cluster}
+								{start}
+								{end}
+								endIsNow={pickerToIsNow}
 								bind:isReloading
 							/>
 						{/key}
@@ -97,12 +150,15 @@
 				</Tabs.Content>
 				<Tabs.Content value="analytics">
 					{#if selectedTab === 'analytics'}
-						{#key selectedNamespace}
+						{#key `${selectedNamespace ?? ''}-${dashboardTimeRangeKey}`}
 							<Dashboard
 								{cluster}
 								namespace={selectedNamespace}
 								client={prometheusDriver}
 								bind:selectedModel
+								{start}
+								{end}
+								endIsNow={pickerToIsNow}
 								bind:isReloading
 							/>
 						{/key}

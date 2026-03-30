@@ -22,8 +22,18 @@
 	let {
 		prometheusDriver,
 		cluster,
+		start,
+		end,
+		endIsNow,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	}: {
+		prometheusDriver: PrometheusDriver;
+		cluster: string;
+		start: Date;
+		end: Date;
+		endIsNow: boolean;
+		isReloading: boolean;
+	} = $props();
 
 	let latestLatency: number | undefined = $state(undefined);
 	let latencies = $state([] as SampleValue[]);
@@ -53,8 +63,8 @@
 		try {
 			const response = await prometheusDriver.rangeQuery(
 				`histogram_quantile(0.95, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket{}[5m])))`,
-				Date.now() - 24 * 60 * 60 * 1000,
-				Date.now(),
+				start.getTime(),
+				endIsNow ? Date.now() : end.getTime(),
 				2 * 60
 			);
 			const sampleValues: SampleValue[] = response.result[0]?.values ?? [];

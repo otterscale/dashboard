@@ -1,40 +1,53 @@
 <script lang="ts">
+	import type { JsonObject } from '@bufbuild/protobuf';
+	import { createClient, type Transport } from '@connectrpc/connect';
 	import HeartPulse from '@lucide/svelte/icons/heart-pulse';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
-	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
-	import { onDestroy, onMount } from 'svelte';
+	import {
+		type ListRequest,
+		type ListResponse,
+		type Resource,
+		ResourceService
+	} from '@otterscale/api/resource/v1';
+	import type { PrometheusDriver } from 'prometheus-query';
+	import { getContext, onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Card from '$lib/components/ui/card';
 	import { Progress } from '$lib/components/ui/progress';
 	import { m } from '$lib/paraglide/messages';
-	import { escapePromqlStringLiteral } from '$lib/prometheus';
 
-	type WorkloadKind = {
+	type WorkloadListSpec = {
 		group: string;
-		kind: string;
+		version: string;
+		resource: string;
 	};
 
-	const WORKLOAD_SPECS: WorkloadKind[] = [
-		{ group: 'model.otterscale.io', kind: 'ModelService' },
-		{ group: 'workload.otterscale.io', kind: 'Application' },
-		{ group: 'helm.toolkit.fluxcd.io', kind: 'HelmRelease' },
-		{ group: 'kubevirt.io', kind: 'VirtualMachine' }
+	/** Same GVR as console nav / model.svelte (ResourceService.list). */
+	const WORKLOAD_SPECS: WorkloadListSpec[] = [
+		{ group: 'model.otterscale.io', version: 'v1alpha1', resource: 'modelservices' },
+		{ group: 'workload.otterscale.io', version: 'v1alpha1', resource: 'applications' },
+		{ group: 'helm.toolkit.fluxcd.io', version: 'v2', resource: 'helmreleases' },
+		{ group: 'kubevirt.io', version: 'v1', resource: 'virtualmachines' }
 	];
 
 	let {
 		prometheusDriver,
+		cluster,
 		namespace,
-		start = new Date(Date.now() - 60 * 60 * 1000),
-		end = new Date(),
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
+		cluster: string;
 		namespace: string;
-		start?: Date;
-		end?: Date;
 		isReloading: boolean;
 	} = $props();
+
+	// widget-grid passes prometheusDriver to every tile; this widget uses Resource API only.
+	void prometheusDriver;
+
+	const transport: Transport = getContext('transport');
+	const resourceClient = createClient(ResourceService, transport);
 
 	const workloadLabels = $derived([
 		m.model(),
@@ -45,44 +58,83 @@
 
 	let rows: { label: string; ready: number; total: number }[] = $state([]);
 
-	function scalar(v: SampleValue | undefined): number {
-		if (v?.value === undefined || v?.value === null) return 0;
-		const n = Number(v.value);
-		return Number.isFinite(n) ? n : 0;
+	function hasReadyConditionTrue(obj: JsonObject | undefined): boolean {
+		if (!obj || typeof obj !== 'object') return false;
+		const status = (obj as Record<string, unknown>)['status'];
+		if (!status || typeof status !== 'object') return false;
+		const conditions = (status as Record<string, unknown>)['conditions'];
+		if (!Array.isArray(conditions)) return false;
+		for (const c of conditions) {
+			if (!c || typeof c !== 'object') continue;
+			const row = c as { type?: unknown; status?: unknown };
+			if (row.type === 'Ready' && row.status === 'True') return true;
+		}
+		return false;
 	}
 
-	async function fetchWorkload(w: WorkloadKind, label: string, ns: string) {
-		const g = escapePromqlStringLiteral(w.group);
-		const k = escapePromqlStringLiteral(w.kind);
-		const n = escapePromqlStringLiteral(ns);
+	function totalsFromItems(items: Resource[]): { ready: number; total: number } {
+		let ready = 0;
+		for (const item of items) {
+			if (hasReadyConditionTrue(item.object)) ready++;
+		}
+		return { ready, total: items.length };
+	}
 
-		const totalQ = `count(kube_customresource_info{namespace="${n}", group="${g}", kind="${k}"})`;
-		const readyQ = `count(kube_customresource_status_condition{namespace="${n}", group="${g}", kind="${k}", condition="Ready", status="true"})`;
+	async function listAllInNamespace(spec: WorkloadListSpec, ns: string): Promise<Resource[]> {
+		const out: Resource[] = [];
+		let continueToken: string | undefined = undefined;
+		for (;;) {
+			const response: ListResponse = await resourceClient.list({
+				cluster,
+				namespace: ns,
+				group: spec.group,
+				version: spec.version,
+				resource: spec.resource,
+				limit: BigInt(500),
+				continue: continueToken
+			} as ListRequest);
+			out.push(...response.items);
+			continueToken = response.continue || undefined;
+			if (!continueToken) break;
+		}
+		return out;
+	}
 
-		const [totalR, readyR] = await Promise.all([
-			prometheusDriver.instantQuery(totalQ, end),
-			prometheusDriver.instantQuery(readyQ, end)
-		]);
-
-		return {
-			label,
-			ready: Math.round(scalar(readyR.result[0]?.value)),
-			total: Math.round(scalar(totalR.result[0]?.value))
-		};
+	async function fetchWorkloadSafe(
+		spec: WorkloadListSpec,
+		label: string,
+		ns: string
+	): Promise<{ label: string; ready: number; total: number }> {
+		try {
+			const items = await listAllInNamespace(spec, ns);
+			const { ready, total } = totalsFromItems(items);
+			return { label, ready, total };
+		} catch (error) {
+			console.error(
+				`Failed to list ${spec.group}/${spec.version}/${spec.resource} in namespace ${ns}:`,
+				error
+			);
+			return { label, ready: 0, total: 0 };
+		}
 	}
 
 	async function fetch() {
+		if (!namespace || !cluster) {
+			rows = [];
+			return;
+		}
+		const labels = workloadLabels;
 		try {
-			if (!namespace) {
-				rows = [];
-				return;
-			}
-			const labels = workloadLabels;
 			rows = await Promise.all(
-				WORKLOAD_SPECS.map((w, i) => fetchWorkload(w, labels[i]!, namespace))
+				WORKLOAD_SPECS.map((w, i) => fetchWorkloadSafe(w, labels[i]!, namespace))
 			);
 		} catch (error) {
 			console.error('Failed to fetch workspace workload health:', error);
+			rows = WORKLOAD_SPECS.map((_, i) => ({
+				label: labels[i]!,
+				ready: 0,
+				total: 0
+			}));
 		}
 	}
 
@@ -97,8 +149,8 @@
 	});
 
 	$effect(() => {
-		void start;
-		void end;
+		void cluster;
+		void namespace;
 		if (isLoaded) fetch();
 	});
 

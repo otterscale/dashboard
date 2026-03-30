@@ -15,8 +15,18 @@
 	let {
 		prometheusDriver,
 		cluster,
+		start,
+		end,
+		endIsNow,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	}: {
+		prometheusDriver: PrometheusDriver;
+		cluster: string;
+		start: Date;
+		end: Date;
+		endIsNow: boolean;
+		isReloading: boolean;
+	} = $props();
 
 	let ninety_five = $state([] as SampleValue[]);
 	let ninety_nine = $state([] as SampleValue[]);
@@ -40,8 +50,8 @@
 		try {
 			const response = await prometheusDriver.rangeQuery(
 				`histogram_quantile(0.95, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket{}[5m])))`,
-				Date.now() - 24 * 60 * 60 * 1000,
-				Date.now(),
+				start.getTime(),
+				endIsNow ? Date.now() : end.getTime(),
 				2 * 60
 			);
 			ninety_five = response.result[0]?.values ?? [];
@@ -54,8 +64,8 @@
 		try {
 			const response = await prometheusDriver.rangeQuery(
 				`histogram_quantile(0.99, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket{}[5m])))`,
-				Date.now() - 24 * 60 * 60 * 1000,
-				Date.now(),
+				start.getTime(),
+				endIsNow ? Date.now() : end.getTime(),
 				2 * 60
 			);
 			ninety_nine = response.result[0]?.values ?? [];
