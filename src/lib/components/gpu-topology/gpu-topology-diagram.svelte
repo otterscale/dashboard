@@ -201,7 +201,7 @@
 </script>
 
 <div class="gpu-topology-flow h-full w-full">
-	<SvelteFlow bind:nodes bind:edges {nodeTypes} fitView minZoom={0.3} maxZoom={2}>
+	<SvelteFlow bind:nodes bind:edges {nodeTypes} fitView minZoom={0.3} maxZoom={2} proOptions={{ hideAttribution: true }}>
 		<Background variant="dots" gap={20} />
 		<Controls />
 	</SvelteFlow>
