@@ -209,33 +209,33 @@
 
 <style>
 	.gpu-topology-flow :global(.svelte-flow) {
-		--xy-background-color: hsl(var(--background));
+		--xy-background-color: var(--background);
 		--xy-node-border-radius: var(--radius);
-		--xy-edge-stroke: hsl(var(--border));
-		--xy-edge-stroke-selected: hsl(var(--primary));
-		--xy-minimap-background-color: hsl(var(--muted));
-		--xy-controls-button-background-color: hsl(var(--card));
-		--xy-controls-button-border-color: hsl(var(--border));
-		--xy-controls-button-color: hsl(var(--foreground));
-		--xy-controls-button-background-color-hover: hsl(var(--muted));
+		--xy-edge-stroke: var(--border);
+		--xy-edge-stroke-selected: var(--primary);
+		--xy-minimap-background-color: var(--muted);
+		--xy-controls-button-background-color: var(--card);
+		--xy-controls-button-border-color: var(--border);
+		--xy-controls-button-color: var(--foreground);
+		--xy-controls-button-background-color-hover: var(--muted);
 	}
 
 	.gpu-topology-flow :global(.svelte-flow__edge-path) {
-		stroke: hsl(var(--border));
+		stroke: var(--border);
 		stroke-width: 1.5;
 	}
 
 	.gpu-topology-flow :global(.svelte-flow__edge.selected .svelte-flow__edge-path) {
-		stroke: hsl(var(--primary));
+		stroke: var(--primary);
 	}
 
 	.gpu-topology-flow :global(.svelte-flow__handle) {
 		width: 8px;
 		height: 8px;
-		border: 2px solid hsl(var(--background));
+		border: 2px solid var(--background);
 	}
 
 	.gpu-topology-flow :global(.svelte-flow__background) {
-		--xy-background-pattern-color: hsl(var(--border));
+		--xy-background-pattern-color: var(--border);
 	}
 </style>
