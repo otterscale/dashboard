@@ -18,12 +18,18 @@
 		cluster,
 		namespace,
 		selectedModel,
+		start,
+		end,
+		endIsNow,
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		cluster: string;
 		namespace: string | undefined;
 		selectedModel: string;
+		start: Date;
+		end: Date;
+		endIsNow: boolean;
 		isReloading: boolean;
 	} = $props();
 
@@ -55,8 +61,8 @@
 		try {
 			const response = await prometheusDriver.rangeQuery(
 				getTtftQuery(quantile),
-				Date.now() - 24 * 60 * 60 * 1000,
-				Date.now(),
+				start.getTime(),
+				endIsNow ? Date.now() : end.getTime(),
 				2 * 60
 			);
 			if (quantile === 0.95) ninety_fives = response.result[0]?.values ?? [];
@@ -92,9 +98,9 @@
 <Statistics.Root type="count" class="overflow-visible">
 	<Statistics.Header>
 		<Statistics.Title>
-			<div class="flex flex-col gap-0.5">
-				{m.time_to_first_token()}
-				<p class="text-sm font-normal text-muted-foreground">
+			<div class="flex min-h-[4.5rem] flex-col gap-0.5">
+				<span class="line-clamp-1">{m.time_to_first_token()}</span>
+				<p class="line-clamp-2 text-sm font-normal text-muted-foreground">
 					{m.llm_dashboard_time_to_first_token_tooltip()}
 				</p>
 			</div>

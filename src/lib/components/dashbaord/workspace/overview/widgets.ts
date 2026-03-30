@@ -15,7 +15,8 @@ export const workspaceOverviewWidgets = [
 	{
 		key: 'workload-health',
 		class: 'col-span-2 row-span-1 md:col-span-2 lg:col-span-4',
-		component: WorkloadHealth
+		component: WorkloadHealth,
+		needsCluster: true
 	},
 	{
 		key: 'storage',

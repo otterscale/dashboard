@@ -8,6 +8,8 @@
 
 	import * as Statistics from '$lib/components/custom/data-table/statistics/index';
 	import { ReloadManager } from '$lib/components/custom/reloader';
+	import { Button } from '$lib/components/ui/button/index.js';
+	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import { formatCapacity, formatPercentage } from '$lib/formatter';
@@ -17,26 +19,35 @@
 	let {
 		prometheusDriver,
 		namespace,
-		start = new Date(Date.now() - 60 * 60 * 1000),
-		end = new Date(),
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		namespace: string;
-		start?: Date;
-		end?: Date;
 		isReloading: boolean;
 	} = $props();
 
-	let cpuUsed = $state<number | null>(null);
-	let cpuHard = $state<number | null>(null);
-	let memUsed = $state<number | null>(null);
-	let memHard = $state<number | null>(null);
+	/** Which ResourceQuota resource keys to visualize (requests.* vs limits.*). */
+	let quotaView = $state<'requests' | 'limits'>('requests');
+
+	let cpuUsedReq = $state<number | null>(null);
+	let cpuHardReq = $state<number | null>(null);
+	let cpuUsedLim = $state<number | null>(null);
+	let cpuHardLim = $state<number | null>(null);
+	let memUsedReq = $state<number | null>(null);
+	let memHardReq = $state<number | null>(null);
+	let memUsedLim = $state<number | null>(null);
+	let memHardLim = $state<number | null>(null);
+	/** GPU / GPU memory: quotas are usually requests-only; not tied to the requests/limits toggle. */
 	let gpuUsed = $state<number | null>(null);
 	let gpuHard = $state<number | null>(null);
 	let gpuMemUsed = $state<number | null>(null);
 	let gpuMemHard = $state<number | null>(null);
 	let hasError = $state(false);
+
+	const cpuUsed = $derived(quotaView === 'requests' ? cpuUsedReq : cpuUsedLim);
+	const cpuHard = $derived(quotaView === 'requests' ? cpuHardReq : cpuHardLim);
+	const memUsed = $derived(quotaView === 'requests' ? memUsedReq : memUsedLim);
+	const memHard = $derived(quotaView === 'requests' ? memHardReq : memHardLim);
 
 	function instantScalar(r: Awaited<ReturnType<PrometheusDriver['instantQuery']>>): number | null {
 		const raw = r.result[0]?.value;
@@ -47,41 +58,79 @@
 		return Number.isFinite(n) ? n : null;
 	}
 
-	async function fetchQuota() {
+	function rqSum(resource: string, t: 'used' | 'hard') {
 		const ns = escapePromqlStringLiteral(namespace);
 		const base = `kube_resourcequota{namespace="${ns}"`;
+		return `sum(${base}, type="${t}", resource="${resource}"})`;
+	}
 
-		const [cpuU, cpuH, memU, memH, gpuU, gpuH, gpuMemU, gpuMemH] = await Promise.all([
-			prometheusDriver.instantQuery(`sum(${base}, type="used", resource="requests.cpu"})`, end),
-			prometheusDriver.instantQuery(`sum(${base}, type="hard", resource="requests.cpu"})`, end),
-			prometheusDriver.instantQuery(`sum(${base}, type="used", resource="requests.memory"})`, end),
-			prometheusDriver.instantQuery(`sum(${base}, type="hard", resource="requests.memory"})`, end),
-			prometheusDriver.instantQuery(
-				`sum(${base}, type="used", resource="requests.nvidia.com/gpu"})`,
-				end
-			),
-			prometheusDriver.instantQuery(
-				`sum(${base}, type="hard", resource="requests.nvidia.com/gpu"})`,
-				end
-			),
-			prometheusDriver.instantQuery(
-				`sum(${base}, type="used", resource="requests.nvidia.com/gpumem"})`,
-				end
-			),
-			prometheusDriver.instantQuery(
-				`sum(${base}, type="hard", resource="requests.nvidia.com/gpumem"})`,
-				end
-			)
+	/** KSM `resource` label on `kube_pod_container_resource_limits` (dots → underscores). */
+	const KSM_POD_RES_NVIDIA_GPU = 'nvidia_com_gpu';
+	const KSM_POD_RES_NVIDIA_GPUMEM = 'nvidia_com_gpumem';
+
+	/** Sum limits for ready containers only (matches workspace viewer pod usage). */
+	function podContainerReadyLimitSum(ns: string, ksmResourceLabel: string): string {
+		const nsLit = escapePromqlStringLiteral(ns);
+		const resLit = escapePromqlStringLiteral(ksmResourceLabel);
+		return `sum(kube_pod_container_resource_limits{namespace="${nsLit}",resource="${resLit}"} and on (namespace, pod, container) kube_pod_container_status_ready{namespace="${nsLit}"} == 1)`;
+	}
+
+	async function queryScalar(q: string): Promise<number | null> {
+		try {
+			const r = await prometheusDriver.instantQuery(q, new Date());
+			return instantScalar(r);
+		} catch {
+			return null;
+		}
+	}
+
+	async function fetchQuota() {
+		const [
+			cpuReqU,
+			cpuReqH,
+			cpuLimU,
+			cpuLimH,
+			memReqU,
+			memReqH,
+			memLimU,
+			memLimH,
+			gpuUsedFromPods,
+			gpuHardFromRq,
+			gpuMemUsedFromPods,
+			gpuMemHardFromRq
+		] = await Promise.all([
+			queryScalar(rqSum('requests.cpu', 'used')),
+			queryScalar(rqSum('requests.cpu', 'hard')),
+			queryScalar(rqSum('limits.cpu', 'used')),
+			queryScalar(rqSum('limits.cpu', 'hard')),
+			queryScalar(rqSum('requests.memory', 'used')),
+			queryScalar(rqSum('requests.memory', 'hard')),
+			queryScalar(rqSum('limits.memory', 'used')),
+			queryScalar(rqSum('limits.memory', 'hard')),
+			queryScalar(podContainerReadyLimitSum(namespace, KSM_POD_RES_NVIDIA_GPU)),
+			queryScalar(rqSum('nvidia.com/gpu', 'hard')),
+			queryScalar(podContainerReadyLimitSum(namespace, KSM_POD_RES_NVIDIA_GPUMEM)),
+			queryScalar(rqSum('nvidia.com/gpumem', 'hard'))
 		]);
 
-		cpuUsed = instantScalar(cpuU);
-		cpuHard = instantScalar(cpuH);
-		memUsed = instantScalar(memU);
-		memHard = instantScalar(memH);
-		gpuUsed = instantScalar(gpuU) ?? 0;
-		gpuHard = instantScalar(gpuH) ?? 0;
-		gpuMemUsed = instantScalar(gpuMemU) ?? 0;
-		gpuMemHard = instantScalar(gpuMemH) ?? 0;
+		cpuUsedReq = cpuReqU;
+		cpuHardReq = cpuReqH;
+		cpuUsedLim = cpuLimU;
+		cpuHardLim = cpuLimH;
+		memUsedReq = memReqU;
+		memHardReq = memReqH;
+		memUsedLim = memLimU;
+		memHardLim = memLimH;
+		gpuUsed = gpuUsedFromPods ?? 0;
+		gpuHard = gpuHardFromRq ?? 0;
+		gpuMemUsed = gpuMemUsedFromPods ?? 0;
+		gpuMemHard = gpuMemHardFromRq ?? 0;
+	}
+
+	function resetQuotaState() {
+		cpuUsedReq = cpuHardReq = cpuUsedLim = cpuHardLim = null;
+		memUsedReq = memHardReq = memUsedLim = memHardLim = null;
+		gpuUsed = gpuHard = gpuMemUsed = gpuMemHard = null;
 	}
 
 	async function fetch() {
@@ -91,7 +140,7 @@
 			await fetchQuota();
 		} catch (error) {
 			hasError = true;
-			cpuUsed = cpuHard = memUsed = memHard = gpuUsed = gpuHard = gpuMemUsed = gpuMemHard = null;
+			resetQuotaState();
 			console.error('Failed to fetch workspace resource quota:', error);
 		}
 	}
@@ -106,13 +155,6 @@
 		}
 	});
 
-	$effect(() => {
-		// Re-fetch when the time range changes
-		void start;
-		void end;
-		if (isLoaded) fetch();
-	});
-
 	let isLoaded = $state(false);
 	onMount(async () => {
 		await fetch();
@@ -125,6 +167,15 @@
 	function formatCpuCores(n: number): string {
 		return Number.isInteger(n) ? String(n) : n.toFixed(2);
 	}
+
+	/** `nvidia.com/gpumem` values are in MB; display converts to GB (1024 MB = 1 GB). */
+	function formatGpuMemGb(nMb: number): { value: string; unit: string } {
+		const gb = nMb / 1024;
+		return {
+			value: gb.toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 0 }),
+			unit: 'GB'
+		};
+	}
 </script>
 
 <Card.Root class="group relative h-full min-h-[160px] gap-2 overflow-hidden">
@@ -132,11 +183,38 @@
 		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"
 		aria-hidden="true"
 	/>
-	<Card.Header>
-		<Card.Title>{m.workspace_quota_usage_title()}</Card.Title>
-		<Card.Description class="text-md flex min-h-6 items-center">
-			{m.workspace_quota_usage_description()}
-		</Card.Description>
+	<Card.Header class="space-y-3">
+		<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+			<div class="min-w-0 flex-1 space-y-1.5">
+				<Card.Title>{m.workspace_quota_usage_title()}</Card.Title>
+				<Card.Description class="text-md flex min-h-6 items-center">
+					{m.workspace_quota_usage_description()}
+				</Card.Description>
+			</div>
+			<ButtonGroup.Root
+				class="shrink-0 self-stretch sm:self-auto"
+				aria-label={m.workspace_quota_toggle_aria()}
+			>
+				<Button
+					type="button"
+					size="sm"
+					variant={quotaView === 'requests' ? 'secondary' : 'outline'}
+					class="min-w-[5.5rem]"
+					onclick={() => (quotaView = 'requests')}
+				>
+					{m.workspace_quota_toggle_requests()}
+				</Button>
+				<Button
+					type="button"
+					size="sm"
+					variant={quotaView === 'limits' ? 'secondary' : 'outline'}
+					class="min-w-[5.5rem]"
+					onclick={() => (quotaView = 'limits')}
+				>
+					{m.workspace_quota_toggle_limits()}
+				</Button>
+			</ButtonGroup.Root>
+		</div>
 	</Card.Header>
 	{#if !namespace}
 		<Card.Content class="text-sm text-muted-foreground"
@@ -362,7 +440,7 @@
 					<div class="flex justify-between gap-4">
 						<Statistics.Title>GPU Memory</Statistics.Title>
 						{#if gpuMemHard !== null}
-							{@const { value, unit } = formatCapacity(gpuMemHard)}
+							{@const { value, unit } = formatGpuMemGb(gpuMemHard)}
 							<div class="flex items-center gap-1 text-xl">
 								<p class="font-bold">{value} {unit}</p>
 							</div>
@@ -423,8 +501,8 @@
 							>
 								{#snippet aboveMarks()}
 									{@const percentage = formatPercentage(gpuMemUsed!, gpuMemHard!, 1)}
-									{@const { value: usingValue, unit: usingUnit } = formatCapacity(gpuMemUsed!)}
-									{@const { value: totalValue, unit: totalUnit } = formatCapacity(gpuMemHard!)}
+									{@const { value: usingValue, unit: usingUnit } = formatGpuMemGb(gpuMemUsed!)}
+									{@const { value: totalValue, unit: totalUnit } = formatGpuMemGb(gpuMemHard!)}
 									<Text
 										value={`${percentage} %`}
 										textAnchor="middle"
