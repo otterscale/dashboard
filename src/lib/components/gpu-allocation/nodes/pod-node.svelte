@@ -5,13 +5,14 @@
 
 	let { data, selected }: NodeProps = $props();
 
-	const statusColor: Record<string, string> = {
+	const statusColorMap: Record<string, string> = {
 		Running: 'bg-green-500',
 		Succeeded: 'bg-green-500',
 		Pending: 'bg-yellow-500',
-		Failed: 'bg-red-500',
-		Unknown: 'bg-muted-foreground'
+		Failed: 'bg-red-500'
 	};
+
+	const statusColor = $derived(statusColorMap[data.status as string] ?? 'bg-muted-foreground');
 </script>
 
 {#if data.hasTargetEdge}
@@ -29,8 +30,7 @@
 		</div>
 		<span class="truncate text-sm font-semibold">Pod</span>
 		<span
-			class="ml-auto inline-block size-2 shrink-0 rounded-full {statusColor[data.status] ??
-				statusColor.Unknown}"
+			class="ml-auto inline-block size-2 shrink-0 rounded-full {statusColor}"
 		></span>
 	</div>
 	<div class="space-y-1 px-3 py-2">

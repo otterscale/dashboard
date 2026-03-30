@@ -1,9 +1,19 @@
 <script lang="ts">
 	import Gpu from '@lucide/svelte/icons/gpu';
-	import type { NodeProps } from '@xyflow/svelte';
+	import type { Node, NodeProps } from '@xyflow/svelte';
 	import { Handle, Position } from '@xyflow/svelte';
 
-	let { data, selected }: NodeProps = $props();
+	type GpuNodeData = {
+		index: number;
+		type: string;
+		health: boolean;
+		totalMem: number;
+		usedMem: number;
+		hasTargetEdge: boolean;
+		hasSourceEdge: boolean;
+	};
+
+	let { data, selected }: NodeProps<Node<GpuNodeData>> = $props();
 
 	const usedMemPct = $derived(
 		data.totalMem > 0 ? Math.round((data.usedMem / data.totalMem) * 100) : 0
