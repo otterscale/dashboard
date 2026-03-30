@@ -16,6 +16,7 @@
 			TailoredComboboxTrigger?: ButtonProps;
 			TailoredComboboxInput?: Command.InputProps;
 			TailoredComboboxEmptyText?: string;
+			TailoredComboboxPopoverClass?: string;
 		}
 	}
 </script>
@@ -122,6 +123,9 @@
 	);
 
 	const emptyText = $derived(retrieveUiOption(ctx, config, 'TailoredComboboxEmptyText'));
+	const popoverClass = $derived(
+		(retrieveUiOption(ctx, config, 'TailoredComboboxPopoverClass') as string) ?? 'w-[200px]'
+	);
 
 	let open = $state(false);
 	let triggerReference = $state<HTMLButtonElement>(null!);
@@ -162,7 +166,7 @@
 			</Button>
 		{/snippet}
 	</PopoverTrigger>
-	<PopoverContent class="w-[200px] p-0">
+	<PopoverContent class="{popoverClass} p-0">
 		<CommandRoot shouldFilter={false}>
 			<CommandInput bind:value={filterValue} />
 			<CommandList>

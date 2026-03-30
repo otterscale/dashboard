@@ -1,16 +1,12 @@
 <script lang="ts">
-	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
+	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
-	import Vnc from '$lib/components/kind-viewer/kind-viewer-actions/default/vnc.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
-	import PauseResume from './pause-resume.svelte';
-	import Restart from './restart.svelte';
-	import StartStop from './start-stop.svelte';
 	import Edit from './update.svelte';
 
 	let {
@@ -41,7 +37,7 @@
 		{#snippet child({ props })}
 			<div class="flex justify-end">
 				<Button size="icon" variant="ghost" class="shadow-none" aria-label="Actions" {...props}>
-					<EllipsisIcon size={16} aria-hidden="true" />
+					<Ellipsis size={16} aria-hidden="true" />
 				</Button>
 			</div>
 		{/snippet}
@@ -72,72 +68,6 @@
 					}}
 				/>
 			</DropdownMenu.Item>
-		</DropdownMenu.Group>
-		<DropdownMenu.Separator />
-		<DropdownMenu.Group>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<Vnc
-					{cluster}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
-			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<StartStop
-					{cluster}
-					{namespace}
-					{version}
-					{resource}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
-			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<PauseResume
-					{cluster}
-					{namespace}
-					{version}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
-			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<Restart
-					{cluster}
-					{namespace}
-					{version}
-					{resource}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
-			</DropdownMenu.Item>
-		</DropdownMenu.Group>
-		<DropdownMenu.Separator />
-		<DropdownMenu.Group>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
