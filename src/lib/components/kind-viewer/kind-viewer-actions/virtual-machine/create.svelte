@@ -60,6 +60,11 @@
 			}
 		},
 		// UI-only fields (not in API schema)
+		diskSourceType: {},
+		containerDiskConfig: {
+			containerDiskImage: null,
+			additionalDisks: []
+		},
 		diskConfig: {
 			bootDisk: null,
 			additionalDisks: []
@@ -100,14 +105,26 @@
 	}
 
 	// Build disks and volumes
-	function buildDisksAndVolumes(): { disks: any[]; volumes: any[] } {
+	function buildDisksAndVolumes(): { disks: any[]; volumes: any[]; isContainerDisk: boolean } {
 		const vmName = typeof values.metadata.name === 'string' ? values.metadata.name : '';
+		const isContainerDisk = values.diskSourceType === 'containerDisk';
 
 		const disks: any[] = [{ name: 'os-disk', disk: { bus: 'virtio' }, bootOrder: 1 }];
-		const volumes: any[] = [{ name: 'os-disk', dataVolume: { name: vmName } }];
+		const volumes: any[] = [];
 
-		const additionalDvNames: string[] = Array.isArray(values.diskConfig?.additionalDisks)
-			? values.diskConfig.additionalDisks
+		if (isContainerDisk) {
+			const image =
+				typeof values.containerDiskConfig?.containerDiskImage === 'string'
+					? values.containerDiskConfig.containerDiskImage
+					: '';
+			volumes.push({ name: 'os-disk', containerDisk: { image } });
+		} else {
+			volumes.push({ name: 'os-disk', dataVolume: { name: vmName } });
+		}
+
+		const diskSource = isContainerDisk ? values.containerDiskConfig : values.diskConfig;
+		const additionalDvNames: string[] = Array.isArray(diskSource?.additionalDisks)
+			? diskSource.additionalDisks
 			: [];
 		additionalDvNames.forEach((dvName: any, index: number) => {
 			if (typeof dvName === 'string' && dvName.trim()) {
@@ -126,7 +143,7 @@
 			});
 		}
 
-		return { disks, volumes };
+		return { disks, volumes, isContainerDisk };
 	}
 
 	// Build dataVolumeTemplates to clone the selected boot DV
@@ -162,7 +179,7 @@
 
 	// Derived submission values (proper VirtualMachine structure)
 	const submissionValues = $derived.by(() => {
-		const { disks, volumes } = buildDisksAndVolumes();
+		const { disks, volumes, isContainerDisk } = buildDisksAndVolumes();
 
 		return {
 			apiVersion: group ? `${group}/${version}` : version,
@@ -177,7 +194,7 @@
 			spec: {
 				runStrategy: 'Halted',
 				instancetype: values.spec.instancetype,
-				dataVolumeTemplates: buildDataVolumeTemplates(),
+				...(isContainerDisk ? {} : { dataVolumeTemplates: buildDataVolumeTemplates() }),
 				template: {
 					metadata: {
 						labels: {
@@ -201,7 +218,7 @@
 	let value = $derived(stringify(submissionValues));
 
 	// Steps Manager
-	const steps = Array.from({ length: 6 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 7 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -448,64 +465,18 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 4: Disks -->
+			<!-- Step 4: Disk Source Type -->
 			<Tabs.Content value={steps[3]}>
 				<Form
 					schema={{
-						type: 'object',
-						title: 'Disks',
-						properties: {
-							bootDisk: {
-								type: 'string',
-								title: 'Boot Disk (DataVolume to Clone)'
-							},
-							additionalDisks: {
-								type: 'array',
-								title: 'Additional Data Disks',
-								items: {
-									type: 'string',
-									title: 'Data Disk'
-								}
-							}
-						},
-						required: ['bootDisk']
+						type: 'string',
+						title: 'Disk Source Type',
+						enum: ['dataVolume', 'containerDisk'],
+						enumNames: ['DataVolume (Clone)', 'Container Disk (Image)']
 					} as Schema}
 					uiSchema={{
-						bootDisk: {
-							'ui:components': {
-								stringField: 'enumField',
-								selectWidget: ComboboxWidget
-							},
-							'ui:options': {
-								TailoredComboboxEnumerations: fetchDataVolumesAsEnumerations,
-								TailoredComboboxVisibility: 10,
-								TailoredComboboxInput: {
-									placeholder: 'Select Boot DataVolume'
-								},
-								TailoredComboboxEmptyText: 'No DataVolumes found.',
-								TailoredComboboxPopoverClass: 'w-[380px]'
-							}
-						},
-						additionalDisks: {
-							'ui:options': {
-								addable: true,
-								removable: true,
-								orderable: false
-							},
-							items: {
-								'ui:components': {
-									stringField: 'enumField',
-									selectWidget: ComboboxWidget
-								},
-								'ui:options': {
-									TailoredComboboxEnumerations: fetchDataVolumesAsEnumerations,
-									TailoredComboboxVisibility: 10,
-									TailoredComboboxInput: {
-										placeholder: 'Select DataVolume'
-									},
-									TailoredComboboxEmptyText: 'No DataVolumes found.'
-								}
-							}
+						'ui:components': {
+							stringField: 'enumField'
 						},
 						'ui:options': {
 							translations: {
@@ -513,14 +484,13 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{ bootDisk: null, additionalDisks: [] } as FormValue}
+					initialValue={'dataVolume' as FormValue}
 					handleSubmit={{
-						posthook: async () => {
-							await fetchBootDvPvcInfo(values.diskConfig?.bootDisk ?? null);
+						posthook: () => {
 							handleNext();
 						}
 					}}
-					bind:values={values['diskConfig']}
+					bind:values={values['diskSourceType']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -536,8 +506,175 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 5: Cloud-Init -->
+			<!-- Step 5: Disks -->
 			<Tabs.Content value={steps[4]}>
+				{#if values.diskSourceType === 'containerDisk'}
+					<Form
+						schema={{
+							type: 'object',
+							title: 'Container Disk',
+							properties: {
+								containerDiskImage: {
+									type: 'string',
+									title: 'Container Disk Image'
+								},
+								additionalDisks: {
+									type: 'array',
+									title: 'Additional Data Disks',
+									items: {
+										type: 'string',
+										title: 'Data Disk'
+									}
+								}
+							},
+							required: ['containerDiskImage']
+						} as Schema}
+						uiSchema={{
+							containerDiskImage: {
+								'ui:options': {
+									shadcn4Text: {
+										placeholder: 'e.g. quay.io/kubevirt/fedora-cloud-container-disk-demo:latest'
+									}
+								}
+							},
+							additionalDisks: {
+								'ui:options': {
+									addable: true,
+									removable: true,
+									orderable: false
+								},
+								items: {
+									'ui:components': {
+										stringField: 'enumField',
+										selectWidget: ComboboxWidget
+									},
+									'ui:options': {
+										TailoredComboboxEnumerations: fetchDataVolumesAsEnumerations,
+										TailoredComboboxVisibility: 10,
+										TailoredComboboxInput: {
+											placeholder: 'Select DataVolume'
+										},
+										TailoredComboboxEmptyText: 'No DataVolumes found.'
+									}
+								}
+							},
+							'ui:options': {
+								translations: {
+									submit: 'Next'
+								}
+							}
+						} as UiSchemaRoot}
+						initialValue={{ containerDiskImage: null, additionalDisks: [] } as FormValue}
+						handleSubmit={{
+							posthook: () => {
+								handleNext();
+							}
+						}}
+						bind:values={values['containerDiskConfig']}
+					>
+						{#snippet actions()}
+							<div class="flex w-full items-center justify-between gap-3">
+								<Button
+									onclick={() => {
+										handlePrevious();
+									}}
+								>
+									Previous
+								</Button>
+								<SubmitButton />
+							</div>
+						{/snippet}
+					</Form>
+				{:else}
+					<Form
+						schema={{
+							type: 'object',
+							title: 'Disks',
+							properties: {
+								bootDisk: {
+									type: 'string',
+									title: 'Boot Disk (DataVolume to Clone)'
+								},
+								additionalDisks: {
+									type: 'array',
+									title: 'Additional Data Disks',
+									items: {
+										type: 'string',
+										title: 'Data Disk'
+									}
+								}
+							},
+							required: ['bootDisk']
+						} as Schema}
+						uiSchema={{
+							bootDisk: {
+								'ui:components': {
+									stringField: 'enumField',
+									selectWidget: ComboboxWidget
+								},
+								'ui:options': {
+									TailoredComboboxEnumerations: fetchDataVolumesAsEnumerations,
+									TailoredComboboxVisibility: 10,
+									TailoredComboboxInput: {
+										placeholder: 'Select Boot DataVolume'
+									},
+									TailoredComboboxEmptyText: 'No DataVolumes found.',
+									TailoredComboboxPopoverClass: 'w-[380px]'
+								}
+							},
+							additionalDisks: {
+								'ui:options': {
+									addable: true,
+									removable: true,
+									orderable: false
+								},
+								items: {
+									'ui:components': {
+										stringField: 'enumField',
+										selectWidget: ComboboxWidget
+									},
+									'ui:options': {
+										TailoredComboboxEnumerations: fetchDataVolumesAsEnumerations,
+										TailoredComboboxVisibility: 10,
+										TailoredComboboxInput: {
+											placeholder: 'Select DataVolume'
+										},
+										TailoredComboboxEmptyText: 'No DataVolumes found.'
+									}
+								}
+							},
+							'ui:options': {
+								translations: {
+									submit: 'Next'
+								}
+							}
+						} as UiSchemaRoot}
+						initialValue={{ bootDisk: null, additionalDisks: [] } as FormValue}
+						handleSubmit={{
+							posthook: async () => {
+								await fetchBootDvPvcInfo(values.diskConfig?.bootDisk ?? null);
+								handleNext();
+							}
+						}}
+						bind:values={values['diskConfig']}
+					>
+						{#snippet actions()}
+							<div class="flex w-full items-center justify-between gap-3">
+								<Button
+									onclick={() => {
+										handlePrevious();
+									}}
+								>
+									Previous
+								</Button>
+								<SubmitButton />
+							</div>
+						{/snippet}
+					</Form>
+				{/if}
+			</Tabs.Content>
+			<!-- Step 6: Cloud-Init -->
+			<Tabs.Content value={steps[5]}>
 				<Form
 					schema={{
 						type: 'string',
@@ -575,8 +712,8 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 6: Review & Create -->
-			<Tabs.Content value={steps[5]} class="min-h-[77vh]">
+			<!-- Step 7: Review & Create -->
+			<Tabs.Content value={steps[6]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{
