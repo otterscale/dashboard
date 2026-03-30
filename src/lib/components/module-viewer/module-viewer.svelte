@@ -28,7 +28,7 @@
 		cluster: string;
 		namespace: string;
 		modules: any[];
-		reload: () => void;
+		reload: any;
 	} = $props();
 
 	const uiSchemas: Record<string, UISchemaType> = getChartUISchemas();
