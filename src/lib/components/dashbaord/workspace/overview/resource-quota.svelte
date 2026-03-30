@@ -3,7 +3,7 @@
 	import Gauge from '@lucide/svelte/icons/gauge';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import { ArcChart, Text } from 'layerchart';
-	import type { PrometheusDriver } from 'prometheus-query';
+	import { ResponseType, type PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import * as Statistics from '$lib/components/custom/data-table/statistics/index';
@@ -49,13 +49,27 @@
 	const memUsed = $derived(quotaView === 'requests' ? memUsedReq : memUsedLim);
 	const memHard = $derived(quotaView === 'requests' ? memHardReq : memHardLim);
 
-	function instantScalar(r: Awaited<ReturnType<PrometheusDriver['instantQuery']>>): number | null {
-		const raw = r.result[0]?.value;
-		const n =
-			raw != null && typeof raw === 'object' && 'value' in raw
-				? Number((raw as { value: number }).value)
-				: Number(raw);
+	function finiteOrNull(v: unknown): number | null {
+		const n = Number(v);
 		return Number.isFinite(n) ? n : null;
+	}
+
+	function extractValue(raw: unknown): unknown {
+		if (Array.isArray(raw) && raw.length >= 2) return raw[1];
+		if (typeof raw === 'object' && raw !== null && 'value' in raw) return (raw as Record<string, unknown>).value;
+		return raw;
+	}
+
+	function instantScalar(r: Awaited<ReturnType<PrometheusDriver['instantQuery']>>): number | null {
+		const res = r.result;
+		if (!Array.isArray(res) || res.length === 0) return null;
+
+		if (r.resultType === ResponseType.SCALAR || r.resultType === ResponseType.STRING) {
+			return finiteOrNull(res[1]);
+		}
+
+		const raw = (res[0] as { value?: unknown })?.value;
+		return raw == null ? null : finiteOrNull(extractValue(raw));
 	}
 
 	function rqSum(resource: string, t: 'used' | 'hard') {

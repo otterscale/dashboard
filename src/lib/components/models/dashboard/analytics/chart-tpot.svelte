@@ -45,7 +45,7 @@
 
 	function getTpotQuery(quantile: number): string {
 		const bucket = vllmMetricWithSelector(
-			'vllm:time_per_output_token_seconds_bucket',
+			'vllm:request_time_per_output_token_seconds_bucket',
 			namespace,
 			selectedModel
 		);

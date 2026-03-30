@@ -155,7 +155,7 @@
 	"llm_dashboard_models_tooltip": "Number of models and available pods.",
 	"llm_dashboard_requests_tooltip": "Shows the 95th and 99th percentile request latency.",
 	"llm_dashboard_request_rate_tooltip": "Request completion rate (requests per second).",
-	"llm_dashboard_throughputs_tooltip": "Displays prompt and generation token throughput for the last 24 hours.",
+	"llm_dashboard_throughputs_tooltip": "Displays prompt and generation token throughput.",
 	"llm_dashboard_time_to_first_token_tooltip": "Shows the 95th and 99th percentile time to first token for requests.",
 	"llm_dashboard_tpot_tooltip": "Time per output token (inter-token latency). P95/P99 percentiles. Higher values indicate slower token generation.",
 	"llm_dashboard_requests_waiting_tooltip": "Number of requests waiting in queue. High values suggest adding replicas.",
