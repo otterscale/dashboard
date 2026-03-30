@@ -3,7 +3,7 @@
 	import FileJsonIcon from '@lucide/svelte/icons/file-json';
 	import FileSearchIcon from '@lucide/svelte/icons/file-search';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import { getContext } from 'svelte';
+	import { getContext, type Snippet } from 'svelte';
 
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -19,7 +19,8 @@
 		version,
 		resource,
 		object,
-		onOpenChangeComplete
+		onOpenChangeComplete,
+		trigger
 	}: {
 		cluster: string;
 		namespace?: string;
@@ -29,6 +30,7 @@
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		object: any;
 		onOpenChangeComplete?: () => void;
+		trigger?: Snippet;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -86,16 +88,20 @@
 </script>
 
 <Dialog.Root bind:open {onOpenChangeComplete} onOpenChange={handleOpenChange}>
-	<Dialog.Trigger class="w-full">
-		<Item.Root class="p-0 text-xs" size="sm">
-			<Item.Media>
-				<FileSearchIcon />
-			</Item.Media>
-			<Item.Content>
-				<Item.Title>Describe</Item.Title>
-			</Item.Content>
-		</Item.Root>
-	</Dialog.Trigger>
+	{#if trigger}
+		{@render trigger()}
+	{:else}
+		<Dialog.Trigger class="w-full">
+			<Item.Root class="p-0 text-xs" size="sm">
+				<Item.Media>
+					<FileSearchIcon />
+				</Item.Media>
+				<Item.Content>
+					<Item.Title>Describe</Item.Title>
+				</Item.Content>
+			</Item.Root>
+		</Dialog.Trigger>
+	{/if}
 	<Dialog.Content class="flex h-fit max-h-[90vh] max-w-[70vw] min-w-[55vw] flex-col gap-3">
 		<Dialog.Header>
 			<div class="flex items-end justify-between">
