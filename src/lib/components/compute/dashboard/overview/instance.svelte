@@ -12,14 +12,14 @@
 
 	let {
 		prometheusDriver,
-		cluster,
+		namespace,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; namespace: string; isReloading: boolean } = $props();
 
 	let instances: SampleValue | undefined = $state(undefined);
 	async function fetchInstances() {
 		const response = await prometheusDriver.instantQuery(
-			`count(kubevirt_vmi_info{juju_model="${cluster}"})`
+			`count(kubevirt_vmi_info{exported_namespace="${namespace}"})`
 		);
 		instances = response.result[0]?.value ?? undefined;
 	}

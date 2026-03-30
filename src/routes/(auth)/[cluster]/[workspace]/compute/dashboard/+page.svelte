@@ -15,8 +15,11 @@
 			})
 		}
 	]);
+
+	const cluster = $derived(page.params.cluster ?? '');
+	const namespace = $derived(page.data.namespace ?? '');
 </script>
 
-{#key page.params.cluster!}
-	<Dashboard cluster={page.params.cluster!} />
+{#key `${cluster}:${namespace}`}
+	<Dashboard {cluster} {namespace} />
 {/key}

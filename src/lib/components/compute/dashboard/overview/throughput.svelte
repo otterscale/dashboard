@@ -16,9 +16,9 @@
 
 	let {
 		prometheusDriver,
-		cluster,
+		namespace,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; namespace: string; isReloading: boolean } = $props();
 
 	const configuration = {
 		read: { label: 'Read', color: 'var(--chart-1)' },
@@ -28,7 +28,7 @@
 	let reads: SampleValue[] = $state([]);
 	async function fetchReads() {
 		const response = await prometheusDriver.rangeQuery(
-			`avg(rate(kubevirt_vmi_storage_read_traffic_bytes_total{juju_model="${cluster}"}[5m]))`,
+			`avg(rate(kubevirt_vmi_storage_read_traffic_bytes_total{exported_namespace="${namespace}"}[5m]))`,
 			new SvelteDate().setMinutes(0, 0, 0) - 60 * 60 * 1000,
 			new SvelteDate().setMinutes(0, 0, 0),
 			2 * 60
@@ -39,7 +39,7 @@
 	let writes: SampleValue[] = $state([]);
 	async function fetchWrites() {
 		const response = await prometheusDriver.rangeQuery(
-			`avg(rate(kubevirt_vmi_storage_write_traffic_bytes_total{juju_model="${cluster}"}[5m]))`,
+			`avg(rate(kubevirt_vmi_storage_write_traffic_bytes_total{exported_namespace="${namespace}"}[5m]))`,
 			new SvelteDate().setMinutes(0, 0, 0) - 60 * 60 * 1000,
 			new SvelteDate().setMinutes(0, 0, 0),
 			2 * 60

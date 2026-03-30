@@ -12,14 +12,14 @@
 
 	let {
 		prometheusDriver,
-		cluster,
+		namespace,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; namespace: string; isReloading: boolean } = $props();
 
 	let virtualMachines: SampleValue | undefined = $state(undefined);
 	async function fetchVirtualMachines() {
 		const response = await prometheusDriver.instantQuery(
-			`count(kubevirt_vm_starting_status_last_transition_timestamp_seconds{juju_model="${cluster}"})`
+			`count(kubevirt_vm_starting_status_last_transition_timestamp_seconds{exported_namespace="${namespace}"})`
 		);
 		virtualMachines = response.result[0]?.value ?? undefined;
 	}
