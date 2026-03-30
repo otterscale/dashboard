@@ -76,7 +76,7 @@
 		create?: Snippet;
 		bulkDelete?: Snippet<[{ table: TanStackTabke<Record<string, JsonValue>> }]>;
 		rowActions?: Snippet<[{ row: Row<Record<string, JsonValue>> }]>;
-		reload: Snippet;
+		reload?: Snippet;
 		gridsLayout?: Snippet<
 			[
 				{
@@ -488,13 +488,19 @@
 			</Sheet.Root>
 		</ButtonGroup.Root>
 		<!-- Accessors -->
-		{@render accessReview?.()}
-		<div>
-			{@render create?.()}
-			{@render bulkDelete?.({ table })}
-		</div>
-		<div class="ml-auto">
-			{@render reload()}
+		<div class="ml-auto flex items-center gap-2">
+			{#if accessReview}
+				{@render accessReview?.()}
+			{/if}
+			{#if create}
+				{@render create?.()}
+			{/if}
+			{#if bulkDelete}
+				{@render bulkDelete?.({ table })}
+			{/if}
+			{#if reload}
+				{@render reload()}
+			{/if}
 		</div>
 	</div>
 	{#if globalFilterError}
