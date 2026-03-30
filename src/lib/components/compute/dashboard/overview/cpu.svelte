@@ -15,9 +15,9 @@
 
 	let {
 		prometheusDriver,
-		cluster,
+		namespace,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; namespace: string; isReloading: boolean } = $props();
 
 	const configuration = {
 		usage: { label: 'Usage', color: 'var(--chart-2)' }
@@ -26,7 +26,7 @@
 	let cpuUsages: SampleValue[] = $state([]);
 	async function fetchCPUUsage() {
 		const response = await prometheusDriver.rangeQuery(
-			`avg(rate(kubevirt_vmi_cpu_usage_seconds_total{juju_model="${cluster}"}[5m]))`,
+			`avg(rate(kubevirt_vmi_cpu_usage_seconds_total{exported_namespace="${namespace}"}[5m]))`,
 			new SvelteDate().setMinutes(0, 0, 0) - 60 * 60 * 1000,
 			new SvelteDate().setMinutes(0, 0, 0),
 			2 * 60
@@ -37,7 +37,7 @@
 	let cpuWait: SampleValue | undefined = $state(undefined);
 	async function fetchCPUWait() {
 		const response = await prometheusDriver.instantQuery(
-			`avg(rate(kubevirt_vmi_vcpu_wait_seconds_total{juju_model="${cluster}"}[5m]))`
+			`avg(rate(kubevirt_vmi_vcpu_wait_seconds_total{exported_namespace="${namespace}"}[5m]))`
 		);
 		cpuWait = response.result[0]?.value ?? undefined;
 	}
@@ -45,7 +45,7 @@
 	let cpuDelay: SampleValue | undefined = $state(undefined);
 	async function fetchCPUDelay() {
 		const response = await prometheusDriver.instantQuery(
-			`avg(rate(kubevirt_vmi_vcpu_delay_seconds_total{juju_model="${cluster}"}[5m]))`
+			`avg(rate(kubevirt_vmi_vcpu_delay_seconds_total{exported_namespace="${namespace}"}[5m]))`
 		);
 		cpuDelay = response.result[0]?.value ?? undefined;
 	}

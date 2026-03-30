@@ -11,15 +11,12 @@
 
 	let {
 		prometheusDriver,
-		cluster,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; isReloading: boolean } = $props();
 
 	let workers: SampleValue | undefined = $state(undefined);
 	async function fetchWorkers() {
-		const response = await prometheusDriver.instantQuery(
-			`count(kubevirt_info{juju_model="${cluster}"})`
-		);
+		const response = await prometheusDriver.instantQuery(`count(kubevirt_info{})`);
 		workers = response.result[0]?.value ?? undefined;
 	}
 
