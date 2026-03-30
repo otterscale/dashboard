@@ -278,7 +278,13 @@
 								},
 								{
 									title: m.module(),
-									url: resourceUrl('module.otterscale.io', 'v1alpha1', 'Module', 'modules')
+									// url: resourceUrl('module.otterscale.io', 'v1alpha1', 'Module', 'modules')
+									url: page.params.workspace
+										? resolve('/(auth)/[cluster]/[workspace]/modules', {
+												cluster: activeCluster,
+												workspace: page.params.workspace
+											})
+										: ''
 								}
 							]
 						}
