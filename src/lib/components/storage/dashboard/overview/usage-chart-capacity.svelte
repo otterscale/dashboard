@@ -14,9 +14,10 @@
 	// Props
 	let {
 		client,
-		cluster,
+		cluster: _,
 		isReloading = $bindable()
 	}: { client: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	void _;
 
 	// Constants
 	const CHART_TITLE = m.capacity();
@@ -25,8 +26,8 @@
 
 	// Queries
 	const queries = $derived({
-		used: `ceph_cluster_total_used_bytes{juju_model="${cluster}"}`,
-		total: `ceph_cluster_total_bytes{juju_model="${cluster}"}`
+		used: `ceph_cluster_total_used_bytes{}`,
+		total: `ceph_cluster_total_bytes{}`
 	});
 
 	// Auto Update

@@ -15,9 +15,10 @@
 	// Props
 	let {
 		client,
-		cluster,
+		cluster: _,
 		isReloading = $bindable()
 	}: { client: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	void _;
 
 	// Constants
 	const CHART_TITLE = m.cluster_health();
@@ -26,7 +27,7 @@
 	// Query
 	const query = $derived(
 		`
-		ceph_health_status{juju_model="${cluster}"}
+		ceph_health_status{}
 		`
 	);
 

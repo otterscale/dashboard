@@ -12,9 +12,10 @@
 	// Props
 	let {
 		client,
-		cluster,
+		cluster: _,
 		isReloading = $bindable()
 	}: { client: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	void _;
 
 	// Constants
 	const CHART_TITLE = m.time_till_full();
@@ -23,12 +24,12 @@
 	const query = $derived(
 		`
 	(
-		ceph_pool_max_avail{job=~".+",juju_model="${cluster}"} 
+		ceph_pool_max_avail{job=~".+",} 
 		/ 
-		deriv(ceph_pool_stored{job=~".+",juju_model="${cluster}"}[6h])
+		deriv(ceph_pool_stored{job=~".+",}[6h])
 	) 
 	* 
-	on(pool_id) group_left(instance, name) ceph_pool_metadata{job=~".+",juju_model="${cluster}",name=~".mgr"} > 0
+	on(pool_id) group_left(instance, name) ceph_pool_metadata{job=~".+",,name=~".mgr"} > 0
 	`
 	);
 

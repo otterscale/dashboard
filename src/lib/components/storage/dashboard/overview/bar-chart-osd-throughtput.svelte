@@ -16,9 +16,10 @@
 	// Props
 	let {
 		client,
-		cluster,
+		cluster: _,
 		isReloading = $bindable()
 	}: { client: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	void _;
 
 	// Constants
 	const CHART_TITLE = m.osd_throughPut();
@@ -64,8 +65,8 @@
 
 	// Derived state
 	const queries = $derived({
-		Read: `sum(irate(ceph_osd_op_r_out_bytes{juju_model="${cluster}"}[1h]))`,
-		Write: `sum(irate(ceph_osd_op_w_in_bytes{juju_model="${cluster}"}[1h]))`
+		Read: `sum(irate(ceph_osd_op_r_out_bytes{}[1h]))`,
+		Write: `sum(irate(ceph_osd_op_w_in_bytes{}[1h]))`
 	});
 
 	const activeSeries = $derived([
