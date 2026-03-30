@@ -11,7 +11,9 @@
 	);
 </script>
 
-<Handle type="target" position={Position.Top} class="!bg-chart-4" />
+{#if data.hasTargetEdge}
+	<Handle type="target" position={Position.Top} class="!bg-chart-4" />
+{/if}
 
 <div
 	class="w-[190px] rounded-lg border border-border bg-card text-card-foreground shadow-sm transition-all duration-200 hover:border-primary/50 hover:shadow-md {selected
@@ -43,4 +45,6 @@
 	</div>
 </div>
 
-<Handle type="source" position={Position.Bottom} class="!bg-chart-4" />
+{#if data.hasSourceEdge}
+	<Handle type="source" position={Position.Bottom} class="!bg-chart-4" />
+{/if}

@@ -24,4 +24,6 @@
 	</div>
 </div>
 
-<Handle type="source" position={Position.Bottom} class="!bg-primary" />
+{#if data.hasSourceEdge}
+	<Handle type="source" position={Position.Bottom} class="!bg-primary" />
+{/if}

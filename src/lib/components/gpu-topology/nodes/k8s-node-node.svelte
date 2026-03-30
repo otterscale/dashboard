@@ -7,7 +7,9 @@
 	let { data, selected }: NodeProps = $props();
 </script>
 
-<Handle type="target" position={Position.Top} class="!bg-chart-3" />
+{#if data.hasTargetEdge}
+	<Handle type="target" position={Position.Top} class="!bg-chart-3" />
+{/if}
 
 <div
 	class="w-[220px] rounded-lg border border-border bg-card text-card-foreground shadow-sm transition-all duration-200 hover:border-primary/50 hover:shadow-md {selected

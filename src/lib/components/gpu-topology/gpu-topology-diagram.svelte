@@ -188,6 +188,14 @@
 			}
 		}
 
+		// Mark which nodes have source/target edges so handles can be hidden when unconnected
+		const sources = new Set(rawEdges.map((e) => e.source));
+		const targets = new Set(rawEdges.map((e) => e.target));
+		for (const node of rawNodes) {
+			node.data.hasSourceEdge = sources.has(node.id);
+			node.data.hasTargetEdge = targets.has(node.id);
+		}
+
 		return computeLayout(rawNodes, rawEdges);
 	});
 
