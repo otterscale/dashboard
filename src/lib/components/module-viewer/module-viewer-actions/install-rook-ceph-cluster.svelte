@@ -53,7 +53,9 @@
 
 	let jsonSchema: Schema | undefined = $state(undefined);
 
-	let disks: Record<string, Record<string, string>> = $state({});
+	let disks: Record<string, Record<string, Record<string, string>>> = $state({});
+
+	let nodes: any = $state({});
 
 	async function fetchNodes() {
 		try {
@@ -67,6 +69,8 @@
 			const nodes: CoreV1Node[] = response.items.map((item) => item.object as CoreV1Node);
 			nodes.forEach((node) =>
 				Object.entries(node.metadata?.labels ?? {}).forEach(([key, value]) => {
+					const nodeName = node.metadata?.name ?? '';
+
 					if (key.startsWith('otterscale.io/disk.')) {
 						const [diskName, ...featureParts] = key
 							.substring('otterscale.io/disk.'.length)
@@ -74,10 +78,17 @@
 
 						const featureName = featureParts.join('-');
 
-						if (!disks[diskName]) {
-							disks[diskName] = {};
+						if (!disks[nodeName]) {
+							disks[nodeName] = {};
 						}
-						disks[diskName][featureName] = value as string;
+
+						if (!disks[nodeName][diskName]) {
+							disks[nodeName][diskName] = {};
+						}
+
+						disks[nodeName][diskName][featureName] = value as string;
+
+						console.log(disks);
 					}
 				})
 			);
@@ -156,7 +167,7 @@
 	}
 
 	// Steps Manager
-	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -332,7 +343,69 @@
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[2]} class="min-h-[23vh]">
+			<Tabs.Content value={steps[2]}>
+				<Form
+					schema={{
+						title: 'Nodes',
+						type: 'array',
+						items: {
+							type: 'object',
+							properties: {
+								'kubeadmin-site4': {
+									type: 'array',
+									description: 'ip',
+									items: {
+										type: 'string',
+										enum: [
+											{ name: 'sdb', ip: '192.168.1.1' },
+											{ name: 'sdc', ip: '192.168.1.2' },
+											{ name: 'sdd', ip: '192.168.1.3' }
+										]
+									}
+								}
+							}
+						}
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							},
+							itemTitle: () => ''
+						},
+						items: {
+							'kubeadmin-site4': {
+								'ui:components': {
+									arrayField: 'multiEnumField'
+								}
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={[]}
+					bind:values={nodes}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+								disabled={currentIndex === 0}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+
+			<Tabs.Content value={steps[3]} class="min-h-[23vh]">
 				{@const schema = {
 					...(lodash.get(jsonSchema, 'properties.spec.properties.values') as Schema),
 					type: 'string',
@@ -407,7 +480,7 @@
 				{/await}
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[3]} class="min-h-[77vh]">
+			<Tabs.Content value={steps[4]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{

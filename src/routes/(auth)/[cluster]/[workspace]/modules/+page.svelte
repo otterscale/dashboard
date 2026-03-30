@@ -80,7 +80,7 @@
 
 	async function fetchModules(
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
-	): Promise<ModuleType[]> {
+	): Promise<ModuleType[] | undefined> {
 		if (isModuleFetching) return;
 
 		isModuleFetching = true;
@@ -160,18 +160,26 @@
 		if (!namespace) return;
 
 		const helmRepository = await fetchHelmRepository();
-		const modules = await fetchModules(helmRepository!);
+		if (!helmRepository) return;
+
+		const modules = await fetchModules(helmRepository);
+		if (!modules) return;
+
 		const installedModules = (await fetchInstalledModules(modules)) ?? new Set();
-		data = modules.map((module) => getChartData(module, installedModules, helmRepository!));
+		data = modules.map((module) => getChartData(module, installedModules, helmRepository));
 	}
 
 	onMount(async () => {
 		if (!namespace) return;
 
 		const helmRepository = await fetchHelmRepository();
-		const modules = await fetchModules(helmRepository!);
+		if (!helmRepository) return;
+
+		const modules = await fetchModules(helmRepository);
+		if (!modules) return;
+
 		const installedModules = (await fetchInstalledModules(modules)) ?? new Set();
-		data = modules.map((module) => getChartData(module, installedModules, helmRepository!));
+		data = modules.map((module) => getChartData(module, installedModules, helmRepository));
 	});
 </script>
 
