@@ -11,14 +11,13 @@
 
 	let {
 		prometheusDriver,
-		cluster,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; isReloading: boolean } = $props();
 
 	let readyControllers: SampleValue | undefined = $state(undefined);
 	async function fetchReadyControllers() {
 		const response = await prometheusDriver.instantQuery(
-			`count(kubevirt_virt_controller_ready_status{juju_model="${cluster}"})`
+			`count(kubevirt_virt_controller_ready_status{})`
 		);
 		readyControllers = response.result[0]?.value ?? undefined;
 	}
@@ -26,7 +25,7 @@
 	let healthControllers: SampleValue | undefined = $state(undefined);
 	async function fetchHealthControllers() {
 		const response = await prometheusDriver.instantQuery(
-			`sum(kubevirt_virt_controller_ready_status{juju_model="${cluster}"})`
+			`sum(kubevirt_virt_controller_ready_status{})`
 		);
 		healthControllers = response.result[0]?.value ?? undefined;
 	}

@@ -14,6 +14,9 @@ export type WidgetBaseProps = {
 /** Widgets that use `juju_model` / cluster-scoped PromQL also receive `cluster` when `needsCluster` is set. */
 export type WidgetWithClusterProps = WidgetBaseProps & { cluster: string };
 
+/** Widgets that filter by Kubernetes namespace receive `namespace` when `needsNamespace` is set. */
+export type WidgetWithNamespaceProps = WidgetBaseProps & { namespace: string };
+
 export type WidgetDefinition = {
 	key: string;
 	class: string;
@@ -22,4 +25,6 @@ export type WidgetDefinition = {
 	props?: Record<string, unknown>;
 	/** When true, WidgetGrid passes `cluster` into the widget. Omit or leave false for widgets that do not use it (avoids `svelte/no-unused-props`). */
 	needsCluster?: boolean;
+	/** When true, WidgetGrid passes `namespace` into the widget. Omit or leave false for widgets that do not use it (avoids `svelte/no-unused-props`). */
+	needsNamespace?: boolean;
 };
