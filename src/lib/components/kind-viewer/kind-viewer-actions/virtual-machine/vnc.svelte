@@ -24,7 +24,7 @@
 {#if isActionAllowed}
 	<DefaultVnc {cluster} {object} {onOpenChangeComplete} />
 {:else}
-	<Item.Root class="w-full p-0 text-xs pointer-events-none opacity-50" size="sm">
+	<Item.Root class="pointer-events-none w-full p-0 text-xs opacity-50" size="sm">
 		<Item.Media>
 			<MonitorIcon />
 		</Item.Media>

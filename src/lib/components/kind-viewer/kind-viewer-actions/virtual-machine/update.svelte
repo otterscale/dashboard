@@ -56,7 +56,8 @@
 	const existingDisks: any[] = lodash.get(object, 'spec.template.spec.domain.devices.disks', []);
 
 	// Detect boot disk: find the os-disk (first volume) — could be containerDisk or dataVolume
-	const existingBootVolume = existingVolumes.find((v: any) => v.name === 'os-disk') ?? existingVolumes[0];
+	const existingBootVolume =
+		existingVolumes.find((v: any) => v.name === 'os-disk') ?? existingVolumes[0];
 	const existingBootDisk = existingDisks.find((d: any) => d.name === 'os-disk') ?? existingDisks[0];
 	const isContainerDiskBoot = !!existingBootVolume?.containerDisk;
 
@@ -86,7 +87,11 @@
 	// Build disks and volumes — boot disk is preserved from existing object
 	function buildDisksAndVolumes(): { disks: any[]; volumes: any[] } {
 		// Start with the immutable boot disk/volume from the existing object
-		const disks: any[] = [existingBootDisk ? { ...existingBootDisk } : { name: 'os-disk', disk: { bus: 'virtio' }, bootOrder: 1 }];
+		const disks: any[] = [
+			existingBootDisk
+				? { ...existingBootDisk }
+				: { name: 'os-disk', disk: { bus: 'virtio' }, bootOrder: 1 }
+		];
 		const volumes: any[] = [existingBootVolume ? { ...existingBootVolume } : { name: 'os-disk' }];
 
 		const additionalDiskNames: string[] = Array.isArray(values.additionalDisks)
