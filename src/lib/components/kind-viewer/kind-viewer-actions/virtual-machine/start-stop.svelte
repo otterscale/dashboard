@@ -5,11 +5,11 @@
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
-	import { canStartOrStop } from './vm-status';
-
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Item from '$lib/components/ui/item';
+
+	import { canStartOrStop } from './vm-status';
 
 	let {
 		cluster,

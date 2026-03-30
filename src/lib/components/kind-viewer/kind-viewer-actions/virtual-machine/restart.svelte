@@ -33,7 +33,6 @@
 
 	const name: string = $derived(object?.metadata?.name ?? '');
 	const printableStatus: string = $derived(object?.status?.printableStatus ?? '');
-	const isRunning = $derived(printableStatus === 'Running');
 	const isActionAllowed = $derived(canRestart(printableStatus));
 
 	let open = $state(false);

@@ -59,8 +59,6 @@
 	const existingBootVolume =
 		existingVolumes.find((v: any) => v.name === 'os-disk') ?? existingVolumes[0];
 	const existingBootDisk = existingDisks.find((d: any) => d.name === 'os-disk') ?? existingDisks[0];
-	const isContainerDiskBoot = !!existingBootVolume?.containerDisk;
-
 	// Extract additional disks (all dataVolume entries except the boot one)
 	const existingAdditionalDisks = existingVolumes
 		.filter((v: any) => v.dataVolume && v.name !== (existingBootVolume?.name ?? 'os-disk'))
