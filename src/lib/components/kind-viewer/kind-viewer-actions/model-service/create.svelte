@@ -53,11 +53,10 @@
 		spec: {
 			accelerator: {},
 			decode: {},
-			prefill: {},
 			engine: {},
 			model: {},
 			routingProxy: {
-				image: 'ghcr.io/llm-d/llm-d-routing-sidecar:v0.4.0'
+				image: 'ghcr.io/llm-d/llm-d-routing-sidecar:v0.6.0'
 			}
 		}
 	});
@@ -569,7 +568,7 @@
 							if (lodash.get(mode, 'mode') === 'Disaggregation') {
 								lodash.set(values, 'spec.prefill', lodash.get(mode, 'prefill'));
 							} else {
-								lodash.set(values, 'spec.prefill', {});
+								lodash.unset(values, 'spec.prefill');
 							}
 						}
 					}}

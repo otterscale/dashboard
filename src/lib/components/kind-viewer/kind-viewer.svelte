@@ -238,7 +238,7 @@
 	onMount(async () => {
 		await fetchSchema();
 		await listResources();
-		columnDefinitions = getColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		columnDefinitions = getColumnDefinitions(apiResource, uiSchemas, dataSchemas, cluster);
 		watchResources();
 
 		isMounted = true;

@@ -17,11 +17,17 @@
 		prometheusDriver,
 		namespace,
 		selectedModel,
+		start,
+		end,
+		endIsNow,
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		namespace: string | undefined;
 		selectedModel: string;
+		start: Date;
+		end: Date;
+		endIsNow: boolean;
 		isReloading: boolean;
 	} = $props();
 
@@ -40,8 +46,8 @@
 		try {
 			const response = await prometheusDriver.rangeQuery(
 				getRequestsQuery(),
-				Date.now() - 24 * 60 * 60 * 1000,
-				Date.now(),
+				start.getTime(),
+				endIsNow ? Date.now() : end.getTime(),
 				2 * 60
 			);
 			requestRates = response.result[0]?.values ?? [];

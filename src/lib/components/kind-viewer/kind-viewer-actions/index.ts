@@ -10,22 +10,28 @@ import ClusterRoleBindingActions from './cluster-role-binding/actions.svelte';
 import ClusterRoleBindingCreate from './cluster-role-binding/create.svelte';
 import CronJobActions from './cronjob/actions.svelte';
 import DaemonSetActions from './daemonset/actions.svelte';
+import DataVolumeActions from './data-volume/actions.svelte';
+import DataVolumeCreate from './data-volume/create.svelte';
 import DefaultActions from './default/actions.svelte';
 import DefaultCreate from './default/create.svelte';
 import DeploymentActions from './deployment/actions.svelte';
 import HelmReleaseActions from './helm-release/actions.svelte';
 import HelmRepositoryActions from './helm-repository/actions.svelte';
 import HelmRepositoryCreate from './helm-repository/create.svelte';
+import InstanceTypeActions from './instance-type/actions.svelte';
+import InstanceTypeCreate from './instance-type/create.svelte';
 import JobActions from './job/actions.svelte';
 import ModelArtifactActions from './model-artifact/actions.svelte';
 import ModelArtifactCreate from './model-artifact/create.svelte';
 import ModelServiceActions from './model-service/actions.svelte';
 import ModelServiceCreate from './model-service/create.svelte';
+import NodeActions from './node/actions.svelte';
 import PodActions from './pod/actions.svelte';
 import ResourceQuotaActions from './resource-quota/actions.svelte';
 import ResourceQuotaCreate from './resource-quota/create.svelte';
 import StatefulSetActions from './statefulset/actions.svelte';
 import VirtualMachineActions from './virtual-machine/actions.svelte';
+import VirtualMachineCreate from './virtual-machine/create.svelte';
 import WorkspaceActions from './workspace/actions.svelte';
 import WorkspaceCreate from './workspace/create.svelte';
 
@@ -69,6 +75,12 @@ function getCreate(kind: string): CreateType {
 			return ResourceQuotaCreate as CreateType;
 		case 'Workspace':
 			return WorkspaceCreate as CreateType;
+		case 'VirtualMachine':
+			return VirtualMachineCreate as CreateType;
+		case 'DataVolume':
+			return DataVolumeCreate as CreateType;
+		case 'VirtualMachineInstancetype':
+			return InstanceTypeCreate as CreateType;
 		case 'CephObjectStore':
 			return CephObjectStoreCreate as CreateType;
 		case 'ObjectBucketClaim':
@@ -102,18 +114,24 @@ function getActions(kind: string): ActionsType {
 			return HelmRepositoryActions as ActionsType;
 		case 'ModelService':
 			return ModelServiceActions as ActionsType;
+		case 'Node':
+			return NodeActions as ActionsType;
 		case 'ModelArtifact':
 			return ModelArtifactActions as ActionsType;
 		case 'ResourceQuota':
 			return ResourceQuotaActions as ActionsType;
 		case 'Workspace':
 			return WorkspaceActions as ActionsType;
+		case 'VirtualMachine':
+			return VirtualMachineActions as ActionsType;
+		case 'DataVolume':
+			return DataVolumeActions as ActionsType;
+		case 'VirtualMachineInstancetype':
+			return InstanceTypeActions as ActionsType;
 		case 'CephObjectStore':
 			return CephObjectStoreActions as ActionsType;
 		case 'ObjectBucketClaim':
 			return ObjectBucketClaimActions as ActionsType;
-		case 'VirtualMachine':
-			return VirtualMachineActions as ActionsType;
 		default:
 			return DefaultActions as ActionsType;
 	}
