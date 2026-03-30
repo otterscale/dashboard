@@ -59,6 +59,7 @@
 					'properties'
 				) as any),
 				title: 'Metadata',
+				required: ['name'],
 				properties: {
 					name: {
 						...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema),
@@ -503,6 +504,21 @@
 						on:ready={() => {
 							lodash.set(values, 'apiVersion', `${group}/${version}`);
 							lodash.set(values, 'kind', kind);
+							lodash.set(values, 'spec.limitRange', {
+								limits: [
+									{
+										type: 'Container',
+										default: {
+											cpu: '4',
+											memory: '8Gi'
+										},
+										defaultRequest: {
+											cpu: '0.5',
+											memory: '1Gi'
+										}
+									}
+								]
+							});
 						}}
 						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
 					/>
