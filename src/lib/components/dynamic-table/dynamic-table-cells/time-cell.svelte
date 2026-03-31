@@ -5,7 +5,7 @@
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import { now } from '$lib/stores/now';
 
-	import { getRelativeTime } from '../utils';
+	import { getRelativeTime, jsonValueToDisplayDate } from '../utils';
 
 	let {
 		row,
@@ -15,10 +15,10 @@
 		column: Column<Record<string, JsonValue>>;
 	} = $props();
 
-	const data = $derived(new Date(row.original[column.id] as string));
+	const data = $derived(jsonValueToDisplayDate(row.original[column.id]));
 </script>
 
-{#if data && !isNaN(data.getTime())}
+{#if data}
 	{@const { value, unit } = getRelativeTime($now, data.getTime())}
 	<Tooltip.Provider>
 		<Tooltip.Root>
