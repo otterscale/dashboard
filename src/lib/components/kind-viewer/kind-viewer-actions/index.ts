@@ -48,6 +48,7 @@ type CreateType = Component<{
 	schema?: any;
 }> | null;
 type ActionsType = Component<{
+	role?: string;
 	row?: any;
 	schema?: any;
 	object?: any;

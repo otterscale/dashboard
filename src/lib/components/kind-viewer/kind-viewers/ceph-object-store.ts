@@ -13,10 +13,10 @@ import { buildResourceDetailUrl } from './resource-url';
 type CephObjectStoreAttribute =
 	| 'Name'
 	| 'Namespace'
-	| 'Gateway Type'
-	| 'Gateway Port'
-	| 'Gateway Instances'
+	| 'Port'
+	| 'Instances'
 	| 'Phase'
+	| 'Replicas'
 	| 'Age'
 	| 'raw';
 
@@ -24,9 +24,9 @@ function getCephObjectStoreDataSchemas(): Record<CephObjectStoreAttribute, DataS
 	return {
 		Name: 'text',
 		Namespace: 'text',
-		'Gateway Type': 'text',
-		'Gateway Port': 'number',
-		'Gateway Instances': 'number',
+		Port: 'number',
+		Instances: 'number',
+		Replicas: 'number',
 		Phase: 'text',
 		Age: 'time',
 		raw: 'object'
@@ -37,9 +37,9 @@ function getCephObjectStoreData(object: any): Record<CephObjectStoreAttribute, J
 	return {
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.metadata?.namespace ?? null,
-		'Gateway Type': object?.spec?.gateway?.type ?? null,
-		'Gateway Port': object?.spec?.gateway?.port ?? null,
-		'Gateway Instances': object?.spec?.gateway?.instances ?? null,
+		Port: object?.spec?.gateway?.port ?? null,
+		Instances: object?.spec?.gateway?.instances ?? null,
+		Replicas: object?.status?.replicas ?? null,
 		Phase: object?.status?.phase ?? null,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
@@ -50,9 +50,9 @@ function getCephObjectStoreUISchemas(): Record<CephObjectStoreAttribute, UISchem
 	return {
 		Name: 'link',
 		Namespace: 'text',
-		'Gateway Type': 'text',
-		'Gateway Port': 'text',
-		'Gateway Instances': 'text',
+		Port: 'text',
+		Instances: 'number',
+		Replicas: 'number',
 		Phase: 'text',
 		Age: 'time',
 		raw: 'object'
@@ -67,10 +67,10 @@ function getCephObjectStoreColumnDefinitions(
 	const columns: CephObjectStoreAttribute[] = [
 		'Name',
 		'Namespace',
-		'Gateway Type',
-		'Gateway Port',
-		'Gateway Instances',
+		'Port',
 		'Phase',
+		'Instances',
+		'Replicas',
 		'Age'
 	];
 	return columns.map((id) => {

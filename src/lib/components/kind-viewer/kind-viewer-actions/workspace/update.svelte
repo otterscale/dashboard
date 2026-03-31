@@ -50,6 +50,9 @@
 		onsuccess?: () => void;
 	} = $props();
 
+	const transport: Transport = getContext('transport');
+	const resourceClient = createClient(ResourceService, transport);
+
 	// Container for Data.
 	let values: any = $state({});
 
@@ -540,9 +543,6 @@
 							if (isSubmitting) return;
 
 							isSubmitting = true;
-
-							const transport: Transport = getContext('transport');
-							const resourceClient = createClient(ResourceService, transport);
 
 							const jsonSchemaValidator = new Ajv({
 								allErrors: true,

@@ -47,6 +47,9 @@
 		showTrigger?: boolean;
 	} = $props();
 
+	const transport: Transport = getContext('transport');
+	const resourceClient = createClient(ResourceService, transport);
+
 	// Container for Data.
 	let values: any = $state({});
 	let value = $derived(stringify(values));
@@ -528,9 +531,6 @@
 							if (isSubmitting) return;
 
 							isSubmitting = true;
-
-							const transport: Transport = getContext('transport');
-							const resourceClient = createClient(ResourceService, transport);
 
 							const jsonSchemaValidator = new Ajv({
 								allErrors: true,

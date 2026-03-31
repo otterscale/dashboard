@@ -231,9 +231,9 @@
 {:else}
 	<Field.Group class="pb-8">
 		<!-- Spec Section -->
-		<Field.Set class="grid grid-cols-1 gap-0 rounded-lg bg-muted/50">
+		<Field.Set>
 			<!-- Status Conditions -->
-			<Card.Root class="flex h-full flex-col border-0 bg-transparent shadow-none">
+			<Card.Root class="flex h-full flex-col border-0 bg-muted/50 shadow-none">
 				{@const conditions = object.status?.conditions ?? []}
 				{@const readyCondition = conditions.find((condition) => condition.type === 'Ready')}
 				{@const isReady = readyCondition?.status === 'True' ? true : false}
@@ -296,11 +296,9 @@
 					{/if}
 				</Card.Content>
 			</Card.Root>
-			<div class="px-4">
-				<Separator class="py-px" />
-			</div>
+
 			<!-- Resource Quota -->
-			<Card.Root class="flex h-full flex-col border-0 bg-transparent shadow-none">
+			<Card.Root class="flex h-full flex-col border-0 bg-muted/50 shadow-none">
 				{@const resourceQuotaHard = object.spec?.resourceQuota?.hard ?? {}}
 				<Card.Header>
 					<Card.Title>
@@ -363,11 +361,9 @@
 					{/if}
 				</Card.Content>
 			</Card.Root>
-			<div class="px-4">
-				<Separator class="py-px" />
-			</div>
+
 			<!-- Limit Range -->
-			<Card.Root class="flex h-full flex-col border-0 bg-transparent shadow-none">
+			<Card.Root class="flex h-full flex-col border-0 bg-muted/50 shadow-none">
 				{@const limits = object.spec?.limitRange?.limits ?? []}
 				<Card.Header>
 					<Card.Title>
@@ -432,11 +428,9 @@
 					{/if}
 				</Card.Content>
 			</Card.Root>
-			<div class="px-4">
-				<Separator class="py-px" />
-			</div>
+
 			<!-- Network Isolation -->
-			<Card.Root class="flex h-full flex-col border-0 bg-transparent shadow-none">
+			<Card.Root class="flex h-full flex-col border-0 bg-muted/50 shadow-none">
 				<Card.Header>
 					<Card.Title>
 						<Item.Root class="p-0">
@@ -496,11 +490,9 @@
 					</Item.Root>
 				</Card.Content>
 			</Card.Root>
-			<div class="px-4">
-				<Separator class="py-px" />
-			</div>
+
 			<!-- Members -->
-			<Card.Root class="flex h-full flex-col border-0 bg-transparent shadow-none">
+			<Card.Root class="flex h-full flex-col border-0 bg-muted/50 shadow-none">
 				{@const members = object.spec?.members ?? []}
 				<Card.Header>
 					<Card.Title>

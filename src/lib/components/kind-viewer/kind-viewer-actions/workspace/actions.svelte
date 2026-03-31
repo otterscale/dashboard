@@ -11,6 +11,7 @@
 	import Edit from './update.svelte';
 
 	let {
+		role,
 		schema,
 		object,
 		cluster,
@@ -19,6 +20,7 @@
 		kind,
 		resource
 	}: {
+		role?: string;
 		schema: any;
 		object: TenantOtterscaleIoV1Alpha1Workspace;
 		cluster: string;
@@ -72,6 +74,7 @@
 				}}
 			>
 				<Edit
+					{role}
 					{cluster}
 					{group}
 					{version}

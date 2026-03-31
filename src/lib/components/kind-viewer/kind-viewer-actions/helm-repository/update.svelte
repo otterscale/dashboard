@@ -177,7 +177,10 @@
 						secretRef: {
 							name: {
 								'ui:options': {
-									help: 'To connect to the internal Harbor service, use "harbor-credential" as the Secret name.'
+									shadcn4Text: {
+										placeholder: 'Only accept Secrets with type kubernetes.io/basic-auth',
+										class: 'placeholder:text-destructive/50'
+									}
 								}
 							}
 						}
