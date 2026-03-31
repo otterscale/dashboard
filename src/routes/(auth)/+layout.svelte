@@ -230,7 +230,10 @@
 						title: m.virtual_machine(),
 						url: resourceUrl('kubevirt.io', 'v1', 'VirtualMachine', 'virtualmachines')
 					},
-
+					{
+						title: m.data_volume(),
+						url: resourceUrl('cdi.kubevirt.io', 'v1beta1', 'DataVolume', 'datavolumes')
+					},
 					{
 						title: m.instance_type(),
 						url: resourceUrl(
@@ -239,10 +242,6 @@
 							'VirtualMachineInstancetype',
 							'virtualmachineinstancetypes'
 						)
-					},
-					{
-						title: m.data_volume(),
-						url: resourceUrl('cdi.kubevirt.io', 'v1beta1', 'DataVolume', 'datavolumes')
 					}
 				]
 			},
