@@ -125,7 +125,7 @@
 	}
 
 	const navData = $derived({
-		managed: [
+		platform: [
 			{
 				title: m.overview(),
 				url: page.params.workspace
@@ -291,7 +291,7 @@
 					]
 				: [])
 		],
-		native: [
+		kubernetes: [
 			{
 				title: m.workloads(),
 				icon: BoxIcon,
@@ -468,10 +468,10 @@
 			<Sidebar.Content class="gap-2">
 				{#if page.params.workspace}
 					<NavMain
-						managedLabel={m.managed()}
-						managedItems={navData.managed}
-						nativeLabel={m.native()}
-						nativeItems={navData.native}
+						platformLabel={m.platform()}
+						platformItems={navData.platform}
+						kubernetesLabel={m.kubernetes()}
+						kubernetesItems={navData.kubernetes}
 					/>
 				{:else}
 					{@render contentSkeleton(sidebarOpen)}
