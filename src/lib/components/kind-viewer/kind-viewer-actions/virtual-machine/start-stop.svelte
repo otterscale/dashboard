@@ -9,7 +9,7 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Item from '$lib/components/ui/item';
 
-	import { canStartOrStop } from './vm-status';
+	import { canStartOrStop, canStop } from './vm-status';
 
 	let {
 		cluster,
@@ -33,7 +33,7 @@
 
 	const name: string = $derived(object?.metadata?.name ?? '');
 	const printableStatus: string = $derived(object?.status?.printableStatus ?? '');
-	const isRunning = $derived(printableStatus === 'Running');
+	const isRunning = $derived(canStop(printableStatus));
 	const isActionAllowed = $derived(canStartOrStop(printableStatus));
 
 	let open = $state(false);

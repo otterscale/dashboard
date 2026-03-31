@@ -224,8 +224,10 @@
 		}
 	}
 
-	// Fetch DataVolumes
-	async function fetchDataVolumesAsEnumerations(
+	// Fetch additional DataVolumes (exclude http and pvc/clone sources)
+	const EXCLUDED_ADDITIONAL_DV_SOURCES = ['http', 'pvc'];
+
+	async function fetchAdditionalDataVolumesAsEnumerations(
 		search: string
 	): Promise<{ label: string; value: string }[]> {
 		try {
@@ -236,12 +238,16 @@
 				version: 'v1beta1',
 				resource: 'datavolumes'
 			});
-			const names = response.items
+			return response.items
+				.filter((item: any) => {
+					const source = (item.object as any)?.spec?.source;
+					return source && !EXCLUDED_ADDITIONAL_DV_SOURCES.some((key) => source[key] != null);
+				})
 				.map((item: any) => (item.object as any)?.metadata?.name as string)
-				.filter((name: string) => name && name.toLowerCase().includes(search.toLowerCase()));
-			return names.map((name: string) => ({ label: name, value: name }));
+				.filter((name: string) => name && name.toLowerCase().includes(search.toLowerCase()))
+				.map((name: string) => ({ label: name, value: name }));
 		} catch (error) {
-			console.error('Error fetching data volumes:', error);
+			console.error('Error fetching additional data volumes:', error);
 			return [];
 		}
 	}
@@ -391,7 +397,7 @@
 								selectWidget: ComboboxWidget
 							},
 							'ui:options': {
-								TailoredComboboxEnumerations: fetchDataVolumesAsEnumerations,
+								TailoredComboboxEnumerations: fetchAdditionalDataVolumesAsEnumerations,
 								TailoredComboboxVisibility: 10,
 								TailoredComboboxInput: {
 									placeholder: 'Select DataVolume'

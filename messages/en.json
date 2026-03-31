@@ -319,5 +319,7 @@
 	"last_1_hour": "Last 1 hour",
 	"last_3_hours": "Last 3 hours",
 	"last_24_hours": "Last 24 hours",
-	"last_30_days": "Last 30 days"
+	"last_30_days": "Last 30 days",
+	"install_rook_ceph_no_disk_after_retry": "Still no disk labels after retries. Ensure node disks are labeled by the exporter (otterscale.io/disk.*).",
+	"install_rook_ceph_no_disk_this_node": "No usable disks detected on this node."
 }

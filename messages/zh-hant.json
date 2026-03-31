@@ -319,5 +319,7 @@
 	"last_1_hour": "最近 1 小時",
 	"last_3_hours": "最近 3 小時",
 	"last_24_hours": "最近 24 小時",
-	"last_30_days": "最近 30 天"
+	"last_30_days": "最近 30 天",
+	"install_rook_ceph_no_disk_after_retry": "重試後仍偵測不到磁碟標籤，請確認節點磁碟已由 exporter 標註（otterscale.io/disk.*）。",
+	"install_rook_ceph_no_disk_this_node": "此節點未偵測到可用磁碟。"
 }
