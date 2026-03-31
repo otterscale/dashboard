@@ -26,6 +26,7 @@ import ModelArtifactCreate from './model-artifact/create.svelte';
 import ModelServiceActions from './model-service/actions.svelte';
 import ModelServiceCreate from './model-service/create.svelte';
 import NodeActions from './node/actions.svelte';
+import NodeCreate from './node/create.svelte';
 import PodActions from './pod/actions.svelte';
 import ResourceQuotaActions from './resource-quota/actions.svelte';
 import ResourceQuotaCreate from './resource-quota/create.svelte';
@@ -87,6 +88,8 @@ function getCreate(kind: string): CreateType {
 			return CephObjectStoreCreate as CreateType;
 		case 'ObjectBucketClaim':
 			return ObjectBucketClaimCreate as CreateType;
+		case 'Node':
+			return NodeCreate as CreateType;
 		default:
 			return DefaultCreate as CreateType;
 	}
