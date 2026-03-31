@@ -70,7 +70,6 @@
 			<p class="p-0 text-xs text-muted-foreground">{m.no_data_display()}</p>
 		</div>
 	{:else}
-		<!-- <Card.Content class="text-3xl">{virtualMachines.value}</Card.Content> -->
-		<Card.Content class="text-3xl">21</Card.Content>
+		<Card.Content class="text-3xl">{virtualMachines.value}</Card.Content>
 	{/if}
 </Card.Root>
