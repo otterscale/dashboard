@@ -6,7 +6,7 @@
 		type DiscoveryRequest,
 		ResourceService
 	} from '@otterscale/api/resource/v1';
-	import type { CoreV1Node, CoreV1Service } from '@otterscale/types';
+	import type { CoreV1Service } from '@otterscale/types';
 	import { getContext } from 'svelte';
 
 	import { resolve } from '$app/paths';
@@ -59,8 +59,8 @@
 		return apiResources;
 	}
 
-	async function fetchServiceUrl(kind: string) {
-		const serviceGatewayResponse = await client.get({
+	async function getExternalIP() {
+		const response = await client.get({
 			cluster,
 			namespace: 'istio-ingress',
 			name: 'gateway-istio',
@@ -68,25 +68,49 @@
 			version: 'v1',
 			resource: 'services'
 		});
+		const service = response.object as CoreV1Service;
+		return (service.spec?.externalIPs ?? [''])[0];
+	}
 
-		const serviceGateway = serviceGatewayResponse.object as CoreV1Service;
+	async function getServiceNodePort(namespace: string, name: string, portName: string) {
+		const response = await client.get({
+			cluster,
+			namespace,
+			name,
+			group: '',
+			version: 'v1',
+			resource: 'services'
+		});
+		const service = response.object as CoreV1Service;
+		return service?.spec?.ports?.find((p) => p.name === portName)?.nodePort;
+	}
 
-		const [externalIP] = serviceGateway.spec?.externalIPs ?? [''];
+	async function getDescription(kind: string) {
+		if (kind !== 'ModelService' && kind !== 'ObjectBucketClaim') {
+			return `${!group ? 'core' : group}/${version}`;
+		}
+
+		const externalIP = await getExternalIP();
 
 		if (kind === 'ModelService') {
-			const modelGatewayResponse = await client.get({
-				cluster,
-				namespace: 'llm-d',
-				name: 'llm-d-infra-inference-gateway-istio',
-				group: '',
-				version: 'v1',
-				resource: 'services'
-			});
-			const modelGateway = modelGatewayResponse.object as CoreV1Service;
-			const port = modelGateway?.spec?.ports?.find((port) => port.name === 'default');
-			return `${externalIP}:${port?.port}`;
+			const nodePort = await getServiceNodePort(
+				'llm-d',
+				'llm-d-infra-inference-gateway-istio',
+				'default'
+			);
+			return `${externalIP}:${nodePort}`;
 		}
-		return externalIP;
+
+		if (kind === 'ObjectBucketClaim') {
+			const nodePort = await getServiceNodePort(
+				'rook-ceph',
+				'rook-ceph-rgw-ceph-objectstore-external',
+				'rgw'
+			);
+			return `Available at ${externalIP}:${nodePort}`;
+		}
+
+		return '';
 	}
 </script>
 
@@ -113,12 +137,10 @@
 						<Item.Title class="text-xl font-bold">
 							{kind}
 						</Item.Title>
-						{#await fetchServiceUrl(kind) then serviceUrl}
-							{#if serviceUrl}
-								<Item.Description class="text-base">
-									Available at {serviceUrl}
-								</Item.Description>
-							{/if}
+						{#await getDescription(kind) then description}
+							<Item.Description class="text-base">
+								{description}
+							</Item.Description>
 						{/await}
 					</Item.Content>
 				</Item.Root>

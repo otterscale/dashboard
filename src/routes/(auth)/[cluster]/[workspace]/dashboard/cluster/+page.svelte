@@ -9,6 +9,7 @@
 	import { WidgetGrid } from '$lib/components/custom/widget-grid';
 	import { Dashboard } from '$lib/components/dashbaord/cluster/analytics';
 	import { widgets } from '$lib/components/dashbaord/cluster/overview/widgets';
+	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/paraglide/messages';
 	import { breadcrumbs } from '$lib/stores';
@@ -17,7 +18,7 @@
 	breadcrumbs.set([
 		{
 			title: m.cluster_status(),
-			url: resolve('/(auth)/[cluster]/[workspace]/cluster-status', {
+			url: resolve('/(auth)/[cluster]/[workspace]/dashboard/cluster', {
 				cluster: page.params.cluster!,
 				workspace: page.params.workspace!
 			})
@@ -50,15 +51,21 @@
 </script>
 
 {#key cluster}
-	<main class="space-y-4 py-4">
+	<div class="space-y-4">
+		<div class="flex items-end justify-between gap-4">
+			<Item.Root class="p-0">
+				<Item.Content class="text-left">
+					<Item.Title class="text-xl font-bold">
+						{m.cluster_status()}
+					</Item.Title>
+					<Item.Description class="text-base">
+						{m.k8s_overview_description()}
+					</Item.Description>
+				</Item.Content>
+			</Item.Root>
+		</div>
 		{#if prometheusDriver}
 			<div class="mx-auto grid w-full gap-6">
-				<div class="grid gap-1">
-					<h1 class="text-2xl font-bold tracking-tight md:text-3xl">{m.cluster_status()}</h1>
-					<p class="text-muted-foreground">
-						{m.k8s_overview_description()}
-					</p>
-				</div>
 				<Tabs.Root bind:value={selectedTab}>
 					<div class="flex justify-between gap-2">
 						<Tabs.List>
@@ -90,5 +97,5 @@
 				<p>{m.no_data_display()}</p>
 			</div>
 		{/if}
-	</main>
+	</div>
 {/key}

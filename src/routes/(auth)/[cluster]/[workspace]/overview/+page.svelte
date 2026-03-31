@@ -11,7 +11,7 @@
 
 	breadcrumbs.set([
 		{
-			title: m.workspace(),
+			title: m.workspace_dashboard_title(),
 			url: resolve('/(auth)/[cluster]/[workspace]/overview', {
 				cluster,
 				workspace

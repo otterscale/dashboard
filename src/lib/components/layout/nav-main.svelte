@@ -18,21 +18,21 @@
 	};
 
 	let {
-		managedLabel,
-		managedItems,
-		nativeLabel,
-		nativeItems
+		platformLabel,
+		platformItems,
+		kubernetesLabel,
+		kubernetesItems
 	}: {
-		managedLabel: string;
-		managedItems: NavItem[];
-		nativeLabel: string;
-		nativeItems: NavItem[];
+		platformLabel: string;
+		platformItems: NavItem[];
+		kubernetesLabel: string;
+		kubernetesItems: NavItem[];
 	} = $props();
 
 	let activeIndex = $state(0);
 
-	const currentLabel = $derived(activeIndex === 0 ? managedLabel : nativeLabel);
-	const currentItems = $derived(activeIndex === 0 ? managedItems : nativeItems);
+	const currentLabel = $derived(activeIndex === 0 ? platformLabel : kubernetesLabel);
+	const currentItems = $derived(activeIndex === 0 ? platformItems : kubernetesItems);
 
 	function toggleLabel() {
 		activeIndex = 1 - activeIndex;

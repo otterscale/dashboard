@@ -9,6 +9,7 @@
 	import CompassIcon from '@lucide/svelte/icons/compass';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
+	import GaugeIcon from '@lucide/svelte/icons/gauge';
 	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import LayersIcon from '@lucide/svelte/icons/layers';
@@ -125,7 +126,7 @@
 	}
 
 	const navData = $derived({
-		managed: [
+		platform: [
 			{
 				title: m.overview(),
 				url: page.params.workspace
@@ -137,19 +138,52 @@
 				icon: CompassIcon
 			},
 			{
-				title: m.ai_studio(),
-				icon: BotIcon,
-				isActive: true,
+				title: m.dashboard(),
+				icon: GaugeIcon,
 				items: [
 					{
-						title: m.dashboard(),
+						title: m.cluster(),
 						url: page.params.workspace
-							? resolve('/(auth)/[cluster]/[workspace]/model/dashboard', {
+							? resolve('/(auth)/[cluster]/[workspace]/dashboard/cluster', {
 									cluster: activeCluster,
 									workspace: page.params.workspace
 								})
 							: ''
 					},
+					{
+						title: m.model(),
+						url: page.params.workspace
+							? resolve('/(auth)/[cluster]/[workspace]/dashboard/model', {
+									cluster: activeCluster,
+									workspace: page.params.workspace
+								})
+							: ''
+					},
+					{
+						title: m.compute(),
+						url: page.params.workspace
+							? resolve('/(auth)/[cluster]/[workspace]/dashboard/compute', {
+									cluster: activeCluster,
+									workspace: page.params.workspace
+								})
+							: ''
+					},
+					{
+						title: m.storage(),
+						url: page.params.workspace
+							? resolve('/(auth)/[cluster]/[workspace]/dashboard/storage', {
+									cluster: activeCluster,
+									workspace: page.params.workspace
+								})
+							: ''
+					}
+				]
+			},
+			{
+				title: m.ai_studio(),
+				icon: BotIcon,
+				isActive: true,
+				items: [
 					{
 						title: m.model(),
 						url: resourceUrl('model.otterscale.io', 'v1alpha1', 'ModelService', 'modelservices')
@@ -170,14 +204,6 @@
 						url: resourceUrl('workload.otterscale.io', 'v1alpha1', 'Application', 'applications')
 					},
 					{
-						title: m.release(),
-						url: resourceUrl('helm.toolkit.fluxcd.io', 'v2', 'HelmRelease', 'helmreleases')
-					},
-					{
-						title: m.repository(),
-						url: resourceUrl('source.toolkit.fluxcd.io', 'v1', 'HelmRepository', 'helmrepositories')
-					},
-					{
 						title: m.application_hub(),
 						url: page.params.workspace
 							? resolve('/(auth)/[cluster]/[workspace]/hub', {
@@ -185,6 +211,14 @@
 									workspace: page.params.workspace
 								})
 							: ''
+					},
+					{
+						title: m.release(),
+						url: resourceUrl('helm.toolkit.fluxcd.io', 'v2', 'HelmRelease', 'helmreleases')
+					},
+					{
+						title: m.repository(),
+						url: resourceUrl('source.toolkit.fluxcd.io', 'v1', 'HelmRepository', 'helmrepositories')
 					}
 				]
 			},
@@ -193,19 +227,13 @@
 				icon: CpuIcon,
 				items: [
 					{
-						title: m.dashboard(),
-						url: page.params.workspace
-							? resolve('/(auth)/[cluster]/[workspace]/compute/dashboard', {
-									cluster: activeCluster,
-									workspace: page.params.workspace
-								})
-							: ''
-					},
-					{
 						title: m.virtual_machine(),
 						url: resourceUrl('kubevirt.io', 'v1', 'VirtualMachine', 'virtualmachines')
 					},
-
+					{
+						title: m.data_volume(),
+						url: resourceUrl('cdi.kubevirt.io', 'v1beta1', 'DataVolume', 'datavolumes')
+					},
 					{
 						title: m.instance_type(),
 						url: resourceUrl(
@@ -214,10 +242,6 @@
 							'VirtualMachineInstancetype',
 							'virtualmachineinstancetypes'
 						)
-					},
-					{
-						title: m.data_volume(),
-						url: resourceUrl('cdi.kubevirt.io', 'v1beta1', 'DataVolume', 'datavolumes')
 					}
 				]
 			},
@@ -226,28 +250,11 @@
 				icon: HardDriveIcon,
 				items: [
 					{
-						title: m.dashboard(),
-						url: page.params.workspace
-							? resolve('/(auth)/[cluster]/[workspace]/storage/dashboard', {
-									cluster: activeCluster,
-									workspace: page.params.workspace
-								})
-							: ''
-					},
-					{
-						title: m.block_pool(),
+						title: m.block_device(),
 						url: resourceUrl('ceph.rook.io', 'v1', 'CephBlockPool', 'cephblockpools')
 					},
-					// {
-					// 	title: m.file_system(),
-					// 	url: resourceUrl('ceph.rook.io', 'v1', 'CephFilesystem', 'cephfilesystems')
-					// },
 					{
-						title: m.object_store(),
-						url: resourceUrl('ceph.rook.io', 'v1', 'CephObjectStore', 'cephobjectstores')
-					},
-					{
-						title: m.object_bucket_claim(),
+						title: m.object_storage(),
 						url: resourceUrl(
 							'objectbucket.io',
 							'v1alpha1',
@@ -264,21 +271,11 @@
 							icon: UserStarIcon,
 							items: [
 								{
-									title: m.cluster_status(),
-									url: page.params.workspace
-										? resolve('/(auth)/[cluster]/[workspace]/cluster-status', {
-												cluster: activeCluster,
-												workspace: page.params.workspace
-											})
-										: ''
-								},
-								{
 									title: m.workspace(),
 									url: resourceUrl('tenant.otterscale.io', 'v1alpha1', 'Workspace', 'workspaces')
 								},
 								{
 									title: m.module(),
-									// url: resourceUrl('module.otterscale.io', 'v1alpha1', 'Module', 'modules')
 									url: page.params.workspace
 										? resolve('/(auth)/[cluster]/[workspace]/modules', {
 												cluster: activeCluster,
@@ -291,7 +288,7 @@
 					]
 				: [])
 		],
-		native: [
+		kubernetes: [
 			{
 				title: m.workloads(),
 				icon: BoxIcon,
@@ -468,10 +465,10 @@
 			<Sidebar.Content class="gap-2">
 				{#if page.params.workspace}
 					<NavMain
-						managedLabel={m.managed()}
-						managedItems={navData.managed}
-						nativeLabel={m.native()}
-						nativeItems={navData.native}
+						platformLabel={m.platform()}
+						platformItems={navData.platform}
+						kubernetesLabel={m.kubernetes()}
+						kubernetesItems={navData.kubernetes}
 					/>
 				{:else}
 					{@render contentSkeleton(sidebarOpen)}

@@ -8,6 +8,8 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
+	import GetUser from './get-user.svelte';
+
 	let {
 		schema,
 		object,
@@ -43,6 +45,20 @@
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content align="end">
 		<DropdownMenu.Group>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<GetUser
+					{cluster}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Separator />
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();

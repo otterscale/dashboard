@@ -47,10 +47,6 @@
 	const uiSchemas: Record<string, UISchemaType> = $derived(getUISchemas(apiResource.kind));
 	const dataSchemas: Record<string, DataSchemaType> = $derived(getDataSchemas(apiResource.kind));
 	const namespace = $derived.by(() => {
-		if (apiResource.kind === 'CephObjectStore') {
-			return 'rook-ceph';
-		}
-
 		return apiResource.namespaced ? namespaceProp : undefined;
 	});
 
