@@ -195,7 +195,7 @@
 						}
 					});
 				} else {
-					console.log('Unknown response type: ', response);
+					console.error('Unknown response type: ', response);
 				}
 			}
 		} catch (error) {
