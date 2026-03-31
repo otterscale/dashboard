@@ -170,6 +170,36 @@ export async function fetchNodeTopology(
 	return { pods, gpus, nodes };
 }
 
+export async function fetchAllGpuNodes(
+	client: ResourceClient,
+	cluster: string
+): Promise<NodeInfo[]> {
+	const response = await client.list({
+		cluster,
+		group: '',
+		version: 'v1',
+		resource: 'nodes',
+		namespace: ''
+	});
+
+	const nodes: NodeInfo[] = [];
+	for (const item of response.items) {
+		const obj = item.object as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+		const annotations = getAnnotations(obj);
+		const registerAnnotation = annotations[ANNOTATION_NODE_REGISTER];
+		if (!registerAnnotation) continue;
+
+		const devices = parseNodeGpuDevices(registerAnnotation);
+		if (devices.length > 0) {
+			nodes.push({
+				name: obj?.metadata?.name ?? '',
+				devices
+			});
+		}
+	}
+	return nodes;
+}
+
 function crossReferencePodGpus(pods: PodInfo[], gpus: GpuInfo[]): void {
 	const gpuMap = new Map(gpus.map((g) => [g.device.id, g]));
 

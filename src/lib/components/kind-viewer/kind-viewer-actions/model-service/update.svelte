@@ -8,12 +8,14 @@
 	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
-	import { getContext } from 'svelte';
+	import { getContext, onMount } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
 	import Form from '$lib/components/dynamic-form/form.svelte';
+	import { fetchAllGpuNodes, type NodeInfo } from '$lib/components/gpu-allocation';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
@@ -87,8 +89,68 @@
 
 	let mode: any = $state({});
 
+	const existingNodeName = lodash.get(
+		object,
+		['spec', 'decode', 'nodeSelector', 'kubernetes.io/hostname'],
+		''
+	);
+	const existingGpuType = lodash.get(
+		object,
+		['spec', 'decode', 'annotations', 'nvidia.com/use-gputype'],
+		''
+	);
+	const existingGpuUuid = lodash.get(
+		object,
+		['spec', 'decode', 'annotations', 'nvidia.com/use-gpuuuid'],
+		''
+	);
+	const existingPlacement = {
+		...(existingNodeName ? { nodeName: existingNodeName } : {}),
+		...(existingGpuType
+			? { gpuType: existingGpuType.split(',').map((s: string) => s.trim()) }
+			: {}),
+		...(existingGpuUuid ? { gpuUuid: existingGpuUuid.split(',').map((s: string) => s.trim()) } : {})
+	};
+	let placement: any = $state(existingPlacement);
+
+	let gpuNodes: NodeInfo[] = $state([]);
+
+	onMount(async () => {
+		try {
+			gpuNodes = await fetchAllGpuNodes(resourceClient, cluster);
+		} catch {
+			console.error('Failed to fetch GPU nodes');
+		}
+	});
+
+	const nodeNameOptions = $derived(
+		gpuNodes.map((n) => ({
+			label: `${n.name} (${n.devices.length} GPUs)`,
+			value: n.name
+		}))
+	);
+
+	const gpuTypeOptions = $derived(() => {
+		const types = new SvelteSet<string>();
+		for (const node of gpuNodes) {
+			for (const device of node.devices) {
+				if (device.type) types.add(device.type);
+			}
+		}
+		return [...types].map((t) => ({ label: t, value: t }));
+	});
+
+	const gpuUuidOptions = $derived(
+		gpuNodes.flatMap((node) =>
+			node.devices.map((device) => ({
+				label: `${node.name} - GPU ${device.index}`,
+				value: device.id
+			}))
+		)
+	);
+
 	// Steps Manager
-	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -444,7 +506,140 @@
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[2]} class="min-h-[77vh]">
+			<Tabs.Content value={steps[2]}>
+				<Form
+					schema={{
+						type: 'object',
+						title: 'GPU Placement',
+						description:
+							'Configure GPU/Node scheduling constraints (HAMI). Leave all fields empty for automatic scheduling. GPU Type and UUID support multiple AND-combined selections.',
+						properties: {
+							nodeName: {
+								title: 'Node',
+								type: 'string',
+								description: 'Select a GPU node (nodeSelector: kubernetes.io/hostname)',
+								enum: nodeNameOptions.map((o) => o.value)
+							},
+							gpuType: {
+								title: 'GPU Type',
+								type: 'array',
+								description: 'Select GPU types (annotation: nvidia.com/use-gputype)',
+								items: {
+									type: 'string',
+									enum: gpuTypeOptions().map((o) => o.value)
+								},
+								uniqueItems: true
+							},
+							gpuUuid: {
+								title: 'GPU UUID',
+								type: 'array',
+								description: 'Select GPU UUIDs (annotation: nvidia.com/use-gpuuuid)',
+								items: {
+									type: 'string',
+									enum: gpuUuidOptions.map((o) => o.value)
+								},
+								uniqueItems: true
+							}
+						}
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						},
+						nodeName: {
+							'ui:components': {
+								stringField: 'enumField'
+							},
+							'ui:options': {
+								useLabel: true,
+								title: 'Node'
+							}
+						},
+						gpuType: {
+							'ui:components': {
+								arrayField: 'multiEnumField',
+								checkboxesWidget: 'multiSelectWidget'
+							},
+							'ui:options': {
+								useLabel: true,
+								title: 'GPU Type'
+							}
+						},
+						gpuUuid: {
+							'ui:components': {
+								arrayField: 'multiEnumField',
+								checkboxesWidget: 'multiSelectWidget'
+							},
+							'ui:options': {
+								useLabel: true,
+								title: 'GPU UUID',
+								enumNames: gpuUuidOptions.map((o) => o.label)
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={existingPlacement as FormValue}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+
+							const nodeName: string = lodash.get(placement, 'nodeName', '');
+							const gpuTypes: string[] = lodash.get(placement, 'gpuType', []);
+							const gpuUuids: string[] = lodash.get(placement, 'gpuUuid', []);
+
+							// Clear any previous placement values
+							lodash.unset(values, 'spec.decode.nodeSelector');
+							lodash.unset(values, 'spec.decode.annotations');
+							lodash.unset(values, 'spec.prefill.nodeSelector');
+							lodash.unset(values, 'spec.prefill.annotations');
+
+							const isDisaggregation = lodash.get(mode, 'mode') === 'Disaggregation';
+
+							// Nodes → nodeSelector
+							if (nodeName) {
+								const selector = { 'kubernetes.io/hostname': nodeName };
+								lodash.set(values, 'spec.decode.nodeSelector', selector);
+								if (isDisaggregation) {
+									lodash.set(values, 'spec.prefill.nodeSelector', selector);
+								}
+							}
+
+							// GPU Type & GPU UUID → spec.decode.annotations / spec.prefill.annotations (HAMI spec)
+							const annotations: Record<string, string> = {};
+							if (gpuTypes.length > 0) {
+								annotations['nvidia.com/use-gputype'] = gpuTypes.join(',');
+							}
+							if (gpuUuids.length > 0) {
+								annotations['nvidia.com/use-gpuuuid'] = gpuUuids.join(',');
+							}
+
+							if (Object.keys(annotations).length > 0) {
+								lodash.set(values, 'spec.decode.annotations', annotations);
+								if (isDisaggregation) {
+									lodash.set(values, 'spec.prefill.annotations', annotations);
+								}
+							}
+						}
+					}}
+					bind:values={placement}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+
+			<Tabs.Content value={steps[3]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{
