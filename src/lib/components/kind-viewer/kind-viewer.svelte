@@ -312,6 +312,7 @@
 			{/snippet}
 			{#snippet rowActions({ row })}
 				<Actions
+					role={isClusterAdmin ? 'Cluster Admin' : undefined}
 					{row}
 					{schema}
 					object={row.original.raw}

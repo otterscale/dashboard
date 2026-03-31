@@ -218,6 +218,16 @@
 									.get(jsonSchema, 'properties.spec.properties.type.enum')
 									.filter((type: string) => type !== 'oci')
 							}
+						},
+						secretRef: {
+							name: {
+								'ui:options': {
+									shadcn4Text: {
+										placeholder: 'Only accept Secrets with type kubernetes.io/basic-auth',
+										class: 'placeholder:text-destructive/50'
+									}
+								}
+							}
 						}
 					} as UiSchemaRoot}
 					initialValue={{
