@@ -67,7 +67,23 @@
 			}
 		}
 	});
-	let value = $derived(stringify(values));
+
+	function deploymentHasPvc(pvc: any): boolean {
+		return !!(pvc && Array.isArray(pvc.accessModes) && pvc.accessModes.length > 0);
+	}
+
+	/** Omit PVC (and mountPath) from manifest/YAML when no access mode — avoids `persistentVolumeClaim: {}` in preview. */
+	function manifestWithoutPvcWhenEmpty(obj: any) {
+		const out = lodash.cloneDeep(obj);
+		const pvc = lodash.get(out, 'spec.deploymentConfig.persistentVolumeClaim');
+		if (!deploymentHasPvc(pvc)) {
+			lodash.unset(out, 'spec.deploymentConfig.persistentVolumeClaim');
+			lodash.unset(out, 'spec.deploymentConfig.mountPath');
+		}
+		return out;
+	}
+
+	let value = $derived(stringify(manifestWithoutPvcWhenEmpty(values)));
 
 	// Steps Manager
 	const steps = Array.from({ length: 6 }, (_, index) => String(index + 1));
@@ -584,13 +600,15 @@
 						type: 'object',
 						properties: {
 							accessMode: {
-								...lodash.get(
-									jsonSchema,
-									'properties.spec.properties.deploymentConfig.properties.persistentVolumeClaim.properties.accessModes.items'
+								...lodash.omit(
+									lodash.get(
+										jsonSchema,
+										'properties.spec.properties.deploymentConfig.properties.persistentVolumeClaim.properties.accessModes.items'
+									) ?? {},
+									'default'
 								),
 								title: 'Access Mode',
-								enum: ['ReadWriteOnce', 'ReadOnlyMany', 'ReadWriteMany', 'ReadWriteOncePod'],
-								default: 'ReadWriteOnce'
+								enum: ['ReadWriteOnce', 'ReadOnlyMany', 'ReadWriteMany', 'ReadWriteOncePod']
 							},
 							resources: {
 								type: 'object',
@@ -651,7 +669,11 @@
 						lodash.unset(formValue, 'resources.requests.mountPath');
 						const accessMode = lodash.get(formValue, 'accessMode') as string | undefined;
 						lodash.unset(formValue, 'accessMode');
-						lodash.set(formValue, 'accessModes', accessMode ? [accessMode] : ['ReadWriteOnce']);
+						if (accessMode) {
+							lodash.set(formValue, 'accessModes', [accessMode]);
+						} else {
+							lodash.unset(formValue, 'accessModes');
+						}
 						return formValue;
 					}}
 					handleSubmit={{
@@ -711,7 +733,9 @@
 
 							isSubmitting = true;
 
-							const isValid = validate(load(value));
+							const parsed: any = manifestWithoutPvcWhenEmpty(load(value));
+
+							const isValid = validate(parsed);
 
 							if (!isValid) {
 								console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
@@ -720,11 +744,11 @@
 								return;
 							}
 
-							const name = lodash.get(load(value), 'metadata.name');
+							const name = lodash.get(parsed, 'metadata.name');
 
 							toast.promise(
 								async () => {
-									const manifest = new TextEncoder().encode(value);
+									const manifest = new TextEncoder().encode(stringify(parsed));
 
 									await resourceClient.create({
 										cluster,
