@@ -33,6 +33,31 @@
 	let resourceQuotaUsed: Record<string, string> = $state({});
 	let isLoaded = $state(false);
 
+	const K8S_QUANTITY_RE = /^(\d+(?:\.\d+)?)\s*(Ki|Mi|Gi|Ti|Pi|Ei|k|M|G|T|P|E|m)?$/;
+	const K8S_MULTIPLIERS: Record<string, number> = {
+		'': 1,
+		m: 0.001,
+		k: 1e3,
+		M: 1e6,
+		G: 1e9,
+		T: 1e12,
+		P: 1e15,
+		E: 1e18,
+		Ki: 1024,
+		Mi: 1024 ** 2,
+		Gi: 1024 ** 3,
+		Ti: 1024 ** 4,
+		Pi: 1024 ** 5,
+		Ei: 1024 ** 6
+	};
+
+	function parseK8sQuantity(raw: string | number): number {
+		if (typeof raw === 'number') return raw;
+		const match = raw.match(K8S_QUANTITY_RE);
+		if (!match) return NaN;
+		return parseFloat(match[1]) * (K8S_MULTIPLIERS[match[2] ?? ''] ?? 1);
+	}
+
 	function formatResourceValue(key: string, value: number): string {
 		if (key.includes('cpu')) {
 			return value < 1 ? `${Math.round(value * 1000)}m` : `${value}`;
@@ -51,6 +76,15 @@
 		return String(Math.round(value));
 	}
 
+	function formatHardValue(key: string, raw: string | number): string {
+		if (!key.includes('gpumem')) return String(raw);
+		if (typeof raw === 'string' && !K8S_QUANTITY_RE.test(raw)) return raw;
+		const base = parseK8sQuantity(raw);
+		if (Number.isNaN(base)) return String(raw);
+		const gi = base / 1024;
+		return `${Math.round(gi * 10) / 10}Gi`;
+	}
+
 	async function fetchResourceQuotaMetrics() {
 		const namespace = object.status?.resourceQuotaRef?.namespace ?? '';
 		if (!namespace) return;
@@ -67,18 +101,12 @@
 				nvidia_com_gpumem: 'nvidia.com/gpumem'
 			};
 
-			const [limitsResponse, requestsResponse, gpuResponse, gpuMemResponse] = await Promise.all([
+			const [limitsResponse, requestsResponse] = await Promise.all([
 				prometheusDriver.instantQuery(
 					`sum by (resource) (kube_pod_container_resource_limits{namespace="${namespace}"} and on (namespace, pod) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`
 				),
 				prometheusDriver.instantQuery(
 					`sum by (resource) (kube_pod_container_resource_requests{namespace="${namespace}"} and on (namespace, pod) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`
-				),
-				prometheusDriver.instantQuery(
-					`sum(kube_pod_container_resource_requests{namespace="${namespace}", resource="nvidia_com_gpu"})`
-				),
-				prometheusDriver.instantQuery(
-					`sum(kube_pod_container_resource_requests{namespace="${namespace}", resource="nvidia_com_gpumem"})`
 				)
 			]);
 
@@ -100,15 +128,9 @@
 					`requests.${quotaResource}`,
 					v.value.value
 				);
-			}
-
-			const gpuScalar = gpuResponse.result[0] as InstantVector | undefined;
-			if (gpuScalar) {
-				usedMap['nvidia.com/gpu'] = formatResourceValue('gpu', gpuScalar.value.value);
-			}
-			const gpuMemScalar = gpuMemResponse.result[0] as InstantVector | undefined;
-			if (gpuMemScalar) {
-				usedMap['nvidia.com/gpumem'] = formatResourceValue('gpumem', gpuMemScalar.value.value);
+				if (gpuResourceMap[metricResource]) {
+					usedMap[quotaResource] = formatResourceValue(quotaResource, v.value.value);
+				}
 			}
 			resourceQuotaUsed = usedMap;
 		} catch (error) {
@@ -363,13 +385,10 @@
 										<Item.Description>
 											{key}
 										</Item.Description>
-										{@const hardValue = key.includes('gpumem')
-											? `${Math.round((Number(resourceQuotaHard[key]) / 1024) * 10) / 10}Gi`
-											: resourceQuotaHard[key]}
 										<Item.Title class={cn(typographyVariants({ variant: 'large' }))}>
 											{resourceQuotaUsed[key] !== undefined
 												? resourceQuotaUsed[key]
-												: '?'}/{hardValue}
+												: '?'}/{formatHardValue(key, resourceQuotaHard[key])}
 										</Item.Title>
 									</Item.Content>
 								</Item.Root>
