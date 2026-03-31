@@ -44,6 +44,10 @@
 			if (mi >= 1) return `${Math.round(mi)}Mi`;
 			return `${Math.round(value / 1024)}Ki`;
 		}
+		if (key.includes('gpumem')) {
+			const gi = value / 1024;
+			return `${Math.round(gi * 10) / 10}Gi`;
+		}
 		return String(Math.round(value));
 	}
 
@@ -58,30 +62,53 @@
 		});
 
 		try {
-			const [limitsResponse, requestsResponse] = await Promise.all([
+			const gpuResourceMap: Record<string, string> = {
+				nvidia_com_gpu: 'nvidia.com/gpu',
+				nvidia_com_gpumem: 'nvidia.com/gpumem'
+			};
+
+			const [limitsResponse, requestsResponse, gpuResponse, gpuMemResponse] = await Promise.all([
 				prometheusDriver.instantQuery(
 					`sum by (resource) (kube_pod_container_resource_limits{namespace="${namespace}"} and on (namespace, pod) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`
 				),
 				prometheusDriver.instantQuery(
 					`sum by (resource) (kube_pod_container_resource_requests{namespace="${namespace}"} and on (namespace, pod) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`
+				),
+				prometheusDriver.instantQuery(
+					`sum(kube_pod_container_resource_requests{namespace="${namespace}", resource="nvidia_com_gpu"})`
+				),
+				prometheusDriver.instantQuery(
+					`sum(kube_pod_container_resource_requests{namespace="${namespace}", resource="nvidia_com_gpumem"})`
 				)
 			]);
 
 			const usedMap: Record<string, string> = {};
 			for (const v of limitsResponse.result as InstantVector[]) {
-				const resource = (v.metric.labels as Record<string, string>).resource;
-				if (resource) {
-					usedMap[`limits.${resource}`] = formatResourceValue(`limits.${resource}`, v.value.value);
-				}
+				const metricResource = (v.metric.labels as Record<string, string>).resource;
+				if (!metricResource) continue;
+				const quotaResource = gpuResourceMap[metricResource] ?? metricResource;
+				usedMap[`limits.${quotaResource}`] = formatResourceValue(
+					`limits.${quotaResource}`,
+					v.value.value
+				);
 			}
 			for (const v of requestsResponse.result as InstantVector[]) {
-				const resource = (v.metric.labels as Record<string, string>).resource;
-				if (resource) {
-					usedMap[`requests.${resource}`] = formatResourceValue(
-						`requests.${resource}`,
-						v.value.value
-					);
-				}
+				const metricResource = (v.metric.labels as Record<string, string>).resource;
+				if (!metricResource) continue;
+				const quotaResource = gpuResourceMap[metricResource] ?? metricResource;
+				usedMap[`requests.${quotaResource}`] = formatResourceValue(
+					`requests.${quotaResource}`,
+					v.value.value
+				);
+			}
+
+			const gpuScalar = gpuResponse.result[0] as InstantVector | undefined;
+			if (gpuScalar) {
+				usedMap['nvidia.com/gpu'] = formatResourceValue('gpu', gpuScalar.value.value);
+			}
+			const gpuMemScalar = gpuMemResponse.result[0] as InstantVector | undefined;
+			if (gpuMemScalar) {
+				usedMap['nvidia.com/gpumem'] = formatResourceValue('gpumem', gpuMemScalar.value.value);
 			}
 			resourceQuotaUsed = usedMap;
 		} catch (error) {
@@ -97,13 +124,11 @@
 	function getGridLayout(key: string) {
 		if (key === 'limits.cpu') return 'md:row-start-1 2xl:row-start-1';
 		if (key === 'limits.memory') return 'md:row-start-2 2xl:row-start-1';
-		if (key === 'limits.nvidia.com/gpu') return 'md:row-start-3 2xl:row-start-1';
-		if (key === 'limits.nvidia.com/gpumem') return 'md:row-start-4 2xl:row-start-1';
+		if (key === 'nvidia.com/gpu') return 'md:row-start-3 2xl:row-start-1';
+		if (key === 'nvidia.com/gpumem') return 'md:row-start-4 2xl:row-start-1';
 
 		if (key === 'requests.cpu') return 'md:row-start-1 2xl:row-start-2';
 		if (key === 'requests.memory') return 'md:row-start-2 2xl:row-start-2';
-		if (key === 'requests.nvidia.com/gpu') return 'md:row-start-3 2xl:row-start-2';
-		if (key === 'requests.nvidia.com/gpumem') return 'md:row-start-4 2xl:row-start-2';
 
 		return '2xl:row-start-3 md:row-start-5';
 	}
@@ -338,10 +363,13 @@
 										<Item.Description>
 											{key}
 										</Item.Description>
+										{@const hardValue = key.includes('gpumem')
+											? `${Math.round((Number(resourceQuotaHard[key]) / 1024) * 10) / 10}Gi`
+											: resourceQuotaHard[key]}
 										<Item.Title class={cn(typographyVariants({ variant: 'large' }))}>
 											{resourceQuotaUsed[key] !== undefined
 												? resourceQuotaUsed[key]
-												: '?'}/{resourceQuotaHard[key]}
+												: '?'}/{hardValue}
 										</Item.Title>
 									</Item.Content>
 								</Item.Root>
