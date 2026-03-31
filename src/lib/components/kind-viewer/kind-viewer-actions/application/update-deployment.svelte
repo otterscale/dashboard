@@ -56,23 +56,37 @@
 	});
 	const validate = jsonSchemaValidator.compile(jsonSchema);
 
+	const defaultSpec = {
+		workloadType: 'Deployment',
+		deploymentConfig: {
+			deployment: {
+				replicas: {},
+				template: { spec: { containers: {} } }
+			},
+			service: {},
+			persistentVolumeClaim: { resources: { requests: {} } },
+			mountPath: {}
+		}
+	};
+
+	function specWithPvcDefaults(spec: typeof defaultSpec | undefined) {
+		if (!spec) return lodash.cloneDeep(defaultSpec);
+		const next = lodash.cloneDeep(spec);
+		if (!next.deploymentConfig)
+			next.deploymentConfig = {} as (typeof defaultSpec)['deploymentConfig'];
+		next.deploymentConfig.persistentVolumeClaim = lodash.merge(
+			{ resources: { requests: {} } },
+			next.deploymentConfig.persistentVolumeClaim ?? {}
+		);
+		return next;
+	}
+
 	// Container for Data
 	let values: any = $state({
 		apiVersion: `${group}/${version}`,
 		kind,
 		metadata: object?.metadata || {},
-		spec: object?.spec || {
-			workloadType: 'Deployment',
-			deploymentConfig: {
-				deployment: {
-					replicas: {},
-					template: { spec: { containers: {} } }
-				},
-				service: {},
-				persistentVolumeClaim: { resources: { requests: {} } },
-				mountPath: {}
-			}
-		}
+		spec: specWithPvcDefaults(object?.spec)
 	});
 
 	const systemFields = [
