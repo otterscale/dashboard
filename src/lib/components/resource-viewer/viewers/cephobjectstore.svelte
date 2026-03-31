@@ -32,12 +32,6 @@
 	const namespace = $derived(object?.metadata?.namespace ?? '');
 	const objectStoreName = $derived(object?.metadata?.name ?? '');
 
-	function buildLabelSelector(labels: Record<string, string>): string {
-		return Object.entries(labels)
-			.map(([key, value]) => `${key}=${value}`)
-			.join(',');
-	}
-
 	function getContainerReadies(pod: CoreV1Pod): number {
 		const containerStatuses = pod?.status?.containerStatuses ?? [];
 		const readyContainers = containerStatuses.filter(
@@ -82,10 +76,7 @@
 				group: '',
 				version: 'v1',
 				resource: 'pods',
-				labelSelector: buildLabelSelector({
-					'rook.io/operator-namespace': 'rook-ceph',
-					rook_object_store: object?.metadata?.name ?? ''
-				})
+				labelSelector: object?.status?.selector
 			});
 
 			pods = response.items.map((item) => item.object as CoreV1Pod);
