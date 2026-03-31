@@ -17,6 +17,7 @@
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
+	import { computeStep } from '$lib/prometheus';
 	import { cn } from '$lib/utils';
 
 	let {
@@ -61,11 +62,12 @@
 
 	async function fetchLatencies() {
 		try {
+			const endMs = endIsNow ? Date.now() : end.getTime();
 			const response = await prometheusDriver.rangeQuery(
 				`histogram_quantile(0.95, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket{}[5m])))`,
 				start.getTime(),
-				endIsNow ? Date.now() : end.getTime(),
-				2 * 60
+				endMs,
+				computeStep(start.getTime(), endMs)
 			);
 			const sampleValues: SampleValue[] = response.result[0]?.values ?? [];
 			latencies =

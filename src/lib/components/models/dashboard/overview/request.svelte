@@ -11,6 +11,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
 	import { m } from '$lib/paraglide/messages';
+	import { computeStep } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -46,13 +47,13 @@
 		ninety_nine: { label: '99th', color: 'var(--chart-2)' }
 	} satisfies Chart.ChartConfig;
 
-	async function fetchNinetyFive() {
+	async function fetchNinetyFive(startMs: number, endMs: number, step: number) {
 		try {
 			const response = await prometheusDriver.rangeQuery(
 				`histogram_quantile(0.95, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket{}[5m])))`,
-				start.getTime(),
-				endIsNow ? Date.now() : end.getTime(),
-				2 * 60
+				startMs,
+				endMs,
+				step
 			);
 			ninety_five = response.result[0]?.values ?? [];
 		} catch (error) {
@@ -60,13 +61,13 @@
 		}
 	}
 
-	async function fetchNinetyNine() {
+	async function fetchNinetyNine(startMs: number, endMs: number, step: number) {
 		try {
 			const response = await prometheusDriver.rangeQuery(
 				`histogram_quantile(0.99, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket{}[5m])))`,
-				start.getTime(),
-				endIsNow ? Date.now() : end.getTime(),
-				2 * 60
+				startMs,
+				endMs,
+				step
 			);
 			ninety_nine = response.result[0]?.values ?? [];
 		} catch (error) {
@@ -76,7 +77,13 @@
 
 	async function fetch() {
 		try {
-			await Promise.all([fetchNinetyFive(), fetchNinetyNine()]);
+			const startMs = start.getTime();
+			const endMs = endIsNow ? Date.now() : end.getTime();
+			const step = computeStep(startMs, endMs);
+			await Promise.all([
+				fetchNinetyFive(startMs, endMs, step),
+				fetchNinetyNine(startMs, endMs, step)
+			]);
 		} catch (error) {
 			console.error(`Fail to fetch requests data in cluster ${cluster}:`, error);
 		}

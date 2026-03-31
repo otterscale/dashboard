@@ -11,6 +11,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
 	import { m } from '$lib/paraglide/messages';
+	import { computeStep } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -45,12 +46,17 @@
 		ninety_nine: { label: '99', color: 'var(--chart-2)' }
 	} satisfies Chart.ChartConfig;
 
-	async function fetchTimesToFirstToken(quantile: number) {
+	async function fetchTimesToFirstToken(
+		quantile: number,
+		startMs: number,
+		endMs: number,
+		step: number
+	) {
 		const response = await prometheusDriver.rangeQuery(
 			`histogram_quantile(${quantile}, sum by(le) (rate(vllm:time_to_first_token_seconds_bucket{}[5m])))`,
-			start.getTime(),
-			endIsNow ? Date.now() : end.getTime(),
-			2 * 60
+			startMs,
+			endMs,
+			step
 		);
 		if (quantile === 0.95) {
 			ninety_fives = response.result[0]?.values ?? [];
@@ -61,7 +67,13 @@
 
 	async function fetch() {
 		try {
-			await Promise.all([fetchTimesToFirstToken(0.95), fetchTimesToFirstToken(0.99)]);
+			const startMs = start.getTime();
+			const endMs = endIsNow ? Date.now() : end.getTime();
+			const step = computeStep(startMs, endMs);
+			await Promise.all([
+				fetchTimesToFirstToken(0.95, startMs, endMs, step),
+				fetchTimesToFirstToken(0.99, startMs, endMs, step)
+			]);
 		} catch (error) {
 			console.error(`Fail to fetch time to first token data in cluster ${cluster}:`, error);
 		}

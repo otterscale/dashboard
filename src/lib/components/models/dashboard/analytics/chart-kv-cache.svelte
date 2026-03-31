@@ -11,7 +11,7 @@
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Chart from '$lib/components/ui/chart';
 	import { m } from '$lib/paraglide/messages';
-	import { vllmMetricWithSelector } from '$lib/prometheus';
+	import { computeStep, vllmMetricWithSelector } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -35,7 +35,7 @@
 
 	function getQuery(): string {
 		const inner = vllmMetricWithSelector('vllm:kv_cache_usage_perc', namespace, selectedModel);
-		return `(avg(${inner}) or vector(0)) * 100`;
+		return `avg(${inner}) * 100`;
 	}
 
 	const configuration = {
@@ -44,11 +44,12 @@
 
 	async function fetch() {
 		try {
+			const endMs = endIsNow ? Date.now() : end.getTime();
 			const response = await prometheusDriver.rangeQuery(
 				getQuery(),
 				start.getTime(),
-				endIsNow ? Date.now() : end.getTime(),
-				2 * 60
+				endMs,
+				computeStep(start.getTime(), endMs)
 			);
 			cacheUsage = response.result[0]?.values ?? [];
 		} catch {

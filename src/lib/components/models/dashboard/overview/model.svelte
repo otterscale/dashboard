@@ -19,6 +19,7 @@
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
+	import { computeStep } from '$lib/prometheus';
 	import { cn } from '$lib/utils';
 
 	let {
@@ -73,11 +74,12 @@
 	);
 	async function fetchAvailablePods() {
 		try {
+			const endMs = endIsNow ? Date.now() : end.getTime();
 			const response = await prometheusDriver.rangeQuery(
 				`count by(endpoint) (vllm:cache_config_info{})`,
 				start.getTime(),
-				endIsNow ? Date.now() : end.getTime(),
-				2 * 60
+				endMs,
+				computeStep(start.getTime(), endMs)
 			);
 			availablePods = response.result[0]?.values ?? [];
 		} catch (error) {
