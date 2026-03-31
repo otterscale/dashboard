@@ -204,14 +204,6 @@
 						url: resourceUrl('workload.otterscale.io', 'v1alpha1', 'Application', 'applications')
 					},
 					{
-						title: m.release(),
-						url: resourceUrl('helm.toolkit.fluxcd.io', 'v2', 'HelmRelease', 'helmreleases')
-					},
-					{
-						title: m.repository(),
-						url: resourceUrl('source.toolkit.fluxcd.io', 'v1', 'HelmRepository', 'helmrepositories')
-					},
-					{
 						title: m.application_hub(),
 						url: page.params.workspace
 							? resolve('/(auth)/[cluster]/[workspace]/hub', {
@@ -219,6 +211,14 @@
 									workspace: page.params.workspace
 								})
 							: ''
+					},
+					{
+						title: m.release(),
+						url: resourceUrl('helm.toolkit.fluxcd.io', 'v2', 'HelmRelease', 'helmreleases')
+					},
+					{
+						title: m.repository(),
+						url: resourceUrl('source.toolkit.fluxcd.io', 'v1', 'HelmRepository', 'helmrepositories')
 					}
 				]
 			},
