@@ -37,7 +37,7 @@
 			</Button>
 		{/snippet}
 	</DropdownMenu.Trigger>
-	<DropdownMenu.Content align="end">
+	<DropdownMenu.Content align="end" class="w-full">
 		<DropdownMenu.Group>
 			<DropdownMenu.Item
 				onSelect={(e) => {
