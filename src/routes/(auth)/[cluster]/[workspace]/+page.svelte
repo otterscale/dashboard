@@ -60,21 +60,21 @@
 	}
 
 	async function fetchServiceUrl(kind: string) {
-		const nodeResponse = await client.list({
+		const serviceGatewayResponse = await client.get({
 			cluster,
+			namespace: 'istio-ingress',
+			name: 'gateway-istio',
 			group: '',
 			version: 'v1',
-			resource: 'nodes'
+			resource: 'services'
 		});
 
-		const nodes = nodeResponse.items.map((item) => item.object as CoreV1Node);
-		const [node] = nodes;
+		const serviceGateway = serviceGatewayResponse.object as CoreV1Service;
 
-		const addresses = node?.status?.addresses ?? [];
-		const internalIPAddress = addresses.find((address) => address.type === 'InternalIP');
+		const [externalIP] = serviceGateway.spec?.externalIPs ?? [''];
 
 		if (kind === 'ModelService') {
-			const serviceResponse = await client.get({
+			const modelGatewayResponse = await client.get({
 				cluster,
 				namespace: 'llm-d',
 				name: 'llm-d-infra-inference-gateway-istio',
@@ -82,11 +82,11 @@
 				version: 'v1',
 				resource: 'services'
 			});
-			const service = serviceResponse.object as CoreV1Service;
-			const port = service?.spec?.ports?.find((port) => port.name === 'default');
-			return `${internalIPAddress?.address}:${port?.port}`;
+			const modelGateway = modelGatewayResponse.object as CoreV1Service;
+			const port = modelGateway?.spec?.ports?.find((port) => port.name === 'default');
+			return `${externalIP}:${port?.port}`;
 		}
-		return internalIPAddress?.address ?? '';
+		return externalIP;
 	}
 </script>
 
