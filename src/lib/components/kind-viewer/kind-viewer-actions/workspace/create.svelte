@@ -522,6 +522,16 @@
 									}
 								]
 							});
+							if (role !== 'Cluster Admin') {
+								lodash.set(values, 'spec.resourceQuota', {
+									hard: {
+										'requests.cpu': '16',
+										'requests.memory': '32Gi',
+										'limits.cpu': '16',
+										'limits.memory': '32Gi'
+									}
+								});
+							}
 						}}
 						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
 					/>
