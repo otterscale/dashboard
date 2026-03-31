@@ -57,7 +57,6 @@
 			console.warn('fetchHelmRepository: sourceRef missing or not HelmRepository', sourceRef);
 			return;
 		}
-		console.log(sourceRef);
 
 		try {
 			const response = await resourceClient.get({
@@ -69,7 +68,6 @@
 				name: sourceRef.name
 			} as any);
 			helmRepository = response?.object as SourceToolkitFluxcdIoV1HelmRepository;
-			console.log('fetchHelmRepository: success', helmRepository);
 		} catch (error) {
 			console.error('Failed to fetch HelmRepository:', error);
 		}
@@ -145,14 +143,6 @@
 
 		const additionUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${referencePath}/additions/${additionPath}`;
 
-		console.log(
-			'getReferenceAddition: sending request for',
-			addition,
-			'with reference',
-			reference,
-			'harborHost',
-			harborHost
-		);
 		const response = await fetch('/bff/harbor/proxy', {
 			method: 'POST',
 			headers: {

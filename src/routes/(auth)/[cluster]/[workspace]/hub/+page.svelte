@@ -100,8 +100,6 @@
 			}
 
 			charts = [...charts, ...chartsByHelmRepository];
-
-			console.log(charts);
 		} catch (error) {
 			console.error(`HelmRepository "${helmRepositoryName}": error fetching charts:`, error);
 			toast.error(`HelmRepository "${helmRepositoryName}": unable to reach repository`);
