@@ -286,8 +286,11 @@
 		}
 	}
 
-	// Fetch DataVolumes
-	async function fetchDataVolumesAsEnumerations(
+	// Fetch filtered DataVolumes by excluding specific source types
+	const EXCLUDED_BOOT_DV_SOURCES = ['blank', 'pvc'];
+	const EXCLUDED_ADDITIONAL_DV_SOURCES = ['http', 'pvc'];
+
+	async function fetchBootDataVolumesAsEnumerations(
 		search: string
 	): Promise<{ label: string; value: string }[]> {
 		try {
@@ -298,12 +301,42 @@
 				version: 'v1beta1',
 				resource: 'datavolumes'
 			});
-			const names = response.items
+			return response.items
+				.filter((item: any) => {
+					const source = (item.object as any)?.spec?.source;
+					return source && !EXCLUDED_BOOT_DV_SOURCES.some((key) => source[key] != null);
+				})
 				.map((item: any) => (item.object as any)?.metadata?.name as string)
-				.filter((name: string) => name && name.toLowerCase().includes(search.toLowerCase()));
-			return names.map((name: string) => ({ label: name, value: name }));
+				.filter((name: string) => name && name.toLowerCase().includes(search.toLowerCase()))
+				.map((name: string) => ({ label: name, value: name }));
 		} catch (error) {
-			console.error('Error fetching data volumes:', error);
+			console.error('Error fetching boot data volumes:', error);
+			return [];
+		}
+	}
+
+	// Fetch additional DataVolumes (exclude http and pvc/clone sources)
+	async function fetchAdditionalDataVolumesAsEnumerations(
+		search: string
+	): Promise<{ label: string; value: string }[]> {
+		try {
+			const response = await resourceClient.list({
+				cluster,
+				namespace,
+				group: 'cdi.kubevirt.io',
+				version: 'v1beta1',
+				resource: 'datavolumes'
+			});
+			return response.items
+				.filter((item: any) => {
+					const source = (item.object as any)?.spec?.source;
+					return source && !EXCLUDED_ADDITIONAL_DV_SOURCES.some((key) => source[key] != null);
+				})
+				.map((item: any) => (item.object as any)?.metadata?.name as string)
+				.filter((name: string) => name && name.toLowerCase().includes(search.toLowerCase()))
+				.map((name: string) => ({ label: name, value: name }));
+		} catch (error) {
+			console.error('Error fetching additional data volumes:', error);
 			return [];
 		}
 	}
@@ -549,7 +582,7 @@
 										selectWidget: ComboboxWidget
 									},
 									'ui:options': {
-										TailoredComboboxEnumerations: fetchDataVolumesAsEnumerations,
+										TailoredComboboxEnumerations: fetchAdditionalDataVolumesAsEnumerations,
 										TailoredComboboxVisibility: 10,
 										TailoredComboboxInput: {
 											placeholder: 'Select DataVolume'
@@ -613,7 +646,7 @@
 									selectWidget: ComboboxWidget
 								},
 								'ui:options': {
-									TailoredComboboxEnumerations: fetchDataVolumesAsEnumerations,
+									TailoredComboboxEnumerations: fetchBootDataVolumesAsEnumerations,
 									TailoredComboboxVisibility: 10,
 									TailoredComboboxInput: {
 										placeholder: 'Select Boot DataVolume'
@@ -634,7 +667,7 @@
 										selectWidget: ComboboxWidget
 									},
 									'ui:options': {
-										TailoredComboboxEnumerations: fetchDataVolumesAsEnumerations,
+										TailoredComboboxEnumerations: fetchAdditionalDataVolumesAsEnumerations,
 										TailoredComboboxVisibility: 10,
 										TailoredComboboxInput: {
 											placeholder: 'Select DataVolume'
