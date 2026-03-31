@@ -232,7 +232,11 @@
 					<div class="grid gap-2 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
 						{#if object?.metadata}
 							{@const clusterData = { name: 'Cluster', information: cluster }}
-							{@const namespaceData = { name: 'Namespace', information: namespace }}
+							{@const namespaceData = {
+								name: 'Namespace',
+								information:
+									object?.kind === 'Workspace' ? object?.status?.namespaceRef?.name : namespace
+							}}
 							{@const creationTimestampData = {
 								name: 'Creation Timestamp',
 								information: new Date(object.metadata?.creationTimestamp).toLocaleString('sv-SE')
