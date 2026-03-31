@@ -324,5 +324,7 @@
 	"cluster_status": "Cluster Status",
 	"model_status": "Model Status",
 	"compute_status": "Compute Status",
-	"storage_status": "Storage Status"
+	"storage_status": "Storage Status",
+	"block_device": "Block Device",
+	"object_storage": "Object Storage"
 }

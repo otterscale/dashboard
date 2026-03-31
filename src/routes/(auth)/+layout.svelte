@@ -251,15 +251,11 @@
 				icon: HardDriveIcon,
 				items: [
 					{
-						title: m.block_pool(),
+						title: m.block_device(),
 						url: resourceUrl('ceph.rook.io', 'v1', 'CephBlockPool', 'cephblockpools')
 					},
 					{
-						title: m.object_store(),
-						url: resourceUrl('ceph.rook.io', 'v1', 'CephObjectStore', 'cephobjectstores')
-					},
-					{
-						title: m.object_bucket_claim(),
+						title: m.object_storage(),
 						url: resourceUrl(
 							'objectbucket.io',
 							'v1alpha1',
