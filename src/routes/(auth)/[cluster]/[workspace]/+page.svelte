@@ -113,11 +113,13 @@
 						<Item.Title class="text-xl font-bold">
 							{kind}
 						</Item.Title>
-						<Item.Description class="text-base">
-							{#await fetchServiceUrl(kind) then serviceUrl}
-								Available at {serviceUrl}
-							{/await}
-						</Item.Description>
+						{#await fetchServiceUrl(kind) then serviceUrl}
+							{#if serviceUrl}
+								<Item.Description class="text-base">
+									Available at {serviceUrl}
+								</Item.Description>
+							{/if}
+						{/await}
 					</Item.Content>
 				</Item.Root>
 			</div>
