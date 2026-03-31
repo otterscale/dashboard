@@ -534,6 +534,14 @@
 									}
 								]
 							});
+								lodash.set(values, 'spec.resourceQuota', {
+									hard: {
+										'requests.cpu': '16',
+										'requests.memory': '32Gi',
+										'limits.cpu': '16',
+										'limits.memory': '32Gi'
+									}
+								});
 						}}
 						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
 					/>
@@ -565,12 +573,15 @@
 								async () => {
 									const manifest = new TextEncoder().encode(value);
 
-									await resourceClient.create({
+									await resourceClient.apply({
 										cluster,
+										name,
 										group,
 										version,
 										resource,
-										manifest
+										manifest,
+										fieldManager: 'otterscale-web-ui',
+										force: true
 									});
 								},
 								{
@@ -591,7 +602,7 @@
 							);
 						}}
 					>
-						Create
+						Update
 					</Button>
 				</div>
 			</Tabs.Content>
