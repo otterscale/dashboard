@@ -326,6 +326,7 @@
 					} as UiSchemaRoot}
 					initialValue={{
 						chart: chartName,
+						releaseName: chartName,
 						version: defaultVersion,
 						sourceRef: {
 							apiVersion: helmRepository?.apiVersion,
