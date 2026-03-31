@@ -76,7 +76,7 @@
 				Object.entries(node.metadata?.labels ?? {}).forEach(([key, value]) => {
 					const nodeName = node.metadata?.name ?? '';
 
-					if (key.startsWith('otterscale.io/disk.')) {
+					if (key?.startsWith('otterscale.io/disk.')) {
 						const [diskName, ...featureParts] = key
 							.substring('otterscale.io/disk.'.length)
 							.split('-');
@@ -371,9 +371,9 @@
 										type: 'object',
 										enum: Object.entries(disks).map(([disk, features]) => ({
 											label: disk,
-											description: `${features['size-gb']}GB, ${features['model']} ${features['type'].toUpperCase()}`,
+											description: `${features?.['size-gb']}GB, ${features?.['model']} ${features?.['type'].toUpperCase()}`,
 											value: `/dev/${disk}`,
-											disabled: features['fw'].startsWith('EIFZ')
+											disabled: (features?.['fw'] ?? '').startsWith('EIFZ')
 										}))
 									}
 								}

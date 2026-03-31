@@ -244,7 +244,8 @@
 			} catch {
 				return false;
 			}
-		}
+		},
+		autoResetPageIndex: false
 	});
 
 	function getAlignment(uiSchema: UISchemaType): 'start' | 'center' | 'end' {

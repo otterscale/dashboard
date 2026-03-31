@@ -79,6 +79,7 @@
 	let resourceVersion: string | undefined = $state(undefined);
 
 	let isListing = $state(false);
+	let isMounted = $state(false);
 	async function listResources() {
 		if (isListing || isWatching || isDestroyed) return;
 
@@ -105,6 +106,8 @@
 
 				const newData = response.items.map((item) => getData(apiResource, item.object));
 				dataset = [...dataset, ...newData];
+
+				isMounted = true;
 
 				if (listAbortController.signal.aborted) {
 					break;
@@ -234,14 +237,11 @@
 		watchResources();
 	}
 
-	let isMounted = $state(false);
 	onMount(async () => {
+		columnDefinitions = getColumnDefinitions(apiResource, uiSchemas, dataSchemas, cluster);
 		await fetchSchema();
 		await listResources();
-		columnDefinitions = getColumnDefinitions(apiResource, uiSchemas, dataSchemas, cluster);
 		watchResources();
-
-		isMounted = true;
 	});
 
 	let isDestroyed = false;
