@@ -565,6 +565,7 @@
 						uiSchema={{
 							containerDiskImage: {
 								'ui:options': {
+									help: 'Browse available images at https://quay.io/organization/containerdisks',
 									shadcn4Text: {
 										placeholder: 'e.g. quay.io/kubevirt/fedora-cloud-container-disk-demo:latest'
 									}
