@@ -6,7 +6,7 @@
 		type DiscoveryRequest,
 		ResourceService
 	} from '@otterscale/api/resource/v1';
-	import type { CoreV1Node, CoreV1Service } from '@otterscale/types';
+	import type { CoreV1Service } from '@otterscale/types';
 	import { getContext } from 'svelte';
 
 	import { resolve } from '$app/paths';
