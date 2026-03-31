@@ -9,7 +9,7 @@
 	breadcrumbs.set([
 		{
 			title: m.compute(),
-			url: resolve('/(auth)/[cluster]/[workspace]/compute/dashboard', {
+			url: resolve('/(auth)/[cluster]/[workspace]/dashboard/compute', {
 				cluster: page.params.cluster!,
 				workspace: page.params.workspace!
 			})

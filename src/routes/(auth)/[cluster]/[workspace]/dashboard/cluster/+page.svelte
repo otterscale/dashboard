@@ -16,8 +16,8 @@
 	// Set breadcrumbs navigation
 	breadcrumbs.set([
 		{
-			title: m.cluster_status(),
-			url: resolve('/(auth)/[cluster]/[workspace]/cluster-status', {
+			title: m.cluster(),
+			url: resolve('/(auth)/[cluster]/[workspace]/dashboard/cluster', {
 				cluster: page.params.cluster!,
 				workspace: page.params.workspace!
 			})
@@ -54,7 +54,7 @@
 		{#if prometheusDriver}
 			<div class="mx-auto grid w-full gap-6">
 				<div class="grid gap-1">
-					<h1 class="text-2xl font-bold tracking-tight md:text-3xl">{m.cluster_status()}</h1>
+					<h1 class="text-2xl font-bold tracking-tight md:text-3xl">{m.cluster()}</h1>
 					<p class="text-muted-foreground">
 						{m.k8s_overview_description()}
 					</p>

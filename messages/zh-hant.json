@@ -309,7 +309,6 @@
 	"console": "主控台",
 	"repository": "倉儲",
 	"add_cluster": "新增叢集",
-	"cluster_status": "叢集狀態",
 	"setting_up_environment": "正在設定您的環境，請稍候...",
 	"now": "現在",
 	"commonly_used": "常用時間",

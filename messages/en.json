@@ -309,7 +309,6 @@
 	"console": "Console",
 	"repository": "Repository",
 	"add_cluster": "Add Cluster",
-	"cluster_status": "Cluster Status",
 	"setting_up_environment": "Setting up your environment, please wait...",
 	"now": "Now",
 	"commonly_used": "Commonly used",
