@@ -251,6 +251,18 @@ function getDefaultDataSchema(type: JsonValue | undefined, format?: JsonValue): 
 	return undefined;
 }
 
+function jsonValueToDisplayDate(value: JsonValue | undefined): Date | null {
+	if (value === undefined || value === null || value === '') return null;
+	if (typeof value === 'boolean') return null;
+	const d =
+		typeof value === 'number'
+			? new Date(value)
+			: typeof value === 'string'
+				? new Date(value)
+				: new Date(String(value));
+	return Number.isNaN(d.getTime()) ? null : d;
+}
+
 export {
 	format,
 	formatWithBinarySuffix,
@@ -259,6 +271,7 @@ export {
 	getDefaultUISchema,
 	getRatio,
 	getRelativeTime,
+	jsonValueToDisplayDate,
 	quantityToScalar
 };
 export type { DataSchemaType, UISchemaType };
