@@ -33,6 +33,31 @@
 	let resourceQuotaUsed: Record<string, string> = $state({});
 	let isLoaded = $state(false);
 
+	const K8S_QUANTITY_RE = /^(\d+(?:\.\d+)?)\s*(Ki|Mi|Gi|Ti|Pi|Ei|k|M|G|T|P|E|m)?$/;
+	const K8S_MULTIPLIERS: Record<string, number> = {
+		'': 1,
+		m: 0.001,
+		k: 1e3,
+		M: 1e6,
+		G: 1e9,
+		T: 1e12,
+		P: 1e15,
+		E: 1e18,
+		Ki: 1024,
+		Mi: 1024 ** 2,
+		Gi: 1024 ** 3,
+		Ti: 1024 ** 4,
+		Pi: 1024 ** 5,
+		Ei: 1024 ** 6
+	};
+
+	function parseK8sQuantity(raw: string | number): number {
+		if (typeof raw === 'number') return raw;
+		const match = raw.match(K8S_QUANTITY_RE);
+		if (!match) return NaN;
+		return parseFloat(match[1]) * (K8S_MULTIPLIERS[match[2] ?? ''] ?? 1);
+	}
+
 	function formatResourceValue(key: string, value: number): string {
 		if (key.includes('cpu')) {
 			return value < 1 ? `${Math.round(value * 1000)}m` : `${value}`;
@@ -44,7 +69,20 @@
 			if (mi >= 1) return `${Math.round(mi)}Mi`;
 			return `${Math.round(value / 1024)}Ki`;
 		}
+		if (key.includes('gpumem')) {
+			const gi = value / 1024;
+			return `${Math.round(gi * 10) / 10}Gi`;
+		}
 		return String(Math.round(value));
+	}
+
+	function formatHardValue(key: string, raw: string | number): string {
+		if (!key.includes('gpumem')) return String(raw);
+		if (typeof raw === 'string' && !K8S_QUANTITY_RE.test(raw)) return raw;
+		const base = parseK8sQuantity(raw);
+		if (Number.isNaN(base)) return String(raw);
+		const gi = base / 1024;
+		return `${Math.round(gi * 10) / 10}Gi`;
 	}
 
 	async function fetchResourceQuotaMetrics() {
@@ -58,6 +96,11 @@
 		});
 
 		try {
+			const gpuResourceMap: Record<string, string> = {
+				nvidia_com_gpu: 'nvidia.com/gpu',
+				nvidia_com_gpumem: 'nvidia.com/gpumem'
+			};
+
 			const [limitsResponse, requestsResponse] = await Promise.all([
 				prometheusDriver.instantQuery(
 					`sum by (resource) (kube_pod_container_resource_limits{namespace="${namespace}"} and on (namespace, pod) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`
@@ -69,18 +112,24 @@
 
 			const usedMap: Record<string, string> = {};
 			for (const v of limitsResponse.result as InstantVector[]) {
-				const resource = (v.metric.labels as Record<string, string>).resource;
-				if (resource) {
-					usedMap[`limits.${resource}`] = formatResourceValue(`limits.${resource}`, v.value.value);
-				}
+				const metricResource = (v.metric.labels as Record<string, string>).resource;
+				if (!metricResource) continue;
+				const quotaResource = gpuResourceMap[metricResource] ?? metricResource;
+				usedMap[`limits.${quotaResource}`] = formatResourceValue(
+					`limits.${quotaResource}`,
+					v.value.value
+				);
 			}
 			for (const v of requestsResponse.result as InstantVector[]) {
-				const resource = (v.metric.labels as Record<string, string>).resource;
-				if (resource) {
-					usedMap[`requests.${resource}`] = formatResourceValue(
-						`requests.${resource}`,
-						v.value.value
-					);
+				const metricResource = (v.metric.labels as Record<string, string>).resource;
+				if (!metricResource) continue;
+				const quotaResource = gpuResourceMap[metricResource] ?? metricResource;
+				usedMap[`requests.${quotaResource}`] = formatResourceValue(
+					`requests.${quotaResource}`,
+					v.value.value
+				);
+				if (gpuResourceMap[metricResource]) {
+					usedMap[quotaResource] = formatResourceValue(quotaResource, v.value.value);
 				}
 			}
 			resourceQuotaUsed = usedMap;
@@ -97,13 +146,11 @@
 	function getGridLayout(key: string) {
 		if (key === 'limits.cpu') return 'md:row-start-1 2xl:row-start-1';
 		if (key === 'limits.memory') return 'md:row-start-2 2xl:row-start-1';
-		if (key === 'limits.nvidia.com/gpu') return 'md:row-start-3 2xl:row-start-1';
-		if (key === 'limits.nvidia.com/gpumem') return 'md:row-start-4 2xl:row-start-1';
+		if (key === 'nvidia.com/gpu') return 'md:row-start-3 2xl:row-start-1';
+		if (key === 'nvidia.com/gpumem') return 'md:row-start-4 2xl:row-start-1';
 
 		if (key === 'requests.cpu') return 'md:row-start-1 2xl:row-start-2';
 		if (key === 'requests.memory') return 'md:row-start-2 2xl:row-start-2';
-		if (key === 'requests.nvidia.com/gpu') return 'md:row-start-3 2xl:row-start-2';
-		if (key === 'requests.nvidia.com/gpumem') return 'md:row-start-4 2xl:row-start-2';
 
 		return '2xl:row-start-3 md:row-start-5';
 	}
@@ -341,7 +388,7 @@
 										<Item.Title class={cn(typographyVariants({ variant: 'large' }))}>
 											{resourceQuotaUsed[key] !== undefined
 												? resourceQuotaUsed[key]
-												: '?'}/{resourceQuotaHard[key]}
+												: '?'}/{formatHardValue(key, resourceQuotaHard[key])}
 										</Item.Title>
 									</Item.Content>
 								</Item.Root>
