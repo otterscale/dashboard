@@ -320,5 +320,9 @@
 	"last_24_hours": "最近 24 小時",
 	"last_30_days": "最近 30 天",
 	"install_rook_ceph_no_disk_after_retry": "重試後仍偵測不到磁碟標籤，請確認節點磁碟已由 exporter 標註（otterscale.io/disk.*）。",
-	"install_rook_ceph_no_disk_this_node": "此節點未偵測到可用磁碟。"
+	"install_rook_ceph_no_disk_this_node": "此節點未偵測到可用磁碟。",
+	"cluster_status": "叢集狀態",
+	"model_status": "模型狀態",
+	"compute_status": "運算狀態",
+	"storage_status": "儲存狀態"
 }

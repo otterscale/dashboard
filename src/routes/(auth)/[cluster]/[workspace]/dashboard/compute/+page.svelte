@@ -8,7 +8,7 @@
 	// Set breadcrumbs navigation
 	breadcrumbs.set([
 		{
-			title: m.compute(),
+			title: m.compute_status(),
 			url: resolve('/(auth)/[cluster]/[workspace]/dashboard/compute', {
 				cluster: page.params.cluster!,
 				workspace: page.params.workspace!

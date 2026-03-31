@@ -8,7 +8,7 @@
 	// Set breadcrumbs navigation
 	breadcrumbs.set([
 		{
-			title: m.models(),
+			title: m.model_status(),
 			url: resolve('/(auth)/[cluster]/[workspace]/dashboard/model', {
 				cluster: page.params.cluster!,
 				workspace: page.params.workspace!

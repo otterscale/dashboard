@@ -13,6 +13,7 @@
 	import { Dashboard } from '$lib/components/models/dashboard/analytics';
 	import ModelPicker from '$lib/components/models/dashboard/analytics/model-picker.svelte';
 	import { Overview } from '$lib/components/models/dashboard/overview/index';
+	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/paraglide/messages';
 
@@ -93,16 +94,21 @@
 	});
 </script>
 
-<main class="space-y-4 py-4">
+<div class="space-y-4">
+	<div class="flex items-end justify-between gap-4">
+		<Item.Root class="p-0">
+			<Item.Content class="text-left">
+				<Item.Title class="text-xl font-bold">
+					{m.model_status()}
+				</Item.Title>
+				<Item.Description class="text-base">
+					{m.llm_dashboard_description()}
+				</Item.Description>
+			</Item.Content>
+		</Item.Root>
+	</div>
 	{#if prometheusDriver}
 		<div class="mx-auto grid w-full gap-6">
-			<div class="grid gap-1">
-				<h1 class="text-2xl font-bold tracking-tight md:text-3xl">{m.dashboard()}</h1>
-				<p class="text-muted-foreground">
-					{m.llm_dashboard_description()}
-				</p>
-			</div>
-
 			<Tabs.Root bind:value={selectedTab}>
 				<div class="flex justify-between gap-2">
 					<Tabs.List>
@@ -175,4 +181,4 @@
 			<p>{m.no_data_display()}</p>
 		</div>
 	{/if}
-</main>
+</div>

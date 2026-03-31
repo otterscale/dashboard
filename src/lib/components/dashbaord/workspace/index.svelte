@@ -5,6 +5,7 @@
 
 	import { Reloader } from '$lib/components/custom/reloader';
 	import { WidgetGrid } from '$lib/components/custom/widget-grid';
+	import * as Item from '$lib/components/ui/item';
 	import { m } from '$lib/paraglide/messages';
 
 	import { workspaceOverviewWidgets } from './overview/widgets';
@@ -46,15 +47,20 @@
 	});
 </script>
 
-<main class="space-y-4 py-4">
+<div class="space-y-4">
+	<div class="flex items-end justify-between gap-4">
+		<Item.Root class="p-0">
+			<Item.Content class="text-left">
+				<Item.Title class="text-xl font-bold">
+					{m.workspace_dashboard_title()}
+				</Item.Title>
+				<Item.Description class="text-base">
+					{m.workspace_dashboard_description()}
+				</Item.Description>
+			</Item.Content>
+		</Item.Root>
+	</div>
 	<div class="mx-auto grid w-full gap-6">
-		<div class="grid gap-1">
-			<h1 class="text-2xl font-bold tracking-tight md:text-3xl">{m.workspace_dashboard_title()}</h1>
-			<p class="text-muted-foreground">
-				{m.workspace_dashboard_description()}
-			</p>
-		</div>
-
 		{#if prometheusDriver}
 			<div class="flex flex-wrap items-center justify-end gap-4">
 				<Reloader bind:checked={isReloading} />
@@ -72,4 +78,4 @@
 			</div>
 		{/if}
 	</div>
-</main>
+</div>
