@@ -632,12 +632,12 @@
 						type: 'object',
 						title: 'GPU Placement',
 						description:
-							'Configure GPU/Node scheduling constraints (HAMI). Leave all fields empty for automatic scheduling. Multiple selections are combined as AND conditions.',
+							'Configure GPU/Node scheduling constraints (HAMI). Leave all fields empty for automatic scheduling. GPU Type and UUID support multiple AND-combined selections.',
 						properties: {
 							nodeName: {
 								title: 'Node',
 								type: 'string',
-								description: 'Select GPU nodes (nodeAffinity: kubernetes.io/hostname)',
+								description: 'Select a GPU node (nodeSelector: kubernetes.io/hostname)',
 								enum: nodeNameOptions.map((o) => o.value)
 							},
 							gpuType: {

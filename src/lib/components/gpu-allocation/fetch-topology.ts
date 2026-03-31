@@ -184,7 +184,7 @@ export async function fetchAllGpuNodes(
 
 	const nodes: NodeInfo[] = [];
 	for (const item of response.items) {
-		const obj = item.object as Record<string, unknown>; // eslint-disable-line @typescript-eslint/no-explicit-any
+		const obj = item.object as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 		const annotations = getAnnotations(obj);
 		const registerAnnotation = annotations[ANNOTATION_NODE_REGISTER];
 		if (!registerAnnotation) continue;
@@ -192,7 +192,7 @@ export async function fetchAllGpuNodes(
 		const devices = parseNodeGpuDevices(registerAnnotation);
 		if (devices.length > 0) {
 			nodes.push({
-				name: (obj as Record<string, any>)?.metadata?.name ?? '', // eslint-disable-line @typescript-eslint/no-explicit-any
+				name: obj?.metadata?.name ?? '',
 				devices
 			});
 		}
