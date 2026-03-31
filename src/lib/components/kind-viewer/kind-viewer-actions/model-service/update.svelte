@@ -143,7 +143,7 @@
 	const gpuUuidOptions = $derived(
 		gpuNodes.flatMap((node) =>
 			node.devices.map((device) => ({
-				label: `${device.id} (${device.type}, ${node.name})`,
+				label: `${node.name} - GPU ${device.index}`,
 				value: device.id
 			}))
 		)
@@ -574,7 +574,8 @@
 							},
 							'ui:options': {
 								useLabel: true,
-								title: 'GPU UUID'
+								title: 'GPU UUID',
+								enumNames: gpuUuidOptions.map((o) => o.label)
 							}
 						}
 					} as UiSchemaRoot}
