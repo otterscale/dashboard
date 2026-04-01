@@ -161,7 +161,7 @@
 						type: 'object',
 						enum: diskEntries.map(([disk, features]) => ({
 							label: disk,
-							description: `${features?.['size-gb']}GB, ${features?.['model']} ${(features?.['type'] ?? '').toUpperCase()}`,
+							description: `${features?.['size-gb']}GB, ${features?.['model']}, ${(features?.['type'] ?? '').toUpperCase()}, fs ${features?.['fs'] ?? 'empty'}`,
 							value: `/dev/${disk}`,
 							disabled:
 								(features?.['fw'] ?? '').startsWith('EIFZ') ||

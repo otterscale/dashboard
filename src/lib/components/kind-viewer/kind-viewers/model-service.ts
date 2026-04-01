@@ -12,6 +12,102 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 import { buildResourceDetailUrl } from './resource-url';
 
+/** MB count → byte string for QuantityCell (`discrete`). */
+function megabytesToByteQuantityString(mb: number): string {
+	if (!Number.isFinite(mb) || mb < 0) {
+		return String(mb);
+	}
+	const mbInt = BigInt(Math.round(mb));
+	return String(mbInt * BigInt(1024) * BigInt(1024));
+}
+
+/**
+ * Parse gpumem field: plain MB (`"24000"`) or compact SI (`"24K"` → 24_000 MB).
+ * Anything else that looks like a Kubernetes quantity (e.g. `8Gi`, `512Mi`) is left to QuantityCell.
+ */
+function parseGpumemMbString(s: string): { mb: number } | 'kubernetesQuantity' | null {
+	const t = s.trim();
+	if (!t) {
+		return null;
+	}
+	const compact = t.match(/^(\d+(?:\.\d+)?)\s*([kKmMgG])?$/);
+	if (compact) {
+		const base = Number(compact[1]);
+		if (!Number.isFinite(base)) {
+			return null;
+		}
+		const suf = (compact[2] ?? '').toUpperCase();
+		if (!suf) {
+			return { mb: base };
+		}
+		if (suf === 'K') {
+			return { mb: base * 1_000 };
+		}
+		if (suf === 'M') {
+			return { mb: base * 1_000_000 };
+		}
+		if (suf === 'G') {
+			return { mb: base * 1_000_000_000 };
+		}
+	}
+	if (/[a-zA-Z]/.test(t)) {
+		return 'kubernetesQuantity';
+	}
+	return null;
+}
+
+/** `nvidia.com/gpumem` is specified in MB; quantity cells expect bytes. */
+function gpumemMbToByteQuantity(mb: JsonValue): JsonValue {
+	if (mb == null || mb === '') {
+		return mb;
+	}
+	if (typeof mb === 'bigint') {
+		return String(mb * BigInt(1024) * BigInt(1024));
+	}
+	if (typeof mb === 'number' && Number.isFinite(mb)) {
+		return megabytesToByteQuantityString(mb);
+	}
+	if (typeof mb === 'string') {
+		const s = mb.trim();
+		if (!s) {
+			return mb;
+		}
+		const parsed = parseGpumemMbString(s);
+		if (parsed === 'kubernetesQuantity') {
+			return mb;
+		}
+		if (parsed?.mb !== undefined) {
+			return megabytesToByteQuantityString(parsed.mb);
+		}
+		const n = Number(s);
+		if (!Number.isFinite(n)) {
+			return mb;
+		}
+		return megabytesToByteQuantityString(n);
+	}
+	if (typeof mb === 'object' && mb !== null && 'value' in mb) {
+		const inner = (mb as { value?: JsonValue }).value;
+		if (inner !== undefined) {
+			return gpumemMbToByteQuantity(inner);
+		}
+	}
+	return mb;
+}
+
+/** JSON / protobuf map keys may use `nvidia.com/gpumem` or `nvidia_com_gpumem`. */
+function gpumemMbFromResourceBlock(
+	requests: Record<string, unknown> | undefined,
+	limits: Record<string, unknown> | undefined
+): JsonValue {
+	const raw =
+		requests?.['nvidia.com/gpumem'] ??
+		requests?.['nvidia_com_gpumem'] ??
+		limits?.['nvidia.com/gpumem'] ??
+		limits?.['nvidia_com_gpumem'] ??
+		null;
+	return gpumemMbToByteQuantity(raw as JsonValue);
+}
+
 type ModelServiceAttribute =
 	| 'Name'
 	| 'Namespace'
@@ -61,10 +157,16 @@ function getModelServiceData(
 					: '',
 		'Decode Tensor': object?.spec?.decode?.parallelism?.tensor ?? null,
 		'Decode Replicas': object?.spec?.decode?.replicas ?? null,
-		'Decode GPU Memory': object?.spec?.decode?.resources?.requests?.['nvidia.com/gpumem'] ?? null,
+		'Decode GPU Memory': gpumemMbFromResourceBlock(
+			object?.spec?.decode?.resources?.requests as Record<string, unknown> | undefined,
+			object?.spec?.decode?.resources?.limits as Record<string, unknown> | undefined
+		),
 		'Prefill Tensor': object?.spec?.prefill?.parallelism?.tensor ?? null,
 		'Prefill Replicas': object?.spec?.prefill?.replicas ?? null,
-		'Prefill GPU Memory': object?.spec?.prefill?.resources?.requests?.['nvidia.com/gpumem'] ?? null,
+		'Prefill GPU Memory': gpumemMbFromResourceBlock(
+			object?.spec?.prefill?.resources?.requests as Record<string, unknown> | undefined,
+			object?.spec?.prefill?.resources?.limits as Record<string, unknown> | undefined
+		),
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
 	};
