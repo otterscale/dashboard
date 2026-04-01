@@ -62,7 +62,7 @@ function gpumemMbToByteQuantity(mb: JsonValue): JsonValue {
 		return mb;
 	}
 	if (typeof mb === 'bigint') {
-		return String(mb * BigInt(1024) * BigInt(1024));
+return String(mb * BigInt(1_000_000));
 	}
 	if (typeof mb === 'number' && Number.isFinite(mb)) {
 		return megabytesToByteQuantityString(mb);
