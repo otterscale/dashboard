@@ -53,7 +53,12 @@ function getModelServiceData(
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.metadata?.namespace ?? null,
 		'Model Name': object?.spec?.model?.name ?? null,
-		Status: readyCondition?.status === 'True' ? 'Ready' : 'Not Ready',
+		Status:
+			readyCondition?.status === 'True'
+				? 'Ready'
+				: readyCondition?.status === 'False'
+					? readyCondition.reason
+					: '',
 		'Decode Tensor': object?.spec?.decode?.parallelism?.tensor ?? null,
 		'Decode Replicas': object?.spec?.decode?.replicas ?? null,
 		'Decode GPU Memory': object?.spec?.decode?.resources?.requests?.['nvidia.com/gpumem'] ?? null,

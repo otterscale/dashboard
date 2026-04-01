@@ -16,6 +16,7 @@
 	import {
 		type ColumnDef,
 		type ColumnFiltersState,
+		type ColumnSizingState,
 		getCoreRowModel,
 		getFacetedUniqueValues,
 		getFilteredRowModel,
@@ -157,6 +158,7 @@
 	let rowSelection = $state<RowSelectionState>({});
 	let columnFilters = $state<ColumnFiltersState>([]);
 	let columnVisibility = $state<VisibilityState>({});
+	let columnSizing = $state<ColumnSizingState>({});
 	let sorting = $state<SortingState>([]);
 	let pagination = $state<PaginationState>({ pageIndex: 0, pageSize: gridsLayout ? 9 : 10 });
 
@@ -191,6 +193,13 @@
 				columnVisibility = updater;
 			}
 		},
+		onColumnSizingChange: (updater) => {
+			if (typeof updater === 'function') {
+				columnSizing = updater(columnSizing);
+			} else {
+				columnSizing = updater;
+			}
+		},
 		onPaginationChange: (updater) => {
 			if (typeof updater === 'function') {
 				pagination = updater(pagination);
@@ -222,6 +231,9 @@
 			get columnVisibility() {
 				return columnVisibility;
 			},
+			get columnSizing() {
+				return columnSizing;
+			},
 			get pagination() {
 				return pagination;
 			},
@@ -245,6 +257,7 @@
 				return false;
 			}
 		},
+		columnResizeMode: 'onChange',
 		autoResetPageIndex: false
 	});
 
@@ -628,7 +641,10 @@
 						{#each headerGroup.headers as header (header.id)}
 							<Table.Head
 								style="width: {header.getSize()}px"
-								class={cn(lodash.get(header.column.columnDef.meta, 'class'), 'h-11')}
+								class={cn(
+									lodash.get(header.column.columnDef.meta, 'class'),
+									'relative h-11 border-t select-none [&:last-child>.cursor-col-resize]:opacity-0'
+								)}
 							>
 								{#if !header.isPlaceholder && header.column.getCanSort()}
 									<div
@@ -666,6 +682,14 @@
 									<FlexRender
 										content={header.column.columnDef.header}
 										context={header.getContext()}
+									/>
+								{/if}
+								{#if header.column.getCanResize()}
+									<div
+										class="user-select-none absolute top-0 -right-2 z-10 flex h-full w-4 cursor-col-resize touch-none justify-center"
+										ondblclick={() => header.column.resetSize()}
+										onmousedown={header.getResizeHandler()}
+										ontouchstart={header.getResizeHandler()}
 									/>
 								{/if}
 							</Table.Head>

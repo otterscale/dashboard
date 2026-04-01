@@ -52,7 +52,12 @@ function getModelArtifactData(
 		'Start Time': object?.status?.startTime ?? null,
 		'Completion Time': object?.status?.completionTime ?? null,
 		Format: object?.spec?.format ?? null,
-		Status: readyCondition?.status === 'True' ? 'Ready' : 'Not Ready',
+		Status:
+			readyCondition?.status === 'True'
+				? 'Ready'
+				: readyCondition?.status === 'False'
+					? readyCondition.reason
+					: '',
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
 	};

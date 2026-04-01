@@ -48,7 +48,12 @@ function getHelmReleaseData(
 		Repository: object?.spec?.chart?.spec?.sourceRef?.name ?? null,
 		'Helm Chart': object?.status?.helmChart ?? null,
 		Version: object?.spec?.chart?.spec?.version ?? null,
-		Status: readyCondition?.status === 'True' ? 'Ready' : 'Not Ready',
+		Status:
+			readyCondition?.status === 'True'
+				? 'Ready'
+				: readyCondition?.status === 'False'
+					? readyCondition.reason
+					: '',
 		Reason: readyCondition?.reason ?? null,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null

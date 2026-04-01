@@ -54,7 +54,12 @@ function getApplicationData(
 		Namespace: object?.metadata?.namespace ?? null,
 		'Workload Type': object?.spec?.workloadType ?? 'Deployment',
 		Resources: resourcesCount,
-		Status: readyCondition?.status === 'True' ? 'Ready' : 'Not Ready',
+		Status:
+			readyCondition?.status === 'True'
+				? 'Ready'
+				: readyCondition?.status === 'False'
+					? readyCondition.reason
+					: '',
 		Age: object?.metadata?.creationTimestamp as JsonValue,
 		raw: object as JsonObject
 	};
