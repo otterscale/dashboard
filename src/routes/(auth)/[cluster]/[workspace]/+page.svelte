@@ -95,7 +95,7 @@
 		if (kind === 'ModelService') {
 			const nodePort = await getServiceNodePort(
 				'llm-d',
-				'llm-d-infra-inference-gateway-istio',
+				'otterscale-llm-d-infra-inference-gateway-istio',
 				'default'
 			);
 			return `${externalIP}:${nodePort}`;
