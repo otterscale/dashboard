@@ -98,7 +98,7 @@
 				'otterscale-llm-d-infra-inference-gateway-istio',
 				'default'
 			);
-			return `${externalIP}:${nodePort}`;
+			return `Available at ${externalIP}:${nodePort}`;
 		}
 
 		if (kind === 'ObjectBucketClaim') {
