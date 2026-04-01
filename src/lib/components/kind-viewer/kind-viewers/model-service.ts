@@ -12,100 +12,109 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 import { buildResourceDetailUrl } from './resource-url';
 
-/** MB count → byte string for QuantityCell (`discrete`). */
-function megabytesToByteQuantityString(mb: number): string {
+const BYTES_PER_MIB = BigInt(1024) * BigInt(1024);
+
+const GPUMEM_JSON_KEYS = ['nvidia.com/gpumem', 'nvidia_com_gpumem'] as const;
+
+/** SI suffix on gpumem strings → multiply MB by this to get total MB (`24K` → 24_000 MB). */
+const GPUMEM_SI_MB: Record<string, number> = {
+	K: 1_000,
+	M: 1_000_000,
+	G: 1_000_000_000
+};
+
+/** MB (scalar) → byte string for QuantityCell (`discrete`). */
+function mbScalarToByteQuantityString(mb: number | bigint): string {
+	if (typeof mb === 'bigint') {
+		return String(mb * BYTES_PER_MIB);
+	}
 	if (!Number.isFinite(mb) || mb < 0) {
 		return String(mb);
 	}
-	const mbInt = BigInt(Math.round(mb));
-return String(mbInt * BigInt(1_000_000));
+	return String(BigInt(Math.round(mb)) * BYTES_PER_MIB);
 }
 
 /**
- * Parse gpumem field: plain MB (`"24000"`) or compact SI (`"24K"` → 24_000 MB).
- * Anything else that looks like a Kubernetes quantity (e.g. `8Gi`, `512Mi`) is left to QuantityCell.
+ * Plain / compact MB (`"24000"`, `"24K"`) → MB count. Kubernetes quantities (`8Gi`) → sentinel.
  */
-function parseGpumemMbString(s: string): { mb: number } | 'kubernetesQuantity' | null {
+function parseGpumemMbString(
+	s: string
+): { mb: number } | 'kubernetesQuantity' | null {
 	const t = s.trim();
 	if (!t) {
 		return null;
 	}
-	const compact = t.match(/^(\d+(?:\.\d+)?)\s*([kKmMgG])?$/);
-	if (compact) {
-		const base = Number(compact[1]);
-		if (!Number.isFinite(base)) {
-			return null;
-		}
-		const suf = (compact[2] ?? '').toUpperCase();
-		if (!suf) {
-			return { mb: base };
-		}
-if (suf === 'K') {
-			return { mb: base / 1_000 };
-		}
-		if (suf === 'M') {
-			return { mb: base };
-		}
-		if (suf === 'G') {
-			return { mb: base * 1_000 };
-		}
+	const m = t.match(/^(\d+(?:\.\d+)?)\s*([kKmMgG])?$/);
+	if (!m) {
+		return /[a-zA-Z]/.test(t) ? 'kubernetesQuantity' : null;
 	}
-	if (/[a-zA-Z]/.test(t)) {
-		return 'kubernetesQuantity';
+	const base = Number(m[1]);
+	if (!Number.isFinite(base)) {
+		return null;
 	}
-	return null;
+	const suf = (m[2] ?? '').toUpperCase();
+	if (!suf) {
+		return { mb: base };
+	}
+	const mult = GPUMEM_SI_MB[suf];
+	return mult !== undefined ? { mb: base * mult } : null;
 }
 
-/** `nvidia.com/gpumem` is specified in MB; quantity cells expect bytes. */
+function gpumemStringToByteQuantity(s: string): JsonValue {
+	const t = s.trim();
+	if (!t) {
+		return s;
+	}
+	const parsed = parseGpumemMbString(t);
+	if (parsed === 'kubernetesQuantity') {
+		return s;
+	}
+	if (parsed?.mb !== undefined) {
+		return mbScalarToByteQuantityString(parsed.mb);
+	}
+	const n = Number(t);
+	return Number.isFinite(n) ? mbScalarToByteQuantityString(n) : s;
+}
+
+/** `nvidia.com/gpumem` values are MB; QuantityCell expects bytes. */
 function gpumemMbToByteQuantity(mb: JsonValue): JsonValue {
 	if (mb == null || mb === '') {
 		return mb;
 	}
-	if (typeof mb === 'bigint') {
-return String(mb * BigInt(1_000_000));
-	}
-	if (typeof mb === 'number' && Number.isFinite(mb)) {
-		return megabytesToByteQuantityString(mb);
-	}
-	if (typeof mb === 'string') {
-		const s = mb.trim();
-		if (!s) {
+	switch (typeof mb) {
+		case 'bigint':
+			return mbScalarToByteQuantityString(mb);
+		case 'number':
+			return Number.isFinite(mb) ? mbScalarToByteQuantityString(mb) : mb;
+		case 'string':
+			return gpumemStringToByteQuantity(mb);
+		case 'object':
+			if (mb !== null && 'value' in mb) {
+				const inner = (mb as { value?: JsonValue }).value;
+				return inner !== undefined ? gpumemMbToByteQuantity(inner) : mb;
+			}
 			return mb;
-		}
-		const parsed = parseGpumemMbString(s);
-		if (parsed === 'kubernetesQuantity') {
+		default:
 			return mb;
-		}
-		if (parsed?.mb !== undefined) {
-			return megabytesToByteQuantityString(parsed.mb);
-		}
-		const n = Number(s);
-		if (!Number.isFinite(n)) {
-			return mb;
-		}
-		return megabytesToByteQuantityString(n);
 	}
-	if (typeof mb === 'object' && mb !== null && 'value' in mb) {
-		const inner = (mb as { value?: JsonValue }).value;
-		if (inner !== undefined) {
-			return gpumemMbToByteQuantity(inner);
-		}
-	}
-	return mb;
 }
 
-/** JSON / protobuf map keys may use `nvidia.com/gpumem` or `nvidia_com_gpumem`. */
 function gpumemMbFromResourceBlock(
 	requests: Record<string, unknown> | undefined,
 	limits: Record<string, unknown> | undefined
 ): JsonValue {
-	const raw =
-		requests?.['nvidia.com/gpumem'] ??
-		requests?.['nvidia_com_gpumem'] ??
-		limits?.['nvidia.com/gpumem'] ??
-		limits?.['nvidia_com_gpumem'] ??
-		null;
-	return gpumemMbToByteQuantity(raw as JsonValue);
+	for (const map of [requests, limits]) {
+		if (!map) {
+			continue;
+		}
+		for (const key of GPUMEM_JSON_KEYS) {
+			const v = map[key];
+			if (v != null) {
+				return gpumemMbToByteQuantity(v as JsonValue);
+			}
+		}
+	}
+	return null;
 }
 
 type ModelServiceAttribute =
