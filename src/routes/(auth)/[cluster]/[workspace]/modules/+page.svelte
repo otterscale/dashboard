@@ -42,9 +42,9 @@
 	const resourceClient = createClient(ResourceService, transport);
 
 	let data: Record<ModuleAttribute, JsonValue>[] = $state([]);
+	let modules: ModuleType[] = $state([]);
+	let helmRepo: SourceToolkitFluxcdIoV1HelmRepository | undefined = $state(undefined);
 	let installedModules: Set<string> = $state(new Set());
-
-	let helmRepository: SourceToolkitFluxcdIoV1HelmRepository | undefined = $state(undefined);
 
 	let isHelmRepositoryFetching = $state(false);
 
@@ -82,7 +82,6 @@
 		}
 	}
 
-	let modules: ModuleType[] = $state([]);
 	let isModuleFetching = $state(false);
 
 	async function fetchModules(
@@ -108,8 +107,9 @@
 				})
 			});
 			if (response.ok) {
-				const modules = await response.json();
-				return modules.filter((module: ModuleType) => !semver.lt(module.version, 'v0.0.1'));
+				return (await response.json()).filter(
+					(module: ModuleType) => !semver.lt(module.version, version)
+				);
 			}
 		} catch (error) {
 			console.error(`HelmRepository "${helmRepositoryName}": error fetching modules:`, error);
@@ -121,10 +121,13 @@
 		return [] as ModuleType[];
 	}
 
-	let releaseResourceVersion: string | undefined = $state(undefined);
 	let isReleaseFetching = $state(false);
+	let releaseResourceVersion: string | undefined = $state(undefined);
+	let watchAbortController: AbortController | null = null;
+	let isWatching = $state(false);
+	let isDestroyed = false;
 
-	async function listReleases() {
+	async function listInstalledModules() {
 		if (isReleaseFetching) return;
 
 		isReleaseFetching = true;
@@ -166,12 +169,17 @@
 		) as Set<string>;
 	}
 
-	let isReleaseWatching = $state(false);
-	let watchAbortController: AbortController | null = null;
-	async function watchReleases() {
-		if (isReleaseFetching || isReleaseWatching || isDestroyed) return;
+	function rebuildData() {
+		if (!helmRepo || modules.length === 0) return;
+		data = modules
+			.filter((module) => module.name.startsWith('otterscale-'))
+			.map((module) => getChartData(module, installedModules, helmRepo!));
+	}
 
-		isReleaseWatching = true;
+	async function watchInstalledModules() {
+		if (isReleaseFetching || isWatching || isDestroyed) return;
+
+		isWatching = true;
 		watchAbortController = new AbortController();
 		try {
 			const stream = resourceClient.watch(
@@ -228,35 +236,29 @@
 			if (!isDestroyed) {
 				toast.info('Watching installed modules was disconnected.');
 			}
-			isReleaseWatching = false;
+			isWatching = false;
 			watchAbortController = null;
 		}
-	}
-
-	function rebuildData() {
-		if (!helmRepository || modules.length === 0) return;
-		data = modules
-			.filter((module) => module.name.startsWith('otterscale-'))
-			.map((module) => getChartData(module, installedModules, helmRepository!));
 	}
 
 	async function fetchData() {
 		if (!namespace) return;
 
-		helmRepository = await fetchHelmRepository();
+		const helmRepository = await fetchHelmRepository();
 		if (!helmRepository) return;
+		helmRepo = helmRepository;
 
 		const fetchedModules = await fetchModules(helmRepository);
 		if (!fetchedModules) return;
 		modules = fetchedModules;
 
-		await listReleases();
+		await listInstalledModules();
 		rebuildData();
 	}
 
 	function handleReload() {
-		if (!isReleaseWatching) {
-			watchReleases();
+		if (!isWatching) {
+			watchInstalledModules();
 			return;
 		}
 		if (watchAbortController) {
@@ -266,10 +268,8 @@
 
 	onMount(async () => {
 		await fetchData();
-		watchReleases();
+		watchInstalledModules();
 	});
-
-	let isDestroyed = false;
 
 	onDestroy(() => {
 		isDestroyed = true;
@@ -285,7 +285,7 @@
 			<ModuleViewer {cluster} {namespace} modules={data}>
 				{#snippet reload()}
 					<Button onclick={handleReload} variant="outline" size="icon">
-						{#if isReleaseWatching}
+						{#if isWatching}
 							<CableIcon class="size-4" />
 						{:else}
 							<UnplugIcon class="size-4 text-destructive" />
