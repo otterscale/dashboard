@@ -5,10 +5,7 @@
 	import type { CoreV1Secret } from '@otterscale/types';
 	import lodash from 'lodash';
 	import { getContext } from 'svelte';
-	import { toast } from 'svelte-sonner';
-	import { stringify } from 'yaml';
 
-	import { page } from '$app/state';
 	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Item from '$lib/components/ui/item';
@@ -28,75 +25,23 @@
 
 	let open = $state(false);
 
-	const storeName = $derived(object?.metadata?.name ?? '');
-	const storeNamespace = $derived(object?.metadata?.namespace ?? '');
-	const userSubject = $derived(page.data.user.sub);
-	const userDisplayName = $derived(page.data.user.name ?? page.data.user.username ?? '');
-	const secretName = $derived(`rook-ceph-object-user-ceph-objectstore-${userSubject}`);
+	const name = $derived(object?.metadata?.name ?? '');
+	const namespace = $derived(object?.metadata?.namespace ?? '');
 
-	async function fetchExistingSecret(): Promise<CoreV1Secret | null> {
+	async function fetchSecret(): Promise<CoreV1Secret | null> {
 		try {
 			const response = await resourceClient.get({
 				cluster,
-				namespace: storeNamespace,
+				namespace,
+				name,
 				group: '',
 				version: 'v1',
-				resource: 'secrets',
-				name: secretName
+				resource: 'secrets'
 			});
 			return response?.object as CoreV1Secret;
 		} catch {
 			return null;
 		}
-	}
-
-	async function createUserAndFetchSecret(): Promise<CoreV1Secret> {
-		const existing = await fetchExistingSecret();
-		if (existing) {
-			return existing;
-		}
-
-		const userManifest = {
-			apiVersion: 'ceph.rook.io/v1',
-			kind: 'CephObjectStoreUser',
-			metadata: {
-				name: userSubject,
-				namespace: storeNamespace
-			},
-			spec: {
-				store: storeName,
-				displayName: userDisplayName
-			}
-		};
-
-		const manifest = new TextEncoder().encode(stringify(userManifest));
-		await resourceClient.create({
-			cluster,
-			namespace: storeNamespace,
-			group: 'ceph.rook.io',
-			version: 'v1',
-			resource: 'cephobjectstoreusers',
-			manifest
-		});
-
-		toast.success(`Successfully created CephObjectStoreUser ${userSubject}`);
-
-		// Poll for the secret to be created by the controller
-		const maxRetries = 10;
-		const retryInterval = 3_000;
-
-		for (let index = 0; index < maxRetries; index++) {
-			await new Promise((resolve) => setTimeout(resolve, retryInterval));
-
-			const secret = await fetchExistingSecret();
-			if (secret) {
-				return secret;
-			}
-		}
-
-		throw new Error(
-			`Secret ${secretName} was not found after ${maxRetries} retries. It may take longer to be created by the controller.`
-		);
 	}
 </script>
 
@@ -115,7 +60,7 @@
 					<UserIcon />
 				</Item.Media>
 				<Item.Content>
-					<Item.Title>Get User</Item.Title>
+					<Item.Title>Get Secret</Item.Title>
 				</Item.Content>
 			</Item.Root>
 		{/snippet}
@@ -125,26 +70,26 @@
 			<Item.Content class="text-left">
 				<Item.Title class="text-xl font-bold">Get User</Item.Title>
 				<Item.Description>
-					User for {storeName}
+					User for {name}
 				</Item.Description>
 			</Item.Content>
 		</Item.Root>
-		{#await createUserAndFetchSecret()}
+		{#await fetchSecret()}
 			<div class="flex flex-col items-center gap-3 py-8">
 				<div class="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary"></div>
-				<p class="text-sm text-muted-foreground">Creating or fetching user and secret...</p>
+				<p class="text-sm text-muted-foreground">fetching secret...</p>
 			</div>
 		{:then secret}
 			<Item.Root variant="muted">
 				<Item.Content class="text-left">
-					<Item.Title class="mb-2 text-sm font-medium">Access Key</Item.Title>
-					{secret.data?.AccessKey}
+					<Item.Title class="mb-2 text-sm font-medium">AWS ACCESS KEY ID</Item.Title>
+					{secret?.data?.AWS_ACCESS_KEY_ID}
 				</Item.Content>
 			</Item.Root>
 			<Item.Root variant="muted">
 				<Item.Content class="text-left">
-					<Item.Title class="mb-2 text-sm font-medium">Secret Key</Item.Title>
-					{secret.data?.SecretKey}
+					<Item.Title class="mb-2 text-sm font-medium">AWS SECRET ACCESS KEY</Item.Title>
+					{secret?.data?.AWS_SECRET_ACCESS_KEY}
 				</Item.Content>
 			</Item.Root>
 			<Button
