@@ -29,7 +29,7 @@
 		object?.metadata?.labels?.['nvidia.com/gpu.workload.config'] === 'vm-passthrough'
 	);
 	const isVirtualOn = $derived(
-		object?.metadata?.labels?.['gpu'] === 'on' &&
+		object?.metadata?.labels?.['otterscale.io/gpu'] === 'on' &&
 			!lodash.get(object?.metadata?.labels, 'nvidia.com/gpu.workload.config')
 	);
 
@@ -55,7 +55,7 @@
 					metadata: {
 						name,
 						labels: {
-							gpu: 'on',
+							'otterscale.io/gpu': 'on',
 							'nvidia.com/gpu.workload.config': null
 						}
 					}
@@ -90,7 +90,7 @@
 		);
 	}}
 >
-	Virtual
+	Virtual GPU
 </DropdownMenu.Item>
 <DropdownMenu.Item
 	disabled={isPassthroughOn}
@@ -107,7 +107,7 @@
 					metadata: {
 						name,
 						labels: {
-							gpu: null,
+							'otterscale.io/gpu': null,
 							'nvidia.com/gpu.workload.config': 'vm-passthrough'
 						}
 					}
@@ -142,5 +142,5 @@
 		);
 	}}
 >
-	Passthrough
+	VM Passthrough
 </DropdownMenu.Item>
