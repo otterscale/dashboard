@@ -37,9 +37,7 @@ function mbScalarToByteQuantityString(mb: number | bigint): string {
 /**
  * Plain / compact MB (`"24000"`, `"24K"`) → MB count. Kubernetes quantities (`8Gi`) → sentinel.
  */
-function parseGpumemMbString(
-	s: string
-): { mb: number } | 'kubernetesQuantity' | null {
+function parseGpumemMbString(s: string): { mb: number } | 'kubernetesQuantity' | null {
 	const t = s.trim();
 	if (!t) {
 		return null;
