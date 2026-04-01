@@ -80,6 +80,7 @@
 		kind,
 		metadata: {},
 		spec: {
+			releaseName: chart.name,
 			targetNamespace: lodash.get(chart, ['annotations', 'module.otterscale.io/namespace']),
 			install: { createNamespace: true },
 			interval: '15m',
@@ -264,7 +265,6 @@
 					} as UiSchemaRoot}
 					initialValue={{
 						chart: chartName,
-						releaseName: chartName,
 						version: defaultVersion,
 						sourceRef: {
 							apiVersion: helmRepository?.apiVersion,
