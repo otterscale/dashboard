@@ -278,7 +278,7 @@
 					} as UiSchemaRoot}
 					initialValue={{
 						image: null,
-						imagePullSecrets: [{ name: 'docker-config' }]
+						imagePullSecrets: [{ name: 'workspace-image-pull-secret' }]
 					} as FormValue}
 					handleSubmit={{
 						posthook: (form) => {
