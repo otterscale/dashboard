@@ -7,9 +7,11 @@
 		HelmToolkitFluxcdIoV2HelmRelease,
 		SourceToolkitFluxcdIoV1HelmRepository
 	} from '@otterscale/types';
+	import semver from 'semver';
 	import { getContext, onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
+	import { version } from '$app/environment';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { ModuleViewer } from '$lib/components/module-viewer';
@@ -100,7 +102,9 @@
 				})
 			});
 			if (response.ok) {
-				return await response.json();
+				return (await response.json()).filter(
+					(module: ModuleType) => !semver.lt(module.version, version)
+				);
 			}
 		} catch (error) {
 			console.error(`HelmRepository "${helmRepositoryName}": error fetching modules:`, error);
