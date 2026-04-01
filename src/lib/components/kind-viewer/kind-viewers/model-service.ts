@@ -18,7 +18,7 @@ function megabytesToByteQuantityString(mb: number): string {
 		return String(mb);
 	}
 	const mbInt = BigInt(Math.round(mb));
-	return String(mbInt * BigInt(1024) * BigInt(1024));
+return String(mbInt * BigInt(1_000_000));
 }
 
 /**
