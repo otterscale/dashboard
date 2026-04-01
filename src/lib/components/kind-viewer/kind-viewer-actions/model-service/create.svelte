@@ -760,139 +760,124 @@
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[5]}>
-				{#key JSON.stringify(lodash.get(values, 'spec.decode.parallelism.tensor'))}
-					{@const initialValue =
-						lodash.get(values, 'spec.decode.parallelism.tensor') &&
-						Number(lodash.get(values, 'spec.decode.parallelism.tensor')) > 1
-							? {
-									args: [
-										'--max-model-len',
-										'8192',
-										'--kv-transfer-config',
-										`{"kv_connector":"NixlConnector", "kv_role":"kv_both"}`,
-										'--disable-uvicorn-access-log',
-										'--tensor-parallel-size'
-									]
-								}
-							: {
-									args: [
-										'--max-model-len',
-										'8192',
-										'--kv-transfer-config',
-										`{"kv_connector":"NixlConnector", "kv_role":"kv_both"}`,
-										'--disable-uvicorn-access-log'
-									]
-								}}
-					<Form
-						schema={{
-							...(lodash.omit(
-								lodash.get(jsonSchema, 'properties.spec.properties.engine'),
-								'properties'
-							) as any),
-							title: 'Engine',
-							properties: {
-								args: {
-									...lodash.get(jsonSchema, 'properties.spec.properties.engine.properties.args'),
-									title: 'Arguments'
-								},
-								env: {
-									...lodash.omit(
-										lodash.get(jsonSchema, 'properties.spec.properties.engine.properties.env'),
-										'items'
-									),
-									title: 'Environment Variables',
-									items: {
-										...lodash.omit(
-											lodash.get(
-												jsonSchema,
-												'properties.spec.properties.engine.properties.env.items'
-											),
-											'properties'
-										),
-										properties: {
-											name: {
-												...lodash.get(
-													jsonSchema,
-													'properties.spec.properties.engine.properties.env.items.properties.name'
-												),
-												title: 'Name'
-											},
-											value: {
-												...lodash.get(
-													jsonSchema,
-													'properties.spec.properties.engine.properties.env.items.properties.value'
-												),
-												title: 'Value'
-											}
-										}
-									}
-								}
-							}
-						} as Schema}
-						uiSchema={{
-							'ui:options': {
-								translations: {
-									submit: 'Next'
-								}
-							},
+				<Form
+					schema={{
+						...(lodash.omit(
+							lodash.get(jsonSchema, 'properties.spec.properties.engine'),
+							'properties'
+						) as any),
+						title: 'Engine',
+						properties: {
 							args: {
-								'ui:options': {
-									itemTitle: () => 'argument'
-								}
+								...lodash.get(jsonSchema, 'properties.spec.properties.engine.properties.args'),
+								title: 'Arguments'
 							},
 							env: {
-								'ui:options': {
-									itemTitle: () => 'environment variable'
-								},
+								...lodash.omit(
+									lodash.get(jsonSchema, 'properties.spec.properties.engine.properties.env'),
+									'items'
+								),
+								title: 'Environment Variables',
 								items: {
-									'ui:options': {
-										layouts: {
-											'object-properties': {
-												class: 'grid grid-cols-2 gap-3'
-											}
+									...lodash.omit(
+										lodash.get(
+											jsonSchema,
+											'properties.spec.properties.engine.properties.env.items'
+										),
+										'properties'
+									),
+									properties: {
+										name: {
+											...lodash.get(
+												jsonSchema,
+												'properties.spec.properties.engine.properties.env.items.properties.name'
+											),
+											title: 'Name'
+										},
+										value: {
+											...lodash.get(
+												jsonSchema,
+												'properties.spec.properties.engine.properties.env.items.properties.value'
+											),
+											title: 'Value'
 										}
 									}
 								}
 							}
-						} as UiSchemaRoot}
-						{initialValue}
-						transformer={(value: FormValue) => {
-							const formValue: any = value;
-							lodash.set(formValue, 'env', [
-								{
-									name: 'VLLM_NIXL_SIDE_CHANNEL_HOST',
-									valueFrom: { fieldRef: { fieldPath: 'status.podIP' } }
-								},
-								{
-									name: 'VLLM_NIXL_SIDE_CHANNEL_PORT',
-									value: '5557'
-								},
-								{ name: 'UCX_TLS', value: 'cuda_ipc,cuda_copy,tcp' },
-								{ name: 'VLLM_LOGGING_LEVEL', value: 'INFO' }
-							]);
-							return formValue;
-						}}
-						handleSubmit={{
-							posthook: () => {
-								handleNext();
+						}
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
 							}
-						}}
-						bind:values={values['spec']['engine']}
-					>
-						{#snippet actions()}
-							<div class="flex w-full items-center justify-between gap-3">
-								<Button
-									onclick={() => {
-										handlePrevious();
-									}}
-								>
-									Previous
-								</Button>
-								<SubmitButton />
-							</div>
-						{/snippet}
-					</Form>
-				{/key}
+						},
+						args: {
+							'ui:options': {
+								itemTitle: () => 'argument'
+							}
+						},
+						env: {
+							'ui:options': {
+								itemTitle: () => 'environment variable'
+							},
+							items: {
+								'ui:options': {
+									layouts: {
+										'object-properties': {
+											class: 'grid grid-cols-2 gap-3'
+										}
+									}
+								}
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={{
+						args: [
+							'--max-model-len',
+							'8192',
+							'--kv-transfer-config',
+							`{"kv_connector":"NixlConnector", "kv_role":"kv_both"}`,
+							'--disable-uvicorn-access-log',
+							'--tensor-parallel-size'
+						]
+					} as FormValue}
+					transformer={(value: FormValue) => {
+						const formValue: any = value;
+						lodash.set(formValue, 'env', [
+							{
+								name: 'VLLM_NIXL_SIDE_CHANNEL_HOST',
+								valueFrom: { fieldRef: { fieldPath: 'status.podIP' } }
+							},
+							{
+								name: 'VLLM_NIXL_SIDE_CHANNEL_PORT',
+								value: '5557'
+							},
+							{ name: 'UCX_TLS', value: 'cuda_ipc,cuda_copy,tcp' },
+							{ name: 'VLLM_LOGGING_LEVEL', value: 'INFO' }
+						]);
+						return formValue;
+					}}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					bind:values={values['spec']['engine']}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[6]} class="min-h-[77vh]">
