@@ -40,14 +40,14 @@ function parseGpumemMbString(s: string): { mb: number } | 'kubernetesQuantity' |
 		if (!suf) {
 			return { mb: base };
 		}
-		if (suf === 'K') {
-			return { mb: base * 1_000 };
+if (suf === 'K') {
+			return { mb: base / 1_000 };
 		}
 		if (suf === 'M') {
-			return { mb: base * 1_000_000 };
+			return { mb: base };
 		}
 		if (suf === 'G') {
-			return { mb: base * 1_000_000_000 };
+			return { mb: base * 1_000 };
 		}
 	}
 	if (/[a-zA-Z]/.test(t)) {
