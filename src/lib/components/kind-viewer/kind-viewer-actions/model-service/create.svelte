@@ -838,8 +838,7 @@
 							'8192',
 							'--kv-transfer-config',
 							`{"kv_connector":"NixlConnector", "kv_role":"kv_both"}`,
-							'--disable-uvicorn-access-log',
-							'--tensor-parallel-size'
+							'--disable-uvicorn-access-log'
 						]
 					} as FormValue}
 					transformer={(value: FormValue) => {
