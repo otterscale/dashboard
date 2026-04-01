@@ -1,13 +1,22 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import Box from '@lucide/svelte/icons/box';
-	import Globe from '@lucide/svelte/icons/globe';
 	import { ResourceService } from '@otterscale/api/resource/v1';
+	import {
+		createForm,
+		setFormContext,
+		type Config,
+		type FieldPath,
+		type Schema,
+		type UiOption
+	} from '@sjsf/form';
 	import { getContext, onMount } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
-	import { writable } from 'svelte/store';
+	import { get, writable } from 'svelte/store';
 
-	import { Single as SingleSelect } from '$lib/components/custom/select';
+	import * as defaults from '$lib/components/dynamic-form/defaults';
+	import ComboboxWidget, {
+		type ComboboxEnumeration
+	} from '$lib/components/dynamic-form/widgets/combobox.svelte';
 	import { m } from '$lib/paraglide/messages';
 
 	let {
@@ -32,6 +41,40 @@
 	const workspaceOptions = writable<WorkspaceOption[]>([]);
 
 	let isLoaded = $state(false);
+
+	const schema: Schema = {
+		type: 'object',
+		properties: {
+			picker: { type: 'string', title: ' ' }
+		}
+	};
+
+	const form = createForm<{ picker: string | undefined }>({
+		...defaults,
+		schema,
+		initialValue: { picker: undefined }
+	});
+	setFormContext(form);
+
+	const pickerPath = ['picker'] as unknown as FieldPath;
+
+	const config: Config = $derived({
+		path: pickerPath,
+		title: ' ',
+		schema: { type: 'string' },
+		uiSchema: {
+			'ui:options': {
+				TailoredComboboxEnumerations: async (
+					_filter: string
+				): Promise<ComboboxEnumeration[]> => get(workspaceOptions) as ComboboxEnumeration[],
+				TailoredComboboxVisibility: 50,
+				TailoredComboboxEmptyText: m.no_result(),
+				TailoredComboboxInput: { placeholder: '' },
+				TailoredComboboxPopoverClass: 'w-full min-w-[200px] max-w-md'
+			}
+		},
+		required: false
+	});
 
 	onMount(async () => {
 		if (!isClusterAdmin) {
@@ -80,28 +123,13 @@
 </script>
 
 {#if isClusterAdmin && isLoaded && $workspaceOptions.length > 0}
-	<SingleSelect.Root options={workspaceOptions} bind:value={namespace}>
-		<SingleSelect.Trigger />
-		<SingleSelect.Content>
-			<SingleSelect.Options>
-				<SingleSelect.Input />
-				<SingleSelect.List>
-					<SingleSelect.Empty>{m.no_result()}</SingleSelect.Empty>
-					<SingleSelect.Group>
-						{#each $workspaceOptions as option (option.value + option.label)}
-							<SingleSelect.Item {option}>
-								{#if option.value === ''}
-									<Globe class="size-5" />
-								{:else}
-									<Box class="size-5" />
-								{/if}
-								{option.label}
-								<SingleSelect.Check {option} />
-							</SingleSelect.Item>
-						{/each}
-					</SingleSelect.Group>
-				</SingleSelect.List>
-			</SingleSelect.Options>
-		</SingleSelect.Content>
-	</SingleSelect.Root>
+	<ComboboxWidget
+		type="widget"
+		bind:value={namespace}
+		{config}
+		handlers={{}}
+		options={[]}
+		errors={[]}
+		uiOption={(() => undefined) as UiOption}
+	/>
 {/if}
