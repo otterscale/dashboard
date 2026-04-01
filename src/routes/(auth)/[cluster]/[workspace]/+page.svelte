@@ -95,10 +95,10 @@
 		if (kind === 'ModelService') {
 			const nodePort = await getServiceNodePort(
 				'llm-d',
-				'llm-d-infra-inference-gateway-istio',
+				'otterscale-llm-d-infra-inference-gateway-istio',
 				'default'
 			);
-			return `${externalIP}:${nodePort}`;
+			return externalIP && nodePort ? `Available at ${externalIP}:${nodePort}` : '';
 		}
 
 		if (kind === 'ObjectBucketClaim') {
@@ -107,7 +107,7 @@
 				'rook-ceph-rgw-ceph-objectstore-external',
 				'rgw'
 			);
-			return `Available at ${externalIP}:${nodePort}`;
+			return externalIP && nodePort ? `Available at ${externalIP}:${nodePort}` : '';
 		}
 
 		return '';
