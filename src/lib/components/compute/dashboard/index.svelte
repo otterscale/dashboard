@@ -2,6 +2,11 @@
 	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
+	import {
+		CalendarDateTime,
+		DatetimePicker,
+		getLocalTimeZone
+	} from '$lib/components/custom/datetime-picker';
 	import { Reloader } from '$lib/components/custom/reloader';
 	import { WidgetGrid } from '$lib/components/custom/widget-grid';
 	import * as Item from '$lib/components/ui/item';
@@ -14,6 +19,40 @@
 
 	let isReloading = $state(true);
 	let prometheusDriver = $state<PrometheusDriver | null>(null);
+
+	function nowCDT(): CalendarDateTime {
+		const d = new Date();
+		return new CalendarDateTime(
+			d.getFullYear(),
+			d.getMonth() + 1,
+			d.getDate(),
+			d.getHours(),
+			d.getMinutes()
+		);
+	}
+	function minutesAgoCDT(min: number): CalendarDateTime {
+		const d = new Date(Date.now() - min * 60 * 1000);
+		return new CalendarDateTime(
+			d.getFullYear(),
+			d.getMonth() + 1,
+			d.getDate(),
+			d.getHours(),
+			d.getMinutes()
+		);
+	}
+
+	let pickerFrom = $state<CalendarDateTime>(minutesAgoCDT(60));
+	let pickerTo = $state<CalendarDateTime>(nowCDT());
+	let pickerToIsNow = $state(true);
+
+	const start = $derived(pickerFrom.toDate(getLocalTimeZone()));
+	const end = $derived(pickerToIsNow ? new Date() : pickerTo.toDate(getLocalTimeZone()));
+
+	const dashboardTimeRangeKey = $derived(
+		`${pickerFrom.toDate(getLocalTimeZone()).getTime()}-${
+			pickerToIsNow ? 'now' : pickerTo.toDate(getLocalTimeZone()).getTime()
+		}-${pickerToIsNow}`
+	);
 
 	onMount(async () => {
 		try {
@@ -55,13 +94,30 @@
 						<Tabs.Trigger value="overview">{m.overview()}</Tabs.Trigger>
 						<Tabs.Trigger value="analytics" disabled>{m.analytics()}</Tabs.Trigger>
 					</Tabs.List>
-					<Reloader bind:checked={isReloading} />
+					<div class="flex flex-wrap items-center justify-end gap-2">
+						<DatetimePicker
+							bind:from={pickerFrom}
+							bind:to={pickerTo}
+							bind:toIsNow={pickerToIsNow}
+						/>
+						<Reloader bind:checked={isReloading} />
+					</div>
 				</div>
 				<Tabs.Content
 					value="overview"
 					class="grid auto-rows-auto grid-cols-2 gap-5 pt-4 md:grid-cols-4 lg:grid-cols-12"
 				>
-					<WidgetGrid {widgets} {prometheusDriver} {cluster} {namespace} bind:isReloading />
+					{#key dashboardTimeRangeKey}
+						<WidgetGrid
+							{widgets}
+							{prometheusDriver}
+							{cluster}
+							{namespace}
+							{start}
+							{end}
+							bind:isReloading
+						/>
+					{/key}
 				</Tabs.Content>
 				<Tabs.Content value="analytics"></Tabs.Content>
 			</Tabs.Root>

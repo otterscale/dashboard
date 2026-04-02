@@ -2,11 +2,11 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import {
-		createForm,
-		setFormContext,
 		type Config,
+		createForm,
 		type FieldPath,
 		type Schema,
+		setFormContext,
 		type UiOption
 	} from '@sjsf/form';
 	import { getContext, onMount } from 'svelte';
@@ -64,9 +64,8 @@
 		schema: { type: 'string' },
 		uiSchema: {
 			'ui:options': {
-				TailoredComboboxEnumerations: async (
-					_filter: string
-				): Promise<ComboboxEnumeration[]> => get(workspaceOptions) as ComboboxEnumeration[],
+				TailoredComboboxEnumerations: async (): Promise<ComboboxEnumeration[]> =>
+					get(workspaceOptions) as ComboboxEnumeration[],
 				TailoredComboboxVisibility: 50,
 				TailoredComboboxEmptyText: m.no_result(),
 				TailoredComboboxInput: { placeholder: '' },
@@ -123,13 +122,15 @@
 </script>
 
 {#if isClusterAdmin && isLoaded && $workspaceOptions.length > 0}
-	<ComboboxWidget
-		type="widget"
-		bind:value={namespace}
-		{config}
-		handlers={{}}
-		options={[]}
-		errors={[]}
-		uiOption={(() => undefined) as UiOption}
-	/>
+	<div class="flex min-h-9 min-w-[11rem] shrink-0 items-center sm:min-w-[12rem]">
+		<ComboboxWidget
+			type="widget"
+			bind:value={namespace}
+			{config}
+			handlers={{}}
+			options={[]}
+			errors={[]}
+			uiOption={(() => undefined) as UiOption}
+		/>
+	</div>
 {/if}

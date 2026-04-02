@@ -12,25 +12,27 @@
 	import { formatIO } from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
 	import { getLocale } from '$lib/paraglide/runtime';
+	import { computeStep } from '$lib/prometheus';
 
 	// Props
 	let {
 		client,
 		cluster: _,
+		start,
+		end,
 		isReloading = $bindable()
-	}: { client: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	}: {
+		client: PrometheusDriver;
+		cluster: string;
+		start: Date;
+		end: Date;
+		isReloading: boolean;
+	} = $props();
 	void _;
 
 	// Constants
 	const CHART_TITLE = m.osd_throughPut();
 	const CHART_DESCRIPTION = `${m.read()}/${m.write()}`;
-
-	// Time range calculation
-	const STEP_SECONDS = 60 * 60; // 1 hour
-	const TIME_RANGE_HOURS = 24; // 24 hours of data
-	const MILLISECONDS_PER_HOUR = 60 * 60 * 1000;
-	const endTime = Date.now();
-	const startTime = endTime - TIME_RANGE_HOURS * MILLISECONDS_PER_HOUR;
 
 	// Chart configuration
 	const chartConfig = {
@@ -93,11 +95,12 @@
 
 	// Data fetching function
 	async function fetch(): Promise<void> {
+		const step = computeStep(start.getTime(), end.getTime(), 300);
 		try {
 			const [readResponse, writeResponse, latestReadResponse, latestWriteResponse] =
 				await Promise.all([
-					client.rangeQuery(queries.Read, startTime, endTime, STEP_SECONDS),
-					client.rangeQuery(queries.Write, startTime, endTime, STEP_SECONDS),
+					client.rangeQuery(queries.Read, start, end, step),
+					client.rangeQuery(queries.Write, start, end, step),
 					client.instantQuery(queries.Read),
 					client.instantQuery(queries.Write)
 				]);

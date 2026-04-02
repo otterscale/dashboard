@@ -2,6 +2,11 @@
 	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
+	import {
+		CalendarDateTime,
+		DatetimePicker,
+		getLocalTimeZone
+	} from '$lib/components/custom/datetime-picker';
 	import Reloader from '$lib/components/custom/reloader/reloader.svelte';
 	import { Overview } from '$lib/components/storage/dashboard/overview';
 	import * as Item from '$lib/components/ui/item';
@@ -12,6 +17,40 @@
 
 	let isReloading = $state(true);
 	let prometheusDriver = $state<PrometheusDriver | null>(null);
+
+	function nowCDT(): CalendarDateTime {
+		const d = new Date();
+		return new CalendarDateTime(
+			d.getFullYear(),
+			d.getMonth() + 1,
+			d.getDate(),
+			d.getHours(),
+			d.getMinutes()
+		);
+	}
+	function minutesAgoCDT(min: number): CalendarDateTime {
+		const d = new Date(Date.now() - min * 60 * 1000);
+		return new CalendarDateTime(
+			d.getFullYear(),
+			d.getMonth() + 1,
+			d.getDate(),
+			d.getHours(),
+			d.getMinutes()
+		);
+	}
+
+	let pickerFrom = $state<CalendarDateTime>(minutesAgoCDT(60));
+	let pickerTo = $state<CalendarDateTime>(nowCDT());
+	let pickerToIsNow = $state(true);
+
+	const start = $derived(pickerFrom.toDate(getLocalTimeZone()));
+	const end = $derived(pickerToIsNow ? new Date() : pickerTo.toDate(getLocalTimeZone()));
+
+	const dashboardTimeRangeKey = $derived(
+		`${pickerFrom.toDate(getLocalTimeZone()).getTime()}-${
+			pickerToIsNow ? 'now' : pickerTo.toDate(getLocalTimeZone()).getTime()
+		}-${pickerToIsNow}`
+	);
 
 	onMount(async () => {
 		try {
@@ -53,10 +92,19 @@
 						<Tabs.Trigger value="overview">{m.overview()}</Tabs.Trigger>
 						<Tabs.Trigger value="analytics" disabled>{m.analytics()}</Tabs.Trigger>
 					</Tabs.List>
-					<Reloader bind:checked={isReloading} />
+					<div class="flex flex-wrap items-center justify-end gap-2">
+						<DatetimePicker
+							bind:from={pickerFrom}
+							bind:to={pickerTo}
+							bind:toIsNow={pickerToIsNow}
+						/>
+						<Reloader bind:checked={isReloading} />
+					</div>
 				</div>
 				<Tabs.Content value="overview">
-					<Overview client={prometheusDriver} {cluster} bind:isReloading />
+					{#key dashboardTimeRangeKey}
+						<Overview client={prometheusDriver} {cluster} {start} {end} bind:isReloading />
+					{/key}
 				</Tabs.Content>
 				<Tabs.Content value="analytics">
 					<!-- <Analytics client={prometheusDriver} {cluster} /> -->

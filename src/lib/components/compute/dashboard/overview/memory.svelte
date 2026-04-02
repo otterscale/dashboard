@@ -6,18 +6,26 @@
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
 	import { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
-	import { SvelteDate } from 'svelte/reactivity';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import { m } from '$lib/paraglide/messages';
+	import { computeStep } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
 		namespace,
+		start,
+		end,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; namespace: string; isReloading: boolean } = $props();
+	}: {
+		prometheusDriver: PrometheusDriver;
+		namespace: string;
+		start: Date;
+		end: Date;
+		isReloading: boolean;
+	} = $props();
 
 	const configuration = {
 		usage: { label: 'Usage', color: 'var(--chart-1)' }
@@ -25,11 +33,12 @@
 
 	let memoryUsages: SampleValue[] = $state([]);
 	async function fetchMemoryUsage() {
+		const step = computeStep(start.getTime(), end.getTime());
 		const response = await prometheusDriver.rangeQuery(
 			`avg(kubevirt_vmi_memory_resident_bytes{exported_namespace="${namespace}"}) / avg(kubevirt_vmi_memory_domain_bytes{exported_namespace="${namespace}"})`,
-			new SvelteDate().setMinutes(0, 0, 0) - 60 * 60 * 1000,
-			new SvelteDate().setMinutes(0, 0, 0),
-			2 * 60
+			start,
+			end,
+			step
 		);
 		memoryUsages = response.result[0]?.values ?? [];
 	}

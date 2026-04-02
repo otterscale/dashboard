@@ -6,19 +6,27 @@
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
 	import { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
-	import { SvelteDate } from 'svelte/reactivity';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import { formatIO } from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
+	import { computeStep } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
 		namespace,
+		start,
+		end,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; namespace: string; isReloading: boolean } = $props();
+	}: {
+		prometheusDriver: PrometheusDriver;
+		namespace: string;
+		start: Date;
+		end: Date;
+		isReloading: boolean;
+	} = $props();
 
 	const configuration = {
 		read: { label: 'Read', color: 'var(--chart-1)' },
@@ -27,22 +35,24 @@
 
 	let reads: SampleValue[] = $state([]);
 	async function fetchReads() {
+		const step = computeStep(start.getTime(), end.getTime());
 		const response = await prometheusDriver.rangeQuery(
 			`avg(rate(kubevirt_vmi_storage_read_traffic_bytes_total{exported_namespace="${namespace}"}[5m]))`,
-			new SvelteDate().setMinutes(0, 0, 0) - 60 * 60 * 1000,
-			new SvelteDate().setMinutes(0, 0, 0),
-			2 * 60
+			start,
+			end,
+			step
 		);
 		reads = response.result[0]?.values ?? [];
 	}
 
 	let writes: SampleValue[] = $state([]);
 	async function fetchWrites() {
+		const step = computeStep(start.getTime(), end.getTime());
 		const response = await prometheusDriver.rangeQuery(
 			`avg(rate(kubevirt_vmi_storage_write_traffic_bytes_total{exported_namespace="${namespace}"}[5m]))`,
-			new SvelteDate().setMinutes(0, 0, 0) - 60 * 60 * 1000,
-			new SvelteDate().setMinutes(0, 0, 0),
-			2 * 60
+			start,
+			end,
+			step
 		);
 		writes = response.result[0]?.values ?? [];
 	}
