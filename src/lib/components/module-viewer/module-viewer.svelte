@@ -22,12 +22,12 @@
 	let {
 		cluster,
 		namespace,
-		modules,
+		data: modules,
 		reload
 	}: {
 		cluster: string;
 		namespace: string;
-		modules: any[];
+		data: any[];
 		reload: any;
 	} = $props();
 

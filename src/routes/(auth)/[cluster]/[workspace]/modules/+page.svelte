@@ -10,15 +10,13 @@
 	} from '@otterscale/types';
 	import semver from 'semver';
 	import { getContext, onDestroy, onMount } from 'svelte';
-	import { SvelteSet } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 
 	import { version } from '$app/environment';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { ModuleViewer } from '$lib/components/module-viewer';
-	import type { ModuleAttribute } from '$lib/components/module-viewer/table-layout';
-	import { getChartData } from '$lib/components/module-viewer/table-layout';
+	import { getChartData, type ModuleAttribute } from '$lib/components/module-viewer/table-layout';
 	import type { ModuleType } from '$lib/components/module-viewer/types';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { m } from '$lib/paraglide/messages';
@@ -35,17 +33,18 @@
 		}
 	]);
 
+	// Parameters
 	const cluster = $derived(page.params.cluster ?? '');
 	const namespace = 'otterscale-system';
 
+	// Clients
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	let data: Record<ModuleAttribute, JsonValue>[] = $state([]);
-	let modules: ModuleType[] = $state([]);
-	let helmRepo: SourceToolkitFluxcdIoV1HelmRepository | undefined = $state(undefined);
-	let installedModules: Set<string> = $state(new Set());
+	let data: Record<ModuleAttribute, JsonValue>[] | undefined = $state(undefined);
 
+	// Helm Repository
+	let helmRepository: SourceToolkitFluxcdIoV1HelmRepository | undefined = $state(undefined);
 	let isHelmRepositoryFetching = $state(false);
 
 	async function fetchHelmRepository(): Promise<SourceToolkitFluxcdIoV1HelmRepository | undefined> {
@@ -56,7 +55,7 @@
 		try {
 			const response = await resourceClient.get({
 				cluster,
-				namespace: 'otterscale-system',
+				namespace,
 				name: 'otterscale-charts',
 				group: 'source.toolkit.fluxcd.io',
 				version: 'v1',
@@ -71,17 +70,19 @@
 			return response.object;
 		} catch (error) {
 			console.error(
-				'OtterScale Charts Helm Repository was not found in namespace ottersacle-system.:',
+				'OtterScale Charts Helm Repository was not found in namespace otterscale-system.:',
 				error
 			);
 			toast.error(
-				'OtterScale Charts Helm Repository was not found in namespace ottersacle-system.'
+				'OtterScale Charts Helm Repository was not found in namespace otterscale-system.'
 			);
 		} finally {
 			isHelmRepositoryFetching = false;
 		}
 	}
 
+	// Modules
+	let modules: ModuleType[] = $state([]);
 	let isModuleFetching = $state(false);
 
 	async function fetchModules(
@@ -91,10 +92,6 @@
 
 		isModuleFetching = true;
 
-		const helmRepositoryName = helmRepository.metadata?.name ?? '';
-		const repositoryUrl = helmRepository.spec?.url ?? '';
-		const secretName = helmRepository.spec?.secretRef?.name ?? '';
-
 		try {
 			const response = await fetch('/bff/helm/repository/index', {
 				method: 'POST',
@@ -102,58 +99,62 @@
 				body: JSON.stringify({
 					cluster,
 					namespace,
-					repositoryUrl,
-					secretName
+					repositoryUrl: helmRepository.spec?.url ?? ''
 				})
 			});
-			if (response.ok) {
-				return (await response.json()).filter(
-					(module: ModuleType) => !semver.lt(module.version, version)
-				);
+
+			if (!response.ok) {
+				return;
 			}
+
+			const entireModules = await response.json();
+
+			return entireModules
+				.filter((module: ModuleType) =>
+					semver.gte(module.version, semver.valid(version) ? version : 'v0.0.0')
+				)
+				.filter((module: ModuleType) => module.name.startsWith('otterscale-'));
 		} catch (error) {
+			const helmRepositoryName = helmRepository.metadata?.name ?? '';
 			console.error(`HelmRepository "${helmRepositoryName}": error fetching modules:`, error);
 			toast.error(`HelmRepository "${helmRepositoryName}": unable to reach repository`);
 		} finally {
 			isModuleFetching = false;
 		}
-
-		return [] as ModuleType[];
 	}
 
+	// Releases
 	let isReleaseFetching = $state(false);
+	let releases: HelmToolkitFluxcdIoV2HelmRelease[] = $state([]);
 	let releaseResourceVersion: string | undefined = $state(undefined);
-	let watchAbortController: AbortController | null = null;
-	let isWatching = $state(false);
-	let isDestroyed = false;
 
-	async function listInstalledModules() {
+	async function listReleases() {
 		if (isReleaseFetching) return;
 
 		isReleaseFetching = true;
 
-		const releases: HelmToolkitFluxcdIoV2HelmRelease[] = [];
-
 		try {
-			let continueToken: string | undefined = undefined;
-			do {
-				const response = await resourceClient.list({
-					cluster,
-					namespace: 'otterscale-system',
-					group: 'helm.toolkit.fluxcd.io',
-					version: 'v2',
-					resource: 'helmreleases',
-					limit: BigInt(10),
-					continue: continueToken
-				});
+			const response = await resourceClient.list({
+				cluster,
+				namespace,
+				group: 'helm.toolkit.fluxcd.io',
+				version: 'v2',
+				resource: 'helmreleases'
+			});
 
-				releaseResourceVersion = response.resourceVersion;
-				continueToken = response.continue;
+			releaseResourceVersion = response.resourceVersion;
 
-				releases.push(
-					...response.items.map((item) => item.object as HelmToolkitFluxcdIoV2HelmRelease)
-				);
-			} while (continueToken);
+			releases = response.items.map((item) => item.object as HelmToolkitFluxcdIoV2HelmRelease);
+
+			data = modules.map((module) =>
+				getChartData(
+					module,
+					new Set(
+						releases.map((release) => release.spec?.chart?.spec.chart).filter(Boolean)
+					) as Set<string>,
+					helmRepository!
+				)
+			);
 		} catch (error) {
 			console.error(
 				'OtterScale Charts Helm Releases was not found in namespace otterscale-system.:',
@@ -163,20 +164,12 @@
 		} finally {
 			isReleaseFetching = false;
 		}
-
-		installedModules = new Set(
-			releases.map((release) => release.spec?.chart?.spec.chart).filter(Boolean)
-		) as Set<string>;
 	}
 
-	function rebuildData() {
-		if (!helmRepo || modules.length === 0) return;
-		data = modules
-			.filter((module) => module.name.startsWith('otterscale-'))
-			.map((module) => getChartData(module, installedModules, helmRepo!));
-	}
+	let watchAbortController: AbortController | null = null;
+	let isWatching = $state(false);
 
-	async function watchInstalledModules() {
+	async function watchReleases() {
 		if (isReleaseFetching || isWatching || isDestroyed) return;
 
 		isWatching = true;
@@ -185,7 +178,7 @@
 			const stream = resourceClient.watch(
 				{
 					cluster,
-					namespace: 'otterscale-system',
+					namespace,
 					group: 'helm.toolkit.fluxcd.io',
 					version: 'v2',
 					resource: 'helmreleases',
@@ -207,27 +200,32 @@
 					continue;
 				}
 
-				const release = response.resource?.object as HelmToolkitFluxcdIoV2HelmRelease;
-				const chartName = release?.spec?.chart?.spec?.chart;
-
-				releaseResourceVersion = release?.metadata?.resourceVersion;
+				releaseResourceVersion = response.resource?.object?.metadata?.resourceVersion;
 
 				if (response.type === WatchEvent_Type.ADDED) {
-					if (chartName) {
-						installedModules = new Set([...installedModules, chartName]);
-						rebuildData();
-					}
+					const addedRelease = response.resource?.object as HelmToolkitFluxcdIoV2HelmRelease;
+					releases = [...releases, addedRelease];
 				} else if (response.type === WatchEvent_Type.MODIFIED) {
-					// Rebuild to update status etc.
-					rebuildData();
+					const modifiedRelease = response.resource?.object as HelmToolkitFluxcdIoV2HelmRelease;
+					releases = releases.map((release) =>
+						release.metadata?.name === modifiedRelease.metadata?.name ? modifiedRelease : release
+					);
 				} else if (response.type === WatchEvent_Type.DELETED) {
-					if (chartName) {
-						const next = new SvelteSet(installedModules);
-						next.delete(chartName);
-						installedModules = next;
-						rebuildData();
-					}
+					const deletedRelease = response.resource?.object as HelmToolkitFluxcdIoV2HelmRelease;
+					releases = releases.filter(
+						(release) => release.metadata?.name !== deletedRelease.metadata?.name
+					);
 				}
+
+				data = modules.map((module) =>
+					getChartData(
+						module,
+						new Set(
+							releases.map((release) => release.spec?.chart?.spec.chart).filter(Boolean)
+						) as Set<string>,
+						helmRepository!
+					)
+				);
 			}
 		} catch (error) {
 			if (watchAbortController.signal.aborted) return;
@@ -241,24 +239,9 @@
 		}
 	}
 
-	async function fetchData() {
-		if (!namespace) return;
-
-		const helmRepository = await fetchHelmRepository();
-		if (!helmRepository) return;
-		helmRepo = helmRepository;
-
-		const fetchedModules = await fetchModules(helmRepository);
-		if (!fetchedModules) return;
-		modules = fetchedModules;
-
-		await listInstalledModules();
-		rebuildData();
-	}
-
 	function handleReload() {
 		if (!isWatching) {
-			watchInstalledModules();
+			watchReleases();
 			return;
 		}
 		if (watchAbortController) {
@@ -267,10 +250,17 @@
 	}
 
 	onMount(async () => {
-		await fetchData();
-		watchInstalledModules();
+		helmRepository = await fetchHelmRepository();
+		if (!helmRepository) return;
+
+		modules = (await fetchModules(helmRepository)) ?? [];
+		if (!modules) return;
+
+		await listReleases();
+		watchReleases();
 	});
 
+	let isDestroyed = false;
 	onDestroy(() => {
 		isDestroyed = true;
 		if (watchAbortController) {
@@ -279,10 +269,10 @@
 	});
 </script>
 
-{#key cluster + namespace}
+{#key cluster}
 	{#if data}
 		<main class="pb-8">
-			<ModuleViewer {cluster} {namespace} modules={data}>
+			<ModuleViewer {cluster} {namespace} {data}>
 				{#snippet reload()}
 					<Button onclick={handleReload} variant="outline" size="icon">
 						{#if isWatching}
@@ -294,5 +284,7 @@
 				{/snippet}
 			</ModuleViewer>
 		</main>
+	{:else}
+		<!-- Fallback to Dynamic Table -->
 	{/if}
 {/key}
