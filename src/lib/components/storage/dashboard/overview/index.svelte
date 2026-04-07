@@ -18,12 +18,14 @@
 		cluster,
 		start,
 		end,
+		endIsNow = false,
 		isReloading = $bindable()
 	}: {
 		client: PrometheusDriver;
 		cluster: string;
 		start: Date;
 		end: Date;
+		endIsNow?: boolean;
 		isReloading: boolean;
 	} = $props();
 </script>
@@ -39,7 +41,7 @@
 		<UsageCapacity {client} {cluster} bind:isReloading />
 	</div>
 	<div class="col-span-2 row-span-2">
-		<AreaCapacity {client} {cluster} {start} {end} bind:isReloading />
+		<AreaCapacity {client} {cluster} {start} {end} {endIsNow} bind:isReloading />
 	</div>
 	<div class="col-span-2 row-span-2">
 		<PieOSDType {client} {cluster} bind:isReloading />
@@ -51,15 +53,15 @@
 		<TextOSDs {client} {cluster} bind:isReloading />
 	</div>
 	<div class="col-span-4 row-span-2">
-		<BarOSDThroughtput {client} {cluster} {start} {end} bind:isReloading />
+		<BarOSDThroughtput {client} {cluster} {start} {end} {endIsNow} bind:isReloading />
 	</div>
 	<div class="col-span-4 row-span-2">
-		<BarOSDIOPS {client} {cluster} {start} {end} bind:isReloading />
+		<BarOSDIOPS {client} {cluster} {start} {end} {endIsNow} bind:isReloading />
 	</div>
 	<div class="col-span-2">
-		<AreaOSDReadLatency {client} {cluster} {start} {end} bind:isReloading />
+		<AreaOSDReadLatency {client} {cluster} {start} {end} {endIsNow} bind:isReloading />
 	</div>
 	<div class="col-span-2">
-		<AreaOSDWriteLatency {client} {cluster} {start} {end} bind:isReloading />
+		<AreaOSDWriteLatency {client} {cluster} {start} {end} {endIsNow} bind:isReloading />
 	</div>
 </div>

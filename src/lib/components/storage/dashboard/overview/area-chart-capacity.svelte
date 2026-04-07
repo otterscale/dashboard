@@ -20,12 +20,14 @@
 		cluster: _,
 		start,
 		end,
+		endIsNow = false,
 		isReloading = $bindable()
 	}: {
 		client: PrometheusDriver;
 		cluster: string;
 		start: Date;
 		end: Date;
+		endIsNow?: boolean;
 		isReloading: boolean;
 	} = $props();
 	void _;
@@ -53,7 +55,8 @@
 
 	async function fetch(): Promise<void> {
 		const startMs = start.getTime();
-		const endMs = end.getTime();
+		const endMs = endIsNow ? Date.now() : end.getTime();
+		const rangeEnd = new Date(endMs);
 		const step = computeStep(startMs, endMs, 300);
 
 		try {
@@ -64,7 +67,7 @@
 					total: `ceph_cluster_total_bytes{}`
 				},
 				start,
-				end,
+				rangeEnd,
 				step
 			);
 

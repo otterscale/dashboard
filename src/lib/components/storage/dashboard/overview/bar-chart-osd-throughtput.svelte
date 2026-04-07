@@ -2,7 +2,7 @@
 	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { BarChart, type ChartContextValue, Highlight } from 'layerchart';
-	import { PrometheusDriver, type SampleValue } from 'prometheus-query';
+	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 	import { cubicInOut } from 'svelte/easing';
 
@@ -12,7 +12,7 @@
 	import { formatIO } from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
 	import { getLocale } from '$lib/paraglide/runtime';
-	import { computeStep } from '$lib/prometheus';
+	import { computeStep, fetchMultipleFlattenedRange } from '$lib/prometheus';
 
 	// Props
 	let {
@@ -20,12 +20,14 @@
 		cluster: _,
 		start,
 		end,
+		endIsNow = false,
 		isReloading = $bindable()
 	}: {
 		client: PrometheusDriver;
 		cluster: string;
 		start: Date;
 		end: Date;
+		endIsNow?: boolean;
 		isReloading: boolean;
 	} = $props();
 	void _;
@@ -79,15 +81,6 @@
 		}
 	]);
 
-	// Helper functions
-	function combineTrafficData(reads: SampleValue[], writes: SampleValue[]): TrafficData[] {
-		return reads.map((sample: SampleValue, index: number) => ({
-			date: sample.time,
-			Read: sample.value,
-			Write: writes[index]?.value ?? null
-		}));
-	}
-
 	// Auto Update
 	let response = $state({} as MetricsResponse);
 	let isLoading = $state(true);
@@ -95,25 +88,34 @@
 
 	// Data fetching function
 	async function fetch(): Promise<void> {
-		const step = computeStep(start.getTime(), end.getTime(), 300);
+		const startMs = start.getTime();
+		const endMs = endIsNow ? Date.now() : end.getTime();
+		const rangeEnd = new Date(endMs);
+		const step = computeStep(startMs, endMs, 300, 50);
 		try {
-			const [readResponse, writeResponse, latestReadResponse, latestWriteResponse] =
-				await Promise.all([
-					client.rangeQuery(queries.Read, start, end, step),
-					client.rangeQuery(queries.Write, start, end, step),
-					client.instantQuery(queries.Read),
-					client.instantQuery(queries.Write)
-				]);
+			const [points, latestReadResponse, latestWriteResponse] = await Promise.all([
+				fetchMultipleFlattenedRange(
+					client,
+					{ Read: queries.Read, Write: queries.Write },
+					start,
+					rangeEnd,
+					step
+				),
+				client.instantQuery(queries.Read),
+				client.instantQuery(queries.Write)
+			]);
 
-			const reads = readResponse.result[0]?.values ?? [];
-			const writes = writeResponse.result[0]?.values ?? [];
 			const latestReadValue = latestReadResponse.result[0]?.value?.value ?? 0;
 			const latestWriteValue = latestWriteResponse.result[0]?.value?.value ?? 0;
 
 			const { value: readValue, unit: readUnit } = formatIO(latestReadValue);
 			const { value: writeValue, unit: writeUnit } = formatIO(latestWriteValue);
 
-			const traffics = combineTrafficData(reads, writes);
+			const traffics: TrafficData[] = points.map((p) => ({
+				date: p.date as Date,
+				Read: Number(p.Read ?? 0),
+				Write: Number(p.Write ?? 0)
+			}));
 
 			response = {
 				traffics,

@@ -19,12 +19,14 @@
 		cluster: _,
 		start,
 		end,
+		endIsNow = false,
 		isReloading = $bindable()
 	}: {
 		client: PrometheusDriver;
 		cluster: string;
 		start: Date;
 		end: Date;
+		endIsNow?: boolean;
 		isReloading: boolean;
 	} = $props();
 	void _;
@@ -50,10 +52,12 @@
 	const reloadManager = new ReloadManager(fetch);
 
 	async function fetch(): Promise<void> {
-		const step = computeStep(start.getTime(), end.getTime(), 300);
+		const endMs = endIsNow ? Date.now() : end.getTime();
+		const rangeEnd = new Date(endMs);
+		const step = computeStep(start.getTime(), endMs, 300);
 		try {
 			const query = PROMETHEUS_QUERY();
-			const result = await client.rangeQuery(query, start, end, step);
+			const result = await client.rangeQuery(query, start, rangeEnd, step);
 			const values = result.result?.[0]?.values ?? [];
 			response = values.map((v: { time: Date; value: number | string }) => ({
 				date: v.time,

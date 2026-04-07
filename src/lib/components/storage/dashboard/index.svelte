@@ -103,7 +103,14 @@
 				</div>
 				<Tabs.Content value="overview">
 					{#key dashboardTimeRangeKey}
-						<Overview client={prometheusDriver} {cluster} {start} {end} bind:isReloading />
+						<Overview
+							client={prometheusDriver}
+							{cluster}
+							{start}
+							{end}
+							endIsNow={pickerToIsNow}
+							bind:isReloading
+						/>
 					{/key}
 				</Tabs.Content>
 				<Tabs.Content value="analytics">
