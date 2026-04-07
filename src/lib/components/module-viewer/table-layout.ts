@@ -23,7 +23,8 @@ type ModuleAttribute =
 	| 'installable'
 	| 'icon'
 	| 'helmRepository'
-	| 'chart';
+	| 'chart'
+	| 'installedModules';
 
 function getChartDataSchemas(): Record<ModuleAttribute, DataSchemaType> {
 	return {
@@ -40,7 +41,8 @@ function getChartDataSchemas(): Record<ModuleAttribute, DataSchemaType> {
 		installable: 'boolean',
 		icon: 'text',
 		helmRepository: 'object',
-		chart: 'object'
+		chart: 'object',
+		installedModules: 'array'
 	};
 }
 
@@ -59,7 +61,8 @@ function getChartUISchemas(): Record<ModuleAttribute, UISchemaType> {
 		installable: 'boolean',
 		icon: 'text',
 		helmRepository: 'object',
-		chart: 'object'
+		chart: 'object',
+		installedModules: 'array'
 	};
 }
 function getChartData(
@@ -67,11 +70,8 @@ function getChartData(
 	installedModules: Set<string>,
 	helmRepository: SourceToolkitFluxcdIoV1HelmRepository
 ): Record<ModuleAttribute, JsonValue> {
-	const prerequisite = (module.annotations?.['module.otterscale.io/depends-on']?.split(',') ??
-		[]) as string[];
-	console.log('---------------------------------------');
-	console.log(module.name, installedModules, prerequisite);
-	console.log('---------------------------------------');
+	const dependsOn = module.annotations?.['module.otterscale.io/depends-on'] ?? '';
+	const prerequisite = dependsOn.split(',').filter(Boolean);
 	return {
 		'Helm Repository': helmRepository.metadata?.name ?? null,
 		'Chart Name': module.name ?? null,
@@ -88,7 +88,8 @@ function getChartData(
 		annotations: module?.annotations as JsonValue,
 		icon: module.icon as JsonValue,
 		helmRepository: helmRepository as JsonValue,
-		chart: module as unknown as JsonValue
+		chart: module as unknown as JsonValue,
+		installedModules: Array.from(installedModules) as unknown as JsonValue
 	};
 }
 

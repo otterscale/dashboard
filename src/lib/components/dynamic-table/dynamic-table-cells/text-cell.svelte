@@ -17,7 +17,7 @@
 
 <Tooltip.Provider>
 	<Tooltip.Root>
-		<Tooltip.Trigger class="max-w-40 truncate">
+		<Tooltip.Trigger class="w-full truncate text-left">
 			{data}
 		</Tooltip.Trigger>
 		<Tooltip.Content>{data}</Tooltip.Content>

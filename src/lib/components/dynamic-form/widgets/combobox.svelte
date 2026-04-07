@@ -2,19 +2,19 @@
 	import '@sjsf/form/fields/extra-widgets/combobox';
 
 	import type { EnumOption, SchemaValue } from '@sjsf/form/core';
-	import type { Command } from 'bits-ui';
-	import type { Snippet } from 'svelte';
+	import type { Command as CommandType } from 'bits-ui';
+	import type { Snippet as SnippetType } from 'svelte';
 
 	import type { ButtonProps } from '$lib/components/ui/button/button.svelte';
 	export type ComboboxEnumeration = EnumOption<SchemaValue> & {
-		description?: Snippet;
+		description?: SnippetType;
 	};
 	declare module '@sjsf/form' {
 		interface UiOptions {
 			TailoredComboboxEnumerations?: (filterValue: string) => Promise<ComboboxEnumeration[]>;
 			TailoredComboboxVisibility?: number;
 			TailoredComboboxTrigger?: ButtonProps;
-			TailoredComboboxInput?: Command.InputProps;
+			TailoredComboboxInput?: CommandType.InputProps;
 			TailoredComboboxEmptyText?: string;
 			TailoredComboboxPopoverClass?: string;
 		}
@@ -39,26 +39,16 @@
 		uiOptionProps
 	} from '@sjsf/form';
 	import { idMapper, singleOption } from '@sjsf/form/options.svelte';
-	import { getThemeContext } from '@sjsf/shadcn4-theme';
 	import { tick } from 'svelte';
 
-	import CommandSeparator from '$lib/components/ui/command/command-separator.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
+	import * as Command from '$lib/components/ui/command/index.js';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
+	import * as Popover from '$lib/components/ui/popover/index.js';
 	import { cn } from '$lib/utils.js';
 	const ctx = getFormContext();
-	const themeCtx = getThemeContext();
-	const {
-		Popover,
-		PopoverContent,
-		PopoverTrigger,
-		Button,
-		Command: CommandRoot,
-		CommandInput,
-		CommandList,
-		CommandGroup,
-		CommandItem
-	} = $derived(themeCtx.components);
+
 	let {
 		value = $bindable(),
 		config,
@@ -139,8 +129,8 @@
 	}
 </script>
 
-<Popover bind:open>
-	<PopoverTrigger
+<Popover.Root bind:open>
+	<Popover.Trigger
 		class="w-full justify-between"
 		bind:ref={triggerReference}
 		{...disabledProp({}, config, ctx)}
@@ -169,11 +159,11 @@
 				<ChevronsUpDown class="ml-2 size-4 shrink-0 opacity-50" />
 			</Button>
 		{/snippet}
-	</PopoverTrigger>
-	<PopoverContent class="{popoverClass} p-0">
-		<CommandRoot shouldFilter={false}>
-			<CommandInput bind:value={filterValue} />
-			<CommandList>
+	</Popover.Trigger>
+	<Popover.Content class="{popoverClass} p-0">
+		<Command.Root shouldFilter={false}>
+			<Command.Input bind:value={filterValue} />
+			<Command.List>
 				{#if filteredOptions.length === 0}
 					<Empty.Root>
 						<Empty.Header>
@@ -184,9 +174,9 @@
 						</Empty.Header>
 					</Empty.Root>
 				{/if}
-				<CommandGroup>
+				<Command.Group>
 					{#each filteredOptions.slice(0, visibleOptions) as option (option.id)}
-						<CommandItem
+						<Command.Item
 							value={option.value as string}
 							onSelect={() => {
 								optionsManager.current = option.id;
@@ -210,21 +200,21 @@
 									{/if}
 								</Item.Content>
 							</Item.Root>
-						</CommandItem>
+						</Command.Item>
 					{/each}
-				</CommandGroup>
+				</Command.Group>
 				{#if filteredOptions.length > visibleOptions}
-					<CommandSeparator />
-					<CommandItem
+					<Command.Separator />
+					<Command.Item
 						class="flex w-full items-center justify-center rounded-t-none hover:bg-muted"
 						onclick={() => {
 							visibleOptions += visibility;
 						}}
 					>
 						<PlusIcon />
-					</CommandItem>
+					</Command.Item>
 				{/if}
-			</CommandList>
-		</CommandRoot>
-	</PopoverContent>
-</Popover>
+			</Command.List>
+		</Command.Root>
+	</Popover.Content>
+</Popover.Root>
