@@ -5,6 +5,7 @@
 
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import InstancePicker from '$lib/components/dashbaord/cluster/analytics/instance-picker.svelte';
 	import { Reloader } from '$lib/components/custom/reloader';
 	import { WidgetGrid } from '$lib/components/custom/widget-grid';
 	import { Dashboard } from '$lib/components/dashbaord/cluster/analytics';
@@ -30,6 +31,8 @@
 	let isReloading = $state(true);
 	let prometheusDriver = $state<PrometheusDriver | null>(null);
 	let selectedTab = $state('overview');
+	/** Node / instance filter for analytics; aligned with Reloader like model dashboard ModelPicker */
+	let selectedInstance = $state<string | undefined>(undefined);
 
 	onMount(async () => {
 		try {
@@ -72,7 +75,16 @@
 							<Tabs.Trigger value="overview">{m.overview()}</Tabs.Trigger>
 							<Tabs.Trigger value="analytics">{m.analytics()}</Tabs.Trigger>
 						</Tabs.List>
-						<div class="flex items-center gap-2">
+						<div class="flex flex-wrap items-center justify-end gap-2">
+							<div
+								class="flex min-h-9 min-w-[11rem] shrink-0 items-center justify-end sm:min-w-[12rem] {selectedTab !==
+								'analytics'
+									? 'pointer-events-none invisible select-none'
+									: ''}"
+								aria-hidden={selectedTab !== 'analytics'}
+							>
+								<InstancePicker prometheusDriver={prometheusDriver} bind:selectedInstance />
+							</div>
 							<Reloader bind:checked={isReloading} />
 						</div>
 					</div>
@@ -84,7 +96,7 @@
 						</div>
 					</Tabs.Content>
 					<Tabs.Content value="analytics">
-						<Dashboard {cluster} client={prometheusDriver} />
+						<Dashboard {cluster} client={prometheusDriver} bind:selectedInstance />
 					</Tabs.Content>
 				</Tabs.Root>
 			</div>

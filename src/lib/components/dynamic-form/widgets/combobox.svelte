@@ -89,7 +89,7 @@
 	});
 
 	const optionsProxy = $derived(
-		enumerationsProvider
+		enumerations
 			? enumerations.map(
 					(enumeration, index) =>
 						({
@@ -100,13 +100,7 @@
 							disabled: enumeration.disabled ?? false
 						}) as ComboboxEnumeration
 				)
-			: (options as ComboboxEnumeration[]).map((enumeration, index) => ({
-					id: getPseudoId(ctx, config.path, index),
-					label: enumeration.label,
-					description: enumeration.description,
-					value: enumeration.value,
-					disabled: enumeration.disabled ?? false
-				}))
+			: (options as ComboboxEnumeration[])
 	);
 	const optionsManager = singleOption({
 		mapper: () => idMapper(optionsProxy),

@@ -2,11 +2,11 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import {
-		createForm,
-		setFormContext,
 		type Config,
+		createForm,
 		type FieldPath,
 		type Schema,
+		setFormContext,
 		type UiOption
 	} from '@sjsf/form';
 	import { getContext } from 'svelte';
@@ -66,9 +66,8 @@
 		schema: { type: 'string' },
 		uiSchema: {
 			'ui:options': {
-				TailoredComboboxEnumerations: async (
-					_filter: string
-				): Promise<ComboboxEnumeration[]> => get(modelOptions) as ComboboxEnumeration[],
+				TailoredComboboxEnumerations: async (): Promise<ComboboxEnumeration[]> =>
+					get(modelOptions) as ComboboxEnumeration[],
 				TailoredComboboxVisibility: 50,
 				TailoredComboboxEmptyText: m.no_result(),
 				TailoredComboboxInput: { placeholder: '' },

@@ -8,23 +8,21 @@
 	import { default as NetworkReceived } from './area-chart-network-received.svelte';
 	import { default as NetworkTransmitted } from './area-chart-network-transmitted.svelte';
 	import { default as BasicRAM } from './area-chart-ram.svelte';
-	import InstancePicker from './instance-picker.svelte';
 	import { default as UsageRateUptime } from './text-chart-uptime.svelte';
 	import { default as UsageRateCPU } from './usage-rate-chart-cpu.svelte';
 	import { default as UsageRateRAM } from './usage-rate-chart-ram.svelte';
 	import { default as UsageRateRootFS } from './usage-rate-chart-root-fs.svelte';
 	import { default as UsageRateSWAP } from './usage-rate-chart-swap.svelte';
 
-	let { client, cluster: _cluster }: { cluster?: string; client: PrometheusDriver } = $props();
+	let {
+		client,
+		cluster: _cluster,
+		selectedInstance = $bindable()
+	}: { cluster?: string; client: PrometheusDriver; selectedInstance: string | undefined } = $props();
 	void _cluster;
-
-	let selectedInstance = $state<string | undefined>(undefined);
 </script>
 
 <div class="flex flex-col gap-4">
-	<div class="ml-auto flex flex-wrap items-center gap-2">
-		<InstancePicker prometheusDriver={client} bind:selectedInstance />
-	</div>
 	{#if selectedInstance}
 		{#key selectedInstance}
 			<div class="grid w-full gap-3 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
