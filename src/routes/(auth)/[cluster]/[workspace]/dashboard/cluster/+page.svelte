@@ -5,10 +5,10 @@
 
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import InstancePicker from '$lib/components/dashbaord/cluster/analytics/instance-picker.svelte';
 	import { Reloader } from '$lib/components/custom/reloader';
 	import { WidgetGrid } from '$lib/components/custom/widget-grid';
 	import { Dashboard } from '$lib/components/dashbaord/cluster/analytics';
+	import InstancePicker from '$lib/components/dashbaord/cluster/analytics/instance-picker.svelte';
 	import { widgets } from '$lib/components/dashbaord/cluster/overview/widgets';
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs';
