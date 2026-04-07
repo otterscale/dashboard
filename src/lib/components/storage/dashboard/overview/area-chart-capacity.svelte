@@ -12,7 +12,7 @@
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
-	import { computeStep } from '$lib/prometheus';
+	import { computeStep, fetchMultipleFlattenedRange } from '$lib/prometheus';
 
 	// Props
 	let {
@@ -57,20 +57,27 @@
 		const step = computeStep(startMs, endMs, 300);
 
 		try {
-			const [usedResponse, totalResponse] = await Promise.all([
-				client.rangeQuery(`ceph_cluster_total_used_bytes{}`, start, end, step),
-				client.rangeQuery(`ceph_cluster_total_bytes{}`, start, end, step)
-			]);
+			const points = await fetchMultipleFlattenedRange(
+				client,
+				{
+					used: `ceph_cluster_total_used_bytes{}`,
+					total: `ceph_cluster_total_bytes{}`
+				},
+				start,
+				end,
+				step
+			);
 
-			const usedValues = usedResponse.result[0]?.values ?? [];
-			const totalValues = totalResponse.result[0]?.values ?? [];
-
-			response = usedValues.map((sample: { time: Date; value: number }, index: number) => ({
-				date: sample.time,
-				used: Number(sample.value || 0),
-				total: Number(totalValues[index]?.value || 0),
-				available: Number(totalValues[index]?.value || 0) - Number(sample.value || 0)
-			}));
+			response = points.map((p) => {
+				const used = Number(p.used ?? 0);
+				const total = Number(p.total ?? 0);
+				return {
+					date: p.date as Date,
+					used,
+					total,
+					available: total - used
+				};
+			});
 		} catch (error) {
 			console.error('Failed to fetch capacity data:', error);
 			response = [];
@@ -140,7 +147,7 @@
 						xAxis: {
 							format: (v: Date) =>
 								`${v.getHours().toString().padStart(2, '0')}:${v.getMinutes().toString().padStart(2, '0')}`,
-							ticks: response.length
+							ticks: 12
 						},
 						yAxis: { format: () => '' }
 					}}

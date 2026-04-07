@@ -4,7 +4,7 @@
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
-	import { PrometheusDriver, SampleValue } from 'prometheus-query';
+	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
@@ -12,19 +12,21 @@
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import { formatIO } from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
-	import { computeStep } from '$lib/prometheus';
+	import { computeStep, fetchMultipleFlattenedRange } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
 		namespace,
 		start,
 		end,
+		endIsNow = false,
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		namespace: string;
 		start: Date;
 		end: Date;
+		endIsNow?: boolean;
 		isReloading: boolean;
 	} = $props();
 
@@ -33,46 +35,35 @@
 		write: { label: 'Write', color: 'var(--chart-2)' }
 	} satisfies Chart.ChartConfig;
 
-	let reads: SampleValue[] = $state([]);
-	async function fetchReads() {
-		const step = computeStep(start.getTime(), end.getTime());
-		const response = await prometheusDriver.rangeQuery(
-			`avg(rate(kubevirt_vmi_storage_read_traffic_bytes_total{exported_namespace="${namespace}"}[5m]))`,
-			start,
-			end,
-			step
-		);
-		reads = response.result[0]?.values ?? [];
-	}
-
-	let writes: SampleValue[] = $state([]);
-	async function fetchWrites() {
-		const step = computeStep(start.getTime(), end.getTime());
-		const response = await prometheusDriver.rangeQuery(
-			`avg(rate(kubevirt_vmi_storage_write_traffic_bytes_total{exported_namespace="${namespace}"}[5m]))`,
-			start,
-			end,
-			step
-		);
-		writes = response.result[0]?.values ?? [];
-	}
+	type ThroughputRow = { time: Date; read: number; write: number };
+	let throughputs = $state<ThroughputRow[]>([]);
 
 	async function fetchData() {
 		try {
-			await Promise.all([fetchReads(), fetchWrites()]);
+			const endMs = endIsNow ? Date.now() : end.getTime();
+			const rangeEnd = new Date(endMs);
+			const step = computeStep(start.getTime(), endMs);
+			const points = await fetchMultipleFlattenedRange(
+				prometheusDriver,
+				{
+					read: `avg(rate(kubevirt_vmi_storage_read_traffic_bytes_total{exported_namespace="${namespace}"}[5m]))`,
+					write: `avg(rate(kubevirt_vmi_storage_write_traffic_bytes_total{exported_namespace="${namespace}"}[5m]))`
+				},
+				start,
+				rangeEnd,
+				step
+			);
+			throughputs = points.map((p) => ({
+				time: p.date as Date,
+				read: Number(p.read ?? 0),
+				write: Number(p.write ?? 0)
+			}));
 		} catch (error) {
 			console.error('Failed to fetch throughput data:', error);
+			throughputs = [];
 		}
 	}
 	const reloadManager = new ReloadManager(fetchData);
-
-	const throughputs = $derived(
-		reads.map((sample, index) => ({
-			time: sample.time,
-			read: sample.value,
-			write: writes[index]?.value ?? null
-		}))
-	);
 
 	$effect(() => {
 		if (isReloading) {
@@ -104,7 +95,7 @@
 			</div>
 		</Card.Content>
 	</Card.Root>
-{:else if !reads?.length || !writes?.length}
+{:else if throughputs.length === 0}
 	<Card.Root>
 		<Card.Header class="h-[42px]">
 			<Card.Title>{m.storage_throughPut()}</Card.Title>

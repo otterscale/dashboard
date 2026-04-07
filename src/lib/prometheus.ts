@@ -49,12 +49,17 @@ export function vllmMetricWithSelector(
  *
  * @param startMs  Range start in epoch milliseconds.
  * @param endMs    Range end   in epoch milliseconds.
- * @param minStep  Minimum step in seconds (default 120 = 2 min).
+ * @param minStep    Minimum step in seconds (default 120 = 2 min).
+ * @param maxPoints  Target upper bound on samples per series (default 10 000).
  */
-export function computeStep(startMs: number, endMs: number, minStep = 120): number {
-	const MAX_POINTS = 10_000;
+export function computeStep(
+	startMs: number,
+	endMs: number,
+	minStep = 120,
+	maxPoints = 10_000
+): number {
 	const rangeSeconds = (endMs - startMs) / 1000;
-	return Math.max(minStep, Math.ceil(rangeSeconds / MAX_POINTS));
+	return Math.max(minStep, Math.ceil(rangeSeconds / maxPoints));
 }
 
 export type DataPoint = Record<string, Date | number>;

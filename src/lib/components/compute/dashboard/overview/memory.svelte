@@ -18,12 +18,14 @@
 		namespace,
 		start,
 		end,
+		endIsNow = false,
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		namespace: string;
 		start: Date;
 		end: Date;
+		endIsNow?: boolean;
 		isReloading: boolean;
 	} = $props();
 
@@ -33,11 +35,13 @@
 
 	let memoryUsages: SampleValue[] = $state([]);
 	async function fetchMemoryUsage() {
-		const step = computeStep(start.getTime(), end.getTime());
+		const endMs = endIsNow ? Date.now() : end.getTime();
+		const rangeEnd = new Date(endMs);
+		const step = computeStep(start.getTime(), endMs);
 		const response = await prometheusDriver.rangeQuery(
 			`avg(kubevirt_vmi_memory_resident_bytes{exported_namespace="${namespace}"}) / avg(kubevirt_vmi_memory_domain_bytes{exported_namespace="${namespace}"})`,
 			start,
-			end,
+			rangeEnd,
 			step
 		);
 		memoryUsages = response.result[0]?.values ?? [];

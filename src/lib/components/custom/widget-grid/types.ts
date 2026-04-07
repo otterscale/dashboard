@@ -9,6 +9,8 @@ export type WidgetBaseProps = {
 	start?: Date;
 	/** Query range end time, driven by the DatetimePicker. Defaults to now. */
 	end?: Date;
+	/** When true, each range query uses the current time as the end bound (live window). */
+	endIsNow?: boolean;
 };
 
 /** Widgets that use `juju_model` / cluster-scoped PromQL also receive `cluster` when `needsCluster` is set. */

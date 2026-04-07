@@ -115,6 +115,7 @@
 							{namespace}
 							{start}
 							{end}
+							endIsNow={pickerToIsNow}
 							bind:isReloading
 						/>
 					{/key}

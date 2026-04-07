@@ -18,12 +18,14 @@
 		namespace,
 		start,
 		end,
+		endIsNow = false,
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		namespace: string;
 		start: Date;
 		end: Date;
+		endIsNow?: boolean;
 		isReloading: boolean;
 	} = $props();
 
@@ -33,11 +35,13 @@
 
 	let cpuUsages: SampleValue[] = $state([]);
 	async function fetchCPUUsage() {
-		const step = computeStep(start.getTime(), end.getTime());
+		const endMs = endIsNow ? Date.now() : end.getTime();
+		const rangeEnd = new Date(endMs);
+		const step = computeStep(start.getTime(), endMs);
 		const response = await prometheusDriver.rangeQuery(
 			`avg(rate(kubevirt_vmi_cpu_usage_seconds_total{exported_namespace="${namespace}"}[5m]))`,
 			start,
-			end,
+			rangeEnd,
 			step
 		);
 		cpuUsages = response.result[0]?.values ?? [];

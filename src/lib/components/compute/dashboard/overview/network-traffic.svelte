@@ -4,7 +4,7 @@
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
-	import { PrometheusDriver, SampleValue } from 'prometheus-query';
+	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
@@ -12,19 +12,21 @@
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import { formatIO } from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
-	import { computeStep } from '$lib/prometheus';
+	import { computeStep, fetchMultipleFlattenedRange } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
 		namespace,
 		start,
 		end,
+		endIsNow = false,
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		namespace: string;
 		start: Date;
 		end: Date;
+		endIsNow?: boolean;
 		isReloading: boolean;
 	} = $props();
 
@@ -33,49 +35,36 @@
 		transmit: { label: 'Transmit', color: 'var(--chart-2)' }
 	} satisfies Chart.ChartConfig;
 
-	let receives: SampleValue[] = $state([]);
-	async function fetchReceives() {
-		const step = computeStep(start.getTime(), end.getTime());
-		const response = await prometheusDriver.rangeQuery(
-			`avg(rate(kubevirt_vmi_network_receive_bytes_total{exported_namespace="${namespace}"}[5m]))`,
-			start,
-			end,
-			step
-		);
-		receives = response.result[0]?.values ?? [];
-	}
-
-	let transmits: SampleValue[] = $state([]);
-	async function fetchTransmits() {
-		const step = computeStep(start.getTime(), end.getTime());
-		const response = await prometheusDriver.rangeQuery(
-			`avg(rate(kubevirt_vmi_network_transmit_bytes_total{exported_namespace="${namespace}"}[5m]))`,
-			start,
-			end,
-			step
-		);
-		transmits = response.result[0]?.values ?? [];
-	}
+	type TrafficRow = { time: Date; receive: number; transmit: number };
+	let traffics = $state<TrafficRow[]>([]);
 
 	async function fetch() {
 		try {
-			await Promise.all([fetchReceives(), fetchTransmits()]);
+			const endMs = endIsNow ? Date.now() : end.getTime();
+			const rangeEnd = new Date(endMs);
+			const step = computeStep(start.getTime(), endMs);
+			const points = await fetchMultipleFlattenedRange(
+				prometheusDriver,
+				{
+					receive: `avg(rate(kubevirt_vmi_network_receive_bytes_total{exported_namespace="${namespace}"}[5m]))`,
+					transmit: `avg(rate(kubevirt_vmi_network_transmit_bytes_total{exported_namespace="${namespace}"}[5m]))`
+				},
+				start,
+				rangeEnd,
+				step
+			);
+			traffics = points.map((p) => ({
+				time: p.date as Date,
+				receive: Number(p.receive ?? 0),
+				transmit: Number(p.transmit ?? 0)
+			}));
 		} catch (error) {
 			console.error('Failed to fetch network data:', error);
+			traffics = [];
 		}
 	}
 
 	const reloadManager = new ReloadManager(fetch);
-
-	const traffics = $derived(
-		receives && transmits
-			? receives.map((sample, index) => ({
-					time: sample.time,
-					receive: sample.value,
-					transmit: transmits[index]?.value ?? null
-				}))
-			: []
-	);
 
 	$effect(() => {
 		if (isReloading) {
@@ -107,7 +96,7 @@
 			</div>
 		</Card.Content>
 	</Card.Root>
-{:else if !receives?.length || !transmits?.length}
+{:else if traffics.length === 0}
 	<Card.Root>
 		<Card.Header class="h-[42px]">
 			<Card.Title>{m.network_bandwidth()}</Card.Title>
