@@ -2,7 +2,7 @@
 	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { BarChart, type ChartContextValue, Highlight } from 'layerchart';
-	import { PrometheusDriver, type SampleValue } from 'prometheus-query';
+	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 	import { cubicInOut } from 'svelte/easing';
 
@@ -12,25 +12,29 @@
 	import { formatBigNumber } from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
 	import { getLocale } from '$lib/paraglide/runtime';
+	import { computeStep, fetchMultipleFlattenedRange } from '$lib/prometheus';
 
 	// Props
 	let {
 		client,
 		cluster: _,
+		start,
+		end,
+		endIsNow = false,
 		isReloading = $bindable()
-	}: { client: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
+	}: {
+		client: PrometheusDriver;
+		cluster: string;
+		start: Date;
+		end: Date;
+		endIsNow?: boolean;
+		isReloading: boolean;
+	} = $props();
 	void _;
 
 	// Constants
 	const CHART_TITLE = 'OSD IOPS';
 	const CHART_DESCRIPTION = `${m.read()}/${m.write()}`;
-
-	// Time range calculation
-	const STEP_SECONDS = 60 * 60; // 1 hour
-	const TIME_RANGE_HOURS = 24; // 24 hours of data
-	const MILLISECONDS_PER_HOUR = 60 * 60 * 1000;
-	const endTime = Date.now();
-	const startTime = endTime - TIME_RANGE_HOURS * MILLISECONDS_PER_HOUR;
 
 	// Chart configuration
 	const chartConfig = {
@@ -77,15 +81,6 @@
 		}
 	]);
 
-	// Helper functions
-	function combineTrafficData(reads: SampleValue[], writes: SampleValue[]): TrafficData[] {
-		return reads.map((sample: SampleValue, index: number) => ({
-			date: sample.time,
-			Read: sample.value,
-			Write: writes[index]?.value ?? null
-		}));
-	}
-
 	// Auto Update
 	let response = $state({} as MetricsResponse);
 	let isLoading = $state(true);
@@ -93,21 +88,31 @@
 
 	// Data fetching function
 	async function fetch(): Promise<void> {
+		const startMs = start.getTime();
+		const endMs = endIsNow ? Date.now() : end.getTime();
+		const rangeEnd = new Date(endMs);
+		const step = computeStep(startMs, endMs, 300, 50);
 		try {
-			const [readResponse, writeResponse, latestReadResponse, latestWriteResponse] =
-				await Promise.all([
-					client.rangeQuery(queries.Read, startTime, endTime, STEP_SECONDS),
-					client.rangeQuery(queries.Write, startTime, endTime, STEP_SECONDS),
-					client.instantQuery(queries.Read),
-					client.instantQuery(queries.Write)
-				]);
+			const [points, latestReadResponse, latestWriteResponse] = await Promise.all([
+				fetchMultipleFlattenedRange(
+					client,
+					{ Read: queries.Read, Write: queries.Write },
+					start,
+					rangeEnd,
+					step
+				),
+				client.instantQuery(queries.Read),
+				client.instantQuery(queries.Write)
+			]);
 
-			const reads = readResponse.result[0]?.values ?? [];
-			const writes = writeResponse.result[0]?.values ?? [];
 			const latestReadValue = latestReadResponse.result[0]?.value?.value ?? 0;
 			const latestWriteValue = latestWriteResponse.result[0]?.value?.value ?? 0;
 
-			const traffics = combineTrafficData(reads, writes);
+			const traffics: TrafficData[] = points.map((p) => ({
+				date: p.date as Date,
+				Read: Number(p.Read ?? 0),
+				Write: Number(p.Write ?? 0)
+			}));
 
 			response = {
 				traffics,
@@ -232,7 +237,7 @@
 									day: 'numeric'
 								});
 							},
-							ticks: 24
+							ticks: 12
 						}
 					}}
 				>

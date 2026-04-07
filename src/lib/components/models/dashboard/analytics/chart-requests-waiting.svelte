@@ -11,7 +11,7 @@
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Chart from '$lib/components/ui/chart';
 	import { m } from '$lib/paraglide/messages';
-	import { vllmMetricWithSelector } from '$lib/prometheus';
+	import { computeStep, vllmMetricWithSelector } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -44,11 +44,12 @@
 
 	async function fetch() {
 		try {
+			const endMs = endIsNow ? Date.now() : end.getTime();
 			const response = await prometheusDriver.rangeQuery(
 				getQuery(),
 				start.getTime(),
-				endIsNow ? Date.now() : end.getTime(),
-				2 * 60
+				endMs,
+				computeStep(start.getTime(), endMs)
 			);
 			waitingData = response.result[0]?.values ?? [];
 		} catch {

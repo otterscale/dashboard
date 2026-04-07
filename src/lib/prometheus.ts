@@ -40,6 +40,28 @@ export function vllmMetricWithSelector(
 	return sel ? `${metric}{${sel}}` : `${metric}{}`;
 }
 
+/**
+ * Compute a query step (in seconds) that keeps the total data-point count
+ * safely below the Prometheus 11 000-point-per-series limit.
+ *
+ * For short ranges the returned step equals {@link minStep} so chart
+ * resolution stays unchanged; for longer ranges it scales up automatically.
+ *
+ * @param startMs  Range start in epoch milliseconds.
+ * @param endMs    Range end   in epoch milliseconds.
+ * @param minStep    Minimum step in seconds (default 120 = 2 min).
+ * @param maxPoints  Target upper bound on samples per series (default 10 000).
+ */
+export function computeStep(
+	startMs: number,
+	endMs: number,
+	minStep = 120,
+	maxPoints = 10_000
+): number {
+	const rangeSeconds = (endMs - startMs) / 1000;
+	return Math.max(minStep, Math.ceil(rangeSeconds / maxPoints));
+}
+
 export type DataPoint = Record<string, Date | number>;
 
 const CHART_COLORS = ['chart-1', 'chart-2', 'chart-3', 'chart-4', 'chart-5'];

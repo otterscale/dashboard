@@ -11,6 +11,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
 	import { m } from '$lib/paraglide/messages';
+	import { computeStep } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -43,13 +44,13 @@
 		generation: { label: 'Generation', color: 'var(--chart-2)' }
 	} satisfies Chart.ChartConfig;
 
-	async function fetchPrompts() {
+	async function fetchPrompts(startMs: number, endMs: number, step: number) {
 		try {
 			const response = await prometheusDriver.rangeQuery(
 				`sum(rate(vllm:prompt_tokens_total{}[2m]))`,
-				start.getTime(),
-				endIsNow ? Date.now() : end.getTime(),
-				2 * 60
+				startMs,
+				endMs,
+				step
 			);
 			prompts = response.result[0]?.values ?? [];
 		} catch (error) {
@@ -57,13 +58,13 @@
 		}
 	}
 
-	async function fetchGenerations() {
+	async function fetchGenerations(startMs: number, endMs: number, step: number) {
 		try {
 			const response = await prometheusDriver.rangeQuery(
 				`sum(rate(vllm:generation_tokens_total{}[2m]))`,
-				start.getTime(),
-				endIsNow ? Date.now() : end.getTime(),
-				2 * 60
+				startMs,
+				endMs,
+				step
 			);
 			generations = response.result[0]?.values ?? [];
 		} catch (error) {
@@ -73,7 +74,13 @@
 
 	async function fetch() {
 		try {
-			await Promise.all([fetchPrompts(), fetchGenerations()]);
+			const startMs = start.getTime();
+			const endMs = endIsNow ? Date.now() : end.getTime();
+			const step = computeStep(startMs, endMs);
+			await Promise.all([
+				fetchPrompts(startMs, endMs, step),
+				fetchGenerations(startMs, endMs, step)
+			]);
 		} catch (error) {
 			console.error(`Fail to fetch throughputs data in cluster ${cluster}:`, error);
 		}

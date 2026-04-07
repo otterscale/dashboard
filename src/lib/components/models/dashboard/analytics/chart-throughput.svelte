@@ -11,7 +11,7 @@
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Chart from '$lib/components/ui/chart';
 	import { m } from '$lib/paraglide/messages';
-	import { vllmMetricWithSelector } from '$lib/prometheus';
+	import { computeStep, vllmMetricWithSelector } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -53,13 +53,13 @@
 		generation: { label: 'Generation', color: 'var(--chart-2)' }
 	} satisfies Chart.ChartConfig;
 
-	async function fetchPrompts() {
+	async function fetchPrompts(startMs: number, endMs: number, step: number) {
 		try {
 			const response = await prometheusDriver.rangeQuery(
 				getThroughputQuery('prompt'),
-				start.getTime(),
-				endIsNow ? Date.now() : end.getTime(),
-				2 * 60
+				startMs,
+				endMs,
+				step
 			);
 			prompts = response.result[0]?.values ?? [];
 		} catch {
@@ -67,13 +67,13 @@
 		}
 	}
 
-	async function fetchGenerations() {
+	async function fetchGenerations(startMs: number, endMs: number, step: number) {
 		try {
 			const response = await prometheusDriver.rangeQuery(
 				getThroughputQuery('generation'),
-				start.getTime(),
-				endIsNow ? Date.now() : end.getTime(),
-				2 * 60
+				startMs,
+				endMs,
+				step
 			);
 			generations = response.result[0]?.values ?? [];
 		} catch {
@@ -82,7 +82,10 @@
 	}
 
 	async function fetch() {
-		await Promise.all([fetchPrompts(), fetchGenerations()]);
+		const startMs = start.getTime();
+		const endMs = endIsNow ? Date.now() : end.getTime();
+		const step = computeStep(startMs, endMs);
+		await Promise.all([fetchPrompts(startMs, endMs, step), fetchGenerations(startMs, endMs, step)]);
 	}
 
 	const reloadManager = new ReloadManager(fetch);

@@ -1,12 +1,22 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import Bot from '@lucide/svelte/icons/bot';
 	import { ResourceService } from '@otterscale/api/resource/v1';
+	import {
+		type Config,
+		createForm,
+		type FieldPath,
+		type Schema,
+		setFormContext,
+		type UiOption
+	} from '@sjsf/form';
 	import { getContext } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { writable } from 'svelte/store';
+	import { get, writable } from 'svelte/store';
 
-	import { Single as SingleSelect } from '$lib/components/custom/select';
+	import * as defaults from '$lib/components/dynamic-form/defaults';
+	import ComboboxWidget, {
+		type ComboboxEnumeration
+	} from '$lib/components/dynamic-form/widgets/combobox.svelte';
 	import { m } from '$lib/paraglide/messages';
 
 	let {
@@ -33,6 +43,39 @@
 	}
 
 	let isLoaded = $state(false);
+
+	const schema: Schema = {
+		type: 'object',
+		properties: {
+			picker: { type: 'string', title: ' ' }
+		}
+	};
+
+	const form = createForm<{ picker: string | undefined }>({
+		...defaults,
+		schema,
+		initialValue: { picker: undefined }
+	});
+	setFormContext(form);
+
+	const pickerPath = ['picker'] as unknown as FieldPath;
+
+	const config: Config = $derived({
+		path: pickerPath,
+		title: ' ',
+		schema: { type: 'string' },
+		uiSchema: {
+			'ui:options': {
+				TailoredComboboxEnumerations: async (): Promise<ComboboxEnumeration[]> =>
+					get(modelOptions) as ComboboxEnumeration[],
+				TailoredComboboxVisibility: 50,
+				TailoredComboboxEmptyText: m.no_result(),
+				TailoredComboboxInput: { placeholder: '' },
+				TailoredComboboxPopoverClass: 'w-full min-w-[200px] max-w-md'
+			}
+		},
+		required: false
+	});
 
 	/** Re-fetch when cluster or workspace (namespace) changes — not only on first mount. */
 	$effect(() => {
@@ -84,24 +127,13 @@
 </script>
 
 {#if isLoaded && $modelOptions.length > 0}
-	<SingleSelect.Root options={modelOptions} bind:value={selectedModel}>
-		<SingleSelect.Trigger />
-		<SingleSelect.Content>
-			<SingleSelect.Options>
-				<SingleSelect.Input />
-				<SingleSelect.List>
-					<SingleSelect.Empty>{m.no_result()}</SingleSelect.Empty>
-					<SingleSelect.Group>
-						{#each $modelOptions as option (option.value)}
-							<SingleSelect.Item {option}>
-								<Bot class="size-5" />
-								{option.label}
-								<SingleSelect.Check {option} />
-							</SingleSelect.Item>
-						{/each}
-					</SingleSelect.Group>
-				</SingleSelect.List>
-			</SingleSelect.Options>
-		</SingleSelect.Content>
-	</SingleSelect.Root>
+	<ComboboxWidget
+		type="widget"
+		bind:value={selectedModel}
+		{config}
+		handlers={{}}
+		options={[]}
+		errors={[]}
+		uiOption={(() => undefined) as UiOption}
+	/>
 {/if}

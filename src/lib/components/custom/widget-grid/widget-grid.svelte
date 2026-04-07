@@ -10,6 +10,7 @@
 		namespace,
 		start,
 		end,
+		endIsNow = false,
 		isReloading = $bindable()
 	}: {
 		widgets: WidgetDefinition[];
@@ -18,6 +19,7 @@
 		namespace?: string;
 		start?: Date;
 		end?: Date;
+		endIsNow?: boolean;
 		isReloading: boolean;
 	} = $props();
 </script>
@@ -29,7 +31,7 @@
 		<Component
 			{prometheusDriver}
 			bind:isReloading
-			{...start != null && end != null ? { start, end } : {}}
+			{...start != null && end != null ? { start, end, endIsNow } : {}}
 			{...widget.needsCluster ? { cluster } : {}}
 			{...widget.needsNamespace ? { namespace } : {}}
 			{...props}
