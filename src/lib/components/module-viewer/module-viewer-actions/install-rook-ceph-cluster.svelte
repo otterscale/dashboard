@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { DownloadIcon, FileIcon } from '@lucide/svelte';
+	import { DownloadIcon, FileIcon, RotateCwIcon, SearchIcon } from '@lucide/svelte';
 	import { ResourceService, type SchemaRequest } from '@otterscale/api/resource/v1';
 	import { RuntimeService } from '@otterscale/api/runtime/v1';
 	import type { CoreV1Node, SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
@@ -26,13 +26,15 @@
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import CheckboxesWidget from '$lib/components/dynamic-form/widgets/checkboxes.svelte';
 	import EditorWidget from '$lib/components/dynamic-form/widgets/editor.svelte';
+	import Badge from '$lib/components/ui/badge/badge.svelte';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
+	import Label from '$lib/components/ui/label/label.svelte';
+	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
-	import { m } from '$lib/paraglide/messages';
 
 	import type { ModuleAttribute } from '../table-layout';
 	import { type ModuleType } from '../types';
@@ -47,7 +49,7 @@
 		onOpenChangeComplete: () => void;
 	} = $props();
 
-	const chart: ModuleType = row.original.chart as unknown as ModuleType;
+	const chart = $derived(row.original.chart as unknown as ModuleType);
 
 	const group = 'helm.toolkit.fluxcd.io';
 	const version = 'v2';
@@ -60,31 +62,12 @@
 
 	let jsonSchema: Schema | undefined = $state(undefined);
 
-	let nodeFeatureDiscoveries: Record<string, Record<string, Record<string, string>>> = $state({});
-	let clusterNodeNames: string[] = $state([]);
-	let diskFetchExhaustedEmpty = $state(false);
-	let nodes: any = $state({});
-
-	const NODE_FEATURE_FETCH_MAX_ATTEMPTS = 4;
-	const NODE_FEATURE_FETCH_RETRY_DELAY_MS = 750;
-
-	function hasNodeFeatureData(
-		data: Record<string, Record<string, Record<string, string>>>
-	): boolean {
-		return Object.keys(data).length > 0;
-	}
-
-	function nodeDiskFieldDescription(
-		disks: Record<string, Record<string, string>>,
-		exhaustedEmpty: boolean
-	): string | undefined {
-		if (Object.keys(disks).length > 0) return undefined;
-		if (exhaustedEmpty) return m.install_rook_ceph_no_disk_after_retry();
-		return m.install_rook_ceph_no_disk_this_node();
-	}
-
-	async function fetchNodes() {
-		const next: Record<string, Record<string, Record<string, string>>> = {};
+	let isDiskFeaturesLoading = $state(false);
+	let selectedDisks: any[] = $state([]);
+	let diskFeatures: Record<string, Record<string, Record<string, string>>> | undefined =
+		$state(undefined);
+	async function fetchDiskFeatures() {
+		isDiskFeaturesLoading = true;
 		try {
 			const response = await resourceClient.list({
 				cluster,
@@ -93,12 +76,9 @@
 				resource: 'nodes'
 			});
 
-			const nodeList: CoreV1Node[] = response.items.map((item) => item.object as CoreV1Node);
-			clusterNodeNames = nodeList
-				.map((n) => n.metadata?.name ?? '')
-				.filter(Boolean)
-				.sort((a, b) => a.localeCompare(b));
-			nodeList.forEach((node) =>
+			const temporary = {};
+			const nodes: CoreV1Node[] = response.items.map((item) => item.object as CoreV1Node);
+			nodes.forEach((node) =>
 				Object.entries(node.metadata?.labels ?? {}).forEach(([key, value]) => {
 					const nodeName = node.metadata?.name ?? '';
 
@@ -109,104 +89,18 @@
 
 						const featureName = featureParts.join('-');
 
-						lodash.set(next, [nodeName, diskName, featureName], value);
+						lodash.set(temporary, [nodeName, diskName, featureName], value);
 					}
 				})
 			);
-			nodeFeatureDiscoveries = next;
+			diskFeatures = temporary;
 		} catch (error) {
 			console.error('Failed to fetch nodes:', error);
 			toast.error('Failed to fetch nodes');
+		} finally {
+			isDiskFeaturesLoading = false;
 		}
 	}
-
-	/** Retry until any disk labels appear or attempts are exhausted. */
-	async function fetchNodesUntilPresent() {
-		diskFetchExhaustedEmpty = false;
-		for (let attempt = 0; attempt < NODE_FEATURE_FETCH_MAX_ATTEMPTS; attempt++) {
-			await fetchNodes();
-			if (hasNodeFeatureData(nodeFeatureDiscoveries)) {
-				return;
-			}
-			if (attempt < NODE_FEATURE_FETCH_MAX_ATTEMPTS - 1) {
-				await new Promise((r) => setTimeout(r, NODE_FEATURE_FETCH_RETRY_DELAY_MS));
-			}
-		}
-		if (!hasNodeFeatureData(nodeFeatureDiscoveries)) {
-			diskFetchExhaustedEmpty = true;
-		}
-	}
-
-	const nodeDiskStepSchema = $derived.by((): Schema => {
-		const properties = Object.fromEntries(
-			clusterNodeNames.map((nodeName) => {
-				const disks = nodeFeatureDiscoveries[nodeName] ?? {};
-				const diskEntries = Object.entries(disks);
-				const desc = nodeDiskFieldDescription(disks, diskFetchExhaustedEmpty);
-				if (diskEntries.length === 0) {
-					const field: Record<string, unknown> = {
-						type: 'array',
-						title: nodeName,
-						minItems: 0,
-						maxItems: 0
-					};
-					if (desc) field.description = desc;
-					return [nodeName, field];
-				}
-				const field: Record<string, unknown> = {
-					type: 'array',
-					title: nodeName,
-					minItems: 0,
-					items: {
-						type: 'object',
-						enum: diskEntries.map(([disk, features]) => ({
-							label: disk,
-							description: `${features?.['size-gb']}GB, ${features?.['model']}, ${(features?.['type'] ?? '').toUpperCase()}, ${features?.['fs'] ?? 'empty'}`,
-							value: `/dev/${disk}`,
-							disabled:
-								(features?.['fw'] ?? '').startsWith('EIFZ') ||
-								(features != null && 'fs' in features)
-						}))
-					}
-				};
-				if (desc) field.description = desc;
-				return [nodeName, field];
-			})
-		);
-		return { type: 'object', properties } as Schema;
-	});
-
-	const nodeDiskStepUiSchema = $derived.by(
-		(): UiSchemaRoot => ({
-			'ui:options': {
-				translations: { submit: 'Next' },
-				itemTitle: () => ''
-			},
-			...Object.fromEntries(
-				clusterNodeNames.map((nodeName) => [
-					nodeName,
-					{
-						'ui:options': {
-							layouts: {
-								'array-field': {
-									class:
-										'*:data-[slot=field-description]:line-clamp-none text-amber-600 dark:text-amber-500'
-								}
-							}
-						},
-						'ui:components': {
-							arrayField: 'multiEnumField',
-							checkboxesWidget: CheckboxesWidget
-						}
-					}
-				])
-			)
-		})
-	);
-
-	const nodeDiskStepInitialValue = $derived.by(() =>
-		Object.fromEntries(clusterNodeNames.map((n) => [n, []]))
-	);
 
 	async function fetchSchema() {
 		try {
@@ -269,7 +163,7 @@
 		}
 	});
 
-	async function getDocuments(nodes: any) {
+	async function getDocuments(selectedNodes: any) {
 		const response = await runtimeClient.showChart({
 			repoUrl: helmRepository.spec?.url ?? '',
 			chartName: selectedChart.name ?? '',
@@ -278,7 +172,7 @@
 		const decoder = new TextDecoder();
 
 		const helmReleaseValues = load(decoder.decode(response.values)) as object;
-		if (nodes.length > 0) {
+		if (selectedNodes.length > 0) {
 			lodash.set(
 				helmReleaseValues,
 				['rook-ceph-cluster', 'cephClusterSpec', 'storage', 'useAllNodes'],
@@ -287,7 +181,7 @@
 			lodash.set(
 				helmReleaseValues,
 				['rook-ceph-cluster', 'cephClusterSpec', 'storage', 'nodes'],
-				nodes
+				selectedNodes
 			);
 		}
 		return {
@@ -316,12 +210,42 @@
 	let isSubmitting = $state(false);
 
 	onMount(async () => {
-		await Promise.all([fetchSchema(), fetchNodesUntilPresent()]);
+		await Promise.all([fetchSchema(), fetchDiskFeatures()]);
 	});
 
 	const chartName = $derived(selectedChart.name);
 	const defaultVersion = $derived(selectedChart.version);
 </script>
+
+{#snippet nodeTemplate({ optionValue, disabled }: { optionValue: any; disabled: boolean })}
+	<Item.Root class="p-0">
+		<Item.Content class="text-left">
+			<Item.Title>
+				<Label for={optionValue.id}>{optionValue.label}</Label>
+			</Item.Title>
+			<Item.Description>
+				{@const descriptions = [
+					`${optionValue.metadata.size}GB`,
+					optionValue.metadata.fileSystem,
+					optionValue.metadata.model,
+					optionValue.metadata.type,
+					optionValue.metadata.firmware
+				]}
+				{@const description = descriptions.filter(Boolean).join(' · ')}
+				{description}
+			</Item.Description>
+		</Item.Content>
+		<Item.Actions>
+			{#if disabled}
+				<Badge variant="destructive">Disabled</Badge>
+			{:else if optionValue?.metadata?.firmware?.startsWith('EIFZ')}
+				<Badge variant="secondary">Discouraged</Badge>
+			{:else}
+				<Badge>Available</Badge>
+			{/if}
+		</Item.Actions>
+	</Item.Root>
+{/snippet}
 
 <Dialog.Root
 	bind:open
@@ -474,23 +398,93 @@
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[2]}>
-				{#key `${clusterNodeNames.join('\0')}-${diskFetchExhaustedEmpty}`}
+				{#if !diskFeatures}
+					<Empty.Root class="rounded-lg bg-muted">
+						<Empty.Header>
+							<Empty.Media variant="icon">
+								<SearchIcon />
+							</Empty.Media>
+							<Empty.Title>No Node Features Found</Empty.Title>
+							<Empty.Description>
+								No node features found. Please reload to fetch node features.
+							</Empty.Description>
+						</Empty.Header>
+						<Empty.Content>
+							<Button onclick={fetchDiskFeatures}>
+								{#if isDiskFeaturesLoading}
+									<Spinner />
+								{:else}
+									<RotateCwIcon class="opacity-60" />
+								{/if}
+								Reload
+							</Button>
+						</Empty.Content>
+					</Empty.Root>
+				{:else}
 					<Form
-						schema={nodeDiskStepSchema}
-						uiSchema={nodeDiskStepUiSchema}
-						initialValue={nodeDiskStepInitialValue}
-						values={nodeDiskStepInitialValue}
+						schema={{
+							type: 'object',
+							properties: Object.fromEntries(
+								Object.entries(diskFeatures!).map(([node, disks]) => [
+									[node],
+									{
+										type: 'array',
+										items: {
+											type: 'object',
+											enum: Object.entries(disks).map(([disk, features]) => {
+												if (!features) return;
+
+												const size = features?.['size-gb'] ?? '';
+												const model = features?.['model'] ?? '';
+												const type = features?.['type'].toUpperCase() ?? '';
+												const fileSystem = features?.['fs'] ?? '';
+												const firmware = features?.['fw'] ?? '';
+
+												return {
+													metadata: { size, model, type, fileSystem, firmware },
+													label: disk,
+													value: `/dev/${disk}`,
+													disabled: lodash.has(features, 'fs') ? true : undefined
+												};
+											})
+										}
+									}
+								])
+							)
+						} as Schema}
+						uiSchema={{
+							'ui:options': {
+								translations: {
+									submit: 'Next'
+								},
+								itemTitle: () => ''
+							},
+							...Object.fromEntries(
+								Object.keys(diskFeatures!).map((node) => [
+									[node],
+									{
+										'ui:components': {
+											arrayField: 'multiEnumField',
+											checkboxesWidget: CheckboxesWidget
+										},
+										'ui:options': {
+											TailoredCheckboxesTemplate: nodeTemplate
+										}
+									}
+								])
+							)
+						} as UiSchemaRoot}
+						initialValue={{}}
+						values={{}}
 						handleSubmit={{
 							posthook: (form: FormState<FormValue>) => {
 								handleNext();
 
 								const formValue = getValueSnapshot(form) as Record<string, any[]>;
-								nodes = Object.entries(formValue)
-									.map(([node, disks]) => ({
-										name: node,
-										devices: (disks ?? []).map((disk) => ({ name: disk.value }))
-									}))
-									.filter((n) => n.devices.length > 0);
+								selectedDisks = Object.entries(formValue).map(([node, disks]) => ({
+									name: node,
+									devices: disks.map((disk) => ({ name: disk.value }))
+								}));
 							}
 						}}
 					>
@@ -508,7 +502,7 @@
 							</div>
 						{/snippet}
 					</Form>
-				{/key}
+				{/if}
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[3]} class="min-h-[23vh]">
@@ -517,7 +511,7 @@
 					type: 'string',
 					title: 'Values'
 				} as Schema}
-				{#await getDocuments(nodes)}
+				{#await getDocuments(selectedDisks)}
 					<Form {schema} initialValue={null} values={null}>
 						{#snippet actions()}
 							<div class="flex w-full items-center justify-between gap-3">

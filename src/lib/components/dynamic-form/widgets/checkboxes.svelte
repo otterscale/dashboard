@@ -1,11 +1,14 @@
 <script lang="ts" module>
 	import '@sjsf/form/fields/extra-widgets/checkboxes';
 
+	import type { SchemaValue } from '@sjsf/form/core';
 	import type { CheckboxRootProps as CheckboxProps } from 'bits-ui';
+	import type { Snippet } from 'svelte';
 
 	declare module '@sjsf/form' {
 		interface UiOptions {
 			TailoredCheckboxes?: CheckboxProps;
+			TailoredCheckboxesTemplate?: Snippet<[{ optionValue: SchemaValue }]>;
 		}
 	}
 </script>
@@ -16,13 +19,12 @@
 		customInputAttributes,
 		getFormContext,
 		getId,
-		handlersAttachment
+		handlersAttachment,
+		retrieveUiOption
 	} from '@sjsf/form';
 	import { idMapper, multipleOptions } from '@sjsf/form/options.svelte';
 
 	import Checkbox from '$lib/components/ui/checkbox/checkbox.svelte';
-	import * as Item from '$lib/components/ui/item';
-	import Label from '$lib/components/ui/label/label.svelte';
 
 	const ctx = getFormContext();
 
@@ -32,13 +34,6 @@
 		config,
 		handlers
 	}: ComponentProps['checkboxesWidget'] = $props();
-
-	const mapped = multipleOptions({
-		mapper: () => idMapper(options),
-		value: () => value,
-		update: (v) => (value = v)
-	});
-	const selected = $derived(new Set(mapped.current));
 
 	const { oninput, onchange, ...buttonHandlers } = $derived(handlers);
 
@@ -56,10 +51,23 @@
 			})
 		)
 	);
+
+	const template = $derived(retrieveUiOption(ctx, config, 'TailoredCheckboxesTemplate')) as Snippet<
+		[{ optionValue: SchemaValue; disabled: boolean }]
+	>;
+
+	const mapped = multipleOptions({
+		mapper: () => idMapper(options),
+		value: () => value,
+		update: (v) => (value = v)
+	});
+
+	const selected = $derived(new Set(mapped.current));
 </script>
 
 {#each options as option (option.id)}
 	{@const optionValue: any = option?.value}
+	{@const disabled = optionValue.disabled || attributes.disabled}
 	<div class="flex items-center space-x-3">
 		<Checkbox
 			checked={selected.has(option.id)}
@@ -73,17 +81,9 @@
 			}}
 			{...attributes}
 			id={option.id}
-			disabled={option.disabled || attributes.disabled || optionValue.disabled}
+			{disabled}
+			class="data-[state=checked]:opacity-100"
 		/>
-		<Item.Root class="p-0">
-			<Item.Content class="text-left">
-				<Item.Title>
-					<Label for={option.id}>{optionValue.label}</Label>
-				</Item.Title>
-				<Item.Description>
-					{optionValue.description}
-				</Item.Description>
-			</Item.Content>
-		</Item.Root>
+		{@render template({ optionValue, disabled })}
 	</div>
 {/each}

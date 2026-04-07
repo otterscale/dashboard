@@ -31,6 +31,6 @@
 	href={typeof metadata.hyperlink === 'function' ? metadata.hyperlink() : metadata.hyperlink}
 	class="hover:underline"
 >
-	<p class="max-w-3xs truncate">{data}</p>
+	<p class="truncate">{data}</p>
 </a>
 <!-- eslint-enable svelte/no-navigation-without-resolve -->

@@ -85,12 +85,19 @@
 			'module.otterscale.io/depends-on',
 			''
 		) as string}
-		{@const dependencies = dependsOn.split(',')}
+		{@const dependencies = dependsOn.split(',').filter(Boolean)}
+		{@const installedModules = (row.original.installedModules ?? []) as string[]}
+		{@const prerequisites = dependencies.filter(
+			(dependency) => !installedModules.includes(dependency)
+		)}
 		<div class="flex items-center gap-2">
 			{#if dependsOn}
-				{#each dependencies as dependency, index (index)}
-					<Badge variant="outline">{dependency}</Badge>
+				{#each prerequisites.slice(0, 1) as prerequisite, index (index)}
+					<Badge variant="destructive">{prerequisite}</Badge>
 				{/each}
+				{#if prerequisites.length > 1}
+					<Badge variant="destructive">+{prerequisites.length - 1} more</Badge>
+				{/if}
 			{/if}
 		</div>
 		<div class="ml-auto">
