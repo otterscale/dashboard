@@ -89,9 +89,7 @@
 
 						const featureName = featureParts.join('-');
 
-						if (diskName.startsWith('sd') || diskName.startsWith('nvme')) {
-							lodash.set(temporary, [nodeName, diskName, featureName], value);
-						}
+						lodash.set(temporary, [nodeName, diskName, featureName], value);
 					}
 				})
 			);
@@ -224,11 +222,6 @@
 		<Item.Content class="text-left">
 			<Item.Title>
 				<Label for={optionValue.id}>{optionValue.label}</Label>
-				{#if !disabled}
-					<Badge>Available</Badge>
-				{:else}
-					<Badge variant="secondary">Disabled</Badge>
-				{/if}
 			</Item.Title>
 			<Item.Description>
 				{@const descriptions = [
@@ -242,6 +235,15 @@
 				{description}
 			</Item.Description>
 		</Item.Content>
+		<Item.Actions>
+			{#if disabled}
+				<Badge variant="destructive">Disabled</Badge>
+			{:else if optionValue?.metadata?.firmware?.startsWith('EIFZ')}
+				<Badge variant="secondary">Discouraged</Badge>
+			{:else}
+				<Badge>Available</Badge>
+			{/if}
+		</Item.Actions>
 	</Item.Root>
 {/snippet}
 
@@ -442,10 +444,7 @@
 													metadata: { size, model, type, fileSystem, firmware },
 													label: disk,
 													value: `/dev/${disk}`,
-													disabled:
-														firmware?.startsWith('EIFZ') || lodash.has(features, 'fs')
-															? true
-															: undefined
+													disabled: lodash.has(features, 'fs') ? true : undefined
 												};
 											})
 										}
