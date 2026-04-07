@@ -83,7 +83,7 @@
 									: ''}"
 								aria-hidden={selectedTab !== 'analytics'}
 							>
-								<InstancePicker prometheusDriver={prometheusDriver} bind:selectedInstance />
+								<InstancePicker {prometheusDriver} bind:selectedInstance />
 							</div>
 							<Reloader bind:checked={isReloading} />
 						</div>
