@@ -10,6 +10,7 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
 
+	import BulkInstall from './bulk-install.svelte';
 	import Grid from './grid-layout.svelte';
 	import Actions from './module-viewer-actions/actions.svelte';
 	import {
@@ -75,7 +76,9 @@
 				</Empty.Root>
 			{/if}
 		{/snippet}
-
+		{#snippet bulkCreate({ table })}
+			<BulkInstall {table} {cluster} />
+		{/snippet}
 		{#snippet rowActions({ row })}
 			<Actions {row} {cluster} />
 		{/snippet}

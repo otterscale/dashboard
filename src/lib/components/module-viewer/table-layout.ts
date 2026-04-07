@@ -17,7 +17,6 @@ type ModuleAttribute =
 	| 'Version'
 	| 'Type'
 	| 'Labels'
-	| 'Source'
 	| 'Installed'
 	| 'annotations'
 	| 'installable'
@@ -35,7 +34,6 @@ function getChartDataSchemas(): Record<ModuleAttribute, DataSchemaType> {
 		Version: 'text',
 		Type: 'text',
 		Labels: 'array',
-		Source: 'text',
 		Installed: 'boolean',
 		annotations: 'object',
 		installable: 'boolean',
@@ -55,7 +53,6 @@ function getChartUISchemas(): Record<ModuleAttribute, UISchemaType> {
 		Version: 'text',
 		Type: 'text',
 		Labels: 'array',
-		Source: 'text',
 		Installed: 'boolean',
 		annotations: 'object',
 		installable: 'boolean',
@@ -81,7 +78,6 @@ function getChartData(
 		Type: module.type ?? null,
 		Labels: (module.keywords ?? []) as JsonValue,
 		Installed: installedModules.has(module.name ?? ''),
-		Source: 'index',
 		installable: prerequisite?.every((prerequisite) =>
 			installedModules.has(prerequisite)
 		) as JsonValue,
@@ -104,7 +100,7 @@ function getChartColumnDefinitions(
 		'Type',
 		'Version',
 		'Labels',
-		'Source'
+		'Installed'
 	];
 
 	return columns.map((id) => {
