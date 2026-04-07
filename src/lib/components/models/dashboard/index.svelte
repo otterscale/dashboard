@@ -6,7 +6,9 @@
 	import {
 		CalendarDateTime,
 		DatetimePicker,
-		getLocalTimeZone
+		getLocalTimeZone,
+		minutesAgoCDT,
+		nowCDT
 	} from '$lib/components/custom/datetime-picker';
 	import { NamespacePicker } from '$lib/components/custom/namespace-picker';
 	import { Reloader } from '$lib/components/custom/reloader';
@@ -40,27 +42,6 @@
 	);
 	/** vLLM analytics model filter; lives next to NamespacePicker so chart grid does not shift vertically */
 	let selectedModel = $state<string | undefined>(undefined);
-
-	function nowCDT(): CalendarDateTime {
-		const d = new Date();
-		return new CalendarDateTime(
-			d.getFullYear(),
-			d.getMonth() + 1,
-			d.getDate(),
-			d.getHours(),
-			d.getMinutes()
-		);
-	}
-	function minutesAgoCDT(min: number): CalendarDateTime {
-		const d = new Date(Date.now() - min * 60 * 1000);
-		return new CalendarDateTime(
-			d.getFullYear(),
-			d.getMonth() + 1,
-			d.getDate(),
-			d.getHours(),
-			d.getMinutes()
-		);
-	}
 
 	let pickerFrom = $state<CalendarDateTime>(minutesAgoCDT(60));
 	let pickerTo = $state<CalendarDateTime>(nowCDT());

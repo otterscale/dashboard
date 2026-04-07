@@ -5,7 +5,9 @@
 	import {
 		CalendarDateTime,
 		DatetimePicker,
-		getLocalTimeZone
+		getLocalTimeZone,
+		minutesAgoCDT,
+		nowCDT
 	} from '$lib/components/custom/datetime-picker';
 	import Reloader from '$lib/components/custom/reloader/reloader.svelte';
 	import { Overview } from '$lib/components/storage/dashboard/overview';
@@ -17,27 +19,6 @@
 
 	let isReloading = $state(true);
 	let prometheusDriver = $state<PrometheusDriver | null>(null);
-
-	function nowCDT(): CalendarDateTime {
-		const d = new Date();
-		return new CalendarDateTime(
-			d.getFullYear(),
-			d.getMonth() + 1,
-			d.getDate(),
-			d.getHours(),
-			d.getMinutes()
-		);
-	}
-	function minutesAgoCDT(min: number): CalendarDateTime {
-		const d = new Date(Date.now() - min * 60 * 1000);
-		return new CalendarDateTime(
-			d.getFullYear(),
-			d.getMonth() + 1,
-			d.getDate(),
-			d.getHours(),
-			d.getMinutes()
-		);
-	}
 
 	let pickerFrom = $state<CalendarDateTime>(minutesAgoCDT(60));
 	let pickerTo = $state<CalendarDateTime>(nowCDT());
