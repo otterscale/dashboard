@@ -7,7 +7,9 @@
 	import {
 		type GetRequest,
 		ResourceService,
-		type SchemaRequest
+		type SchemaRequest,
+		WatchEvent_Type,
+		type WatchRequest
 	} from '@otterscale/api/resource/v1';
 	import { getContext, onDestroy, onMount } from 'svelte';
 	import { stringify } from 'yaml';
@@ -94,11 +96,73 @@
 		}
 	}
 
+	let isWatching = $state(false);
+	let watchAbortController: AbortController | null = null;
+
+	async function watchResource() {
+		if (isWatching || isDestroyed) return;
+
+		const resourceVersion = object?.metadata?.resourceVersion;
+		if (!resourceVersion) return;
+
+		isWatching = true;
+		watchAbortController = new AbortController();
+
+		try {
+			const stream = resourceClient.watch(
+				{
+					cluster,
+					namespace,
+					group,
+					version,
+					resource,
+					fieldSelector: `metadata.name=${name}`,
+					resourceVersion
+				} as WatchRequest,
+				{ signal: watchAbortController.signal }
+			);
+
+			for await (const event of stream) {
+				// eslint-disable-next-line
+				const response: any = event;
+
+				if (response.type === WatchEvent_Type.ERROR) {
+					continue;
+				}
+
+				if (response.type === WatchEvent_Type.BOOKMARK) {
+					continue;
+				}
+
+				if (response.type === WatchEvent_Type.MODIFIED) {
+					object = response.resource?.object;
+				} else if (response.type === WatchEvent_Type.DELETED) {
+					error = { name: 'Resource Deleted', rawMessage: `${kind} "${name}" has been deleted.` };
+				}
+			}
+		} catch (e) {
+			if (watchAbortController?.signal.aborted) return;
+			console.error('Watch stream ended:', e);
+		} finally {
+			isWatching = false;
+			watchAbortController = null;
+
+			// Reconnect if not destroyed
+			if (!isDestroyed) {
+				await sleep(2000);
+				await GetResource();
+				await watchResource();
+			}
+		}
+	}
+
+	const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 	let isMounted = $state(false);
 	onMount(async () => {
 		await GetResource();
-
 		isMounted = true;
+		watchResource();
 	});
 
 	let isDestroyed = $state(false);
@@ -107,6 +171,9 @@
 
 		if (getAbortController) {
 			getAbortController.abort();
+		}
+		if (watchAbortController) {
+			watchAbortController.abort();
 		}
 	});
 </script>

@@ -1,12 +1,5 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import {
-		CircleIcon,
-		FileSearchIcon,
-		ScrollTextIcon,
-		TerminalSquareIcon,
-		XIcon
-	} from '@lucide/svelte';
 	import Box from '@lucide/svelte/icons/box';
 	import HeartPulse from '@lucide/svelte/icons/heart-pulse';
 	import Layers from '@lucide/svelte/icons/layers';
@@ -19,19 +12,16 @@
 	import { getContext, onMount } from 'svelte';
 
 	import { page } from '$app/state';
-	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
-	import Log from '$lib/components/kind-viewer/kind-viewer-actions/default/log.svelte';
-	import Terminal from '$lib/components/kind-viewer/kind-viewer-actions/default/terminal.svelte';
 	import { typographyVariants } from '$lib/components/typography/index.ts';
-	import { Badge } from '$lib/components/ui/badge';
-	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
-	import * as Dialog from '$lib/components/ui/dialog/index.ts';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import Label from '$lib/components/ui/label/label.svelte';
 	import { cn } from '$lib/utils';
+
+	import DeploymentCard from '../related-resources-viewer/deployment.svelte';
+	import PodCard from '../related-resources-viewer/pod.svelte';
 
 	let { object }: { object: ModelOtterscaleIoV1Alpha1ModelService } = $props();
 
@@ -46,34 +36,6 @@
 		return Object.entries(labels)
 			.map(([key, value]) => `${key}=${value}`)
 			.join(',');
-	}
-
-	function getContainerReadies(pod: CoreV1Pod): number {
-		const containerStatuses = pod?.status?.containerStatuses ?? [];
-		const readyContainers = containerStatuses.filter(
-			(containerStatus) => containerStatus.ready
-		).length;
-
-		return readyContainers;
-	}
-
-	function getContainerRestarts(pod: CoreV1Pod): number {
-		return (pod?.status?.containerStatuses ?? []).reduce(
-			(a, containerStatus) => a + (containerStatus.restartCount ?? 0),
-			0
-		);
-	}
-
-	function getPodStatus(pod: CoreV1Pod): string {
-		const waitingReason = pod?.status?.containerStatuses?.find(
-			(containerStatus) => containerStatus.state?.waiting
-		)?.state?.waiting?.reason;
-
-		const terminatedReason = pod?.status?.containerStatuses?.find(
-			(containerStatus) => containerStatus.state?.terminated
-		)?.state?.terminated?.reason;
-
-		return waitingReason ?? terminatedReason ?? pod?.status?.phase ?? 'Unknown';
 	}
 
 	let deployments: AppsV1Deployment[] = $state([]);
@@ -277,61 +239,11 @@
 	</Field.Set>
 
 	<Field.Set>
-		<Label class={typographyVariants({ variant: 'h4' })}>Deployments</Label>
+		<Label class={typographyVariants({ variant: 'h4' })}>Related Resources</Label>
 		{#if deployments.length > 0}
 			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
 				{#each deployments as deployment, index (index)}
-					<Card.Root>
-						<Card.Header>
-							<Card.Title>{deployment?.metadata?.name}</Card.Title>
-							<Card.Description>
-								{@const availability = deployment.status?.conditions?.find(
-									(condition) => condition.type === 'Available'
-								)}
-								{#if availability?.status === 'True'}
-									<Badge>Available</Badge>
-								{:else}
-									<Badge variant="destructive">Unavailable</Badge>
-								{/if}
-							</Card.Description>
-							<Card.Action>
-								<Describe
-									{cluster}
-									namespace={deployment?.metadata?.namespace ?? namespace}
-									group="apps"
-									version="v1"
-									resource="deployments"
-									object={deployment}
-								>
-									{#snippet trigger()}
-										<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost' }))}>
-											<FileSearchIcon />
-										</Dialog.Trigger>
-									{/snippet}
-								</Describe>
-							</Card.Action>
-						</Card.Header>
-						<Card.Content class="flex flex-col gap-2">
-							{@const conditions = deployment?.status?.conditions ?? []}
-							{#each conditions as condition, index (index)}
-								<Item.Root class="p-0">
-									<Item.Media>
-										{#if condition.status === 'True'}
-											<CircleIcon />
-										{:else}
-											<XIcon />
-										{/if}
-									</Item.Media>
-									<Item.Content>
-										<Item.Title>{condition.type}</Item.Title>
-										<Item.Description>{condition.reason}</Item.Description>
-										{condition.message}
-									</Item.Content>
-									<Item.Actions>{condition.lastUpdateTime}</Item.Actions>
-								</Item.Root>
-							{/each}
-						</Card.Content>
-					</Card.Root>
+					<DeploymentCard {deployment} {cluster} {namespace} />
 				{/each}
 			</div>
 		{:else}
@@ -355,48 +267,7 @@
 		{#if pods.length > 0}
 			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
 				{#each pods as pod, index (index)}
-					<Card.Root>
-						<Card.Header>
-							<Card.Title>{pod?.metadata?.name}</Card.Title>
-							<Card.Description>
-								<Badge>{getPodStatus(pod)}</Badge>
-							</Card.Description>
-							<Card.Action class="flex items-center">
-								<Describe
-									{cluster}
-									namespace={pod?.metadata?.namespace ?? namespace}
-									group=""
-									version="v1"
-									resource="pods"
-									object={pod}
-								>
-									{#snippet trigger()}
-										<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost' }))}>
-											<FileSearchIcon />
-										</Dialog.Trigger>
-									{/snippet}
-								</Describe>
-								<Log {cluster} object={pod} kind="Pod">
-									{#snippet trigger()}
-										<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost' }))}>
-											<ScrollTextIcon />
-										</Dialog.Trigger>
-									{/snippet}
-								</Log>
-								<Terminal {cluster} object={pod}>
-									{#snippet trigger()}
-										<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost' }))}>
-											<TerminalSquareIcon />
-										</Dialog.Trigger>
-									{/snippet}
-								</Terminal>
-							</Card.Action>
-						</Card.Header>
-						<Card.Content class="flex items-center gap-4 text-lg">
-							<p>{getContainerRestarts(pod)} Restart</p>
-							<p>{getContainerReadies(pod)} Ready</p>
-						</Card.Content>
-					</Card.Root>
+					<PodCard {pod} {cluster} {namespace} />
 				{/each}
 			</div>
 		{/if}
