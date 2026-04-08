@@ -143,7 +143,8 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Trigger disabled={rows.filter((row) => row.original.installable).length === 0}>
+	{@const installableModules = rows.filter((row) => row.original.installable).length}
+	<Dialog.Trigger disabled={installableModules === 0}>
 		{#snippet child({ props })}
 			<Button variant="outline" {...props}>
 				<DownloadIcon size={16} />
@@ -156,8 +157,7 @@
 				<Item.Content class="text-left">
 					<Item.Title class="text-xl font-bold">Bulk Install</Item.Title>
 					<Item.Description>
-						Install {rows.filter((row) => row.original.installable).length} module(s) with default values
-						into cluster {cluster}
+						Install {installableModules} module(s) with default values into cluster {cluster}
 					</Item.Description>
 				</Item.Content>
 			</Item.Root>
