@@ -64,6 +64,7 @@
 		// dataSchemas,
 		accessReview,
 		create,
+		bulkCreate,
 		bulkDelete,
 		reload,
 		rowActions = createRawSnippet(() => ({ render: () => '' })),
@@ -75,6 +76,7 @@
 		// dataSchemas: Record<string, DataSchemaType>;
 		accessReview?: Snippet;
 		create?: Snippet;
+		bulkCreate?: Snippet<[{ table: TanStackTabke<Record<string, JsonValue>> }]>;
 		bulkDelete?: Snippet<[{ table: TanStackTabke<Record<string, JsonValue>> }]>;
 		rowActions?: Snippet<[{ row: Row<Record<string, JsonValue>> }]>;
 		reload?: Snippet;
@@ -372,7 +374,7 @@
 			</Button>
 		</ButtonGroup.Root>
 		<DropdownMenu.Root>
-			<DropdownMenu.Trigger>
+			<DropdownMenu.Trigger disabled={mode === 'grid'}>
 				{#snippet child({ props })}
 					<Button variant="outline" size="icon" {...props}>
 						<Columns3Icon size={16} aria-hidden="true" />
@@ -505,6 +507,7 @@
 		<div class="ml-auto flex items-center gap-2">
 			{@render accessReview?.()}
 			{@render create?.()}
+			{@render bulkCreate?.({ table })}
 			{@render bulkDelete?.({ table })}
 			{@render reload?.()}
 		</div>

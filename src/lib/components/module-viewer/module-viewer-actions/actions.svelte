@@ -8,7 +8,7 @@
 
 	import type { ModuleAttribute } from '../table-layout';
 	import Install from './install.svelte';
-	import InstallRookCephCluster from './install-rook-ceph-cluster.svelte';
+	import { getSetUp, type SetUpType } from './setup/index.ts';
 	import View from './view.svelte';
 
 	let {
@@ -25,14 +25,12 @@
 <DropdownMenu.Root bind:open={actionsOpen}>
 	<DropdownMenu.Trigger>
 		{#snippet child({ props })}
-			<div class="flex justify-end">
-				<Button size="icon" variant="ghost" class="shadow-none" aria-label="Actions" {...props}>
-					<Ellipsis size={16} aria-hidden="true" />
-				</Button>
-			</div>
+			<Button size="icon-sm" variant="ghost" class="shadow-none" aria-label="Actions" {...props}>
+				<Ellipsis size={16} aria-hidden="true" />
+			</Button>
 		{/snippet}
 	</DropdownMenu.Trigger>
-	<DropdownMenu.Content align="end">
+	<DropdownMenu.Content align="end" class="w-full">
 		<DropdownMenu.Group>
 			<DropdownMenu.Item
 				onSelect={(e) => {
@@ -41,13 +39,14 @@
 			>
 				<View {row} />
 			</DropdownMenu.Item>
-			{#if row.original.installable && row.original['Chart Name'] === 'otterscale-rook-ceph-cluster'}
+
+			{#if row.original.installable}
 				<DropdownMenu.Item
 					onSelect={(e) => {
 						e.preventDefault();
 					}}
 				>
-					<InstallRookCephCluster
+					<Install
 						{row}
 						{cluster}
 						onOpenChangeComplete={() => {
@@ -55,13 +54,13 @@
 						}}
 					/>
 				</DropdownMenu.Item>
-			{:else if row.original.installable}
+				{@const SetUp: SetUpType = getSetUp(row.original['Chart Name'] as string)}
 				<DropdownMenu.Item
 					onSelect={(e) => {
 						e.preventDefault();
 					}}
 				>
-					<Install
+					<SetUp
 						{row}
 						{cluster}
 						onOpenChangeComplete={() => {
