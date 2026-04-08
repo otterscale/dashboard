@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { TerminalSquareIcon } from '@lucide/svelte';
 	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
@@ -10,8 +11,11 @@
 		nowCDT
 	} from '$lib/components/custom/datetime-picker';
 	import Reloader from '$lib/components/custom/reloader/reloader.svelte';
+	import RookCephViewer from '$lib/components/resource-viewer/viewers/rook-ceph-viewer.svelte';
 	import { Overview } from '$lib/components/storage/dashboard/overview';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Item from '$lib/components/ui/item';
+	import * as Sheet from '$lib/components/ui/sheet';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/paraglide/messages';
 
@@ -63,6 +67,18 @@
 					{m.storage_dashboard_description()}
 				</Item.Description>
 			</Item.Content>
+			<Item.Actions>
+				<Sheet.Root>
+					<Sheet.Trigger>
+						<Button>
+							<TerminalSquareIcon />
+						</Button>
+					</Sheet.Trigger>
+					<Sheet.Content class="min-w-[77vw] overflow-auto p-8">
+						<RookCephViewer {cluster} />
+					</Sheet.Content>
+				</Sheet.Root>
+			</Item.Actions>
 		</Item.Root>
 	</div>
 	{#if prometheusDriver}
@@ -73,6 +89,7 @@
 						<Tabs.Trigger value="overview">{m.overview()}</Tabs.Trigger>
 						<Tabs.Trigger value="analytics" disabled>{m.analytics()}</Tabs.Trigger>
 					</Tabs.List>
+
 					<div class="flex flex-wrap items-center justify-end gap-2">
 						<DatetimePicker
 							bind:from={pickerFrom}

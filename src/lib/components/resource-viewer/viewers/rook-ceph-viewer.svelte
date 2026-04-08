@@ -1,42 +1,48 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import Box from '@lucide/svelte/icons/box';
-	import Database from '@lucide/svelte/icons/database';
+	import FileSearchIcon from '@lucide/svelte/icons/file-search';
 	import HeartPulse from '@lucide/svelte/icons/heart-pulse';
 	import Layers from '@lucide/svelte/icons/layers';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type { CoreV1Pod } from '@otterscale/types';
+	import type {
+		CephRookIoV1CephBlockPool,
+		CephRookIoV1CephCluster,
+		CephRookIoV1CephFilesystem,
+		CephRookIoV1CephObjectStore,
+		CoreV1Pod
+	} from '@otterscale/types';
 	import { getContext, onMount } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 
+	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import { typographyVariants } from '$lib/components/typography/index.ts';
 	import { Badge } from '$lib/components/ui/badge';
+	import { buttonVariants } from '$lib/components/ui/button';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Card from '$lib/components/ui/card';
+	import * as Dialog from '$lib/components/ui/dialog/index.ts';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import Label from '$lib/components/ui/label/label.svelte';
-	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import { cn } from '$lib/utils';
 
-	import CrdResourceCard from '../related-resources-viewer/crd-resource.svelte';
-	import PersistentVolumeCard from '../related-resources-viewer/persistent-volume.svelte';
-	import PersistentVolumeClaimCard from '../related-resources-viewer/persistent-volume-claim.svelte';
-	import PodCard from '../related-resources-viewer/pod.svelte';
-	import StorageClassCard from '../related-resources-viewer/storage-class.svelte';
+	import PodViewer from '../related-resources-viewer/pod.svelte';
 
 	let {
-		cluster,
-		namespace = 'rook-ceph'
+		cluster
 	}: {
 		cluster: string;
-		namespace?: string;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
+	const namespace = 'rook-ceph';
+
 	// L1 - CephClusters
-	let cephClusters = $state<any[]>([]);
+	let cephClusters = $state<CephRookIoV1CephCluster[]>([]);
 
 	async function fetchCephClusters() {
 		try {
@@ -47,46 +53,97 @@
 				version: 'v1',
 				resource: 'cephclusters'
 			});
-			cephClusters = response.items.map((item) => item.object);
+			cephClusters = response.items.map((item) => item.object as CephRookIoV1CephCluster);
 		} catch (error) {
 			console.error('Failed to fetch CephClusters:', error);
 		}
 	}
 
-	// L2 - CRDs
-	const crdDefinitions = [
-		{ key: 'CephBlockPool', resource: 'cephblockpools' },
-		{ key: 'CephFilesystem', resource: 'cephfilesystems' },
-		{ key: 'CephObjectStore', resource: 'cephobjectstores' }
-	];
+	// L2 - CephBlockPools
+	let cephBlockPools = $state<CephRookIoV1CephBlockPool[]>([]);
 
-	let crdResources = $state<Record<string, any[]>>({});
+	async function fetchCephBlockPools() {
+		try {
+			const response = await resourceClient.list({
+				cluster,
+				namespace,
+				group: 'ceph.rook.io',
+				version: 'v1',
+				resource: 'cephblockpools'
+			});
+			cephBlockPools = response.items.map((item) => item.object as CephRookIoV1CephBlockPool);
+		} catch (error) {
+			console.error('Failed to fetch CephBlockPools:', error);
+		}
+	}
 
-	async function fetchCrdResources() {
-		const results = await Promise.allSettled(
-			crdDefinitions.map((def) =>
-				resourceClient.list({
-					cluster,
-					namespace,
-					group: 'ceph.rook.io',
-					version: 'v1',
-					resource: def.resource
-				})
-			)
-		);
+	// L2 - CephFilesystems
+	let cephFilesystems = $state<CephRookIoV1CephFilesystem[]>([]);
 
-		for (let i = 0; i < results.length; i++) {
-			const result = results[i];
-			if (result.status === 'fulfilled') {
-				crdResources[crdDefinitions[i].key] = result.value.items.map((item) => item.object);
-			} else {
-				console.error(`Failed to fetch ${crdDefinitions[i].key}:`, result.reason);
-			}
+	async function fetchCephFilesystems() {
+		try {
+			const response = await resourceClient.list({
+				cluster,
+				namespace,
+				group: 'ceph.rook.io',
+				version: 'v1',
+				resource: 'cephfilesystems'
+			});
+			cephFilesystems = response.items.map((item) => item.object as CephRookIoV1CephFilesystem);
+		} catch (error) {
+			console.error('Failed to fetch CephFilesystems:', error);
+		}
+	}
+
+	// L2 - CephObjectStores
+	let cephObjectStores = $state<CephRookIoV1CephObjectStore[]>([]);
+
+	async function fetchCephObjectStores() {
+		try {
+			const response = await resourceClient.list({
+				cluster,
+				namespace,
+				group: 'ceph.rook.io',
+				version: 'v1',
+				resource: 'cephobjectstores'
+			});
+			cephObjectStores = response.items.map((item) => item.object as CephRookIoV1CephObjectStore);
+		} catch (error) {
+			console.error('Failed to fetch CephObjectStores:', error);
 		}
 	}
 
 	// L3 - Pods
 	let pods = $state<CoreV1Pod[]>([]);
+	let filteredPods = $derived(
+		pods.filter((pod) => selectedPodFilters.has(pod.metadata?.labels?.['app'] ?? ''))
+	);
+
+	const podLabelSelectors = $derived(
+		[...new Set(pods.map((pod) => pod.metadata?.labels?.['app'] ?? '').filter(Boolean))].sort()
+	);
+
+	let selectedPodFilters = $derived(
+		new SvelteSet<string>(
+			podLabelSelectors.find((label) => label === 'rook-ceph-osd-prepare')
+				? ['rook-ceph-osd-prepare']
+				: []
+		)
+	);
+
+	function togglePodFilter(podFilter: string) {
+		if (selectedPodFilters.has(podFilter)) {
+			selectedPodFilters.delete(podFilter);
+		} else {
+			selectedPodFilters.add(podFilter);
+		}
+	}
+	function clearPodFilters() {
+		selectedPodFilters.clear();
+	}
+	function selectAllPodFilters() {
+		podLabelSelectors.forEach((podFilter) => selectedPodFilters.add(podFilter));
+	}
 
 	async function fetchPods() {
 		try {
@@ -103,113 +160,25 @@
 		}
 	}
 
-	// L4 - Storage
-	let storageClasses = $state<any[]>([]);
-	let persistentVolumes = $state<any[]>([]);
-	let persistentVolumeClaims = $state<any[]>([]);
-
-	async function fetchStorage() {
-		const [scResult, pvResult, pvcResult] = await Promise.allSettled([
-			resourceClient.list({
-				cluster,
-				namespace: '',
-				group: 'storage.k8s.io',
-				version: 'v1',
-				resource: 'storageclasses'
-			}),
-			resourceClient.list({
-				cluster,
-				namespace: '',
-				group: '',
-				version: 'v1',
-				resource: 'persistentvolumes'
-			}),
-			resourceClient.list({
-				cluster,
-				namespace: '',
-				group: '',
-				version: 'v1',
-				resource: 'persistentvolumeclaims'
-			})
-		]);
-
-		// Filter StorageClasses by ceph/rook provisioner
-		if (scResult.status === 'fulfilled') {
-			storageClasses = scResult.value.items
-				.map((item) => item.object as any)
-				.filter((sc) => sc?.provisioner?.includes('ceph') || sc?.provisioner?.includes('rook'));
-		}
-
-		const scNames = new Set(storageClasses.map((sc) => sc?.metadata?.name));
-
-		// Filter PVs by ceph StorageClass or CSI driver
-		if (pvResult.status === 'fulfilled') {
-			persistentVolumes = pvResult.value.items
-				.map((item) => item.object as any)
-				.filter(
-					(pv) =>
-						scNames.has(pv?.spec?.storageClassName) ||
-						pv?.spec?.csi?.driver?.includes('ceph') ||
-						pv?.spec?.csi?.driver?.includes('rook')
-				);
-		}
-
-		// Filter PVCs by ceph StorageClass
-		if (pvcResult.status === 'fulfilled') {
-			persistentVolumeClaims = pvcResult.value.items
-				.map((item) => item.object as any)
-				.filter((pvc) => scNames.has(pvc?.spec?.storageClassName));
-		}
-	}
-
-	// L1 helpers
-	function healthVariant(health: string | undefined): 'default' | 'secondary' | 'destructive' {
-		if (health === 'HEALTH_OK') return 'default';
-		if (health === 'HEALTH_WARN') return 'secondary';
-		return 'destructive';
-	}
-
-	function healthLabel(health: string | undefined): string {
-		if (health === 'HEALTH_OK') return 'Healthy';
-		if (health === 'HEALTH_WARN') return 'Warning';
-		if (health === 'HEALTH_ERR') return 'Error';
-		return 'Unknown';
-	}
-
-	function formatGiB(bytes: number | undefined): string {
-		if (!bytes) return '—';
-		return (bytes / 1073741824).toFixed(1) + ' GiB';
-	}
-
-	const totalCrdCount = $derived(
-		Object.values(crdResources).reduce((sum, items) => sum + items.length, 0)
-	);
-
 	onMount(async () => {
 		await Promise.allSettled([
 			fetchCephClusters(),
-			fetchCrdResources(),
-			fetchPods(),
-			fetchStorage()
+			fetchCephBlockPools(),
+			fetchCephFilesystems(),
+			fetchCephObjectStores(),
+			fetchPods()
 		]);
 	});
 </script>
 
 <Field.Group class="pb-8">
-	<!-- L1 - Cluster Health -->
 	<Field.Set>
-		<Label class={typographyVariants({ variant: 'h4' })}>Cluster Health</Label>
 		{#if cephClusters.length > 0}
 			{#each cephClusters as cephCluster, index (index)}
-				{@const health: any = cephCluster?.status?.ceph?.health}
-				{@const phase: any = cephCluster?.status?.phase}
-				{@const capacity: any = cephCluster?.status?.ceph?.capacity}
-				{@const details: any[] = cephCluster?.status?.ceph?.details ?? {}}
-				{@const versions: any[] = cephCluster?.status?.versions?.overall ?? {}}
-				{@const cephVersion: any = Object.keys(versions)[0]}
-
 				<Card.Root class="flex h-full flex-col border-0 bg-muted/50 shadow-none">
 					<Card.Header>
+						{@const health = cephCluster?.status?.ceph?.health}
+
 						<Card.Title>
 							<Item.Root class="p-0">
 								<Item.Media>
@@ -219,64 +188,65 @@
 									<Item.Title class={typographyVariants({ variant: 'h6' })}>
 										{cephCluster?.metadata?.name}
 									</Item.Title>
+									<Item.Description>cephclusters</Item.Description>
 								</Item.Content>
+								<Item.Actions>
+									<Describe
+										{cluster}
+										namespace={cephCluster?.metadata?.namespace ?? namespace}
+										group="ceph.rook.io"
+										version="v1"
+										resource="cephclusters"
+										object={cephCluster}
+									>
+										{#snippet trigger()}
+											<Dialog.Trigger
+												class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}
+											>
+												<FileSearchIcon size={16} />
+											</Dialog.Trigger>
+										{/snippet}
+									</Describe>
+								</Item.Actions>
 							</Item.Root>
 						</Card.Title>
 						<Card.Description>
-							<Badge variant={healthVariant(health)}>{healthLabel(health)}</Badge>
-							{#if phase}
-								<Badge
-									variant={phase === 'Ready'
-										? 'default'
-										: phase === 'Progressing'
-											? 'secondary'
-											: 'destructive'}
-								>
-									{phase}
-								</Badge>
-							{/if}
+							<Badge>{health}</Badge>
 						</Card.Description>
 					</Card.Header>
-					<Card.Content class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-						{@const summaries = [
-							{ name: 'FSID', information: cephCluster?.status?.ceph?.fsid },
-							{
-								name: 'Capacity',
-								information: capacity
-									? `${formatGiB(capacity.bytesUsed)} / ${formatGiB(capacity.bytesTotal)}`
-									: undefined
-							},
-							{ name: 'Ceph Version', information: cephVersion },
-							{
-								name: 'OSD Count',
-								information: cephCluster?.status?.ceph?.versions?.osd
-									? Object.keys(cephCluster.status.ceph.versions.osd)[0]
-									: undefined
-							}
-						]}
-						{#each summaries as item, i (i)}
-							{#if item.information}
-								<Item.Root class="p-0">
-									<Item.Content>
-										<Item.Description>{item.name}</Item.Description>
-										<Item.Title>{item.information}</Item.Title>
-									</Item.Content>
-								</Item.Root>
-							{/if}
-						{/each}
+					<Card.Content class="flex flex-col gap-2">
+						{@const phase = cephCluster?.status?.phase}
+						{@const message = cephCluster?.status?.message}
+						<Item.Root class="p-0">
+							<Item.Content>
+								<Item.Title>
+									{phase}
+								</Item.Title>
+								<Item.Description>
+									{message}
+								</Item.Description>
+							</Item.Content>
+						</Item.Root>
+						{@const details = cephCluster?.status?.ceph?.details ?? {}}
+						{#if Object.keys(details).length > 0}
+							<div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+								{#each Object.entries(details) as [key, value] (key)}
+									{@const detail = value as any}
+									<Item.Root class="p-0">
+										<Item.Content>
+											<Item.Title class="text-sm font-medium"
+												>{key}
+												<Badge variant="outline">{detail.severity}</Badge>
+											</Item.Title>
+											<Item.Description class="text-xs">
+												{detail.message}
+											</Item.Description>
+										</Item.Content>
+									</Item.Root>
+								{/each}
+							</div>
+						{/if}
 					</Card.Content>
-					{#if Object.keys(details).length > 0}
-						<Separator class="mx-4" />
-						<Card.Content class="flex flex-col gap-2">
-							{#each Object.values(details) as detail}
-								<Item.Root class={cn('p-0', '**:text-amber-700')}>
-									<Item.Content>
-										<Item.Description>{detail.message}</Item.Description>
-									</Item.Content>
-								</Item.Root>
-							{/each}
-						</Card.Content>
-					{/if}
 				</Card.Root>
 			{/each}
 		{:else}
@@ -294,34 +264,248 @@
 		{/if}
 	</Field.Set>
 
-	<!-- L2 - CRD Status -->
-	<Field.Set>
-		<Label class={typographyVariants({ variant: 'h4' })}>CRD Status</Label>
-		{#if totalCrdCount > 0}
-			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-				{#each crdDefinitions as def}
-					{#each crdResources[def.key] ?? [] as item, index (index)}
-						<CrdResourceCard
-							object={item}
-							{cluster}
-							{namespace}
-							group="ceph.rook.io"
-							version="v1"
-							resource={def.resource}
-						/>
-					{/each}
-				{/each}
-			</div>
+	<Field.Set class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+		<!-- CephBlockPool -->
+		{#if cephBlockPools.length > 0}
+			{#each cephBlockPools as cephBlockPool, index (index)}
+				<Card.Root class="flex h-full flex-col border-0">
+					<Card.Header>
+						<Card.Title>
+							<Item.Root class="p-0">
+								<Item.Content>
+									<Item.Title class={typographyVariants({ variant: 'h6' })}>
+										{cephBlockPool?.metadata?.name}
+									</Item.Title>
+									<Item.Description>cephblockpools</Item.Description>
+									<Badge variant="default">{cephBlockPool?.status?.phase}</Badge>
+								</Item.Content>
+								<Item.Actions>
+									<Describe
+										{cluster}
+										namespace={cephBlockPool?.metadata?.namespace ?? namespace}
+										group="ceph.rook.io"
+										version="v1"
+										resource="cephblockpools"
+										object={cephBlockPool}
+									>
+										{#snippet trigger()}
+											<Dialog.Trigger
+												class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}
+											>
+												<FileSearchIcon size={16} />
+											</Dialog.Trigger>
+										{/snippet}
+									</Describe>
+								</Item.Actions>
+							</Item.Root>
+						</Card.Title>
+					</Card.Header>
+					<Card.Content>
+						{#if cephBlockPool?.status?.conditions?.length}
+							{#each cephBlockPool.status.conditions as condition, index (index)}
+								<Item.Root
+									class={cn('p-0', condition.status === 'False' ? '**:text-destructive' : '')}
+								>
+									<Item.Content>
+										<Item.Title class="flex items-center gap-2 text-xs">
+											{condition.type}
+											{#if condition.status === 'True'}
+												<Badge variant="default">{condition.reason}</Badge>
+											{:else}
+												<Badge variant="destructive">{condition.reason}</Badge>
+											{/if}
+										</Item.Title>
+										{#if condition.message}
+											<Item.Description class="text-xs">{condition.message}</Item.Description>
+										{/if}
+									</Item.Content>
+								</Item.Root>
+							{/each}
+						{:else}
+							<Item.Root class="p-0">
+								<Item.Content>
+									<Item.Title>{cephBlockPool?.status?.phase}</Item.Title>
+									<Item.Description>
+										{cephBlockPool?.status?.message ?? 'There is no message.'}
+									</Item.Description>
+								</Item.Content>
+							</Item.Root>
+						{/if}
+					</Card.Content>
+				</Card.Root>
+			{/each}
 		{:else}
 			<Empty.Root class="h-full">
 				<Empty.Header>
 					<Empty.Media variant="icon">
 						<Layers />
 					</Empty.Media>
-					<Empty.Title>No CRDs Found</Empty.Title>
-					<Empty.Description>
-						No CephBlockPool, CephFilesystem, or CephObjectStore resources were found.
-					</Empty.Description>
+					<Empty.Title>No CephBlockPool Found</Empty.Title>
+					<Empty.Description>No CephBlockPool resources were found.</Empty.Description>
+				</Empty.Header>
+			</Empty.Root>
+		{/if}
+
+		<!-- CephFilesystem -->
+		{#if cephFilesystems.length > 0}
+			{#each cephFilesystems as cephFilesystem, index (index)}
+				<Card.Root class="flex h-full flex-col border-0">
+					<Card.Header>
+						<Card.Title>
+							<Item.Root class="p-0">
+								<Item.Content>
+									<Item.Title class={typographyVariants({ variant: 'h6' })}>
+										{cephFilesystem?.metadata?.name}
+									</Item.Title>
+									<Item.Description>cephfilesystems</Item.Description>
+									<Badge variant="default">{cephFilesystem?.status?.phase}</Badge>
+								</Item.Content>
+								<Item.Actions>
+									<Describe
+										{cluster}
+										namespace={cephFilesystem?.metadata?.namespace ?? namespace}
+										group="ceph.rook.io"
+										version="v1"
+										resource="cephfilesystems"
+										object={cephFilesystem}
+									>
+										{#snippet trigger()}
+											<Dialog.Trigger
+												class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}
+											>
+												<FileSearchIcon size={16} />
+											</Dialog.Trigger>
+										{/snippet}
+									</Describe>
+								</Item.Actions>
+							</Item.Root>
+						</Card.Title>
+					</Card.Header>
+					<Card.Content>
+						{#if cephFilesystem?.status?.conditions?.length}
+							<Card.Content class="flex flex-col gap-1">
+								{#each cephFilesystem.status.conditions as condition, ci (ci)}
+									<Item.Root
+										class={cn('p-0', condition.status === 'False' ? '**:text-destructive' : '')}
+									>
+										<Item.Content>
+											<Item.Title class="flex items-center gap-2 text-xs">
+												{condition.type}
+												{#if condition.status === 'True'}
+													<Badge variant="default">{condition.reason}</Badge>
+												{:else}
+													<Badge variant="destructive">{condition.reason}</Badge>
+												{/if}
+											</Item.Title>
+											{#if condition.message}
+												<Item.Description class="text-xs">{condition.message}</Item.Description>
+											{/if}
+										</Item.Content>
+									</Item.Root>
+								{/each}
+							</Card.Content>
+						{:else}
+							<Item.Root class="p-0">
+								<Item.Content>
+									<Item.Title>{cephFilesystem?.status?.phase}</Item.Title>
+									<Item.Description>
+										{cephFilesystem?.status?.message ?? 'There is no message.'}
+									</Item.Description>
+								</Item.Content>
+							</Item.Root>
+						{/if}
+					</Card.Content>
+				</Card.Root>
+			{/each}
+		{:else}
+			<Empty.Root class="h-full">
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<Layers />
+					</Empty.Media>
+					<Empty.Title>No CephFilesystem Found</Empty.Title>
+					<Empty.Description>No CephFilesystem resources were found.</Empty.Description>
+				</Empty.Header>
+			</Empty.Root>
+		{/if}
+
+		<!-- CephObjectStore -->
+		{#if cephObjectStores.length > 0}
+			{#each cephObjectStores as cephObjectStore, index (index)}
+				<Card.Root class="flex h-full flex-col border-0">
+					<Card.Header>
+						<Card.Title>
+							<Item.Root class="p-0">
+								<Item.Content>
+									<Item.Title class={typographyVariants({ variant: 'h6' })}>
+										{cephObjectStore?.metadata?.name}
+									</Item.Title>
+									<Item.Description>cephobjectstores</Item.Description>
+									<Badge variant="default">{cephObjectStore?.status?.phase}</Badge>
+								</Item.Content>
+								<Item.Actions>
+									<Describe
+										{cluster}
+										namespace={cephObjectStore?.metadata?.namespace ?? namespace}
+										group="ceph.rook.io"
+										version="v1"
+										resource="cephobjectstores"
+										object={cephObjectStore}
+									>
+										{#snippet trigger()}
+											<Dialog.Trigger
+												class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}
+											>
+												<FileSearchIcon size={16} />
+											</Dialog.Trigger>
+										{/snippet}
+									</Describe>
+								</Item.Actions>
+							</Item.Root>
+						</Card.Title>
+					</Card.Header>
+					<Card.Content>
+						{#if cephObjectStore?.status?.conditions?.length}
+							{#each cephObjectStore.status.conditions as condition, index (index)}
+								<Item.Root
+									class={cn('p-0', condition.status === 'False' ? '**:text-destructive' : '')}
+								>
+									<Item.Content>
+										<Item.Title class="flex items-center gap-2 text-xs">
+											{condition.type}
+											{#if condition.status === 'True'}
+												<Badge variant="default">{condition.reason}</Badge>
+											{:else}
+												<Badge variant="destructive">{condition.reason}</Badge>
+											{/if}
+										</Item.Title>
+										{#if condition.message}
+											<Item.Description class="text-xs">{condition.message}</Item.Description>
+										{/if}
+									</Item.Content>
+								</Item.Root>
+							{/each}
+						{:else}
+							<Item.Root class="p-0">
+								<Item.Content>
+									<Item.Title>{cephObjectStore?.status?.phase}</Item.Title>
+									<Item.Description>
+										{cephObjectStore?.status?.message ?? 'There is no message.'}
+									</Item.Description>
+								</Item.Content>
+							</Item.Root>
+						{/if}
+					</Card.Content>
+				</Card.Root>
+			{/each}
+		{:else}
+			<Empty.Root class="h-full">
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<Layers />
+					</Empty.Media>
+					<Empty.Title>No CephObjectStore Found</Empty.Title>
+					<Empty.Description>No CephObjectStore resources were found.</Empty.Description>
 				</Empty.Header>
 			</Empty.Root>
 		{/if}
@@ -331,11 +515,55 @@
 	<Field.Set>
 		<Label class={typographyVariants({ variant: 'h4' })}>Pods</Label>
 		{#if pods.length > 0}
+			<div class="flex flex-wrap gap-2">
+				{#each podLabelSelectors as labelSelector, index (index)}
+					<Button
+						class="rounded-full text-xs"
+						size="sm"
+						variant={selectedPodFilters.has(labelSelector) ? 'secondary' : 'outline'}
+						onclick={() => togglePodFilter(labelSelector)}
+					>
+						{labelSelector}
+					</Button>
+				{/each}
+				{#if selectedPodFilters.size > 0}
+					<Button
+						class="rounded-full text-xs"
+						size="sm"
+						variant="destructive"
+						onclick={clearPodFilters}
+					>
+						Clear
+					</Button>
+				{:else if selectedPodFilters.size === 0}
+					<Button
+						class="rounded-full text-xs"
+						size="sm"
+						variant="outline"
+						onclick={selectAllPodFilters}
+					>
+						All
+					</Button>
+				{/if}
+			</div>
 			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-				{#each pods as pod, index (index)}
-					<PodCard {pod} {cluster} {namespace} />
+				{#each filteredPods as pod, index (index)}
+					<PodViewer {pod} {cluster} {namespace} />
 				{/each}
 			</div>
+			{#if filteredPods.length === 0}
+				<Empty.Root class="h-full">
+					<Empty.Header>
+						<Empty.Media variant="icon">
+							<Box />
+						</Empty.Media>
+						<Empty.Title>No Pods Match Filter</Empty.Title>
+						<Empty.Description>
+							No pods match the selected filter. Try selecting different labels.
+						</Empty.Description>
+					</Empty.Header>
+				</Empty.Root>
+			{/if}
 		{:else}
 			<Empty.Root class="h-full">
 				<Empty.Header>
@@ -345,57 +573,6 @@
 					<Empty.Title>No Pods Found</Empty.Title>
 					<Empty.Description>
 						No pods were found in the {namespace} namespace.
-					</Empty.Description>
-				</Empty.Header>
-			</Empty.Root>
-		{/if}
-	</Field.Set>
-
-	<!-- L4 - Storage -->
-	<Field.Set>
-		<Label class={typographyVariants({ variant: 'h4' })}>Storage</Label>
-
-		{#if storageClasses.length > 0 || persistentVolumes.length > 0 || persistentVolumeClaims.length > 0}
-			{#if storageClasses.length > 0}
-				<Label class={typographyVariants({ variant: 'h6' })}>StorageClass</Label>
-				<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-					{#each storageClasses as sc, index (index)}
-						<StorageClassCard storageClass={sc} {cluster} />
-					{/each}
-				</div>
-			{/if}
-
-			{#if persistentVolumes.length > 0}
-				<Label class={typographyVariants({ variant: 'h6' })}>PersistentVolume</Label>
-				<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-					{#each persistentVolumes as pv, index (index)}
-						<PersistentVolumeCard persistentVolume={pv} {cluster} />
-					{/each}
-				</div>
-			{/if}
-
-			{#if persistentVolumeClaims.length > 0}
-				<Label class={typographyVariants({ variant: 'h6' })}>PersistentVolumeClaim</Label>
-				<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-					{#each persistentVolumeClaims as pvc, index (index)}
-						<PersistentVolumeClaimCard
-							persistentVolumeClaim={pvc}
-							{cluster}
-							namespace={pvc?.metadata?.namespace ?? ''}
-						/>
-					{/each}
-				</div>
-			{/if}
-		{:else}
-			<Empty.Root class="h-full">
-				<Empty.Header>
-					<Empty.Media variant="icon">
-						<Database />
-					</Empty.Media>
-					<Empty.Title>No Storage Resources</Empty.Title>
-					<Empty.Description>
-						No Ceph-related StorageClass, PersistentVolume, or PersistentVolumeClaim resources were
-						found.
 					</Empty.Description>
 				</Empty.Header>
 			</Empty.Root>

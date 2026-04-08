@@ -8,6 +8,7 @@
 	declare module '@sjsf/form' {
 		interface UiOptions {
 			TailoredCheckboxes?: CheckboxProps;
+			TailoredCheckboxesIsDisabledInvisible?: boolean;
 			TailoredCheckboxesTemplate?: Snippet<[{ optionValue: SchemaValue }]>;
 		}
 	}
@@ -52,6 +53,9 @@
 		)
 	);
 
+	const isDisabledInvisible = $derived(
+		retrieveUiOption(ctx, config, 'TailoredCheckboxesIsDisabledInvisible')
+	) as boolean;
 	const template = $derived(retrieveUiOption(ctx, config, 'TailoredCheckboxesTemplate')) as Snippet<
 		[{ optionValue: SchemaValue; disabled: boolean }]
 	>;
@@ -68,22 +72,24 @@
 {#each options as option (option.id)}
 	{@const optionValue: any = option?.value}
 	{@const disabled = optionValue.disabled || attributes.disabled}
-	<div class="flex items-center space-x-3">
-		<Checkbox
-			checked={selected.has(option.id)}
-			value={option.id}
-			onCheckedChange={(v) => {
-				mapped.current = v
-					? mapped.current.concat(option.id)
-					: mapped.current.filter((id) => id !== option.id);
-				oninput?.();
-				onchange?.();
-			}}
-			{...attributes}
-			id={option.id}
-			{disabled}
-			class="data-[state=checked]:opacity-100"
-		/>
-		{@render template({ optionValue, disabled })}
-	</div>
+	{@const isInvisible = isDisabledInvisible && isDisabledInvisible === true && disabled}
+	{#if !isInvisible}
+		<div class="flex items-center space-x-3">
+			<Checkbox
+				checked={selected.has(option.id)}
+				value={option.id}
+				onCheckedChange={(v) => {
+					mapped.current = v
+						? mapped.current.concat(option.id)
+						: mapped.current.filter((id) => id !== option.id);
+					oninput?.();
+					onchange?.();
+				}}
+				{...attributes}
+				id={option.id}
+				{disabled}
+			/>
+			{@render template({ optionValue, disabled })}
+		</div>
+	{/if}
 {/each}

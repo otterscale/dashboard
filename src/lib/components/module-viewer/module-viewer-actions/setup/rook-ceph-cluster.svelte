@@ -432,8 +432,6 @@
 										items: {
 											type: 'object',
 											enum: Object.entries(disks).map(([disk, features]) => {
-												if (!features) return;
-
 												const size = features?.['size-gb'] ?? '';
 												const model = features?.['model'] ?? '';
 												const type = features?.['type'].toUpperCase() ?? '';
@@ -468,6 +466,7 @@
 											checkboxesWidget: CheckboxesWidget
 										},
 										'ui:options': {
+											TailoredCheckboxesIsDisabledInvisible: true,
 											TailoredCheckboxesTemplate: nodeTemplate
 										}
 									}
