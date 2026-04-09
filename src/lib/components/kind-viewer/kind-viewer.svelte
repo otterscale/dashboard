@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { type JsonValue } from '@bufbuild/protobuf';
 	import { createClient, type Transport } from '@connectrpc/connect';
+	import BanIcon from '@lucide/svelte/icons/ban';
 	import CableIcon from '@lucide/svelte/icons/cable';
 	import UnplugIcon from '@lucide/svelte/icons/unplug';
 	import UsersRoundIcon from '@lucide/svelte/icons/users-round';
@@ -18,6 +19,7 @@
 
 	import { DynamicTable } from '$lib/components/dynamic-table';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import * as Empty from '$lib/components/ui/empty/index.js';
 	import { Toggle } from '$lib/components/ui/toggle';
 
 	import type { DataSchemaType, UISchemaType } from '../dynamic-table/utils';
@@ -66,6 +68,7 @@
 		}
 	}
 
+	let fetchError: Error | null = $state(null);
 	let dataset: Record<string, JsonValue>[] = $state([]);
 	let columnDefinitions: ColumnDef<Record<string, JsonValue>>[] | undefined = $state(undefined);
 
@@ -109,10 +112,11 @@
 					break;
 				}
 			} while (continueToken);
-		} catch (error) {
+		} catch (err) {
 			if (listAbortController.signal.aborted) return;
 
-			console.error('Failed to list resources:', error);
+			console.error('Failed to list resources:', err);
+			fetchError = err instanceof Error ? err : new Error(String(err));
 
 			return null;
 		} finally {
@@ -224,6 +228,7 @@
 
 		dataset = [];
 		resourceVersion = undefined;
+		fetchError = null;
 		isListing = false;
 		isWatching = false;
 
@@ -266,7 +271,22 @@
 	const Actions: ActionsType = $derived(getActions(apiResource.kind));
 </script>
 
-{#if isMounted}
+{#if fetchError}
+	<Empty.Root>
+		<Empty.Header>
+			<Empty.Media class="rounded-full bg-muted p-4">
+				<BanIcon size={36} />
+			</Empty.Media>
+			<Empty.Title class="text-2xl font-bold">Failed to load data</Empty.Title>
+			<Empty.Description>
+				{fetchError.message}
+			</Empty.Description>
+		</Empty.Header>
+		<Empty.Content>
+			<Button onclick={resetAndReload}>Retry</Button>
+		</Empty.Content>
+	</Empty.Root>
+{:else if isMounted}
 	{#if columnDefinitions}
 		<DynamicTable {dataset} {columnDefinitions} {uiSchemas}>
 			{#snippet accessReview()}
