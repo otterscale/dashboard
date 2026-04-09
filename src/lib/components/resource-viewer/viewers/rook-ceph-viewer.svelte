@@ -6,6 +6,7 @@
 	import Layers from '@lucide/svelte/icons/layers';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type {
+		AppsV1Deployment,
 		CephRookIoV1CephBlockPool,
 		CephRookIoV1CephCluster,
 		CephRookIoV1CephFilesystem,
@@ -28,6 +29,7 @@
 	import Label from '$lib/components/ui/label/label.svelte';
 	import { cn } from '$lib/utils';
 
+	import DeploymentViewer from '../related-resources-viewer/deployment.svelte';
 	import PodViewer from '../related-resources-viewer/pod.svelte';
 
 	let {
@@ -113,6 +115,65 @@
 		}
 	}
 
+	// L3 - Deployments
+	let deployments = $state<AppsV1Deployment[]>([]);
+	let filteredDeployments = $derived(
+		deployments.filter((deployment) =>
+			selectedDeploymentFilters.has(
+				deployment.metadata?.labels?.['app.kubernetes.io/part-of'] ?? ''
+			)
+		)
+	);
+
+	const deploymentLabelSelectors = $derived(
+		[
+			...new Set(
+				deployments
+					.map((deployment) => deployment.metadata?.labels?.['app.kubernetes.io/part-of'] ?? '')
+					.filter(Boolean)
+			)
+		].sort()
+	);
+
+	let selectedDeploymentFilters = $derived(
+		new SvelteSet<string>(
+			deploymentLabelSelectors.find((label) => label === 'rook-ceph-operator')
+				? ['rook-ceph-operator']
+				: []
+		)
+	);
+
+	function toggleDeploymentFilter(deploymentFilter: string) {
+		if (selectedDeploymentFilters.has(deploymentFilter)) {
+			selectedDeploymentFilters.delete(deploymentFilter);
+		} else {
+			selectedDeploymentFilters.add(deploymentFilter);
+		}
+	}
+	function clearDeploymentFilters() {
+		selectedDeploymentFilters.clear();
+	}
+	function selectAllDeploymentFilters() {
+		deploymentLabelSelectors.forEach((deploymentFilter) =>
+			selectedDeploymentFilters.add(deploymentFilter)
+		);
+	}
+
+	async function fetchDeployments() {
+		try {
+			const response = await resourceClient.list({
+				cluster,
+				namespace,
+				group: 'apps',
+				version: 'v1',
+				resource: 'deployments'
+			});
+			deployments = response.items.map((item) => item.object as AppsV1Deployment);
+		} catch (error) {
+			console.error('Failed to fetch Deployments:', error);
+		}
+	}
+
 	// L3 - Pods
 	let pods = $state<CoreV1Pod[]>([]);
 	let filteredPods = $derived(
@@ -125,9 +186,11 @@
 
 	let selectedPodFilters = $derived(
 		new SvelteSet<string>(
-			podLabelSelectors.find((label) => label === 'rook-ceph-osd-prepare')
-				? ['rook-ceph-osd-prepare']
-				: []
+			podLabelSelectors.find((label) => label === 'rook-ceph-osd')
+				? ['rook-ceph-osd']
+				: podLabelSelectors.length > 0
+					? [podLabelSelectors[0]]
+					: []
 		)
 	);
 
@@ -166,6 +229,7 @@
 			fetchCephBlockPools(),
 			fetchCephFilesystems(),
 			fetchCephObjectStores(),
+			fetchDeployments(),
 			fetchPods()
 		]);
 	});
@@ -506,6 +570,72 @@
 					</Empty.Media>
 					<Empty.Title>No CephObjectStore Found</Empty.Title>
 					<Empty.Description>No CephObjectStore resources were found.</Empty.Description>
+				</Empty.Header>
+			</Empty.Root>
+		{/if}
+	</Field.Set>
+
+	<!-- L3 - Deployments -->
+	<Field.Set>
+		<Label class={typographyVariants({ variant: 'h4' })}>Deployments</Label>
+		{#if deployments.length > 0}
+			<div class="flex flex-wrap gap-2">
+				{#each deploymentLabelSelectors as labelSelector, index (index)}
+					<Button
+						class="rounded-full text-xs"
+						size="sm"
+						variant={selectedDeploymentFilters.has(labelSelector) ? 'secondary' : 'outline'}
+						onclick={() => toggleDeploymentFilter(labelSelector)}
+					>
+						{labelSelector}
+					</Button>
+				{/each}
+				{#if selectedDeploymentFilters.size > 0}
+					<Button
+						class="rounded-full text-xs"
+						size="sm"
+						variant="destructive"
+						onclick={clearDeploymentFilters}
+					>
+						Clear
+					</Button>
+				{:else if selectedDeploymentFilters.size === 0}
+					<Button
+						class="rounded-full text-xs"
+						size="sm"
+						variant="outline"
+						onclick={selectAllDeploymentFilters}
+					>
+						All
+					</Button>
+				{/if}
+			</div>
+			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+				{#each filteredDeployments as deployment, index (index)}
+					<DeploymentViewer {deployment} {cluster} {namespace} />
+				{/each}
+			</div>
+			{#if filteredDeployments.length === 0}
+				<Empty.Root class="h-full">
+					<Empty.Header>
+						<Empty.Media variant="icon">
+							<Box />
+						</Empty.Media>
+						<Empty.Title>No Deployments Match Filter</Empty.Title>
+						<Empty.Description>No deployments match the selected filter.</Empty.Description>
+					</Empty.Header>
+				</Empty.Root>
+			{/if}
+		{:else}
+			<Empty.Root class="h-full">
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<Layers />
+					</Empty.Media>
+					<Empty.Title>No Deployments Found</Empty.Title>
+					<Empty.Description>
+						No deployments were found in the {namespace} namespace.
+					</Empty.Description>
 				</Empty.Header>
 			</Empty.Root>
 		{/if}

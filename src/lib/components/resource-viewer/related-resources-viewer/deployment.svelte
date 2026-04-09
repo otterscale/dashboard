@@ -1,8 +1,18 @@
 <script lang="ts">
-	import { CircleIcon, FileSearchIcon, XIcon } from '@lucide/svelte';
+	import {
+		CircleIcon,
+		FileSearchIcon,
+		RotateCcwIcon,
+		ScrollTextIcon,
+		TerminalSquareIcon,
+		XIcon
+	} from '@lucide/svelte';
 	import type { AppsV1Deployment } from '@otterscale/types';
 
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
+	import Log from '$lib/components/kind-viewer/kind-viewer-actions/default/log.svelte';
+	import Restart from '$lib/components/kind-viewer/kind-viewer-actions/default/restart.svelte';
+	import Terminal from '$lib/components/kind-viewer/kind-viewer-actions/default/terminal.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
@@ -34,7 +44,7 @@
 				<Badge variant="destructive">Unavailable</Badge>
 			{/if}
 		</Card.Description>
-		<Card.Action>
+		<Card.Action class="flex items-center">
 			<Describe
 				{cluster}
 				namespace={deployment?.metadata?.namespace ?? namespace}
@@ -44,11 +54,40 @@
 				object={deployment}
 			>
 				{#snippet trigger()}
-					<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost' }))}>
-						<FileSearchIcon />
+					<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
+						<FileSearchIcon size={16} />
 					</Dialog.Trigger>
 				{/snippet}
 			</Describe>
+			<Log {cluster} object={deployment} kind="Deployment">
+				{#snippet trigger()}
+					<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
+						<ScrollTextIcon size={16} />
+					</Dialog.Trigger>
+				{/snippet}
+			</Log>
+			<Terminal {cluster} object={deployment}>
+				{#snippet trigger()}
+					<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
+						<TerminalSquareIcon size={16} />
+					</Dialog.Trigger>
+				{/snippet}
+			</Terminal>
+			<Restart
+				{cluster}
+				namespace={deployment?.metadata?.namespace ?? namespace}
+				group="apps"
+				version="v1"
+				kind="Deployment"
+				resource="deployments"
+				object={deployment}
+			>
+				{#snippet trigger()}
+					<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
+						<RotateCcwIcon size={16} />
+					</Dialog.Trigger>
+				{/snippet}
+			</Restart>
 		</Card.Action>
 	</Card.Header>
 	<Card.Content class="flex flex-col gap-2">
