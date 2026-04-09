@@ -4,6 +4,7 @@ import type { Component } from 'svelte';
 
 import type { ModuleAttribute } from '../../table-layout';
 import Default from './default.svelte';
+import HarborDefault from './harbor-default.svelte';
 import RookCephCluster from './rook-ceph-cluster.svelte';
 
 interface SetUpProps {
@@ -14,7 +15,11 @@ interface SetUpProps {
 
 type SetUpType = Component<SetUpProps>;
 
-function getSetUp(chartName: string) {
+function getSetUp(chartName: string, sourceType?: string) {
+	if (sourceType === 'harbor') {
+		return HarborDefault;
+	}
+
 	if (chartName === 'otterscale-rook-ceph-cluster') {
 		return RookCephCluster;
 	} else {

@@ -8,6 +8,7 @@
 		HelmToolkitFluxcdIoV2HelmRelease,
 		SourceToolkitFluxcdIoV1HelmRepository
 	} from '@otterscale/types';
+	import lodash from 'lodash';
 	import semver from 'semver';
 	import { getContext, onDestroy, onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -15,9 +16,18 @@
 	import { version } from '$app/environment';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import {
+		encodeHarborURIComponent,
+		parseHarborHost,
+		parseHarborProjectName
+	} from '$lib/components/artifact-viewer/utils.svelte';
 	import { ModuleViewer } from '$lib/components/module-viewer';
-	import { getChartData, type ModuleAttribute } from '$lib/components/module-viewer/table-layout';
-	import type { ModuleType } from '$lib/components/module-viewer/types';
+	import {
+		getChartData,
+		getChartDataFromHarbor,
+		type ModuleAttribute
+	} from '$lib/components/module-viewer/table-layout';
+	import type { HarborModuleType, ModuleType } from '$lib/components/module-viewer/types';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { breadcrumbs } from '$lib/stores';
@@ -46,6 +56,7 @@
 	// Helm Repository
 	let helmRepository: SourceToolkitFluxcdIoV1HelmRepository | undefined = $state(undefined);
 	let isHelmRepositoryFetching = $state(false);
+	let fromHarbor = $state(false);
 
 	async function fetchHelmRepository(): Promise<SourceToolkitFluxcdIoV1HelmRepository | undefined> {
 		if (isHelmRepositoryFetching) return;
@@ -67,7 +78,11 @@
 				return;
 			}
 
-			return response.object;
+			const repo = response.object as SourceToolkitFluxcdIoV1HelmRepository;
+			fromHarbor =
+				lodash.get(repo, ['metadata', 'labels', 'tenant.otterscale.io/from-harbor']) === 'true';
+
+			return repo;
 		} catch (error) {
 			console.error(
 				'OtterScale Charts Helm Repository was not found in namespace otterscale-system.:',
@@ -81,8 +96,10 @@
 		}
 	}
 
-	// Modules
+	// Modules (index source)
 	let modules: ModuleType[] = $state([]);
+	// Modules (harbor source)
+	let harborModules: HarborModuleType[] = $state([]);
 	let isModuleFetching = $state(false);
 
 	async function fetchModules(
@@ -123,10 +140,69 @@
 		}
 	}
 
+	async function fetchHarborModules(
+		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
+	): Promise<HarborModuleType[] | undefined> {
+		if (isModuleFetching) return;
+
+		isModuleFetching = true;
+
+		try {
+			const harborHost = parseHarborHost(helmRepository);
+			const harborProjectName = parseHarborProjectName(helmRepository);
+			const secretName = helmRepository.spec?.secretRef?.name ?? '';
+			const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')}&latest_in_repository=true`;
+
+			const response = await fetch('/bff/helm/repository/harbor', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					cluster,
+					namespace,
+					harborHost,
+					secretName,
+					apiPath: artifactsUrl
+				})
+			});
+
+			if (!response.ok) {
+				return;
+			}
+
+			const entireModules: HarborModuleType[] = await response.json();
+
+			return entireModules.filter((module) =>
+				(module.extra_attrs?.name ?? '').startsWith('otterscale-')
+			);
+		} catch (error) {
+			const helmRepositoryName = helmRepository.metadata?.name ?? '';
+			console.error(`HelmRepository "${helmRepositoryName}": error fetching Harbor modules:`, error);
+			toast.error(`HelmRepository "${helmRepositoryName}": unable to reach Harbor repository`);
+		} finally {
+			isModuleFetching = false;
+		}
+	}
+
 	// Releases
 	let isReleaseFetching = $state(false);
 	let releases: HelmToolkitFluxcdIoV2HelmRelease[] = $state([]);
 	let releaseResourceVersion: string | undefined = $state(undefined);
+
+	function buildData() {
+		const installedModules = new Set(
+			releases.map((release) => release.spec?.chart?.spec.chart).filter(Boolean)
+		) as Set<string>;
+
+		if (fromHarbor) {
+			data = harborModules.map((module) =>
+				getChartDataFromHarbor(module, installedModules, helmRepository!)
+			);
+		} else {
+			data = modules.map((module) =>
+				getChartData(module, installedModules, helmRepository!)
+			);
+		}
+	}
 
 	async function listReleases() {
 		if (isReleaseFetching) return;
@@ -146,15 +222,7 @@
 
 			releases = response.items.map((item) => item.object as HelmToolkitFluxcdIoV2HelmRelease);
 
-			data = modules.map((module) =>
-				getChartData(
-					module,
-					new Set(
-						releases.map((release) => release.spec?.chart?.spec.chart).filter(Boolean)
-					) as Set<string>,
-					helmRepository!
-				)
-			);
+			buildData();
 		} catch (error) {
 			console.error(
 				'OtterScale Charts Helm Releases was not found in namespace otterscale-system.:',
@@ -217,15 +285,7 @@
 					);
 				}
 
-				data = modules.map((module) =>
-					getChartData(
-						module,
-						new Set(
-							releases.map((release) => release.spec?.chart?.spec.chart).filter(Boolean)
-						) as Set<string>,
-						helmRepository!
-					)
-				);
+				buildData();
 			}
 		} catch (error) {
 			if (watchAbortController.signal.aborted) return;
@@ -253,8 +313,13 @@
 		helmRepository = await fetchHelmRepository();
 		if (!helmRepository) return;
 
-		modules = (await fetchModules(helmRepository)) ?? [];
-		if (!modules) return;
+		if (fromHarbor) {
+			harborModules = (await fetchHarborModules(helmRepository)) ?? [];
+			if (!harborModules.length) return;
+		} else {
+			modules = (await fetchModules(helmRepository)) ?? [];
+			if (!modules.length) return;
+		}
 
 		await listReleases();
 		watchReleases();
