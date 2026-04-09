@@ -1,12 +1,8 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import BanIcon from '@lucide/svelte/icons/ban';
-	import {
-		type APIResource,
-		type DiscoveryRequest,
-		ResourceService
-	} from '@otterscale/api/resource/v1';
-	import type { CoreV1Service } from '@otterscale/types';
+	import { type DiscoveryRequest, ResourceService } from '@otterscale/api/resource/v1';
+	import type { CoreV1ConfigMap } from '@otterscale/types';
 	import { getContext } from 'svelte';
 
 	import { resolve } from '$app/paths';
@@ -32,6 +28,11 @@
 		]);
 	});
 
+	const endpointMap: Record<string, string> = {
+		ModelService: 'ModelGatewayEndpoint',
+		ObjectBucketClaim: 'ObjectGatewayEndpoint'
+	};
+
 	const isClusterAdmin = $derived(page.data.isClusterAdmin === true);
 	const cluster = $derived(page.params.cluster ?? '');
 	const namespace = $derived(page.data.namespace ?? '');
@@ -43,74 +44,31 @@
 	const transport: Transport = getContext('transport');
 	const client = createClient(ResourceService, transport);
 
-	let apiResources = $state<APIResource[]>([]);
 	async function fetchAPIResources(cluster: string, group: string, version: string, kind: string) {
-		const response = await client.discovery({
-			cluster: cluster
-		} as DiscoveryRequest);
+		const response = await client.discovery({ cluster } as DiscoveryRequest);
 
-		apiResources = response.apiResources.filter(
-			(apiResource) =>
-				apiResource &&
-				apiResource.group === group &&
-				apiResource.version === version &&
-				apiResource.kind === kind
+		return response.apiResources.filter(
+			(r) => r && r.group === group && r.version === version && r.kind === kind
 		);
-		return apiResources;
-	}
-
-	async function getExternalIP() {
-		const response = await client.get({
-			cluster,
-			namespace: 'istio-ingress',
-			name: 'gateway-istio',
-			group: '',
-			version: 'v1',
-			resource: 'services'
-		});
-		const service = response.object as CoreV1Service;
-		return (service.spec?.externalIPs ?? [''])[0];
-	}
-
-	async function getServiceNodePort(namespace: string, name: string, portName: string) {
-		const response = await client.get({
-			cluster,
-			namespace,
-			name,
-			group: '',
-			version: 'v1',
-			resource: 'services'
-		});
-		const service = response.object as CoreV1Service;
-		return service?.spec?.ports?.find((p) => p.name === portName)?.nodePort;
 	}
 
 	async function getDescription(kind: string) {
-		if (kind !== 'ModelService' && kind !== 'ObjectBucketClaim') {
-			return `${!group ? 'core' : group}/${version}`;
+		const endpointKey = endpointMap[kind];
+		if (!endpointKey) {
+			return `${group || 'core'}/${version}`;
 		}
 
-		const externalIP = await getExternalIP();
+		const response = await client.get({
+			cluster,
+			namespace,
+			name: 'workspace-config',
+			group: '',
+			version: 'v1',
+			resource: 'configmaps'
+		});
+		const config = (response.object as CoreV1ConfigMap).data;
 
-		if (kind === 'ModelService') {
-			const nodePort = await getServiceNodePort(
-				'llm-d',
-				'otterscale-llm-d-infra-inference-gateway-istio',
-				'default'
-			);
-			return externalIP && nodePort ? `Available at ${externalIP}:${nodePort}` : '';
-		}
-
-		if (kind === 'ObjectBucketClaim') {
-			const nodePort = await getServiceNodePort(
-				'rook-ceph',
-				'rook-ceph-rgw-ceph-objectstore-external',
-				'rgw'
-			);
-			return externalIP && nodePort ? `Available at ${externalIP}:${nodePort}` : '';
-		}
-
-		return '';
+		return config?.[endpointKey] ? `Available at ${config[endpointKey]}` : 'Unavailable';
 	}
 </script>
 
@@ -146,14 +104,7 @@
 				</Item.Root>
 			</div>
 			{#key resource + namespace}
-				{@const apiResource = apiResources.find(
-					(apiResource) =>
-						apiResource &&
-						apiResource.group === group &&
-						apiResource.version === version &&
-						apiResource.kind === kind &&
-						apiResource.resource === resource
-				)}
+				{@const apiResource = apiResources.find((r) => r.resource === resource)}
 				{#if apiResource}
 					<KindViewer {isClusterAdmin} {cluster} {namespace} {apiResource} />
 				{/if}
