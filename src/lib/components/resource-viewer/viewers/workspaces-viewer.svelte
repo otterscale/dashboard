@@ -192,6 +192,13 @@
 				resource: 'resourcequotas'
 			},
 			{
+				ref: status.configMapRef,
+				group: '',
+				version: 'v1',
+				kind: 'ConfigMap',
+				resource: 'configmaps'
+			},
+			{
 				ref: status.limitRangeRef,
 				group: '',
 				version: 'v1',
