@@ -187,7 +187,7 @@
 								repository: `${namespace}/${lodash.get(values, 'metadata.name')}`,
 								tag: 'latest',
 								credentialsSecretRef: { name: 'workspace-image-pull-secret' },
-								insecure: true
+								insecure: harborUrl.protocol === 'http:' ? true : false
 							};
 
 							lodash.set(values, 'spec.target', target);
