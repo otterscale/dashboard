@@ -109,10 +109,15 @@
 
 			const entireModules = await response.json();
 
+			const minVersion = semver.valid(version)
+				? `${semver.major(version)}.${semver.minor(version)}.0`
+				: '1.0.0';
+
 			return entireModules
-				.filter((module: ModuleType) =>
-					semver.gte(module.version, semver.valid(version) ? version : 'v0.0.0')
-				)
+				.filter((module: ModuleType) => {
+					const moduleMinor = `${semver.major(module.version)}.${semver.minor(module.version)}.0`;
+					return semver.gte(moduleMinor, minVersion);
+				})
 				.filter((module: ModuleType) => module.name.startsWith('otterscale-'));
 		} catch (error) {
 			const helmRepositoryName = helmRepository.metadata?.name ?? '';
