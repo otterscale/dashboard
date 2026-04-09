@@ -15,6 +15,10 @@
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
+	import {
+		encodeHarborURIComponent,
+		parseHarborHost
+	} from '$lib/components/artifact-viewer/utils.svelte';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import EditorWidget from '$lib/components/dynamic-form/widgets/editor.svelte';
 	import { buttonVariants } from '$lib/components/ui/button';
@@ -26,10 +30,6 @@
 
 	import type { ModuleAttribute } from '../../table-layout';
 	import { type HarborModuleType } from '../../types';
-	import {
-		encodeHarborURIComponent,
-		parseHarborHost
-	} from '$lib/components/artifact-viewer/utils.svelte';
 
 	let {
 		row,
@@ -95,7 +95,6 @@
 	let value = $derived(stringify(values));
 
 	const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
-	const namespace = helmRepository.metadata?.namespace ?? 'otterscale-system';
 
 	// Fetch chart versions from Harbor
 	let charts: HarborModuleType[] = $state([]);
@@ -103,7 +102,6 @@
 		const [project, ...chartNameParts] = chart.repository_name.split('/');
 		const repository = chartNameParts.join('/');
 		const harborHost = parseHarborHost(helmRepository);
-		const secretName = helmRepository?.spec?.secretRef?.name ?? '';
 
 		try {
 			const projectPath = encodeHarborURIComponent(project);
@@ -114,10 +112,7 @@
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
-					cluster,
-					namespace,
 					harborHost,
-					secretName,
 					apiPath: artifactsUrl
 				})
 			});
@@ -133,14 +128,10 @@
 
 	let selectedChart: HarborModuleType = $derived(charts[0] || ({} as HarborModuleType));
 	function getVersions() {
-		return charts.map(
-			(c) => lodash.get(c.extra_attrs, 'version') as unknown as string
-		);
+		return charts.map((c) => lodash.get(c.extra_attrs, 'version') as unknown as string);
 	}
 	function getSelectedChart(ver: string) {
-		return (
-			charts.find((c) => lodash.get(c.extra_attrs, 'version') === ver) ?? charts[0]
-		);
+		return charts.find((c) => lodash.get(c.extra_attrs, 'version') === ver) ?? charts[0];
 	}
 	$effect(() => {
 		const ver = lodash.get(values, 'spec.chart.spec.version') as unknown as string;
@@ -153,7 +144,6 @@
 		const [project, ...chartNameParts] = chart.repository_name.split('/');
 		const repository = chartNameParts.join('/');
 		const harborHost = parseHarborHost(helmRepository);
-		const secretName = helmRepository?.spec?.secretRef?.name ?? '';
 
 		const projectPath = encodeHarborURIComponent(project);
 		const repositoryPath = encodeHarborURIComponent(repository);
@@ -166,10 +156,7 @@
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				cluster,
-				namespace,
 				harborHost,
-				secretName,
 				apiPath: additionUrl
 			})
 		});
@@ -217,9 +204,7 @@
 	});
 
 	const chartName = $derived(selectedChart.repository_name);
-	const defaultVersion = $derived(
-		lodash.get(selectedChart.extra_attrs, 'version') as string
-	);
+	const defaultVersion = $derived(lodash.get(selectedChart.extra_attrs, 'version') as string);
 </script>
 
 <Dialog.Root

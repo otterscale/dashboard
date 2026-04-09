@@ -53,8 +53,6 @@
 		const [project, ...chartNameParts] = chart.repository_name.split('/');
 		const repository = chartNameParts.join('/');
 		const harborHost = parseHarborHost(helmRepository);
-		const secretName = helmRepository?.spec?.secretRef?.name ?? '';
-		const namespace = helmRepository.metadata?.namespace ?? 'otterscale-system';
 
 		const projectPath = encodeHarborURIComponent(project);
 		const repositoryPath = encodeHarborURIComponent(repository);
@@ -67,10 +65,7 @@
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({
-				cluster,
-				namespace,
 				harborHost,
-				secretName,
 				apiPath: additionUrl
 			})
 		});
