@@ -26,7 +26,7 @@
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
 	import type { ModuleAttribute } from '../../table-layout';
-	import { type ModuleType } from '../../types';
+	import { type IndexModuleType } from '../../types';
 
 	let {
 		row,
@@ -38,7 +38,7 @@
 		onOpenChangeComplete: () => void;
 	} = $props();
 
-	const chart: ModuleType = row.original.chart as unknown as ModuleType;
+	const chart: IndexModuleType = row.original.chart as unknown as IndexModuleType;
 
 	const group = 'helm.toolkit.fluxcd.io';
 	const version = 'v2';
@@ -94,11 +94,11 @@
 
 	const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
 
-	let modules: ModuleType[] = $derived(
-		lodash.get(row.original.chart, 'versions', {}) as ModuleType[]
+	let modules: IndexModuleType[] = $derived(
+		lodash.get(row.original.chart, 'versions', {}) as IndexModuleType[]
 	);
 
-	let selectedChart: ModuleType = $derived(modules[0] || ({} as ModuleType));
+	let selectedChart: IndexModuleType = $derived(modules[0] || ({} as IndexModuleType));
 	function getVersions() {
 		return modules.map((chart) => chart.version);
 	}

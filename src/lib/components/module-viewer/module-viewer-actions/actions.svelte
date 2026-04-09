@@ -7,8 +7,8 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
 	import type { ModuleAttribute } from '../table-layout';
-	import HarborInstall from './harbor-install.svelte';
-	import Install from './install.svelte';
+	import InstallFromHarbor from './install-from-harbor.svelte';
+	import InstallFromIndex from './install-from-index.svelte';
 	import { getSetUp, type SetUpType } from './setup/index.ts';
 	import View from './view.svelte';
 
@@ -48,7 +48,7 @@
 					}}
 				>
 					{#if row.original.sourceType === 'harbor'}
-						<HarborInstall
+						<InstallFromHarbor
 							{row}
 							{cluster}
 							onOpenChangeComplete={() => {
@@ -56,7 +56,7 @@
 							}}
 						/>
 					{:else}
-						<Install
+						<InstallFromIndex
 							{row}
 							{cluster}
 							onOpenChangeComplete={() => {

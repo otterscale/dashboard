@@ -3,15 +3,17 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { DownloadIcon } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import { RuntimeService } from '@otterscale/api/runtime/v1';
 	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 	import type { Row, Table } from '@tanstack/table-core';
 	import { load } from 'js-yaml';
-	import lodash from 'lodash';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
+	import {
+		encodeHarborURIComponent,
+		parseHarborHost
+	} from '$lib/components/artifact-viewer/utils.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
@@ -19,7 +21,7 @@
 
 	import Badge from '../ui/badge/badge.svelte';
 	import type { ModuleAttribute } from './table-layout';
-	import { type ModuleType } from './types';
+	import { type HarborModuleType } from './types';
 
 	let {
 		table,
@@ -36,7 +38,6 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-	const runtimeClient = createClient(RuntimeService, transport);
 
 	const rows = $derived(table.getFilteredSelectedRowModel().rows);
 
@@ -45,40 +46,68 @@
 
 	type ResultType = { status: 'installed'; name: string } | { status: 'skipped'; name: string };
 
-	async function install(row: Row<Record<ModuleAttribute, JsonValue>>): Promise<ResultType> {
-		const chart = row.original.chart as unknown as ModuleType;
-		const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
-		const modules: ModuleType[] = lodash.get(chart, 'versions', []) as ModuleType[];
-		const latestVersion: ModuleType = modules[0] || ({} as ModuleType);
+	async function fetchHarborValues(
+		chart: HarborModuleType,
+		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
+	): Promise<string> {
+		const [project, ...chartNameParts] = chart.repository_name.split('/');
+		const repository = chartNameParts.join('/');
+		const harborHost = parseHarborHost(helmRepository);
 
-		if (!row.original.installable) {
-			return { status: 'skipped', name: chart.name };
+		const projectPath = encodeHarborURIComponent(project);
+		const repositoryPath = encodeHarborURIComponent(repository);
+		const referencePath = encodeHarborURIComponent(chart.digest);
+		const additionPath = encodeHarborURIComponent('values.yaml');
+
+		const additionUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${referencePath}/additions/${additionPath}`;
+
+		const response = await fetch('/bff/helm/repository/harbor', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				harborHost,
+				apiPath: additionUrl
+			})
+		});
+
+		if (!response.ok) {
+			throw new Error('Failed to fetch Harbor values.yaml');
 		}
 
-		const response = await runtimeClient.showChart({
-			repoUrl: helmRepository.spec?.url ?? '',
-			chartName: latestVersion.name ?? '',
-			version: latestVersion.version ?? ''
-		});
-		const decoder = new TextDecoder();
-		const helmValues = decoder.decode(response.values);
+		const contentType = response.headers.get('content-type') ?? '';
+		if (contentType.includes('application/json')) {
+			return JSON.stringify(await response.json());
+		}
+		return response.text();
+	}
+
+	async function install(row: Row<Record<ModuleAttribute, JsonValue>>): Promise<ResultType> {
+		const chart = row.original.chart as unknown as HarborModuleType;
+		const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
+		const chartName = chart.extra_attrs?.name ?? '';
+
+		if (!row.original.installable) {
+			return { status: 'skipped', name: chartName };
+		}
+
+		const chartValues = await fetchHarborValues(chart, helmRepository);
 
 		const manifest = {
 			apiVersion: `${group}/${version}`,
 			kind,
 			metadata: {
-				name: chart.name,
+				name: chartName,
 				namespace: 'otterscale-system'
 			},
 			spec: {
-				releaseName: chart.name,
-				targetNamespace: lodash.get(chart, ['annotations', 'module.otterscale.io/namespace']),
+				releaseName: chartName,
+				targetNamespace: chart.annotations?.['module.otterscale.io/namespace'],
 				install: { createNamespace: true },
 				interval: '15m',
 				chart: {
 					spec: {
-						chart: latestVersion.name,
-						version: latestVersion.version,
+						chart: chart.repository_name,
+						version: chart.extra_attrs?.version ?? '',
 						sourceRef: {
 							apiVersion: helmRepository?.apiVersion,
 							kind: helmRepository?.kind,
@@ -87,7 +116,7 @@
 						}
 					}
 				},
-				values: load(helmValues) ?? {}
+				values: load(chartValues) ?? {}
 			}
 		};
 
@@ -100,7 +129,7 @@
 			manifest: new TextEncoder().encode(stringify(manifest))
 		});
 
-		return { status: 'installed', name: chart.name };
+		return { status: 'installed', name: chartName };
 	}
 
 	async function handleBulkInstall() {
@@ -164,13 +193,13 @@
 		</Dialog.Header>
 		<div class="space-y-2">
 			{#each rows as row (row.id)}
-				{@const chart = row.original.chart as unknown as ModuleType}
-				{@const modules = lodash.get(chart, 'versions', []) as ModuleType[]}
-				{@const latestVersion = modules[0]?.version ?? ''}
+				{@const chart = row.original.chart as unknown as HarborModuleType}
+				{@const chartName = chart.extra_attrs?.name ?? ''}
+				{@const latestVersion = chart.extra_attrs?.version ?? ''}
 				<Item.Root class="rounded-md border p-0">
 					<Item.Content class="text-left">
 						<Item.Title class="text-sm font-medium">
-							{row.original['Chart Name']}
+							{chartName}
 						</Item.Title>
 						<Item.Description class="text-xs">
 							v{latestVersion}

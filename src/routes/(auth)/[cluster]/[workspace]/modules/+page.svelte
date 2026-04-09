@@ -23,13 +23,13 @@
 	} from '$lib/components/artifact-viewer/utils.svelte';
 	import { ModuleViewer } from '$lib/components/module-viewer';
 	import {
-		getChartData,
 		getChartDataFromHarbor,
+		getChartDataFromIndex as getChartDataFromIndex,
 		type ModuleAttribute
 	} from '$lib/components/module-viewer/table-layout';
 	import type {
 		HarborModuleType,
-		ModuleType as IndexModuleType
+		IndexModuleType as IndexModuleType
 	} from '$lib/components/module-viewer/types';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { m } from '$lib/paraglide/messages';
@@ -54,12 +54,17 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	let data: Record<ModuleAttribute, JsonValue>[] | undefined = $state(undefined);
+	let data: Record<ModuleAttribute, JsonValue>[] = $state([]);
 
 	// Helm Repository
 	let helmRepository: SourceToolkitFluxcdIoV1HelmRepository | undefined = $state(undefined);
 	let isHelmRepositoryFetching = $state(false);
-	let fromHarbor = $state(false);
+	const fromHarbor: boolean | undefined = $derived(
+		helmRepository
+			? lodash.get(helmRepository, ['metadata', 'labels', 'tenant.otterscale.io/from-harbor']) ===
+					'true'
+			: undefined
+	);
 
 	async function fetchHelmRepository(): Promise<SourceToolkitFluxcdIoV1HelmRepository | undefined> {
 		if (isHelmRepositoryFetching) return;
@@ -81,11 +86,7 @@
 				return;
 			}
 
-			const repo = response.object as SourceToolkitFluxcdIoV1HelmRepository;
-			fromHarbor =
-				lodash.get(repo, ['metadata', 'labels', 'tenant.otterscale.io/from-harbor']) === 'true';
-
-			return repo;
+			return response.object as SourceToolkitFluxcdIoV1HelmRepository;
 		} catch (error) {
 			console.error(
 				'OtterScale Charts Helm Repository was not found in namespace otterscale-system.:',
@@ -161,7 +162,6 @@
 					apiPath: artifactsUrl
 				})
 			});
-			console.log(harborHost, artifactsUrl);
 
 			if (!response.ok) {
 				return;
@@ -189,20 +189,6 @@
 	let releases: HelmToolkitFluxcdIoV2HelmRelease[] = $state([]);
 	let releaseResourceVersion: string | undefined = $state(undefined);
 
-	function buildData() {
-		const installedModules = new Set(
-			releases.map((release) => release.spec?.chart?.spec.chart).filter(Boolean)
-		) as Set<string>;
-
-		if (fromHarbor) {
-			data = harborModules.map((module) =>
-				getChartDataFromHarbor(module, installedModules, helmRepository!)
-			);
-		} else {
-			data = indexModules.map((module) => getChartData(module, installedModules, helmRepository!));
-		}
-	}
-
 	async function listReleases() {
 		if (isReleaseFetching) return;
 
@@ -220,8 +206,6 @@
 			releaseResourceVersion = response.resourceVersion;
 
 			releases = response.items.map((item) => item.object as HelmToolkitFluxcdIoV2HelmRelease);
-
-			buildData();
 		} catch (error) {
 			console.error(
 				'OtterScale Charts Helm Releases was not found in namespace otterscale-system.:',
@@ -283,8 +267,6 @@
 						(release) => release.metadata?.name !== deletedRelease.metadata?.name
 					);
 				}
-
-				buildData();
 			}
 		} catch (error) {
 			if (watchAbortController.signal.aborted) return;
@@ -323,6 +305,21 @@
 		await listReleases();
 		watchReleases();
 	});
+	$effect(() => {
+		const installedModules = new Set(
+			releases.map((release) => release.spec?.chart?.spec.chart).filter(Boolean)
+		) as Set<string>;
+
+		if (fromHarbor) {
+			data = harborModules.map((module) =>
+				getChartDataFromHarbor(module, installedModules, helmRepository!)
+			);
+		} else {
+			data = indexModules.map((module) =>
+				getChartDataFromIndex(module, installedModules, helmRepository!)
+			);
+		}
+	});
 
 	let isDestroyed = false;
 	onDestroy(() => {
@@ -334,21 +331,17 @@
 </script>
 
 {#key cluster}
-	{#if data}
-		<main class="pb-8">
-			<ModuleViewer {cluster} {namespace} {data}>
-				{#snippet reload()}
-					<Button onclick={handleReload} variant="outline" size="icon">
-						{#if isWatching}
-							<CableIcon class="size-4" />
-						{:else}
-							<UnplugIcon class="size-4 text-destructive" />
-						{/if}
-					</Button>
-				{/snippet}
-			</ModuleViewer>
-		</main>
-	{:else}
-		<!-- Fallback to Dynamic Table -->
-	{/if}
+	<main class="pb-8">
+		<ModuleViewer {cluster} {namespace} {data} {fromHarbor}>
+			{#snippet reload()}
+				<Button onclick={handleReload} variant="outline" size="icon">
+					{#if isWatching}
+						<CableIcon class="size-4" />
+					{:else}
+						<UnplugIcon class="size-4 text-destructive" />
+					{/if}
+				</Button>
+			{/snippet}
+		</ModuleViewer>
+	</main>
 {/key}

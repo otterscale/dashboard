@@ -7,7 +7,7 @@ import { DynamicTableCell, DynamicTableHeader } from '$lib/components/dynamic-ta
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
 
-import type { HarborModuleType, ModuleType } from './types';
+import type { HarborModuleType, IndexModuleType } from './types';
 
 type ModuleAttribute =
 	| 'Helm Repository'
@@ -65,8 +65,8 @@ function getChartUISchemas(): Record<ModuleAttribute, UISchemaType> {
 		sourceType: 'text'
 	};
 }
-function getChartData(
-	module: ModuleType,
+function getChartDataFromIndex(
+	module: IndexModuleType,
 	installedModules: Set<string>,
 	helmRepository: SourceToolkitFluxcdIoV1HelmRepository
 ): Record<ModuleAttribute, JsonValue> {
@@ -161,8 +161,8 @@ function getChartColumnDefinitions(
 
 export {
 	getChartColumnDefinitions,
-	getChartData,
 	getChartDataFromHarbor,
+	getChartDataFromIndex,
 	getChartDataSchemas,
 	getChartUISchemas,
 	type ModuleAttribute

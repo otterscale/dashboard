@@ -1,4 +1,4 @@
-interface SingleModuleType {
+interface IndexModuleMetadataType {
 	apiVersion: string;
 	appVersion: string;
 	created: string;
@@ -18,8 +18,8 @@ interface SingleModuleType {
 	annotations?: Record<string, string>;
 }
 
-interface ModuleType extends SingleModuleType {
-	versions: SingleModuleType[];
+interface IndexModuleType extends IndexModuleMetadataType {
+	versions: IndexModuleMetadataType[];
 }
 
 interface HarborModuleVersion {
@@ -57,4 +57,4 @@ interface HarborModuleType {
 	annotations?: Record<string, string>;
 }
 
-export { type HarborModuleType, type HarborModuleVersion, type ModuleType };
+export { type HarborModuleType, type HarborModuleVersion, type IndexModuleType };

@@ -10,7 +10,8 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
 
-	import BulkInstall from './bulk-install.svelte';
+	import BulkInstallFromHarbor from './bulk-install-from-harbor.svelte';
+	import BulkInstallFromIndex from './bulk-install-from-index.svelte';
 	import Grid from './grid-layout.svelte';
 	import Actions from './module-viewer-actions/actions.svelte';
 	import {
@@ -23,12 +24,14 @@
 	let {
 		cluster,
 		namespace,
-		data: modules,
+		data: dataset,
+		fromHarbor = false,
 		reload
 	}: {
 		cluster: string;
 		namespace: string;
 		data: any[];
+		fromHarbor?: boolean;
 		reload: any;
 	} = $props();
 
@@ -47,7 +50,7 @@
 			</Item.Content>
 		</Item.Root>
 	</div>
-	<DynamicTable dataset={modules} {columnDefinitions} {uiSchemas} {reload}>
+	<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {reload}>
 		{#snippet gridsLayout({ table, handleClear })}
 			{#if table.getRowModel().rows?.length}
 				<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -77,7 +80,11 @@
 			{/if}
 		{/snippet}
 		{#snippet bulkCreate({ table })}
-			<BulkInstall {table} {cluster} />
+			{#if fromHarbor}
+				<BulkInstallFromHarbor {table} {cluster} />
+			{:else}
+				<BulkInstallFromIndex {table} {cluster} />
+			{/if}
 		{/snippet}
 		{#snippet rowActions({ row })}
 			<Actions {row} {cluster} />
