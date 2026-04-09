@@ -16,6 +16,7 @@
 	let { namespace }: { namespace: string } = $props();
 
 	const harborUniformResourceLocator = new SvelteURL(publicEnv.PUBLIC_HARBOR_URL ?? '');
+	const plainHttp = harborUniformResourceLocator.protocol === 'http:';
 </script>
 
 <Dialog.Root>
@@ -26,6 +27,20 @@
 		<Dialog.Header>
 			<Dialog.Title class="text-center">{m.commands()}</Dialog.Title>
 		</Dialog.Header>
+
+		<Item.Root class="w-full">
+			{@const command = `helm push <chart_package> oci://${harborUniformResourceLocator.host}/${namespace}${plainHttp ? ' --plain-http' : ''}`}
+			<Item.Media variant="icon">
+				<SiHelm class="size-4" />
+			</Item.Media>
+			<Item.Content class="flex flex-col items-start">
+				<Item.Description>{m.push_chart_description()}</Item.Description>
+				<Item.Title><p class="font-mono text-xs">{command}</p></Item.Title>
+			</Item.Content>
+			<Item.Actions>
+				<CopyButton text={command} />
+			</Item.Actions>
+		</Item.Root>
 
 		<Item.Root class="w-full">
 			{@const command = `docker push ${harborUniformResourceLocator.host}/<repository>[:<tag>]`}
@@ -41,70 +56,58 @@
 			</Item.Actions>
 		</Item.Root>
 
-		<Item.Root class="w-full">
-			{@const command = `helm push <chart_package> oci://${harborUniformResourceLocator.host}/${namespace} --plain-http`}
-			<Item.Media variant="icon">
-				<SiHelm class="size-4" />
-			</Item.Media>
-			<Item.Content class="flex flex-col items-start">
-				<Item.Description>{m.push_chart_description()}</Item.Description>
-				<Item.Title><p class="font-mono text-xs">{command}</p></Item.Title>
-			</Item.Content>
-			<Item.Actions>
-				<CopyButton text={command} />
-			</Item.Actions>
-		</Item.Root>
-
-		<div class="m-4 space-y-2 rounded-lg bg-muted p-4">
-			<h3 class="text-sm font-semibold">{m.trouble_pushing_image()}</h3>
-			<Collapsible.Root>
-				<Collapsible.Trigger class="text-sm hover:underline">
-					<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-					{@html m.trouble_pushing_image_step_one({
-						daemon: '<span class="font-mono">daemon.json</span>',
-						insecure_registries: '<span class="font-mono">insecure-registries</span>'
-					})}
-				</Collapsible.Trigger>
-				<Collapsible.Content>
-					<div class="space-y-2 p-4 text-sm text-muted-foreground">
+		{#if plainHttp}
+			<div class="m-4 space-y-2 rounded-lg bg-muted p-4">
+				<h3 class="text-sm font-semibold">{m.trouble_pushing_image()}</h3>
+				<Collapsible.Root>
+					<Collapsible.Trigger class="text-sm hover:underline">
 						<!-- eslint-disable-next-line svelte/no-at-html-tags -->
-						{@html m.trouble_pushing_image_step_one_details({
-							insecure_registries: '<span class="font-mono">insecure-registries</span>',
+						{@html m.trouble_pushing_image_step_one({
 							daemon: '<span class="font-mono">daemon.json</span>',
-							path: '<span class="font-mono">/etc/docker/daemon.json</span>'
+							insecure_registries: '<span class="font-mono">insecure-registries</span>'
 						})}
-						<Code.Root
-							class="w-fit border-none bg-transparent"
-							lang="json"
-							code={JSON.stringify(
-								{
-									'insecure-registries': [harborUniformResourceLocator.host]
-								},
-								null,
-								2
-							)}
-							hideLines
-						/>
-					</div>
-				</Collapsible.Content>
-			</Collapsible.Root>
+					</Collapsible.Trigger>
+					<Collapsible.Content>
+						<div class="space-y-2 p-4 text-sm text-muted-foreground">
+							<!-- eslint-disable-next-line svelte/no-at-html-tags -->
+							{@html m.trouble_pushing_image_step_one_details({
+								insecure_registries: '<span class="font-mono">insecure-registries</span>',
+								daemon: '<span class="font-mono">daemon.json</span>',
+								path: '<span class="font-mono">/etc/docker/daemon.json</span>'
+							})}
+							<Code.Root
+								class="w-fit border-none bg-transparent"
+								lang="json"
+								code={JSON.stringify(
+									{
+										'insecure-registries': [harborUniformResourceLocator.host]
+									},
+									null,
+									2
+								)}
+								hideLines
+							/>
+						</div>
+					</Collapsible.Content>
+				</Collapsible.Root>
 
-			<Collapsible.Root>
-				<Collapsible.Trigger class="text-sm hover:underline">
-					{m.trouble_pushing_image_step_two()}
-				</Collapsible.Trigger>
-				<Collapsible.Content>
-					<div class="space-y-2 p-4 text-sm text-muted-foreground">
-						{m.trouble_pushing_image_step_two_details()}
-						<Code.Root
-							class="w-fit border-none bg-transparent"
-							lang="bash"
-							code={['sudo systemctl daemon-reload', 'sudo systemctl restart docker'].join('\n')}
-							hideLines
-						/>
-					</div>
-				</Collapsible.Content>
-			</Collapsible.Root>
-		</div>
+				<Collapsible.Root>
+					<Collapsible.Trigger class="text-sm hover:underline">
+						{m.trouble_pushing_image_step_two()}
+					</Collapsible.Trigger>
+					<Collapsible.Content>
+						<div class="space-y-2 p-4 text-sm text-muted-foreground">
+							{m.trouble_pushing_image_step_two_details()}
+							<Code.Root
+								class="w-fit border-none bg-transparent"
+								lang="bash"
+								code={['sudo systemctl daemon-reload', 'sudo systemctl restart docker'].join('\n')}
+								hideLines
+							/>
+						</div>
+					</Collapsible.Content>
+				</Collapsible.Root>
+			</div>
+		{/if}
 	</Dialog.Content>
 </Dialog.Root>
