@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import ArrowDownIcon from '@lucide/svelte/icons/arrow-down';
+	import DownloadIcon from '@lucide/svelte/icons/download';
+	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
 	import PauseIcon from '@lucide/svelte/icons/pause';
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import { RuntimeService } from '@otterscale/api/runtime/v1';
@@ -41,6 +43,7 @@
 	let logContainer = $state<HTMLElement | undefined>(undefined);
 	let showScrollButton = $state(false);
 	let showAllData = $state(false);
+	let downloading = $state(false);
 
 	$effect(() => {
 		if (active) {
@@ -131,6 +134,47 @@
 			abortController = null;
 		}
 	}
+
+	async function downloadLogs() {
+		if (!podName || downloading) return;
+		downloading = true;
+
+		try {
+			const allLines: string[] = [];
+			const dlAbort = new AbortController();
+			const stream = client.podLog(
+				{
+					cluster,
+					namespace,
+					name: podName,
+					container: effectiveContainer,
+					follow: false,
+					previous
+				},
+				{ signal: dlAbort.signal }
+			);
+
+			for await (const response of stream) {
+				if (response.data && response.data.length > 0) {
+					const text = new TextDecoder().decode(response.data);
+					const lines = text.split('\n').filter((l) => l.length > 0);
+					allLines.push(...lines);
+				}
+			}
+
+			const blob = new Blob([allLines.join('\n')], { type: 'text/plain' });
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `${podName}_${effectiveContainer}_${new Date().toISOString().replace(/[:.]/g, '-')}.log`;
+			a.click();
+			URL.revokeObjectURL(url);
+		} catch (error) {
+			logLines = [...logLines, `[Error] Failed to download logs: ${error}`];
+		} finally {
+			downloading = false;
+		}
+	}
 </script>
 
 <!-- Controls -->
@@ -195,7 +239,15 @@
 	>
 		<span class="text-xs">All</span>
 	</Toggle>
-	<div class="ml-auto">
+	<div class="ml-auto flex items-center gap-2">
+		<Button size="sm" variant="outline" onclick={downloadLogs} disabled={downloading || !podName}>
+			{#if downloading}
+				<LoaderCircleIcon size={14} class="animate-spin" />
+			{:else}
+				<DownloadIcon size={14} />
+			{/if}
+			{downloading ? 'Downloading...' : 'Download'}
+		</Button>
 		<Button
 			size="sm"
 			variant="outline"
