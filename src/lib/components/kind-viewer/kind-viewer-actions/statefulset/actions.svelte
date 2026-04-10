@@ -77,6 +77,7 @@
 				<Terminal
 					{cluster}
 					{object}
+					{kind}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
 					}}
