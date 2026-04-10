@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { Plus } from '@lucide/svelte';
+	import { ExternalLink, Plus } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
@@ -202,6 +202,17 @@
 	const sourceType = $derived(values.sourceType as string);
 </script>
 
+{#snippet externalLink()}
+	<Button
+		href="https://cloud-images.ubuntu.com/"
+		target="_blank"
+		rel="noopener noreferrer"
+		variant="ghost"
+	>
+		<ExternalLink size={16} />
+	</Button>
+{/snippet}
+
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
@@ -358,7 +369,7 @@
 							},
 							url: {
 								'ui:options': {
-									help: 'Browse available images at https://cloud-images.ubuntu.com/',
+									action: externalLink,
 									shadcn4Text: {
 										placeholder:
 											'https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img'
