@@ -140,7 +140,7 @@
 		downloading = true;
 
 		try {
-			const allLines: string[] = [];
+			const chunks: BlobPart[] = [];
 			const dlAbort = new AbortController();
 			const stream = client.podLog(
 				{
@@ -156,13 +156,11 @@
 
 			for await (const response of stream) {
 				if (response.data && response.data.length > 0) {
-					const text = new TextDecoder().decode(response.data);
-					const lines = text.split('\n').filter((l) => l.length > 0);
-					allLines.push(...lines);
+					chunks.push(new Uint8Array(response.data));
 				}
 			}
 
-			const blob = new Blob([allLines.join('\n')], { type: 'text/plain' });
+			const blob = new Blob(chunks, { type: 'text/plain' });
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement('a');
 			a.href = url;
