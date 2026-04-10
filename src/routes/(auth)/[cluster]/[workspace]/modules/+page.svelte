@@ -27,10 +27,7 @@
 		getChartDataFromIndex,
 		type ModuleAttribute
 	} from '$lib/components/module-viewer/table-layout';
-	import type {
-		HarborModuleType,
-		IndexModuleType
-	} from '$lib/components/module-viewer/types';
+	import type { HarborModuleType, IndexModuleType } from '$lib/components/module-viewer/types';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { breadcrumbs } from '$lib/stores';
