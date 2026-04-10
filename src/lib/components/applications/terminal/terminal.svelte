@@ -96,6 +96,7 @@
 
 	let container = $state<HTMLElement>();
 	let handleResize = $state<() => void>();
+	let abortController: AbortController | null = null;
 	let terminalState = $state<TerminalState>({
 		sessionId: '',
 		isConnected: false
@@ -174,24 +175,38 @@
 
 	// TTY communication
 	async function startTTYSession(): Promise<void> {
+		abortController?.abort();
+		abortController = new AbortController();
+
 		try {
-			const stream = client.executeTTY({
-				cluster: cluster,
-				namespace: namespace,
-				name: podName,
-				container: containerName,
-				command: command,
-				tty: true
-			} as ExecuteTTYRequest);
+			const stream = client.executeTTY(
+				{
+					cluster: cluster,
+					namespace: namespace,
+					name: podName,
+					container: containerName,
+					command: command,
+					tty: true
+				} as ExecuteTTYRequest,
+				{ signal: abortController.signal }
+			);
 			terminalState.isConnected = true;
 
 			for await (const response of stream) {
 				handleTTYResponse(response);
 			}
 		} catch (error) {
+			if (abortController?.signal.aborted) return;
 			terminalState.isConnected = false;
 			writeToTerminal(`Connection failed: ${error}`, true);
 		}
+	}
+
+	function cleanup(): void {
+		abortController?.abort();
+		abortController = null;
+		terminalState.terminal?.dispose();
+		terminalState.isConnected = false;
 	}
 
 	function handleTTYResponse(response: ExecuteTTYResponse): void {
@@ -248,9 +263,9 @@
 	}
 
 	// Lifecycle
-	onMount(async () => {
-		await initializeTerminal();
-		await startTTYSession();
+	onMount(() => {
+		initializeTerminal().then(() => startTTYSession());
+		return cleanup;
 	});
 </script>
 
