@@ -10,7 +10,7 @@
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
 	import { Toggle } from '$lib/components/ui/toggle';
 
-	const MAX_LINES = 2000;
+	const MAX_LINES = 1000;
 
 	let {
 		cluster,
@@ -116,7 +116,7 @@
 					logLines = showAllData ? newLogLines : newLogLines.slice(-MAX_LINES);
 
 					autoScrollToBottom();
-					await delay(100);
+					await delay(10);
 				}
 			}
 		} catch (error) {
