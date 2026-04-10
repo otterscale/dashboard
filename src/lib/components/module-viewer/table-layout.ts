@@ -7,7 +7,7 @@ import { DynamicTableCell, DynamicTableHeader } from '$lib/components/dynamic-ta
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
 
-import type { HarborModuleType, IndexModuleType } from './types';
+import type { IndexModuleType } from './types';
 
 type ModuleAttribute =
 	| 'Helm Repository'
@@ -93,33 +93,6 @@ function getChartDataFromIndex(
 	};
 }
 
-function getChartDataFromHarbor(
-	module: HarborModuleType,
-	installedModules: Set<string>,
-	helmRepository: SourceToolkitFluxcdIoV1HelmRepository
-): Record<ModuleAttribute, JsonValue> {
-	const chartName = module.extra_attrs?.name ?? '';
-	const dependsOn = module.annotations?.['module.otterscale.io/depends-on'] ?? '';
-	const prerequisite = dependsOn.split(',').filter(Boolean);
-	return {
-		'Helm Repository': helmRepository.metadata?.name ?? null,
-		'Chart Name': chartName,
-		Description: (module.extra_attrs?.description ?? '') as JsonValue,
-		Digest: module.digest ?? null,
-		Version: (module.extra_attrs?.version ?? '') as JsonValue,
-		Type: module.type ?? null,
-		Labels: (module.labels?.map((l) => l.name) ?? []) as JsonValue,
-		Installed: installedModules.has(chartName),
-		installable: prerequisite?.every((p) => installedModules.has(p)) as JsonValue,
-		annotations: (module.annotations ?? {}) as JsonValue,
-		icon: (module.extra_attrs?.icon ?? '') as JsonValue,
-		helmRepository: helmRepository as JsonValue,
-		chart: module as unknown as JsonValue,
-		installedModules: Array.from(installedModules) as unknown as JsonValue,
-		sourceType: 'harbor'
-	};
-}
-
 function getChartColumnDefinitions(
 	uiSchemas: Record<ModuleAttribute, UISchemaType>,
 	dataSchemas: Record<ModuleAttribute, DataSchemaType>
@@ -161,7 +134,6 @@ function getChartColumnDefinitions(
 
 export {
 	getChartColumnDefinitions,
-	getChartDataFromHarbor,
 	getChartDataFromIndex,
 	getChartDataSchemas,
 	getChartUISchemas,

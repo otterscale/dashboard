@@ -16,6 +16,10 @@
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
+	import {
+		encodeHarborURIComponent,
+		parseHarborHost
+	} from '$lib/components/artifact-viewer/utils.svelte';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import EditorWidget from '$lib/components/dynamic-form/widgets/editor.svelte';
 	import { buttonVariants } from '$lib/components/ui/button';
@@ -23,6 +27,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
+	import Spinner from '$lib/components/ui/spinner/spinner.svelte';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
 	import type { ModuleAttribute } from '../../table-layout';
@@ -31,10 +36,12 @@
 	let {
 		row,
 		cluster,
+		fromHarbor,
 		onOpenChangeComplete
 	}: {
 		row: Row<Record<ModuleAttribute, JsonValue>>;
 		cluster: string;
+		fromHarbor: boolean;
 		onOpenChangeComplete: () => void;
 	} = $props();
 
@@ -94,32 +101,107 @@
 
 	const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
 
-	let modules: IndexModuleType[] = $derived(
-		lodash.get(row.original.chart, 'versions', {}) as IndexModuleType[]
-	);
+	async function fetchModules(project: string, chartName: string): Promise<IndexModuleType[]> {
+		let modules: IndexModuleType[] = [];
 
-	let selectedChart: IndexModuleType = $derived(modules[0] || ({} as IndexModuleType));
-	function getVersions() {
-		return modules.map((chart) => chart.version);
-	}
-	function getSelectedChart(version: string) {
-		return modules.find((chart) => chart.version === version) ?? modules[0];
-	}
-	$effect(() => {
-		const version = lodash.get(values, 'spec.chart.spec.version') as unknown as string;
-		if (version) {
-			selectedChart = getSelectedChart(version);
+		try {
+			if (fromHarbor) {
+				const harborHost = parseHarborHost(helmRepository);
+				const projectPath = encodeHarborURIComponent(project);
+				const repositoryPath = encodeHarborURIComponent(chartName);
+				const artifactsUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts?with_label=true`;
+
+				const response = await fetch('/bff/helm/repository/harbor', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						harborHost,
+						apiPath: artifactsUrl
+					})
+				});
+
+				if (!response.ok) {
+					console.error('Failed to fetch repository artifacts:', response.statusText);
+				}
+
+				const harborModules = await response.json();
+				modules = harborModules.map((module: any) => ({
+					apiVersion: module.extra_attrs.apiVersion,
+					appVersion: module.extra_attrs.appVersion,
+					annotations: module.extra_attrs.annotations,
+					name: module.extra_attrs.name,
+					description: module.extra_attrs.description,
+					version: module.extra_attrs.version,
+					digest: module.digest,
+					icon: module.icon,
+					keywords: module.labels ?? [],
+					type: module.type
+				}));
+			} else {
+				modules = chart.versions as IndexModuleType[];
+			}
+		} catch (error) {
+			console.error('Error fetching repository artifacts:', error);
 		}
-	});
 
-	async function getDocuments() {
-		const response = await runtimeClient.showChart({
-			repoUrl: helmRepository.spec?.url ?? '',
-			chartName: selectedChart.name ?? '',
-			version: selectedChart.version ?? ''
-		});
-		const decoder = new TextDecoder();
-		return { values: decoder.decode(response.values), readme: decoder.decode(response.readme) };
+		return modules;
+	}
+
+	async function getValuesWithDocument(module: IndexModuleType | undefined) {
+		if (module === undefined) {
+			return { values: '', readme: '' };
+		}
+
+		if (fromHarbor) {
+			const harborHost = parseHarborHost(helmRepository);
+
+			const projectPath = encodeHarborURIComponent('otterscale');
+			const repositoryPath = encodeHarborURIComponent(module.name);
+			const referencePath = encodeHarborURIComponent(module.digest);
+			const valuesPath = encodeHarborURIComponent('values.yaml');
+			const readmePath = encodeHarborURIComponent('readme.md');
+
+			const valuesUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${referencePath}/additions/${valuesPath}`;
+			const valuesResponse = await fetch('/bff/helm/repository/harbor', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					harborHost,
+					apiPath: valuesUrl
+				})
+			});
+			if (!valuesResponse.ok) {
+				throw new Error('Failed to fetch Harbor values.yaml');
+			}
+
+			const readmeUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${referencePath}/additions/${readmePath}`;
+			const readmeResponse = await fetch('/bff/helm/repository/harbor', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					harborHost,
+					apiPath: readmeUrl
+				})
+			});
+			if (!readmeResponse.ok) {
+				throw new Error('Failed to fetch Harbor readme.md');
+			}
+
+			const contentType = valuesResponse.headers.get('content-type') ?? '';
+			if (contentType.includes('application/json')) {
+				return valuesResponse.json();
+			}
+
+			return { values: await valuesResponse.text(), readme: await readmeResponse.text() };
+		} else {
+			const response = await runtimeClient.showChart({
+				repoUrl: helmRepository.spec?.url ?? '',
+				chartName: module.name,
+				version: module.version
+			});
+			const decoder = new TextDecoder();
+			return { values: decoder.decode(response.values), readme: decoder.decode(response.readme) };
+		}
 	}
 
 	// Steps Manager
@@ -145,8 +227,7 @@
 		await fetchSchema();
 	});
 
-	const chartName = $derived(selectedChart.name);
-	const defaultVersion = $derived(selectedChart.version);
+	let selectedModule: undefined | IndexModuleType = $state(undefined);
 </script>
 
 <Dialog.Root
@@ -227,73 +308,84 @@
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[1]}>
-				<Form
-					schema={{
-						...(lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.chart.properties.spec') as Schema,
-							'properties'
-						) as Schema),
-						title: 'Chart',
-						properties: {
-							chart: {
-								...(lodash.get(
+				{#await fetchModules('otterscale', chart.name) then modules}
+					{@const [module] = modules}
+					<Form
+						schema={{
+							...(lodash.omit(
+								lodash.get(
 									jsonSchema,
-									'properties.spec.properties.chart.properties.spec.properties.chart'
-								) as Schema)
+									'properties.spec.properties.chart.properties.spec'
+								) as Schema,
+								'properties'
+							) as Schema),
+							title: 'Chart',
+							properties: {
+								chart: {
+									...(lodash.get(
+										jsonSchema,
+										'properties.spec.properties.chart.properties.spec.properties.chart'
+									) as Schema)
+								},
+								version: {
+									...(lodash.get(
+										jsonSchema,
+										'properties.spec.properties.chart.properties.spec.properties.version'
+									) as Schema),
+									title: 'Version',
+									enum: modules.map((module) => module.version)
+								}
+							}
+						} as Schema}
+						uiSchema={{
+							'ui:options': {
+								translations: {
+									submit: 'Next'
+								}
 							},
 							version: {
-								...(lodash.get(
-									jsonSchema,
-									'properties.spec.properties.chart.properties.spec.properties.version'
-								) as Schema),
-								title: 'Version',
-								enum: getVersions()
+								'ui:components': {
+									stringField: 'enumField'
+								}
 							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
+						} as UiSchemaRoot}
+						initialValue={{
+							chart: module.name,
+							version: module.version,
+							sourceRef: {
+								apiVersion: helmRepository?.apiVersion,
+								kind: helmRepository?.kind,
+								name: helmRepository?.metadata?.name,
+								namespace: helmRepository?.metadata?.namespace
 							}
-						},
-						version: {
-							'ui:components': {
-								stringField: 'enumField'
+						} as any}
+						bind:values={values['spec']['chart']['spec']}
+						handleSubmit={{
+							posthook: () => {
+								handleNext();
+
+								selectedModule = modules.find(
+									(module) =>
+										module.version === lodash.get(values, ['spec', 'chart', 'spec', 'version'])
+								) as IndexModuleType;
 							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{
-						chart: chartName,
-						version: defaultVersion,
-						sourceRef: {
-							apiVersion: helmRepository?.apiVersion,
-							kind: helmRepository?.kind,
-							name: helmRepository?.metadata?.name,
-							namespace: helmRepository?.metadata?.namespace
-						}
-					} as any}
-					bind:values={values['spec']['chart']['spec']}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-								disabled={currentIndex === 0}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
+						}}
+					>
+						{#snippet actions()}
+							<div class="flex w-full items-center justify-between gap-3">
+								<Button
+									onclick={() => {
+										handlePrevious();
+									}}
+									disabled={currentIndex === 0}
+								>
+									Previous
+								</Button>
+								<SubmitButton />
+							</div>
+						{/snippet}
+					</Form>
+				{/await}
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[2]} class="min-h-[23vh]">
@@ -302,15 +394,16 @@
 					type: 'string',
 					title: 'Values'
 				} as Schema}
-				{#await getDocuments()}
-					<Form {schema} initialValue={null} values={null}>
-						{#snippet actions()}
-							<div class="flex w-full items-center justify-between gap-3">
-								<Button disabled>Previous</Button>
-								<Button disabled>Next</Button>
-							</div>
-						{/snippet}
-					</Form>
+				{#await getValuesWithDocument(selectedModule)}
+					<Empty.Root>
+						<Empty.Header>
+							<Empty.Media variant="icon">
+								<Spinner />
+							</Empty.Media>
+							<Empty.Title>Loading...</Empty.Title>
+							<Empty.Description>Values and Document are loading, please wait...</Empty.Description>
+						</Empty.Header>
+					</Empty.Root>
 				{:then documents}
 					<Form
 						{schema}

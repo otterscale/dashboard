@@ -12,6 +12,10 @@
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
+	import {
+		encodeHarborURIComponent,
+		parseHarborHost
+	} from '$lib/components/artifact-viewer/utils.svelte';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -24,10 +28,12 @@
 	let {
 		row,
 		cluster,
+		fromHarbor,
 		onOpenChangeComplete
 	}: {
 		row: Row<Record<ModuleAttribute, JsonValue>>;
 		cluster: string;
+		fromHarbor: boolean;
 		onOpenChangeComplete: () => void;
 	} = $props();
 
@@ -52,6 +58,42 @@
 	let open = $state(false);
 	let isSubmitting = $state(false);
 
+	async function fetchValuesFromHarbor(
+		project: string,
+		chartName: string,
+		digest: string,
+		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
+	): Promise<string> {
+		const harborHost = parseHarborHost(helmRepository);
+
+		const projectPath = encodeHarborURIComponent(project);
+		const repositoryPath = encodeHarborURIComponent(chartName);
+		const referencePath = encodeHarborURIComponent(digest);
+		const additionPath = encodeHarborURIComponent('values.yaml');
+
+		const additionUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${referencePath}/additions/${additionPath}`;
+
+		const response = await fetch('/bff/helm/repository/harbor', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				harborHost,
+				apiPath: additionUrl
+			})
+		});
+
+		if (!response.ok) {
+			throw new Error('Failed to fetch Harbor values.yaml');
+		}
+
+		const contentType = response.headers.get('content-type') ?? '';
+		if (contentType.includes('application/json')) {
+			return JSON.stringify(await response.json());
+		}
+
+		return response.text();
+	}
+
 	async function handleInstall() {
 		if (isSubmitting) return;
 		isSubmitting = true;
@@ -60,13 +102,23 @@
 
 		toast.promise(
 			async () => {
-				const response = await runtimeClient.showChart({
-					repoUrl: helmRepository.spec?.url ?? '',
-					chartName: latestChart.name ?? '',
-					version: latestChart.version ?? ''
-				});
-				const decoder = new TextDecoder();
-				const chartValues = decoder.decode(response.values);
+				let helmValues = '';
+				if (fromHarbor) {
+					helmValues = await fetchValuesFromHarbor(
+						'otterscale',
+						chart.name,
+						chart.digest,
+						helmRepository
+					);
+				} else {
+					const response = await runtimeClient.showChart({
+						repoUrl: helmRepository.spec?.url ?? '',
+						chartName: latestChart.name ?? '',
+						version: latestChart.version ?? ''
+					});
+					const decoder = new TextDecoder();
+					helmValues = decoder.decode(response.values);
+				}
 
 				const manifest = {
 					apiVersion: `${group}/${version}`,
@@ -82,8 +134,8 @@
 						interval: '15m',
 						chart: {
 							spec: {
-								chart: latestChart.name,
-								version: latestChart.version,
+								chart: chart.name,
+								version: chart.version,
 								sourceRef: {
 									apiVersion: helmRepository?.apiVersion,
 									kind: helmRepository?.kind,
@@ -92,7 +144,7 @@
 								}
 							}
 						},
-						values: load(chartValues) ?? {}
+						values: load(helmValues) ?? {}
 					}
 				};
 
