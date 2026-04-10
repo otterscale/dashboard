@@ -99,6 +99,10 @@
 
 	let isModuleFetching = $state(false);
 
+	const minimumVersion = semver.valid(version)
+		? `${semver.major(version)}.${semver.minor(version)}.0`
+		: '1.0.0';
+
 	let indexModules: IndexModuleType[] = $state([]);
 
 	async function fetchIndexModules(
@@ -123,14 +127,12 @@
 
 			const entireModules = await response.json();
 
-			const minVersion = semver.valid(version)
-				? `${semver.major(version)}.${semver.minor(version)}.0`
-				: '1.0.0';
-
 			return entireModules
-				.filter((module: IndexModuleType) =>
-					semver.gte(module.version, semver.valid(version) ? version : 'v0.0.0')
-				)
+				.filter((module: IndexModuleType) => {
+					const moduleVersion = module.version;
+					const moduleMinorVersion = `${semver.major(moduleVersion)}.${semver.minor(moduleVersion)}.0`;
+					return semver.gte(moduleMinorVersion, minimumVersion);
+				})
 				.filter((module: IndexModuleType) => module.name.startsWith('otterscale-'));
 		} catch (error) {
 			const helmRepositoryName = helmRepository.metadata?.name ?? '';
@@ -170,9 +172,15 @@
 
 			const entireModules: HarborModuleType[] = await response.json();
 
-			return entireModules.filter((module) =>
-				(module.extra_attrs?.name ?? '').startsWith('otterscale-')
-			);
+			return entireModules
+				.filter((module: HarborModuleType) => {
+					const moduleVersion = lodash.get(module, 'extra_attrs.version');
+					const moduleMinorVersion = `${semver.major(moduleVersion)}.${semver.minor(moduleVersion)}.0`;
+					return semver.gte(moduleMinorVersion, minimumVersion);
+				})
+				.filter((module: HarborModuleType) =>
+					(module.extra_attrs?.name ?? '').startsWith('otterscale-')
+				);
 		} catch (error) {
 			const helmRepositoryName = helmRepository.metadata?.name ?? '';
 			console.error(
