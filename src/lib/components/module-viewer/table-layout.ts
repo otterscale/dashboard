@@ -7,7 +7,7 @@ import { DynamicTableCell, DynamicTableHeader } from '$lib/components/dynamic-ta
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
 
-import type { ModuleType } from './types';
+import type { HarborModuleType, IndexModuleType } from './types';
 
 type ModuleAttribute =
 	| 'Helm Repository'
@@ -23,7 +23,8 @@ type ModuleAttribute =
 	| 'icon'
 	| 'helmRepository'
 	| 'chart'
-	| 'installedModules';
+	| 'installedModules'
+	| 'sourceType';
 
 function getChartDataSchemas(): Record<ModuleAttribute, DataSchemaType> {
 	return {
@@ -40,7 +41,8 @@ function getChartDataSchemas(): Record<ModuleAttribute, DataSchemaType> {
 		icon: 'text',
 		helmRepository: 'object',
 		chart: 'object',
-		installedModules: 'array'
+		installedModules: 'array',
+		sourceType: 'text'
 	};
 }
 
@@ -59,11 +61,12 @@ function getChartUISchemas(): Record<ModuleAttribute, UISchemaType> {
 		icon: 'text',
 		helmRepository: 'object',
 		chart: 'object',
-		installedModules: 'array'
+		installedModules: 'array',
+		sourceType: 'text'
 	};
 }
-function getChartData(
-	module: ModuleType,
+function getChartDataFromIndex(
+	module: IndexModuleType,
 	installedModules: Set<string>,
 	helmRepository: SourceToolkitFluxcdIoV1HelmRepository
 ): Record<ModuleAttribute, JsonValue> {
@@ -85,7 +88,35 @@ function getChartData(
 		icon: module.icon as JsonValue,
 		helmRepository: helmRepository as JsonValue,
 		chart: module as unknown as JsonValue,
-		installedModules: Array.from(installedModules) as unknown as JsonValue
+		installedModules: Array.from(installedModules) as unknown as JsonValue,
+		sourceType: 'index'
+	};
+}
+
+function getChartDataFromHarbor(
+	module: HarborModuleType,
+	installedModules: Set<string>,
+	helmRepository: SourceToolkitFluxcdIoV1HelmRepository
+): Record<ModuleAttribute, JsonValue> {
+	const chartName = module.extra_attrs?.name ?? '';
+	const dependsOn = module.annotations?.['module.otterscale.io/depends-on'] ?? '';
+	const prerequisite = dependsOn.split(',').filter(Boolean);
+	return {
+		'Helm Repository': helmRepository.metadata?.name ?? null,
+		'Chart Name': chartName,
+		Description: (module.extra_attrs?.description ?? '') as JsonValue,
+		Digest: module.digest ?? null,
+		Version: (module.extra_attrs?.version ?? '') as JsonValue,
+		Type: module.type ?? null,
+		Labels: (module.labels?.map((l) => l.name) ?? []) as JsonValue,
+		Installed: installedModules.has(chartName),
+		installable: prerequisite?.every((p) => installedModules.has(p)) as JsonValue,
+		annotations: (module.annotations ?? {}) as JsonValue,
+		icon: (module.extra_attrs?.icon ?? '') as JsonValue,
+		helmRepository: helmRepository as JsonValue,
+		chart: module as unknown as JsonValue,
+		installedModules: Array.from(installedModules) as unknown as JsonValue,
+		sourceType: 'harbor'
 	};
 }
 
@@ -130,7 +161,8 @@ function getChartColumnDefinitions(
 
 export {
 	getChartColumnDefinitions,
-	getChartData,
+	getChartDataFromHarbor,
+	getChartDataFromIndex,
 	getChartDataSchemas,
 	getChartUISchemas,
 	type ModuleAttribute
