@@ -177,6 +177,7 @@
 	async function startTTYSession(): Promise<void> {
 		abortController?.abort();
 		abortController = new AbortController();
+		const signal = abortController.signal;
 
 		try {
 			const stream = client.executeTTY(
@@ -188,15 +189,20 @@
 					command: command,
 					tty: true
 				} as ExecuteTTYRequest,
-				{ signal: abortController.signal }
+				{ signal }
 			);
 			terminalState.isConnected = true;
 
 			for await (const response of stream) {
 				handleTTYResponse(response);
 			}
+
+			if (!signal.aborted) {
+				terminalState.isConnected = false;
+				writeToTerminal('Session terminated. Connection closed.');
+			}
 		} catch (error) {
-			if (abortController?.signal.aborted) return;
+			if (signal.aborted) return;
 			terminalState.isConnected = false;
 			writeToTerminal(`Connection failed: ${error}`, true);
 		}
@@ -217,11 +223,6 @@
 		if (response.stdout) {
 			const data = new TextDecoder().decode(response.stdout);
 			terminalState.terminal?.write(data);
-
-			if (data.includes('exit') && data.includes('\r')) {
-				writeToTerminal('Session terminated. Connection closed.');
-				terminalState.isConnected = false;
-			}
 		}
 	}
 
@@ -264,8 +265,14 @@
 
 	// Lifecycle
 	onMount(() => {
-		initializeTerminal().then(() => startTTYSession());
-		return cleanup;
+		let active = true;
+		initializeTerminal().then(() => {
+			if (active) startTTYSession();
+		});
+		return () => {
+			active = false;
+			cleanup();
+		};
 	});
 </script>
 
