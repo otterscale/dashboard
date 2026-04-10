@@ -24,12 +24,12 @@
 	import { ModuleViewer } from '$lib/components/module-viewer';
 	import {
 		getChartDataFromHarbor,
-		getChartDataFromIndex as getChartDataFromIndex,
+		getChartDataFromIndex,
 		type ModuleAttribute
 	} from '$lib/components/module-viewer/table-layout';
 	import type {
 		HarborModuleType,
-		IndexModuleType as IndexModuleType
+		IndexModuleType
 	} from '$lib/components/module-viewer/types';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { m } from '$lib/paraglide/messages';
@@ -125,6 +125,10 @@
 			}
 
 			const entireModules = await response.json();
+
+			const minVersion = semver.valid(version)
+				? `${semver.major(version)}.${semver.minor(version)}.0`
+				: '1.0.0';
 
 			return entireModules
 				.filter((module: IndexModuleType) =>

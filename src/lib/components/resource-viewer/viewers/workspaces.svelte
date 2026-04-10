@@ -192,6 +192,13 @@
 				resource: 'resourcequotas'
 			},
 			{
+				ref: status.configMapRef,
+				group: '',
+				version: 'v1',
+				kind: 'ConfigMap',
+				resource: 'configmaps'
+			},
+			{
 				ref: status.limitRangeRef,
 				group: '',
 				version: 'v1',
@@ -590,8 +597,9 @@
 					{#each relatedResources as ref (ref.kind + ref.name)}
 						<Item.Root variant="outline">
 							{#snippet child({ props })}
+								{@const ns = object.status?.namespaceRef?.name ?? ''}
 								{@const url = resolve(
-									`/(auth)/${page.params.cluster}/${page.params.workspace}/${ref.name}?group=${ref.group}&version=${ref.version}&kind=${ref.kind}&resource=${ref.resource}`
+									`/(auth)/${page.params.cluster}/${page.params.workspace}/${ref.name}?group=${ref.group}&version=${ref.version}&kind=${ref.kind}&resource=${ref.resource}&namespace=${ns}`
 								)}
 								<a href={url} target="_blank" rel="noopener noreferrer" {...props}>
 									<Item.Content>
