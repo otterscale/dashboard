@@ -1,42 +1,40 @@
 <script lang="ts">
+	import { type Transport } from '@connectrpc/connect';
 	import TerminalSquareIcon from '@lucide/svelte/icons/terminal-square';
-	import type { Snippet } from 'svelte';
+	import { getContext, type Snippet } from 'svelte';
 
 	import { Terminal } from '$lib/components/applications/terminal';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
 
+	import { createPodResolver } from './pod-resolver.svelte';
+
 	let {
 		cluster,
 		object,
+		kind = 'Pod',
 		onOpenChangeComplete,
 		trigger
 	}: {
 		cluster: string;
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		object: any;
+		kind?: string;
 		onOpenChangeComplete?: () => void;
 		trigger?: Snippet;
 	} = $props();
 
-	// Derived from the raw K8s object
-	const namespace: string = $derived(object?.metadata?.namespace ?? '');
-	const podName: string = $derived(object?.metadata?.name ?? '');
-	const containers: string[] = $derived(
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		((object?.spec?.containers || object?.spec?.template?.spec?.containers) as any[])?.map(
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			(c: any) => c.name as string
-		) ?? []
-	);
+	const transport: Transport = getContext('transport');
+	const resolver = createPodResolver(() => ({ transport, cluster, object, kind }));
 
-	let selectedContainer = $state(containers[0] ?? '');
 	let open = $state(false);
 	let showTerminal = $state(false);
 
-	function handleOpenChange(isOpen: boolean) {
+	async function handleOpenChange(isOpen: boolean) {
 		if (isOpen) {
 			showTerminal = true;
+			await resolver.resolve();
 		} else {
 			showTerminal = false;
 		}
@@ -60,41 +58,77 @@
 	{/if}
 	<Dialog.Content class="flex h-fit max-h-[80vh] max-w-[70vw] min-w-[55vw] flex-col gap-3">
 		<Dialog.Header>
-			<Dialog.Title>Terminal — {podName}</Dialog.Title>
+			<Dialog.Title>Terminal — {resolver.effectivePodName || resolver.name}</Dialog.Title>
 			<Dialog.Description>
-				Interactive shell in namespace <strong>{namespace}</strong>
+				Interactive shell in namespace <strong>{resolver.namespace}</strong>
 			</Dialog.Description>
 		</Dialog.Header>
 
-		{#if containers.length > 1}
-			<div class="flex items-center gap-2">
+		<div class="flex flex-wrap items-center gap-2">
+			{#if kind === 'CronJob' && resolver.associatedJobs.length > 0}
 				<Select
 					type="single"
-					value={selectedContainer}
+					value={resolver.selectedJob}
+					onValueChange={async (value) => {
+						await resolver.handleJobChange(value);
+					}}
+				>
+					<SelectTrigger class="w-56 max-w-64 min-w-0">
+						<span class="truncate">{resolver.selectedJob || 'Select job'}</span>
+					</SelectTrigger>
+					<SelectContent class="w-56 max-w-64">
+						{#each resolver.associatedJobs as j (j)}
+							<SelectItem value={j}>{j}</SelectItem>
+						{/each}
+					</SelectContent>
+				</Select>
+			{/if}
+			{#if kind !== 'Pod' && resolver.associatedPods.length > 1}
+				<Select
+					type="single"
+					value={resolver.selectedPod}
 					onValueChange={(value) => {
-						if (value) selectedContainer = value;
+						resolver.selectedPod = value;
+					}}
+				>
+					<SelectTrigger class="w-64 max-w-64 min-w-0">
+						<span class="truncate">{resolver.selectedPod || 'Select pod'}</span>
+					</SelectTrigger>
+					<SelectContent class="w-64 max-w-64">
+						{#each resolver.associatedPods as p (p)}
+							<SelectItem value={p}>{p}</SelectItem>
+						{/each}
+					</SelectContent>
+				</Select>
+			{/if}
+			{#if resolver.containers.length > 1}
+				<Select
+					type="single"
+					value={resolver.selectedContainer}
+					onValueChange={(value) => {
+						if (value) resolver.selectedContainer = value;
 					}}
 				>
 					<SelectTrigger class="w-48">
-						{selectedContainer || 'Select container'}
+						{resolver.selectedContainer || 'Select container'}
 					</SelectTrigger>
 					<SelectContent>
-						{#each containers as c (c)}
+						{#each resolver.containers as c (c)}
 							<SelectItem value={c}>{c}</SelectItem>
 						{/each}
 					</SelectContent>
 				</Select>
-			</div>
-		{/if}
+			{/if}
+		</div>
 
 		<div class="h-[55vh] overflow-hidden rounded-md border bg-[#1e1e1e] p-3">
-			{#if showTerminal && selectedContainer}
-				{#key selectedContainer}
+			{#if showTerminal && resolver.selectedContainer && resolver.effectivePodName}
+				{#key `${resolver.effectivePodName}-${resolver.selectedContainer}`}
 					<Terminal
 						{cluster}
-						{namespace}
-						{podName}
-						containerName={selectedContainer}
+						namespace={resolver.namespace}
+						podName={resolver.effectivePodName}
+						containerName={resolver.selectedContainer}
 						command={['/bin/sh']}
 					/>
 				{/key}

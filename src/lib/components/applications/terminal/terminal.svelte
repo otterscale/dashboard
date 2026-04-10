@@ -96,6 +96,7 @@
 
 	let container = $state<HTMLElement>();
 	let handleResize = $state<() => void>();
+	let abortController: AbortController | null = null;
 	let terminalState = $state<TerminalState>({
 		sessionId: '',
 		isConnected: false
@@ -174,24 +175,44 @@
 
 	// TTY communication
 	async function startTTYSession(): Promise<void> {
+		abortController?.abort();
+		abortController = new AbortController();
+		const signal = abortController.signal;
+
 		try {
-			const stream = client.executeTTY({
-				cluster: cluster,
-				namespace: namespace,
-				name: podName,
-				container: containerName,
-				command: command,
-				tty: true
-			} as ExecuteTTYRequest);
+			const stream = client.executeTTY(
+				{
+					cluster: cluster,
+					namespace: namespace,
+					name: podName,
+					container: containerName,
+					command: command,
+					tty: true
+				} as ExecuteTTYRequest,
+				{ signal }
+			);
 			terminalState.isConnected = true;
 
 			for await (const response of stream) {
 				handleTTYResponse(response);
 			}
+
+			if (!signal.aborted) {
+				terminalState.isConnected = false;
+				writeToTerminal('Session terminated. Connection closed.');
+			}
 		} catch (error) {
+			if (signal.aborted) return;
 			terminalState.isConnected = false;
 			writeToTerminal(`Connection failed: ${error}`, true);
 		}
+	}
+
+	function cleanup(): void {
+		abortController?.abort();
+		abortController = null;
+		terminalState.terminal?.dispose();
+		terminalState.isConnected = false;
 	}
 
 	function handleTTYResponse(response: ExecuteTTYResponse): void {
@@ -202,11 +223,6 @@
 		if (response.stdout) {
 			const data = new TextDecoder().decode(response.stdout);
 			terminalState.terminal?.write(data);
-
-			if (data.includes('exit') && data.includes('\r')) {
-				writeToTerminal('Session terminated. Connection closed.');
-				terminalState.isConnected = false;
-			}
 		}
 	}
 
@@ -248,9 +264,15 @@
 	}
 
 	// Lifecycle
-	onMount(async () => {
-		await initializeTerminal();
-		await startTTYSession();
+	onMount(() => {
+		let active = true;
+		initializeTerminal().then(() => {
+			if (active) startTTYSession();
+		});
+		return () => {
+			active = false;
+			cleanup();
+		};
 	});
 </script>
 

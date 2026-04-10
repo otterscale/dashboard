@@ -34,3 +34,5 @@ coverage
 # ESLint
 .eslintcache
 
+# AI
+.claude
