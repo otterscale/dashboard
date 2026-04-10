@@ -53,7 +53,6 @@
 			'true';
 		const helmRepositoryName = helmRepository.metadata?.name ?? '';
 		const repositoryUrl = helmRepository.spec?.url ?? '';
-		const secretName = helmRepository.spec?.secretRef?.name ?? '';
 
 		try {
 			let chartsByHelmRepository: Record<ChartAttribute, JsonValue>[] = [];
@@ -66,10 +65,7 @@
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
-						cluster,
-						namespace,
 						harborHost,
-						secretName,
 						apiPath: artifactsUrl
 					})
 				});
@@ -85,10 +81,7 @@
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
-						cluster,
-						namespace,
-						repositoryUrl,
-						secretName
+						repositoryUrl
 					})
 				});
 				if (response.ok) {

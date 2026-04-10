@@ -7,7 +7,8 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
 	import type { ModuleAttribute } from '../table-layout';
-	import Install from './install.svelte';
+	import InstallFromHarbor from './install-from-harbor.svelte';
+	import InstallFromIndex from './install-from-index.svelte';
 	import { getSetUp, type SetUpType } from './setup/index.ts';
 	import View from './view.svelte';
 
@@ -46,15 +47,25 @@
 						e.preventDefault();
 					}}
 				>
-					<Install
-						{row}
-						{cluster}
-						onOpenChangeComplete={() => {
-							actionsOpen = false;
-						}}
-					/>
+					{#if row.original.sourceType === 'harbor'}
+						<InstallFromHarbor
+							{row}
+							{cluster}
+							onOpenChangeComplete={() => {
+								actionsOpen = false;
+							}}
+						/>
+					{:else}
+						<InstallFromIndex
+							{row}
+							{cluster}
+							onOpenChangeComplete={() => {
+								actionsOpen = false;
+							}}
+						/>
+					{/if}
 				</DropdownMenu.Item>
-				{@const SetUp: SetUpType = getSetUp(row.original['Chart Name'] as string)}
+				{@const SetUp: SetUpType = getSetUp(row.original['Chart Name'] as string, row.original.sourceType as string)}
 				<DropdownMenu.Item
 					onSelect={(e) => {
 						e.preventDefault();

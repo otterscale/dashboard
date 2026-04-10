@@ -98,7 +98,6 @@
 		const [project, ...latestChartNameParts] = $derived(chart.repository_name.split('/'));
 		const repository = $derived(latestChartNameParts.join('/'));
 		const harborHost = $derived(parseHarborHost(helmRepository));
-		const secretName = $derived(helmRepository?.spec?.secretRef?.name ?? '');
 
 		try {
 			const projectPath = encodeHarborURIComponent(project);
@@ -111,10 +110,7 @@
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify({
-					cluster,
-					namespace,
 					harborHost,
-					secretName,
 					apiPath: artifactsUrl
 				})
 			});
@@ -150,7 +146,6 @@
 		const [project, ...latestChartNameParts] = artifacChart.repository_name.split('/');
 		const repository = latestChartNameParts.join('/');
 		const harborHost = parseHarborHost(helmRepository);
-		const secretName = helmRepository?.spec?.secretRef?.name ?? '';
 
 		const projectPath = encodeHarborURIComponent(project);
 		const repositoryPath = encodeHarborURIComponent(repository);
@@ -165,10 +160,7 @@
 				'Content-Type': 'application/json'
 			},
 			body: JSON.stringify({
-				cluster,
-				namespace,
 				harborHost,
-				secretName,
 				apiPath: additionUrl
 			})
 		});

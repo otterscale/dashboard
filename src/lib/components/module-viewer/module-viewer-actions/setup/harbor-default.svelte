@@ -3,7 +3,6 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { FileIcon, Settings2Icon } from '@lucide/svelte';
 	import { ResourceService, type SchemaRequest } from '@otterscale/api/resource/v1';
-	import { RuntimeService } from '@otterscale/api/runtime/v1';
 	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 	import { type Schema, SubmitButton, type UiSchemaRoot } from '@sjsf/form';
 	import type { Row } from '@tanstack/table-core';
@@ -16,6 +15,10 @@
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
+	import {
+		encodeHarborURIComponent,
+		parseHarborHost
+	} from '$lib/components/artifact-viewer/utils.svelte';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import EditorWidget from '$lib/components/dynamic-form/widgets/editor.svelte';
 	import { buttonVariants } from '$lib/components/ui/button';
@@ -26,7 +29,7 @@
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
 	import type { ModuleAttribute } from '../../table-layout';
-	import { type IndexModuleType } from '../../types';
+	import { type HarborModuleType } from '../../types';
 
 	let {
 		row,
@@ -38,7 +41,7 @@
 		onOpenChangeComplete: () => void;
 	} = $props();
 
-	const chart: IndexModuleType = row.original.chart as unknown as IndexModuleType;
+	const chart: HarborModuleType = row.original.chart as unknown as HarborModuleType;
 
 	const group = 'helm.toolkit.fluxcd.io';
 	const version = 'v2';
@@ -47,7 +50,6 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-	const runtimeClient = createClient(RuntimeService, transport);
 
 	let jsonSchema: Schema | undefined = $state(undefined);
 
@@ -80,8 +82,8 @@
 		kind,
 		metadata: {},
 		spec: {
-			releaseName: chart.name,
-			targetNamespace: lodash.get(chart, ['annotations', 'module.otterscale.io/namespace']),
+			releaseName: chart.extra_attrs?.name,
+			targetNamespace: chart.annotations?.['module.otterscale.io/namespace'],
 			install: { createNamespace: true },
 			interval: '15m',
 			chart: {
@@ -94,32 +96,88 @@
 
 	const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
 
-	let modules: IndexModuleType[] = $derived(
-		lodash.get(row.original.chart, 'versions', {}) as IndexModuleType[]
-	);
+	// Fetch chart versions from Harbor
+	let charts: HarborModuleType[] = $state([]);
+	async function fetchCharts() {
+		const [project, ...chartNameParts] = chart.repository_name.split('/');
+		const repository = chartNameParts.join('/');
+		const harborHost = parseHarborHost(helmRepository);
 
-	let selectedChart: IndexModuleType = $derived(modules[0] || ({} as IndexModuleType));
-	function getVersions() {
-		return modules.map((chart) => chart.version);
+		try {
+			const projectPath = encodeHarborURIComponent(project);
+			const repositoryPath = encodeHarborURIComponent(repository);
+			const artifactsUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts?with_label=true`;
+
+			const response = await fetch('/bff/helm/repository/harbor', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					harborHost,
+					apiPath: artifactsUrl
+				})
+			});
+			if (!response.ok) {
+				console.error('Failed to fetch repository artifacts:', response.statusText);
+				return;
+			}
+			charts = await response.json();
+		} catch (error) {
+			console.error('Error fetching repository artifacts:', error);
+		}
 	}
-	function getSelectedChart(version: string) {
-		return modules.find((chart) => chart.version === version) ?? modules[0];
+
+	let selectedChart: HarborModuleType = $derived(charts[0] || ({} as HarborModuleType));
+	function getVersions() {
+		return charts.map((c) => lodash.get(c.extra_attrs, 'version') as unknown as string);
+	}
+	function getSelectedChart(ver: string) {
+		return charts.find((c) => lodash.get(c.extra_attrs, 'version') === ver) ?? charts[0];
 	}
 	$effect(() => {
-		const version = lodash.get(values, 'spec.chart.spec.version') as unknown as string;
-		if (version) {
-			selectedChart = getSelectedChart(version);
+		const ver = lodash.get(values, 'spec.chart.spec.version') as unknown as string;
+		if (ver) {
+			selectedChart = getSelectedChart(ver);
 		}
 	});
 
-	async function getDocuments() {
-		const response = await runtimeClient.showChart({
-			repoUrl: helmRepository.spec?.url ?? '',
-			chartName: selectedChart.name ?? '',
-			version: selectedChart.version ?? ''
+	async function getDocument(reference: string, addition: string) {
+		const [project, ...chartNameParts] = chart.repository_name.split('/');
+		const repository = chartNameParts.join('/');
+		const harborHost = parseHarborHost(helmRepository);
+
+		const projectPath = encodeHarborURIComponent(project);
+		const repositoryPath = encodeHarborURIComponent(repository);
+		const referencePath = encodeHarborURIComponent(reference);
+		const additionPath = encodeHarborURIComponent(addition);
+
+		const additionUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${referencePath}/additions/${additionPath}`;
+
+		const response = await fetch('/bff/helm/repository/harbor', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				harborHost,
+				apiPath: additionUrl
+			})
 		});
-		const decoder = new TextDecoder();
-		return { values: decoder.decode(response.values), readme: decoder.decode(response.readme) };
+		if (!response.ok) {
+			console.error('Failed to fetch Harbor addition:', response.statusText);
+			throw new Error('Failed to fetch Harbor addition');
+		}
+
+		const contentType = response.headers.get('content-type') ?? '';
+		if (contentType.includes('application/json')) {
+			return response.json();
+		}
+		return response.text();
+	}
+
+	async function getDocuments(digest: string) {
+		const [chartValues, readme] = await Promise.all([
+			getDocument(digest, 'values.yaml'),
+			getDocument(digest, 'readme.md')
+		]);
+		return { values: chartValues, readme };
 	}
 
 	// Steps Manager
@@ -142,11 +200,11 @@
 	let isSubmitting = $state(false);
 
 	onMount(async () => {
-		await fetchSchema();
+		await Promise.all([fetchSchema(), fetchCharts()]);
 	});
 
-	const chartName = $derived(selectedChart.name);
-	const defaultVersion = $derived(selectedChart.version);
+	const chartName = $derived(selectedChart.repository_name);
+	const defaultVersion = $derived(lodash.get(selectedChart.extra_attrs, 'version') as string);
 </script>
 
 <Dialog.Root
@@ -202,7 +260,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{ name: chart.name, namespace: 'otterscale-system' }}
+					initialValue={{ name: chart.extra_attrs?.name, namespace: 'otterscale-system' }}
 					bind:values={values['metadata']}
 					handleSubmit={{
 						posthook: () => {
@@ -302,7 +360,7 @@
 					type: 'string',
 					title: 'Values'
 				} as Schema}
-				{#await getDocuments()}
+				{#await getDocuments(selectedChart.digest)}
 					<Form {schema} initialValue={null} values={null}>
 						{#snippet actions()}
 							<div class="flex w-full items-center justify-between gap-3">

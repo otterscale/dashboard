@@ -14,57 +14,6 @@ function getIndexUrl(repositoryUrl: string): URL {
 	return new URL('index.yaml', url);
 }
 
-async function fetchSecretAuthorityHeader(
-	fetchFn: typeof fetch,
-	cluster: string,
-	namespace: string,
-	secretName: string
-): Promise<string> {
-	if (!cluster || !namespace || !secretName) {
-		return '';
-	}
-
-	const payload = {
-		cluster,
-		namespace,
-		group: '',
-		version: 'v1',
-		resource: 'secrets',
-		name: secretName
-	};
-
-	const secretResponse = await fetchFn('/otterscale.resource.v1.ResourceService/Get', {
-		method: 'POST',
-		headers: {
-			'x-proxy-target': 'api',
-			'Content-Type': 'application/json'
-		},
-		body: JSON.stringify(payload)
-	});
-
-	if (!secretResponse.ok) {
-		const errorText = await secretResponse.text();
-		console.error(
-			`Secret Response NOT OK: ${secretResponse.status} ${secretResponse.statusText}\nBody: ${errorText}`
-		);
-		return '';
-	}
-
-	const { object: secret } = (await secretResponse.json()) as any;
-	if (secret?.type !== 'kubernetes.io/basic-auth' || !secret?.data) return '';
-
-	const username = secret.data.username
-		? Buffer.from(secret.data.username, 'base64').toString('utf8')
-		: '';
-	const password = secret.data.password
-		? Buffer.from(secret.data.password, 'base64').toString('utf8')
-		: '';
-
-	if (!username && !password) return '';
-
-	return `Basic ${Buffer.from(`${username}:${password}`, 'utf8').toString('base64')}`;
-}
-
 export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 	if (!locals.session) {
 		throw error(403, 'Unauthorized dashboard session');
@@ -72,25 +21,18 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 
 	try {
 		const body = await request.json();
-		const { cluster, namespace, repositoryUrl, secretName } = body as {
-			cluster?: string;
-			namespace?: string;
+		const { repositoryUrl } = body as {
 			repositoryUrl?: string;
-			secretName?: string;
 		};
 
 		if (!repositoryUrl) {
 			throw error(400, 'Missing required fields: repositoryUrl');
 		}
 
-		const authorizationHeader = secretName
-			? await fetchSecretAuthorityHeader(fetch, cluster ?? '', namespace ?? '', secretName ?? '')
-			: '';
 		const indexUrl = getIndexUrl(repositoryUrl);
 		const response = await fetch(indexUrl, {
 			headers: {
-				Accept: 'application/yaml, application/x-yaml, text/yaml, text/plain, */*',
-				...(authorizationHeader ? { Authorization: authorizationHeader } : {})
+				Accept: 'application/yaml, application/x-yaml, text/yaml, text/plain, */*'
 			}
 		});
 
