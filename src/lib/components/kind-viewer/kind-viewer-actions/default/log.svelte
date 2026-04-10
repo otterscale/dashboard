@@ -85,7 +85,7 @@
 						</SelectContent>
 					</Select>
 				{/if}
-				{#if kind !== 'Pod' && resolver.associatedPods.length > 0}
+				{#if kind !== 'Pod' && resolver.associatedPods.length > 1}
 					<Select
 						type="single"
 						value={resolver.selectedPod}
