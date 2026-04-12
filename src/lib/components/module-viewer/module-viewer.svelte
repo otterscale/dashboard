@@ -23,7 +23,7 @@
 	let {
 		cluster,
 		namespace,
-		data: dataset,
+		data,
 		fromHarbor,
 		reload
 	}: {
@@ -49,7 +49,7 @@
 			</Item.Content>
 		</Item.Root>
 	</div>
-	<DynamicTable {dataset} {columnDefinitions} {uiSchemas} {reload}>
+	<DynamicTable dataset={data} {columnDefinitions} {uiSchemas} {reload}>
 		{#snippet gridsLayout({ table, handleClear })}
 			{#if table.getRowModel().rows?.length}
 				<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

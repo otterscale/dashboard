@@ -31,7 +31,7 @@
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
 	import type { ModuleAttribute } from '../../table-layout';
-	import { type IndexModuleType } from '../../types';
+	import { type ModuleType } from '../../types';
 
 	let {
 		row,
@@ -45,12 +45,13 @@
 		onOpenChangeComplete: () => void;
 	} = $props();
 
-	const chart: IndexModuleType = row.original.chart as unknown as IndexModuleType;
-
 	const group = 'helm.toolkit.fluxcd.io';
 	const version = 'v2';
 	const kind = 'HelmRelease';
 	const resource = 'helmreleases';
+
+	const chart: ModuleType = row.original.chart as unknown as ModuleType;
+	const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
@@ -99,10 +100,8 @@
 	});
 	let value = $derived(stringify(values));
 
-	const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
-
-	async function fetchModules(project: string, chartName: string): Promise<IndexModuleType[]> {
-		let modules: IndexModuleType[] = [];
+	async function fetchModuleVersions(project: string, chartName: string): Promise<ModuleType[]> {
+		let moduleVersions: ModuleType[] = [];
 
 		try {
 			if (fromHarbor) {
@@ -125,7 +124,7 @@
 				}
 
 				const harborModules = await response.json();
-				modules = harborModules.map((module: any) => ({
+				moduleVersions = harborModules.map((module: any) => ({
 					apiVersion: module.extra_attrs.apiVersion,
 					appVersion: module.extra_attrs.appVersion,
 					annotations: module.extra_attrs.annotations,
@@ -138,16 +137,16 @@
 					type: module.type
 				}));
 			} else {
-				modules = chart.versions as IndexModuleType[];
+				moduleVersions = chart.versions as ModuleType[];
 			}
 		} catch (error) {
 			console.error('Error fetching repository artifacts:', error);
 		}
 
-		return modules;
+		return moduleVersions;
 	}
 
-	async function getValuesWithDocument(module: IndexModuleType | undefined) {
+	async function getValuesWithDocument(module: ModuleType | undefined) {
 		if (module === undefined) {
 			return { values: '', readme: '' };
 		}
@@ -227,7 +226,7 @@
 		await fetchSchema();
 	});
 
-	let selectedModule: undefined | IndexModuleType = $state(undefined);
+	let selectedModuleVersion: undefined | ModuleType = $state(undefined);
 </script>
 
 <Dialog.Root
@@ -308,8 +307,8 @@
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[1]}>
-				{#await fetchModules('otterscale', chart.name) then modules}
-					{@const [module] = modules}
+				{#await fetchModuleVersions('otterscale', chart.name) then moduleVersions}
+					{@const [moduleVersion] = moduleVersions}
 					<Form
 						schema={{
 							...(lodash.omit(
@@ -333,7 +332,7 @@
 										'properties.spec.properties.chart.properties.spec.properties.version'
 									) as Schema),
 									title: 'Version',
-									enum: modules.map((module) => module.version)
+									enum: moduleVersions.map((module) => module.version)
 								}
 							}
 						} as Schema}
@@ -350,8 +349,8 @@
 							}
 						} as UiSchemaRoot}
 						initialValue={{
-							chart: module.name,
-							version: module.version,
+							chart: moduleVersion.name,
+							version: moduleVersion.version,
 							sourceRef: {
 								apiVersion: helmRepository?.apiVersion,
 								kind: helmRepository?.kind,
@@ -364,10 +363,10 @@
 							posthook: () => {
 								handleNext();
 
-								selectedModule = modules.find(
+								selectedModuleVersion = moduleVersions.find(
 									(module) =>
 										module.version === lodash.get(values, ['spec', 'chart', 'spec', 'version'])
-								) as IndexModuleType;
+								) as ModuleType;
 							}
 						}}
 					>
@@ -394,7 +393,7 @@
 					type: 'string',
 					title: 'Values'
 				} as Schema}
-				{#await getValuesWithDocument(selectedModule)}
+				{#await getValuesWithDocument(selectedModuleVersion)}
 					<Empty.Root>
 						<Empty.Header>
 							<Empty.Media variant="icon">

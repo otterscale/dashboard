@@ -23,7 +23,7 @@
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 
 	import type { ModuleAttribute } from '../table-layout';
-	import { type IndexModuleType } from '../types';
+	import { type ModuleType } from '../types';
 
 	let {
 		row,
@@ -37,7 +37,7 @@
 		onOpenChangeComplete: () => void;
 	} = $props();
 
-	const chart: IndexModuleType = row.original.chart as unknown as IndexModuleType;
+	const chart: ModuleType = row.original.chart as unknown as ModuleType;
 
 	const group = 'helm.toolkit.fluxcd.io';
 	const version = 'v2';
@@ -48,27 +48,27 @@
 	const resourceClient = createClient(ResourceService, transport);
 	const runtimeClient = createClient(RuntimeService, transport);
 
+	const decoder = new TextDecoder();
+
 	const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
 
-	let modules: IndexModuleType[] = $derived(
-		lodash.get(row.original.chart, 'versions', {}) as IndexModuleType[]
+	let modules: ModuleType[] = $derived(
+		lodash.get(row.original.chart, 'versions', {}) as ModuleType[]
 	);
-	let latestChart: IndexModuleType = $derived(modules[0] || ({} as IndexModuleType));
+	let latestChart: ModuleType = $derived(modules[0] || ({} as ModuleType));
 
 	let open = $state(false);
 	let isSubmitting = $state(false);
 
 	async function fetchValuesFromHarbor(
-		project: string,
-		chartName: string,
-		digest: string,
+		chart: ModuleType,
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
 	): Promise<string> {
 		const harborHost = parseHarborHost(helmRepository);
 
-		const projectPath = encodeHarborURIComponent(project);
-		const repositoryPath = encodeHarborURIComponent(chartName);
-		const referencePath = encodeHarborURIComponent(digest);
+		const projectPath = encodeHarborURIComponent('otterscale');
+		const repositoryPath = encodeHarborURIComponent(chart.name);
+		const referencePath = encodeHarborURIComponent(chart.digest);
 		const additionPath = encodeHarborURIComponent('values.yaml');
 
 		const additionUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${referencePath}/additions/${additionPath}`;
@@ -94,6 +94,22 @@
 		return response.text();
 	}
 
+	async function fetchValuesFromIndex(
+		chart: ModuleType,
+		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
+	) {
+		const chartVersions = lodash.get(chart, 'versions', []) as ModuleType[];
+		const [chartVersion] = chartVersions;
+
+		const response = await runtimeClient.showChart({
+			repoUrl: helmRepository.spec?.url ?? '',
+			chartName: chartVersion.name ?? '',
+			version: chartVersion.version ?? ''
+		});
+
+		return decoder.decode(response.values);
+	}
+
 	async function handleInstall() {
 		if (isSubmitting) return;
 		isSubmitting = true;
@@ -102,23 +118,9 @@
 
 		toast.promise(
 			async () => {
-				let helmValues = '';
-				if (fromHarbor) {
-					helmValues = await fetchValuesFromHarbor(
-						'otterscale',
-						chart.name,
-						chart.digest,
-						helmRepository
-					);
-				} else {
-					const response = await runtimeClient.showChart({
-						repoUrl: helmRepository.spec?.url ?? '',
-						chartName: latestChart.name ?? '',
-						version: latestChart.version ?? ''
-					});
-					const decoder = new TextDecoder();
-					helmValues = decoder.decode(response.values);
-				}
+				const helmValues = fromHarbor
+					? await fetchValuesFromHarbor(chart, helmRepository)
+					: await fetchValuesFromIndex(chart, helmRepository);
 
 				const manifest = {
 					apiVersion: `${group}/${version}`,

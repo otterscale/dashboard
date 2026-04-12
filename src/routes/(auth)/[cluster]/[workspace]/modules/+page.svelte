@@ -22,11 +22,8 @@
 		parseHarborProjectName
 	} from '$lib/components/artifact-viewer/utils.svelte';
 	import { ModuleViewer } from '$lib/components/module-viewer';
-	import {
-		getChartDataFromIndex,
-		type ModuleAttribute
-	} from '$lib/components/module-viewer/table-layout';
-	import type { IndexModuleType } from '$lib/components/module-viewer/types';
+	import { getChartData, type ModuleAttribute } from '$lib/components/module-viewer/table-layout';
+	import type { ModuleType } from '$lib/components/module-viewer/types';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { breadcrumbs } from '$lib/stores';
@@ -102,16 +99,16 @@
 		? `${semver.major(version)}.${semver.minor(version)}.0`
 		: '1.0.0';
 
-	let indexModules: IndexModuleType[] = $state([]);
+	let indexModules: ModuleType[] = $state([]);
 
 	async function fetchIndexModules(
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
-	): Promise<IndexModuleType[] | undefined> {
+	): Promise<ModuleType[] | undefined> {
 		if (isModuleFetching) return;
 
 		isModuleFetching = true;
 
-		let entireModules: IndexModuleType[] = [];
+		let entireModules: ModuleType[] = [];
 
 		try {
 			if (fromHarbor) {
@@ -167,12 +164,12 @@
 			console.log(entireModules);
 
 			return entireModules
-				.filter((module: IndexModuleType) => {
+				.filter((module: ModuleType) => {
 					const moduleVersion = module.version;
 					const moduleMinorVersion = `${semver.major(moduleVersion)}.${semver.minor(moduleVersion)}.0`;
 					return semver.gte(moduleMinorVersion, minimumVersion);
 				})
-				.filter((module: IndexModuleType) => module.name.startsWith('otterscale-'));
+				.filter((module: ModuleType) => module.name.startsWith('otterscale-'));
 		} catch (error) {
 			const helmRepositoryName = helmRepository.metadata?.name ?? '';
 			console.error(`HelmRepository "${helmRepositoryName}": error fetching modules:`, error);
@@ -303,9 +300,7 @@
 			releases.map((release) => release.spec?.chart?.spec.chart).filter(Boolean)
 		) as Set<string>;
 
-		data = indexModules.map((module) =>
-			getChartDataFromIndex(module, installedModules, helmRepository!)
-		);
+		data = indexModules.map((module) => getChartData(module, installedModules, helmRepository!));
 	});
 
 	let isDestroyed = false;

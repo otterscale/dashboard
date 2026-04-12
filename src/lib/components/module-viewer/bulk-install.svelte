@@ -23,7 +23,7 @@
 
 	import Badge from '../ui/badge/badge.svelte';
 	import type { ModuleAttribute } from './table-layout';
-	import { type IndexModuleType } from './types';
+	import { type ModuleType } from './types';
 
 	let {
 		table,
@@ -44,6 +44,8 @@
 	const resourceClient = createClient(ResourceService, transport);
 	const runtimeClient = createClient(RuntimeService, transport);
 
+	const decoder = new TextDecoder();
+
 	const rows = $derived(table.getFilteredSelectedRowModel().rows);
 
 	let open = $state(false);
@@ -52,16 +54,14 @@
 	type ResultType = { status: 'installed'; name: string } | { status: 'skipped'; name: string };
 
 	async function fetchValuesFromHarbor(
-		project: string,
-		chartName: string,
-		digest: string,
+		chart: ModuleType,
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
 	): Promise<string> {
 		const harborHost = parseHarborHost(helmRepository);
 
-		const projectPath = encodeHarborURIComponent(project);
-		const repositoryPath = encodeHarborURIComponent(chartName);
-		const referencePath = encodeHarborURIComponent(digest);
+		const projectPath = encodeHarborURIComponent('otterscale');
+		const repositoryPath = encodeHarborURIComponent(chart.name);
+		const referencePath = encodeHarborURIComponent(chart.digest);
 		const additionPath = encodeHarborURIComponent('values.yaml');
 
 		const additionUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${referencePath}/additions/${additionPath}`;
@@ -87,34 +87,33 @@
 		return response.text();
 	}
 
-	async function install(row: Row<Record<ModuleAttribute, JsonValue>>): Promise<ResultType> {
-		const chart = row.original.chart as unknown as IndexModuleType;
+	async function fetchValuesFromIndex(
+		chart: ModuleType,
+		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
+	) {
+		const chartVersions = lodash.get(chart, 'versions', []) as ModuleType[];
+		const [chartVersion] = chartVersions;
+
+		const response = await runtimeClient.showChart({
+			repoUrl: helmRepository.spec?.url ?? '',
+			chartName: chartVersion.name ?? '',
+			version: chartVersion.version ?? ''
+		});
+
+		return decoder.decode(response.values);
+	}
+
+	async function handleInstall(row: Row<Record<ModuleAttribute, JsonValue>>): Promise<ResultType> {
+		if (!row.original.installable) {
+			return { status: 'skipped', name: row.original['Chart Name'] as string };
+		}
+
+		const chart = row.original.chart as unknown as ModuleType;
 		const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
 
-		if (!row.original.installable) {
-			return { status: 'skipped', name: chart.name };
-		}
-
-		let helmValues = '';
-		if (fromHarbor) {
-			helmValues = await fetchValuesFromHarbor(
-				'otterscale',
-				chart.name,
-				chart.digest,
-				helmRepository
-			);
-		} else {
-			const versions = lodash.get(chart, 'versions', []) as IndexModuleType[];
-			const [version] = versions;
-
-			const response = await runtimeClient.showChart({
-				repoUrl: helmRepository.spec?.url ?? '',
-				chartName: version.name ?? '',
-				version: version.version ?? ''
-			});
-			const decoder = new TextDecoder();
-			helmValues = decoder.decode(response.values);
-		}
+		const helmValues = fromHarbor
+			? await fetchValuesFromHarbor(chart, helmRepository)
+			: await fetchValuesFromIndex(chart, helmRepository);
 
 		const manifest = {
 			apiVersion: `${group}/${version}`,
@@ -160,7 +159,7 @@
 		if (isSubmitting) return;
 		isSubmitting = true;
 
-		const results = await Promise.allSettled(rows.map((row) => install(row)));
+		const results = await Promise.allSettled(rows.map((row) => handleInstall(row)));
 
 		let successes = 0;
 		let fails = 0;
@@ -217,7 +216,7 @@
 		</Dialog.Header>
 		<div class="space-y-2">
 			{#each rows as row (row.id)}
-				{@const chart = row.original.chart as unknown as IndexModuleType}
+				{@const chart = row.original.chart as unknown as ModuleType}
 				<Item.Root class="rounded-md border p-0">
 					<Item.Content class="text-left">
 						<Item.Title class="text-sm font-medium">
