@@ -52,11 +52,6 @@
 
 	const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
 
-	let modules: ModuleType[] = $derived(
-		lodash.get(row.original.chart, 'versions', {}) as ModuleType[]
-	);
-	let latestChart: ModuleType = $derived(modules[0] || ({} as ModuleType));
-
 	let open = $state(false);
 	let isSubmitting = $state(false);
 
