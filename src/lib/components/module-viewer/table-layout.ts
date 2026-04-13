@@ -23,7 +23,7 @@ type ModuleAttribute =
 	| 'icon'
 	| 'helmRepository'
 	| 'chart'
-	| 'installedModules'
+	| 'installedModules';
 
 function getChartDataSchemas(): Record<ModuleAttribute, DataSchemaType> {
 	return {
@@ -40,7 +40,7 @@ function getChartDataSchemas(): Record<ModuleAttribute, DataSchemaType> {
 		icon: 'text',
 		helmRepository: 'object',
 		chart: 'object',
-		installedModules: 'array',
+		installedModules: 'array'
 	};
 }
 
@@ -59,7 +59,7 @@ function getChartUISchemas(): Record<ModuleAttribute, UISchemaType> {
 		icon: 'text',
 		helmRepository: 'object',
 		chart: 'object',
-		installedModules: 'array',
+		installedModules: 'array'
 	};
 }
 function getChartData(
@@ -85,7 +85,7 @@ function getChartData(
 		icon: module.icon as JsonValue,
 		helmRepository: helmRepository as JsonValue,
 		chart: module as unknown as JsonValue,
-		installedModules: Array.from(installedModuleNames) as unknown as JsonValue,
+		installedModules: Array.from(installedModuleNames) as unknown as JsonValue
 	};
 }
 
