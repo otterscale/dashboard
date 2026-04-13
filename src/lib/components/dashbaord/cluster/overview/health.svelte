@@ -19,7 +19,7 @@
 	let nodeNotReady: SampleValue | undefined = $state(undefined);
 	async function fetchNodeStatus() {
 		const responseNotReadyNode = await prometheusDriver.instantQuery(
-			`sum(kube_node_status_condition{condition="Ready" , status="false", container!=""})`
+			`sum(kube_node_status_condition{condition="Ready" , status="false", container!=""}) + sum(kube_node_status_condition{condition="Ready" , status="unknown", container!=""})`
 		);
 		nodeNotReady = responseNotReadyNode.result[0]?.value ?? undefined;
 	}
