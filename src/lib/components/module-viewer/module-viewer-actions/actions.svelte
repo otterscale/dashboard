@@ -7,17 +7,18 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
 	import type { ModuleAttribute } from '../table-layout';
-	import InstallFromHarbor from './install-from-harbor.svelte';
-	import InstallFromIndex from './install-from-index.svelte';
+	import Install from './install.svelte';
 	import { getSetUp, type SetUpType } from './setup/index.ts';
 	import View from './view.svelte';
 
 	let {
 		row,
-		cluster
+		cluster,
+		fromHarbor = true
 	}: {
 		row: Row<Record<ModuleAttribute, JsonValue>>;
 		cluster: string;
+		fromHarbor: boolean;
 	} = $props();
 
 	let actionsOpen = $state(false);
@@ -47,25 +48,16 @@
 						e.preventDefault();
 					}}
 				>
-					{#if row.original.sourceType === 'harbor'}
-						<InstallFromHarbor
-							{row}
-							{cluster}
-							onOpenChangeComplete={() => {
-								actionsOpen = false;
-							}}
-						/>
-					{:else}
-						<InstallFromIndex
-							{row}
-							{cluster}
-							onOpenChangeComplete={() => {
-								actionsOpen = false;
-							}}
-						/>
-					{/if}
+					<Install
+						{row}
+						{cluster}
+						{fromHarbor}
+						onOpenChangeComplete={() => {
+							actionsOpen = false;
+						}}
+					/>
 				</DropdownMenu.Item>
-				{@const SetUp: SetUpType = getSetUp(row.original['Chart Name'] as string, row.original.sourceType as string)}
+				{@const SetUp: SetUpType = getSetUp(row.original['Chart Name'] as string)}
 				<DropdownMenu.Item
 					onSelect={(e) => {
 						e.preventDefault();
@@ -74,6 +66,7 @@
 					<SetUp
 						{row}
 						{cluster}
+						{fromHarbor}
 						onOpenChangeComplete={() => {
 							actionsOpen = false;
 						}}

@@ -192,7 +192,7 @@
 				resource: 'resourcequotas'
 			},
 			{
-				ref: status.configMapRef,
+				ref: status.configMapRef as { [k: string]: unknown; name: string; namespace?: string },
 				group: '',
 				version: 'v1',
 				kind: 'ConfigMap',

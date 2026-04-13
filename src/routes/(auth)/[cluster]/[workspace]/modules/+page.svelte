@@ -22,12 +22,8 @@
 		parseHarborProjectName
 	} from '$lib/components/artifact-viewer/utils.svelte';
 	import { ModuleViewer } from '$lib/components/module-viewer';
-	import {
-		getChartDataFromHarbor,
-		getChartDataFromIndex,
-		type ModuleAttribute
-	} from '$lib/components/module-viewer/table-layout';
-	import type { HarborModuleType, IndexModuleType } from '$lib/components/module-viewer/types';
+	import { getChartData, type ModuleAttribute } from '$lib/components/module-viewer/table-layout';
+	import type { ModuleType } from '$lib/components/module-viewer/types';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { breadcrumbs } from '$lib/stores';
@@ -56,11 +52,11 @@
 	// Helm Repository
 	let helmRepository: SourceToolkitFluxcdIoV1HelmRepository | undefined = $state(undefined);
 	let isHelmRepositoryFetching = $state(false);
-	const fromHarbor: boolean | undefined = $derived(
+	const fromHarbor: boolean = $derived(
 		helmRepository
 			? lodash.get(helmRepository, ['metadata', 'labels', 'tenant.otterscale.io/from-harbor']) ===
 					'true'
-			: undefined
+			: false
 	);
 
 	async function fetchHelmRepository(): Promise<SourceToolkitFluxcdIoV1HelmRepository | undefined> {
@@ -103,91 +99,81 @@
 		? `${semver.major(version)}.${semver.minor(version)}.0`
 		: '1.0.0';
 
-	let indexModules: IndexModuleType[] = $state([]);
+	let indexModules: ModuleType[] = $state([]);
 
 	async function fetchIndexModules(
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
-	): Promise<IndexModuleType[] | undefined> {
+	): Promise<ModuleType[] | undefined> {
 		if (isModuleFetching) return;
 
 		isModuleFetching = true;
 
-		try {
-			const response = await fetch('/bff/helm/repository/index', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					repositoryUrl: helmRepository.spec?.url ?? ''
-				})
-			});
+		let entireModules: ModuleType[] = [];
 
-			if (!response.ok) {
-				return;
+		try {
+			if (fromHarbor) {
+				const harborHost = parseHarborHost(helmRepository);
+				const harborProjectName = parseHarborProjectName(helmRepository);
+				const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')}&latest_in_repository=true`;
+
+				const response = await fetch('/bff/helm/repository/harbor', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						harborHost,
+						apiPath: artifactsUrl
+					})
+				});
+
+				if (!response.ok) {
+					return;
+				}
+
+				const entireHarborModules: any = await response.json();
+
+				entireModules = entireHarborModules.map((module: any) => {
+					return {
+						apiVersion: module.extra_attrs.apiVersion,
+						appVersion: module.extra_attrs.appVersion,
+						annotations: module.extra_attrs.annotations,
+						name: module.extra_attrs.name,
+						description: module.extra_attrs.description,
+						version: module.extra_attrs.version,
+						digest: module.digest,
+						icon: module.icon,
+						keywords: module.labels ?? [],
+						type: module.type
+					};
+				});
+			} else {
+				const response = await fetch('/bff/helm/repository/index', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						repositoryUrl: helmRepository.spec?.url ?? ''
+					})
+				});
+
+				if (!response.ok) {
+					return;
+				}
+
+				entireModules = await response.json();
 			}
 
-			const entireModules = await response.json();
+			console.log(entireModules);
 
 			return entireModules
-				.filter((module: IndexModuleType) => {
+				.filter((module: ModuleType) => {
 					const moduleVersion = module.version;
 					const moduleMinorVersion = `${semver.major(moduleVersion)}.${semver.minor(moduleVersion)}.0`;
 					return semver.gte(moduleMinorVersion, minimumVersion);
 				})
-				.filter((module: IndexModuleType) => module.name.startsWith('otterscale-'));
+				.filter((module: ModuleType) => module.name.startsWith('otterscale-'));
 		} catch (error) {
 			const helmRepositoryName = helmRepository.metadata?.name ?? '';
 			console.error(`HelmRepository "${helmRepositoryName}": error fetching modules:`, error);
 			toast.error(`HelmRepository "${helmRepositoryName}": unable to reach repository`);
-		} finally {
-			isModuleFetching = false;
-		}
-	}
-
-	let harborModules: HarborModuleType[] = $state([]);
-
-	async function fetchHarborModules(
-		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
-	): Promise<HarborModuleType[] | undefined> {
-		if (isModuleFetching) return;
-
-		isModuleFetching = true;
-
-		try {
-			const harborHost = parseHarborHost(helmRepository);
-			const harborProjectName = parseHarborProjectName(helmRepository);
-			const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')}&latest_in_repository=true`;
-
-			const response = await fetch('/bff/helm/repository/harbor', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					harborHost,
-					apiPath: artifactsUrl
-				})
-			});
-
-			if (!response.ok) {
-				return;
-			}
-
-			const entireModules: HarborModuleType[] = await response.json();
-
-			return entireModules
-				.filter((module: HarborModuleType) => {
-					const moduleVersion = lodash.get(module, 'extra_attrs.version');
-					const moduleMinorVersion = `${semver.major(moduleVersion)}.${semver.minor(moduleVersion)}.0`;
-					return semver.gte(moduleMinorVersion, minimumVersion);
-				})
-				.filter((module: HarborModuleType) =>
-					(module.extra_attrs?.name ?? '').startsWith('otterscale-')
-				);
-		} catch (error) {
-			const helmRepositoryName = helmRepository.metadata?.name ?? '';
-			console.error(
-				`HelmRepository "${helmRepositoryName}": error fetching Harbor modules:`,
-				error
-			);
-			toast.error(`HelmRepository "${helmRepositoryName}": unable to reach Harbor repository`);
 		} finally {
 			isModuleFetching = false;
 		}
@@ -303,13 +289,8 @@
 		helmRepository = await fetchHelmRepository();
 		if (!helmRepository) return;
 
-		if (fromHarbor) {
-			harborModules = (await fetchHarborModules(helmRepository)) ?? [];
-			if (!harborModules.length) return;
-		} else {
-			indexModules = (await fetchIndexModules(helmRepository)) ?? [];
-			if (!indexModules.length) return;
-		}
+		indexModules = (await fetchIndexModules(helmRepository)) ?? [];
+		if (!indexModules.length) return;
 
 		await listReleases();
 		watchReleases();
@@ -319,15 +300,7 @@
 			releases.map((release) => release.spec?.chart?.spec.chart).filter(Boolean)
 		) as Set<string>;
 
-		if (fromHarbor) {
-			data = harborModules.map((module) =>
-				getChartDataFromHarbor(module, installedModules, helmRepository!)
-			);
-		} else {
-			data = indexModules.map((module) =>
-				getChartDataFromIndex(module, installedModules, helmRepository!)
-			);
-		}
+		data = indexModules.map((module) => getChartData(module, installedModules, helmRepository!));
 	});
 
 	let isDestroyed = false;
@@ -339,7 +312,7 @@
 	});
 </script>
 
-{#key cluster}
+{#key cluster + String(fromHarbor)}
 	<main class="pb-8">
 		<ModuleViewer {cluster} {namespace} {data} {fromHarbor}>
 			{#snippet reload()}
