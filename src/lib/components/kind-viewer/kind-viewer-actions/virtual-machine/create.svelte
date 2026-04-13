@@ -181,6 +181,39 @@
 	const submissionValues = $derived.by(() => {
 		const { disks, volumes, isContainerDisk } = buildDisksAndVolumes();
 
+		// Build devices object with disks and interfaces
+		const devices: any = {
+			disks,
+			interfaces: [{ name: 'nic1', bridge: {} }]
+		};
+
+		// Add GPUs if selected
+		if (gpuPassthroughConfig.selectedResource && typeof gpuPassthroughConfig.selectedResource === 'string' && gpuPassthroughConfig.selectedResource !== '') {
+			const gpuDevices: any[] = [
+				{
+					deviceName: gpuPassthroughConfig.selectedResource,
+					name: 'gpu1'
+				}
+			];
+
+			// Find corresponding AUDIO device
+			const match = gpuPassthroughConfig.selectedResource.match(/nvidia\.com\/([A-Z0-9]+)_/);
+			if (match) {
+				const prefix = match[1];
+				const audioDevice = `nvidia.com/${prefix}_HIGH_DEFINITION_AUDIO_CONTROLLER`;
+
+				// Check if AUDIO device is available
+				if (allAvailableGpuResources.includes(audioDevice)) {
+					gpuDevices.push({
+						deviceName: audioDevice,
+						name: 'gpu1-audio'
+					});
+				}
+			}
+
+			devices.gpus = gpuDevices;
+		}
+
 		return {
 			apiVersion: group ? `${group}/${version}` : version,
 			kind,
@@ -203,10 +236,7 @@
 					},
 					spec: {
 						domain: {
-							devices: {
-								disks,
-								interfaces: [{ name: 'nic1', bridge: {} }]
-							}
+							devices
 						},
 						networks: [{ name: 'nic1', pod: {} }],
 						volumes
@@ -218,7 +248,7 @@
 	let value = $derived(stringify(submissionValues));
 
 	// Steps Manager
-	const steps = Array.from({ length: 7 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 8 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -340,6 +370,99 @@
 			return [];
 		}
 	}
+
+	// Fetch nodes with GPU passthrough support
+	async function fetchNodesWithGpuPassthrough(): Promise<any[]> {
+		try {
+			const response = await resourceClient.list({
+				cluster,
+				group: '',
+				version: 'v1',
+				resource: 'nodes'
+			});
+
+			const requiredLabels = {
+				'nvidia.com/gpu.workload.config': 'vm-passthrough',
+				'cpu-feature.node.kubevirt.io/vmx': 'true',
+				'nvidia.com/gpu.present': 'true'
+			};
+
+			return response.items.filter((item: any) => {
+				const nodeLabels = (item.object as any)?.metadata?.labels ?? {};
+				return Object.entries(requiredLabels).every(
+					([key, value]) => nodeLabels[key] === value
+				);
+			});
+		} catch (error) {
+			console.error('Error fetching nodes with GPU passthrough:', error);
+			return [];
+		}
+	}
+
+	// Fetch all GPU resources (including AUDIO devices)
+	async function fetchAllGpuResources(): Promise<string[]> {
+		try {
+			const nodes = await fetchNodesWithGpuPassthrough();
+			const gpuResources = new Set<string>();
+
+			for (const nodeItem of nodes) {
+				const allocatable = (nodeItem.object as any)?.status?.allocatable ?? {};
+				Object.keys(allocatable).forEach((resourceKey) => {
+					if (
+						resourceKey.startsWith('nvidia.com/') &&
+						!resourceKey.endsWith('vgpu') &&
+						!resourceKey.includes('/vgpu')
+					) {
+						gpuResources.add(resourceKey);
+					}
+				});
+			}
+
+			return Array.from(gpuResources);
+		} catch (error) {
+			console.error('Error fetching all GPU resources:', error);
+			return [];
+		}
+	}
+
+	// Fetch GPU resources for dropdown (excluding AUDIO devices)
+	async function fetchGpuResourcesAsEnumerations(
+		search: string
+	): Promise<{ label: string; value: string }[]> {
+		try {
+			const allResources = allAvailableGpuResources.length > 0
+				? allAvailableGpuResources
+				: await fetchAllGpuResources();
+
+			const gpuOptions = allResources
+				.filter((resource) => !resource.toUpperCase().includes('AUDIO'))
+				.filter((resource) => resource.toLowerCase().includes(search.toLowerCase()))
+				.map((resource) => ({ label: resource, value: resource }));
+
+			// Add empty option at the beginning
+			return [{ label: 'None (No GPU)', value: '' }, ...gpuOptions];
+		} catch (error) {
+			console.error('Error fetching GPU resources:', error);
+			return [{ label: 'None (No GPU)', value: '' }];
+		}
+	}
+
+	// Cache for all available GPU resources
+	let allAvailableGpuResources: string[] = $state([]);
+
+	// Container for GPU passthrough selection
+	let gpuPassthroughConfig: any = $state({
+		selectedResource: ''
+	});
+
+	// Load available GPU resources when dialog opens
+	$effect(() => {
+		if (open) {
+			fetchAllGpuResources().then((resources) => {
+				allAvailableGpuResources = resources;
+			});
+		}
+	});
 
 	// Flag for Dialog
 	let isSubmitting = $state(false);
@@ -718,8 +841,66 @@
 					</Form>
 				{/if}
 			</Tabs.Content>
-			<!-- Step 6: Cloud-Init -->
+			<!-- Step 6: GPU Passthrough -->
 			<Tabs.Content value={steps[5]}>
+				<Form
+					schema={{
+						type: 'object',
+						title: 'GPU Passthrough Configuration',
+						properties: {
+							selectedResource: {
+								type: 'string',
+								title: 'GPU Resource Type'
+							}
+						},
+						required: []
+					} as Schema}
+					uiSchema={{
+						selectedResource: {
+							'ui:components': {
+								stringField: 'enumField',
+								selectWidget: ComboboxWidget
+							},
+							'ui:options': {
+								TailoredComboboxEnumerations: fetchGpuResourcesAsEnumerations,
+								TailoredComboboxVisibility: 10,
+								TailoredComboboxInput: {
+									placeholder: 'Select GPU Resource'
+								},
+								TailoredComboboxEmptyText: 'No GPU resources found.',
+								TailoredComboboxPopoverClass: 'w-[380px]'
+							}
+						},
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={{ selectedResource: '' } as FormValue}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					bind:values={gpuPassthroughConfig}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+			<!-- Step 7: Cloud-Init -->
+			<Tabs.Content value={steps[6]}>
 				<Form
 					schema={{
 						type: 'string',
@@ -757,8 +938,8 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 7: Review & Create -->
-			<Tabs.Content value={steps[6]} class="min-h-[77vh]">
+			<!-- Step 8: Review & Create -->
+			<Tabs.Content value={steps[7]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{
