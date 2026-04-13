@@ -518,7 +518,9 @@
 								title: 'Node',
 								type: 'string',
 								description: 'Select a GPU node (nodeSelector: kubernetes.io/hostname)',
-								enum: nodeNameOptions.map((o) => o.value)
+								...(nodeNameOptions.length > 0 && {
+									enum: nodeNameOptions.map((o) => o.value)
+								})
 							},
 							gpuType: {
 								title: 'GPU Type',
@@ -526,7 +528,9 @@
 								description: 'Select GPU types (annotation: nvidia.com/use-gputype)',
 								items: {
 									type: 'string',
-									enum: gpuTypeOptions().map((o) => o.value)
+									...(gpuTypeOptions().length > 0 && {
+										enum: gpuTypeOptions().map((o) => o.value)
+									})
 								},
 								uniqueItems: true
 							},
@@ -536,7 +540,9 @@
 								description: 'Select GPU UUIDs (annotation: nvidia.com/use-gpuuuid)',
 								items: {
 									type: 'string',
-									enum: gpuUuidOptions.map((o) => o.value)
+									...(gpuUuidOptions.length > 0 && {
+										enum: gpuUuidOptions.map((o) => o.value)
+									})
 								},
 								uniqueItems: true
 							}
