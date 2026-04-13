@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { Plus } from '@lucide/svelte';
+	import { ExternalLink, Plus } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
@@ -345,6 +345,17 @@
 	let isSubmitting = $state(false);
 </script>
 
+{#snippet externalLink()}
+	<Button
+		href="https://quay.io/organization/containerdisks"
+		target="_blank"
+		rel="noopener noreferrer"
+		variant="ghost"
+	>
+		<ExternalLink size={16} />
+	</Button>
+{/snippet}
+
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
@@ -565,7 +576,7 @@
 						uiSchema={{
 							containerDiskImage: {
 								'ui:options': {
-									help: 'Browse available images at https://quay.io/organization/containerdisks',
+									action: externalLink,
 									shadcn4Text: {
 										placeholder: 'e.g. quay.io/kubevirt/fedora-cloud-container-disk-demo:latest'
 									}
