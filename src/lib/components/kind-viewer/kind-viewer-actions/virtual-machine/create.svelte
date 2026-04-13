@@ -300,7 +300,7 @@
 	function generateMacAddress(): string {
 		const hex = () => Math.floor(Math.random() * 16).toString(16);
 		const byte = () => (hex() + hex()).toUpperCase();
-		return `13:fe:10:${byte()}:${byte()}:${byte()}`;
+		return `52:54:00:${byte()}:${byte()}:${byte()}`;
 	}
 
 	// Fetch Instance Types
