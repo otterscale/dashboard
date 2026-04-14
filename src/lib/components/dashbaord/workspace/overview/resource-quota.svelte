@@ -123,9 +123,9 @@
 			queryScalar(rqSum('limits.memory', 'used')),
 			queryScalar(rqSum('limits.memory', 'hard')),
 			queryScalar(podContainerReadyLimitSum(namespace, KSM_POD_RES_NVIDIA_GPU)),
-			queryScalar(rqSum('nvidia.com/gpu', 'hard')),
+			queryScalar(rqSum('limits.nvidia.com/gpu', 'hard')),
 			queryScalar(podContainerReadyLimitSum(namespace, KSM_POD_RES_NVIDIA_GPUMEM)),
-			queryScalar(rqSum('nvidia.com/gpumem', 'hard'))
+			queryScalar(rqSum('limits.nvidia.com/gpumem', 'hard'))
 		]);
 
 		cpuUsedReq = cpuReqU;
