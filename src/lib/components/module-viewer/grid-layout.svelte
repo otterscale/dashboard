@@ -16,10 +16,12 @@
 
 	let {
 		row,
-		cluster
+		cluster,
+		fromHarbor
 	}: {
 		row: Row<Record<ModuleAttribute, JsonValue>>;
 		cluster: string;
+		fromHarbor: boolean;
 	} = $props();
 </script>
 
@@ -66,7 +68,7 @@
 				</Item.Description>
 			</Item.Content>
 			<Item.Actions>
-				<Actions {row} {cluster} />
+				<Actions {row} {cluster} {fromHarbor} />
 			</Item.Actions>
 		</Item.Root>
 	</Card.Header>
