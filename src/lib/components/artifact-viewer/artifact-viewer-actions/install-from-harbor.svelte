@@ -208,7 +208,7 @@
 		await Promise.all([fetchSchema(), fetchCharts()]);
 	});
 
-	const chartName = $derived(selectedChart.extra_attrs.name);
+	const chartName = $derived(lodash.get(selectedChart.extra_attrs, 'name') as string);
 	const defaultVersion = $derived(lodash.get(selectedChart.extra_attrs, 'version') as string);
 </script>
 
@@ -465,8 +465,6 @@
 							}
 
 							const name = lodash.get(load(value), 'metadata.name');
-
-							console.log(value);
 
 							toast.promise(
 								async () => {
