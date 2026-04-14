@@ -228,6 +228,9 @@
 				runStrategy: 'Halted',
 				instancetype: values.spec.instancetype,
 				...(isContainerDisk ? {} : { dataVolumeTemplates: buildDataVolumeTemplates() }),
+				...(nodeSelector.node && typeof nodeSelector.node === 'string' && nodeSelector.node !== '' 
+					? { nodeSelector: { 'kubernetes.io/hostname': nodeSelector.node } }
+					: {}),
 				template: {
 					metadata: {
 						labels: {
@@ -248,7 +251,7 @@
 	let value = $derived(stringify(submissionValues));
 
 	// Steps Manager
-	const steps = Array.from({ length: 8 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 9 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -371,6 +374,26 @@
 		}
 	}
 
+	// Fetch nodes with CPU feature VMX support
+	async function fetchNodesWithVmxLabel(): Promise<any[]> {
+		try {
+			const response = await resourceClient.list({
+				cluster,
+				group: '',
+				version: 'v1',
+				resource: 'nodes'
+			});
+
+			return response.items.filter((item: any) => {
+				const nodeLabels = (item.object as any)?.metadata?.labels ?? {};
+				return nodeLabels['cpu-feature.node.kubevirt.io/vmx'] === 'true';
+			});
+		} catch (error) {
+			console.error('Error fetching nodes with VMX label:', error);
+			return [];
+		}
+	}
+
 	// Fetch nodes with GPU passthrough support
 	async function fetchNodesWithGpuPassthrough(): Promise<any[]> {
 		try {
@@ -424,16 +447,69 @@
 		}
 	}
 
+	// Fetch GPU resources for a specific node
+	async function fetchGpuResourcesForNode(nodeName: string): Promise<string[]> {
+		if (!nodeName || typeof nodeName !== 'string') return [];
+		try {
+			const response = await resourceClient.get({
+				cluster,
+				group: '',
+				version: 'v1',
+				resource: 'nodes',
+				name: nodeName
+			});
+
+			const nodeObj = response.object as any;
+			const nodeLabels = nodeObj?.metadata?.labels ?? {};
+
+			// Check if node has both required GPU labels
+			const hasGpuWorkloadConfig = nodeLabels['nvidia.com/gpu.workload.config'] === 'vm-passthrough';
+			const hasGpuPresent = nodeLabels['nvidia.com/gpu.present'] === 'true';
+
+			if (!hasGpuWorkloadConfig || !hasGpuPresent) {
+				console.warn(`Node ${nodeName} does not have both required GPU labels`);
+				return [];
+			}
+
+			// Extract GPU resources from node allocatable
+			const allocatable = nodeObj?.status?.allocatable ?? {};
+			const gpuResources: string[] = [];
+
+			Object.keys(allocatable).forEach((resourceKey) => {
+				if (
+					resourceKey.startsWith('nvidia.com/') &&
+					!resourceKey.endsWith('vgpu') &&
+					!resourceKey.includes('/vgpu')
+				) {
+					gpuResources.push(resourceKey);
+				}
+			});
+
+			return gpuResources;
+		} catch (error) {
+			console.error(`Error fetching GPU resources for node ${nodeName}:`, error);
+			return [];
+		}
+	}
+
 	// Fetch GPU resources for dropdown (excluding AUDIO devices)
 	async function fetchGpuResourcesAsEnumerations(
 		search: string
 	): Promise<{ label: string; value: string }[]> {
 		try {
-			const allResources = allAvailableGpuResources.length > 0
-				? allAvailableGpuResources
-				: await fetchAllGpuResources();
+			let gpuResourcesList: string[];
 
-			const gpuOptions = allResources
+			// If a node is selected in step 6, fetch GPU resources only for that node
+			if (nodeSelector.node && typeof nodeSelector.node === 'string' && nodeSelector.node !== '') {
+				gpuResourcesList = await fetchGpuResourcesForNode(nodeSelector.node);
+			} else {
+				// Otherwise, use all available GPU resources from nodes with GPU passthrough support
+				gpuResourcesList = allAvailableGpuResources.length > 0
+					? allAvailableGpuResources
+					: await fetchAllGpuResources();
+			}
+
+			const gpuOptions = gpuResourcesList
 				.filter((resource) => !resource.toUpperCase().includes('AUDIO'))
 				.filter((resource) => resource.toLowerCase().includes(search.toLowerCase()))
 				.map((resource) => ({ label: resource, value: resource }));
@@ -446,12 +522,36 @@
 		}
 	}
 
+	// Fetch nodes for dropdown
+	async function fetchNodesAsEnumerations(
+		search: string
+	): Promise<{ label: string; value: string }[]> {
+		try {
+			const nodes = await fetchNodesWithVmxLabel();
+			const nodeOptions = nodes
+				.map((item: any) => (item.object as any)?.metadata?.name as string)
+				.filter((name: string) => name && name.toLowerCase().includes(search.toLowerCase()))
+				.map((name: string) => ({ label: name, value: name }));
+
+			// Add empty option at the beginning
+			return [{ label: 'No selection', value: '' }, ...nodeOptions];
+		} catch (error) {
+			console.error('Error fetching nodes:', error);
+			return [{ label: 'No selection', value: '' }];
+		}
+	}
+
 	// Cache for all available GPU resources
 	let allAvailableGpuResources: string[] = $state([]);
 
 	// Container for GPU passthrough selection
 	let gpuPassthroughConfig: any = $state({
 		selectedResource: ''
+	});
+
+	// Container for Node selection
+	let nodeSelector: any = $state({
+		node: ''
 	});
 
 	// Load available GPU resources when dialog opens
@@ -840,8 +940,66 @@
 					</Form>
 				{/if}
 			</Tabs.Content>
-			<!-- Step 6: GPU Passthrough -->
+			<!-- Step 6: Node Selector -->
 			<Tabs.Content value={steps[5]}>
+				<Form
+					schema={{
+						type: 'object',
+						title: 'Node Selector',
+						properties: {
+							node: {
+								type: 'string',
+								title: 'Select Node (Optional)'
+							}
+						},
+						required: []
+					} as Schema}
+					uiSchema={{
+						node: {
+							'ui:components': {
+								stringField: 'enumField',
+								selectWidget: ComboboxWidget
+							},
+							'ui:options': {
+								TailoredComboboxEnumerations: fetchNodesAsEnumerations,
+								TailoredComboboxVisibility: 10,
+								TailoredComboboxInput: {
+									placeholder: 'Select Node'
+								},
+								TailoredComboboxEmptyText: 'No nodes with VMX support found.',
+								TailoredComboboxPopoverClass: 'w-[380px]'
+							}
+						},
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={{ node: '' } as FormValue}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					bind:values={nodeSelector}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+			<!-- Step 7: GPU Passthrough -->
+			<Tabs.Content value={steps[6]}>
 				<Form
 					schema={{
 						type: 'object',
@@ -898,8 +1056,8 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 7: Cloud-Init -->
-			<Tabs.Content value={steps[6]}>
+			<!-- Step 8: Cloud-Init -->
+			<Tabs.Content value={steps[7]}>
 				<Form
 					schema={{
 						type: 'string',
@@ -937,8 +1095,8 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 8: Review & Create -->
-			<Tabs.Content value={steps[7]} class="min-h-[77vh]">
+			<!-- Step 9: Review & Create -->
+			<Tabs.Content value={steps[8]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{
