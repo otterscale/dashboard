@@ -208,7 +208,7 @@
 		await Promise.all([fetchSchema(), fetchCharts()]);
 	});
 
-	const chartName = $derived(selectedChart.repository_name);
+	const chartName = $derived(lodash.get(selectedChart.extra_attrs, 'name') as string);
 	const defaultVersion = $derived(lodash.get(selectedChart.extra_attrs, 'version') as string);
 </script>
 
