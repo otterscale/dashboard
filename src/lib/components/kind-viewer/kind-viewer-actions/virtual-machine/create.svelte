@@ -69,10 +69,7 @@
 			bootDisk: null,
 			additionalDisks: []
 		},
-		cloudInit: {
-			userData: '',
-			networkData: ''
-		},
+		cloudInit: {},
 		// PVC info inherited from selected boot DV
 		bootDvPvcInfo: {
 			accessModes: ['ReadWriteOnce'],
@@ -108,7 +105,7 @@
 	}
 
 	// Build disks and volumes
-	function buildDisksAndVolumes(macAddress: string): { disks: any[]; volumes: any[]; isContainerDisk: boolean } {
+	function buildDisksAndVolumes(): { disks: any[]; volumes: any[]; isContainerDisk: boolean } {
 		const vmName = typeof values.metadata.name === 'string' ? values.metadata.name : '';
 		const isContainerDisk = values.diskSourceType === 'containerDisk';
 
@@ -137,28 +134,12 @@
 			}
 		});
 
-		const userDataContent = typeof values.cloudInit?.userData === 'string' ? values.cloudInit.userData : '';
-		let networkDataContent = typeof values.cloudInit?.networkData === 'string' ? values.cloudInit.networkData : '';
-		
-		// Replace macaddress placeholder in networkData with actual MAC address
-		if (networkDataContent.trim()) {
-			networkDataContent = networkDataContent.replace(/macaddress: ".*?"/g, `macaddress: "${macAddress}"`);
-		}
-		
-		if (userDataContent.trim() || networkDataContent.trim()) {
+		const cloudInitData = typeof values.cloudInit === 'string' ? values.cloudInit : '';
+		if (cloudInitData.trim()) {
 			disks.push({ name: 'cloud-init-disk', disk: { bus: 'virtio' } });
-			const cloudInitConfig: any = {};
-			
-			if (userDataContent.trim()) {
-				cloudInitConfig.userData = userDataContent;
-			}
-			if (networkDataContent.trim()) {
-				cloudInitConfig.networkData = networkDataContent;
-			}
-			
 			volumes.push({
 				name: 'cloud-init-disk',
-				cloudInitNoCloud: cloudInitConfig
+				cloudInitNoCloud: { userData: cloudInitData }
 			});
 		}
 
@@ -198,13 +179,12 @@
 
 	// Derived submission values (proper VirtualMachine structure)
 	const submissionValues = $derived.by(() => {
-		const macAddress = generateMacAddress();
-		const { disks, volumes, isContainerDisk } = buildDisksAndVolumes(macAddress);
+		const { disks, volumes, isContainerDisk } = buildDisksAndVolumes();
 
 		// Build devices object with disks and interfaces
 		const devices: any = {
 			disks,
-			interfaces: [{ name: 'nic1', bridge: {}, macAddress }]
+			interfaces: [{ name: 'nic1', bridge: {} }]
 		};
 
 		// Add GPUs if selected
@@ -294,13 +274,6 @@
 		const tiMatch = quantity.match(/^(\d+(?:\.\d+)?)Ti$/);
 		if (tiMatch) return `${tiMatch[1]} TB`;
 		return quantity;
-	}
-
-	// Generate random MAC address
-	function generateMacAddress(): string {
-		const hex = () => Math.floor(Math.random() * 16).toString(16);
-		const byte = () => (hex() + hex()).toUpperCase();
-		return `52:54:00:${byte()}:${byte()}:${byte()}`;
 	}
 
 	// Fetch Instance Types
@@ -410,7 +383,6 @@
 
 			const requiredLabels = {
 				'nvidia.com/gpu.workload.config': 'vm-passthrough',
-				'cpu-feature.node.kubevirt.io/vmx': 'true',
 				'nvidia.com/gpu.present': 'true'
 			};
 
@@ -930,40 +902,12 @@
 			<Tabs.Content value={steps[6]}>
 				<Form
 					schema={{
-						type: 'object',
-						title: 'Cloud-Init Configuration',
-						properties: {
-							userData: {
-								type: 'string',
-								title: 'User Data'
-							},
-							networkData: {
-								type: 'string',
-								title: 'Network Data'
-							}
-						},
-						required: []
+						type: 'string',
+						title: 'Cloud-Init (userData)'
 					} as Schema}
 					uiSchema={{
-						userData: {
-							'ui:components': {
-								textWidget: 'textareaWidget'
-							},
-							'ui:options': {
-								shadcn4Textarea: {
-									placeholder: '#cloud-config\npassword: password\nchpasswd:\n  expire: false'
-								}
-							}
-						},
-						networkData: {
-							'ui:components': {
-								textWidget: 'textareaWidget'
-							},
-							'ui:options': {
-								shadcn4Textarea: {
-									placeholder: 'version: 2\nethernets:\n  eth0:\n    dhcp4: true'
-								}
-							}
+						'ui:components': {
+							textWidget: 'textareaWidget'
 						},
 						'ui:options': {
 							translations: {
@@ -971,7 +915,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{ userData: '#cloud-config\npassword: password\nchpasswd:\n  expire: false', networkData: 'version: 2\nethernets:\n  primary:\n    match:\n      macaddress: "52:54:00:00:00:00"\n    dhcp4: true\n    nameservers:\n      addresses:\n        - 8.8.8.8' } as FormValue}
+					initialValue={'#cloud-config\npassword: password\nchpasswd:\n  expire: false' as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
