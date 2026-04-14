@@ -161,8 +161,6 @@
 				entireModules = await response.json();
 			}
 
-			console.log(entireModules);
-
 			return entireModules
 				.filter((module: ModuleType) => {
 					const moduleVersion = module.version;
