@@ -132,6 +132,7 @@
 				),
 			enableHiding: false,
 			enableSorting: false,
+			enableResizing: false,
 			size: 40
 		}
 	];
