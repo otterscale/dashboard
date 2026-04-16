@@ -100,22 +100,21 @@
 
 						const modelRepositories: string[] = [];
 						modelArtifacts.forEach((artifact) => {
-							if (
-								Array.isArray(artifact.tags) &&
-								artifact.tags.some((tag) => tag.name === 'latest')
-							) {
+							if (Array.isArray(artifact.tags) && artifact.tags.length > 0) {
+								const artifactTagNames = artifact.tags.map((tag) => tag.name);
+								const [artifactTagName] = artifactTagNames;
 								imageToArtifact.set(
-									`${harborUrl.host}/${artifact.repository_name}:latest`,
+									`${harborUrl.host}/${artifact.repository_name}:${artifactTagName}`,
 									artifact
 								);
-								modelRepositories.push(artifact.repository_name);
+								modelRepositories.push(`${artifact.repository_name}:${artifactTagName}`);
 							}
 						});
 
 						resolve(
-							modelRepositories.map((repositoryName: string) => ({
-								label: repositoryName,
-								value: `${harborUrl.host}/${repositoryName}:latest`
+							modelRepositories.map((repository: string) => ({
+								label: repository,
+								value: `${harborUrl.host}/${repository}`
 							}))
 						);
 					} else {
@@ -290,7 +289,7 @@
 							if (artifact) {
 								const extraAttributes = artifact.extra_attrs;
 								const name = [
-									...(lodash.get(extraAttributes, 'descriptor.authors') as []),
+									...(lodash.get(extraAttributes, 'descriptor.authors', []) as []),
 									lodash.get(extraAttributes, 'descriptor.name')
 								].join('/');
 

@@ -115,9 +115,7 @@
 	const attributes = $derived(inputAttributes(ctx, config, 'TailoredComboboxInput', handlers, {}));
 
 	const emptyText = $derived(retrieveUiOption(ctx, config, 'TailoredComboboxEmptyText'));
-	const popoverClass = $derived(
-		(retrieveUiOption(ctx, config, 'TailoredComboboxPopoverClass') as string) ?? 'w-[200px]'
-	);
+	const popoverClass = $derived('w-[var(--bits-popover-anchor-width)] min-w-xs');
 
 	let open = $state(false);
 	let triggerReference = $state<HTMLButtonElement>(null!);
