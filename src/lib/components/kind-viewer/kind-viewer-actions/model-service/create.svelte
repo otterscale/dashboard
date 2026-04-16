@@ -289,7 +289,7 @@
 							if (artifact) {
 								const extraAttributes = artifact.extra_attrs;
 								const name = [
-									...(lodash.get(extraAttributes, 'descriptor.authors', []) as []),
+									...(lodash.get(extraAttributes, 'descriptor.authors', []) as string[]),
 									lodash.get(extraAttributes, 'descriptor.name')
 								].join('/');
 
