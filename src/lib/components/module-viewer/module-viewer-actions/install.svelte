@@ -6,11 +6,10 @@
 	import { RuntimeService } from '@otterscale/api/runtime/v1';
 	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 	import type { Row } from '@tanstack/table-core';
-	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import { stringify } from 'yaml';
+	import { parse, stringify } from 'yaml';
 
 	import {
 		encodeHarborURIComponent,
@@ -141,7 +140,7 @@
 								}
 							}
 						},
-						values: load(helmValues) ?? {}
+						values: parse(helmValues) ?? {}
 					}
 				};
 
@@ -151,7 +150,7 @@
 					group,
 					version,
 					resource,
-					manifest: new TextEncoder().encode(stringify(manifest))
+					manifest: new TextEncoder().encode(stringify(manifest, { schema: 'yaml-1.1' }))
 				});
 			},
 			{

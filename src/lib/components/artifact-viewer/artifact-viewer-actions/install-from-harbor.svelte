@@ -8,13 +8,12 @@
 	import { type Schema, SubmitButton, type UiSchemaRoot } from '@sjsf/form';
 	import type { Row } from '@tanstack/table-core';
 	import Ajv from 'ajv';
-	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext, onMount } from 'svelte';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
-	import { stringify } from 'yaml';
+	import { parse, stringify } from 'yaml';
 
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import EditorWidget from '$lib/components/dynamic-form/widgets/editor.svelte';
@@ -87,7 +86,7 @@
 			values: {}
 		}
 	});
-	let value = $derived(stringify(values));
+	let value = $derived(stringify(values, { schema: 'yaml-1.1' }));
 
 	const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
 
@@ -394,7 +393,7 @@
 							posthook: () => {
 								handleNext();
 								try {
-									const structuredValues = load(lodash.get(values, 'spec.values') as string);
+									const structuredValues = parse(lodash.get(values, 'spec.values') as string);
 
 									lodash.set(values, 'spec.values', structuredValues);
 								} catch (error) {
@@ -455,7 +454,7 @@
 							if (isSubmitting) return;
 							isSubmitting = true;
 
-							const isValid = validate(load(value));
+							const isValid = validate(parse(value));
 
 							if (!isValid) {
 								console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
@@ -464,7 +463,7 @@
 								return;
 							}
 
-							const name = lodash.get(load(value), 'metadata.name');
+							const name = lodash.get(parse(value), 'metadata.name');
 
 							toast.promise(
 								async () => {
