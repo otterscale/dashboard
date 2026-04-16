@@ -421,10 +421,10 @@
 						handleSubmit={{
 							posthook: () => {
 								handleNext();
+								const raw = lodash.get(values, 'spec.values');
+								if (typeof raw !== 'string') return;
 								try {
-									const structuredValues = parse(lodash.get(values, 'spec.values') as string);
-
-									lodash.set(values, 'spec.values', structuredValues);
+									lodash.set(values, 'spec.values', parse(raw) ?? {});
 								} catch (error) {
 									console.error('Failed to load values:', error);
 									toast.error('Failed to load values');
@@ -483,7 +483,17 @@
 							if (isSubmitting) return;
 							isSubmitting = true;
 
-							const isValid = validate(parse(value));
+							let parsed: unknown;
+							try {
+								parsed = parse(value);
+							} catch (error) {
+								console.error('Failed to parse YAML:', error);
+								toast.error('Invalid YAML. Please check the syntax.');
+								isSubmitting = false;
+								return;
+							}
+
+							const isValid = validate(parsed);
 
 							if (!isValid) {
 								console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
@@ -492,7 +502,7 @@
 								return;
 							}
 
-							const name = lodash.get(parse(value), 'metadata.name');
+							const name = lodash.get(parsed, 'metadata.name');
 
 							toast.promise(
 								async () => {
