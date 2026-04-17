@@ -50,7 +50,7 @@
 		| CephRookIoV1CephObjectStore
 		| AppsV1Deployment
 		| CoreV1Pod;
-	// AbortController 用來在元件銷毀時終止所有 watch streams
+	// AbortController is used to terminate all watch streams when the component is destroyed
 	const abortController = new AbortController();
 
 	const getKey = (o: any) => o?.metadata?.uid ?? o?.metadata?.name ?? '';
@@ -62,7 +62,7 @@
 		while (!abortController.signal.aborted) {
 			let resourceVersion = '';
 
-			// === 1. List: 取得初始 snapshot ===
+			// === 1. List: Get initial snapshot ===
 			try {
 				const response = await resourceClient.list(
 					{
@@ -82,7 +82,7 @@
 				continue;
 			}
 
-			// === 2. Watch: 從該 resourceVersion 開始串流事件 ===
+			// === 2. Watch: Stream events starting from this resourceVersion ===
 			try {
 				const stream = resourceClient.watch(
 					{
@@ -101,7 +101,7 @@
 					}
 
 					if (event.type === WatchEvent_Type.ERROR) {
-						// 伺服端錯誤 (例如 resourceVersion 過舊) → 跳出,重新 list-then-watch
+						// Server-side error (e.g., resourceVersion too old) -> break, re-list-then-watch
 						console.warn(`Watch error for ${identifier.resource}, relisting...`);
 						break;
 					}
@@ -138,7 +138,7 @@
 				console.error(`Watch stream error for ${identifier.resource}:`, error);
 			}
 
-			// stream 結束或錯誤 → 短暫等待後重新 list-then-watch
+			// Stream ended or error -> wait briefly and re-list-then-watch
 			if (!abortController.signal.aborted) {
 				await sleep(1000);
 			}
