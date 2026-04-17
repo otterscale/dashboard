@@ -10,7 +10,7 @@
 		nowCDT
 	} from '$lib/components/custom/datetime-picker';
 	import Reloader from '$lib/components/custom/reloader/reloader.svelte';
-	import { Overview } from '$lib/components/storage/dashboard/overview';
+	import { Overview } from '$lib/components/dashboard/storage/overview';
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/paraglide/messages';
