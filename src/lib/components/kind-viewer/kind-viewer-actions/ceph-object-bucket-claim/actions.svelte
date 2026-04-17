@@ -8,7 +8,11 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
-	import Secret from './secret.svelte';
+	import AccessKey from './access-key.svelte';
+	import Download from './download.svelte';
+	import List from './list.svelte';
+	import Remove from './remove.svelte';
+	import Upload from './upload.svelte';
 
 	let {
 		schema,
@@ -50,8 +54,65 @@
 					e.preventDefault();
 				}}
 			>
-				<Secret
+				<AccessKey
 					{cluster}
+					{namespace}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<List
+					{cluster}
+					{namespace}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Upload
+					{cluster}
+					{namespace}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Download
+					{cluster}
+					{namespace}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Remove
+					{cluster}
+					{namespace}
 					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;

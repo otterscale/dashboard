@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import FileIcon from '@lucide/svelte/icons/file';
+	import { SquareArrowOutUpRightIcon } from '@lucide/svelte';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
@@ -58,7 +58,6 @@
 		metadata: {},
 		spec: {
 			storageClassName: 'ceph-bucket',
-			generateBucketName: {},
 			additionalConfig: {}
 		}
 	});
@@ -90,7 +89,7 @@
 		rel="noopener noreferrer"
 		variant="ghost"
 	>
-		<FileIcon size={16} />
+		<SquareArrowOutUpRightIcon size={16} />
 	</Button>
 {/snippet}
 
@@ -144,7 +143,7 @@
 						posthook: (form: FormState<FormValue>) => {
 							handleNext();
 							const formValue = getValueSnapshot(form);
-							lodash.set(values, 'spec.generateBucketName', lodash.get(formValue, 'name'));
+							lodash.set(values, 'spec.bucketName', lodash.get(formValue, 'name'));
 						}
 					}}
 					bind:values={values['metadata']}
