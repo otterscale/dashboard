@@ -1,10 +1,10 @@
 import type { Component } from 'svelte';
 
-import Applications from './applications.svelte';
-import Default from './default.svelte';
-import Edit from './edit-workspace.svelte';
-import ModelServices from './modelservices.svelte';
-import Workspaces from './workspaces.svelte';
+import ApplicationsViewer from './applications-viewer.svelte';
+import DefaultViewer from './default-viewer.svelte';
+import ModelServicesViewer from './model-service-viewer.svelte';
+import WorkspaceEditor from './workspace-editor.svelte';
+import WorkspaceViewer from './workspaces-viewer.svelte';
 
 type ViewerProps = { object: any; schema?: any };
 type ViewerType = Component<ViewerProps>;
@@ -23,20 +23,20 @@ type EditorType = Component<EditorProps> | null;
 
 function getResourceViewer(resource: string): ViewerType {
 	if (resource === 'applications') {
-		return Applications as ViewerType;
+		return ApplicationsViewer as ViewerType;
 	}
 	if (resource === 'modelservices') {
-		return ModelServices as ViewerType;
+		return ModelServicesViewer as ViewerType;
 	}
 	if (resource === 'workspaces') {
-		return Workspaces as ViewerType;
+		return WorkspaceViewer as ViewerType;
 	}
-	return Default as ViewerType;
+	return DefaultViewer as ViewerType;
 }
 
 function getEditor(resource: string): EditorType {
 	if (resource === 'workspaces') {
-		return Edit as unknown as EditorType;
+		return WorkspaceEditor as unknown as EditorType;
 	}
 	return null;
 }
