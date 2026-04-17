@@ -11,8 +11,8 @@
 		nowCDT
 	} from '$lib/components/custom/datetime-picker';
 	import Reloader from '$lib/components/custom/reloader/reloader.svelte';
+	import { Overview } from '$lib/components/dashboard/storage/overview';
 	import RookCephViewer from '$lib/components/resource-viewer/viewers/rook-ceph-viewer.svelte';
-	import { Overview } from '$lib/components/storage/dashboard/overview';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Item from '$lib/components/ui/item';
 	import * as Sheet from '$lib/components/ui/sheet';
