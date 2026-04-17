@@ -1,15 +1,3 @@
-<!--
-Example: Upload file to Ceph Object Bucket
-Replace the placeholders with your actual values.
-
-FILE="<your-file-name>"
-KEY="<your-object-key>"
-curl -X PUT "http://<your-host>/<your-bucket-name>/$KEY" \
-  -H "Date: $(date -u +'%a, %d %b %Y %H:%M:%S GMT')" \
-  -H "Content-Type: text/plain" \
-  -H "Authorization: AWS <your-access-key>:$(echo -en "PUT\n\n$text/plain\n$D\n/<your-bucket-name>/$KEY" | openssl sha1 -hmac "<your-secret-key>" -binary | base64)" \
-  -T "$FILE"
--->
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import { DeleteIcon } from '@lucide/svelte';
@@ -125,7 +113,7 @@ curl -X PUT "http://<your-host>/<your-bucket-name>/$KEY" \
 					'<endpoint>'
 				)}
 				{@const bucketName = lodash.get(object, ['spec', 'bucketName'], '<bucket-name>')}
-				{@const upload = `\
+				{@const command = `\
 KEY=<key>
 TIMESTAMP=$(date -u +'%a, %d %b %Y %H:%M:%S GMT')
 ACCESS_KEY=$(echo ${secret?.data?.AWS_ACCESS_KEY_ID} | base64 -d)
@@ -137,7 +125,7 @@ curl -X DELETE "http://${endpoint}/${bucketName}/$KEY" \\
   -H "Date: $TIMESTAMP" \\
   -H "Authorization: AWS $ACCESS_KEY:$SIGNATURE"\
 `}
-				<Code.Root lang="bash" code={upload} hideLines />
+				<Code.Root lang="bash" code={command} hideLines />
 				<Button
 					class="mt-auto w-full"
 					onclick={() => {
