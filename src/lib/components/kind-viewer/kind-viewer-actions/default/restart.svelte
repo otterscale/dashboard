@@ -4,11 +4,11 @@
 	import { RuntimeService } from '@otterscale/api/runtime/v1';
 	import type { FormValue, Schema } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
-	import { getContext } from 'svelte';
+	import { getContext, type Snippet } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import Form from '$lib/components/dynamic-form/form.svelte';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 
 	let {
@@ -19,7 +19,8 @@
 		kind,
 		resource,
 		object,
-		onOpenChangeComplete
+		onOpenChangeComplete,
+		trigger
 	}: {
 		cluster: string;
 		namespace: string;
@@ -30,6 +31,7 @@
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		object: any;
 		onOpenChangeComplete?: () => void;
+		trigger?: Snippet;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -80,20 +82,24 @@
 	}
 </script>
 
-<AlertDialog.Root bind:open {onOpenChangeComplete}>
-	<AlertDialog.Trigger>
-		{#snippet child({ props })}
-			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
-				<Item.Media>
-					<RotateCcwIcon />
-				</Item.Media>
-				<Item.Content>
-					<Item.Title>Restart</Item.Title>
-				</Item.Content>
-			</Item.Root>
-		{/snippet}
-	</AlertDialog.Trigger>
-	<AlertDialog.Content class="max-h-[95vh] min-w-[23vw] overflow-auto">
+<Dialog.Root bind:open {onOpenChangeComplete}>
+	{#if trigger}
+		{@render trigger()}
+	{:else}
+		<Dialog.Trigger>
+			{#snippet child({ props })}
+				<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
+					<Item.Media>
+						<RotateCcwIcon />
+					</Item.Media>
+					<Item.Content>
+						<Item.Title>Restart</Item.Title>
+					</Item.Content>
+				</Item.Root>
+			{/snippet}
+		</Dialog.Trigger>
+	{/if}
+	<Dialog.Content class="max-h-[95vh] min-w-[23vw] overflow-auto">
 		<Item.Root class="p-0">
 			<Item.Content class="text-left">
 				<Item.Title class="text-xl font-bold">Restart {kind}</Item.Title>
@@ -121,5 +127,5 @@
 				</div>
 			{/snippet}
 		</Form>
-	</AlertDialog.Content>
-</AlertDialog.Root>
+	</Dialog.Content>
+</Dialog.Root>
