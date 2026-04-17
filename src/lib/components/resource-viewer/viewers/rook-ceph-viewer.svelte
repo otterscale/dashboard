@@ -4,7 +4,7 @@
 	import FileSearchIcon from '@lucide/svelte/icons/file-search';
 	import HeartPulse from '@lucide/svelte/icons/heart-pulse';
 	import Layers from '@lucide/svelte/icons/layers';
-	import { ResourceService } from '@otterscale/api/resource/v1';
+	import { ResourceService, WatchEvent_Type } from '@otterscale/api/resource/v1';
 	import type {
 		AppsV1Deployment,
 		CephRookIoV1CephBlockPool,
@@ -13,7 +13,7 @@
 		CephRookIoV1CephObjectStore,
 		CoreV1Pod
 	} from '@otterscale/types';
-	import { getContext, onMount } from 'svelte';
+	import { getContext, onDestroy, onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
@@ -43,77 +43,129 @@
 
 	const namespace = 'rook-ceph';
 
-	// L1 - CephClusters
-	let cephClusters = $state<CephRookIoV1CephCluster[]>([]);
+	type TargetResource =
+		| CephRookIoV1CephCluster
+		| CephRookIoV1CephBlockPool
+		| CephRookIoV1CephFilesystem
+		| CephRookIoV1CephObjectStore
+		| AppsV1Deployment
+		| CoreV1Pod;
+	// AbortController 用來在元件銷毀時終止所有 watch streams
+	const abortController = new AbortController();
 
-	async function fetchCephClusters() {
-		try {
-			const response = await resourceClient.list({
-				cluster,
-				namespace,
-				group: 'ceph.rook.io',
-				version: 'v1',
-				resource: 'cephclusters'
-			});
-			cephClusters = response.items.map((item) => item.object as CephRookIoV1CephCluster);
-		} catch (error) {
-			console.error('Failed to fetch CephClusters:', error);
+	const getKey = (o: any) => o?.metadata?.uid ?? o?.metadata?.name ?? '';
+	async function listAndWatch<T extends TargetResource>(
+		identifier: { group: string; version: string; resource: string },
+		setObjects: (items: T[]) => void,
+		updateObject: (updater: (previous: T[]) => T[]) => void
+	) {
+		while (!abortController.signal.aborted) {
+			let resourceVersion = '';
+
+			// === 1. List: 取得初始 snapshot ===
+			try {
+				const response = await resourceClient.list(
+					{
+						cluster,
+						namespace,
+						...identifier
+					},
+					{ signal: abortController.signal }
+				);
+				const items = response.items.map((item) => item.object as T);
+				setObjects(items);
+				resourceVersion = response.resourceVersion;
+			} catch (error) {
+				if (abortController.signal.aborted) return;
+				console.error(`Failed to list ${identifier.resource}:`, error);
+				await sleep(3000);
+				continue;
+			}
+
+			// === 2. Watch: 從該 resourceVersion 開始串流事件 ===
+			try {
+				const stream = resourceClient.watch(
+					{
+						cluster,
+						namespace,
+						...identifier,
+						resourceVersion
+					},
+					{ signal: abortController.signal }
+				);
+
+				for await (const event of stream) {
+					if (event.type === WatchEvent_Type.BOOKMARK) {
+						if (event.resourceVersion) resourceVersion = event.resourceVersion;
+						continue;
+					}
+
+					if (event.type === WatchEvent_Type.ERROR) {
+						// 伺服端錯誤 (例如 resourceVersion 過舊) → 跳出,重新 list-then-watch
+						console.warn(`Watch error for ${identifier.resource}, relisting...`);
+						break;
+					}
+
+					const resourceObject = event.resource?.object as T | undefined;
+					if (!resourceObject) continue;
+					const key = getKey(resourceObject);
+					if (!key) continue;
+
+					if (event.resourceVersion) resourceVersion = event.resourceVersion;
+
+					switch (event.type) {
+						case WatchEvent_Type.ADDED:
+						case WatchEvent_Type.MODIFIED: {
+							updateObject((previous) => {
+								const index = previous.findIndex((o) => getKey(o) === key);
+								if (index >= 0) {
+									const next = previous.slice();
+									next[index] = resourceObject;
+									return next;
+								}
+								return [...previous, resourceObject];
+							});
+							break;
+						}
+						case WatchEvent_Type.DELETED: {
+							updateObject((previous) => previous.filter((o) => getKey(o) !== key));
+							break;
+						}
+					}
+				}
+			} catch (error) {
+				if (abortController.signal.aborted) return;
+				console.error(`Watch stream error for ${identifier.resource}:`, error);
+			}
+
+			// stream 結束或錯誤 → 短暫等待後重新 list-then-watch
+			if (!abortController.signal.aborted) {
+				await sleep(1000);
+			}
 		}
 	}
+
+	function sleep(ms: number) {
+		return new Promise<void>((resolve) => {
+			const timer = setTimeout(resolve, ms);
+			abortController.signal.addEventListener('abort', () => {
+				clearTimeout(timer);
+				resolve();
+			});
+		});
+	}
+
+	// L1 - CephClusters
+	let cephClusters = $state<CephRookIoV1CephCluster[]>([]);
 
 	// L2 - CephBlockPools
 	let cephBlockPools = $state<CephRookIoV1CephBlockPool[]>([]);
 
-	async function fetchCephBlockPools() {
-		try {
-			const response = await resourceClient.list({
-				cluster,
-				namespace,
-				group: 'ceph.rook.io',
-				version: 'v1',
-				resource: 'cephblockpools'
-			});
-			cephBlockPools = response.items.map((item) => item.object as CephRookIoV1CephBlockPool);
-		} catch (error) {
-			console.error('Failed to fetch CephBlockPools:', error);
-		}
-	}
-
 	// L2 - CephFilesystems
 	let cephFilesystems = $state<CephRookIoV1CephFilesystem[]>([]);
 
-	async function fetchCephFilesystems() {
-		try {
-			const response = await resourceClient.list({
-				cluster,
-				namespace,
-				group: 'ceph.rook.io',
-				version: 'v1',
-				resource: 'cephfilesystems'
-			});
-			cephFilesystems = response.items.map((item) => item.object as CephRookIoV1CephFilesystem);
-		} catch (error) {
-			console.error('Failed to fetch CephFilesystems:', error);
-		}
-	}
-
 	// L2 - CephObjectStores
 	let cephObjectStores = $state<CephRookIoV1CephObjectStore[]>([]);
-
-	async function fetchCephObjectStores() {
-		try {
-			const response = await resourceClient.list({
-				cluster,
-				namespace,
-				group: 'ceph.rook.io',
-				version: 'v1',
-				resource: 'cephobjectstores'
-			});
-			cephObjectStores = response.items.map((item) => item.object as CephRookIoV1CephObjectStore);
-		} catch (error) {
-			console.error('Failed to fetch CephObjectStores:', error);
-		}
-	}
 
 	// L3 - Deployments
 	let deployments = $state<AppsV1Deployment[]>([]);
@@ -135,13 +187,7 @@
 		].sort()
 	);
 
-	let selectedDeploymentFilters = $derived(
-		new SvelteSet<string>(
-			deploymentLabelSelectors.find((label) => label === 'rook-ceph-operator')
-				? ['rook-ceph-operator']
-				: []
-		)
-	);
+	let selectedDeploymentFilters = new SvelteSet<string>(['rook-ceph-operator']);
 
 	function toggleDeploymentFilter(deploymentFilter: string) {
 		if (selectedDeploymentFilters.has(deploymentFilter)) {
@@ -159,21 +205,6 @@
 		);
 	}
 
-	async function fetchDeployments() {
-		try {
-			const response = await resourceClient.list({
-				cluster,
-				namespace,
-				group: 'apps',
-				version: 'v1',
-				resource: 'deployments'
-			});
-			deployments = response.items.map((item) => item.object as AppsV1Deployment);
-		} catch (error) {
-			console.error('Failed to fetch Deployments:', error);
-		}
-	}
-
 	// L3 - Pods
 	let pods = $state<CoreV1Pod[]>([]);
 	let filteredPods = $derived(
@@ -184,15 +215,7 @@
 		[...new Set(pods.map((pod) => pod.metadata?.labels?.['app'] ?? '').filter(Boolean))].sort()
 	);
 
-	let selectedPodFilters = $derived(
-		new SvelteSet<string>(
-			podLabelSelectors.find((label) => label === 'rook-ceph-osd')
-				? ['rook-ceph-osd']
-				: podLabelSelectors.length > 0
-					? [podLabelSelectors[0]]
-					: []
-		)
-	);
+	let selectedPodFilters = new SvelteSet<string>(['rook-ceph-osd']);
 
 	function togglePodFilter(podFilter: string) {
 		if (selectedPodFilters.has(podFilter)) {
@@ -208,30 +231,41 @@
 		podLabelSelectors.forEach((podFilter) => selectedPodFilters.add(podFilter));
 	}
 
-	async function fetchPods() {
-		try {
-			const response = await resourceClient.list({
-				cluster,
-				namespace,
-				group: '',
-				version: 'v1',
-				resource: 'pods'
-			});
-			pods = response.items.map((item) => item.object as CoreV1Pod);
-		} catch (error) {
-			console.error('Failed to fetch pods:', error);
-		}
-	}
+	onMount(() => {
+		listAndWatch<CephRookIoV1CephCluster>(
+			{ group: 'ceph.rook.io', version: 'v1', resource: 'cephclusters' },
+			(items) => (cephClusters = items),
+			(updater) => (cephClusters = updater(cephClusters))
+		);
+		listAndWatch<CephRookIoV1CephBlockPool>(
+			{ group: 'ceph.rook.io', version: 'v1', resource: 'cephblockpools' },
+			(items) => (cephBlockPools = items),
+			(updater) => (cephBlockPools = updater(cephBlockPools))
+		);
+		listAndWatch<CephRookIoV1CephFilesystem>(
+			{ group: 'ceph.rook.io', version: 'v1', resource: 'cephfilesystems' },
+			(items) => (cephFilesystems = items),
+			(updater) => (cephFilesystems = updater(cephFilesystems))
+		);
+		listAndWatch<CephRookIoV1CephObjectStore>(
+			{ group: 'ceph.rook.io', version: 'v1', resource: 'cephobjectstores' },
+			(items) => (cephObjectStores = items),
+			(updater) => (cephObjectStores = updater(cephObjectStores))
+		);
+		listAndWatch<AppsV1Deployment>(
+			{ group: 'apps', version: 'v1', resource: 'deployments' },
+			(items) => (deployments = items),
+			(updater) => (deployments = updater(deployments))
+		);
+		listAndWatch<CoreV1Pod>(
+			{ group: '', version: 'v1', resource: 'pods' },
+			(items) => (pods = items),
+			(updater) => (pods = updater(pods))
+		);
+	});
 
-	onMount(async () => {
-		await Promise.allSettled([
-			fetchCephClusters(),
-			fetchCephBlockPools(),
-			fetchCephFilesystems(),
-			fetchCephObjectStores(),
-			fetchDeployments(),
-			fetchPods()
-		]);
+	onDestroy(() => {
+		abortController.abort();
 	});
 </script>
 
@@ -242,7 +276,6 @@
 				<Card.Root class="flex h-full flex-col border-0 bg-muted/50 shadow-none">
 					<Card.Header>
 						{@const health = cephCluster?.status?.ceph?.health}
-
 						<Card.Title>
 							<Item.Root class="p-0">
 								<Item.Media>
@@ -575,9 +608,9 @@
 		{/if}
 	</Field.Set>
 
-	<!-- L3 - Deployments -->
+	<!-- Deployments -->
 	<Field.Set>
-		<Label class={typographyVariants({ variant: 'h4' })}>Deployments</Label>
+		<Label class={typographyVariants({ variant: 'h6' })}>Deployments</Label>
 		{#if deployments.length > 0}
 			<div class="flex flex-wrap gap-2">
 				{#each deploymentLabelSelectors as labelSelector, index (index)}
@@ -641,9 +674,9 @@
 		{/if}
 	</Field.Set>
 
-	<!-- L3 - Pods -->
+	<!-- Pods -->
 	<Field.Set>
-		<Label class={typographyVariants({ variant: 'h4' })}>Pods</Label>
+		<Label class={typographyVariants({ variant: 'h6' })}>Pods</Label>
 		{#if pods.length > 0}
 			<div class="flex flex-wrap gap-2">
 				{#each podLabelSelectors as labelSelector, index (index)}
