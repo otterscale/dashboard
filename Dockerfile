@@ -19,7 +19,7 @@ COPY . .
 ENV VERSION=${VERSION}
 
 # Build the application
-RUN pnpm build
+RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm build
 
 # Prune to production dependencies only
 RUN pnpm prune --production --ignore-scripts && pnpm store prune
