@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import Dashboard from '$lib/components/dashbaord/storage/index.svelte';
+	import Dashboard from '$lib/components/dashboard/storage/index.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { breadcrumbs } from '$lib/stores';
 

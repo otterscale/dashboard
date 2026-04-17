@@ -12,9 +12,9 @@
 	} from '$lib/components/custom/datetime-picker';
 	import { NamespacePicker } from '$lib/components/custom/namespace-picker';
 	import { Reloader } from '$lib/components/custom/reloader';
-	import { Dashboard } from '$lib/components/dashbaord/model/analytics';
-	import ModelPicker from '$lib/components/dashbaord/model/analytics/model-picker.svelte';
-	import { Overview } from '$lib/components/dashbaord/model/overview/index';
+	import { Dashboard } from '$lib/components/dashboard/model/analytics';
+	import ModelPicker from '$lib/components/dashboard/model/analytics/model-picker.svelte';
+	import { Overview } from '$lib/components/dashboard/model/overview/index';
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/paraglide/messages';
