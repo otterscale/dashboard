@@ -5,7 +5,7 @@
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import * as Dialog from '$lib/components/ui/dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Item from '$lib/components/ui/item';
 
@@ -79,8 +79,8 @@
 	}
 </script>
 
-<AlertDialog.Root bind:open {onOpenChangeComplete}>
-	<AlertDialog.Trigger>
+<Dialog.Root bind:open {onOpenChangeComplete}>
+	<Dialog.Trigger>
 		{#snippet child({ props })}
 			<Item.Root
 				{...props}
@@ -95,8 +95,8 @@
 				</Item.Content>
 			</Item.Root>
 		{/snippet}
-	</AlertDialog.Trigger>
-	<AlertDialog.Content class="max-h-[95vh] min-w-[23vw] overflow-auto">
+	</Dialog.Trigger>
+	<Dialog.Content class="max-h-[95vh] min-w-[23vw] overflow-auto">
 		<Item.Root class="p-0">
 			<Item.Content class="text-left">
 				<Item.Title class="text-xl font-bold"
@@ -110,7 +110,7 @@
 			</Item.Content>
 		</Item.Root>
 		<div class="flex justify-end gap-2">
-			<AlertDialog.Cancel>Cancel</AlertDialog.Cancel>
+			<Button variant="outline" onclick={() => (open = false)}>Cancel</Button>
 			<Button disabled={isSubmitting || !isActionAllowed} onclick={() => handleAction()}>
 				{#if isSubmitting}
 					Processing...
@@ -119,5 +119,5 @@
 				{/if}
 			</Button>
 		</div>
-	</AlertDialog.Content>
-</AlertDialog.Root>
+	</Dialog.Content>
+</Dialog.Root>

@@ -7,7 +7,7 @@
 	import { getContext } from 'svelte';
 
 	import * as Code from '$lib/components/custom/code';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import * as Dialog from '$lib/components/ui/dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Item from '$lib/components/ui/item';
 
@@ -63,7 +63,7 @@
 	}
 </script>
 
-<AlertDialog.Root
+<Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
 		if (!isOpen) {
@@ -71,7 +71,7 @@
 		}
 	}}
 >
-	<AlertDialog.Trigger>
+	<Dialog.Trigger>
 		{#snippet child({ props })}
 			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
 				<Item.Media>
@@ -82,8 +82,8 @@
 				</Item.Content>
 			</Item.Root>
 		{/snippet}
-	</AlertDialog.Trigger>
-	<AlertDialog.Content class="max-h-[95vh] min-w-[62vw] overflow-auto">
+	</Dialog.Trigger>
+	<Dialog.Content class="max-h-[95vh] min-w-[62vw] overflow-auto">
 		<Item.Root class="p-0">
 			<Item.Content class="text-left">
 				<Item.Title class="text-xl font-bold">Upload</Item.Title>
@@ -157,5 +157,5 @@ curl -X PUT "http://${endpoint}/${bucketName}/$KEY" \\
 				</div>
 			</div>
 		{/await}
-	</AlertDialog.Content>
-</AlertDialog.Root>
+	</Dialog.Content>
+</Dialog.Root>
