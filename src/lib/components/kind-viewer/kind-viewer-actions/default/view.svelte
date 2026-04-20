@@ -1,6 +1,5 @@
 <script lang="ts">
 	import EyeIcon from '@lucide/svelte/icons/eye';
-	import type { ModelOtterscaleIoV1Alpha1ModelService } from '@otterscale/types';
 	import type { Schema } from 'ajv';
 	import lodash from 'lodash';
 	import { stringify } from 'yaml';
@@ -15,7 +14,7 @@
 		onOpenChangeComplete
 	}: {
 		schema: Schema;
-		object: ModelOtterscaleIoV1Alpha1ModelService;
+		object: any;
 		onOpenChangeComplete?: () => void;
 	} = $props();
 

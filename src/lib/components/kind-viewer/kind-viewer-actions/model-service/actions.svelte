@@ -53,14 +53,7 @@
 					e.preventDefault();
 				}}
 			>
-				<GpuAllocation
-					{cluster}
-					{namespace}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
+				<GpuAllocation {cluster} {namespace} {object} />
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {
