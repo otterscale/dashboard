@@ -8,7 +8,7 @@
 	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
-	import { getContext } from 'svelte';
+	import { getContext,SvelteSet } from 'svelte';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
@@ -165,8 +165,7 @@
 	async function fetchAllGpuResources(): Promise<string[]> {
 		try {
 			const nodes = await fetchNodesWithGpuPassthrough();
-			const gpuResources = new Set<string>();
-
+			const gpuResources = new SvelteSet<string>();
 			for (const nodeItem of nodes) {
 				const allocatable = (nodeItem.object as any)?.status?.allocatable ?? {};
 				Object.keys(allocatable).forEach((resourceKey) => {
@@ -286,23 +285,6 @@
 
 		const quantity = gpuResourceQuantities.get(gpuPassthroughConfig.selectedResource);
 		return quantity ? Math.max(1, quantity) : 1;
-	}
-
-	// Fetch GPU count options
-	async function fetchGpuCountOptions(search: string): Promise<{ label: string; value: string }[]> {
-		const maxCount = getMaxGpuCount();
-		if (maxCount === 0) {
-			return [];
-		}
-
-		const options: { label: string; value: string }[] = [];
-		for (let i = 1; i <= maxCount; i++) {
-			if (i.toString().includes(search)) {
-				options.push({ label: i.toString(), value: i.toString() });
-			}
-		}
-
-		return options;
 	}
 
 	// Fetch nodes for dropdown
