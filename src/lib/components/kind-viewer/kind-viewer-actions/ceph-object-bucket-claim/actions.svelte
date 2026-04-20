@@ -54,70 +54,35 @@
 					e.preventDefault();
 				}}
 			>
-				<AccessKey
-					{cluster}
-					{namespace}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
+				<AccessKey {cluster} {namespace} {object} />
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
 			>
-				<List
-					{cluster}
-					{namespace}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
+				<List {cluster} {namespace} {object} />
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
 			>
-				<Upload
-					{cluster}
-					{namespace}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
+				<Upload {cluster} {namespace} {object} />
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
 			>
-				<Download
-					{cluster}
-					{namespace}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
+				<Download {cluster} {namespace} {object} />
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
 			>
-				<Remove
-					{cluster}
-					{namespace}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
+				<Remove {cluster} {namespace} {object} />
 			</DropdownMenu.Item>
 			<DropdownMenu.Separator />
 			<DropdownMenu.Item
@@ -132,17 +97,7 @@
 					e.preventDefault();
 				}}
 			>
-				<Describe
-					{cluster}
-					{namespace}
-					{group}
-					{version}
-					{resource}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
+				<Describe {cluster} {namespace} {group} {version} {resource} {object} />
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {

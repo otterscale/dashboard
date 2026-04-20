@@ -180,9 +180,12 @@
 			</Button>
 		{/snippet}
 	</Dialog.Trigger>
-	<Dialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
+	<Dialog.Content
+		class="max-h-[95vh] min-w-[38vw] overflow-auto"
+		onInteractOutside={(e) => e.preventDefault()}
+	>
 		<Item.Root class="p-0">
-			<Progress value={currentIndex + 1} max={steps.length} />
+			<Progress value={currentIndex + 1} max={steps.length} class="mt-1 mr-6" />
 			<Item.Content class="text-left">
 				<Item.Title class="text-xl font-bold">{kind}</Item.Title>
 				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>

@@ -13,7 +13,8 @@
 	import { isMap, isPair, isScalar, parseDocument, stringify, visit } from 'yaml';
 
 	import SchemaViewer from '$lib/components/schema-viewer/schema-viewer.svelte';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import Button from '$lib/components/ui/button/button.svelte';
+	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { m } from '$lib/paraglide/messages';
 
@@ -287,7 +288,7 @@
 	}
 </script>
 
-<AlertDialog.Root
+<Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
 		onOpenChangeComplete?.();
@@ -298,7 +299,7 @@
 		}
 	}}
 >
-	<AlertDialog.Trigger>
+	<Dialog.Trigger>
 		{#snippet child({ props })}
 			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
 				<Item.Media>
@@ -309,19 +310,16 @@
 				</Item.Content>
 			</Item.Root>
 		{/snippet}
-	</AlertDialog.Trigger>
-	<AlertDialog.Content class="min-w-[77vw]">
-		<AlertDialog.Header>
+	</Dialog.Trigger>
+	<Dialog.Content class="min-w-[77vw]" onInteractOutside={(e) => e.preventDefault()}>
+		<Dialog.Header>
 			<Item.Root class="p-0">
 				<Item.Content class="text-left">
 					<Item.Title class="text-lg font-bold">{kind}</Item.Title>
 					<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
 				</Item.Content>
-				<Item.Actions>
-					{group ? String(group) : 'core'}/{version}
-				</Item.Actions>
 			</Item.Root>
-		</AlertDialog.Header>
+		</Dialog.Header>
 		<div class="grid grid-cols-2 gap-4 *:max-h-[62vh] *:min-h-[62vh]">
 			<SchemaViewer schema={jsonSchema} class="h-full max-h-screen min-h-0 overflow-auto" />
 			<div class="transition-opacity duration-300 {isReady ? 'opacity-100' : 'opacity-0'}">
@@ -341,11 +339,11 @@
 				/>
 			</div>
 		</div>
-		<AlertDialog.Footer>
-			<AlertDialog.Cancel class="mr-auto">{m.cancel()}</AlertDialog.Cancel>
-			<AlertDialog.Action onclick={handleConfirm}>
+		<Dialog.Footer>
+			<Button class="mr-auto" variant="outline" onclick={() => (open = false)}>{m.cancel()}</Button>
+			<Button onclick={handleConfirm}>
 				{m.confirm()}
-			</AlertDialog.Action>
-		</AlertDialog.Footer>
-	</AlertDialog.Content>
-</AlertDialog.Root>
+			</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>

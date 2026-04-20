@@ -56,17 +56,7 @@
 					e.preventDefault();
 				}}
 			>
-				<Describe
-					{cluster}
-					{namespace}
-					{group}
-					{version}
-					{resource}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
+				<Describe {cluster} {namespace} {group} {version} {resource} {object} />
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {
