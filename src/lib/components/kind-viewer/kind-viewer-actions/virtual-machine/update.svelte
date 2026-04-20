@@ -66,6 +66,23 @@
 	const existingCloudInit =
 		existingVolumes.find((v: any) => v.cloudInitNoCloud)?.cloudInitNoCloud?.userData ?? '';
 
+	// Extract existing Node Selector
+	const existingNodeSelector = lodash.get(
+		object,
+		['spec', 'nodeSelector', 'kubernetes.io/hostname'],
+		''
+	);
+
+	// Extract existing GPU devices
+	const existingGpuDevices: any[] = lodash.get(
+		object,
+		'spec.template.spec.domain.devices.gpus',
+		[]
+	);
+	const existingGpuResource =
+		existingGpuDevices.find((gpu: any) => !gpu.deviceName?.toUpperCase().includes('AUDIO'))
+			?.deviceName ?? '';
+
 	// Container for Data
 	let values: any = $state({
 		apiVersion: group ? `${group}/${version}` : version,
@@ -81,6 +98,233 @@
 		additionalDisks: [] as string[],
 		cloudInit: {}
 	});
+
+	// Container for GPU passthrough selection
+	let gpuPassthroughConfig: any = $state({
+		selectedResource: existingGpuResource,
+		gpuCount: 1
+	});
+
+	// Container for Node selection
+	let nodeSelector: any = $state({
+		node: existingNodeSelector
+	});
+
+	// Cache for all available GPU resources
+	let allAvailableGpuResources: string[] = $state([]);
+
+	// Cache for GPU resource quantities per node
+	let gpuResourceQuantities: Map<string, number> = $state(new Map());
+
+	// Fetch nodes with CPU feature VMX support
+	async function fetchNodesWithVmxLabel(): Promise<any[]> {
+		try {
+			const response = await resourceClient.list({
+				cluster,
+				group: '',
+				version: 'v1',
+				resource: 'nodes'
+			});
+
+			return response.items.filter((item: any) => {
+				const nodeLabels = (item.object as any)?.metadata?.labels ?? {};
+				return nodeLabels['cpu-feature.node.kubevirt.io/vmx'] === 'true';
+			});
+		} catch (error) {
+			console.error('Error fetching nodes with VMX label:', error);
+			return [];
+		}
+	}
+
+	// Fetch nodes with GPU passthrough support
+	async function fetchNodesWithGpuPassthrough(): Promise<any[]> {
+		try {
+			const response = await resourceClient.list({
+				cluster,
+				group: '',
+				version: 'v1',
+				resource: 'nodes'
+			});
+
+			const requiredLabels = {
+				'nvidia.com/gpu.workload.config': 'vm-passthrough',
+				'nvidia.com/gpu.present': 'true'
+			};
+
+			return response.items.filter((item: any) => {
+				const nodeLabels = (item.object as any)?.metadata?.labels ?? {};
+				return Object.entries(requiredLabels).every(([key, value]) => nodeLabels[key] === value);
+			});
+		} catch (error) {
+			console.error('Error fetching nodes with GPU passthrough:', error);
+			return [];
+		}
+	}
+
+	// Fetch all GPU resources (including AUDIO devices)
+	async function fetchAllGpuResources(): Promise<string[]> {
+		try {
+			const nodes = await fetchNodesWithGpuPassthrough();
+			const gpuResources = new Set<string>();
+
+			for (const nodeItem of nodes) {
+				const allocatable = (nodeItem.object as any)?.status?.allocatable ?? {};
+				Object.keys(allocatable).forEach((resourceKey) => {
+					if (
+						resourceKey.startsWith('nvidia.com/') &&
+						!resourceKey.endsWith('vgpu') &&
+						!resourceKey.includes('/vgpu') &&
+						parseInt(allocatable[resourceKey]) > 0
+					) {
+						gpuResources.add(resourceKey);
+						// Store the maximum quantity found for this resource
+						const quantity = parseInt(allocatable[resourceKey]) || 0;
+						const currentMax = gpuResourceQuantities.get(resourceKey) || 0;
+						if (quantity > currentMax) {
+							gpuResourceQuantities.set(resourceKey, quantity);
+						}
+					}
+				});
+			}
+
+			return Array.from(gpuResources);
+		} catch (error) {
+			console.error('Error fetching all GPU resources:', error);
+			return [];
+		}
+	}
+
+	// Fetch GPU resources for a specific node and their quantities
+	async function fetchGpuResourcesForNode(nodeName: string): Promise<string[]> {
+		if (!nodeName || typeof nodeName !== 'string') return [];
+		try {
+			const response = await resourceClient.get({
+				cluster,
+				group: '',
+				version: 'v1',
+				resource: 'nodes',
+				name: nodeName
+			});
+
+			const nodeObj = response.object as any;
+			const nodeLabels = nodeObj?.metadata?.labels ?? {};
+
+			// Check if node has both required GPU labels
+			const hasGpuWorkloadConfig =
+				nodeLabels['nvidia.com/gpu.workload.config'] === 'vm-passthrough';
+			const hasGpuPresent = nodeLabels['nvidia.com/gpu.present'] === 'true';
+
+			if (!hasGpuWorkloadConfig || !hasGpuPresent) {
+				console.warn(`Node ${nodeName} does not have both required GPU labels`);
+				return [];
+			}
+
+			// Extract GPU resources from node allocatable
+			const allocatable = nodeObj?.status?.allocatable ?? {};
+			const gpuResources: string[] = [];
+
+			Object.keys(allocatable).forEach((resourceKey) => {
+				if (
+					resourceKey.startsWith('nvidia.com/') &&
+					!resourceKey.endsWith('vgpu') &&
+					!resourceKey.includes('/vgpu') &&
+					parseInt(allocatable[resourceKey]) > 0
+				) {
+					gpuResources.push(resourceKey);
+					// Store the quantity for this resource
+					gpuResourceQuantities.set(resourceKey, parseInt(allocatable[resourceKey]) || 0);
+				}
+			});
+
+			return gpuResources;
+		} catch (error) {
+			console.error(`Error fetching GPU resources for node ${nodeName}:`, error);
+			return [];
+		}
+	}
+
+	// Fetch GPU resources for dropdown (excluding AUDIO devices)
+	async function fetchGpuResourcesAsEnumerations(
+		search: string
+	): Promise<{ label: string; value: string }[]> {
+		try {
+			let gpuResourcesList: string[];
+
+			// If a node is selected in step 4, fetch GPU resources only for that node
+			if (nodeSelector.node && typeof nodeSelector.node === 'string' && nodeSelector.node !== '') {
+				gpuResourcesList = await fetchGpuResourcesForNode(nodeSelector.node);
+			} else {
+				// Otherwise, use all available GPU resources from nodes with GPU passthrough support
+				gpuResourcesList =
+					allAvailableGpuResources.length > 0
+						? allAvailableGpuResources
+						: await fetchAllGpuResources();
+			}
+
+			const gpuOptions = gpuResourcesList
+				.filter((resource) => !resource.toUpperCase().includes('AUDIO'))
+				.filter((resource) => resource.toLowerCase().includes(search.toLowerCase()))
+				.map((resource) => ({ label: resource, value: resource }));
+
+			// Add empty option at the beginning
+			return [{ label: 'None (No GPU)', value: '' }, ...gpuOptions];
+		} catch (error) {
+			console.error('Error fetching GPU resources:', error);
+			return [{ label: 'None (No GPU)', value: '' }];
+		}
+	}
+
+	// Get maximum GPU count for the selected resource
+	function getMaxGpuCount(): number {
+		if (
+			!gpuPassthroughConfig.selectedResource ||
+			typeof gpuPassthroughConfig.selectedResource !== 'string' ||
+			gpuPassthroughConfig.selectedResource === ''
+		) {
+			return 0;
+		}
+
+		const quantity = gpuResourceQuantities.get(gpuPassthroughConfig.selectedResource);
+		return quantity ? Math.max(1, quantity) : 1;
+	}
+
+	// Fetch GPU count options
+	async function fetchGpuCountOptions(
+		search: string
+	): Promise<{ label: string; value: string }[]> {
+		const maxCount = getMaxGpuCount();
+		if (maxCount === 0) {
+			return [];
+		}
+
+		const options: { label: string; value: string }[] = [];
+		for (let i = 1; i <= maxCount; i++) {
+			if (i.toString().includes(search)) {
+				options.push({ label: i.toString(), value: i.toString() });
+			}
+		}
+
+		return options;
+	}
+
+	// Fetch nodes for dropdown
+	async function fetchNodesAsEnumerations(
+		search: string
+	): Promise<{ label: string; value: string }[]> {
+		try {
+			const nodes = await fetchNodesWithVmxLabel();
+			const nodeOptions = nodes
+				.map((item: any) => (item.object as any)?.metadata?.name as string)
+				.filter((name: string) => name && name.toLowerCase().includes(search.toLowerCase()))
+				.map((name: string) => ({ label: name, value: name }));
+
+			// Add empty option at the beginning
+			return [{ label: 'No selection', value: '' }, ...nodeOptions];
+		} catch (error) {
+			console.error('Error fetching nodes:', error);
+			return [{ label: 'No selection', value: '' }];
+		}
+	}
 
 	// Build disks and volumes — boot disk is preserved from existing object
 	function buildDisksAndVolumes(): { disks: any[]; volumes: any[] } {
@@ -120,6 +364,49 @@
 	const submissionValues = $derived.by(() => {
 		const { disks, volumes } = buildDisksAndVolumes();
 
+		// Build devices object with disks and interfaces
+		const devices: any = {
+			disks,
+			interfaces: [{ name: 'nic1', bridge: {} }]
+		};
+
+		// Add GPUs if selected
+		if (
+			gpuPassthroughConfig.selectedResource &&
+			typeof gpuPassthroughConfig.selectedResource === 'string' &&
+			gpuPassthroughConfig.selectedResource !== ''
+		) {
+			const gpuDevices: any[] = [];
+			const gpuCount = Math.max(1, parseInt(gpuPassthroughConfig.gpuCount) || 1);
+
+			// Find corresponding AUDIO device prefix
+			const match = gpuPassthroughConfig.selectedResource.match(/nvidia\.com\/([A-Z0-9]+)_/);
+			const audioDeviceName = match
+				? `nvidia.com/${match[1]}_HIGH_DEFINITION_AUDIO_CONTROLLER`
+				: null;
+
+			// Add GPU devices based on count
+			for (let i = 1; i <= gpuCount; i++) {
+				gpuDevices.push({
+					deviceName: gpuPassthroughConfig.selectedResource,
+					name: `gpu${i}`
+				});
+
+				// Add corresponding AUDIO device if available
+				if (
+					audioDeviceName &&
+					allAvailableGpuResources.includes(audioDeviceName)
+				) {
+					gpuDevices.push({
+						deviceName: audioDeviceName,
+						name: `gpu${i}-audio`
+					});
+				}
+			}
+
+			devices.gpus = gpuDevices;
+		}
+
 		return {
 			apiVersion: group ? `${group}/${version}` : version,
 			kind,
@@ -133,6 +420,9 @@
 			spec: {
 				runStrategy: values.spec.runStrategy,
 				instancetype: values.spec.instancetype,
+				...(nodeSelector.node && typeof nodeSelector.node === 'string' && nodeSelector.node !== ''
+					? { nodeSelector: { 'kubernetes.io/hostname': nodeSelector.node } }
+					: {}),
 				template: {
 					metadata: {
 						labels: {
@@ -141,10 +431,7 @@
 					},
 					spec: {
 						domain: {
-							devices: {
-								disks,
-								interfaces: [{ name: 'nic1', bridge: {} }]
-							}
+							devices
 						},
 						networks: [{ name: 'nic1', pod: {} }],
 						volumes
@@ -156,7 +443,7 @@
 	let value = $derived(stringify(submissionValues));
 
 	// Steps Manager
-	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 7 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -251,6 +538,37 @@
 			return [];
 		}
 	}
+
+	// Load available GPU resources when dialog opens
+	$effect(() => {
+		if (open) {
+			fetchAllGpuResources().then((resources) => {
+				allAvailableGpuResources = resources;
+			});
+		}
+	});
+
+	// Update GPU count when selected resource changes
+	$effect(() => {
+		if (
+			gpuPassthroughConfig.selectedResource &&
+			gpuPassthroughConfig.selectedResource !== ''
+		) {
+			// Fetch GPU resources for node to update quantities cache
+			if (nodeSelector.node && nodeSelector.node !== '') {
+				fetchGpuResourcesForNode(nodeSelector.node).then(() => {
+					// Reset GPU count to 1 when resource changes
+					gpuPassthroughConfig.gpuCount = '1';
+				});
+			} else {
+				// If no node selected, we already have quantities from allAvailableGpuResources fetch
+				gpuPassthroughConfig.gpuCount = '1';
+			}
+		} else {
+			// Clear GPU count if no resource selected
+			gpuPassthroughConfig.gpuCount = '1';
+		}
+	});
 
 	// Flag for Dialog
 	let open = $state(false);
@@ -428,8 +746,150 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 4: Cloud-Init -->
+			<!-- Step 4: Node Selector -->
 			<Tabs.Content value={steps[3]}>
+				<Form
+					schema={{
+						type: 'object',
+						title: 'Node Selector',
+						properties: {
+							node: {
+								type: 'string',
+								title: 'Select Node (Optional)'
+							}
+						},
+						required: []
+					} as Schema}
+					uiSchema={{
+						node: {
+							'ui:components': {
+								stringField: 'enumField',
+								selectWidget: ComboboxWidget
+							},
+							'ui:options': {
+								TailoredComboboxEnumerations: fetchNodesAsEnumerations,
+								TailoredComboboxVisibility: 10,
+								TailoredComboboxInput: {
+									placeholder: 'Select Node'
+								},
+								TailoredComboboxEmptyText: 'No nodes with VMX support found.',
+								TailoredComboboxPopoverClass: 'w-[380px]'
+							}
+						},
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={{ node: existingNodeSelector } as FormValue}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					bind:values={nodeSelector}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+			<!-- Step 5: GPU Passthrough -->
+			<Tabs.Content value={steps[4]}>
+				<Form
+					schema={{
+						type: 'object',
+						title: 'GPU Passthrough Configuration',
+						properties: {
+							selectedResource: {
+								type: 'string',
+								title: 'GPU Resource Type'
+							}
+						},
+						dependencies: {
+							selectedResource: {
+								oneOf: [
+									{
+										properties: {
+											selectedResource: { enum: [''] }
+										}
+									},
+									{
+										properties: {
+											selectedResource: { not: { enum: [''] } },
+											gpuCount: {
+												type: 'string',
+												title: 'Number of GPUs',
+												enum: Array.from({ length: Math.max(1, getMaxGpuCount()) }, (_, i) => String(i + 1))
+											}
+										}
+									}
+								]
+							}
+						},
+						required: []
+					} as Schema}
+					uiSchema={{
+						selectedResource: {
+							'ui:components': {
+								stringField: 'enumField',
+								selectWidget: ComboboxWidget
+							},
+							'ui:options': {
+								TailoredComboboxEnumerations: fetchGpuResourcesAsEnumerations,
+								TailoredComboboxVisibility: 10,
+								TailoredComboboxInput: {
+									placeholder: 'Select GPU Resource'
+								},
+								TailoredComboboxEmptyText: 'No GPU resources found.',
+								TailoredComboboxPopoverClass: 'w-[380px]'
+							}
+						},
+						gpuCount: {
+							'ui:components': {
+								stringField: 'enumField'
+							}
+						},
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={{ selectedResource: existingGpuResource, gpuCount: '1' } as FormValue}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					bind:values={gpuPassthroughConfig}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+			<!-- Step 6: Cloud-Init -->
+			<Tabs.Content value={steps[5]}>
 				<Form
 					schema={{
 						type: 'string',
@@ -468,8 +928,8 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 5: Review & Edit -->
-			<Tabs.Content value={steps[4]}>
+			<!-- Step 7: Review & Edit -->
+			<Tabs.Content value={steps[6]}>
 				<div class="flex h-full flex-col gap-3">
 					<!-- <Code.Root lang="yaml" class="w-full" hideLines code={stringify(submissionValues, null, 2)} /> -->
 					<Monaco

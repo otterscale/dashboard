@@ -188,25 +188,35 @@
 		};
 
 		// Add GPUs if selected
-		if (gpuPassthroughConfig.selectedResource && typeof gpuPassthroughConfig.selectedResource === 'string' && gpuPassthroughConfig.selectedResource !== '') {
-			const gpuDevices: any[] = [
-				{
-					deviceName: gpuPassthroughConfig.selectedResource,
-					name: 'gpu1'
-				}
-			];
+		if (
+			gpuPassthroughConfig.selectedResource &&
+			typeof gpuPassthroughConfig.selectedResource === 'string' &&
+			gpuPassthroughConfig.selectedResource !== ''
+		) {
+			const gpuDevices: any[] = [];
+			const gpuCount = Math.max(1, parseInt(gpuPassthroughConfig.gpuCount) || 1);
 
-			// Find corresponding AUDIO device
+			// Find corresponding AUDIO device prefix
 			const match = gpuPassthroughConfig.selectedResource.match(/nvidia\.com\/([A-Z0-9]+)_/);
-			if (match) {
-				const prefix = match[1];
-				const audioDevice = `nvidia.com/${prefix}_HIGH_DEFINITION_AUDIO_CONTROLLER`;
+			const audioDeviceName = match
+				? `nvidia.com/${match[1]}_HIGH_DEFINITION_AUDIO_CONTROLLER`
+				: null;
 
-				// Check if AUDIO device is available
-				if (allAvailableGpuResources.includes(audioDevice)) {
+			// Add GPU devices based on count
+			for (let i = 1; i <= gpuCount; i++) {
+				gpuDevices.push({
+					deviceName: gpuPassthroughConfig.selectedResource,
+					name: `gpu${i}`
+				});
+
+				// Add corresponding AUDIO device if available
+				if (
+					audioDeviceName &&
+					allAvailableGpuResources.includes(audioDeviceName)
+				) {
 					gpuDevices.push({
-						deviceName: audioDevice,
-						name: 'gpu1-audio'
+						deviceName: audioDeviceName,
+						name: `gpu${i}-audio`
 					});
 				}
 			}
@@ -433,9 +443,16 @@
 					if (
 						resourceKey.startsWith('nvidia.com/') &&
 						!resourceKey.endsWith('vgpu') &&
-						!resourceKey.includes('/vgpu')
+						!resourceKey.includes('/vgpu') &&
+						parseInt(allocatable[resourceKey]) > 0
 					) {
 						gpuResources.add(resourceKey);
+						// Store the maximum quantity found for this resource
+						const quantity = parseInt(allocatable[resourceKey]) || 0;
+						const currentMax = gpuResourceQuantities.get(resourceKey) || 0;
+						if (quantity > currentMax) {
+							gpuResourceQuantities.set(resourceKey, quantity);
+						}
 					}
 				});
 			}
@@ -447,7 +464,7 @@
 		}
 	}
 
-	// Fetch GPU resources for a specific node
+	// Fetch GPU resources for a specific node and their quantities
 	async function fetchGpuResourcesForNode(nodeName: string): Promise<string[]> {
 		if (!nodeName || typeof nodeName !== 'string') return [];
 		try {
@@ -463,7 +480,8 @@
 			const nodeLabels = nodeObj?.metadata?.labels ?? {};
 
 			// Check if node has both required GPU labels
-			const hasGpuWorkloadConfig = nodeLabels['nvidia.com/gpu.workload.config'] === 'vm-passthrough';
+			const hasGpuWorkloadConfig =
+				nodeLabels['nvidia.com/gpu.workload.config'] === 'vm-passthrough';
 			const hasGpuPresent = nodeLabels['nvidia.com/gpu.present'] === 'true';
 
 			if (!hasGpuWorkloadConfig || !hasGpuPresent) {
@@ -479,9 +497,12 @@
 				if (
 					resourceKey.startsWith('nvidia.com/') &&
 					!resourceKey.endsWith('vgpu') &&
-					!resourceKey.includes('/vgpu')
+					!resourceKey.includes('/vgpu') &&
+					parseInt(allocatable[resourceKey]) > 0
 				) {
 					gpuResources.push(resourceKey);
+					// Store the quantity for this resource
+					gpuResourceQuantities.set(resourceKey, parseInt(allocatable[resourceKey]) || 0);
 				}
 			});
 
@@ -504,9 +525,10 @@
 				gpuResourcesList = await fetchGpuResourcesForNode(nodeSelector.node);
 			} else {
 				// Otherwise, use all available GPU resources from nodes with GPU passthrough support
-				gpuResourcesList = allAvailableGpuResources.length > 0
-					? allAvailableGpuResources
-					: await fetchAllGpuResources();
+				gpuResourcesList =
+					allAvailableGpuResources.length > 0
+						? allAvailableGpuResources
+						: await fetchAllGpuResources();
 			}
 
 			const gpuOptions = gpuResourcesList
@@ -520,6 +542,39 @@
 			console.error('Error fetching GPU resources:', error);
 			return [{ label: 'None (No GPU)', value: '' }];
 		}
+	}
+
+	// Get maximum GPU count for the selected resource
+	function getMaxGpuCount(): number {
+		if (
+			!gpuPassthroughConfig.selectedResource ||
+			typeof gpuPassthroughConfig.selectedResource !== 'string' ||
+			gpuPassthroughConfig.selectedResource === ''
+		) {
+			return 0;
+		}
+
+		const quantity = gpuResourceQuantities.get(gpuPassthroughConfig.selectedResource);
+		return quantity ? Math.max(1, quantity) : 1;
+	}
+
+	// Fetch GPU count options
+	async function fetchGpuCountOptions(
+		search: string
+	): Promise<{ label: string; value: string }[]> {
+		const maxCount = getMaxGpuCount();
+		if (maxCount === 0) {
+			return [];
+		}
+
+		const options: { label: string; value: string }[] = [];
+		for (let i = 1; i <= maxCount; i++) {
+			if (i.toString().includes(search)) {
+				options.push({ label: i.toString(), value: i.toString() });
+			}
+		}
+
+		return options;
 	}
 
 	// Fetch nodes for dropdown
@@ -544,9 +599,13 @@
 	// Cache for all available GPU resources
 	let allAvailableGpuResources: string[] = $state([]);
 
+	// Cache for GPU resource quantities per node
+	let gpuResourceQuantities: Map<string, number> = $state(new Map());
+
 	// Container for GPU passthrough selection
 	let gpuPassthroughConfig: any = $state({
-		selectedResource: ''
+		selectedResource: '',
+		gpuCount: 1
 	});
 
 	// Container for Node selection
@@ -560,6 +619,28 @@
 			fetchAllGpuResources().then((resources) => {
 				allAvailableGpuResources = resources;
 			});
+		}
+	});
+
+	// Update GPU count when selected resource changes
+	$effect(() => {
+		if (
+			gpuPassthroughConfig.selectedResource &&
+			gpuPassthroughConfig.selectedResource !== ''
+		) {
+			// Fetch GPU resources for node to update quantities cache
+			if (nodeSelector.node && nodeSelector.node !== '') {
+				fetchGpuResourcesForNode(nodeSelector.node).then(() => {
+					// Reset GPU count to 1 when resource changes
+					gpuPassthroughConfig.gpuCount = '1';
+				});
+			} else {
+				// If no node selected, we already have quantities from allAvailableGpuResources fetch
+				gpuPassthroughConfig.gpuCount = '1';
+			}
+		} else {
+			// Clear GPU count if no resource selected
+			gpuPassthroughConfig.gpuCount = '1';
 		}
 	});
 
@@ -1010,6 +1091,27 @@
 								title: 'GPU Resource Type'
 							}
 						},
+						dependencies: {
+							selectedResource: {
+								oneOf: [
+									{
+										properties: {
+											selectedResource: { enum: [''] }
+										}
+									},
+									{
+										properties: {
+											selectedResource: { not: { enum: [''] } },
+											gpuCount: {
+												type: 'string',
+												title: 'Number of GPUs',
+												enum: Array.from({ length: Math.max(1, getMaxGpuCount()) }, (_, i) => String(i + 1))
+											}
+										}
+									}
+								]
+							}
+						},
 						required: []
 					} as Schema}
 					uiSchema={{
@@ -1028,13 +1130,18 @@
 								TailoredComboboxPopoverClass: 'w-[380px]'
 							}
 						},
+						gpuCount: {
+							'ui:components': {
+								stringField: 'enumField'
+							}
+						},
 						'ui:options': {
 							translations: {
 								submit: 'Next'
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{ selectedResource: '' } as FormValue}
+					initialValue={{ selectedResource: '', gpuCount: '1' } as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
