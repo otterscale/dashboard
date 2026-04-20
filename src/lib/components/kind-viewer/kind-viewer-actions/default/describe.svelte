@@ -104,18 +104,23 @@
 	{/if}
 	<Dialog.Content class="flex h-fit max-h-[90vh] max-w-[70vw] min-w-[55vw] flex-col gap-3">
 		<Dialog.Header>
-			<div class="flex items-end justify-between">
-				<div>
-					<Dialog.Title>Describe — {name}</Dialog.Title>
-					<Dialog.Description>
-						{#if namespace}
-							Resource details and events in namespace <strong>{namespace}</strong>
-						{:else}
-							Resource details and events
-						{/if}
-					</Dialog.Description>
-				</div>
-				<div class="ml-auto flex gap-1">
+			<div class="flex items-end justify-between gap-4">
+				<Item.Root class="p-0">
+					<Item.Content class="text-left">
+						<Item.Title class="text-lg font-bold">
+							Describe — {name}
+						</Item.Title>
+						<Item.Description>
+							{#if namespace}
+								Resource details and events in namespace <strong>{namespace}</strong>
+							{:else}
+								Resource details and events
+							{/if}
+						</Item.Description>
+					</Item.Content>
+				</Item.Root>
+
+				<div class="flex gap-1">
 					<Button
 						size="icon-sm"
 						variant="ghost"

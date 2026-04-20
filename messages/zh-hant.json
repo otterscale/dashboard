@@ -325,6 +325,6 @@
 	"model_status": "模型狀態",
 	"compute_status": "運算狀態",
 	"storage_status": "儲存狀態",
-	"block_device": "區塊裝置",
+	"block_pool": "區塊池",
 	"object_storage": "物件儲存"
 }

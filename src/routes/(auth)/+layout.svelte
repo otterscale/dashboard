@@ -250,7 +250,7 @@
 				icon: HardDriveIcon,
 				items: [
 					{
-						title: m.block_device(),
+						title: m.block_pool(),
 						url: resourceUrl('ceph.rook.io', 'v1', 'CephBlockPool', 'cephblockpools')
 					},
 					{

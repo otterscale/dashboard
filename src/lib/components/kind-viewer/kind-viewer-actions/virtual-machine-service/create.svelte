@@ -109,7 +109,7 @@
 		}}
 	>
 		<Item.Root class="p-0">
-			<Progress value={currentIndex + 1} max={steps.length} />
+			<Progress value={currentIndex + 1} max={steps.length} class="mt-1 mr-6" />
 			<Item.Content class="text-left">
 				<Item.Title class="text-xl font-bold">Create Service</Item.Title>
 				<Item.Description>
