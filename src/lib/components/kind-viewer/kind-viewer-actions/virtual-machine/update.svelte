@@ -8,7 +8,8 @@
 	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
-	import { getContext,SvelteSet } from 'svelte';
+	import { getContext } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
@@ -69,7 +70,7 @@
 	// Extract existing Node Selector
 	const existingNodeSelector = lodash.get(
 		object,
-		['spec', 'nodeSelector', 'kubernetes.io/hostname'],
+		['spec', 'template', 'spec', 'nodeSelector', 'kubernetes.io/hostname'],
 		''
 	);
 
@@ -397,9 +398,6 @@
 			spec: {
 				runStrategy: values.spec.runStrategy,
 				instancetype: values.spec.instancetype,
-				...(nodeSelector.node && typeof nodeSelector.node === 'string' && nodeSelector.node !== ''
-					? { nodeSelector: { 'kubernetes.io/hostname': nodeSelector.node } }
-					: {}),
 				template: {
 					metadata: {
 						labels: {
@@ -407,6 +405,11 @@
 						}
 					},
 					spec: {
+						...(nodeSelector.node &&
+						typeof nodeSelector.node === 'string' &&
+						nodeSelector.node !== ''
+							? { nodeSelector: { 'kubernetes.io/hostname': nodeSelector.node } }
+							: {}),
 						domain: {
 							devices
 						},
