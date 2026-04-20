@@ -210,10 +210,7 @@
 				});
 
 				// Add corresponding AUDIO device if available
-				if (
-					audioDeviceName &&
-					allAvailableGpuResources.includes(audioDeviceName)
-				) {
+				if (audioDeviceName && allAvailableGpuResources.includes(audioDeviceName)) {
 					gpuDevices.push({
 						deviceName: audioDeviceName,
 						name: `gpu${i}-audio`
@@ -238,7 +235,7 @@
 				runStrategy: 'Halted',
 				instancetype: values.spec.instancetype,
 				...(isContainerDisk ? {} : { dataVolumeTemplates: buildDataVolumeTemplates() }),
-				...(nodeSelector.node && typeof nodeSelector.node === 'string' && nodeSelector.node !== '' 
+				...(nodeSelector.node && typeof nodeSelector.node === 'string' && nodeSelector.node !== ''
 					? { nodeSelector: { 'kubernetes.io/hostname': nodeSelector.node } }
 					: {}),
 				template: {
@@ -421,9 +418,7 @@
 
 			return response.items.filter((item: any) => {
 				const nodeLabels = (item.object as any)?.metadata?.labels ?? {};
-				return Object.entries(requiredLabels).every(
-					([key, value]) => nodeLabels[key] === value
-				);
+				return Object.entries(requiredLabels).every(([key, value]) => nodeLabels[key] === value);
 			});
 		} catch (error) {
 			console.error('Error fetching nodes with GPU passthrough:', error);
@@ -559,9 +554,7 @@
 	}
 
 	// Fetch GPU count options
-	async function fetchGpuCountOptions(
-		search: string
-	): Promise<{ label: string; value: string }[]> {
+	async function fetchGpuCountOptions(search: string): Promise<{ label: string; value: string }[]> {
 		const maxCount = getMaxGpuCount();
 		if (maxCount === 0) {
 			return [];
@@ -624,10 +617,7 @@
 
 	// Update GPU count when selected resource changes
 	$effect(() => {
-		if (
-			gpuPassthroughConfig.selectedResource &&
-			gpuPassthroughConfig.selectedResource !== ''
-		) {
+		if (gpuPassthroughConfig.selectedResource && gpuPassthroughConfig.selectedResource !== '') {
 			// Fetch GPU resources for node to update quantities cache
 			if (nodeSelector.node && nodeSelector.node !== '') {
 				fetchGpuResourcesForNode(nodeSelector.node).then(() => {
@@ -1105,7 +1095,9 @@
 											gpuCount: {
 												type: 'string',
 												title: 'Number of GPUs',
-												enum: Array.from({ length: Math.max(1, getMaxGpuCount()) }, (_, i) => String(i + 1))
+												enum: Array.from({ length: Math.max(1, getMaxGpuCount()) }, (_, i) =>
+													String(i + 1)
+												)
 											}
 										}
 									}

@@ -289,9 +289,7 @@
 	}
 
 	// Fetch GPU count options
-	async function fetchGpuCountOptions(
-		search: string
-	): Promise<{ label: string; value: string }[]> {
+	async function fetchGpuCountOptions(search: string): Promise<{ label: string; value: string }[]> {
 		const maxCount = getMaxGpuCount();
 		if (maxCount === 0) {
 			return [];
@@ -393,10 +391,7 @@
 				});
 
 				// Add corresponding AUDIO device if available
-				if (
-					audioDeviceName &&
-					allAvailableGpuResources.includes(audioDeviceName)
-				) {
+				if (audioDeviceName && allAvailableGpuResources.includes(audioDeviceName)) {
 					gpuDevices.push({
 						deviceName: audioDeviceName,
 						name: `gpu${i}-audio`
@@ -550,10 +545,7 @@
 
 	// Update GPU count when selected resource changes
 	$effect(() => {
-		if (
-			gpuPassthroughConfig.selectedResource &&
-			gpuPassthroughConfig.selectedResource !== ''
-		) {
+		if (gpuPassthroughConfig.selectedResource && gpuPassthroughConfig.selectedResource !== '') {
 			// Fetch GPU resources for node to update quantities cache
 			if (nodeSelector.node && nodeSelector.node !== '') {
 				fetchGpuResourcesForNode(nodeSelector.node).then(() => {
@@ -830,7 +822,9 @@
 											gpuCount: {
 												type: 'string',
 												title: 'Number of GPUs',
-												enum: Array.from({ length: Math.max(1, getMaxGpuCount()) }, (_, i) => String(i + 1))
+												enum: Array.from({ length: Math.max(1, getMaxGpuCount()) }, (_, i) =>
+													String(i + 1)
+												)
 											}
 										}
 									}
