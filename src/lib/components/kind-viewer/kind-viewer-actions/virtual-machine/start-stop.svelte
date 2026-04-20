@@ -5,8 +5,8 @@
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
-	import * as Dialog from '$lib/components/ui/dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 
 	import { canStartOrStop, canStop } from './vm-status';

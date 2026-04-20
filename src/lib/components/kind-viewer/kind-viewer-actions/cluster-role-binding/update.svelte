@@ -15,8 +15,8 @@
 
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';
-	import * as Dialog from '$lib/components/ui/dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
