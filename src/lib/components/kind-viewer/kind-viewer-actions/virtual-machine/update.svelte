@@ -168,6 +168,13 @@
 			const nodes = await fetchNodesWithGpuPassthrough();
 			const gpuResources = new SvelteSet<string>();
 			for (const nodeItem of nodes) {
+				const nodeLabels = (nodeItem.object as any)?.metadata?.labels ?? {};
+				if (
+					nodeLabels['nvidia.com/gpu.workload.config'] !== 'vm-passthrough' ||
+					nodeLabels['nvidia.com/gpu.present'] !== 'true'
+				) {
+					continue;
+				}
 				const allocatable = (nodeItem.object as any)?.status?.allocatable ?? {};
 				Object.keys(allocatable).forEach((resourceKey) => {
 					if (
@@ -361,7 +368,7 @@
 			const gpuCount = Math.max(1, parseInt(gpuPassthroughConfig.gpuCount) || 1);
 
 			// Find corresponding AUDIO device prefix
-			const match = gpuPassthroughConfig.selectedResource.match(/nvidia\.com\/([A-Z0-9]+)_/);
+			const match = gpuPassthroughConfig.selectedResource.match(/nvidia\.com\/([A-Z0-9\-]+)_/);
 			const audioDeviceName = match
 				? `nvidia.com/${match[1]}_HIGH_DEFINITION_AUDIO_CONTROLLER`
 				: null;
