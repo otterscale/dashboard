@@ -9,6 +9,7 @@ import {
 	acquireRefreshLock,
 	deleteSessionTokenCookie,
 	getSessionTokenCookie,
+	invalidateSession,
 	releaseRefreshLock,
 	setSessionTokenCookie,
 	updateSessionTokenSet,
@@ -82,9 +83,9 @@ const handleRefreshToken: Handle = async ({ event, resolve }) => {
 		return resolve(event);
 	}
 
-	const hasLock = await acquireRefreshLock(session.id, REFRESH_LOCK_TTL_MS);
+	const lockToken = await acquireRefreshLock(session.id, REFRESH_LOCK_TTL_MS);
 
-	if (!hasLock) {
+	if (!lockToken) {
 		// Another request is refreshing — wait briefly for it to finish, then reload from Redis.
 		const deadline = Date.now() + REFRESH_WAIT_MAX_MS;
 		while (Date.now() < deadline) {
@@ -137,15 +138,18 @@ const handleRefreshToken: Handle = async ({ event, resolve }) => {
 			// Transient errors (network, 5xx) should keep the session so the next request can retry.
 			if (err instanceof OAuth2RequestError && err.code === 'invalid_grant') {
 				console.error('Refresh token rejected by Keycloak:', err);
+				await invalidateSession(latest.id);
 				deleteSessionTokenCookie(event.cookies);
 				event.locals.session = null;
 			} else {
+				// Transient error (network / 5xx): keep the existing session so the next
+				// request can retry. This request's downstream API call will likely 401,
+				// which is preferable to forcing a logout.
 				console.error('Token refresh failed (transient):', err);
-				event.locals.session = latest;
 			}
 		}
 	} finally {
-		await releaseRefreshLock(session.id);
+		await releaseRefreshLock(session.id, lockToken);
 	}
 
 	return resolve(event);

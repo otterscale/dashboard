@@ -9,13 +9,27 @@ import { redis } from './redis';
 const SESSION_EXPIRY_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 const SESSION_REFRESH_THRESHOLD_MS = 1000 * 60 * 60 * 24 * 15; // 15 days
 
-export async function acquireRefreshLock(sessionId: string, ttlMs: number): Promise<boolean> {
-	const result = await redis.set(`refresh_lock:${sessionId}`, 'locked', 'PX', ttlMs, 'NX');
-	return result === 'OK';
+export async function acquireRefreshLock(
+	sessionId: string,
+	ttlMs: number
+): Promise<string | null> {
+	const token = encodeHexLowerCase(crypto.getRandomValues(new Uint8Array(16)));
+	const result = await redis.set(`refresh_lock:${sessionId}`, token, 'PX', ttlMs, 'NX');
+	return result === 'OK' ? token : null;
 }
 
-export async function releaseRefreshLock(sessionId: string): Promise<void> {
-	await redis.del(`refresh_lock:${sessionId}`);
+// Compare-and-delete: only remove the lock if we still own it, so an expired lock
+// taken over by another request is not mistakenly released by us.
+const RELEASE_LOCK_SCRIPT = `
+if redis.call("get", KEYS[1]) == ARGV[1] then
+	return redis.call("del", KEYS[1])
+else
+	return 0
+end
+`;
+
+export async function releaseRefreshLock(sessionId: string, token: string): Promise<void> {
+	await redis.eval(RELEASE_LOCK_SCRIPT, 1, `refresh_lock:${sessionId}`, token);
 }
 
 export function generateSessionToken(): string {
@@ -66,7 +80,15 @@ export async function validateSessionToken(
 
 	if (Date.now() >= session.expiresAt.getTime() - SESSION_REFRESH_THRESHOLD_MS) {
 		session.expiresAt = new Date(Date.now() + SESSION_EXPIRY_MS);
-		await setSessionToRedis(session);
+		// Only touch the expiresAt field + key TTL; rewriting the whole hash would
+		// race with concurrent updateSessionTokenSet calls and could clobber freshly
+		// refreshed tokens.
+		const pipeline = redis.pipeline();
+		pipeline.hset(`session:${sessionId}`, {
+			expiresAt: session.expiresAt.getTime().toString()
+		});
+		pipeline.expireat(`session:${sessionId}`, Math.floor(session.expiresAt.getTime() / 1000));
+		await pipeline.exec();
 		return { session: session, fresh: true };
 	}
 
