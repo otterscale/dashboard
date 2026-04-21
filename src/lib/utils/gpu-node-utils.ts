@@ -116,8 +116,7 @@ export async function fetchGpuResourcesForNode(
 
 		const nodeObj = response.object as any;
 		const nodeLabels = nodeObj?.metadata?.labels ?? {};
-		const hasGpuWorkloadConfig =
-			nodeLabels['nvidia.com/gpu.workload.config'] === 'vm-passthrough';
+		const hasGpuWorkloadConfig = nodeLabels['nvidia.com/gpu.workload.config'] === 'vm-passthrough';
 		const hasGpuPresent = nodeLabels['nvidia.com/gpu.present'] === 'true';
 
 		if (!hasGpuWorkloadConfig || !hasGpuPresent) {
