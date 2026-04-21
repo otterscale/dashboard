@@ -41,6 +41,7 @@
 
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog/index.js';
+	import * as Item from '$lib/components/ui/item';
 
 	const ctx = getFormContext();
 
@@ -107,6 +108,16 @@
 			<div class="*:h-24">
 				{@render header()}
 			</div>
+		{:else}
+			<Item.Root class="p-0">
+				<Item.Content>
+					<Item.Title class="text-lg">Editor</Item.Title>
+					<Item.Description>
+						This component provides a real-time editing experience. Changes are saved and updated
+						immediately upon closing the editor.
+					</Item.Description>
+				</Item.Content>
+			</Item.Root>
 		{/if}
 		<Resizable.PaneGroup direction="horizontal" class="min-h-0 flex-1">
 			<Resizable.Pane defaultSize={documentRatio}>
