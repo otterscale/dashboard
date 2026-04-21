@@ -67,13 +67,6 @@ export async function fetchAllGpuResources(
 		const quantities = new Map<string, number>();
 
 		for (const nodeItem of nodes) {
-			const nodeLabels = (nodeItem.object as any)?.metadata?.labels ?? {};
-			if (
-				nodeLabels['nvidia.com/gpu.workload.config'] !== 'vm-passthrough' ||
-				nodeLabels['nvidia.com/gpu.present'] !== 'true'
-			) {
-				continue;
-			}
 			const allocatable = (nodeItem.object as any)?.status?.allocatable ?? {};
 			Object.keys(allocatable).forEach((resourceKey) => {
 				if (

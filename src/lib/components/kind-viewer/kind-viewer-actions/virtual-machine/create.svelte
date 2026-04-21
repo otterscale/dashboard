@@ -483,7 +483,7 @@
 	// Container for GPU passthrough selection
 	let gpuPassthroughConfig: any = $state({
 		selectedResource: '',
-		gpuCount: 1
+		gpuCount: '1'
 	});
 
 	// Container for Node selection
