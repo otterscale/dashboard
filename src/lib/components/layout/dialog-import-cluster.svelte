@@ -47,14 +47,14 @@
 
 <Dialog.Root {open} onOpenChange={handleOpenChange}>
 	<Dialog.Content
-		class="flex max-h-[95vh] min-w-[38vw] flex-col overflow-y-auto"
+		class="flex max-h-[95vh] min-w-[38vw] flex-col overflow-hidden"
 		showCloseButton={false}
 	>
 		<Dialog.Title class="sr-only">Import Cluster Wizard</Dialog.Title>
 
-		<Progress value={stepIndex + 1} max={TOTAL_STEPS} />
+		<Progress value={stepIndex + 1} max={TOTAL_STEPS} class="shrink-0" />
 
-		<div class="mt-4 flex flex-1 flex-col">
+		<div class="mt-4 flex min-h-0 flex-1 flex-col">
 			{#if flowStep === 'provider'}
 				<div class="flex h-full flex-1 flex-col gap-6">
 					<div class="flex flex-col gap-1">

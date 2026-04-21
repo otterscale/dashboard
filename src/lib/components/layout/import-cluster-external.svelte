@@ -20,6 +20,7 @@
 	import * as InputGroup from '$lib/components/ui/input-group';
 	import * as Item from '$lib/components/ui/item';
 	import { Spinner } from '$lib/components/ui/spinner';
+	import { cn } from '$lib/utils';
 
 	let {
 		stepIndex = $bindable(1),
@@ -43,6 +44,7 @@
 	let clusterStatus = $state<'pending' | 'installing' | 'ready'>('pending');
 	let isCreating = $state(false);
 	let errorMessage = $state('');
+	let isYamlOpen = $state(false);
 
 	let isPolling = false;
 	let abortController: AbortController | null = null;
@@ -144,7 +146,7 @@
 	}
 </script>
 
-<div class="flex h-full flex-1 flex-col gap-6">
+<div class="flex h-full min-h-0 flex-1 flex-col gap-6">
 	{#if stepIndex === 1}
 		{@render stepClusterInfo()}
 	{:else if stepIndex === 2}
@@ -153,23 +155,25 @@
 		{@render stepVerifyBinding()}
 	{/if}
 
-	<div class="mt-auto flex w-full items-center justify-between gap-3 pt-4">
-		{#if stepIndex === 1}
-			<Button variant="outline" onclick={onBack}>Previous</Button>
-			<Button onclick={handleGenerateManifest} disabled={!canGoNext || isCreating}>
-				{#if isCreating}
-					<Spinner data-icon="inline-start" />
-					Generating...
-				{:else}
-					<TerminalIcon data-icon="inline-start" />
-					Generate Install Command
-				{/if}
-			</Button>
-		{:else if stepIndex === 3}
-			<div></div>
-			<Button onclick={onFinish}>Done</Button>
-		{/if}
-	</div>
+	{#if stepIndex === 1 || stepIndex === 3}
+		<div class="mt-auto flex w-full items-center justify-between gap-3 pt-4">
+			{#if stepIndex === 1}
+				<Button variant="outline" onclick={onBack}>Previous</Button>
+				<Button onclick={handleGenerateManifest} disabled={!canGoNext || isCreating}>
+					{#if isCreating}
+						<Spinner data-icon="inline-start" />
+						Generating...
+					{:else}
+						<TerminalIcon data-icon="inline-start" />
+						Generate Install Command
+					{/if}
+				</Button>
+			{:else if stepIndex === 3}
+				<div></div>
+				<Button onclick={onFinish}>Done</Button>
+			{/if}
+		</div>
+	{/if}
 </div>
 
 {#snippet stepClusterInfo()}
@@ -203,7 +207,7 @@
 {/snippet}
 
 {#snippet stepDeployAgent()}
-	<div class="flex flex-col gap-6">
+	<div class="flex min-h-0 flex-1 flex-col gap-6">
 		<div class="flex flex-col gap-1">
 			<h3 class="text-xl font-bold">Deploy Agent</h3>
 			<p class="text-sm text-muted-foreground">
@@ -211,16 +215,19 @@
 			</p>
 		</div>
 
-		<div class="flex flex-col gap-3 rounded-lg border bg-card p-4">
-			<Field.FieldLabel
-				class="text-xs font-medium tracking-wide uppercase text-muted-foreground"
-			>
+		<div
+			class={cn(
+				'flex flex-col gap-3 rounded-lg border bg-card p-4',
+				isYamlOpen && 'min-h-0 flex-1'
+			)}
+		>
+			<Field.FieldLabel class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
 				Install Command
 			</Field.FieldLabel>
 
 			<Code.Root
 				lang="bash"
-				class="w-full pr-12 text-sm [&_pre.shiki]:[scrollbar-width:none] [&_pre.shiki::-webkit-scrollbar]:hidden"
+				class="w-full shrink-0 pr-12 text-sm [&_pre.shiki]:[scrollbar-width:none] [&_pre.shiki::-webkit-scrollbar]:hidden"
 				variant="secondary"
 				code={installCommand}
 				hideLines
@@ -233,20 +240,23 @@
 			</Field.FieldDescription>
 
 			{#if manifestYaml}
-				<Collapsible.Root>
+				<Collapsible.Root
+					bind:open={isYamlOpen}
+					class={cn('flex flex-col', isYamlOpen && 'min-h-0 flex-1')}
+				>
 					<Collapsible.Trigger
-						class="group flex w-full items-center justify-between border-t pt-3 text-sm font-medium transition-colors hover:text-foreground"
+						class="group flex w-full items-center justify-between border-t pt-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
 					>
 						<span class="flex items-center gap-2">
 							<FileCodeIcon class="size-4" />
 							Preview YAML Manifest
 						</span>
 						<ChevronDownIcon
-							class="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180"
+							class="size-4 transition-transform duration-200 group-data-[state=open]:rotate-180"
 						/>
 					</Collapsible.Trigger>
-					<Collapsible.Content>
-						<div class="mt-2 max-h-125 overflow-auto rounded-md border">
+					<Collapsible.Content class="flex min-h-0 flex-1 flex-col">
+						<div class="mt-2 min-h-0 flex-1 overflow-auto rounded-md border">
 							<Code.Root lang="yaml" class="w-full text-xs" code={manifestYaml}>
 								<Code.CopyButton />
 							</Code.Root>
@@ -258,7 +268,7 @@
 
 		<Item.Root variant="outline">
 			<Item.Media variant="icon" class="size-10 rounded-full bg-muted text-muted-foreground">
-				<ServerIcon class="size-5" />
+				<ServerIcon />
 			</Item.Media>
 			<Item.Content>
 				<Item.Title>{clusterName}</Item.Title>
@@ -266,7 +276,7 @@
 			</Item.Content>
 			<Item.Actions>
 				{#if clusterStatus === 'pending'}
-					<span class="flex items-center gap-2 text-sm text-muted-foreground">
+					<span class="flex items-center gap-2 text-muted-foreground">
 						<span class="relative flex size-2">
 							<span
 								class="absolute inline-flex size-full animate-ping rounded-full bg-primary/75 opacity-75"
@@ -276,13 +286,13 @@
 						Waiting for connection
 					</span>
 				{:else if clusterStatus === 'installing'}
-					<span class="flex items-center gap-2 text-sm text-amber-500">
+					<span class="flex items-center gap-2 text-amber-500">
 						<Spinner />
 						<span class="font-medium">Installing...</span>
 					</span>
 				{:else}
-					<span class="flex items-center gap-2 text-sm text-primary">
-						<CircleCheckIcon class="size-4" />
+					<span class="flex items-center gap-2 text-primary">
+						<CircleCheckIcon />
 						<span class="font-medium">Managed successfully</span>
 					</span>
 				{/if}
