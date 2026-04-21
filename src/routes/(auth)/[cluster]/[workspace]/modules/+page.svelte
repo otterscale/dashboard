@@ -68,7 +68,7 @@
 			const response = await resourceClient.get({
 				cluster,
 				namespace,
-				name: 'otterscale-charts',
+				name: 'otterscale-charts-local',
 				group: 'source.toolkit.fluxcd.io',
 				version: 'v1',
 				resource: 'helmrepositories'
