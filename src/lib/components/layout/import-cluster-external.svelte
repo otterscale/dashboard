@@ -1,24 +1,32 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
+	import CheckIcon from '@lucide/svelte/icons/check';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import FileCodeIcon from '@lucide/svelte/icons/file-code';
+	import PlusIcon from '@lucide/svelte/icons/plus';
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import TerminalIcon from '@lucide/svelte/icons/terminal';
+	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
+	import UserIcon from '@lucide/svelte/icons/user';
+	import XIcon from '@lucide/svelte/icons/x';
 	import { type Link, LinkService } from '@otterscale/api/link/v1';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext, onDestroy } from 'svelte';
 	import { toast } from 'svelte-sonner';
+	import { stringify } from 'yaml';
 
 	import * as Code from '$lib/components/custom/code';
 	import { CopyButton } from '$lib/components/custom/copy-button';
+	import * as Avatar from '$lib/components/ui/avatar';
 	import { Button } from '$lib/components/ui/button';
 	import * as Collapsible from '$lib/components/ui/collapsible';
+	import * as Command from '$lib/components/ui/command';
 	import * as Empty from '$lib/components/ui/empty';
 	import * as Field from '$lib/components/ui/field';
 	import { Input } from '$lib/components/ui/input';
-	import * as InputGroup from '$lib/components/ui/input-group';
 	import * as Item from '$lib/components/ui/item';
+	import * as Popover from '$lib/components/ui/popover';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { cn } from '$lib/utils';
 
@@ -33,6 +41,15 @@
 	} = $props();
 
 	const POLL_INTERVAL = 3000;
+	const CLUSTER_ADMIN_BINDING_NAME = 'otterscale-cluster-admins';
+
+	interface KeycloakUser {
+		id: string;
+		username: string;
+		email?: string;
+		firstName?: string;
+		lastName?: string;
+	}
 
 	const transport: Transport = getContext('transport');
 	const linkClient = createClient(LinkService, transport);
@@ -41,10 +58,21 @@
 	let clusterName = $state('');
 	let installUrl = $state('');
 	let manifestYaml = $state('');
-	let clusterStatus = $state<'pending' | 'installing' | 'ready'>('pending');
+	let clusterStatus = $state<
+		'pending' | 'installing' | 'ready' | 'binding' | 'done' | 'binding-failed'
+	>('pending');
 	let isCreating = $state(false);
 	let errorMessage = $state('');
 	let isYamlOpen = $state(false);
+
+	let selectedUsers = $state<KeycloakUser[]>([]);
+	let userSearchOpen = $state(false);
+	let userSearchQuery = $state('');
+	let userSearchResults = $state<KeycloakUser[]>([]);
+	let userSearchLoading = $state(false);
+	let userSearchInitialized = false;
+	let userDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+	let bindingError = $state('');
 
 	let isPolling = false;
 	let abortController: AbortController | null = null;
@@ -58,6 +86,84 @@
 	);
 
 	const canGoNext = $derived(stepIndex === 1 ? clusterName.trim().length > 0 : false);
+
+	function displayName(u: KeycloakUser): string {
+		const full = `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim();
+		return full || u.username;
+	}
+
+	async function fetchUsers(q: string) {
+		userSearchLoading = true;
+		try {
+			const res = await fetch(`/rest/users?search=${encodeURIComponent(q)}&max=10`);
+			userSearchResults = res.ok ? ((await res.json()) as KeycloakUser[]) : [];
+		} catch (e) {
+			console.error('Failed to search users:', e);
+			userSearchResults = [];
+		} finally {
+			userSearchLoading = false;
+		}
+	}
+
+	function handleUserSearch(q: string) {
+		userSearchQuery = q;
+		if (userDebounceTimer) clearTimeout(userDebounceTimer);
+		userDebounceTimer = setTimeout(() => {
+			fetchUsers(q);
+		}, 300);
+	}
+
+	function handleUserPopoverOpenChange(open: boolean) {
+		if (open && !userSearchInitialized) {
+			userSearchInitialized = true;
+			fetchUsers('');
+		}
+	}
+
+	function toggleUser(u: KeycloakUser) {
+		const i = selectedUsers.findIndex((s) => s.id === u.id);
+		if (i >= 0) {
+			selectedUsers.splice(i, 1);
+		} else {
+			selectedUsers.push(u);
+		}
+	}
+
+	function removeUser(id: string) {
+		selectedUsers = selectedUsers.filter((s) => s.id !== id);
+	}
+
+	async function createClusterAdminBinding() {
+		const subjects = selectedUsers
+			.filter((u) => u.id)
+			.map((u) => ({
+				kind: 'User',
+				name: u.id,
+				apiGroup: 'rbac.authorization.k8s.io'
+			}));
+		if (subjects.length === 0) return;
+
+		const manifestObj = {
+			apiVersion: 'rbac.authorization.k8s.io/v1',
+			kind: 'ClusterRoleBinding',
+			metadata: { name: CLUSTER_ADMIN_BINDING_NAME },
+			roleRef: {
+				apiGroup: 'rbac.authorization.k8s.io',
+				kind: 'ClusterRole',
+				name: 'cluster-admin'
+			},
+			subjects
+		};
+		const manifest = new TextEncoder().encode(stringify(manifestObj));
+
+		await resourceClient.create({
+			cluster: clusterName,
+			group: 'rbac.authorization.k8s.io',
+			version: 'v1',
+			resource: 'clusterrolebindings',
+			manifest
+		});
+	}
 
 	async function handleGenerateManifest() {
 		if (!clusterName.trim() || isCreating) return;
@@ -131,6 +237,24 @@
 				const available = conditions.find((c: any) => c.type === 'Available');
 				if (available?.status === 'True') {
 					clusterStatus = 'ready';
+					if (selectedUsers.length > 0) {
+						clusterStatus = 'binding';
+						try {
+							await createClusterAdminBinding();
+							clusterStatus = 'done';
+						} catch (e) {
+							bindingError =
+								e instanceof ConnectError
+									? e.message
+									: e instanceof Error
+										? e.message
+										: 'Failed to grant cluster-admin';
+							clusterStatus = 'binding-failed';
+							toast.error(`Permission grant failed: ${bindingError}`);
+						}
+					} else {
+						clusterStatus = 'done';
+					}
 					stepIndex = 3;
 					break;
 				}
@@ -199,6 +323,152 @@
 					bind:value={clusterName}
 					required
 				/>
+			</Field.Field>
+
+			<Field.Field>
+				<Field.FieldLabel>Cluster Administrators</Field.FieldLabel>
+				<Field.FieldDescription>
+					Selected users will be granted cluster-admin via ClusterRoleBinding.
+				</Field.FieldDescription>
+
+				{#if selectedUsers.length === 0}
+					<Empty.Root class="rounded-md border">
+						<Empty.Header>
+							<Empty.Media>
+								<Avatar.Group>
+									<Avatar.Root>
+										<Avatar.Fallback><UserIcon class="size-4" /></Avatar.Fallback>
+									</Avatar.Root>
+									<Avatar.Root>
+										<Avatar.Fallback><UserIcon class="size-4" /></Avatar.Fallback>
+									</Avatar.Root>
+									<Avatar.Root>
+										<Avatar.Fallback><UserIcon class="size-4" /></Avatar.Fallback>
+									</Avatar.Root>
+								</Avatar.Group>
+							</Empty.Media>
+							<Empty.Title>No Administrators</Empty.Title>
+							<Empty.Description>
+								Grant trusted users cluster-admin access to manage this cluster.
+							</Empty.Description>
+						</Empty.Header>
+						<Empty.Content>
+							<Popover.Root bind:open={userSearchOpen} onOpenChange={handleUserPopoverOpenChange}>
+								<Popover.Trigger>
+									{#snippet child({ props })}
+										<Button {...props}>
+											<PlusIcon data-icon="inline-start" />
+											Add Administrator
+										</Button>
+									{/snippet}
+								</Popover.Trigger>
+								<Popover.Content class="w-80 p-0" align="center">
+									<Command.Root shouldFilter={false}>
+										<Command.Input
+											placeholder="Search users..."
+											value={userSearchQuery}
+											oninput={(e) => handleUserSearch(e.currentTarget.value)}
+										/>
+										<Command.List>
+											{#if userSearchLoading}
+												<Command.Loading>Searching...</Command.Loading>
+											{:else}
+												<Command.Empty>No users found.</Command.Empty>
+												<Command.Group>
+													{#each userSearchResults as user (user.id)}
+														{@const isSelected = selectedUsers.some((s) => s.id === user.id)}
+														<Command.Item value={user.id} onSelect={() => toggleUser(user)}>
+															<CheckIcon
+																class={cn('mr-2 size-4', !isSelected && 'text-transparent')}
+															/>
+															<div class="flex flex-col">
+																<span class="font-medium">{displayName(user)}</span>
+																<span class="text-xs text-muted-foreground">
+																	{user.email || user.username}
+																</span>
+															</div>
+														</Command.Item>
+													{/each}
+												</Command.Group>
+											{/if}
+										</Command.List>
+									</Command.Root>
+								</Popover.Content>
+							</Popover.Root>
+						</Empty.Content>
+					</Empty.Root>
+				{:else}
+					<div class="flex flex-col gap-2">
+						{#each selectedUsers as user (user.id)}
+							<Item.Root variant="outline">
+								<Item.Media>
+									<Avatar.Root>
+										<Avatar.Fallback>
+											{displayName(user).charAt(0).toUpperCase()}
+										</Avatar.Fallback>
+									</Avatar.Root>
+								</Item.Media>
+								<Item.Content>
+									<Item.Title>{displayName(user)}</Item.Title>
+									<Item.Description>{user.email || user.username}</Item.Description>
+								</Item.Content>
+								<Item.Actions>
+									<Button
+										variant="ghost"
+										size="icon"
+										onclick={() => removeUser(user.id)}
+										aria-label={`Remove ${displayName(user)}`}
+									>
+										<XIcon />
+									</Button>
+								</Item.Actions>
+							</Item.Root>
+						{/each}
+
+						<Popover.Root bind:open={userSearchOpen} onOpenChange={handleUserPopoverOpenChange}>
+							<Popover.Trigger>
+								{#snippet child({ props })}
+									<Button {...props} variant="outline" class="w-full justify-start">
+										<PlusIcon data-icon="inline-start" />
+										Add administrator
+									</Button>
+								{/snippet}
+							</Popover.Trigger>
+							<Popover.Content class="w-80 p-0" align="start">
+								<Command.Root shouldFilter={false}>
+									<Command.Input
+										placeholder="Search users..."
+										value={userSearchQuery}
+										oninput={(e) => handleUserSearch(e.currentTarget.value)}
+									/>
+									<Command.List>
+										{#if userSearchLoading}
+											<Command.Loading>Searching...</Command.Loading>
+										{:else}
+											<Command.Empty>No users found.</Command.Empty>
+											<Command.Group>
+												{#each userSearchResults as user (user.id)}
+													{@const isSelected = selectedUsers.some((s) => s.id === user.id)}
+													<Command.Item value={user.id} onSelect={() => toggleUser(user)}>
+														<CheckIcon
+															class={cn('mr-2 size-4', !isSelected && 'text-transparent')}
+														/>
+														<div class="flex flex-col">
+															<span class="font-medium">{displayName(user)}</span>
+															<span class="text-xs text-muted-foreground">
+																{user.email || user.username}
+															</span>
+														</div>
+													</Command.Item>
+												{/each}
+											</Command.Group>
+										{/if}
+									</Command.List>
+								</Command.Root>
+							</Popover.Content>
+						</Popover.Root>
+					</div>
+				{/if}
 			</Field.Field>
 		</Field.FieldGroup>
 
@@ -290,6 +560,16 @@
 						<Spinner />
 						<span class="font-medium">Installing...</span>
 					</span>
+				{:else if clusterStatus === 'binding'}
+					<span class="flex items-center gap-2 text-amber-500">
+						<Spinner />
+						<span class="font-medium">Granting cluster-admin...</span>
+					</span>
+				{:else if clusterStatus === 'binding-failed'}
+					<span class="flex items-center gap-2 text-amber-600">
+						<TriangleAlertIcon class="size-4" />
+						<span class="font-medium">Permissions failed</span>
+					</span>
 				{:else}
 					<span class="flex items-center gap-2 text-primary">
 						<CircleCheckIcon />
@@ -326,8 +606,31 @@
 							Managed
 						</span>
 					</div>
+					{#if selectedUsers.length > 0}
+						<div class="flex justify-between">
+							<span class="text-muted-foreground">Permissions</span>
+							{#if clusterStatus === 'binding-failed'}
+								<span class="flex items-center gap-1.5 font-medium text-amber-600">
+									<TriangleAlertIcon class="size-3.5" />
+									Failed
+								</span>
+							{:else}
+								<span class="flex items-center gap-1.5 font-medium text-primary">
+									<CircleCheckIcon class="size-3.5" />
+									{selectedUsers.length} cluster-admin{selectedUsers.length > 1 ? 's' : ''}
+								</span>
+							{/if}
+						</div>
+					{/if}
 				</div>
 			</div>
+			{#if clusterStatus === 'binding-failed'}
+				<p class="mt-3 max-w-sm text-center text-xs text-muted-foreground">
+					<strong class="text-amber-600">Permissions failed:</strong>
+					{bindingError || 'Could not grant cluster-admin.'} You can assign it manually from the ClusterRoleBinding
+					view.
+				</p>
+			{/if}
 		</Empty.Content>
 	</Empty.Root>
 {/snippet}
