@@ -9,7 +9,7 @@
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
-	import { SvelteSet } from 'svelte/reactivity';
+	import * as gpuNodeUtils from '$lib/utils/gpu-node-utils';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
@@ -384,137 +384,30 @@
 		}
 	}
 
-	// Fetch nodes with CPU feature VMX support
 	async function fetchNodesWithVmxLabel(): Promise<any[]> {
-		try {
-			const response = await resourceClient.list({
-				cluster,
-				group: '',
-				version: 'v1',
-				resource: 'nodes'
-			});
-
-			return response.items.filter((item: any) => {
-				const nodeLabels = (item.object as any)?.metadata?.labels ?? {};
-				return nodeLabels['cpu-feature.node.kubevirt.io/vmx'] === 'true';
-			});
-		} catch (error) {
-			console.error('Error fetching nodes with VMX label:', error);
-			return [];
-		}
+		return gpuNodeUtils.fetchNodesWithVmxLabel(resourceClient, cluster);
 	}
 
-	// Fetch nodes with GPU passthrough support
-	async function fetchNodesWithGpuPassthrough(): Promise<any[]> {
-		try {
-			const response = await resourceClient.list({
-				cluster,
-				group: '',
-				version: 'v1',
-				resource: 'nodes'
-			});
-
-			const requiredLabels = {
-				'nvidia.com/gpu.workload.config': 'vm-passthrough',
-				'nvidia.com/gpu.present': 'true'
-			};
-
-			return response.items.filter((item: any) => {
-				const nodeLabels = (item.object as any)?.metadata?.labels ?? {};
-				return Object.entries(requiredLabels).every(([key, value]) => nodeLabels[key] === value);
-			});
-		} catch (error) {
-			console.error('Error fetching nodes with GPU passthrough:', error);
-			return [];
-		}
-	}
-
-	// Fetch all GPU resources (including AUDIO devices)
 	async function fetchAllGpuResources(): Promise<string[]> {
-		try {
-			const nodes = await fetchNodesWithGpuPassthrough();
-			const gpuResources = new SvelteSet<string>();
-			for (const nodeItem of nodes) {
-				const nodeLabels = (nodeItem.object as any)?.metadata?.labels ?? {};
-				if (
-					nodeLabels['nvidia.com/gpu.workload.config'] !== 'vm-passthrough' ||
-					nodeLabels['nvidia.com/gpu.present'] !== 'true'
-				) {
-					continue;
-				}
-				const allocatable = (nodeItem.object as any)?.status?.allocatable ?? {};
-				Object.keys(allocatable).forEach((resourceKey) => {
-					if (
-						resourceKey.startsWith('nvidia.com/') &&
-						!resourceKey.endsWith('vgpu') &&
-						!resourceKey.includes('/vgpu') &&
-						parseInt(allocatable[resourceKey]) > 0
-					) {
-						gpuResources.add(resourceKey);
-						// Store the maximum quantity found for this resource
-						const quantity = parseInt(allocatable[resourceKey]) || 0;
-						const currentMax = gpuResourceQuantities.get(resourceKey) || 0;
-						if (quantity > currentMax) {
-							gpuResourceQuantities.set(resourceKey, quantity);
-						}
-					}
-				});
-			}
-
-			return Array.from(gpuResources);
-		} catch (error) {
-			console.error('Error fetching all GPU resources:', error);
-			return [];
-		}
+		const { resources, quantities } = await gpuNodeUtils.fetchAllGpuResources(
+			resourceClient,
+			cluster
+		);
+		quantities.forEach((qty, key) => {
+			const currentMax = gpuResourceQuantities.get(key) || 0;
+			if (qty > currentMax) gpuResourceQuantities.set(key, qty);
+		});
+		return resources;
 	}
 
-	// Fetch GPU resources for a specific node and their quantities
 	async function fetchGpuResourcesForNode(nodeName: string): Promise<string[]> {
-		if (!nodeName || typeof nodeName !== 'string') return [];
-		try {
-			const response = await resourceClient.get({
-				cluster,
-				group: '',
-				version: 'v1',
-				resource: 'nodes',
-				name: nodeName
-			});
-
-			const nodeObj = response.object as any;
-			const nodeLabels = nodeObj?.metadata?.labels ?? {};
-
-			// Check if node has both required GPU labels
-			const hasGpuWorkloadConfig =
-				nodeLabels['nvidia.com/gpu.workload.config'] === 'vm-passthrough';
-			const hasGpuPresent = nodeLabels['nvidia.com/gpu.present'] === 'true';
-
-			if (!hasGpuWorkloadConfig || !hasGpuPresent) {
-				console.warn(`Node ${nodeName} does not have both required GPU labels`);
-				return [];
-			}
-
-			// Extract GPU resources from node allocatable
-			const allocatable = nodeObj?.status?.allocatable ?? {};
-			const gpuResources: string[] = [];
-
-			Object.keys(allocatable).forEach((resourceKey) => {
-				if (
-					resourceKey.startsWith('nvidia.com/') &&
-					!resourceKey.endsWith('vgpu') &&
-					!resourceKey.includes('/vgpu') &&
-					parseInt(allocatable[resourceKey]) > 0
-				) {
-					gpuResources.push(resourceKey);
-					// Store the quantity for this resource
-					gpuResourceQuantities.set(resourceKey, parseInt(allocatable[resourceKey]) || 0);
-				}
-			});
-
-			return gpuResources;
-		} catch (error) {
-			console.error(`Error fetching GPU resources for node ${nodeName}:`, error);
-			return [];
-		}
+		const { resources, quantities } = await gpuNodeUtils.fetchGpuResourcesForNode(
+			resourceClient,
+			cluster,
+			nodeName
+		);
+		quantities.forEach((qty, key) => gpuResourceQuantities.set(key, qty));
+		return resources;
 	}
 
 	// Fetch GPU resources for dropdown (excluding AUDIO devices)
