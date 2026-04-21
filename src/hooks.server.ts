@@ -68,7 +68,7 @@ const REFRESH_WAIT_POLL_MS = 200;
 const REFRESH_WAIT_MAX_MS = 10 * 1000;
 
 const isNearExpiry = (expiresAt: Date): boolean =>
-	Date.now() >= (expiresAt.getTime() ?? 0) - BUFFER_MS;
+	Date.now() >= expiresAt.getTime() - BUFFER_MS;
 
 const handleRefreshToken: Handle = async ({ event, resolve }) => {
 	const session = event.locals.session;
@@ -90,7 +90,11 @@ const handleRefreshToken: Handle = async ({ event, resolve }) => {
 		while (Date.now() < deadline) {
 			await new Promise((r) => setTimeout(r, REFRESH_WAIT_POLL_MS));
 			const { session: latest } = await validateSessionToken(token);
-			if (!latest) break;
+			if (!latest) {
+				deleteSessionTokenCookie(event.cookies);
+				event.locals.session = null;
+				return resolve(event);
+			}
 			if (!isNearExpiry(latest.tokenSet.accessTokenExpiresAt)) {
 				event.locals.session = latest;
 				return resolve(event);
