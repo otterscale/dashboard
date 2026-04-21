@@ -1,19 +1,22 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import PencilIcon from '@lucide/svelte/icons/pencil';
+	import FormIcon from '@lucide/svelte/icons/form';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
+	import Ajv from 'ajv';
+	import { load } from 'js-yaml';
 	import lodash from 'lodash';
+	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
+	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
-	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
@@ -157,7 +160,8 @@
 						}
 						resolve(
 							fetchedUsers.map((user) => ({
-								label: user.username,
+								label:
+									((user.firstName ?? '') + ' ' + (user.lastName ?? '')).trim() || user.username,
 								value: user.username
 							}))
 						);
@@ -176,12 +180,15 @@
 		return usernameToIdentifier[username];
 	}
 
+	// Derived YAML value
+	let value = $derived(stringify(submissionValues));
+
 	// Flag for Dialog
 	let open = $state(false);
 	let isSubmitting = $state(false);
 </script>
 
-<AlertDialog.Root
+<Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
 		onOpenChangeComplete?.();
@@ -190,19 +197,19 @@
 		}
 	}}
 >
-	<AlertDialog.Trigger>
+	<Dialog.Trigger>
 		{#snippet child({ props })}
 			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
 				<Item.Media>
-					<PencilIcon />
+					<FormIcon />
 				</Item.Media>
 				<Item.Content>
-					<Item.Title>Edit</Item.Title>
+					<Item.Title>Update</Item.Title>
 				</Item.Content>
 			</Item.Root>
 		{/snippet}
-	</AlertDialog.Trigger>
-	<AlertDialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
+	</Dialog.Trigger>
+	<Dialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
 		<Item.Root class="p-0">
 			<Progress value={currentIndex + 1} max={steps.length} />
 			<Item.Content class="text-left">
@@ -415,13 +422,19 @@
 				{/if}
 			</Tabs.Content>
 			<!-- Step 4: Review & Edit -->
-			<Tabs.Content value={steps[3]}>
+			<Tabs.Content value={steps[3]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
-					<Code.Root
-						lang="yaml"
-						class="w-full"
-						hideLines
-						code={stringify(submissionValues, null, 2)}
+					<Monaco
+						options={{
+							language: 'yaml',
+							padding: { top: 24 },
+							automaticLayout: true,
+							folding: true,
+							foldingStrategy: 'indentation',
+							showFoldingControls: 'always'
+						}}
+						bind:value
+						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
 					/>
 					<div class="mt-auto flex w-full items-center justify-between gap-3">
 						<Button
@@ -438,11 +451,26 @@
 
 								isSubmitting = true;
 
-								const name = lodash.get(object, 'metadata.name');
+								const jsonSchemaValidator = new Ajv({
+									allErrors: true,
+									strict: false
+								});
+								const validate = jsonSchemaValidator.compile(jsonSchema);
+
+								const isValid = validate(load(value));
+
+								if (!isValid) {
+									console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
+									toast.error('Validation failed. Please check the YAML.');
+									isSubmitting = false;
+									return;
+								}
+
+								const name = lodash.get(load(value), 'metadata.name');
 
 								toast.promise(
 									async () => {
-										const manifest = new TextEncoder().encode(JSON.stringify(submissionValues));
+										const manifest = new TextEncoder().encode(value);
 
 										await resourceClient.apply({
 											cluster,
@@ -478,5 +506,5 @@
 				</div>
 			</Tabs.Content>
 		</Tabs.Root>
-	</AlertDialog.Content>
-</AlertDialog.Root>
+	</Dialog.Content>
+</Dialog.Root>

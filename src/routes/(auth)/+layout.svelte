@@ -250,7 +250,7 @@
 				icon: HardDriveIcon,
 				items: [
 					{
-						title: m.block_device(),
+						title: m.block_pool(),
 						url: resourceUrl('ceph.rook.io', 'v1', 'CephBlockPool', 'cephblockpools')
 					},
 					{
@@ -450,7 +450,7 @@
 
 <DialogAbout bind:open={aboutOpen} />
 
-<Sidebar.Provider bind:open={sidebarOpen}>
+<Sidebar.Provider class="h-svh overflow-hidden" bind:open={sidebarOpen}>
 	<Sidebar.Root id="sidebar-guide-step" collapsible="icon" variant="inset" class="p-3">
 		{#if activeCluster && isMounted}
 			<Sidebar.Header id="workspace-guide-step">
@@ -488,7 +488,7 @@
 		</Sidebar.Footer>
 		<Sidebar.Rail />
 	</Sidebar.Root>
-	<Sidebar.Inset>
+	<Sidebar.Inset class="min-w-0 overflow-hidden">
 		<header
 			class="flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12"
 		>
@@ -569,7 +569,7 @@
 				/>
 			</div>
 		</header>
-		<main class="flex flex-1 flex-col px-2 md:px-4 lg:px-8">
+		<main class="flex min-w-0 flex-1 flex-col overflow-auto px-2 md:px-4 lg:px-8">
 			{@render children()}
 		</main>
 	</Sidebar.Inset>

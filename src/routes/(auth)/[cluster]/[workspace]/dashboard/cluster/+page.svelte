@@ -7,9 +7,9 @@
 	import { page } from '$app/state';
 	import { Reloader } from '$lib/components/custom/reloader';
 	import { WidgetGrid } from '$lib/components/custom/widget-grid';
-	import { Dashboard } from '$lib/components/dashbaord/cluster/analytics';
-	import InstancePicker from '$lib/components/dashbaord/cluster/analytics/instance-picker.svelte';
-	import { widgets } from '$lib/components/dashbaord/cluster/overview/widgets';
+	import { Dashboard } from '$lib/components/dashboard/cluster/analytics';
+	import InstancePicker from '$lib/components/dashboard/cluster/analytics/instance-picker.svelte';
+	import { widgets } from '$lib/components/dashboard/cluster/overview/widgets';
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/paraglide/messages';

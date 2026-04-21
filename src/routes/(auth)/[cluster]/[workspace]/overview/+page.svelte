@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import WorkspaceDashboard from '$lib/components/dashbaord/workspace/index.svelte';
+	import WorkspaceDashboard from '$lib/components/dashboard/workspace/index.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { breadcrumbs } from '$lib/stores';
 

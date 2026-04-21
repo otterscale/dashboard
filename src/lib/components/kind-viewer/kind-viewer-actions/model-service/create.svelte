@@ -100,22 +100,21 @@
 
 						const modelRepositories: string[] = [];
 						modelArtifacts.forEach((artifact) => {
-							if (
-								Array.isArray(artifact.tags) &&
-								artifact.tags.some((tag) => tag.name === 'latest')
-							) {
+							if (Array.isArray(artifact.tags) && artifact.tags.length > 0) {
+								const artifactTagNames = artifact.tags.map((tag) => tag.name);
+								const [artifactTagName] = artifactTagNames;
 								imageToArtifact.set(
-									`${harborUrl.host}/${artifact.repository_name}:latest`,
+									`${harborUrl.host}/${artifact.repository_name}:${artifactTagName}`,
 									artifact
 								);
-								modelRepositories.push(artifact.repository_name);
+								modelRepositories.push(`${artifact.repository_name}:${artifactTagName}`);
 							}
 						});
 
 						resolve(
-							modelRepositories.map((repositoryName: string) => ({
-								label: repositoryName,
-								value: `${harborUrl.host}/${repositoryName}:latest`
+							modelRepositories.map((repository: string) => ({
+								label: repository,
+								value: `${harborUrl.host}/${repository}`
 							}))
 						);
 					} else {
@@ -181,9 +180,12 @@
 			</Button>
 		{/snippet}
 	</Dialog.Trigger>
-	<Dialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
+	<Dialog.Content
+		class="max-h-[95vh] min-w-[38vw] overflow-auto"
+		onInteractOutside={(e) => e.preventDefault()}
+	>
 		<Item.Root class="p-0">
-			<Progress value={currentIndex + 1} max={steps.length} />
+			<Progress value={currentIndex + 1} max={steps.length} class="mt-1 mr-6" />
 			<Item.Content class="text-left">
 				<Item.Title class="text-xl font-bold">{kind}</Item.Title>
 				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
@@ -290,7 +292,7 @@
 							if (artifact) {
 								const extraAttributes = artifact.extra_attrs;
 								const name = [
-									...(lodash.get(extraAttributes, 'descriptor.authors') as []),
+									...(lodash.get(extraAttributes, 'descriptor.authors', []) as string[]),
 									lodash.get(extraAttributes, 'descriptor.name')
 								].join('/');
 
@@ -639,7 +641,9 @@
 								title: 'Node',
 								type: 'string',
 								description: 'Select a GPU node (nodeSelector: kubernetes.io/hostname)',
-								enum: nodeNameOptions.map((o) => o.value)
+								...(nodeNameOptions.length > 0 && {
+									enum: nodeNameOptions.map((o) => o.value)
+								})
 							},
 							gpuType: {
 								title: 'GPU Type',
@@ -647,7 +651,9 @@
 								description: 'Select GPU types (annotation: nvidia.com/use-gputype)',
 								items: {
 									type: 'string',
-									enum: gpuTypeOptions().map((o) => o.value)
+									...(gpuTypeOptions().length > 0 && {
+										enum: gpuTypeOptions().map((o) => o.value)
+									})
 								},
 								uniqueItems: true
 							},
@@ -657,7 +663,9 @@
 								description: 'Select GPU UUIDs (annotation: nvidia.com/use-gpuuuid)',
 								items: {
 									type: 'string',
-									enum: gpuUuidOptions.map((o) => o.value)
+									...(gpuUuidOptions.length > 0 && {
+										enum: gpuUuidOptions.map((o) => o.value)
+									})
 								},
 								uniqueItems: true
 							}

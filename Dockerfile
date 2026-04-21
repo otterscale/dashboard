@@ -1,5 +1,5 @@
 # Build stage
-FROM node:25-alpine@sha256:cf38e1f3c28ac9d81cdc0c51d8220320b3b618780e44ef96a39f76f7dbfef023 AS builder
+FROM node:24-alpine@sha256:d1b3b4da11eefd5941e7f0b9cf17783fc99d9c6fc34884a665f40a06dbdfc94f AS builder
 
 ARG VERSION=unknown
 
@@ -19,13 +19,13 @@ COPY . .
 ENV VERSION=${VERSION}
 
 # Build the application
-RUN pnpm build
+RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm build
 
 # Prune to production dependencies only
 RUN pnpm prune --production --ignore-scripts && pnpm store prune
 
 # Runtime stage
-FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:924918584d0e6793e578fc0e98b8b8026ae4ac2ccf2fea283bc54a7165441ccd
+FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:f16acace4aa70086d4a2caad6c716f01e3e2fe0dd8274c4530c7c17d987bdb1a
 
 WORKDIR /app
 

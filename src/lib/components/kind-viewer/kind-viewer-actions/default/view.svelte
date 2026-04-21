@@ -14,15 +14,13 @@
 		onOpenChangeComplete
 	}: {
 		schema: Schema;
-		object: Record<string, unknown>;
+		object: any;
 		onOpenChangeComplete?: () => void;
 	} = $props();
 
 	let open = $state(false);
 
-	const [{ group, version, kind }] = $derived(
-		lodash.get(schema, 'x-kubernetes-group-version-kind')
-	);
+	const name = $derived(object?.metadata?.name);
 </script>
 
 <Dialog.Root bind:open {onOpenChangeComplete}>
@@ -40,12 +38,11 @@
 		<Dialog.Header>
 			<Item.Root class="p-0">
 				<Item.Content class="text-left">
-					<Item.Title class="text-lg font-bold">{kind}</Item.Title>
+					<Item.Title class="text-lg font-bold">
+						View - {name}
+					</Item.Title>
 					<Item.Description>{lodash.get(schema, 'description')}</Item.Description>
 				</Item.Content>
-				<Item.Actions>
-					{group}/{version}
-				</Item.Actions>
 			</Item.Root>
 		</Dialog.Header>
 		<Code.Root

@@ -54,7 +54,7 @@ function getWorkspaceData(
 		'CPU Requests': object?.spec?.resourceQuota?.hard?.['requests.cpu'] ?? null,
 		'Memory Limit': object?.spec?.resourceQuota?.hard?.['limits.memory'] ?? null,
 		'Memory Requests': object?.spec?.resourceQuota?.hard?.['requests.memory'] ?? null,
-		'GPU Requests': object?.spec?.resourceQuota?.hard?.['requests.otterscale.com/vgpu'] ?? null,
+		'GPU Requests': object?.spec?.resourceQuota?.hard?.['requests.nvidia.com/gpu'] ?? null,
 		'Creation Timestamp': object?.metadata?.creationTimestamp as JsonValue,
 		raw: object as JsonObject
 	};

@@ -9,6 +9,7 @@
 	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { getContext } from 'svelte';
+	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
@@ -21,7 +22,6 @@
 	import * as Item from '$lib/components/ui/item';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 
-	import Badge from '../ui/badge/badge.svelte';
 	import type { ModuleAttribute } from './table-layout';
 	import { type ModuleType } from './types';
 
@@ -103,12 +103,92 @@
 		return decoder.decode(response.values);
 	}
 
-	async function handleInstall(row: Row<Record<ModuleAttribute, JsonValue>>): Promise<ResultType> {
-		if (!row.original.installable) {
-			return { status: 'skipped', name: row.original['Chart Name'] as string };
+	function getDependencies(chart: ModuleType): string[] {
+		const dependsOn = chart.annotations?.['module.otterscale.io/depends-on'] ?? '';
+		return dependsOn.split(',').filter(Boolean);
+	}
+
+	/**
+	 * Layered Topological Sort (Kahn's Algorithm variant)
+	 *
+	 * Groups selected modules into installation layers, where all modules
+	 * within the same layer can be installed in parallel. Each layer only
+	 * contains modules whose dependencies are satisfied by previously placed
+	 * layers or already-installed modules.
+	 *
+	 * Unresolvable modules (circular deps or missing deps) are collected into
+	 * a final "dead-end" layer for the caller to handle as failures.
+	 */
+	function buildInstallLayers(
+		selectedRows: Row<Record<ModuleAttribute, JsonValue>>[],
+		installedSet: Set<string>
+	): Row<Record<ModuleAttribute, JsonValue>>[][] {
+		// Build a lookup map from module name → row for quick access during sorting
+		const rowByModuleName = new SvelteMap<string, Row<Record<ModuleAttribute, JsonValue>>>();
+		for (const row of selectedRows) {
+			const chart = row.original.chart as unknown as ModuleType;
+			rowByModuleName.set(chart.name, row);
 		}
 
+		// "Placed" tracks all modules whose dependencies are already satisfied —
+		// seeded with already-installed modules so they count as resolved from the start
+		const placedModuleNames = new SvelteSet<string>(installedSet);
+
+		// "Remaining" is the working set of modules not yet assigned to a layer
+		const remainingModuleNames = new SvelteSet(rowByModuleName.keys());
+
+		const installLayers: Row<Record<ModuleAttribute, JsonValue>>[][] = [];
+
+		while (remainingModuleNames.size > 0) {
+			// Collect all modules whose dependencies are fully satisfied this round
+			const currentLayer: Row<Record<ModuleAttribute, JsonValue>>[] = [];
+
+			for (const moduleName of remainingModuleNames) {
+				const row = rowByModuleName.get(moduleName)!;
+				const chart = row.original.chart as unknown as ModuleType;
+				const dependencies = getDependencies(chart);
+
+				if (dependencies.every((dependency) => placedModuleNames.has(dependency))) {
+					currentLayer.push(row);
+				}
+			}
+
+			if (currentLayer.length === 0) {
+				// No progress was made — remaining modules have unresolvable dependencies
+				// (circular dependency or dependency not present in the selected set).
+				// Collect them into a final dead-end layer so the caller can mark them as failures.
+				const deadEndLayer = [...remainingModuleNames].map(
+					(moduleName) => rowByModuleName.get(moduleName)!
+				);
+				installLayers.push(deadEndLayer);
+				break;
+			}
+
+			// Promote this layer's modules into "placed" so the next round can depend on them
+			for (const row of currentLayer) {
+				const chart = row.original.chart as unknown as ModuleType;
+				remainingModuleNames.delete(chart.name);
+				placedModuleNames.add(chart.name);
+			}
+
+			installLayers.push(currentLayer);
+		}
+
+		return installLayers;
+	}
+
+	async function handleInstall(
+		row: Row<Record<ModuleAttribute, JsonValue>>,
+		installedSet: Set<string>
+	): Promise<ResultType> {
 		const chart = row.original.chart as unknown as ModuleType;
+		const dependencies = getDependencies(chart);
+		const dependenciesReady = dependencies.every((dependency) => installedSet.has(dependency));
+
+		if (!dependenciesReady) {
+			return { status: 'skipped', name: chart.name };
+		}
+
 		const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
 
 		const helmValues = fromHarbor
@@ -159,28 +239,50 @@
 		if (isSubmitting) return;
 		isSubmitting = true;
 
-		const results = await Promise.allSettled(rows.map((row) => handleInstall(row)));
+		// Fetch currently installed HelmReleases from the cluster in real time
+		const listResponse = await resourceClient.list({
+			cluster,
+			namespace: 'otterscale-system',
+			group,
+			version,
+			resource
+		});
+
+		const installedSet = new SvelteSet<string>(
+			listResponse.items
+				.map((item) => (item.object?.['metadata'] as Record<string, unknown>)?.['name'] as string)
+				.filter(Boolean)
+		);
+
+		const layers = buildInstallLayers(rows, installedSet);
 
 		let successes = 0;
 		let fails = 0;
 		let skipped = 0;
 
-		results.forEach((result) => {
-			if (result.status === 'fulfilled') {
-				if (result.value.status === 'skipped') {
-					skipped = skipped + 1;
-					toast.info(`Skipped ${result.value.name}`);
+		for (const layer of layers) {
+			const results = await Promise.allSettled(
+				layer.map((row) => handleInstall(row, installedSet))
+			);
+
+			for (const result of results) {
+				if (result.status === 'fulfilled') {
+					if (result.value.status === 'skipped') {
+						skipped += 1;
+						toast.info(`Skipped ${result.value.name}`);
+					} else {
+						successes += 1;
+						installedSet.add(result.value.name);
+						toast.success(`Successfully installed ${result.value.name}`);
+					}
 				} else {
-					successes = successes + 1;
-					toast.success(`Successfully installed ${result.value.name}`);
+					fails += 1;
+					const message =
+						result.reason instanceof ConnectError ? result.reason.message : String(result.reason);
+					toast.error(`Failed to install: ${message}`);
 				}
-			} else {
-				fails = fails + 1;
-				const message =
-					result.reason instanceof ConnectError ? result.reason.message : String(result.reason);
-				toast.error(`Failed to install: ${message}`);
 			}
-		});
+		}
 
 		if (fails === 0) {
 			toast.success(`${successes} installed, ${skipped} skipped`);
@@ -195,8 +297,7 @@
 </script>
 
 <Dialog.Root bind:open>
-	{@const installableModules = rows.filter((row) => row.original.installable).length}
-	<Dialog.Trigger disabled={installableModules === 0}>
+	<Dialog.Trigger disabled={rows.length === 0}>
 		{#snippet child({ props })}
 			<Button variant="outline" {...props}>
 				<DownloadIcon size={16} />
@@ -209,7 +310,7 @@
 				<Item.Content class="text-left">
 					<Item.Title class="text-xl font-bold">Bulk Install</Item.Title>
 					<Item.Description>
-						Install {installableModules} module(s) with default values into cluster {cluster}
+						Install module(s) with default values into cluster {cluster}
 					</Item.Description>
 				</Item.Content>
 			</Item.Root>
@@ -226,11 +327,6 @@
 							v{chart.version}
 						</Item.Description>
 					</Item.Content>
-					{#if row.original['installable']}
-						<Item.Actions>
-							<Badge variant="outline">Installable</Badge>
-						</Item.Actions>
-					{/if}
 				</Item.Root>
 			{/each}
 		</div>

@@ -25,7 +25,6 @@
 	import { toast } from 'svelte-sonner';
 	import { parse, stringify } from 'yaml';
 
-	import { shortcut } from '$lib/actions/shortcut.svelte';
 	import * as defaults from '$lib/components/dynamic-form/defaults';
 	import ObjectPropertyField from '$lib/components/dynamic-form/fields/object-property.svelte';
 	import ArrayTemplate from '$lib/components/dynamic-form/templates/array.svelte';
@@ -199,22 +198,6 @@
 	setFormContext(form);
 </script>
 
-<svelte:window
-	use:shortcut={{
-		key: 'f',
-		ctrl: true,
-		callback: async () => {
-			await changeMode('form');
-		}
-	}}
-	use:shortcut={{
-		key: 'y',
-		ctrl: true,
-		callback: async () => {
-			await changeMode('yaml');
-		}
-	}}
-/>
 <div class={cn('h-full', className)}>
 	<Tabs.Root bind:value={mode} class="h-full">
 		<!-- Mode Switcher -->

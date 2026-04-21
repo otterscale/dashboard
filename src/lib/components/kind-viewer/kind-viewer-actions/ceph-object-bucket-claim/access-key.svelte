@@ -1,21 +1,23 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import UserIcon from '@lucide/svelte/icons/user';
+	import { KeyIcon } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { CoreV1Secret } from '@otterscale/types';
 	import lodash from 'lodash';
 	import { getContext } from 'svelte';
 
-	import * as AlertDialog from '$lib/components/ui/alert-dialog';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 
 	let {
 		cluster,
+		namespace,
 		object,
 		onOpenChangeComplete
 	}: {
 		cluster: string;
+		namespace: string;
 		object: any;
 		onOpenChangeComplete?: () => void;
 	} = $props();
@@ -26,7 +28,6 @@
 	let open = $state(false);
 
 	const name = $derived(object?.metadata?.name ?? '');
-	const namespace = $derived(object?.metadata?.namespace ?? '');
 
 	async function fetchSecret(): Promise<CoreV1Secret | null> {
 		try {
@@ -45,7 +46,7 @@
 	}
 </script>
 
-<AlertDialog.Root
+<Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
 		if (!isOpen) {
@@ -53,24 +54,25 @@
 		}
 	}}
 >
-	<AlertDialog.Trigger>
+	<Dialog.Trigger>
 		{#snippet child({ props })}
 			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
 				<Item.Media>
-					<UserIcon />
+					<KeyIcon />
 				</Item.Media>
 				<Item.Content>
-					<Item.Title>Get Secret</Item.Title>
+					<Item.Title>Access Key</Item.Title>
 				</Item.Content>
 			</Item.Root>
 		{/snippet}
-	</AlertDialog.Trigger>
-	<AlertDialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
+	</Dialog.Trigger>
+	<Dialog.Content class="max-h-[95vh] min-w-[38vw] overflow-auto">
 		<Item.Root class="p-0">
 			<Item.Content class="text-left">
-				<Item.Title class="text-xl font-bold">Get User</Item.Title>
+				<Item.Title class="text-xl font-bold">Access Key</Item.Title>
 				<Item.Description>
-					User for {name}
+					The Access Key is used to authenticate and access the object storage bucket. Keep it
+					secure and do not share it with unauthorized users.
 				</Item.Description>
 			</Item.Content>
 		</Item.Root>
@@ -109,5 +111,5 @@
 				</div>
 			</div>
 		{/await}
-	</AlertDialog.Content>
-</AlertDialog.Root>
+	</Dialog.Content>
+</Dialog.Root>

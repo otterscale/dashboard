@@ -53,14 +53,7 @@
 					e.preventDefault();
 				}}
 			>
-				<GpuAllocation
-					{cluster}
-					{namespace}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
+				<GpuAllocation {cluster} {namespace} {object} />
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {
@@ -74,17 +67,7 @@
 					e.preventDefault();
 				}}
 			>
-				<Describe
-					{cluster}
-					{namespace}
-					{group}
-					{version}
-					{resource}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
+				<Describe {cluster} {namespace} {group} {version} {resource} {object} />
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {

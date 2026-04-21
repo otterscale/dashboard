@@ -8,13 +8,12 @@
 	import { type Schema, SubmitButton, type UiSchemaRoot } from '@sjsf/form';
 	import type { Row } from '@tanstack/table-core';
 	import Ajv from 'ajv';
-	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext, onMount } from 'svelte';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
-	import { stringify } from 'yaml';
+	import { parse, stringify } from 'yaml';
 
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import EditorWidget from '$lib/components/dynamic-form/widgets/editor.svelte';
@@ -87,7 +86,7 @@
 			values: {}
 		}
 	});
-	let value = $derived(stringify(values));
+	let value = $derived(stringify(values, { schema: 'yaml-1.1' }));
 
 	const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
 
@@ -208,7 +207,7 @@
 		await Promise.all([fetchSchema(), fetchCharts()]);
 	});
 
-	const chartName = $derived(selectedChart.repository_name);
+	const chartName = $derived(lodash.get(selectedChart.extra_attrs, 'name') as string);
 	const defaultVersion = $derived(lodash.get(selectedChart.extra_attrs, 'version') as string);
 </script>
 
@@ -233,7 +232,10 @@
 			</Item.Root>
 		{/snippet}
 	</Dialog.Trigger>
-	<Dialog.Content class="max-h-[95vh] min-w-[33vw] overflow-auto">
+	<Dialog.Content
+		class="max-h-[95vh] min-w-[33vw] overflow-auto"
+		onInteractOutside={(e) => e.preventDefault()}
+	>
 		<Item.Root class="p-0">
 			<Item.Content class="text-left">
 				<Item.Title class="text-xl font-bold">
@@ -393,10 +395,10 @@
 						handleSubmit={{
 							posthook: () => {
 								handleNext();
+								const raw = lodash.get(values, 'spec.values');
+								if (typeof raw !== 'string') return;
 								try {
-									const structuredValues = load(lodash.get(values, 'spec.values') as string);
-
-									lodash.set(values, 'spec.values', structuredValues);
+									lodash.set(values, 'spec.values', parse(raw) ?? {});
 								} catch (error) {
 									console.error('Failed to load values:', error);
 									toast.error('Failed to load values');
@@ -455,7 +457,17 @@
 							if (isSubmitting) return;
 							isSubmitting = true;
 
-							const isValid = validate(load(value));
+							let parsed: unknown;
+							try {
+								parsed = parse(value);
+							} catch (error) {
+								console.error('Failed to parse YAML:', error);
+								toast.error('Invalid YAML. Please check the syntax.');
+								isSubmitting = false;
+								return;
+							}
+
+							const isValid = validate(parsed);
 
 							if (!isValid) {
 								console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
@@ -464,7 +476,7 @@
 								return;
 							}
 
-							const name = lodash.get(load(value), 'metadata.name');
+							const name = lodash.get(parsed, 'metadata.name');
 
 							toast.promise(
 								async () => {

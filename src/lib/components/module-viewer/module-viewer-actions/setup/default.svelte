@@ -8,13 +8,12 @@
 	import { type Schema, SubmitButton, type UiSchemaRoot } from '@sjsf/form';
 	import type { Row } from '@tanstack/table-core';
 	import Ajv from 'ajv';
-	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext, onMount } from 'svelte';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
-	import { stringify } from 'yaml';
+	import { parse, stringify } from 'yaml';
 
 	import {
 		encodeHarborURIComponent,
@@ -27,6 +26,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
+	import Progress from '$lib/components/ui/progress/progress.svelte';
 	import Spinner from '$lib/components/ui/spinner/spinner.svelte';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
@@ -98,7 +98,7 @@
 			values: {}
 		}
 	});
-	let value = $derived(stringify(values));
+	let value = $derived(stringify(values, { schema: 'yaml-1.1' })); // k8s use yaml 1.1
 
 	async function fetchModuleVersions(project: string, chartName: string): Promise<ModuleType[]> {
 		let moduleVersions: ModuleType[] = [];
@@ -250,8 +250,12 @@
 			</Item.Root>
 		{/snippet}
 	</Dialog.Trigger>
-	<Dialog.Content class="max-h-[95vh] min-w-[33vw] overflow-auto">
+	<Dialog.Content
+		class="max-h-[95vh] min-w-[33vw] overflow-auto"
+		onInteractOutside={(e) => e.preventDefault()}
+	>
 		<Item.Root class="p-0">
+			<Progress value={currentIndex + 1} max={steps.length} class="mt-1 mr-6" />
 			<Item.Content class="text-left">
 				<Item.Title class="text-xl font-bold">
 					{lodash.get(lodash.get(jsonSchema, 'x-kubernetes-group-version-kind', [])[0], 'kind')}
@@ -422,10 +426,10 @@
 						handleSubmit={{
 							posthook: () => {
 								handleNext();
+								const raw = lodash.get(values, 'spec.values');
+								if (typeof raw !== 'string') return;
 								try {
-									const structuredValues = load(lodash.get(values, 'spec.values') as string);
-
-									lodash.set(values, 'spec.values', structuredValues);
+									lodash.set(values, 'spec.values', parse(raw) ?? {});
 								} catch (error) {
 									console.error('Failed to load values:', error);
 									toast.error('Failed to load values');
@@ -484,7 +488,17 @@
 							if (isSubmitting) return;
 							isSubmitting = true;
 
-							const isValid = validate(load(value));
+							let parsed: unknown;
+							try {
+								parsed = parse(value);
+							} catch (error) {
+								console.error('Failed to parse YAML:', error);
+								toast.error('Invalid YAML. Please check the syntax.');
+								isSubmitting = false;
+								return;
+							}
+
+							const isValid = validate(parsed);
 
 							if (!isValid) {
 								console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
@@ -493,7 +507,7 @@
 								return;
 							}
 
-							const name = lodash.get(load(value), 'metadata.name');
+							const name = lodash.get(parsed, 'metadata.name');
 
 							toast.promise(
 								async () => {
