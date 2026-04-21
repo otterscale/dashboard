@@ -209,7 +209,9 @@
 			lang="bash"
 			class="w-full text-sm"
 			variant="secondary"
-			code={installCommand}
+			code={installUrl
+				? `# Command\nkubectl apply -f ${installUrl}`
+				: 'Generating install command...'}
 			hideLines
 		>
 			<Code.CopyButton />
