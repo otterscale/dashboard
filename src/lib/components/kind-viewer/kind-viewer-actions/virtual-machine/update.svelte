@@ -9,7 +9,6 @@
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
-	import * as gpuNodeUtils from '$lib/utils/gpu-node-utils';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
@@ -21,6 +20,7 @@
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
+	import * as gpuNodeUtils from '$lib/utils/gpu-node-utils';
 
 	let {
 		schema: jsonSchema,
