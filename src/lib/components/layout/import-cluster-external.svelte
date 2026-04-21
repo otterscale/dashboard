@@ -17,7 +17,6 @@
 	import { stringify } from 'yaml';
 
 	import * as Code from '$lib/components/custom/code';
-	import { CopyButton } from '$lib/components/custom/copy-button';
 	import * as Avatar from '$lib/components/ui/avatar';
 	import { Button } from '$lib/components/ui/button';
 	import * as Collapsible from '$lib/components/ui/collapsible';
