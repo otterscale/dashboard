@@ -3,6 +3,7 @@
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import FileCodeIcon from '@lucide/svelte/icons/file-code';
+	import ServerIcon from '@lucide/svelte/icons/server';
 	import TerminalIcon from '@lucide/svelte/icons/terminal';
 	import { type Link, LinkService } from '@otterscale/api/link/v1';
 	import { ResourceService } from '@otterscale/api/resource/v1';
@@ -17,6 +18,7 @@
 	import * as Field from '$lib/components/ui/field';
 	import { Input } from '$lib/components/ui/input';
 	import * as InputGroup from '$lib/components/ui/input-group';
+	import * as Item from '$lib/components/ui/item';
 	import { Spinner } from '$lib/components/ui/spinner';
 
 	let {
@@ -204,72 +206,88 @@
 	<div class="flex flex-col gap-6">
 		<div class="flex flex-col gap-1">
 			<h3 class="text-xl font-bold">Deploy Agent</h3>
-			<p class="text-sm text-muted-foreground">Run this command on your target cluster.</p>
+			<p class="text-sm text-muted-foreground">
+				Run the generated command on your target cluster to enroll it.
+			</p>
 		</div>
 
-		<Code.Root
-			lang="bash"
-			class="w-full pr-12 text-sm [&_pre.shiki]:[scrollbar-width:none] [&_pre.shiki::-webkit-scrollbar]:hidden"
-			variant="secondary"
-			code={installCommand}
-			hideLines
-		>
-			<Code.CopyButton />
-		</Code.Root>
+		<div class="flex flex-col gap-3 rounded-lg border bg-card p-4">
+			<Field.FieldLabel
+				class="text-xs font-medium tracking-wide uppercase text-muted-foreground"
+			>
+				Install Command
+			</Field.FieldLabel>
 
-		{#if manifestYaml}
-			<Collapsible.Root>
-				<Collapsible.Trigger
-					class="group flex w-full items-center justify-between rounded-md border bg-card px-3 py-2 text-xs text-muted-foreground transition-colors hover:bg-accent"
-				>
-					<span class="flex items-center gap-2">
-						<FileCodeIcon class="size-4" />
-						Preview YAML Manifest
-					</span>
-					<ChevronDownIcon
-						class="size-4 transition-transform duration-200 group-data-[state=open]:rotate-180"
-					/>
-				</Collapsible.Trigger>
-				<Collapsible.Content>
-					<div class="mt-2 max-h-125 overflow-auto rounded-md border">
-						<Code.Root lang="yaml" class="w-full text-xs" code={manifestYaml}>
-							<Code.CopyButton />
-						</Code.Root>
-					</div>
-				</Collapsible.Content>
-			</Collapsible.Root>
-		{/if}
+			<Code.Root
+				lang="bash"
+				class="w-full pr-12 text-sm [&_pre.shiki]:[scrollbar-width:none] [&_pre.shiki::-webkit-scrollbar]:hidden"
+				variant="secondary"
+				code={installCommand}
+				hideLines
+			>
+				<Code.CopyButton />
+			</Code.Root>
 
-		<div
-			class="flex items-center justify-between rounded-md border bg-card px-3 py-2 text-xs text-muted-foreground"
-		>
-			<span>
-				Target Cluster: <code class="rounded bg-muted px-1 py-0.5 font-mono text-foreground"
-					>{clusterName}</code
-				>
-			</span>
-			{#if clusterStatus === 'pending'}
-				<span class="flex items-center gap-2">
-					<span class="relative flex size-2">
-						<span
-							class="absolute inline-flex size-full animate-ping rounded-full bg-primary/75 opacity-75"
-						></span>
-						<span class="relative inline-flex size-2 rounded-full bg-primary"></span>
-					</span>
-					Waiting for connection
-				</span>
-			{:else if clusterStatus === 'installing'}
-				<span class="flex items-center gap-2 text-amber-500">
-					<Spinner />
-					<span class="font-medium">Installing...</span>
-				</span>
-			{:else}
-				<span class="flex items-center gap-2 text-primary">
-					<CircleCheckIcon class="size-4" />
-					<span class="font-medium">Managed successfully</span>
-				</span>
+			<Field.FieldDescription>
+				Copy and execute this command with kubectl on the cluster you want to import.
+			</Field.FieldDescription>
+
+			{#if manifestYaml}
+				<Collapsible.Root>
+					<Collapsible.Trigger
+						class="group flex w-full items-center justify-between border-t pt-3 text-sm font-medium transition-colors hover:text-foreground"
+					>
+						<span class="flex items-center gap-2">
+							<FileCodeIcon class="size-4" />
+							Preview YAML Manifest
+						</span>
+						<ChevronDownIcon
+							class="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180"
+						/>
+					</Collapsible.Trigger>
+					<Collapsible.Content>
+						<div class="mt-2 max-h-125 overflow-auto rounded-md border">
+							<Code.Root lang="yaml" class="w-full text-xs" code={manifestYaml}>
+								<Code.CopyButton />
+							</Code.Root>
+						</div>
+					</Collapsible.Content>
+				</Collapsible.Root>
 			{/if}
 		</div>
+
+		<Item.Root variant="outline">
+			<Item.Media variant="icon" class="size-10 rounded-full bg-muted text-muted-foreground">
+				<ServerIcon class="size-5" />
+			</Item.Media>
+			<Item.Content>
+				<Item.Title>{clusterName}</Item.Title>
+				<Item.Description>Target Cluster</Item.Description>
+			</Item.Content>
+			<Item.Actions>
+				{#if clusterStatus === 'pending'}
+					<span class="flex items-center gap-2 text-sm text-muted-foreground">
+						<span class="relative flex size-2">
+							<span
+								class="absolute inline-flex size-full animate-ping rounded-full bg-primary/75 opacity-75"
+							></span>
+							<span class="relative inline-flex size-2 rounded-full bg-primary"></span>
+						</span>
+						Waiting for connection
+					</span>
+				{:else if clusterStatus === 'installing'}
+					<span class="flex items-center gap-2 text-sm text-amber-500">
+						<Spinner />
+						<span class="font-medium">Installing...</span>
+					</span>
+				{:else}
+					<span class="flex items-center gap-2 text-sm text-primary">
+						<CircleCheckIcon class="size-4" />
+						<span class="font-medium">Managed successfully</span>
+					</span>
+				{/if}
+			</Item.Actions>
+		</Item.Root>
 	</div>
 {/snippet}
 

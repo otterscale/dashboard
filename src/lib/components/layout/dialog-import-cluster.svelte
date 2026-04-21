@@ -54,7 +54,7 @@
 
 		<Progress value={stepIndex + 1} max={TOTAL_STEPS} />
 
-		<div class="mt-4 flex min-h-[38vh] flex-1 flex-col">
+		<div class="mt-4 flex flex-1 flex-col">
 			{#if flowStep === 'provider'}
 				<div class="flex h-full flex-1 flex-col gap-6">
 					<div class="flex flex-col gap-1">
