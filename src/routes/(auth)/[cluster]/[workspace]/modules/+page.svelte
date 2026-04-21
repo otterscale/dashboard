@@ -111,7 +111,7 @@
 		let entireModules: ModuleType[] = [];
 
 		let currentPage = 1;
-		const pageSize = 10;
+		const pageSize = 50;
 
 		try {
 			if (fromHarbor) {
@@ -154,8 +154,6 @@
 							};
 						})
 					];
-
-					console.log(entireModules);
 
 					currentPage = currentPage + 1;
 				}

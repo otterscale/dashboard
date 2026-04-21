@@ -55,7 +55,7 @@
 		const repositoryUrl = helmRepository.spec?.url ?? '';
 
 		let currentPage = 1;
-		const pageSize = 10;
+		const pageSize = 50;
 
 		try {
 			let chartsByHelmRepository: Record<ChartAttribute, JsonValue>[] = [];
