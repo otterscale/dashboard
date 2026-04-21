@@ -9,10 +9,7 @@ import { redis } from './redis';
 const SESSION_EXPIRY_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 const SESSION_REFRESH_THRESHOLD_MS = 1000 * 60 * 60 * 24 * 15; // 15 days
 
-export async function acquireRefreshLock(
-	sessionId: string,
-	ttlMs: number
-): Promise<string | null> {
+export async function acquireRefreshLock(sessionId: string, ttlMs: number): Promise<string | null> {
 	const token = encodeHexLowerCase(crypto.getRandomValues(new Uint8Array(16)));
 	const result = await redis.set(`refresh_lock:${sessionId}`, token, 'PX', ttlMs, 'NX');
 	return result === 'OK' ? token : null;
