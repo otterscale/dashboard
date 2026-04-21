@@ -27,7 +27,6 @@ import NodeActions from './node/actions.svelte';
 import NodeCreate from './node/create.svelte';
 import PodActions from './pod/actions.svelte';
 import ResourceQuotaActions from './resource-quota/actions.svelte';
-import ResourceQuotaCreate from './resource-quota/create.svelte';
 import StatefulSetActions from './statefulset/actions.svelte';
 import VirtualMachineActions from './virtual-machine/actions.svelte';
 import VirtualMachineCreate from './virtual-machine/create.svelte';
@@ -72,8 +71,6 @@ function getCreate(kind: string): CreateType {
 			return ModelServiceCreate as CreateType;
 		case 'ModelArtifact':
 			return ModelArtifactCreate as CreateType;
-		case 'ResourceQuota':
-			return ResourceQuotaCreate as CreateType;
 		case 'Workspace':
 			return WorkspaceCreate as CreateType;
 		case 'VirtualMachine':
