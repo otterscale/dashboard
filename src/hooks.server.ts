@@ -1,5 +1,6 @@
 import { type Handle, type HandleServerError, redirect } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
+import { OAuth2RequestError } from 'arctic';
 
 import { env } from '$env/dynamic/private';
 import { paraglideMiddleware } from '$lib/paraglide/server';
@@ -61,55 +62,86 @@ const handleAuth: Handle = async ({ event, resolve }) => {
 	return resolve(event);
 };
 
+const BUFFER_MS = 60 * 1000;
+const REFRESH_LOCK_TTL_MS = 30 * 1000;
+const REFRESH_WAIT_POLL_MS = 200;
+const REFRESH_WAIT_MAX_MS = 10 * 1000;
+
+const isNearExpiry = (expiresAt: Date): boolean =>
+	Date.now() >= (expiresAt.getTime() ?? 0) - BUFFER_MS;
+
 const handleRefreshToken: Handle = async ({ event, resolve }) => {
 	const session = event.locals.session;
 
-	if (session) {
-		const BUFFER_MS = 60 * 1000;
-		const isNearExpiry =
-			Date.now() >= (session.tokenSet.accessTokenExpiresAt.getTime() ?? 0) - BUFFER_MS;
+	if (!session || !isNearExpiry(session.tokenSet.accessTokenExpiresAt)) {
+		return resolve(event);
+	}
 
-		if (isNearExpiry) {
-			const REFRESH_LOCK_TTL_MS = 10 * 1000;
-			const hasLock = await acquireRefreshLock(session.id, REFRESH_LOCK_TTL_MS);
+	const token = getSessionTokenCookie(event.cookies);
+	if (!token) {
+		return resolve(event);
+	}
 
-			// stale-while-revalidate
-			if (hasLock) {
-				try {
-					const tokens = await keycloak.refreshAccessToken(session.tokenSet.refreshToken);
-					const tokenSet = {
-						idToken: tokens.idToken(),
-						accessToken: tokens.accessToken(),
-						refreshToken: tokens.refreshToken(),
-						accessTokenExpiresAt: tokens.accessTokenExpiresAt()
-					};
+	const hasLock = await acquireRefreshLock(session.id, REFRESH_LOCK_TTL_MS);
 
-					await updateSessionTokenSet(session.id, tokenSet);
-
-					session.tokenSet = tokenSet;
-					event.locals.session = session;
-				} catch (err) {
-					console.error('Token refresh failed:', err);
-
-					deleteSessionTokenCookie(event.cookies);
-					event.locals.session = null;
-				} finally {
-					await releaseRefreshLock(session.id);
-				}
-			} else {
-				// Another request is refreshing — reload session from Redis to pick up updated tokens
-				const token = getSessionTokenCookie(event.cookies);
-				if (token) {
-					const { session: refreshedSession } = await validateSessionToken(token);
-					if (refreshedSession) {
-						event.locals.session = refreshedSession;
-					} else {
-						deleteSessionTokenCookie(event.cookies);
-						event.locals.session = null;
-					}
-				}
+	if (!hasLock) {
+		// Another request is refreshing — wait briefly for it to finish, then reload from Redis.
+		const deadline = Date.now() + REFRESH_WAIT_MAX_MS;
+		while (Date.now() < deadline) {
+			await new Promise((r) => setTimeout(r, REFRESH_WAIT_POLL_MS));
+			const { session: latest } = await validateSessionToken(token);
+			if (!latest) break;
+			if (!isNearExpiry(latest.tokenSet.accessTokenExpiresAt)) {
+				event.locals.session = latest;
+				return resolve(event);
 			}
 		}
+		// Fall through: couldn't confirm a refresh; proceed with existing (possibly stale) session.
+		return resolve(event);
+	}
+
+	try {
+		// Re-read after acquiring the lock: another request may have just refreshed,
+		// which would have invalidated our in-memory refresh token (single-use).
+		const { session: latest } = await validateSessionToken(token);
+		if (!latest) {
+			deleteSessionTokenCookie(event.cookies);
+			event.locals.session = null;
+			return resolve(event);
+		}
+
+		if (!isNearExpiry(latest.tokenSet.accessTokenExpiresAt)) {
+			event.locals.session = latest;
+			return resolve(event);
+		}
+
+		try {
+			const tokens = await keycloak.refreshAccessToken(latest.tokenSet.refreshToken);
+			const tokenSet = {
+				idToken: tokens.idToken(),
+				accessToken: tokens.accessToken(),
+				refreshToken: tokens.refreshToken(),
+				accessTokenExpiresAt: tokens.accessTokenExpiresAt()
+			};
+
+			await updateSessionTokenSet(latest.id, tokenSet);
+
+			latest.tokenSet = tokenSet;
+			event.locals.session = latest;
+		} catch (err) {
+			// Only log the user out when Keycloak explicitly says the refresh token is bad.
+			// Transient errors (network, 5xx) should keep the session so the next request can retry.
+			if (err instanceof OAuth2RequestError && err.code === 'invalid_grant') {
+				console.error('Refresh token rejected by Keycloak:', err);
+				deleteSessionTokenCookie(event.cookies);
+				event.locals.session = null;
+			} else {
+				console.error('Token refresh failed (transient):', err);
+				event.locals.session = latest;
+			}
+		}
+	} finally {
+		await releaseRefreshLock(session.id);
 	}
 
 	return resolve(event);
