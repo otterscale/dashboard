@@ -10,11 +10,13 @@
 	import { toast } from 'svelte-sonner';
 
 	import * as Code from '$lib/components/custom/code';
+	import { CopyButton } from '$lib/components/custom/copy-button';
 	import { Button } from '$lib/components/ui/button';
 	import * as Collapsible from '$lib/components/ui/collapsible';
 	import * as Empty from '$lib/components/ui/empty';
 	import * as Field from '$lib/components/ui/field';
 	import { Input } from '$lib/components/ui/input';
+	import * as InputGroup from '$lib/components/ui/input-group';
 	import { Spinner } from '$lib/components/ui/spinner';
 
 	let {
@@ -207,11 +209,9 @@
 
 		<Code.Root
 			lang="bash"
-			class="w-full text-sm"
+			class="w-full pr-12 text-sm [&_pre.shiki]:[scrollbar-width:none] [&_pre.shiki::-webkit-scrollbar]:hidden"
 			variant="secondary"
-			code={installUrl
-				? `# Command\nkubectl apply -f ${installUrl}`
-				: 'Generating install command...'}
+			code={installCommand}
 			hideLines
 		>
 			<Code.CopyButton />
