@@ -110,41 +110,55 @@
 
 		let entireModules: ModuleType[] = [];
 
+		let currentPage = 1;
+		const pageSize = 10;
+
 		try {
 			if (fromHarbor) {
 				const harborHost = parseHarborHost(helmRepository);
 				const harborProjectName = parseHarborProjectName(helmRepository);
-				const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')}&latest_in_repository=true`;
+				while (true) {
+					const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')}&latest_in_repository=true&page=${currentPage}&page_size=${pageSize}`;
+					const response = await fetch('/bff/helm/repository/harbor', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							harborHost,
+							apiPath: artifactsUrl
+						})
+					});
 
-				const response = await fetch('/bff/helm/repository/harbor', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						harborHost,
-						apiPath: artifactsUrl
-					})
-				});
+					if (!response.ok) {
+						break;
+					}
 
-				if (!response.ok) {
-					return;
+					const harborModules: any = await response.json();
+					if (harborModules.length === 0) {
+						break;
+					}
+
+					entireModules = [
+						...entireModules,
+						...harborModules.map((module: any) => {
+							return {
+								apiVersion: module.extra_attrs.apiVersion,
+								appVersion: module.extra_attrs.appVersion,
+								annotations: module.extra_attrs.annotations,
+								name: module.extra_attrs.name,
+								description: module.extra_attrs.description,
+								version: module.extra_attrs.version,
+								digest: module.digest,
+								icon: module.icon,
+								keywords: module.labels ?? [],
+								type: module.type
+							};
+						})
+					];
+
+					console.log(entireModules);
+
+					currentPage = currentPage + 1;
 				}
-
-				const entireHarborModules: any = await response.json();
-
-				entireModules = entireHarborModules.map((module: any) => {
-					return {
-						apiVersion: module.extra_attrs.apiVersion,
-						appVersion: module.extra_attrs.appVersion,
-						annotations: module.extra_attrs.annotations,
-						name: module.extra_attrs.name,
-						description: module.extra_attrs.description,
-						version: module.extra_attrs.version,
-						digest: module.digest,
-						icon: module.icon,
-						keywords: module.labels ?? [],
-						type: module.type
-					};
-				});
 			} else {
 				const response = await fetch('/bff/helm/repository/index', {
 					method: 'POST',

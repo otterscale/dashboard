@@ -54,27 +54,43 @@
 		const helmRepositoryName = helmRepository.metadata?.name ?? '';
 		const repositoryUrl = helmRepository.spec?.url ?? '';
 
+		let currentPage = 1;
+		const pageSize = 10;
+
 		try {
 			let chartsByHelmRepository: Record<ChartAttribute, JsonValue>[] = [];
 
 			if (fromHarbor) {
 				const harborHost = parseHarborHost(helmRepository);
 				const harborProjectName = parseHarborProjectName(helmRepository);
-				const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')}&latest_in_repository=true`;
-				const response = await fetch('/bff/helm/repository/harbor', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						harborHost,
-						apiPath: artifactsUrl
-					})
-				});
+				while (true) {
+					const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')}&page=${currentPage}&page_size=${pageSize}&latest_in_repository=true`;
+					const response = await fetch('/bff/helm/repository/harbor', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							harborHost,
+							apiPath: artifactsUrl
+						})
+					});
 
-				if (response.ok) {
+					if (!response.ok) {
+						break;
+					}
+
 					const artifactCharts: ArtifactChartType[] = await response.json();
-					chartsByHelmRepository = artifactCharts.map((artifactChart) =>
-						getChartDataFromHarbor(artifactChart, helmRepository)
-					);
+					if (artifactCharts.length === 0) {
+						break;
+					}
+
+					chartsByHelmRepository = [
+						...chartsByHelmRepository,
+						...artifactCharts.map((artifactChart) =>
+							getChartDataFromHarbor(artifactChart, helmRepository)
+						)
+					];
+
+					currentPage = currentPage + 1;
 				}
 			} else {
 				const response = await fetch('/bff/helm/repository/index', {
