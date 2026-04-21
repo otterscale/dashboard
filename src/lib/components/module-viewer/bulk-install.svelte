@@ -297,7 +297,7 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Trigger>
+	<Dialog.Trigger disabled={rows.length === 0}>
 		{#snippet child({ props })}
 			<Button variant="outline" {...props}>
 				<DownloadIcon size={16} />

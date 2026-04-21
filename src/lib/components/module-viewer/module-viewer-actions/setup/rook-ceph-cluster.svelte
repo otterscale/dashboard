@@ -37,6 +37,7 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import Label from '$lib/components/ui/label/label.svelte';
+	import Progress from '$lib/components/ui/progress/progress.svelte';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
@@ -356,8 +357,12 @@
 			</Item.Root>
 		{/snippet}
 	</Dialog.Trigger>
-	<Dialog.Content class="max-h-[95vh] min-w-[33vw] overflow-auto">
+	<Dialog.Content
+		class="max-h-[95vh] min-w-[33vw] overflow-auto"
+		onInteractOutside={(e) => e.preventDefault()}
+	>
 		<Item.Root class="p-0">
+			<Progress value={currentIndex + 1} max={steps.length} class="mt-1 mr-6" />
 			<Item.Content class="text-left">
 				<Item.Title class="text-xl font-bold">
 					{lodash.get(lodash.get(jsonSchema, 'x-kubernetes-group-version-kind', [])[0], 'kind')}

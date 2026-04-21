@@ -325,6 +325,6 @@
 	"model_status": "Model Status",
 	"compute_status": "Compute Status",
 	"storage_status": "Storage Status",
-	"block_device": "Block Device",
+	"block_pool": "Block Pool",
 	"object_storage": "Object Storage"
 }
