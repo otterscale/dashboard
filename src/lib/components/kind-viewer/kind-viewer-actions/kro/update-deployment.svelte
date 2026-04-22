@@ -268,9 +268,8 @@
 											serviceNodePort: {
 												type: 'integer',
 												title: 'Service Node Port',
-												description: 'Node port (30000-32767, leave empty for auto-assign)',
-												minimum: 30000,
-												maximum: 32767
+												description: 'Node port 0 for auto-assign)',
+												default: 0
 											}
 										}
 									},
