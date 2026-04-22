@@ -218,12 +218,14 @@
 		isSubmitting = true;
 
 		// Check for validation errors before submission
-		if (monacoInstance && editorInstance) {
-			const model = editorInstance.getModel();
+		const monaco = monacoInstance;
+		const editor = editorInstance;
+		if (monaco && editor) {
+			const model = editor.getModel();
 			if (model) {
-				const markers = monacoInstance.editor.getModelMarkers({ resource: model.uri });
+				const markers = monaco.editor.getModelMarkers({ resource: model.uri });
 				const hasErrors = markers.some(
-					(marker) => marker.severity === monacoInstance!.MarkerSeverity.Error
+					(marker) => marker.severity === monaco.MarkerSeverity.Error
 				);
 				if (hasErrors) {
 					toast.error('Please fix all YAML errors before submitting', {
@@ -242,6 +244,9 @@
 		try {
 			initialStructuredValue = load(stringify(object), { schema: JSON_SCHEMA });
 			currentStructuredValue = load(value, { schema: JSON_SCHEMA });
+			if (!currentStructuredValue || typeof currentStructuredValue !== 'object') {
+				throw new Error('Parsed YAML is not a valid object');
+			}
 		} catch (error) {
 			toast.error(`Invalid YAML: ${(error as Error).message}`, {
 				duration: 5000,
