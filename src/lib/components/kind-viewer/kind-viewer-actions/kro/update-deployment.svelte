@@ -16,6 +16,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
+	import { Switch } from '$lib/components/ui/switch/index.ts';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
 	let {
@@ -104,6 +105,11 @@
 
 	let open = $state(false);
 	let isSubmitting = $state(false);
+	let storageEnabled = $state(
+		object.spec?.accessMode != null ||
+			object.spec?.storageSize != null ||
+			object.spec?.mountPath != null
+	);
 </script>
 
 <Dialog.Root
@@ -319,67 +325,89 @@
 
 			<!-- Step 3: Storage -->
 			<Tabs.Content value={steps[2]}>
-				<Form
-					schema={{
-						title: 'Storage',
-						type: 'object',
-						properties: {
-							accessMode: {
-								type: 'string',
-								title: 'Access Mode',
-								description: 'Access mode for the persistent volume',
-								enum: ['ReadWriteOnce', 'ReadOnlyMany', 'ReadWriteMany']
-							},
-							storageSize: {
-								type: 'string',
-								title: 'Storage Size',
-								description: 'Size of the persistent volume (e.g. 1Gi)',
-								default: '1Gi'
-							},
-							mountPath: {
-								type: 'string',
-								title: 'Mount Path',
-								description: 'Path to mount the volume inside the container'
-							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						},
-						accessMode: {
-							'ui:components': {
-								stringField: 'enumField'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{
-						accessMode: object.spec?.accessMode ?? null,
-						storageSize: object.spec?.storageSize ?? '1Gi',
-						mountPath: object.spec?.mountPath ?? null
-					} as FormValue}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-					bind:values={storageValues}
-				>
-					{#snippet actions()}
+				<div class="flex flex-col gap-4">
+					<div class="flex items-center gap-3 py-2">
+						<Switch bind:checked={storageEnabled} id="storage-enabled" />
+						<label for="storage-enabled" class="cursor-pointer text-sm font-medium">
+							Enable Storage
+						</label>
+					</div>
+					{#if storageEnabled}
+						<Form
+							schema={{
+								title: 'Storage',
+								type: 'object',
+								properties: {
+									accessMode: {
+										type: 'string',
+										title: 'Access Mode',
+										description: 'Access mode for the persistent volume',
+										enum: ['ReadWriteOnce', 'ReadOnlyMany', 'ReadWriteMany']
+									},
+									storageSize: {
+										type: 'string',
+										title: 'Storage Size',
+										description: 'Size of the persistent volume (e.g. 1Gi)',
+										default: '1Gi'
+									},
+									mountPath: {
+										type: 'string',
+										title: 'Mount Path',
+										description: 'Path to mount the volume inside the container'
+									}
+								}
+							} as Schema}
+							uiSchema={{
+								'ui:options': {
+									translations: {
+										submit: 'Next'
+									}
+								},
+								accessMode: {
+									'ui:components': {
+										stringField: 'enumField'
+									}
+								}
+							} as UiSchemaRoot}
+							initialValue={{
+								accessMode: object.spec?.accessMode ?? null,
+								storageSize: object.spec?.storageSize ?? '1Gi',
+								mountPath: object.spec?.mountPath ?? null
+							} as FormValue}
+							handleSubmit={{
+								posthook: () => {
+									handleNext();
+								}
+							}}
+							bind:values={storageValues}
+						>
+							{#snippet actions()}
+								<div class="flex w-full items-center justify-between gap-3">
+									<Button
+										onclick={() => {
+											handlePrevious();
+										}}
+									>
+										Previous
+									</Button>
+									<SubmitButton />
+								</div>
+							{/snippet}
+						</Form>
+					{:else}
 						<div class="flex w-full items-center justify-between gap-3">
+							<Button onclick={() => handlePrevious()}>Previous</Button>
 							<Button
 								onclick={() => {
-									handlePrevious();
+									storageValues = {};
+									handleNext();
 								}}
 							>
-								Previous
+								Next
 							</Button>
-							<SubmitButton />
 						</div>
-					{/snippet}
-				</Form>
+					{/if}
+				</div>
 			</Tabs.Content>
 
 			<!-- Step 4: Resources -->

@@ -36,6 +36,7 @@
 		version: string;
 		kind: string;
 		resource: string;
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		schema?: any;
 		onOpenChangeComplete: () => void;
 	} = $props();
@@ -50,14 +51,18 @@
 	const validate = jsonSchemaValidator.compile(jsonSchema);
 
 	// Container for Data — flat structure matching quickJob RGD schema
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	let values: any = $state({
 		apiVersion: group ? `${group}/${version}` : version,
 		kind,
 		metadata: {},
 		spec: {}
 	});
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	let settingsValues: any = $state({});
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	let specValues: any = $state({});
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	let resourceValues: any = $state({});
 
 	$effect(() => {
@@ -118,7 +123,10 @@
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
-						...(lodash.omit(lodash.get(jsonSchema, 'properties.metadata'), 'properties') as any),
+						...(lodash.omit(lodash.get(jsonSchema, 'properties.metadata'), 'properties') as Record<
+							string,
+							unknown
+						>),
 						title: 'Metadata',
 						properties: {
 							name: {
@@ -452,7 +460,17 @@
 
 							isSubmitting = true;
 
-							const isValid = validate(load(value));
+							// eslint-disable-next-line @typescript-eslint/no-explicit-any
+							let parsed: any;
+							try {
+								parsed = load(value);
+							} catch {
+								toast.error('Invalid YAML. Please check the content.');
+								isSubmitting = false;
+								return;
+							}
+
+							const isValid = validate(parsed);
 
 							if (!isValid) {
 								console.error('Validation errors:', validate.errors);
@@ -461,7 +479,7 @@
 								return;
 							}
 
-							const name = lodash.get(load(value), 'metadata.name');
+							const name = lodash.get(parsed, 'metadata.name');
 
 							toast.promise(
 								async () => {

@@ -75,7 +75,8 @@
 		values.spec = { ...settingsValues, ...specValues, ...resourceValues };
 	});
 
-	let value = $derived.by(() => {
+	let value = $state('');
+	$effect(() => {
 		const filtered = lodash.cloneDeep(values);
 		if (filtered.metadata) {
 			for (const field of systemFields) {
@@ -83,10 +84,8 @@
 			}
 		}
 		delete filtered.status;
-		return stringify(filtered);
+		value = stringify(filtered);
 	});
-
-	// Steps: 1=Setting, 2=Container, 3=Resources, 4=YAML Preview
 	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);

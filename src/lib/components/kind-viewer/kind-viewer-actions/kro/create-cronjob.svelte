@@ -118,7 +118,10 @@
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
-						...(lodash.omit(lodash.get(jsonSchema, 'properties.metadata'), 'properties') as any),
+						...(lodash.omit(lodash.get(jsonSchema, 'properties.metadata'), 'properties') as Record<
+							string,
+							unknown
+						>),
 						title: 'Metadata',
 						properties: {
 							name: {
@@ -452,7 +455,16 @@
 
 							isSubmitting = true;
 
-							const isValid = validate(load(value));
+							let parsed: any;
+							try {
+								parsed = load(value);
+							} catch {
+								toast.error('Invalid YAML. Please check the content.');
+								isSubmitting = false;
+								return;
+							}
+
+							const isValid = validate(parsed);
 
 							if (!isValid) {
 								console.error('Validation errors:', validate.errors);
@@ -461,7 +473,7 @@
 								return;
 							}
 
-							const name = lodash.get(load(value), 'metadata.name');
+							const name = lodash.get(parsed, 'metadata.name');
 
 							toast.promise(
 								async () => {

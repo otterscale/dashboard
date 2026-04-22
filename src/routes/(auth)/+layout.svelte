@@ -224,15 +224,15 @@
 				icon: ContainerIcon,
 				items: [
 					{
-						title: m.service(),
+						title: m.application(),
 						url: resourceUrl('kro.run', 'v1alpha1', 'QuickDeployment', 'quickdeployments')
 					},
 					{
-						title: m.job(),
+						title: m.task(),
 						url: resourceUrl('kro.run', 'v1alpha1', 'QuickJob', 'quickjobs')
 					},
 					{
-						title: m.scheduler(),
+						title: m.schedule(),
 						url: resourceUrl('kro.run', 'v1alpha1', 'QuickCronjob', 'quickcronjobs')
 					}
 				]
