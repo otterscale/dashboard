@@ -289,7 +289,7 @@
 											serviceNodePort: {
 												type: 'integer',
 												title: 'Service Node Port',
-												description: 'Node port 0 for auto-assign)',
+												description: 'Node port (0 for auto-assign)',
 												default: 0
 											}
 										}
