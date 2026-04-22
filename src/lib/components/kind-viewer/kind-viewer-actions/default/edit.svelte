@@ -217,8 +217,39 @@
 
 		isSubmitting = true;
 
-		const initialStructuredValue: any = load(stringify(object), { schema: JSON_SCHEMA });
-		const currentStructuredValue: any = load(value, { schema: JSON_SCHEMA });
+		// Check for validation errors before submission
+		if (monacoInstance && editorInstance) {
+			const model = editorInstance.getModel();
+			if (model) {
+				const markers = monacoInstance.editor.getModelMarkers({ resource: model.uri });
+				const hasErrors = markers.some(
+					(marker) => marker.severity === monacoInstance!.MarkerSeverity.Error
+				);
+				if (hasErrors) {
+					toast.error('Please fix all YAML errors before submitting', {
+						duration: 5000,
+						closeButton: true
+					});
+					isSubmitting = false;
+					return;
+				}
+			}
+		}
+
+		let initialStructuredValue: any;
+		let currentStructuredValue: any;
+
+		try {
+			initialStructuredValue = load(stringify(object), { schema: JSON_SCHEMA });
+			currentStructuredValue = load(value, { schema: JSON_SCHEMA });
+		} catch (error) {
+			toast.error(`Invalid YAML: ${(error as Error).message}`, {
+				duration: 5000,
+				closeButton: true
+			});
+			isSubmitting = false;
+			return;
+		}
 
 		const patches = jsonpatch.compare(initialStructuredValue, currentStructuredValue);
 
