@@ -238,7 +238,8 @@
 						properties: {
 							serviceType: {
 								...lodash.get(jsonSchema, 'properties.spec.properties.serviceType'),
-								title: 'Service Type'
+								title: 'Service Type',
+								enum: ['ClusterIP', 'NodePort', 'LoadBalancer']
 							}
 						},
 						dependencies: {
@@ -286,9 +287,7 @@
 					} as UiSchemaRoot}
 					initialValue={{
 						serviceType: object.spec?.serviceType ?? 'ClusterIP',
-						...(object.spec?.serviceNodePort != null
-							? { serviceNodePort: object.spec.serviceNodePort }
-							: {})
+						serviceNodePort: object.status?.nodePort ?? 0
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -329,7 +328,8 @@
 								properties: {
 									accessMode: {
 										...lodash.get(jsonSchema, 'properties.spec.properties.accessMode'),
-										title: 'Access Mode'
+										title: 'Access Mode',
+										enum: ['ReadWriteOnce', 'ReadOnlyMany', 'ReadWriteMany']
 									},
 									storageSize: {
 										...lodash.get(jsonSchema, 'properties.spec.properties.storageSize'),

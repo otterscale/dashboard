@@ -146,7 +146,8 @@
 						properties: {
 							concurrencyPolicy: {
 								...lodash.get(jsonSchema, 'properties.spec.properties.concurrencyPolicy'),
-								title: 'Concurrency Policy'
+								title: 'Concurrency Policy',
+								enum: ['Allow', 'Forbid', 'Replace']
 							},
 							suspend: {
 								...lodash.get(jsonSchema, 'properties.spec.properties.suspend'),
@@ -162,7 +163,8 @@
 							},
 							restartPolicy: {
 								...lodash.get(jsonSchema, 'properties.spec.properties.restartPolicy'),
-								title: 'Restart Policy'
+								title: 'Restart Policy',
+								enum: ['OnFailure', 'Never']
 							}
 						}
 					} as Schema}

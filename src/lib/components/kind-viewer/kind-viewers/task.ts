@@ -16,6 +16,7 @@ type TaskAttribute =
 	| 'State'
 	| 'Ready'
 	| 'Status'
+	| 'Suspend'
 	| 'Completions'
 	| 'Age'
 	| 'raw';
@@ -27,6 +28,7 @@ function getTaskDataSchemas(): Record<TaskAttribute, DataSchemaType> {
 		State: 'text',
 		Ready: 'text',
 		Status: 'text',
+		Suspend: 'text',
 		Completions: 'text',
 		Age: 'time',
 		raw: 'object'
@@ -49,6 +51,7 @@ function getTaskData(object: any): Record<TaskAttribute, JsonValue> {
 					? 'False'
 					: '',
 		Status: object?.status?.status ?? null,
+		Suspend: object?.spec?.suspend != null ? String(object.spec.suspend) : null,
 		Completions: object?.status?.completions != null ? String(object.status.completions) : null,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
@@ -62,6 +65,7 @@ function getTaskUISchemas(): Record<TaskAttribute, UISchemaType> {
 		State: 'text',
 		Ready: 'text',
 		Status: 'text',
+		Suspend: 'text',
 		Completions: 'text',
 		Age: 'time',
 		raw: 'object'
@@ -185,6 +189,27 @@ function getTaskColumnDefinitions(
 					uiSchemas: uiSchemas
 				}),
 			accessorKey: 'Status'
+		},
+		{
+			id: 'Suspend',
+			header: ({ column }: { column: Column<Record<TaskAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<TaskAttribute, JsonValue>>;
+				row: Row<Record<TaskAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Suspend'
 		},
 		{
 			id: 'Completions',

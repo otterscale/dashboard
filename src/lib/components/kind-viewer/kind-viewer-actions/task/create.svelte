@@ -199,7 +199,8 @@
 							},
 							restartPolicy: {
 								...lodash.get(jsonSchema, 'properties.spec.properties.restartPolicy'),
-								title: 'Restart Policy'
+								title: 'Restart Policy',
+								enum: ['Never', 'OnFailure']
 							}
 						}
 					} as Schema}

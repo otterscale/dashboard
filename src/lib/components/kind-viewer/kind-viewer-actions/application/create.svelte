@@ -260,7 +260,7 @@
 							serviceType: {
 								...lodash.get(jsonSchema, 'properties.spec.properties.serviceType'),
 								title: 'Service Type',
-								enum: ['ExternalName', 'ClusterIP', 'NodePort', 'LoadBalancer']
+								enum: ['ClusterIP', 'NodePort', 'LoadBalancer']
 							}
 						},
 						dependencies: {
@@ -348,7 +348,8 @@
 								properties: {
 									accessMode: {
 										...lodash.get(jsonSchema, 'properties.spec.properties.accessMode'),
-										title: 'Access Mode'
+										title: 'Access Mode',
+										enum: ['ReadWriteOnce', 'ReadOnlyMany', 'ReadWriteMany']
 									},
 									storageSize: {
 										...lodash.get(jsonSchema, 'properties.spec.properties.storageSize'),

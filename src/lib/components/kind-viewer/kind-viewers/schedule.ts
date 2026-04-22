@@ -16,6 +16,7 @@ type ScheduleAttribute =
 	| 'Schedule'
 	| 'State'
 	| 'Ready'
+	| 'Suspend'
 	| 'LastScheduleTime'
 	| 'Age'
 	| 'raw';
@@ -27,6 +28,7 @@ function getScheduleDataSchemas(): Record<ScheduleAttribute, DataSchemaType> {
 		Schedule: 'text',
 		State: 'text',
 		Ready: 'text',
+		Suspend: 'text',
 		LastScheduleTime: 'time',
 		Age: 'time',
 		raw: 'object'
@@ -49,6 +51,7 @@ function getScheduleData(object: any): Record<ScheduleAttribute, JsonValue> {
 				: readyCondition?.status === 'False'
 					? 'False'
 					: '',
+		Suspend: object?.spec?.suspend != null ? String(object.spec.suspend) : null,
 		LastScheduleTime: object?.status?.lastScheduleTime ?? null,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
@@ -62,6 +65,7 @@ function getScheduleUISchemas(): Record<ScheduleAttribute, UISchemaType> {
 		Schedule: 'text',
 		State: 'text',
 		Ready: 'text',
+		Suspend: 'text',
 		LastScheduleTime: 'time',
 		Age: 'time',
 		raw: 'object'
@@ -185,6 +189,27 @@ function getScheduleColumnDefinitions(
 					uiSchemas: uiSchemas
 				}),
 			accessorKey: 'Schedule'
+		},
+		{
+			id: 'Suspend',
+			header: ({ column }: { column: Column<Record<ScheduleAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<ScheduleAttribute, JsonValue>>;
+				row: Row<Record<ScheduleAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Suspend'
 		},
 		{
 			id: 'LastScheduleTime',
