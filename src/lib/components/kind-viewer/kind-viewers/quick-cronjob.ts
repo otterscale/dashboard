@@ -10,7 +10,7 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 import { buildResourceDetailUrl } from './resource-url';
 
-type QuickCronjobAttribute =
+type QuickCronJobAttribute =
 	| 'Name'
 	| 'Namespace'
 	| 'Schedule'
@@ -20,7 +20,7 @@ type QuickCronjobAttribute =
 	| 'Age'
 	| 'raw';
 
-function getQuickCronjobDataSchemas(): Record<QuickCronjobAttribute, DataSchemaType> {
+function getQuickCronJobDataSchemas(): Record<QuickCronJobAttribute, DataSchemaType> {
 	return {
 		Name: 'text',
 		Namespace: 'text',
@@ -33,7 +33,7 @@ function getQuickCronjobDataSchemas(): Record<QuickCronjobAttribute, DataSchemaT
 	};
 }
 
-function getQuickCronjobData(object: any): Record<QuickCronjobAttribute, JsonValue> {
+function getQuickCronJobData(object: any): Record<QuickCronJobAttribute, JsonValue> {
 	const readyCondition = object?.status?.conditions?.find(
 		(condition: any) => condition.type === 'Ready'
 	);
@@ -55,7 +55,7 @@ function getQuickCronjobData(object: any): Record<QuickCronjobAttribute, JsonVal
 	};
 }
 
-function getQuickCronjobUISchemas(): Record<QuickCronjobAttribute, UISchemaType> {
+function getQuickCronJobUISchemas(): Record<QuickCronJobAttribute, UISchemaType> {
 	return {
 		Name: 'link',
 		Namespace: 'text',
@@ -68,15 +68,15 @@ function getQuickCronjobUISchemas(): Record<QuickCronjobAttribute, UISchemaType>
 	};
 }
 
-function getQuickCronjobColumnDefinitions(
+function getQuickCronJobColumnDefinitions(
 	apiResource: APIResource,
-	uiSchemas: Record<QuickCronjobAttribute, UISchemaType>,
-	dataSchemas: Record<QuickCronjobAttribute, DataSchemaType>
-): ColumnDef<Record<QuickCronjobAttribute, JsonValue>>[] {
+	uiSchemas: Record<QuickCronJobAttribute, UISchemaType>,
+	dataSchemas: Record<QuickCronJobAttribute, DataSchemaType>
+): ColumnDef<Record<QuickCronJobAttribute, JsonValue>>[] {
 	return [
 		{
 			id: 'Name',
-			header: ({ column }: { column: Column<Record<QuickCronjobAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<QuickCronJobAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -85,8 +85,8 @@ function getQuickCronjobColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<QuickCronjobAttribute, JsonValue>>;
-				row: Row<Record<QuickCronjobAttribute, JsonValue>>;
+				column: Column<Record<QuickCronJobAttribute, JsonValue>>;
+				row: Row<Record<QuickCronJobAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -95,7 +95,7 @@ function getQuickCronjobColumnDefinitions(
 					metadata: {
 						hyperlink: buildResourceDetailUrl(
 							apiResource,
-							row.original[column.id as QuickCronjobAttribute] as string,
+							row.original[column.id as QuickCronJobAttribute] as string,
 							row.original['Namespace'] as string
 						)
 					} satisfies LinkMetadata
@@ -104,7 +104,7 @@ function getQuickCronjobColumnDefinitions(
 		},
 		{
 			id: 'Namespace',
-			header: ({ column }: { column: Column<Record<QuickCronjobAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<QuickCronJobAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -113,8 +113,8 @@ function getQuickCronjobColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<QuickCronjobAttribute, JsonValue>>;
-				row: Row<Record<QuickCronjobAttribute, JsonValue>>;
+				column: Column<Record<QuickCronJobAttribute, JsonValue>>;
+				row: Row<Record<QuickCronJobAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -125,7 +125,7 @@ function getQuickCronjobColumnDefinitions(
 		},
 		{
 			id: 'State',
-			header: ({ column }: { column: Column<Record<QuickCronjobAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<QuickCronJobAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -134,8 +134,8 @@ function getQuickCronjobColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<QuickCronjobAttribute, JsonValue>>;
-				row: Row<Record<QuickCronjobAttribute, JsonValue>>;
+				column: Column<Record<QuickCronJobAttribute, JsonValue>>;
+				row: Row<Record<QuickCronJobAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -146,7 +146,7 @@ function getQuickCronjobColumnDefinitions(
 		},
 		{
 			id: 'Ready',
-			header: ({ column }: { column: Column<Record<QuickCronjobAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<QuickCronJobAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -155,8 +155,8 @@ function getQuickCronjobColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<QuickCronjobAttribute, JsonValue>>;
-				row: Row<Record<QuickCronjobAttribute, JsonValue>>;
+				column: Column<Record<QuickCronJobAttribute, JsonValue>>;
+				row: Row<Record<QuickCronJobAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -167,7 +167,7 @@ function getQuickCronjobColumnDefinitions(
 		},
 		{
 			id: 'Schedule',
-			header: ({ column }: { column: Column<Record<QuickCronjobAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<QuickCronJobAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -176,8 +176,8 @@ function getQuickCronjobColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<QuickCronjobAttribute, JsonValue>>;
-				row: Row<Record<QuickCronjobAttribute, JsonValue>>;
+				column: Column<Record<QuickCronJobAttribute, JsonValue>>;
+				row: Row<Record<QuickCronJobAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -188,7 +188,7 @@ function getQuickCronjobColumnDefinitions(
 		},
 		{
 			id: 'LastScheduleTime',
-			header: ({ column }: { column: Column<Record<QuickCronjobAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<QuickCronJobAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -197,8 +197,8 @@ function getQuickCronjobColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<QuickCronjobAttribute, JsonValue>>;
-				row: Row<Record<QuickCronjobAttribute, JsonValue>>;
+				column: Column<Record<QuickCronJobAttribute, JsonValue>>;
+				row: Row<Record<QuickCronJobAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -209,7 +209,7 @@ function getQuickCronjobColumnDefinitions(
 		},
 		{
 			id: 'Age',
-			header: ({ column }: { column: Column<Record<QuickCronjobAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<QuickCronJobAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -218,8 +218,8 @@ function getQuickCronjobColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<QuickCronjobAttribute, JsonValue>>;
-				row: Row<Record<QuickCronjobAttribute, JsonValue>>;
+				column: Column<Record<QuickCronJobAttribute, JsonValue>>;
+				row: Row<Record<QuickCronJobAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -232,8 +232,8 @@ function getQuickCronjobColumnDefinitions(
 }
 
 export {
-	getQuickCronjobColumnDefinitions,
-	getQuickCronjobData,
-	getQuickCronjobDataSchemas,
-	getQuickCronjobUISchemas
+	getQuickCronJobColumnDefinitions,
+	getQuickCronJobData,
+	getQuickCronJobDataSchemas,
+	getQuickCronJobUISchemas
 };

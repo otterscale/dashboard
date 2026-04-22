@@ -122,7 +122,7 @@
 							actionsOpen = false;
 						}}
 					/>
-				{:else if kind === 'QuickCronjob' || kind === 'quickCronjob'}
+				{:else if kind === 'QuickCronJob' || kind === 'quickCronjob'}
 					<UpdateCronjob
 						{cluster}
 						{namespace}

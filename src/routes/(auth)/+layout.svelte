@@ -233,7 +233,7 @@
 					},
 					{
 						title: m.schedule(),
-						url: resourceUrl('kro.run', 'v1alpha1', 'QuickCronjob', 'quickcronjobs')
+						url: resourceUrl('kro.run', 'v1alpha1', 'QuickCronJob', 'quickcronjobs')
 					}
 				]
 			},

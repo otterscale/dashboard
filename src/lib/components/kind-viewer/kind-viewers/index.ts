@@ -157,10 +157,10 @@ import {
 } from './persistentvolumeclaim.js';
 import { getPodColumnDefinitions, getPodData, getPodDataSchemas, getPodUISchemas } from './pod.js';
 import {
-	getQuickCronjobColumnDefinitions,
-	getQuickCronjobData,
-	getQuickCronjobDataSchemas,
-	getQuickCronjobUISchemas
+	getQuickCronJobColumnDefinitions,
+	getQuickCronJobData,
+	getQuickCronJobDataSchemas,
+	getQuickCronJobUISchemas
 } from './quick-cronjob.js';
 import {
 	getQuickDeploymentColumnDefinitions,
@@ -313,8 +313,8 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 			return getQuickDeploymentDataSchemas();
 		case 'QuickJob':
 			return getQuickJobDataSchemas();
-		case 'QuickCronjob':
-			return getQuickCronjobDataSchemas();
+		case 'QuickCronJob':
+			return getQuickCronJobDataSchemas();
 		default:
 			return getDefaultDataSchemas();
 	}
@@ -398,8 +398,8 @@ function getData(apiResource: APIResource, object: any): Record<string, JsonValu
 			return getQuickDeploymentData(object);
 		case 'QuickJob':
 			return getQuickJobData(object);
-		case 'QuickCronjob':
-			return getQuickCronjobData(object);
+		case 'QuickCronJob':
+			return getQuickCronJobData(object);
 		default:
 			return getDefaultData(apiResource, object);
 	}
@@ -483,8 +483,8 @@ function getUISchemas(kind: string): Record<string, UISchemaType> {
 			return getQuickDeploymentUISchemas();
 		case 'QuickJob':
 			return getQuickJobUISchemas();
-		case 'QuickCronjob':
-			return getQuickCronjobUISchemas();
+		case 'QuickCronJob':
+			return getQuickCronJobUISchemas();
 		default:
 			return getDefaultUISchemas();
 	}
@@ -573,8 +573,8 @@ function getColumnDefinitions(
 			return getQuickDeploymentColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'QuickJob':
 			return getQuickJobColumnDefinitions(apiResource, uiSchemas, dataSchemas);
-		case 'QuickCronjob':
-			return getQuickCronjobColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'QuickCronJob':
+			return getQuickCronJobColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		default:
 			return getDefaultColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 	}
