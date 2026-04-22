@@ -3,10 +3,12 @@
 	import BugIcon from '@lucide/svelte/icons/bug';
 
 	import { version } from '$app/environment';
+	import { env } from '$env/dynamic/public';
 	import LogoImage from '$lib/assets/logo.svg';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
 
 	let { open = $bindable(false) }: { open: boolean } = $props();
@@ -20,7 +22,18 @@
 					<img src={LogoImage} alt="Logo" class="h-5" />
 				</Dialog.Title>
 				<Badge variant="secondary" class="text-xs font-medium">
-					{version}
+					{#if env.PUBLIC_APP_VERSION}
+						<Tooltip.Provider>
+							<Tooltip.Root ignoreNonKeyboardFocus>
+								<Tooltip.Trigger>{version}</Tooltip.Trigger>
+								<Tooltip.Content>
+									<p>{env.PUBLIC_APP_VERSION}</p>
+								</Tooltip.Content>
+							</Tooltip.Root>
+						</Tooltip.Provider>
+					{:else}
+						{version}
+					{/if}
 				</Badge>
 			</div>
 			<Dialog.Description class="text-xs text-muted-foreground">
