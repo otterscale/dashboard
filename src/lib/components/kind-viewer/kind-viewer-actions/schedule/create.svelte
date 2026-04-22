@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import FormIcon from '@lucide/svelte/icons/form-input';
+	import Plus from '@lucide/svelte/icons/plus';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
+	import Ajv from 'ajv';
+	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
@@ -26,7 +28,6 @@
 		kind,
 		resource,
 		schema: jsonSchema,
-		object,
 		onOpenChangeComplete
 	}: {
 		cluster: string;
@@ -35,36 +36,24 @@
 		version: string;
 		kind: string;
 		resource: string;
-		schema: any;
-		object: any;
+		schema?: any;
 		onOpenChangeComplete: () => void;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	const systemFields = [
-		'clusterName',
-		'creationTimestamp',
-		'deletionGracePeriodSeconds',
-		'deletionTimestamp',
-		'finalizers',
-		'generateName',
-		'generation',
-		'initializers',
-		'managedFields',
-		'ownerReferences',
-		'resourceVersion',
-		'relationships',
-		'selfLink',
-		'state',
-		'uid'
-	];
+	const jsonSchemaValidator = new Ajv({
+		allErrors: true,
+		strict: false
+	});
+	const validate = jsonSchemaValidator.compile(jsonSchema);
 
+	// Container for Data — flat structure matching quickCronjob RGD schema
 	let values: any = $state({
 		apiVersion: group ? `${group}/${version}` : version,
 		kind,
-		metadata: object.metadata,
+		metadata: {},
 		spec: {}
 	});
 	let settingsValues: any = $state({});
@@ -75,18 +64,10 @@
 		values.spec = { ...settingsValues, ...specValues, ...resourceValues };
 	});
 
-	let value = $state('');
-	$effect(() => {
-		const filtered = lodash.cloneDeep(values);
-		if (filtered.metadata) {
-			for (const field of systemFields) {
-				delete filtered.metadata[field];
-			}
-		}
-		delete filtered.status;
-		value = stringify(filtered);
-	});
-	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
+	let value = $derived(stringify(values));
+
+	// Steps: 1=Metadata, 2=Setting, 3=Container, 4=Resources, 5=YAML Preview
+	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -100,6 +81,7 @@
 		currentStep = firstStep;
 	}
 
+	// Flag for Dialog
 	let open = $state(false);
 	let isSubmitting = $state(false);
 </script>
@@ -115,14 +97,9 @@
 >
 	<Dialog.Trigger>
 		{#snippet child({ props })}
-			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
-				<Item.Media>
-					<FormIcon />
-				</Item.Media>
-				<Item.Content>
-					<Item.Title>Update</Item.Title>
-				</Item.Content>
-			</Item.Root>
+			<Button {...props} variant="outline" size="icon">
+				<Plus />
+			</Button>
 		{/snippet}
 	</Dialog.Trigger>
 	<Dialog.Content
@@ -137,41 +114,84 @@
 			</Item.Content>
 		</Item.Root>
 		<Tabs.Root value={currentStep}>
-			<!-- Step 1: Setting -->
+			<!-- Step 1: Metadata -->
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
+						...(lodash.omit(lodash.get(jsonSchema, 'properties.metadata'), 'properties') as Record<
+							string,
+							unknown
+						>),
+						title: 'Metadata',
+						properties: {
+							name: {
+								...lodash.get(jsonSchema, 'properties.metadata.properties.name'),
+								title: 'Name'
+							},
+							namespace: {
+								...lodash.get(jsonSchema, 'properties.metadata.properties.namespace'),
+								title: 'Namespace',
+								readOnly: true
+							}
+						}
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={{ namespace: namespace } as FormValue}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					bind:values={values['metadata']}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+								disabled={currentIndex === 0}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+
+			<!-- Step 2: Setting -->
+			<Tabs.Content value={steps[1]}>
+				<Form
+					schema={{
 						title: 'Setting',
-						type: 'object',
+						...lodash.omit(lodash.get(jsonSchema, 'properties.spec'), 'properties'),
 						properties: {
 							concurrencyPolicy: {
-								type: 'string',
-								title: 'Concurrency Policy',
-								default: 'Allow',
-								enum: ['Allow', 'Forbid', 'Replace']
+								...lodash.get(jsonSchema, 'properties.spec.properties.concurrencyPolicy'),
+								title: 'Concurrency Policy'
 							},
 							suspend: {
-								type: 'boolean',
-								title: 'Suspend',
-								default: false
+								...lodash.get(jsonSchema, 'properties.spec.properties.suspend'),
+								title: 'Suspend'
 							},
 							successfulJobsHistoryLimit: {
-								type: 'integer',
-								title: 'Successful Jobs History Limit',
-								default: 3,
-								minimum: 0
+								...lodash.get(jsonSchema, 'properties.spec.properties.successfulJobsHistoryLimit'),
+								title: 'Successful Jobs History Limit'
 							},
 							failedJobsHistoryLimit: {
-								type: 'integer',
-								title: 'Failed Jobs History Limit',
-								default: 1,
-								minimum: 0
+								...lodash.get(jsonSchema, 'properties.spec.properties.failedJobsHistoryLimit'),
+								title: 'Failed Jobs History Limit'
 							},
 							restartPolicy: {
-								type: 'string',
-								title: 'Restart Policy',
-								default: 'OnFailure',
-								enum: ['Never', 'OnFailure']
+								...lodash.get(jsonSchema, 'properties.spec.properties.restartPolicy'),
+								title: 'Restart Policy'
 							}
 						}
 					} as Schema}
@@ -208,11 +228,11 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						concurrencyPolicy: object.spec?.concurrencyPolicy ?? 'Allow',
-						suspend: object.spec?.suspend ?? false,
-						successfulJobsHistoryLimit: object.spec?.successfulJobsHistoryLimit ?? 3,
-						failedJobsHistoryLimit: object.spec?.failedJobsHistoryLimit ?? 1,
-						restartPolicy: object.spec?.restartPolicy ?? 'OnFailure'
+						concurrencyPolicy: 'Allow',
+						suspend: false,
+						successfulJobsHistoryLimit: 3,
+						failedJobsHistoryLimit: 1,
+						restartPolicy: 'OnFailure'
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -227,7 +247,6 @@
 								onclick={() => {
 									handlePrevious();
 								}}
-								disabled={currentIndex === 0}
 							>
 								Previous
 							</Button>
@@ -237,44 +256,39 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 2: Container (name, image, command, args, cronSchedule, containerPort) -->
-			<Tabs.Content value={steps[1]}>
+			<!-- Step 3: Container (name, image, command, args, containerPort, cronSchedule) -->
+			<Tabs.Content value={steps[2]}>
 				<Form
 					schema={{
 						title: 'Container',
 						type: 'object',
-						required: ['name', 'image', 'cronSchedule'],
+						required: lodash
+							.get(jsonSchema, 'properties.spec.required', [])
+							.filter((f: string) => ['name', 'image', 'cronSchedule'].includes(f)),
 						properties: {
 							name: {
-								type: 'string',
-								title: 'Name',
-								description: 'Name of the workload'
+								...lodash.get(jsonSchema, 'properties.spec.properties.name'),
+								title: 'Name'
 							},
 							image: {
-								type: 'string',
-								title: 'Image',
-								description: 'Container image to use'
+								...lodash.get(jsonSchema, 'properties.spec.properties.image'),
+								title: 'Image'
 							},
 							command: {
-								type: 'array',
-								title: 'Command',
-								items: { type: 'string' }
+								...lodash.get(jsonSchema, 'properties.spec.properties.command'),
+								title: 'Command'
 							},
 							args: {
-								type: 'array',
-								title: 'Arguments',
-								items: { type: 'string' }
+								...lodash.get(jsonSchema, 'properties.spec.properties.args'),
+								title: 'Arguments'
 							},
 							cronSchedule: {
-								type: 'string',
-								title: 'Cron Schedule',
-								description: 'Cron expression for scheduling (e.g. */5 * * * *)',
-								default: '*/5 * * * *'
+								...lodash.get(jsonSchema, 'properties.spec.properties.cronSchedule'),
+								title: 'Cron Schedule'
 							},
 							containerPort: {
-								type: 'integer',
-								title: 'Container Port',
-								default: 8080
+								...lodash.get(jsonSchema, 'properties.spec.properties.containerPort'),
+								title: 'Container Port'
 							}
 						}
 					} as Schema}
@@ -296,12 +310,10 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						name: object.spec?.name ?? null,
-						image: object.spec?.image ?? null,
-						command: object.spec?.command ?? undefined,
-						args: object.spec?.args ?? undefined,
-						cronSchedule: object.spec?.cronSchedule ?? '*/5 * * * *',
-						containerPort: object.spec?.containerPort ?? 8080
+						name: values.metadata?.name ?? null,
+						image: null,
+						cronSchedule: '*/5 * * * *',
+						containerPort: 8080
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -316,7 +328,6 @@
 								onclick={() => {
 									handlePrevious();
 								}}
-								disabled={currentIndex === 0}
 							>
 								Previous
 							</Button>
@@ -326,42 +337,36 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 3: Resources -->
-			<Tabs.Content value={steps[2]}>
+			<!-- Step 4: Resources -->
+			<Tabs.Content value={steps[3]}>
 				<Form
 					schema={{
 						title: 'Resources',
 						type: 'object',
 						properties: {
 							resourcesRequestsCpu: {
-								type: 'string',
-								title: 'CPU Request',
-								default: '100m'
+								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesRequestsCpu'),
+								title: 'CPU Request'
 							},
 							resourcesRequestsMemory: {
-								type: 'string',
-								title: 'Memory Request',
-								default: '128Mi'
+								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesRequestsMemory'),
+								title: 'Memory Request'
 							},
 							resourcesLimitsCpu: {
-								type: 'string',
-								title: 'CPU Limit',
-								default: '500m'
+								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesLimitsCpu'),
+								title: 'CPU Limit'
 							},
 							resourcesLimitsMemory: {
-								type: 'string',
-								title: 'Memory Limit',
-								default: '512Mi'
+								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesLimitsMemory'),
+								title: 'Memory Limit'
 							},
 							resourcesGpu: {
-								type: 'string',
-								title: 'GPU',
-								default: '0'
+								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesGpu'),
+								title: 'GPU'
 							},
 							resourcesGpumem: {
-								type: 'string',
-								title: 'GPU Memory',
-								default: '0'
+								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesGpumem'),
+								title: 'GPU Memory'
 							}
 						}
 					} as Schema}
@@ -378,12 +383,12 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						resourcesRequestsCpu: object.spec?.resourcesRequestsCpu ?? '100m',
-						resourcesRequestsMemory: object.spec?.resourcesRequestsMemory ?? '128Mi',
-						resourcesLimitsCpu: object.spec?.resourcesLimitsCpu ?? '500m',
-						resourcesLimitsMemory: object.spec?.resourcesLimitsMemory ?? '512Mi',
-						resourcesGpu: object.spec?.resourcesGpu ?? '0',
-						resourcesGpumem: object.spec?.resourcesGpumem ?? '0'
+						resourcesRequestsCpu: '100m',
+						resourcesRequestsMemory: '128Mi',
+						resourcesLimitsCpu: '500m',
+						resourcesLimitsMemory: '512Mi',
+						resourcesGpu: '0',
+						resourcesGpumem: '0'
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -407,8 +412,8 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 4: YAML Preview & Submit -->
-			<Tabs.Content value={steps[3]} class="min-h-[77vh]">
+			<!-- Step 5: YAML Preview & Submit -->
+			<Tabs.Content value={steps[4]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{
@@ -430,32 +435,48 @@
 
 							isSubmitting = true;
 
-							const name = object.metadata?.name;
-							const manifest = new TextEncoder().encode(value);
+							let parsed: any;
+							try {
+								parsed = load(value);
+							} catch {
+								toast.error('Invalid YAML. Please check the content.');
+								isSubmitting = false;
+								return;
+							}
+
+							const isValid = validate(parsed);
+
+							if (!isValid) {
+								console.error('Validation errors:', validate.errors);
+								toast.error('Validation failed. Please check the YAML.');
+								isSubmitting = false;
+								return;
+							}
+
+							const name = lodash.get(parsed, 'metadata.name');
 
 							toast.promise(
 								async () => {
-									await resourceClient.apply({
+									const manifest = new TextEncoder().encode(value);
+
+									await resourceClient.create({
 										cluster,
 										namespace,
 										group,
 										version,
 										resource,
-										name,
-										manifest,
-										fieldManager: 'otterscale-web-ui',
-										force: true
+										manifest
 									});
 								},
 								{
-									loading: `Updating ${kind} ${name}...`,
+									loading: `Creating ${kind} ${name}...`,
 									success: () => {
 										open = false;
-										return `Successfully updated ${kind} ${name}`;
+										return `Successfully created ${kind} ${name}`;
 									},
 									error: (error) => {
-										console.error(`Failed to update ${kind} ${name}:`, error);
-										return `Failed to update ${kind} ${name}: ${(error as ConnectError).message}`;
+										console.error(`Failed to create ${kind} ${name}:`, error);
+										return `Failed to create ${kind} ${name}: ${(error as ConnectError).message}`;
 									},
 									finally() {
 										isSubmitting = false;
@@ -464,7 +485,7 @@
 							);
 						}}
 					>
-						Update
+						Create
 					</Button>
 				</div>
 			</Tabs.Content>

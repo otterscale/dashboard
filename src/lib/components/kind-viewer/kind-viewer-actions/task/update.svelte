@@ -16,7 +16,6 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
-	import { Switch } from '$lib/components/ui/switch/index.ts';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
 	let {
@@ -68,16 +67,16 @@
 		metadata: object.metadata,
 		spec: {}
 	});
+	let settingsValues: any = $state({});
 	let specValues: any = $state({});
-	let serviceValues: any = $state({});
-	let storageValues: any = $state({});
-	let resourceFormValues: any = $state({});
+	let resourceValues: any = $state({});
 
 	$effect(() => {
-		values.spec = { ...specValues, ...serviceValues, ...storageValues, ...resourceFormValues };
+		values.spec = { ...settingsValues, ...specValues, ...resourceValues };
 	});
 
-	let value = $derived.by(() => {
+	let value = $state('');
+	$effect(() => {
 		const filtered = lodash.cloneDeep(values);
 		if (filtered.metadata) {
 			for (const field of systemFields) {
@@ -85,11 +84,9 @@
 			}
 		}
 		delete filtered.status;
-		return stringify(filtered);
+		value = stringify(filtered);
 	});
-
-	// Steps: 1=Container+Replicas, 2=Service, 3=Storage, 4=Resources, 5=YAML Preview
-	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -105,11 +102,6 @@
 
 	let open = $state(false);
 	let isSubmitting = $state(false);
-	let storageEnabled = $state(
-		object.spec?.accessMode != null ||
-			object.spec?.storageSize != null ||
-			object.spec?.mountPath != null
-	);
 </script>
 
 <Dialog.Root
@@ -145,44 +137,131 @@
 			</Item.Content>
 		</Item.Root>
 		<Tabs.Root value={currentStep}>
-			<!-- Step 1: Container (name, image, command, args, containerPort, replicas) -->
+			<!-- Step 1: Setting -->
 			<Tabs.Content value={steps[0]}>
+				<Form
+					schema={{
+						title: 'Setting',
+						...lodash.omit(lodash.get(jsonSchema, 'properties.spec'), 'properties'),
+						properties: {
+							completions: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.completions'),
+								title: 'Completions'
+							},
+							parallelism: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.parallelism'),
+								title: 'Parallelism'
+							},
+							backoffLimit: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.backoffLimit'),
+								title: 'Backoff Limit'
+							},
+							activeDeadlineSeconds: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.activeDeadlineSeconds'),
+								title: 'Active Deadline Seconds'
+							},
+							ttlSecondsAfterFinished: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.ttlSecondsAfterFinished'),
+								title: 'TTL Seconds After Finished'
+							},
+							suspend: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.suspend'),
+								title: 'Suspend'
+							},
+							restartPolicy: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.restartPolicy'),
+								title: 'Restart Policy'
+							}
+						}
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							},
+							layouts: {
+								'object-properties': {
+									class: 'grid grid-cols-2 gap-3'
+								}
+							}
+						},
+						suspend: {
+							'ui:components': {
+								checkboxWidget: 'switchWidget'
+							},
+							'ui:options': {
+								layout: {
+									class: 'col-span-full'
+								}
+							}
+						},
+						restartPolicy: {
+							'ui:components': {
+								stringField: 'enumField'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={{
+						completions: object.spec?.completions ?? 1,
+						parallelism: object.spec?.parallelism ?? 1,
+						backoffLimit: object.spec?.backoffLimit ?? 6,
+						activeDeadlineSeconds: object.spec?.activeDeadlineSeconds ?? 0,
+						ttlSecondsAfterFinished: object.spec?.ttlSecondsAfterFinished ?? 0,
+						suspend: object.spec?.suspend ?? false,
+						restartPolicy: object.spec?.restartPolicy ?? 'Never'
+					} as FormValue}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					bind:values={settingsValues}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+								disabled={currentIndex === 0}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+
+			<!-- Step 2: Container -->
+			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
 						title: 'Container',
 						type: 'object',
-						required: ['name', 'image'],
+						required: lodash
+							.get(jsonSchema, 'properties.spec.required', [])
+							.filter((f: string) => ['name', 'image'].includes(f)),
 						properties: {
 							name: {
-								type: 'string',
-								title: 'Name',
-								description: 'Name of the workload'
+								...lodash.get(jsonSchema, 'properties.spec.properties.name'),
+								title: 'Name'
 							},
 							image: {
-								type: 'string',
-								title: 'Image',
-								description: 'Container image to use'
+								...lodash.get(jsonSchema, 'properties.spec.properties.image'),
+								title: 'Image'
 							},
 							command: {
-								type: 'array',
-								title: 'Command',
-								items: { type: 'string' }
+								...lodash.get(jsonSchema, 'properties.spec.properties.command'),
+								title: 'Command'
 							},
 							args: {
-								type: 'array',
-								title: 'Arguments',
-								items: { type: 'string' }
+								...lodash.get(jsonSchema, 'properties.spec.properties.args'),
+								title: 'Arguments'
 							},
 							containerPort: {
-								type: 'integer',
-								title: 'Container Port',
-								default: 80
-							},
-							replicas: {
-								type: 'integer',
-								title: 'Replicas',
-								default: 1,
-								minimum: 1
+								...lodash.get(jsonSchema, 'properties.spec.properties.containerPort'),
+								title: 'Container Port'
 							}
 						}
 					} as Schema}
@@ -208,8 +287,7 @@
 						image: object.spec?.image ?? null,
 						command: object.spec?.command ?? undefined,
 						args: object.spec?.args ?? undefined,
-						containerPort: object.spec?.containerPort ?? 80,
-						replicas: object.spec?.replicas ?? 1
+						containerPort: object.spec?.containerPort ?? 8080
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -234,217 +312,36 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 2: Service -->
-			<Tabs.Content value={steps[1]}>
-				<Form
-					schema={{
-						title: 'Service',
-						type: 'object',
-						properties: {
-							serviceType: {
-								type: 'string',
-								title: 'Service Type',
-								description: 'Kubernetes service type',
-								default: 'ClusterIP',
-								enum: ['ExternalName', 'ClusterIP', 'NodePort', 'LoadBalancer']
-							}
-						},
-						dependencies: {
-							serviceType: {
-								oneOf: [
-									{
-										properties: {
-											serviceType: { enum: ['ExternalName'] }
-										}
-									},
-									{
-										properties: {
-											serviceType: { enum: ['ClusterIP'] }
-										}
-									},
-									{
-										properties: {
-											serviceType: { enum: ['NodePort'] },
-											serviceNodePort: {
-												type: 'integer',
-												title: 'Service Node Port',
-												description: 'Node port 0 for auto-assign)',
-												default: 0
-											}
-										}
-									},
-									{
-										properties: {
-											serviceType: { enum: ['LoadBalancer'] }
-										}
-									}
-								]
-							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						},
-						serviceType: {
-							'ui:components': {
-								stringField: 'enumField'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{
-						serviceType: object.spec?.serviceType ?? 'ClusterIP',
-						...(object.spec?.serviceNodePort != null
-							? { serviceNodePort: object.spec.serviceNodePort }
-							: {})
-					} as FormValue}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-					bind:values={serviceValues}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-
-			<!-- Step 3: Storage -->
+			<!-- Step 3: Resources -->
 			<Tabs.Content value={steps[2]}>
-				<div class="flex flex-col gap-4">
-					<div class="flex items-center gap-3 py-2">
-						<Switch bind:checked={storageEnabled} id="storage-enabled" />
-						<label for="storage-enabled" class="cursor-pointer text-sm font-medium">
-							Enable Storage
-						</label>
-					</div>
-					{#if storageEnabled}
-						<Form
-							schema={{
-								title: 'Storage',
-								type: 'object',
-								properties: {
-									accessMode: {
-										type: 'string',
-										title: 'Access Mode',
-										description: 'Access mode for the persistent volume',
-										enum: ['ReadWriteOnce', 'ReadOnlyMany', 'ReadWriteMany']
-									},
-									storageSize: {
-										type: 'string',
-										title: 'Storage Size',
-										description: 'Size of the persistent volume (e.g. 1Gi)',
-										default: '1Gi'
-									},
-									mountPath: {
-										type: 'string',
-										title: 'Mount Path',
-										description: 'Path to mount the volume inside the container'
-									}
-								}
-							} as Schema}
-							uiSchema={{
-								'ui:options': {
-									translations: {
-										submit: 'Next'
-									}
-								},
-								accessMode: {
-									'ui:components': {
-										stringField: 'enumField'
-									}
-								}
-							} as UiSchemaRoot}
-							initialValue={{
-								accessMode: object.spec?.accessMode ?? null,
-								storageSize: object.spec?.storageSize ?? '1Gi',
-								mountPath: object.spec?.mountPath ?? null
-							} as FormValue}
-							handleSubmit={{
-								posthook: () => {
-									handleNext();
-								}
-							}}
-							bind:values={storageValues}
-						>
-							{#snippet actions()}
-								<div class="flex w-full items-center justify-between gap-3">
-									<Button
-										onclick={() => {
-											handlePrevious();
-										}}
-									>
-										Previous
-									</Button>
-									<SubmitButton />
-								</div>
-							{/snippet}
-						</Form>
-					{:else}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button onclick={() => handlePrevious()}>Previous</Button>
-							<Button
-								onclick={() => {
-									storageValues = {};
-									handleNext();
-								}}
-							>
-								Next
-							</Button>
-						</div>
-					{/if}
-				</div>
-			</Tabs.Content>
-
-			<!-- Step 4: Resources -->
-			<Tabs.Content value={steps[3]}>
 				<Form
 					schema={{
 						title: 'Resources',
 						type: 'object',
 						properties: {
 							resourcesRequestsCpu: {
-								type: 'string',
-								title: 'CPU Request',
-								default: '100m'
+								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesRequestsCpu'),
+								title: 'CPU Request'
 							},
 							resourcesRequestsMemory: {
-								type: 'string',
-								title: 'Memory Request',
-								default: '128Mi'
+								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesRequestsMemory'),
+								title: 'Memory Request'
 							},
 							resourcesLimitsCpu: {
-								type: 'string',
-								title: 'CPU Limit',
-								default: '500m'
+								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesLimitsCpu'),
+								title: 'CPU Limit'
 							},
 							resourcesLimitsMemory: {
-								type: 'string',
-								title: 'Memory Limit',
-								default: '512Mi'
+								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesLimitsMemory'),
+								title: 'Memory Limit'
 							},
 							resourcesGpu: {
-								type: 'string',
-								title: 'GPU',
-								default: '0'
+								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesGpu'),
+								title: 'GPU'
 							},
 							resourcesGpumem: {
-								type: 'string',
-								title: 'GPU Memory',
-								default: '0'
+								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesGpumem'),
+								title: 'GPU Memory'
 							}
 						}
 					} as Schema}
@@ -473,7 +370,7 @@
 							handleNext();
 						}
 					}}
-					bind:values={resourceFormValues}
+					bind:values={resourceValues}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -490,8 +387,8 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 5: YAML Preview & Submit -->
-			<Tabs.Content value={steps[4]} class="min-h-[77vh]">
+			<!-- Step 4: YAML Preview & Submit -->
+			<Tabs.Content value={steps[3]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{

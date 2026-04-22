@@ -19,10 +19,6 @@ import HelmRepositoryCreate from './helm-repository/create.svelte';
 import InstanceTypeActions from './instance-type/actions.svelte';
 import InstanceTypeCreate from './instance-type/create.svelte';
 import JobActions from './job/actions.svelte';
-import KroActions from './kro/actions.svelte';
-import QuickCronJobCreate from './kro/create-cronjob.svelte';
-import QuickDeployCreate from './kro/create-deployment.svelte';
-import QuickJobCreate from './kro/create-job.svelte';
 import ModelArtifactActions from './model-artifact/actions.svelte';
 import ModelArtifactCreate from './model-artifact/create.svelte';
 import ModelServiceActions from './model-service/actions.svelte';
@@ -31,7 +27,11 @@ import NodeActions from './node/actions.svelte';
 import NodeCreate from './node/create.svelte';
 import PodActions from './pod/actions.svelte';
 import ResourceQuotaActions from './resource-quota/actions.svelte';
+import ScheduleActions from './schedule/actions.svelte';
+import ScheduleCreate from './schedule/create.svelte';
 import StatefulSetActions from './statefulset/actions.svelte';
+import TaskActions from './task/actions.svelte';
+import TaskCreate from './task/create.svelte';
 import VirtualMachineActions from './virtual-machine/actions.svelte';
 import VirtualMachineCreate from './virtual-machine/create.svelte';
 import WorkspaceActions from './workspace/actions.svelte';
@@ -87,12 +87,10 @@ function getCreate(kind: string): CreateType {
 			return ObjectBucketClaimCreate as CreateType;
 		case 'Node':
 			return NodeCreate as CreateType;
-		case 'QuickDeployment':
-			return QuickDeployCreate as CreateType;
-		case 'QuickJob':
-			return QuickJobCreate as CreateType;
-		case 'QuickCronJob':
-			return QuickCronJobCreate as CreateType;
+		case 'Task':
+			return TaskCreate as CreateType;
+		case 'Schedule':
+			return ScheduleCreate as CreateType;
 		default:
 			return DefaultCreate as CreateType;
 	}
@@ -138,12 +136,10 @@ function getActions(kind: string): ActionsType {
 			return InstanceTypeActions as ActionsType;
 		case 'ObjectBucketClaim':
 			return ObjectBucketClaimActions as ActionsType;
-		case 'QuickDeployment':
-			return KroActions as ActionsType;
-		case 'QuickJob':
-			return KroActions as ActionsType;
-		case 'QuickCronJob':
-			return KroActions as ActionsType;
+		case 'Task':
+			return TaskActions as ActionsType;
+		case 'Schedule':
+			return ScheduleActions as ActionsType;
 		default:
 			return DefaultActions as ActionsType;
 	}
