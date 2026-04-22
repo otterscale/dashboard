@@ -40,7 +40,7 @@
 		onOpenChangeComplete: () => void;
 	} = $props();
 
-	let value = $derived(stringify(object));
+	let value = $state(stringify(object));
 
 	let editorInstance: import('monaco-editor').editor.IStandaloneCodeEditor | undefined =
 		$state(undefined);
@@ -214,6 +214,18 @@
 	let isSubmitting = $state(false);
 	function handleConfirm() {
 		if (isSubmitting) return;
+
+		const document = parseDocument(value);
+		if (document.errors.length > 0) {
+			toast.error('YAML syntax errors found. Please fix them before submitting.');
+			return;
+		}
+
+		const parsed = document.toJS() as Record<string, any>;
+		if (!validate(parsed)) {
+			toast.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
+			return;
+		}
 
 		isSubmitting = true;
 
