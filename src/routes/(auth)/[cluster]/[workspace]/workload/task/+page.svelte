@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import type { ResolvedPathname } from '$app/types';
 	import { Construction } from '$lib/components/construction';
 	import { m } from '$lib/paraglide/messages';
 	import { breadcrumbs } from '$lib/stores';
@@ -11,11 +12,11 @@
 	breadcrumbs.set([
 		{
 			title: m.workload(),
-			url: ''
+			url: '' as ResolvedPathname
 		},
 		{
-			title: m.service(),
-			url: resolve('/(auth)/[cluster]/[workspace]/workload/service', {
+			title: m.task(),
+			url: resolve('/(auth)/[cluster]/[workspace]/workload/task', {
 				cluster,
 				workspace
 			})
