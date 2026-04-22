@@ -10,30 +10,30 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 import { buildResourceDetailUrl } from './resource-url';
 
-type QuickCronJobAttribute =
+type TaskAttribute =
 	| 'Name'
 	| 'Namespace'
-	| 'Schedule'
 	| 'State'
 	| 'Ready'
-	| 'LastScheduleTime'
+	| 'Status'
+	| 'Completions'
 	| 'Age'
 	| 'raw';
 
-function getQuickCronJobDataSchemas(): Record<QuickCronJobAttribute, DataSchemaType> {
+function getTaskDataSchemas(): Record<TaskAttribute, DataSchemaType> {
 	return {
 		Name: 'text',
 		Namespace: 'text',
-		Schedule: 'text',
 		State: 'text',
 		Ready: 'text',
-		LastScheduleTime: 'time',
+		Status: 'text',
+		Completions: 'text',
 		Age: 'time',
 		raw: 'object'
 	};
 }
 
-function getQuickCronJobData(object: any): Record<QuickCronJobAttribute, JsonValue> {
+function getTaskData(object: any): Record<TaskAttribute, JsonValue> {
 	const readyCondition = object?.status?.conditions?.find(
 		(condition: any) => condition.type === 'Ready'
 	);
@@ -41,7 +41,6 @@ function getQuickCronJobData(object: any): Record<QuickCronJobAttribute, JsonVal
 	return {
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.metadata?.namespace ?? null,
-		Schedule: object?.spec?.cronSchedule ?? null,
 		State: object?.status?.state ?? null,
 		Ready:
 			readyCondition?.status === 'True'
@@ -49,34 +48,35 @@ function getQuickCronJobData(object: any): Record<QuickCronJobAttribute, JsonVal
 				: readyCondition?.status === 'False'
 					? 'False'
 					: '',
-		LastScheduleTime: object?.status?.lastScheduleTime ?? null,
+		Status: object?.status?.status ?? null,
+		Completions: object?.status?.completions != null ? String(object.status.completions) : null,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
 	};
 }
 
-function getQuickCronJobUISchemas(): Record<QuickCronJobAttribute, UISchemaType> {
+function getTaskUISchemas(): Record<TaskAttribute, UISchemaType> {
 	return {
 		Name: 'link',
 		Namespace: 'text',
-		Schedule: 'text',
 		State: 'text',
 		Ready: 'text',
-		LastScheduleTime: 'time',
+		Status: 'text',
+		Completions: 'text',
 		Age: 'time',
 		raw: 'object'
 	};
 }
 
-function getQuickCronJobColumnDefinitions(
+function getTaskColumnDefinitions(
 	apiResource: APIResource,
-	uiSchemas: Record<QuickCronJobAttribute, UISchemaType>,
-	dataSchemas: Record<QuickCronJobAttribute, DataSchemaType>
-): ColumnDef<Record<QuickCronJobAttribute, JsonValue>>[] {
+	uiSchemas: Record<TaskAttribute, UISchemaType>,
+	dataSchemas: Record<TaskAttribute, DataSchemaType>
+): ColumnDef<Record<TaskAttribute, JsonValue>>[] {
 	return [
 		{
 			id: 'Name',
-			header: ({ column }: { column: Column<Record<QuickCronJobAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<TaskAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -85,8 +85,8 @@ function getQuickCronJobColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<QuickCronJobAttribute, JsonValue>>;
-				row: Row<Record<QuickCronJobAttribute, JsonValue>>;
+				column: Column<Record<TaskAttribute, JsonValue>>;
+				row: Row<Record<TaskAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -95,7 +95,7 @@ function getQuickCronJobColumnDefinitions(
 					metadata: {
 						hyperlink: buildResourceDetailUrl(
 							apiResource,
-							row.original[column.id as QuickCronJobAttribute] as string,
+							row.original[column.id as TaskAttribute] as string,
 							row.original['Namespace'] as string
 						)
 					} satisfies LinkMetadata
@@ -104,7 +104,7 @@ function getQuickCronJobColumnDefinitions(
 		},
 		{
 			id: 'Namespace',
-			header: ({ column }: { column: Column<Record<QuickCronJobAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<TaskAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -113,8 +113,8 @@ function getQuickCronJobColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<QuickCronJobAttribute, JsonValue>>;
-				row: Row<Record<QuickCronJobAttribute, JsonValue>>;
+				column: Column<Record<TaskAttribute, JsonValue>>;
+				row: Row<Record<TaskAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -125,7 +125,7 @@ function getQuickCronJobColumnDefinitions(
 		},
 		{
 			id: 'State',
-			header: ({ column }: { column: Column<Record<QuickCronJobAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<TaskAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -134,8 +134,8 @@ function getQuickCronJobColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<QuickCronJobAttribute, JsonValue>>;
-				row: Row<Record<QuickCronJobAttribute, JsonValue>>;
+				column: Column<Record<TaskAttribute, JsonValue>>;
+				row: Row<Record<TaskAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -146,7 +146,7 @@ function getQuickCronJobColumnDefinitions(
 		},
 		{
 			id: 'Ready',
-			header: ({ column }: { column: Column<Record<QuickCronJobAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<TaskAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -155,8 +155,8 @@ function getQuickCronJobColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<QuickCronJobAttribute, JsonValue>>;
-				row: Row<Record<QuickCronJobAttribute, JsonValue>>;
+				column: Column<Record<TaskAttribute, JsonValue>>;
+				row: Row<Record<TaskAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -166,8 +166,8 @@ function getQuickCronJobColumnDefinitions(
 			accessorKey: 'Ready'
 		},
 		{
-			id: 'Schedule',
-			header: ({ column }: { column: Column<Record<QuickCronJobAttribute, JsonValue>> }) =>
+			id: 'Status',
+			header: ({ column }: { column: Column<Record<TaskAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -176,19 +176,19 @@ function getQuickCronJobColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<QuickCronJobAttribute, JsonValue>>;
-				row: Row<Record<QuickCronJobAttribute, JsonValue>>;
+				column: Column<Record<TaskAttribute, JsonValue>>;
+				row: Row<Record<TaskAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'Schedule'
+			accessorKey: 'Status'
 		},
 		{
-			id: 'LastScheduleTime',
-			header: ({ column }: { column: Column<Record<QuickCronJobAttribute, JsonValue>> }) =>
+			id: 'Completions',
+			header: ({ column }: { column: Column<Record<TaskAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -197,19 +197,19 @@ function getQuickCronJobColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<QuickCronJobAttribute, JsonValue>>;
-				row: Row<Record<QuickCronJobAttribute, JsonValue>>;
+				column: Column<Record<TaskAttribute, JsonValue>>;
+				row: Row<Record<TaskAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'LastScheduleTime'
+			accessorKey: 'Completions'
 		},
 		{
 			id: 'Age',
-			header: ({ column }: { column: Column<Record<QuickCronJobAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<TaskAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -218,8 +218,8 @@ function getQuickCronJobColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<QuickCronJobAttribute, JsonValue>>;
-				row: Row<Record<QuickCronJobAttribute, JsonValue>>;
+				column: Column<Record<TaskAttribute, JsonValue>>;
+				row: Row<Record<TaskAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -231,9 +231,4 @@ function getQuickCronJobColumnDefinitions(
 	];
 }
 
-export {
-	getQuickCronJobColumnDefinitions,
-	getQuickCronJobData,
-	getQuickCronJobDataSchemas,
-	getQuickCronJobUISchemas
-};
+export { getTaskColumnDefinitions, getTaskData, getTaskDataSchemas, getTaskUISchemas };

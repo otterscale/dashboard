@@ -1,14 +1,9 @@
 import { type JsonObject, type JsonValue } from '@bufbuild/protobuf';
 import type { APIResource } from '@otterscale/api/resource/v1';
-import type { WorkloadOtterscaleIoV1Alpha1Application } from '@otterscale/types';
 import type { Column, ColumnDef } from '@tanstack/table-core';
 import { type Row } from '@tanstack/table-core';
 
 import { DynamicTableCell, DynamicTableHeader } from '$lib/components/dynamic-table';
-import type {
-	ArrayOfObjectItemType,
-	ArrayOfObjectMetadata
-} from '$lib/components/dynamic-table/dynamic-table-cells/array-of-object-cell.svelte';
 import type { LinkMetadata } from '$lib/components/dynamic-table/dynamic-table-cells/link-cell.svelte';
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
@@ -18,9 +13,10 @@ import { buildResourceDetailUrl } from './resource-url';
 type ApplicationAttribute =
 	| 'Name'
 	| 'Namespace'
-	| 'Workload Type'
-	| 'Resources'
-	| 'Status'
+	| 'State'
+	| 'Ready'
+	| 'ServiceType'
+	| 'ServicePort'
 	| 'Age'
 	| 'raw';
 
@@ -28,40 +24,34 @@ function getApplicationDataSchemas(): Record<ApplicationAttribute, DataSchemaTyp
 	return {
 		Name: 'text',
 		Namespace: 'text',
-		'Workload Type': 'text',
-		Resources: 'number',
-		Status: 'text',
+		State: 'text',
+		Ready: 'text',
+		ServiceType: 'text',
+		ServicePort: 'text',
 		Age: 'time',
 		raw: 'object'
 	};
 }
 
-function getApplicationData(
-	object: WorkloadOtterscaleIoV1Alpha1Application
-): Record<ApplicationAttribute, JsonValue> {
-	const resourcesCount = [
-		object.status?.deploymentRef,
-		object.status?.cronJobRef,
-		object.status?.jobRef,
-		object.status?.serviceRef,
-		object.status?.persistentVolumeClaimRef
-	].filter(Boolean).length;
-
-	const readyCondition = object.status?.conditions?.find((condition) => condition.type === 'Ready');
+function getApplicationData(object: any): Record<ApplicationAttribute, JsonValue> {
+	const readyCondition = object?.status?.conditions?.find(
+		(condition: any) => condition.type === 'Ready'
+	);
 
 	return {
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.metadata?.namespace ?? null,
-		'Workload Type': object?.spec?.workloadType ?? 'Deployment',
-		Resources: resourcesCount,
-		Status:
+		State: object?.status?.state ?? null,
+		Ready:
 			readyCondition?.status === 'True'
-				? 'Ready'
+				? 'True'
 				: readyCondition?.status === 'False'
-					? readyCondition.reason
+					? 'False'
 					: '',
-		Age: object?.metadata?.creationTimestamp as JsonValue,
-		raw: object as JsonObject
+		ServiceType: object?.spec?.serviceType ?? null,
+		ServicePort: object?.status?.nodePort != null ? String(object.status.nodePort) : null,
+		Age: object?.metadata?.creationTimestamp ?? null,
+		raw: (object as JsonObject) ?? null
 	};
 }
 
@@ -69,9 +59,10 @@ function getApplicationUISchemas(): Record<ApplicationAttribute, UISchemaType> {
 	return {
 		Name: 'link',
 		Namespace: 'text',
-		'Workload Type': 'text',
-		Resources: 'array-of-object',
-		Status: 'text',
+		State: 'text',
+		Ready: 'text',
+		ServiceType: 'text',
+		ServicePort: 'text',
 		Age: 'time',
 		raw: 'object'
 	};
@@ -80,7 +71,7 @@ function getApplicationUISchemas(): Record<ApplicationAttribute, UISchemaType> {
 function getApplicationColumnDefinitions(
 	apiResource: APIResource,
 	uiSchemas: Record<ApplicationAttribute, UISchemaType>,
-	dataSchemas: Record<string, DataSchemaType>
+	dataSchemas: Record<ApplicationAttribute, DataSchemaType>
 ): ColumnDef<Record<ApplicationAttribute, JsonValue>>[] {
 	return [
 		{
@@ -107,7 +98,7 @@ function getApplicationColumnDefinitions(
 							row.original[column.id as ApplicationAttribute] as string,
 							row.original['Namespace'] as string
 						)
-					} as LinkMetadata
+					} satisfies LinkMetadata
 				}),
 			accessorKey: 'Name'
 		},
@@ -133,7 +124,7 @@ function getApplicationColumnDefinitions(
 			accessorKey: 'Namespace'
 		},
 		{
-			id: 'Workload Type',
+			id: 'State',
 			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
@@ -151,74 +142,10 @@ function getApplicationColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'Workload Type'
+			accessorKey: 'State'
 		},
 		{
-			id: 'Resources',
-			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<ApplicationAttribute, JsonValue>>;
-				row: Row<Record<ApplicationAttribute, JsonValue>>;
-			}) => {
-				const application = row.original.raw as WorkloadOtterscaleIoV1Alpha1Application;
-				const items: ArrayOfObjectItemType[] = [];
-
-				if (application.status?.deploymentRef) {
-					items.push({
-						title: 'Deployment',
-						description: application.status.deploymentRef.name,
-						raw: application.status.deploymentRef as any
-					});
-				}
-				if (application.status?.cronJobRef) {
-					items.push({
-						title: 'CronJob',
-						description: application.status.cronJobRef.name,
-						raw: application.status.cronJobRef as any
-					});
-				}
-				if (application.status?.jobRef) {
-					items.push({
-						title: 'Job',
-						description: application.status.jobRef.name,
-						raw: application.status.jobRef as any
-					});
-				}
-				if (application.status?.serviceRef) {
-					items.push({
-						title: 'Service',
-						description: application.status.serviceRef.name,
-						raw: application.status.serviceRef as any
-					});
-				}
-				if (application.status?.persistentVolumeClaimRef) {
-					items.push({
-						title: 'PVC',
-						description: application.status.persistentVolumeClaimRef.name,
-						raw: application.status.persistentVolumeClaimRef as any
-					});
-				}
-
-				return renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas,
-					metadata: {
-						items
-					} satisfies ArrayOfObjectMetadata
-				});
-			},
-			accessorKey: 'Resources'
-		},
-		{
-			id: 'Status',
+			id: 'Ready',
 			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
@@ -236,7 +163,49 @@ function getApplicationColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'Status'
+			accessorKey: 'Ready'
+		},
+		{
+			id: 'ServiceType',
+			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<ApplicationAttribute, JsonValue>>;
+				row: Row<Record<ApplicationAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'ServiceType'
+		},
+		{
+			id: 'ServicePort',
+			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<ApplicationAttribute, JsonValue>>;
+				row: Row<Record<ApplicationAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'ServicePort'
 		},
 		{
 			id: 'Age',

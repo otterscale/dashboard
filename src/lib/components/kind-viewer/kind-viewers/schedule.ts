@@ -10,30 +10,30 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 import { buildResourceDetailUrl } from './resource-url';
 
-type QuickDeploymentAttribute =
+type ScheduleAttribute =
 	| 'Name'
 	| 'Namespace'
+	| 'Schedule'
 	| 'State'
 	| 'Ready'
-	| 'ServiceType'
-	| 'ServicePort'
+	| 'LastScheduleTime'
 	| 'Age'
 	| 'raw';
 
-function getQuickDeploymentDataSchemas(): Record<QuickDeploymentAttribute, DataSchemaType> {
+function getScheduleDataSchemas(): Record<ScheduleAttribute, DataSchemaType> {
 	return {
 		Name: 'text',
 		Namespace: 'text',
+		Schedule: 'text',
 		State: 'text',
 		Ready: 'text',
-		ServiceType: 'text',
-		ServicePort: 'text',
+		LastScheduleTime: 'time',
 		Age: 'time',
 		raw: 'object'
 	};
 }
 
-function getQuickDeploymentData(object: any): Record<QuickDeploymentAttribute, JsonValue> {
+function getScheduleData(object: any): Record<ScheduleAttribute, JsonValue> {
 	const readyCondition = object?.status?.conditions?.find(
 		(condition: any) => condition.type === 'Ready'
 	);
@@ -41,6 +41,7 @@ function getQuickDeploymentData(object: any): Record<QuickDeploymentAttribute, J
 	return {
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.metadata?.namespace ?? null,
+		Schedule: object?.spec?.cronSchedule ?? null,
 		State: object?.status?.state ?? null,
 		Ready:
 			readyCondition?.status === 'True'
@@ -48,35 +49,34 @@ function getQuickDeploymentData(object: any): Record<QuickDeploymentAttribute, J
 				: readyCondition?.status === 'False'
 					? 'False'
 					: '',
-		ServiceType: object?.spec?.serviceType ?? null,
-		ServicePort: object?.status?.nodePort != null ? String(object.status.nodePort) : null,
+		LastScheduleTime: object?.status?.lastScheduleTime ?? null,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
 	};
 }
 
-function getQuickDeploymentUISchemas(): Record<QuickDeploymentAttribute, UISchemaType> {
+function getScheduleUISchemas(): Record<ScheduleAttribute, UISchemaType> {
 	return {
 		Name: 'link',
 		Namespace: 'text',
+		Schedule: 'text',
 		State: 'text',
 		Ready: 'text',
-		ServiceType: 'text',
-		ServicePort: 'text',
+		LastScheduleTime: 'time',
 		Age: 'time',
 		raw: 'object'
 	};
 }
 
-function getQuickDeploymentColumnDefinitions(
+function getScheduleColumnDefinitions(
 	apiResource: APIResource,
-	uiSchemas: Record<QuickDeploymentAttribute, UISchemaType>,
-	dataSchemas: Record<QuickDeploymentAttribute, DataSchemaType>
-): ColumnDef<Record<QuickDeploymentAttribute, JsonValue>>[] {
+	uiSchemas: Record<ScheduleAttribute, UISchemaType>,
+	dataSchemas: Record<ScheduleAttribute, DataSchemaType>
+): ColumnDef<Record<ScheduleAttribute, JsonValue>>[] {
 	return [
 		{
 			id: 'Name',
-			header: ({ column }: { column: Column<Record<QuickDeploymentAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<ScheduleAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -85,8 +85,8 @@ function getQuickDeploymentColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<QuickDeploymentAttribute, JsonValue>>;
-				row: Row<Record<QuickDeploymentAttribute, JsonValue>>;
+				column: Column<Record<ScheduleAttribute, JsonValue>>;
+				row: Row<Record<ScheduleAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -95,7 +95,7 @@ function getQuickDeploymentColumnDefinitions(
 					metadata: {
 						hyperlink: buildResourceDetailUrl(
 							apiResource,
-							row.original[column.id as QuickDeploymentAttribute] as string,
+							row.original[column.id as ScheduleAttribute] as string,
 							row.original['Namespace'] as string
 						)
 					} satisfies LinkMetadata
@@ -104,7 +104,7 @@ function getQuickDeploymentColumnDefinitions(
 		},
 		{
 			id: 'Namespace',
-			header: ({ column }: { column: Column<Record<QuickDeploymentAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<ScheduleAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -113,8 +113,8 @@ function getQuickDeploymentColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<QuickDeploymentAttribute, JsonValue>>;
-				row: Row<Record<QuickDeploymentAttribute, JsonValue>>;
+				column: Column<Record<ScheduleAttribute, JsonValue>>;
+				row: Row<Record<ScheduleAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -125,7 +125,7 @@ function getQuickDeploymentColumnDefinitions(
 		},
 		{
 			id: 'State',
-			header: ({ column }: { column: Column<Record<QuickDeploymentAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<ScheduleAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -134,8 +134,8 @@ function getQuickDeploymentColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<QuickDeploymentAttribute, JsonValue>>;
-				row: Row<Record<QuickDeploymentAttribute, JsonValue>>;
+				column: Column<Record<ScheduleAttribute, JsonValue>>;
+				row: Row<Record<ScheduleAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -146,7 +146,7 @@ function getQuickDeploymentColumnDefinitions(
 		},
 		{
 			id: 'Ready',
-			header: ({ column }: { column: Column<Record<QuickDeploymentAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<ScheduleAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -155,8 +155,8 @@ function getQuickDeploymentColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<QuickDeploymentAttribute, JsonValue>>;
-				row: Row<Record<QuickDeploymentAttribute, JsonValue>>;
+				column: Column<Record<ScheduleAttribute, JsonValue>>;
+				row: Row<Record<ScheduleAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -166,8 +166,8 @@ function getQuickDeploymentColumnDefinitions(
 			accessorKey: 'Ready'
 		},
 		{
-			id: 'ServiceType',
-			header: ({ column }: { column: Column<Record<QuickDeploymentAttribute, JsonValue>> }) =>
+			id: 'Schedule',
+			header: ({ column }: { column: Column<Record<ScheduleAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -176,19 +176,19 @@ function getQuickDeploymentColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<QuickDeploymentAttribute, JsonValue>>;
-				row: Row<Record<QuickDeploymentAttribute, JsonValue>>;
+				column: Column<Record<ScheduleAttribute, JsonValue>>;
+				row: Row<Record<ScheduleAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'ServiceType'
+			accessorKey: 'Schedule'
 		},
 		{
-			id: 'ServicePort',
-			header: ({ column }: { column: Column<Record<QuickDeploymentAttribute, JsonValue>> }) =>
+			id: 'LastScheduleTime',
+			header: ({ column }: { column: Column<Record<ScheduleAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -197,19 +197,19 @@ function getQuickDeploymentColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<QuickDeploymentAttribute, JsonValue>>;
-				row: Row<Record<QuickDeploymentAttribute, JsonValue>>;
+				column: Column<Record<ScheduleAttribute, JsonValue>>;
+				row: Row<Record<ScheduleAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'ServicePort'
+			accessorKey: 'LastScheduleTime'
 		},
 		{
 			id: 'Age',
-			header: ({ column }: { column: Column<Record<QuickDeploymentAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<ScheduleAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -218,8 +218,8 @@ function getQuickDeploymentColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<QuickDeploymentAttribute, JsonValue>>;
-				row: Row<Record<QuickDeploymentAttribute, JsonValue>>;
+				column: Column<Record<ScheduleAttribute, JsonValue>>;
+				row: Row<Record<ScheduleAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -232,8 +232,8 @@ function getQuickDeploymentColumnDefinitions(
 }
 
 export {
-	getQuickDeploymentColumnDefinitions,
-	getQuickDeploymentData,
-	getQuickDeploymentDataSchemas,
-	getQuickDeploymentUISchemas
+	getScheduleColumnDefinitions,
+	getScheduleData,
+	getScheduleDataSchemas,
+	getScheduleUISchemas
 };

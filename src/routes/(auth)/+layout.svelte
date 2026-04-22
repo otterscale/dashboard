@@ -225,15 +225,15 @@
 				items: [
 					{
 						title: m.application(),
-						url: resourceUrl('kro.run', 'v1alpha1', 'QuickDeployment', 'quickdeployments')
+						url: resourceUrl('kro.run', 'v1alpha1', 'Application', 'applications')
 					},
 					{
 						title: m.task(),
-						url: resourceUrl('kro.run', 'v1alpha1', 'QuickJob', 'quickjobs')
+						url: resourceUrl('kro.run', 'v1alpha1', 'Task', 'tasks')
 					},
 					{
 						title: m.schedule(),
-						url: resourceUrl('kro.run', 'v1alpha1', 'QuickCronJob', 'quickcronjobs')
+						url: resourceUrl('kro.run', 'v1alpha1', 'Schedule', 'schedules')
 					}
 				]
 			},

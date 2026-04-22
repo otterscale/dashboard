@@ -259,7 +259,8 @@
 						properties: {
 							serviceType: {
 								...lodash.get(jsonSchema, 'properties.spec.properties.serviceType'),
-								title: 'Service Type'
+								title: 'Service Type',
+								enum: ['ExternalName', 'ClusterIP', 'NodePort', 'LoadBalancer']
 							}
 						},
 						dependencies: {
