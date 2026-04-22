@@ -19,6 +19,10 @@ import HelmRepositoryCreate from './helm-repository/create.svelte';
 import InstanceTypeActions from './instance-type/actions.svelte';
 import InstanceTypeCreate from './instance-type/create.svelte';
 import JobActions from './job/actions.svelte';
+import KroActions from './kro/actions.svelte';
+import QuickCronjobCreate from './kro/create-cronjob.svelte';
+import QuickDeployCreate from './kro/create-deployment.svelte';
+import QuickJobCreate from './kro/create-job.svelte';
 import ModelArtifactActions from './model-artifact/actions.svelte';
 import ModelArtifactCreate from './model-artifact/create.svelte';
 import ModelServiceActions from './model-service/actions.svelte';
@@ -83,6 +87,12 @@ function getCreate(kind: string): CreateType {
 			return ObjectBucketClaimCreate as CreateType;
 		case 'Node':
 			return NodeCreate as CreateType;
+		case 'QuickDeployment':
+			return QuickDeployCreate as CreateType;
+		case 'QuickJob':
+			return QuickJobCreate as CreateType;
+		case 'QuickCronjob':
+			return QuickCronjobCreate as CreateType;
 		default:
 			return DefaultCreate as CreateType;
 	}
@@ -128,6 +138,12 @@ function getActions(kind: string): ActionsType {
 			return InstanceTypeActions as ActionsType;
 		case 'ObjectBucketClaim':
 			return ObjectBucketClaimActions as ActionsType;
+		case 'QuickDeployment':
+			return KroActions as ActionsType;
+		case 'QuickJob':
+			return KroActions as ActionsType;
+		case 'QuickCronjob':
+			return KroActions as ActionsType;
 		default:
 			return DefaultActions as ActionsType;
 	}

@@ -326,5 +326,8 @@
 	"compute_status": "運算狀態",
 	"storage_status": "儲存狀態",
 	"block_pool": "區塊池",
-	"object_storage": "物件儲存"
+	"object_storage": "物件儲存",
+	"workload": "工作負載",
+	"task": "任務",
+	"schedule": "排程器"
 }

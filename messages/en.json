@@ -326,5 +326,8 @@
 	"compute_status": "Compute Status",
 	"storage_status": "Storage Status",
 	"block_pool": "Block Pool",
-	"object_storage": "Object Storage"
+	"object_storage": "Object Storage",
+	"workload": "Workload",
+	"task": "Task",
+	"schedule": "Schedule"
 }

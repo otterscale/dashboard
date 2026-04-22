@@ -157,6 +157,24 @@ import {
 } from './persistentvolumeclaim.js';
 import { getPodColumnDefinitions, getPodData, getPodDataSchemas, getPodUISchemas } from './pod.js';
 import {
+	getQuickCronjobColumnDefinitions,
+	getQuickCronjobData,
+	getQuickCronjobDataSchemas,
+	getQuickCronjobUISchemas
+} from './quick-cronjob.js';
+import {
+	getQuickDeploymentColumnDefinitions,
+	getQuickDeploymentData,
+	getQuickDeploymentDataSchemas,
+	getQuickDeploymentUISchemas
+} from './quick-deployment.js';
+import {
+	getQuickJobColumnDefinitions,
+	getQuickJobData,
+	getQuickJobDataSchemas,
+	getQuickJobUISchemas
+} from './quick-job.js';
+import {
 	getResourceQuotaColumnDefinitions,
 	getResourceQuotaData,
 	getResourceQuotaDataSchemas,
@@ -291,6 +309,12 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 			return getVirtualMachineInstancetypeDataSchemas();
 		case 'ObjectBucketClaim':
 			return getObjectBucketClaimDataSchemas();
+		case 'QuickDeployment':
+			return getQuickDeploymentDataSchemas();
+		case 'QuickJob':
+			return getQuickJobDataSchemas();
+		case 'QuickCronjob':
+			return getQuickCronjobDataSchemas();
 		default:
 			return getDefaultDataSchemas();
 	}
@@ -370,6 +394,12 @@ function getData(apiResource: APIResource, object: any): Record<string, JsonValu
 			return getVirtualMachineInstancetypeData(object);
 		case 'ObjectBucketClaim':
 			return getObjectBucketClaimData(object);
+		case 'QuickDeployment':
+			return getQuickDeploymentData(object);
+		case 'QuickJob':
+			return getQuickJobData(object);
+		case 'QuickCronjob':
+			return getQuickCronjobData(object);
 		default:
 			return getDefaultData(apiResource, object);
 	}
@@ -449,6 +479,12 @@ function getUISchemas(kind: string): Record<string, UISchemaType> {
 			return getVirtualMachineInstancetypeUISchemas();
 		case 'ObjectBucketClaim':
 			return getObjectBucketClaimUISchemas();
+		case 'QuickDeployment':
+			return getQuickDeploymentUISchemas();
+		case 'QuickJob':
+			return getQuickJobUISchemas();
+		case 'QuickCronjob':
+			return getQuickCronjobUISchemas();
 		default:
 			return getDefaultUISchemas();
 	}
@@ -533,6 +569,12 @@ function getColumnDefinitions(
 			return getVirtualMachineInstancetypeColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'ObjectBucketClaim':
 			return getObjectBucketClaimColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'QuickDeployment':
+			return getQuickDeploymentColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'QuickJob':
+			return getQuickJobColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'QuickCronjob':
+			return getQuickCronjobColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		default:
 			return getDefaultColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 	}

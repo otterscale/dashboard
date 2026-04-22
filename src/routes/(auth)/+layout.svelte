@@ -7,6 +7,7 @@
 	import BracesIcon from '@lucide/svelte/icons/braces';
 	import CircleQuestionMarkIcon from '@lucide/svelte/icons/circle-question-mark';
 	import CompassIcon from '@lucide/svelte/icons/compass';
+	import ContainerIcon from '@lucide/svelte/icons/container';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import GaugeIcon from '@lucide/svelte/icons/gauge';
@@ -200,10 +201,6 @@
 				isActive: true,
 				items: [
 					{
-						title: m.application(),
-						url: resourceUrl('workload.otterscale.io', 'v1alpha1', 'Application', 'applications')
-					},
-					{
 						title: m.application_hub(),
 						url: page.params.workspace
 							? resolve('/(auth)/[cluster]/[workspace]/hub', {
@@ -219,6 +216,24 @@
 					{
 						title: m.repository(),
 						url: resourceUrl('source.toolkit.fluxcd.io', 'v1', 'HelmRepository', 'helmrepositories')
+					}
+				]
+			},
+			{
+				title: m.workload(),
+				icon: ContainerIcon,
+				items: [
+					{
+						title: m.service(),
+						url: resourceUrl('kro.run', 'v1alpha1', 'QuickDeployment', 'quickdeployments')
+					},
+					{
+						title: m.job(),
+						url: resourceUrl('kro.run', 'v1alpha1', 'QuickJob', 'quickjobs')
+					},
+					{
+						title: m.scheduler(),
+						url: resourceUrl('kro.run', 'v1alpha1', 'QuickCronjob', 'quickcronjobs')
 					}
 				]
 			},
