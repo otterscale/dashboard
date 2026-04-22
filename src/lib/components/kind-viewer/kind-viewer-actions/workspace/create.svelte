@@ -359,7 +359,9 @@
 						'requests.cpu': '16',
 						'requests.memory': '32Gi',
 						'limits.cpu': '16',
-						'limits.memory': '32Gi'
+						'limits.memory': '32Gi',
+						'limits.nvidia.com/gpu': '0',
+						'limits.nvidia.com/gpumem': '0'
 					}
 				} as FormValue,
 				handleSubmit: {
