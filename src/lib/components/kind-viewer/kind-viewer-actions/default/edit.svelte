@@ -40,7 +40,7 @@
 		onOpenChangeComplete: () => void;
 	} = $props();
 
-	let value = $derived(stringify(object));
+	let value = $state(stringify(object));
 
 	let editorInstance: import('monaco-editor').editor.IStandaloneCodeEditor | undefined =
 		$state(undefined);
@@ -215,46 +215,22 @@
 	function handleConfirm() {
 		if (isSubmitting) return;
 
-		isSubmitting = true;
-
-		// Check for validation errors before submission
-		const monaco = monacoInstance;
-		const editor = editorInstance;
-		if (monaco && editor) {
-			const model = editor.getModel();
-			if (model) {
-				const markers = monaco.editor.getModelMarkers({ resource: model.uri });
-				const hasErrors = markers.some(
-					(marker) => marker.severity === monaco.MarkerSeverity.Error
-				);
-				if (hasErrors) {
-					toast.error('Please fix all YAML errors before submitting', {
-						duration: 5000,
-						closeButton: true
-					});
-					isSubmitting = false;
-					return;
-				}
-			}
-		}
-
-		let initialStructuredValue: any;
-		let currentStructuredValue: any;
-
-		try {
-			initialStructuredValue = load(stringify(object), { schema: JSON_SCHEMA });
-			currentStructuredValue = load(value, { schema: JSON_SCHEMA });
-			if (!currentStructuredValue || typeof currentStructuredValue !== 'object') {
-				throw new Error('Parsed YAML is not a valid object');
-			}
-		} catch (error) {
-			toast.error(`Invalid YAML: ${(error as Error).message}`, {
-				duration: 5000,
-				closeButton: true
-			});
-			isSubmitting = false;
+		const document = parseDocument(value);
+		if (document.errors.length > 0) {
+			toast.error('YAML syntax errors found. Please fix them before submitting.');
 			return;
 		}
+
+		const parsed = document.toJS() as Record<string, any>;
+		if (!validate(parsed)) {
+			toast.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
+			return;
+		}
+
+		isSubmitting = true;
+
+		const initialStructuredValue: any = load(stringify(object), { schema: JSON_SCHEMA });
+		const currentStructuredValue: any = load(value, { schema: JSON_SCHEMA });
 
 		const patches = jsonpatch.compare(initialStructuredValue, currentStructuredValue);
 
