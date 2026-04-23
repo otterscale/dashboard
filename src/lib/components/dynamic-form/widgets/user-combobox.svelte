@@ -7,8 +7,8 @@
 
 	export interface KeycloakUser {
 		id: string;
+		name: string;
 		username: string;
-		email?: string;
 		firstName?: string;
 		lastName?: string;
 	}
@@ -19,8 +19,17 @@
 			TailoredUserComboboxTrigger?: ButtonProps;
 			TailoredUserComboboxInput?: CommandType.InputProps;
 			TailoredUserComboboxEmptyText?: string;
-			TailoredUserComboboxOnFetched?: (users: KeycloakUser[]) => void;
+			TailoredUserComboboxOnFetch?: (users: KeycloakUser[]) => void;
 		}
+	}
+
+	export function getDisplayName(user: KeycloakUser | undefined) {
+		if (!user) return '';
+
+		const displayName = ((user.firstName ?? '') + ' ' + (user.lastName ?? '')).trim();
+		if (!displayName) return user.username;
+
+		return displayName;
 	}
 </script>
 
@@ -51,14 +60,15 @@
 
 	const ctx = getFormContext();
 
+	// Bind subject for identifier user
 	let { value = $bindable(), config, handlers }: ComponentProps['comboboxWidget'] = $props();
 	const { ...buttonHandlers } = $derived(handlers);
 
-	let filterValue = $state((value as string) ?? '');
+	let filterValue = $state('');
 	let enumerations = $state<{ label: string; value: string }[]>([]);
 
-	const onFetched = $derived(
-		retrieveUiOption(ctx, config, 'TailoredUserComboboxOnFetched') as
+	const onFetch = $derived(
+		retrieveUiOption(ctx, config, 'TailoredUserComboboxOnFetch') as
 			| ((users: KeycloakUser[]) => void)
 			| undefined
 	);
@@ -72,10 +82,10 @@
 				const response = await fetch(`/rest/users?search=${encodeURIComponent(search)}`);
 				if (response.ok) {
 					const fetched: KeycloakUser[] = await response.json();
-					onFetched?.(fetched);
+					onFetch?.(fetched);
 					enumerations = fetched.map((user) => ({
-						label: ((user.firstName ?? '') + ' ' + (user.lastName ?? '')).trim() || user.username,
-						value: user.username
+						label: getDisplayName(user),
+						value: user.id
 					}));
 				} else {
 					enumerations = [];
@@ -104,6 +114,9 @@
 		inputAttributes(ctx, config, 'TailoredUserComboboxInput', handlers, {})
 	);
 	const emptyText = $derived(retrieveUiOption(ctx, config, 'TailoredUserComboboxEmptyText'));
+	let triggerText: string | undefined = $derived(
+		enumerations.find((option) => value && option.value === value)?.label
+	);
 
 	let open = $state(false);
 	let triggerReference = $state<HTMLButtonElement>(null!);
@@ -138,9 +151,7 @@
 				)}
 			>
 				<span>
-					{enumerations.find((option) => option.value === value)?.label ??
-						value ??
-						attributes.placeholder}
+					{triggerText ?? attributes.placeholder}
 				</span>
 				<ChevronsUpDown class="ml-2 size-4 shrink-0 opacity-50" />
 			</Button>
@@ -161,7 +172,7 @@
 					</Empty.Root>
 				{/if}
 				<Command.Group>
-					{#each filteredOptions.slice(0, visibleOptions) as option (option.value)}
+					{#each filteredOptions.slice(0, visibleOptions) as option, index (index)}
 						<Command.Item
 							value={option.value}
 							onSelect={() => {
@@ -169,7 +180,9 @@
 								closeAndFocusTrigger();
 							}}
 						>
-							<Check class={cn('mr-2 size-4', value !== option.value && 'text-transparent')} />
+							<Check
+								class={cn('mr-2 size-4', !(value && value === option.value) && 'text-transparent')}
+							/>
 							<Item.Root class="w-full p-0">
 								<Item.Content class="text-start">
 									<Item.Title>{option.label}</Item.Title>

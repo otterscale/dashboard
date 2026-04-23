@@ -16,7 +16,10 @@
 
 	import { page } from '$app/state';
 	import Form from '$lib/components/dynamic-form/form.svelte';
-	import UserComboboxWidget from '$lib/components/dynamic-form/widgets/user-combobox.svelte';
+	import UserComboboxWidget, {
+		getDisplayName,
+		type KeycloakUser
+	} from '$lib/components/dynamic-form/widgets/user-combobox.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
@@ -137,10 +140,11 @@
 						'name'
 					],
 					properties: {
-						name: {
+						// For user friendly, use subject to identifier user and render username.
+						subject: {
 							...(lodash.get(
 								jsonSchema,
-								'properties.spec.properties.members.items.properties.name'
+								'properties.spec.properties.members.items.properties.subject'
 							) as any),
 							title: 'Name'
 						},
@@ -179,7 +183,7 @@
 							}
 						}
 					},
-					name: {
+					subject: {
 						'ui:components': {
 							stringField: 'enumField',
 							selectWidget: UserComboboxWidget
@@ -190,9 +194,9 @@
 								placeholder: 'Name'
 							},
 							TailoredUserComboboxEmptyText: 'No names available.',
-							TailoredUserComboboxOnFetched: (users: KeycloakUser[]) => {
+							TailoredUserComboboxOnFetch: (users: KeycloakUser[]) => {
 								for (const user of users) {
-									usernameToKeycloakUser[user.username] = user;
+									usernameToKeycloakUserBySubject[user.id] = user;
 								}
 							}
 						}
@@ -211,21 +215,20 @@
 			initialValue: [
 				// From login user information.
 				{
-					role: 'admin',
 					subject: page.data.user.sub,
-					username: page.data.user.username,
+					role: 'admin',
 					name: page.data.user.name
 				}
 			] as FormValue,
 			transformer: (value: FormValue) => {
 				let members = value as SchemaObjectValue[];
 				members = members.map((member) => {
-					const keycloakUser = getKeycloakUser(member.name as string);
+					const keycloakUser = getKeycloakUserBySubject(member.subject as string);
 					return {
 						...member,
-						subject: member.subject ?? keycloakUser?.id ?? null,
-						username: member.username ?? keycloakUser?.username ?? null,
-						serviceAccount: isServiceAccount(keycloakUser?.username)
+						name: getDisplayName(keycloakUser) ?? null,
+						serviceAccount: isServiceAccount(keycloakUser?.username),
+						username: keycloakUser?.username ?? null
 					};
 				});
 				return members;
@@ -395,18 +398,9 @@
 		currentStep = firstStep;
 	}
 
-	// TODO: Refactor into UserManager
-	// Users
-	interface KeycloakUser {
-		id: string;
-		username: string;
-		email?: string;
-		firstName?: string;
-		lastName?: string;
-	}
-	let usernameToKeycloakUser = $state<Record<string, KeycloakUser>>({});
-	function getKeycloakUser(username: string): KeycloakUser | undefined {
-		return usernameToKeycloakUser[username];
+	let usernameToKeycloakUserBySubject = $state<Record<string, KeycloakUser>>({});
+	function getKeycloakUserBySubject(subject: string): KeycloakUser | undefined {
+		return usernameToKeycloakUserBySubject[subject];
 	}
 	function isServiceAccount(username?: string): boolean | undefined {
 		return username?.startsWith('service-account-');
