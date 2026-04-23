@@ -69,7 +69,7 @@
 		"typescript-eslint": "^8.58.2",
 		"vite": "^7.3.2",
 		"vite-plugin-devtools-json": "^1.0.0",
-		"vite-plugin-static-copy": "^3.4.0",
+		"vite-plugin-static-copy": "^4.1.0",
 		"vitest": "^4.1.4"
 	},
 	"dependencies": {
