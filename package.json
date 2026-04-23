@@ -50,7 +50,7 @@
 		"eslint-plugin-simple-import-sort": "^12.1.1",
 		"eslint-plugin-svelte": "^3.17.0",
 		"globals": "^17.5.0",
-		"layerchart": "2.0.0-next.46",
+		"layerchart": "2.0.0-next.58",
 		"mdsvex": "^0.12.7",
 		"mode-watcher": "^1.1.0",
 		"paneforge": "^1.0.2",
