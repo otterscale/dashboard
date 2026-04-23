@@ -260,7 +260,9 @@
 
 		<Field.FieldGroup>
 			<Field.Field>
-				<Field.FieldLabel for="wizard-cluster-name">{m.import_cluster_name_label()}</Field.FieldLabel>
+				<Field.FieldLabel for="wizard-cluster-name"
+					>{m.import_cluster_name_label()}</Field.FieldLabel
+				>
 				<Input
 					id="wizard-cluster-name"
 					type="text"
