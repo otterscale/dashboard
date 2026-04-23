@@ -7,14 +7,12 @@
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import TerminalIcon from '@lucide/svelte/icons/terminal';
-	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import UserIcon from '@lucide/svelte/icons/user';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { type Link, LinkService } from '@otterscale/api/link/v1';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext, onDestroy } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import { stringify } from 'yaml';
 
 	import * as Code from '$lib/components/custom/code';
 	import * as Avatar from '$lib/components/ui/avatar';
@@ -27,6 +25,7 @@
 	import * as Item from '$lib/components/ui/item';
 	import * as Popover from '$lib/components/ui/popover';
 	import { Spinner } from '$lib/components/ui/spinner';
+	import { m } from '$lib/paraglide/messages';
 	import { cn } from '$lib/utils';
 
 	let {
@@ -40,7 +39,6 @@
 	} = $props();
 
 	const POLL_INTERVAL = 3000;
-	const CLUSTER_ADMIN_BINDING_NAME = 'otterscale-cluster-admins';
 
 	interface KeycloakUser {
 		id: string;
@@ -57,9 +55,7 @@
 	let clusterName = $state('');
 	let installUrl = $state('');
 	let manifestYaml = $state('');
-	let clusterStatus = $state<
-		'pending' | 'installing' | 'ready' | 'binding' | 'done' | 'binding-failed'
-	>('pending');
+	let clusterStatus = $state<'pending' | 'installing' | 'done'>('pending');
 	let isCreating = $state(false);
 	let errorMessage = $state('');
 	let isYamlOpen = $state(false);
@@ -71,7 +67,6 @@
 	let userSearchLoading = $state(false);
 	let userSearchInitialized = false;
 	let userDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-	let bindingError = $state('');
 
 	let isPolling = false;
 	let abortController: AbortController | null = null;
@@ -81,7 +76,7 @@
 	});
 
 	const installCommand = $derived(
-		installUrl ? `kubectl apply -f ${installUrl}` : 'Generating install command...'
+		installUrl ? `kubectl apply -f ${installUrl}` : m.import_cluster_generating_command()
 	);
 
 	const canGoNext = $derived(stepIndex === 1 ? clusterName.trim().length > 0 : false);
@@ -132,38 +127,6 @@
 		selectedUsers = selectedUsers.filter((s) => s.id !== id);
 	}
 
-	async function createClusterAdminBinding() {
-		const subjects = selectedUsers
-			.filter((u) => u.id)
-			.map((u) => ({
-				kind: 'User',
-				name: u.id,
-				apiGroup: 'rbac.authorization.k8s.io'
-			}));
-		if (subjects.length === 0) return;
-
-		const manifestObj = {
-			apiVersion: 'rbac.authorization.k8s.io/v1',
-			kind: 'ClusterRoleBinding',
-			metadata: { name: CLUSTER_ADMIN_BINDING_NAME },
-			roleRef: {
-				apiGroup: 'rbac.authorization.k8s.io',
-				kind: 'ClusterRole',
-				name: 'cluster-admin'
-			},
-			subjects
-		};
-		const manifest = new TextEncoder().encode(stringify(manifestObj));
-
-		await resourceClient.create({
-			cluster: clusterName,
-			group: 'rbac.authorization.k8s.io',
-			version: 'v1',
-			resource: 'clusterrolebindings',
-			manifest
-		});
-	}
-
 	async function handleGenerateManifest() {
 		if (!clusterName.trim() || isCreating) return;
 		isCreating = true;
@@ -171,7 +134,8 @@
 
 		try {
 			const response = await linkClient.getAgentManifest({
-				cluster: clusterName
+				cluster: clusterName,
+				extraUsers: selectedUsers.map((u) => u.id).filter((id) => id)
 			});
 
 			installUrl = response.url;
@@ -179,13 +143,13 @@
 			clusterStatus = 'pending';
 			stepIndex = 2;
 
-			toast.success(`Agent manifest generated for "${clusterName}"`);
+			toast.success(m.import_cluster_manifest_generated({ name: clusterName }));
 			pollForConnection();
 		} catch (e) {
 			if (e instanceof ConnectError) {
 				errorMessage = e.message;
 			} else {
-				errorMessage = e instanceof Error ? e.message : 'Failed to generate manifest';
+				errorMessage = e instanceof Error ? e.message : m.import_cluster_manifest_failed();
 			}
 			toast.error(errorMessage);
 		} finally {
@@ -235,25 +199,7 @@
 				const conditions: any[] = obj?.status?.conditions ?? [];
 				const available = conditions.find((c: any) => c.type === 'Available');
 				if (available?.status === 'True') {
-					clusterStatus = 'ready';
-					if (selectedUsers.length > 0) {
-						clusterStatus = 'binding';
-						try {
-							await createClusterAdminBinding();
-							clusterStatus = 'done';
-						} catch (e) {
-							bindingError =
-								e instanceof ConnectError
-									? e.message
-									: e instanceof Error
-										? e.message
-										: 'Failed to grant cluster-admin';
-							clusterStatus = 'binding-failed';
-							toast.error(`Permission grant failed: ${bindingError}`);
-						}
-					} else {
-						clusterStatus = 'done';
-					}
+					clusterStatus = 'done';
 					stepIndex = 3;
 					break;
 				}
@@ -281,19 +227,19 @@
 	{#if stepIndex === 1 || stepIndex === 3}
 		<div class="mt-auto flex w-full items-center justify-between gap-3 pt-4">
 			{#if stepIndex === 1}
-				<Button variant="outline" onclick={onBack}>Previous</Button>
+				<Button variant="outline" onclick={onBack}>{m.previous()}</Button>
 				<Button onclick={handleGenerateManifest} disabled={!canGoNext || isCreating}>
 					{#if isCreating}
 						<Spinner data-icon="inline-start" />
-						Generating...
+						{m.import_cluster_generating()}
 					{:else}
 						<TerminalIcon data-icon="inline-start" />
-						Generate Install Command
+						{m.import_cluster_generate_install_command()}
 					{/if}
 				</Button>
 			{:else if stepIndex === 3}
 				<div></div>
-				<Button onclick={onFinish}>Done</Button>
+				<Button onclick={onFinish}>{m.done()}</Button>
 			{/if}
 		</div>
 	{/if}
@@ -308,26 +254,28 @@
 		}}
 	>
 		<div class="flex flex-col gap-1">
-			<h3 class="text-xl font-bold">Cluster Information</h3>
-			<p class="text-sm text-muted-foreground">Provide details about this cluster.</p>
+			<h3 class="text-xl font-bold">{m.import_cluster_info_title()}</h3>
+			<p class="text-sm text-muted-foreground">{m.import_cluster_info_description()}</p>
 		</div>
 
 		<Field.FieldGroup>
 			<Field.Field>
-				<Field.FieldLabel for="wizard-cluster-name">Cluster Name</Field.FieldLabel>
+				<Field.FieldLabel for="wizard-cluster-name"
+					>{m.import_cluster_name_label()}</Field.FieldLabel
+				>
 				<Input
 					id="wizard-cluster-name"
 					type="text"
-					placeholder="e.g. production-us-west-2"
+					placeholder={m.import_cluster_name_placeholder()}
 					bind:value={clusterName}
 					required
 				/>
 			</Field.Field>
 
 			<Field.Field>
-				<Field.FieldLabel>Cluster Administrators</Field.FieldLabel>
+				<Field.FieldLabel>{m.import_cluster_administrators()}</Field.FieldLabel>
 				<Field.FieldDescription>
-					Selected users will be granted cluster-admin via ClusterRoleBinding.
+					{m.import_cluster_administrators_description()}
 				</Field.FieldDescription>
 
 				{#if selectedUsers.length === 0}
@@ -346,9 +294,9 @@
 									</Avatar.Root>
 								</Avatar.Group>
 							</Empty.Media>
-							<Empty.Title>No Administrators</Empty.Title>
+							<Empty.Title>{m.import_cluster_no_administrators()}</Empty.Title>
 							<Empty.Description>
-								Grant trusted users cluster-admin access to manage this cluster.
+								{m.import_cluster_no_administrators_description()}
 							</Empty.Description>
 						</Empty.Header>
 						<Empty.Content>
@@ -357,22 +305,22 @@
 									{#snippet child({ props })}
 										<Button {...props}>
 											<PlusIcon data-icon="inline-start" />
-											Add Administrator
+											{m.import_cluster_add_administrator()}
 										</Button>
 									{/snippet}
 								</Popover.Trigger>
 								<Popover.Content class="w-80 p-0" align="center">
 									<Command.Root shouldFilter={false}>
 										<Command.Input
-											placeholder="Search users..."
+											placeholder={m.import_cluster_search_users_placeholder()}
 											value={userSearchQuery}
 											oninput={(e) => handleUserSearch(e.currentTarget.value)}
 										/>
 										<Command.List>
 											{#if userSearchLoading}
-												<Command.Loading>Searching...</Command.Loading>
+												<Command.Loading>{m.import_cluster_searching()}</Command.Loading>
 											{:else}
-												<Command.Empty>No users found.</Command.Empty>
+												<Command.Empty>{m.import_cluster_no_users_found()}</Command.Empty>
 												<Command.Group>
 													{#each userSearchResults as user (user.id)}
 														{@const isSelected = selectedUsers.some((s) => s.id === user.id)}
@@ -416,7 +364,7 @@
 										variant="ghost"
 										size="icon"
 										onclick={() => removeUser(user.id)}
-										aria-label={`Remove ${displayName(user)}`}
+										aria-label={m.import_cluster_remove_user({ name: displayName(user) })}
 									>
 										<XIcon />
 									</Button>
@@ -429,22 +377,22 @@
 								{#snippet child({ props })}
 									<Button {...props} variant="outline" class="w-full justify-start">
 										<PlusIcon data-icon="inline-start" />
-										Add administrator
+										{m.import_cluster_add_administrator()}
 									</Button>
 								{/snippet}
 							</Popover.Trigger>
 							<Popover.Content class="w-80 p-0" align="start">
 								<Command.Root shouldFilter={false}>
 									<Command.Input
-										placeholder="Search users..."
+										placeholder={m.import_cluster_search_users_placeholder()}
 										value={userSearchQuery}
 										oninput={(e) => handleUserSearch(e.currentTarget.value)}
 									/>
 									<Command.List>
 										{#if userSearchLoading}
-											<Command.Loading>Searching...</Command.Loading>
+											<Command.Loading>{m.import_cluster_searching()}</Command.Loading>
 										{:else}
-											<Command.Empty>No users found.</Command.Empty>
+											<Command.Empty>{m.import_cluster_no_users_found()}</Command.Empty>
 											<Command.Group>
 												{#each userSearchResults as user (user.id)}
 													{@const isSelected = selectedUsers.some((s) => s.id === user.id)}
@@ -471,16 +419,16 @@
 			</Field.Field>
 		</Field.FieldGroup>
 
-		<button type="submit" class="hidden" disabled={!canGoNext || isCreating}>Submit</button>
+		<button type="submit" class="hidden" disabled={!canGoNext || isCreating}>{m.submit()}</button>
 	</form>
 {/snippet}
 
 {#snippet stepDeployAgent()}
 	<div class="flex min-h-0 flex-1 flex-col gap-6">
 		<div class="flex flex-col gap-1">
-			<h3 class="text-xl font-bold">Deploy Agent</h3>
+			<h3 class="text-xl font-bold">{m.import_cluster_deploy_agent_title()}</h3>
 			<p class="text-sm text-muted-foreground">
-				Run the generated command on your target cluster to enroll it.
+				{m.import_cluster_deploy_agent_description()}
 			</p>
 		</div>
 
@@ -491,7 +439,7 @@
 			)}
 		>
 			<Field.FieldLabel class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-				Install Command
+				{m.import_cluster_install_command_label()}
 			</Field.FieldLabel>
 
 			<Code.Root
@@ -505,7 +453,7 @@
 			</Code.Root>
 
 			<Field.FieldDescription>
-				Copy and execute this command with kubectl on the cluster you want to import.
+				{m.import_cluster_install_command_description()}
 			</Field.FieldDescription>
 
 			{#if manifestYaml}
@@ -518,7 +466,7 @@
 					>
 						<span class="flex items-center gap-2">
 							<FileCodeIcon class="size-4" />
-							Preview YAML Manifest
+							{m.import_cluster_preview_yaml()}
 						</span>
 						<ChevronDownIcon
 							class="size-4 transition-transform duration-200 group-data-[state=open]:rotate-180"
@@ -541,7 +489,7 @@
 			</Item.Media>
 			<Item.Content>
 				<Item.Title>{clusterName}</Item.Title>
-				<Item.Description>Target Cluster</Item.Description>
+				<Item.Description>{m.import_cluster_target_cluster()}</Item.Description>
 			</Item.Content>
 			<Item.Actions>
 				{#if clusterStatus === 'pending'}
@@ -552,27 +500,17 @@
 							></span>
 							<span class="relative inline-flex size-2 rounded-full bg-primary"></span>
 						</span>
-						Waiting for connection
+						{m.import_cluster_waiting_connection()}
 					</span>
 				{:else if clusterStatus === 'installing'}
 					<span class="flex items-center gap-2 text-amber-500">
 						<Spinner />
-						<span class="font-medium">Installing...</span>
-					</span>
-				{:else if clusterStatus === 'binding'}
-					<span class="flex items-center gap-2 text-amber-500">
-						<Spinner />
-						<span class="font-medium">Granting cluster-admin...</span>
-					</span>
-				{:else if clusterStatus === 'binding-failed'}
-					<span class="flex items-center gap-2 text-amber-600">
-						<TriangleAlertIcon class="size-4" />
-						<span class="font-medium">Permissions failed</span>
+						<span class="font-medium">{m.import_cluster_installing()}</span>
 					</span>
 				{:else}
 					<span class="flex items-center gap-2 text-primary">
 						<CircleCheckIcon />
-						<span class="font-medium">Managed successfully</span>
+						<span class="font-medium">{m.import_cluster_managed_status()}</span>
 					</span>
 				{/if}
 			</Item.Actions>
@@ -586,50 +524,36 @@
 			<Empty.Media variant="icon" class="size-14 bg-primary/10 ring-4 ring-primary/5">
 				<CircleCheckIcon class="size-8 text-primary" />
 			</Empty.Media>
-			<Empty.Title>Managed Successfully</Empty.Title>
+			<Empty.Title>{m.import_cluster_managed_successfully_title()}</Empty.Title>
 			<Empty.Description>
-				<strong>{clusterName}</strong> is now managed and ready to use.
+				<strong>{clusterName}</strong>{m.import_cluster_managed_ready_suffix()}
 			</Empty.Description>
 		</Empty.Header>
 		<Empty.Content>
 			<div class="w-full max-w-sm rounded-lg border bg-card p-3 text-sm shadow-sm">
 				<div class="flex flex-col gap-2">
 					<div class="flex justify-between">
-						<span class="text-muted-foreground">Cluster</span>
+						<span class="text-muted-foreground">{m.cluster()}</span>
 						<span class="font-medium">{clusterName}</span>
 					</div>
 					<div class="flex justify-between">
-						<span class="text-muted-foreground">Status</span>
+						<span class="text-muted-foreground">{m.status()}</span>
 						<span class="flex items-center gap-1.5 font-medium text-primary">
 							<span class="size-1.5 rounded-full bg-primary"></span>
-							Managed
+							{m.import_cluster_managed()}
 						</span>
 					</div>
 					{#if selectedUsers.length > 0}
 						<div class="flex justify-between">
-							<span class="text-muted-foreground">Permissions</span>
-							{#if clusterStatus === 'binding-failed'}
-								<span class="flex items-center gap-1.5 font-medium text-amber-600">
-									<TriangleAlertIcon class="size-3.5" />
-									Failed
-								</span>
-							{:else}
-								<span class="flex items-center gap-1.5 font-medium text-primary">
-									<CircleCheckIcon class="size-3.5" />
-									{selectedUsers.length} cluster-admin{selectedUsers.length > 1 ? 's' : ''}
-								</span>
-							{/if}
+							<span class="text-muted-foreground">{m.import_cluster_permissions()}</span>
+							<span class="flex items-center gap-1.5 font-medium text-primary">
+								<CircleCheckIcon class="size-3.5" />
+								{m.import_cluster_admin_count({ count: selectedUsers.length })}
+							</span>
 						</div>
 					{/if}
 				</div>
 			</div>
-			{#if clusterStatus === 'binding-failed'}
-				<p class="mt-3 max-w-sm text-center text-xs text-muted-foreground">
-					<strong class="text-amber-600">Permissions failed:</strong>
-					{bindingError || 'Could not grant cluster-admin.'} You can assign it manually from the ClusterRoleBinding
-					view.
-				</p>
-			{/if}
 		</Empty.Content>
 	</Empty.Root>
 {/snippet}
