@@ -191,8 +191,8 @@ importers:
         specifier: ^0.577.0
         version: 0.577.0(svelte@5.55.4)
       '@otterscale/api':
-        specifier: ^1.0.1
-        version: 1.0.1
+        specifier: ^1.0.2
+        version: 1.0.2
       '@otterscale/types':
         specifier: ^1.0.1
         version: 1.0.1
@@ -747,8 +747,8 @@ packages:
   '@oslojs/jwt@0.2.0':
     resolution: {integrity: sha512-bLE7BtHrURedCn4Mco3ma9L4Y1GR2SMBuIvjWr7rmQ4/W/4Jy70TIAgZ+0nIlk0xHz1vNP8x8DCns45Sb2XRbg==}
 
-  '@otterscale/api@1.0.1':
-    resolution: {integrity: sha512-ZQxFzUjcPypyI2NJhkj3DRIYfgVivtKWZe2ZCNwFhbldk7GRBaHvTEL2GHtfDvC7ImqDdmFtIRThbXC0tt+CfA==}
+  '@otterscale/api@1.0.2':
+    resolution: {integrity: sha512-LtzzXlvCrcT4W1GbpAcBoWi245JD3mGtUlEZVQ2STi/fqw/RcvhFykpMrdOFTh3W7mMrXIHaTg2PWIeesjYPgQ==}
 
   '@otterscale/types@1.0.1':
     resolution: {integrity: sha512-zEQWE9D5duymnz/ErLK7mUguyvsZQ39RPayqN8d3eiy2PkjUU3XDf3BEuEXg+6zGelD7zYKE/dniDf8tkLLoLA==}
@@ -3666,7 +3666,7 @@ snapshots:
     dependencies:
       '@oslojs/encoding': 0.4.1
 
-  '@otterscale/api@1.0.1':
+  '@otterscale/api@1.0.2':
     dependencies:
       '@bufbuild/protobuf': 2.11.0
 
