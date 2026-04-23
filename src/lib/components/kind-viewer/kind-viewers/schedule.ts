@@ -10,30 +10,32 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 import { buildResourceDetailUrl } from './resource-url';
 
-type ApplicationAttribute =
+type ScheduleAttribute =
 	| 'Name'
 	| 'Namespace'
+	| 'Schedule'
 	| 'State'
 	| 'Ready'
-	| 'ServiceType'
-	| 'ServicePort'
+	| 'Suspend'
+	| 'LastScheduleTime'
 	| 'Age'
 	| 'raw';
 
-function getApplicationDataSchemas(): Record<ApplicationAttribute, DataSchemaType> {
+function getScheduleDataSchemas(): Record<ScheduleAttribute, DataSchemaType> {
 	return {
 		Name: 'text',
 		Namespace: 'text',
+		Schedule: 'text',
 		State: 'text',
 		Ready: 'text',
-		ServiceType: 'text',
-		ServicePort: 'text',
+		Suspend: 'text',
+		LastScheduleTime: 'time',
 		Age: 'time',
 		raw: 'object'
 	};
 }
 
-function getApplicationData(object: any): Record<ApplicationAttribute, JsonValue> {
+function getScheduleData(object: any): Record<ScheduleAttribute, JsonValue> {
 	const readyCondition = object?.status?.conditions?.find(
 		(condition: any) => condition.type === 'Ready'
 	);
@@ -41,6 +43,7 @@ function getApplicationData(object: any): Record<ApplicationAttribute, JsonValue
 	return {
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.metadata?.namespace ?? null,
+		Schedule: object?.spec?.cronSchedule ?? null,
 		State: object?.status?.state ?? null,
 		Ready:
 			readyCondition?.status === 'True'
@@ -48,35 +51,36 @@ function getApplicationData(object: any): Record<ApplicationAttribute, JsonValue
 				: readyCondition?.status === 'False'
 					? 'False'
 					: '',
-		ServiceType: object?.spec?.serviceType ?? null,
-		ServicePort: object?.status?.nodePort != null ? String(object.status.nodePort) : null,
+		Suspend: object?.spec?.suspend != null ? String(object.spec.suspend) : null,
+		LastScheduleTime: object?.status?.lastScheduleTime ?? null,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
 	};
 }
 
-function getApplicationUISchemas(): Record<ApplicationAttribute, UISchemaType> {
+function getScheduleUISchemas(): Record<ScheduleAttribute, UISchemaType> {
 	return {
 		Name: 'link',
 		Namespace: 'text',
+		Schedule: 'text',
 		State: 'text',
 		Ready: 'text',
-		ServiceType: 'text',
-		ServicePort: 'text',
+		Suspend: 'text',
+		LastScheduleTime: 'time',
 		Age: 'time',
 		raw: 'object'
 	};
 }
 
-function getApplicationColumnDefinitions(
+function getScheduleColumnDefinitions(
 	apiResource: APIResource,
-	uiSchemas: Record<ApplicationAttribute, UISchemaType>,
-	dataSchemas: Record<ApplicationAttribute, DataSchemaType>
-): ColumnDef<Record<ApplicationAttribute, JsonValue>>[] {
+	uiSchemas: Record<ScheduleAttribute, UISchemaType>,
+	dataSchemas: Record<ScheduleAttribute, DataSchemaType>
+): ColumnDef<Record<ScheduleAttribute, JsonValue>>[] {
 	return [
 		{
 			id: 'Name',
-			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<ScheduleAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -85,8 +89,8 @@ function getApplicationColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<ApplicationAttribute, JsonValue>>;
-				row: Row<Record<ApplicationAttribute, JsonValue>>;
+				column: Column<Record<ScheduleAttribute, JsonValue>>;
+				row: Row<Record<ScheduleAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -95,7 +99,7 @@ function getApplicationColumnDefinitions(
 					metadata: {
 						hyperlink: buildResourceDetailUrl(
 							apiResource,
-							row.original[column.id as ApplicationAttribute] as string,
+							row.original[column.id as ScheduleAttribute] as string,
 							row.original['Namespace'] as string
 						)
 					} satisfies LinkMetadata
@@ -104,7 +108,7 @@ function getApplicationColumnDefinitions(
 		},
 		{
 			id: 'Namespace',
-			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<ScheduleAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -113,8 +117,8 @@ function getApplicationColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<ApplicationAttribute, JsonValue>>;
-				row: Row<Record<ApplicationAttribute, JsonValue>>;
+				column: Column<Record<ScheduleAttribute, JsonValue>>;
+				row: Row<Record<ScheduleAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -125,7 +129,7 @@ function getApplicationColumnDefinitions(
 		},
 		{
 			id: 'State',
-			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<ScheduleAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -134,8 +138,8 @@ function getApplicationColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<ApplicationAttribute, JsonValue>>;
-				row: Row<Record<ApplicationAttribute, JsonValue>>;
+				column: Column<Record<ScheduleAttribute, JsonValue>>;
+				row: Row<Record<ScheduleAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -146,7 +150,7 @@ function getApplicationColumnDefinitions(
 		},
 		{
 			id: 'Ready',
-			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<ScheduleAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -155,8 +159,8 @@ function getApplicationColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<ApplicationAttribute, JsonValue>>;
-				row: Row<Record<ApplicationAttribute, JsonValue>>;
+				column: Column<Record<ScheduleAttribute, JsonValue>>;
+				row: Row<Record<ScheduleAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -166,8 +170,8 @@ function getApplicationColumnDefinitions(
 			accessorKey: 'Ready'
 		},
 		{
-			id: 'ServiceType',
-			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
+			id: 'Schedule',
+			header: ({ column }: { column: Column<Record<ScheduleAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -176,19 +180,19 @@ function getApplicationColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<ApplicationAttribute, JsonValue>>;
-				row: Row<Record<ApplicationAttribute, JsonValue>>;
+				column: Column<Record<ScheduleAttribute, JsonValue>>;
+				row: Row<Record<ScheduleAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'ServiceType'
+			accessorKey: 'Schedule'
 		},
 		{
-			id: 'ServicePort',
-			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
+			id: 'Suspend',
+			header: ({ column }: { column: Column<Record<ScheduleAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -197,19 +201,40 @@ function getApplicationColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<ApplicationAttribute, JsonValue>>;
-				row: Row<Record<ApplicationAttribute, JsonValue>>;
+				column: Column<Record<ScheduleAttribute, JsonValue>>;
+				row: Row<Record<ScheduleAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'ServicePort'
+			accessorKey: 'Suspend'
+		},
+		{
+			id: 'LastScheduleTime',
+			header: ({ column }: { column: Column<Record<ScheduleAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<ScheduleAttribute, JsonValue>>;
+				row: Row<Record<ScheduleAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'LastScheduleTime'
 		},
 		{
 			id: 'Age',
-			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<ScheduleAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -218,8 +243,8 @@ function getApplicationColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<ApplicationAttribute, JsonValue>>;
-				row: Row<Record<ApplicationAttribute, JsonValue>>;
+				column: Column<Record<ScheduleAttribute, JsonValue>>;
+				row: Row<Record<ScheduleAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -232,8 +257,8 @@ function getApplicationColumnDefinitions(
 }
 
 export {
-	getApplicationColumnDefinitions,
-	getApplicationData,
-	getApplicationDataSchemas,
-	getApplicationUISchemas
+	getScheduleColumnDefinitions,
+	getScheduleData,
+	getScheduleDataSchemas,
+	getScheduleUISchemas
 };
