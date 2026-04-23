@@ -52,7 +52,7 @@
 	const ctx = getFormContext();
 
 	let { value = $bindable(), config, handlers }: ComponentProps['comboboxWidget'] = $props();
-	const { oninput, onchange, ...buttonHandlers } = $derived(handlers);
+	const { ...buttonHandlers } = $derived(handlers);
 
 	let filterValue = $state((value as string) ?? '');
 	let enumerations = $state<{ label: string; value: string }[]>([]);
@@ -165,7 +165,7 @@
 						<Command.Item
 							value={option.value}
 							onSelect={() => {
-								value = option;
+								value = option.value;
 								closeAndFocusTrigger();
 							}}
 						>

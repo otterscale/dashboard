@@ -17,7 +17,6 @@
 	import { page } from '$app/state';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import UserComboboxWidget from '$lib/components/dynamic-form/widgets/user-combobox.svelte';
-	import type { KeycloakUser } from '$lib/components/dynamic-form/widgets/user-combobox.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
