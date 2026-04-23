@@ -175,6 +175,12 @@ import {
 	getRoleBindingUISchemas
 } from './rolebinding.js';
 import {
+	getScheduleColumnDefinitions,
+	getScheduleData,
+	getScheduleDataSchemas,
+	getScheduleUISchemas
+} from './schedule.js';
+import {
 	getSecretColumnDefinitions,
 	getSecretData,
 	getSecretDataSchemas,
@@ -205,6 +211,12 @@ import {
 	getStorageClassUISchemas
 } from './storageclass.js';
 import {
+	getTaskColumnDefinitions,
+	getTaskData,
+	getTaskDataSchemas,
+	getTaskUISchemas
+} from './task.js';
+import {
 	getVirtualMachineColumnDefinitions,
 	getVirtualMachineData,
 	getVirtualMachineDataSchemas,
@@ -219,8 +231,6 @@ import {
 
 function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 	switch (kind) {
-		case 'Application':
-			return getApplicationDataSchemas();
 		case 'CronJob':
 			return getCronJobDataSchemas();
 		case 'DaemonSet':
@@ -291,6 +301,12 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 			return getVirtualMachineInstancetypeDataSchemas();
 		case 'ObjectBucketClaim':
 			return getObjectBucketClaimDataSchemas();
+		case 'Application':
+			return getApplicationDataSchemas();
+		case 'Task':
+			return getTaskDataSchemas();
+		case 'Schedule':
+			return getScheduleDataSchemas();
 		default:
 			return getDefaultDataSchemas();
 	}
@@ -298,8 +314,6 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 
 function getData(apiResource: APIResource, object: any): Record<string, JsonValue> {
 	switch (apiResource.kind) {
-		case 'Application':
-			return getApplicationData(object);
 		case 'CronJob':
 			return getCronJobData(object);
 		case 'DaemonSet':
@@ -370,6 +384,12 @@ function getData(apiResource: APIResource, object: any): Record<string, JsonValu
 			return getVirtualMachineInstancetypeData(object);
 		case 'ObjectBucketClaim':
 			return getObjectBucketClaimData(object);
+		case 'Application':
+			return getApplicationData(object);
+		case 'Task':
+			return getTaskData(object);
+		case 'Schedule':
+			return getScheduleData(object);
 		default:
 			return getDefaultData(apiResource, object);
 	}
@@ -377,8 +397,6 @@ function getData(apiResource: APIResource, object: any): Record<string, JsonValu
 
 function getUISchemas(kind: string): Record<string, UISchemaType> {
 	switch (kind) {
-		case 'Application':
-			return getApplicationUISchemas();
 		case 'CronJob':
 			return getCronJobUISchemas();
 		case 'DaemonSet':
@@ -449,6 +467,12 @@ function getUISchemas(kind: string): Record<string, UISchemaType> {
 			return getVirtualMachineInstancetypeUISchemas();
 		case 'ObjectBucketClaim':
 			return getObjectBucketClaimUISchemas();
+		case 'Application':
+			return getApplicationUISchemas();
+		case 'Task':
+			return getTaskUISchemas();
+		case 'Schedule':
+			return getScheduleUISchemas();
 		default:
 			return getDefaultUISchemas();
 	}
@@ -461,8 +485,6 @@ function getColumnDefinitions(
 	cluster?: string
 ): ColumnDef<Record<string, JsonValue>>[] {
 	switch (apiResource.kind) {
-		case 'Application':
-			return getApplicationColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'CronJob':
 			return getCronJobColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'DaemonSet':
@@ -533,6 +555,12 @@ function getColumnDefinitions(
 			return getVirtualMachineInstancetypeColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'ObjectBucketClaim':
 			return getObjectBucketClaimColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'Application':
+			return getApplicationColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'Task':
+			return getTaskColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'Schedule':
+			return getScheduleColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		default:
 			return getDefaultColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 	}

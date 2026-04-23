@@ -18,7 +18,6 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
-	import { Switch } from '$lib/components/ui/switch/index.ts';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
 	let {
@@ -50,26 +49,25 @@
 	});
 	const validate = jsonSchemaValidator.compile(jsonSchema);
 
-	// Container for Data — flat structure matching quickDeployment RGD schema
+	// Container for Data — flat structure matching quickCronjob RGD schema
 	let values: any = $state({
 		apiVersion: group ? `${group}/${version}` : version,
 		kind,
 		metadata: {},
 		spec: {}
 	});
+	let settingsValues: any = $state({});
 	let specValues: any = $state({});
-	let serviceValues: any = $state({});
-	let storageValues: any = $state({});
-	let resourceFormValues: any = $state({});
+	let resourceValues: any = $state({});
 
 	$effect(() => {
-		values.spec = { ...specValues, ...serviceValues, ...storageValues, ...resourceFormValues };
+		values.spec = { ...settingsValues, ...specValues, ...resourceValues };
 	});
 
 	let value = $derived(stringify(values));
 
-	// Steps: 1=Metadata, 2=Container+Replicas, 3=Service, 4=Storage, 5=Resources, 6=YAML Preview
-	const steps = Array.from({ length: 6 }, (_, index) => String(index + 1));
+	// Steps: 1=Metadata, 2=Setting, 3=Container, 4=Resources, 5=YAML Preview
+	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -86,7 +84,6 @@
 	// Flag for Dialog
 	let open = $state(false);
 	let isSubmitting = $state(false);
-	let storageEnabled = $state(false);
 </script>
 
 <Dialog.Root
@@ -169,15 +166,107 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 2: Container (name, image, command, args, containerPort, replicas) -->
+			<!-- Step 2: Setting -->
 			<Tabs.Content value={steps[1]}>
+				<Form
+					schema={{
+						title: 'Setting',
+						...lodash.omit(lodash.get(jsonSchema, 'properties.spec'), 'properties'),
+						properties: {
+							concurrencyPolicy: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.concurrencyPolicy'),
+								title: 'Concurrency Policy',
+								enum: ['Allow', 'Forbid', 'Replace']
+							},
+							suspend: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.suspend'),
+								title: 'Suspend'
+							},
+							successfulJobsHistoryLimit: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.successfulJobsHistoryLimit'),
+								title: 'Successful Jobs History Limit'
+							},
+							failedJobsHistoryLimit: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.failedJobsHistoryLimit'),
+								title: 'Failed Jobs History Limit'
+							},
+							restartPolicy: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.restartPolicy'),
+								title: 'Restart Policy',
+								enum: ['OnFailure', 'Never']
+							}
+						}
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							},
+							layouts: {
+								'object-properties': {
+									class: 'grid grid-cols-2 gap-3'
+								}
+							}
+						},
+						suspend: {
+							'ui:components': {
+								checkboxWidget: 'switchWidget'
+							},
+							'ui:options': {
+								layout: {
+									class: 'col-span-full'
+								}
+							}
+						},
+						concurrencyPolicy: {
+							'ui:components': {
+								stringField: 'enumField'
+							}
+						},
+						restartPolicy: {
+							'ui:components': {
+								stringField: 'enumField'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={{
+						concurrencyPolicy: 'Allow',
+						suspend: false,
+						successfulJobsHistoryLimit: 3,
+						failedJobsHistoryLimit: 1,
+						restartPolicy: 'OnFailure'
+					} as FormValue}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					bind:values={settingsValues}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+
+			<!-- Step 3: Container (name, image, command, args, containerPort, cronSchedule) -->
+			<Tabs.Content value={steps[2]}>
 				<Form
 					schema={{
 						title: 'Container',
 						type: 'object',
 						required: lodash
 							.get(jsonSchema, 'properties.spec.required', [])
-							.filter((f: string) => ['name', 'image'].includes(f)),
+							.filter((f: string) => ['name', 'image', 'cronSchedule'].includes(f)),
 						properties: {
 							name: {
 								...lodash.get(jsonSchema, 'properties.spec.properties.name'),
@@ -195,13 +284,13 @@
 								...lodash.get(jsonSchema, 'properties.spec.properties.args'),
 								title: 'Arguments'
 							},
+							cronSchedule: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.cronSchedule'),
+								title: 'Cron Schedule'
+							},
 							containerPort: {
 								...lodash.get(jsonSchema, 'properties.spec.properties.containerPort'),
 								title: 'Container Port'
-							},
-							replicas: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.replicas'),
-								title: 'Replicas'
 							}
 						}
 					} as Schema}
@@ -225,8 +314,8 @@
 					initialValue={{
 						name: values.metadata?.name ?? null,
 						image: null,
-						containerPort: 80,
-						replicas: 1
+						cronSchedule: '*/5 * * * *',
+						containerPort: 8080
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -250,172 +339,8 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 3: Service -->
-			<Tabs.Content value={steps[2]}>
-				<Form
-					schema={{
-						title: 'Service',
-						type: 'object',
-						properties: {
-							serviceType: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.serviceType'),
-								title: 'Service Type',
-								enum: ['ClusterIP', 'NodePort', 'LoadBalancer']
-							}
-						},
-						dependencies: {
-							serviceType: {
-								oneOf: [
-									{
-										properties: {
-											serviceType: { enum: ['ExternalName'] }
-										}
-									},
-									{
-										properties: {
-											serviceType: { enum: ['ClusterIP'] }
-										}
-									},
-									{
-										properties: {
-											serviceType: { enum: ['NodePort'] },
-											serviceNodePort: {
-												...lodash.get(jsonSchema, 'properties.spec.properties.serviceNodePort'),
-												title: 'Service Node Port'
-											}
-										}
-									},
-									{
-										properties: {
-											serviceType: { enum: ['LoadBalancer'] }
-										}
-									}
-								]
-							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						},
-						serviceType: {
-							'ui:components': {
-								stringField: 'enumField'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{
-						serviceType: 'ClusterIP'
-					} as FormValue}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-					bind:values={serviceValues}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-
-			<!-- Step 4: Storage -->
+			<!-- Step 4: Resources -->
 			<Tabs.Content value={steps[3]}>
-				<div class="flex flex-col gap-4">
-					<div class="flex items-center gap-3 py-2">
-						<Switch bind:checked={storageEnabled} id="storage-enabled" />
-						<label for="storage-enabled" class="cursor-pointer text-sm font-medium">
-							Enable Storage
-						</label>
-					</div>
-					{#if storageEnabled}
-						<Form
-							schema={{
-								title: 'Storage',
-								type: 'object',
-								properties: {
-									accessMode: {
-										...lodash.get(jsonSchema, 'properties.spec.properties.accessMode'),
-										title: 'Access Mode',
-										enum: ['ReadWriteOnce', 'ReadOnlyMany', 'ReadWriteMany']
-									},
-									storageSize: {
-										...lodash.get(jsonSchema, 'properties.spec.properties.storageSize'),
-										title: 'Storage Size'
-									},
-									mountPath: {
-										...lodash.get(jsonSchema, 'properties.spec.properties.mountPath'),
-										title: 'Mount Path'
-									}
-								}
-							} as Schema}
-							uiSchema={{
-								'ui:options': {
-									translations: {
-										submit: 'Next'
-									}
-								},
-								accessMode: {
-									'ui:components': {
-										stringField: 'enumField'
-									}
-								}
-							} as UiSchemaRoot}
-							initialValue={{
-								accessMode: null,
-								storageSize: '1Gi',
-								mountPath: null
-							} as FormValue}
-							handleSubmit={{
-								posthook: () => {
-									handleNext();
-								}
-							}}
-							bind:values={storageValues}
-						>
-							{#snippet actions()}
-								<div class="flex w-full items-center justify-between gap-3">
-									<Button
-										onclick={() => {
-											handlePrevious();
-										}}
-									>
-										Previous
-									</Button>
-									<SubmitButton />
-								</div>
-							{/snippet}
-						</Form>
-					{:else}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button onclick={() => handlePrevious()}>Previous</Button>
-							<Button
-								onclick={() => {
-									storageValues = {};
-									handleNext();
-								}}
-							>
-								Next
-							</Button>
-						</div>
-					{/if}
-				</div>
-			</Tabs.Content>
-
-			<!-- Step 5: Resources -->
-			<Tabs.Content value={steps[4]}>
 				<Form
 					schema={{
 						title: 'Resources',
@@ -472,7 +397,7 @@
 							handleNext();
 						}
 					}}
-					bind:values={resourceFormValues}
+					bind:values={resourceValues}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -489,8 +414,8 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 6: YAML Preview & Submit -->
-			<Tabs.Content value={steps[5]} class="min-h-[77vh]">
+			<!-- Step 5: YAML Preview & Submit -->
+			<Tabs.Content value={steps[4]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{

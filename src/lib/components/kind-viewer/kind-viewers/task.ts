@@ -10,30 +10,32 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 import { buildResourceDetailUrl } from './resource-url';
 
-type ApplicationAttribute =
+type TaskAttribute =
 	| 'Name'
 	| 'Namespace'
 	| 'State'
 	| 'Ready'
-	| 'ServiceType'
-	| 'ServicePort'
+	| 'Status'
+	| 'Suspend'
+	| 'Completions'
 	| 'Age'
 	| 'raw';
 
-function getApplicationDataSchemas(): Record<ApplicationAttribute, DataSchemaType> {
+function getTaskDataSchemas(): Record<TaskAttribute, DataSchemaType> {
 	return {
 		Name: 'text',
 		Namespace: 'text',
 		State: 'text',
 		Ready: 'text',
-		ServiceType: 'text',
-		ServicePort: 'text',
+		Status: 'text',
+		Suspend: 'text',
+		Completions: 'text',
 		Age: 'time',
 		raw: 'object'
 	};
 }
 
-function getApplicationData(object: any): Record<ApplicationAttribute, JsonValue> {
+function getTaskData(object: any): Record<TaskAttribute, JsonValue> {
 	const readyCondition = object?.status?.conditions?.find(
 		(condition: any) => condition.type === 'Ready'
 	);
@@ -48,35 +50,37 @@ function getApplicationData(object: any): Record<ApplicationAttribute, JsonValue
 				: readyCondition?.status === 'False'
 					? 'False'
 					: '',
-		ServiceType: object?.spec?.serviceType ?? null,
-		ServicePort: object?.status?.nodePort != null ? String(object.status.nodePort) : null,
+		Status: object?.status?.status ?? null,
+		Suspend: object?.spec?.suspend != null ? String(object.spec.suspend) : null,
+		Completions: object?.status?.completions != null ? String(object.status.completions) : null,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
 	};
 }
 
-function getApplicationUISchemas(): Record<ApplicationAttribute, UISchemaType> {
+function getTaskUISchemas(): Record<TaskAttribute, UISchemaType> {
 	return {
 		Name: 'link',
 		Namespace: 'text',
 		State: 'text',
 		Ready: 'text',
-		ServiceType: 'text',
-		ServicePort: 'text',
+		Status: 'text',
+		Suspend: 'text',
+		Completions: 'text',
 		Age: 'time',
 		raw: 'object'
 	};
 }
 
-function getApplicationColumnDefinitions(
+function getTaskColumnDefinitions(
 	apiResource: APIResource,
-	uiSchemas: Record<ApplicationAttribute, UISchemaType>,
-	dataSchemas: Record<ApplicationAttribute, DataSchemaType>
-): ColumnDef<Record<ApplicationAttribute, JsonValue>>[] {
+	uiSchemas: Record<TaskAttribute, UISchemaType>,
+	dataSchemas: Record<TaskAttribute, DataSchemaType>
+): ColumnDef<Record<TaskAttribute, JsonValue>>[] {
 	return [
 		{
 			id: 'Name',
-			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<TaskAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -85,8 +89,8 @@ function getApplicationColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<ApplicationAttribute, JsonValue>>;
-				row: Row<Record<ApplicationAttribute, JsonValue>>;
+				column: Column<Record<TaskAttribute, JsonValue>>;
+				row: Row<Record<TaskAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -95,7 +99,7 @@ function getApplicationColumnDefinitions(
 					metadata: {
 						hyperlink: buildResourceDetailUrl(
 							apiResource,
-							row.original[column.id as ApplicationAttribute] as string,
+							row.original[column.id as TaskAttribute] as string,
 							row.original['Namespace'] as string
 						)
 					} satisfies LinkMetadata
@@ -104,7 +108,7 @@ function getApplicationColumnDefinitions(
 		},
 		{
 			id: 'Namespace',
-			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<TaskAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -113,8 +117,8 @@ function getApplicationColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<ApplicationAttribute, JsonValue>>;
-				row: Row<Record<ApplicationAttribute, JsonValue>>;
+				column: Column<Record<TaskAttribute, JsonValue>>;
+				row: Row<Record<TaskAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -125,7 +129,7 @@ function getApplicationColumnDefinitions(
 		},
 		{
 			id: 'State',
-			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<TaskAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -134,8 +138,8 @@ function getApplicationColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<ApplicationAttribute, JsonValue>>;
-				row: Row<Record<ApplicationAttribute, JsonValue>>;
+				column: Column<Record<TaskAttribute, JsonValue>>;
+				row: Row<Record<TaskAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -146,7 +150,7 @@ function getApplicationColumnDefinitions(
 		},
 		{
 			id: 'Ready',
-			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<TaskAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -155,8 +159,8 @@ function getApplicationColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<ApplicationAttribute, JsonValue>>;
-				row: Row<Record<ApplicationAttribute, JsonValue>>;
+				column: Column<Record<TaskAttribute, JsonValue>>;
+				row: Row<Record<TaskAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -166,8 +170,8 @@ function getApplicationColumnDefinitions(
 			accessorKey: 'Ready'
 		},
 		{
-			id: 'ServiceType',
-			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
+			id: 'Status',
+			header: ({ column }: { column: Column<Record<TaskAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -176,19 +180,19 @@ function getApplicationColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<ApplicationAttribute, JsonValue>>;
-				row: Row<Record<ApplicationAttribute, JsonValue>>;
+				column: Column<Record<TaskAttribute, JsonValue>>;
+				row: Row<Record<TaskAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'ServiceType'
+			accessorKey: 'Status'
 		},
 		{
-			id: 'ServicePort',
-			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
+			id: 'Suspend',
+			header: ({ column }: { column: Column<Record<TaskAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -197,19 +201,40 @@ function getApplicationColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<ApplicationAttribute, JsonValue>>;
-				row: Row<Record<ApplicationAttribute, JsonValue>>;
+				column: Column<Record<TaskAttribute, JsonValue>>;
+				row: Row<Record<TaskAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'ServicePort'
+			accessorKey: 'Suspend'
+		},
+		{
+			id: 'Completions',
+			header: ({ column }: { column: Column<Record<TaskAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<TaskAttribute, JsonValue>>;
+				row: Row<Record<TaskAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Completions'
 		},
 		{
 			id: 'Age',
-			header: ({ column }: { column: Column<Record<ApplicationAttribute, JsonValue>> }) =>
+			header: ({ column }: { column: Column<Record<TaskAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
 					dataSchemas: dataSchemas
@@ -218,8 +243,8 @@ function getApplicationColumnDefinitions(
 				column,
 				row
 			}: {
-				column: Column<Record<ApplicationAttribute, JsonValue>>;
-				row: Row<Record<ApplicationAttribute, JsonValue>>;
+				column: Column<Record<TaskAttribute, JsonValue>>;
+				row: Row<Record<TaskAttribute, JsonValue>>;
 			}) =>
 				renderComponent(DynamicTableCell, {
 					row: row,
@@ -231,9 +256,4 @@ function getApplicationColumnDefinitions(
 	];
 }
 
-export {
-	getApplicationColumnDefinitions,
-	getApplicationData,
-	getApplicationDataSchemas,
-	getApplicationUISchemas
-};
+export { getTaskColumnDefinitions, getTaskData, getTaskDataSchemas, getTaskUISchemas };
