@@ -1,4 +1,4 @@
-import { type Handle, type HandleServerError, redirect,type RequestEvent } from '@sveltejs/kit';
+import { type Handle, type HandleServerError, redirect, type RequestEvent } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 
 import { paraglideMiddleware } from '$lib/paraglide/server';
