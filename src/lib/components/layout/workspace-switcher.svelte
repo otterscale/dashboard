@@ -52,6 +52,8 @@
 	import { m } from '$lib/paraglide/messages';
 	import type { User } from '$lib/server/session';
 	import { role } from '$lib/stores';
+	import { ChevronUpIcon } from '@lucide/svelte';
+	import { cn } from '$lib/utils';
 
 	let {
 		cluster,
@@ -318,15 +320,18 @@
 								)?.role}</span
 							>
 						</div>
-						<DropdownMenu.Shortcut class="flex items-center gap-0.5 text-sm">
-							{#if index < 9}
-								{#if isMac}
-									<CommandIcon class="size-3" />
-								{:else}
-									<span class="text-xs">Ctrl</span>
-								{/if}
-								<span class="font-mono">{index + 1}</span>
+						<DropdownMenu.Shortcut
+							class={cn('flex gap-0.5 text-sm', {
+								invisible: index >= 9,
+								'items-center': isMac
+							})}
+						>
+							{#if isMac}
+								<CommandIcon class="size-3" />
+							{:else}
+								<ChevronUpIcon class="size-3" />
 							{/if}
+							<span class="font-mono">{index + 1}</span>
 						</DropdownMenu.Shortcut>
 					</DropdownMenu.Item>
 				{/each}
