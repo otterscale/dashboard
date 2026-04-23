@@ -16,7 +16,10 @@
 
 	import { page } from '$app/state';
 	import Form from '$lib/components/dynamic-form/form.svelte';
-	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';
+	import UserComboboxWidget, {
+		getDisplayName,
+		type KeycloakUser
+	} from '$lib/components/dynamic-form/widgets/user-combobox.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
@@ -137,10 +140,11 @@
 						'name'
 					],
 					properties: {
-						name: {
+						// For user friendly, use subject to identifier user and render username.
+						subject: {
 							...(lodash.get(
 								jsonSchema,
-								'properties.spec.properties.members.items.properties.name'
+								'properties.spec.properties.members.items.properties.subject'
 							) as any),
 							title: 'Name'
 						},
@@ -179,18 +183,22 @@
 							}
 						}
 					},
-					name: {
+					subject: {
 						'ui:components': {
 							stringField: 'enumField',
-							selectWidget: ComboboxWidget
+							selectWidget: UserComboboxWidget
 						},
 						'ui:options': {
-							TailoredComboboxEnumerations: fetchUsersAsEnumerations,
-							TailoredComboboxVisibility: 10,
-							TailoredComboboxInput: {
+							TailoredUserComboboxVisibility: 10,
+							TailoredUserComboboxInput: {
 								placeholder: 'Name'
 							},
-							TailoredComboboxEmptyText: 'No names available.'
+							TailoredUserComboboxEmptyText: 'No names available.',
+							TailoredUserComboboxOnFetch: (users: KeycloakUser[]) => {
+								for (const user of users) {
+									usernameToKeycloakUserBySubject[user.id] = user;
+								}
+							}
 						}
 					},
 					role: {
@@ -207,21 +215,20 @@
 			initialValue: [
 				// From login user information.
 				{
-					role: 'admin',
 					subject: page.data.user.sub,
-					username: page.data.user.username,
+					role: 'admin',
 					name: page.data.user.name
 				}
 			] as FormValue,
 			transformer: (value: FormValue) => {
 				let members = value as SchemaObjectValue[];
 				members = members.map((member) => {
-					const keycloakUser = getKeycloakUser(member.name as string);
+					const keycloakUser = getKeycloakUserBySubject(member.subject as string);
 					return {
 						...member,
-						subject: member.subject ?? keycloakUser?.id ?? null,
-						username: member.username ?? keycloakUser?.username ?? null,
-						serviceAccount: isServiceAccount(keycloakUser?.username)
+						name: getDisplayName(keycloakUser) ?? null,
+						serviceAccount: isServiceAccount(keycloakUser?.username),
+						username: keycloakUser?.username ?? null
 					};
 				});
 				return members;
@@ -391,49 +398,9 @@
 		currentStep = firstStep;
 	}
 
-	// TODO: Refactor into UserManager
-	// Users
-	interface KeycloakUser {
-		id: string;
-		username: string;
-		email?: string;
-		firstName?: string;
-		lastName?: string;
-	}
-	let usernameToKeycloakUser = $state<Record<string, KeycloakUser>>({});
-	let timer: ReturnType<typeof setTimeout> | null = null;
-	function fetchUsersAsEnumerations(search: string): Promise<{ label: string; value: string }[]> {
-		return new Promise((resolve) => {
-			if (timer) clearTimeout(timer);
-
-			timer = setTimeout(async () => {
-				try {
-					const response = await fetch(`/rest/users?search=${encodeURIComponent(search)}`);
-					if (response.ok) {
-						const fetchedUsers: KeycloakUser[] = await response.json();
-						for (const user of fetchedUsers) {
-							usernameToKeycloakUser[user.username] = user;
-						}
-						resolve(
-							fetchedUsers.map((user) => ({
-								label:
-									((user.firstName ?? '') + ' ' + (user.lastName ?? '')).trim() || user.username,
-								value: user.username
-							}))
-						);
-					} else {
-						console.error('Failed to fetch users:', response.statusText);
-						resolve([]);
-					}
-				} catch (error) {
-					console.error('Error fetching users:', error);
-					resolve([]);
-				}
-			}, 300);
-		});
-	}
-	function getKeycloakUser(username: string): KeycloakUser | undefined {
-		return usernameToKeycloakUser[username];
+	let usernameToKeycloakUserBySubject = $state<Record<string, KeycloakUser>>({});
+	function getKeycloakUserBySubject(subject: string): KeycloakUser | undefined {
+		return usernameToKeycloakUserBySubject[subject];
 	}
 	function isServiceAccount(username?: string): boolean | undefined {
 		return username?.startsWith('service-account-');
