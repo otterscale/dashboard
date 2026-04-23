@@ -17,7 +17,8 @@
 
 	import { page } from '$app/state';
 	import Form from '$lib/components/dynamic-form/form.svelte';
-	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';
+	import UserComboboxWidget from '$lib/components/dynamic-form/widgets/user-combobox.svelte';
+	import type { KeycloakUser } from '$lib/components/dynamic-form/widgets/user-combobox.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
@@ -180,15 +181,19 @@
 					name: {
 						'ui:components': {
 							stringField: 'enumField',
-							selectWidget: ComboboxWidget
+							selectWidget: UserComboboxWidget
 						},
 						'ui:options': {
-							TailoredComboboxEnumerations: fetchUsersAsEnumerations,
-							TailoredComboboxVisibility: 10,
-							TailoredComboboxInput: {
+							TailoredUserComboboxVisibility: 10,
+							TailoredUserComboboxInput: {
 								placeholder: 'Name'
 							},
-							TailoredComboboxEmptyText: 'No names available.'
+							TailoredUserComboboxEmptyText: 'No names available.',
+							TailoredUserComboboxOnFetched: (users: KeycloakUser[]) => {
+								for (const user of users) {
+									usernameToKeycloakUser[user.username] = user;
+								}
+							}
 						}
 					},
 					role: {
@@ -401,37 +406,6 @@
 		lastName?: string;
 	}
 	let usernameToKeycloakUser = $state<Record<string, KeycloakUser>>({});
-	let timer: ReturnType<typeof setTimeout> | null = null;
-	function fetchUsersAsEnumerations(search: string): Promise<{ label: string; value: string }[]> {
-		return new Promise((resolve) => {
-			if (timer) clearTimeout(timer);
-
-			timer = setTimeout(async () => {
-				try {
-					const response = await fetch(`/rest/users?search=${encodeURIComponent(search)}`);
-					if (response.ok) {
-						const fetchedUsers: KeycloakUser[] = await response.json();
-						for (const user of fetchedUsers) {
-							usernameToKeycloakUser[user.username] = user;
-						}
-						resolve(
-							fetchedUsers.map((user) => ({
-								label:
-									((user.firstName ?? '') + ' ' + (user.lastName ?? '')).trim() || user.username,
-								value: user.username
-							}))
-						);
-					} else {
-						console.error('Failed to fetch users:', response.statusText);
-						resolve([]);
-					}
-				} catch (error) {
-					console.error('Error fetching users:', error);
-					resolve([]);
-				}
-			}, 300);
-		});
-	}
 	function getKeycloakUser(username: string): KeycloakUser | undefined {
 		return usernameToKeycloakUser[username];
 	}
