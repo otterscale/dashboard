@@ -66,6 +66,9 @@
 
 	let filterValue = $state('');
 	let enumerations = $state<{ label: string; value: string }[]>([]);
+	// Persist labels across fetches so the trigger can still display the
+	// selected user's name even when they're no longer in the current result set.
+	let labelCache = $state<Record<string, string>>({});
 
 	const onFetch = $derived(
 		retrieveUiOption(ctx, config, 'TailoredUserComboboxOnFetch') as
@@ -83,10 +86,11 @@
 				if (response.ok) {
 					const fetched: KeycloakUser[] = await response.json();
 					onFetch?.(fetched);
-					enumerations = fetched.map((user) => ({
-						label: getDisplayName(user),
-						value: user.id
-					}));
+					enumerations = fetched.map((user) => {
+						const label = getDisplayName(user);
+						labelCache[user.id] = label;
+						return { label, value: user.id };
+					});
 				} else {
 					enumerations = [];
 				}
@@ -114,9 +118,7 @@
 		inputAttributes(ctx, config, 'TailoredUserComboboxInput', handlers, {})
 	);
 	const emptyText = $derived(retrieveUiOption(ctx, config, 'TailoredUserComboboxEmptyText'));
-	let triggerText: string | undefined = $derived(
-		enumerations.find((option) => value && option.value === value)?.label
-	);
+	let triggerText: string | undefined = $derived(value ? labelCache[value as string] : undefined);
 
 	let open = $state(false);
 	let triggerReference = $state<HTMLButtonElement>(null!);
@@ -194,12 +196,14 @@
 				{#if filteredOptions.length > visibleOptions}
 					<Command.Separator />
 					<Command.Item
-						class="flex w-full items-center justify-center rounded-t-none hover:bg-muted"
+						class="w-full rounded-t-none hover:bg-muted"
 						onclick={() => {
 							visibleOptions += visibility;
 						}}
 					>
-						<PlusIcon />
+						<div class="flex w-full items-center justify-center">
+							<PlusIcon />
+						</div>
 					</Command.Item>
 				{/if}
 			</Command.List>
