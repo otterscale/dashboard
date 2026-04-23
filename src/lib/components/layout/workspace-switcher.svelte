@@ -77,8 +77,10 @@
 	);
 	let workspaceSchema: any = $state();
 	let createWorkspaceOpen = $state(false);
+	let isMac = $state(false);
 
 	onMount(async () => {
+		isMac = navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
 		try {
 			const res = await resourceClient.schema({
 				cluster,
@@ -318,7 +320,11 @@
 						</div>
 						<DropdownMenu.Shortcut class="flex items-center gap-0.5 text-sm">
 							{#if index < 9}
-								<CommandIcon class="size-3" />
+								{#if isMac}
+									<CommandIcon class="size-3" />
+								{:else}
+									<span class="text-xs">Ctrl</span>
+								{/if}
 								<span class="font-mono">{index + 1}</span>
 							{/if}
 						</DropdownMenu.Shortcut>
