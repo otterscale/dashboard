@@ -84,6 +84,26 @@ async function fetchUsers(
 	return response.json();
 }
 
+export async function getUserBySubject(subject: string): Promise<User | null> {
+	const adminUrl = getAdminUrl();
+	const accessToken = await getAccessToken();
+	const headers = { Authorization: `Bearer ${accessToken}` };
+
+	const response = await fetch(`${adminUrl}/users/${encodeURIComponent(subject)}`, { headers });
+	if (response.status === 404) {
+		return null;
+	}
+	if (!response.ok) {
+		const errorText = await response.text();
+		console.error(
+			`Failed to get user from Keycloak: ${response.status} ${response.statusText}`,
+			errorText
+		);
+		throw new Error('Failed to get user from Keycloak');
+	}
+	return response.json();
+}
+
 export async function getUsers(options: GetUsersOptions = {}): Promise<User[]> {
 	const { search = '', first = 0, max = 10 } = options;
 

@@ -66,16 +66,7 @@
 
 	let filterValue = $state('');
 	let enumerations = $state<{ label: string; value: string }[]>([]);
-	// Persist labels across fetches so the trigger can still display the
-	// selected user's name even when they're no longer in the current result set.
 	let labelCache = $state<Record<string, string>>({});
-
-	const onFetch = $derived(
-		retrieveUiOption(ctx, config, 'TailoredUserComboboxOnFetch') as
-			| ((users: KeycloakUser[]) => void)
-			| undefined
-	);
-
 	let timer: ReturnType<typeof setTimeout> | null = null;
 	$effect(() => {
 		const search = filterValue;
@@ -99,6 +90,23 @@
 			}
 		}, 300);
 	});
+
+	$effect(() => {
+		const subject = value as string | undefined;
+		if (!subject || labelCache[subject]) return;
+		fetch(`/rest/users/${encodeURIComponent(subject)}`)
+			.then(async (response) => {
+				if (!response.ok) return;
+				const user: KeycloakUser = await response.json();
+				labelCache[subject] = getDisplayName(user);
+			})
+			.catch(() => {});
+	});
+	const onFetch = $derived(
+		retrieveUiOption(ctx, config, 'TailoredUserComboboxOnFetch') as
+			| ((users: KeycloakUser[]) => void)
+			| undefined
+	);
 
 	const visibility: number = $derived(
 		(retrieveUiOption(ctx, config, 'TailoredUserComboboxVisibility') as number) ?? 10
