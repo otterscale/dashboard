@@ -19,12 +19,11 @@ import { buildResourceDetailUrl } from './resource-url';
 type WorkspaceAttribute =
 	| 'Name'
 	| 'Namespace'
+	| 'Admin'
 	| 'Members'
-	| 'CPU Limit'
-	| 'CPU Requests'
-	| 'Memory Limit'
-	| 'Memory Requests'
-	| 'GPU Requests'
+	| 'CPU Quota'
+	| 'Memory Quota'
+	| 'GPU Quota'
 	| 'Creation Timestamp'
 	| 'raw';
 
@@ -32,12 +31,11 @@ function getWorkspaceDataSchemas(): Record<WorkspaceAttribute, DataSchemaType> {
 	return {
 		Name: 'text',
 		Namespace: 'text',
+		Admin: 'text',
 		Members: 'number',
-		'CPU Limit': 'quantity',
-		'CPU Requests': 'quantity',
-		'Memory Limit': 'quantity',
-		'Memory Requests': 'quantity',
-		'GPU Requests': 'quantity',
+		'CPU Quota': 'text',
+		'Memory Quota': 'text',
+		'GPU Quota': 'text',
 		'Creation Timestamp': 'time',
 		raw: 'object'
 	};
@@ -49,12 +47,11 @@ function getWorkspaceData(
 	return {
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.spec?.namespace ?? null,
+		Admin: object?.spec?.members.find((member) => member.role === 'admin')?.name ?? null,
 		Members: (object?.spec?.members ?? []).length,
-		'CPU Limit': object?.spec?.resourceQuota?.hard?.['limits.cpu'] ?? null,
-		'CPU Requests': object?.spec?.resourceQuota?.hard?.['requests.cpu'] ?? null,
-		'Memory Limit': object?.spec?.resourceQuota?.hard?.['limits.memory'] ?? null,
-		'Memory Requests': object?.spec?.resourceQuota?.hard?.['requests.memory'] ?? null,
-		'GPU Requests': object?.spec?.resourceQuota?.hard?.['requests.nvidia.com/gpu'] ?? null,
+		'CPU Quota': `${object?.spec?.resourceQuota?.hard?.['requests.cpu'] ?? '-'} / ${object?.spec?.resourceQuota?.hard?.['limits.cpu'] ?? '-'}`,
+		'Memory Quota': `${object?.spec?.resourceQuota?.hard?.['requests.memory'] ?? '-'} / ${object?.spec?.resourceQuota?.hard?.['limits.memory'] ?? '-'}`,
+		'GPU Quota': `${object?.spec?.resourceQuota?.hard?.['requests.nvidia.com/gpu'] ?? '-'} / ${object?.spec?.resourceQuota?.hard?.['limits.nvidia.com/gpu'] ?? '-'}`,
 		'Creation Timestamp': object?.metadata?.creationTimestamp as JsonValue,
 		raw: object as JsonObject
 	};
@@ -64,12 +61,11 @@ function getWorkspaceUISchemas(): Record<WorkspaceAttribute, UISchemaType> {
 	return {
 		Name: 'link',
 		Namespace: 'text',
+		Admin: 'text',
 		Members: 'array-of-object',
-		'CPU Limit': 'quantity',
-		'CPU Requests': 'quantity',
-		'Memory Limit': 'quantity',
-		'Memory Requests': 'quantity',
-		'GPU Requests': 'quantity',
+		'CPU Quota': 'text',
+		'Memory Quota': 'text',
+		'GPU Quota': 'text',
 		'Creation Timestamp': 'time',
 		raw: 'object'
 	};
@@ -130,6 +126,27 @@ function getWorkspaceColumnDefinitions(
 			accessorKey: 'Namespace'
 		},
 		{
+			id: 'Admin',
+			header: ({ column }: { column: Column<Record<WorkspaceAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<WorkspaceAttribute, JsonValue>>;
+				row: Row<Record<WorkspaceAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Admin'
+		},
+		{
 			id: 'Members',
 			header: ({ column }: { column: Column<Record<WorkspaceAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
@@ -161,7 +178,7 @@ function getWorkspaceColumnDefinitions(
 			accessorKey: 'Members'
 		},
 		{
-			id: 'CPU Limit',
+			id: 'CPU Quota',
 			header: ({ column }: { column: Column<Record<WorkspaceAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
@@ -182,34 +199,10 @@ function getWorkspaceColumnDefinitions(
 						type: 'continuous'
 					} satisfies QuantityMetadata
 				}),
-			accessorKey: 'CPU Limit'
+			accessorKey: 'CPU Quota'
 		},
 		{
-			id: 'CPU Requests',
-			header: ({ column }: { column: Column<Record<WorkspaceAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<WorkspaceAttribute, JsonValue>>;
-				row: Row<Record<WorkspaceAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas,
-					metadata: {
-						type: 'continuous'
-					} satisfies QuantityMetadata
-				}),
-			accessorKey: 'CPU Requests'
-		},
-		{
-			id: 'Memory Limit',
+			id: 'Memory Quota',
 			header: ({ column }: { column: Column<Record<WorkspaceAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
@@ -230,10 +223,10 @@ function getWorkspaceColumnDefinitions(
 						type: 'discrete'
 					} satisfies QuantityMetadata
 				}),
-			accessorKey: 'Memory Limit'
+			accessorKey: 'Memory Quota'
 		},
 		{
-			id: 'Memory Requests',
+			id: 'GPU Quota',
 			header: ({ column }: { column: Column<Record<WorkspaceAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
@@ -254,31 +247,7 @@ function getWorkspaceColumnDefinitions(
 						type: 'discrete'
 					} satisfies QuantityMetadata
 				}),
-			accessorKey: 'Memory Requests'
-		},
-		{
-			id: 'GPU Requests',
-			header: ({ column }: { column: Column<Record<WorkspaceAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<WorkspaceAttribute, JsonValue>>;
-				row: Row<Record<WorkspaceAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas,
-					metadata: {
-						type: 'discrete'
-					} satisfies QuantityMetadata
-				}),
-			accessorKey: 'GPU Requests'
+			accessorKey: 'GPU Quota'
 		},
 		{
 			id: 'Creation Timestamp',

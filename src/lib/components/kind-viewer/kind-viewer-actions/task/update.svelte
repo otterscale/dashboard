@@ -1,11 +1,9 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import Plus from '@lucide/svelte/icons/plus';
+	import FormIcon from '@lucide/svelte/icons/form-input';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
-	import Ajv from 'ajv';
-	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
@@ -18,7 +16,6 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
-	import { Switch } from '$lib/components/ui/switch/index.ts';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
 	let {
@@ -29,6 +26,7 @@
 		kind,
 		resource,
 		schema: jsonSchema,
+		object,
 		onOpenChangeComplete
 	}: {
 		cluster: string;
@@ -37,39 +35,58 @@
 		version: string;
 		kind: string;
 		resource: string;
-		schema?: any;
+		schema: any;
+		object: any;
 		onOpenChangeComplete: () => void;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	const jsonSchemaValidator = new Ajv({
-		allErrors: true,
-		strict: false
-	});
-	const validate = jsonSchemaValidator.compile(jsonSchema);
+	const systemFields = [
+		'clusterName',
+		'creationTimestamp',
+		'deletionGracePeriodSeconds',
+		'deletionTimestamp',
+		'finalizers',
+		'generateName',
+		'generation',
+		'initializers',
+		'managedFields',
+		'ownerReferences',
+		'resourceVersion',
+		'relationships',
+		'selfLink',
+		'state',
+		'uid'
+	];
 
-	// Container for Data — flat structure matching quickDeployment RGD schema
 	let values: any = $state({
 		apiVersion: group ? `${group}/${version}` : version,
 		kind,
-		metadata: {},
+		metadata: object.metadata,
 		spec: {}
 	});
+	let settingsValues: any = $state({});
 	let specValues: any = $state({});
-	let serviceValues: any = $state({});
-	let storageValues: any = $state({});
-	let resourceFormValues: any = $state({});
+	let resourceValues: any = $state({});
 
 	$effect(() => {
-		values.spec = { ...specValues, ...serviceValues, ...storageValues, ...resourceFormValues };
+		values.spec = { ...settingsValues, ...specValues, ...resourceValues };
 	});
 
-	let value = $derived(stringify(values));
-
-	// Steps: 1=Metadata, 2=Container+Replicas, 3=Service, 4=Storage, 5=Resources, 6=YAML Preview
-	const steps = Array.from({ length: 6 }, (_, index) => String(index + 1));
+	let value = $state('');
+	$effect(() => {
+		const filtered = lodash.cloneDeep(values);
+		if (filtered.metadata) {
+			for (const field of systemFields) {
+				delete filtered.metadata[field];
+			}
+		}
+		delete filtered.status;
+		value = stringify(filtered);
+	});
+	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -83,10 +100,8 @@
 		currentStep = firstStep;
 	}
 
-	// Flag for Dialog
 	let open = $state(false);
 	let isSubmitting = $state(false);
-	let storageEnabled = $state(false);
 </script>
 
 <Dialog.Root
@@ -100,9 +115,14 @@
 >
 	<Dialog.Trigger>
 		{#snippet child({ props })}
-			<Button {...props} variant="outline" size="icon">
-				<Plus />
-			</Button>
+			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
+				<Item.Media>
+					<FormIcon />
+				</Item.Media>
+				<Item.Content>
+					<Item.Title>Update</Item.Title>
+				</Item.Content>
+			</Item.Root>
 		{/snippet}
 	</Dialog.Trigger>
 	<Dialog.Content
@@ -117,24 +137,41 @@
 			</Item.Content>
 		</Item.Root>
 		<Tabs.Root value={currentStep}>
-			<!-- Step 1: Metadata -->
+			<!-- Step 1: Setting -->
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
-						...(lodash.omit(lodash.get(jsonSchema, 'properties.metadata'), 'properties') as Record<
-							string,
-							unknown
-						>),
-						title: 'Metadata',
+						title: 'Setting',
+						...lodash.omit(lodash.get(jsonSchema, 'properties.spec'), 'properties'),
 						properties: {
-							name: {
-								...lodash.get(jsonSchema, 'properties.metadata.properties.name'),
-								title: 'Name'
+							completions: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.completions'),
+								title: 'Completions'
 							},
-							namespace: {
-								...lodash.get(jsonSchema, 'properties.metadata.properties.namespace'),
-								title: 'Namespace',
-								readOnly: true
+							parallelism: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.parallelism'),
+								title: 'Parallelism'
+							},
+							backoffLimit: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.backoffLimit'),
+								title: 'Backoff Limit'
+							},
+							activeDeadlineSeconds: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.activeDeadlineSeconds'),
+								title: 'Active Deadline Seconds'
+							},
+							ttlSecondsAfterFinished: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.ttlSecondsAfterFinished'),
+								title: 'TTL Seconds After Finished'
+							},
+							suspend: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.suspend'),
+								title: 'Suspend'
+							},
+							restartPolicy: {
+								...lodash.get(jsonSchema, 'properties.spec.properties.restartPolicy'),
+								title: 'Restart Policy',
+								enum: ['Never', 'OnFailure']
 							}
 						}
 					} as Schema}
@@ -142,16 +179,44 @@
 						'ui:options': {
 							translations: {
 								submit: 'Next'
+							},
+							layouts: {
+								'object-properties': {
+									class: 'grid grid-cols-2 gap-3'
+								}
+							}
+						},
+						suspend: {
+							'ui:components': {
+								checkboxWidget: 'switchWidget'
+							},
+							'ui:options': {
+								layout: {
+									class: 'col-span-full'
+								}
+							}
+						},
+						restartPolicy: {
+							'ui:components': {
+								stringField: 'enumField'
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{ namespace: namespace } as FormValue}
+					initialValue={{
+						completions: object.spec?.completions ?? 1,
+						parallelism: object.spec?.parallelism ?? 1,
+						backoffLimit: object.spec?.backoffLimit ?? 6,
+						activeDeadlineSeconds: object.spec?.activeDeadlineSeconds ?? 0,
+						ttlSecondsAfterFinished: object.spec?.ttlSecondsAfterFinished ?? 0,
+						suspend: object.spec?.suspend ?? false,
+						restartPolicy: object.spec?.restartPolicy ?? 'Never'
+					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
 						}
 					}}
-					bind:values={values['metadata']}
+					bind:values={settingsValues}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -169,7 +234,7 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 2: Container (name, image, command, args, containerPort, replicas) -->
+			<!-- Step 2: Container -->
 			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
@@ -198,10 +263,6 @@
 							containerPort: {
 								...lodash.get(jsonSchema, 'properties.spec.properties.containerPort'),
 								title: 'Container Port'
-							},
-							replicas: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.replicas'),
-								title: 'Replicas'
 							}
 						}
 					} as Schema}
@@ -223,10 +284,11 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						name: values.metadata?.name ?? null,
-						image: null,
-						containerPort: 80,
-						replicas: 1
+						name: object.spec?.name ?? null,
+						image: object.spec?.image ?? null,
+						command: object.spec?.command ?? undefined,
+						args: object.spec?.args ?? undefined,
+						containerPort: object.spec?.containerPort ?? 8080
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -241,6 +303,7 @@
 								onclick={() => {
 									handlePrevious();
 								}}
+								disabled={currentIndex === 0}
 							>
 								Previous
 							</Button>
@@ -250,172 +313,8 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 3: Service -->
+			<!-- Step 3: Resources -->
 			<Tabs.Content value={steps[2]}>
-				<Form
-					schema={{
-						title: 'Service',
-						type: 'object',
-						properties: {
-							serviceType: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.serviceType'),
-								title: 'Service Type',
-								enum: ['ClusterIP', 'NodePort', 'LoadBalancer']
-							}
-						},
-						dependencies: {
-							serviceType: {
-								oneOf: [
-									{
-										properties: {
-											serviceType: { enum: ['ExternalName'] }
-										}
-									},
-									{
-										properties: {
-											serviceType: { enum: ['ClusterIP'] }
-										}
-									},
-									{
-										properties: {
-											serviceType: { enum: ['NodePort'] },
-											serviceNodePort: {
-												...lodash.get(jsonSchema, 'properties.spec.properties.serviceNodePort'),
-												title: 'Service Node Port'
-											}
-										}
-									},
-									{
-										properties: {
-											serviceType: { enum: ['LoadBalancer'] }
-										}
-									}
-								]
-							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						},
-						serviceType: {
-							'ui:components': {
-								stringField: 'enumField'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{
-						serviceType: 'ClusterIP'
-					} as FormValue}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-					bind:values={serviceValues}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-
-			<!-- Step 4: Storage -->
-			<Tabs.Content value={steps[3]}>
-				<div class="flex flex-col gap-4">
-					<div class="flex items-center gap-3 py-2">
-						<Switch bind:checked={storageEnabled} id="storage-enabled" />
-						<label for="storage-enabled" class="cursor-pointer text-sm font-medium">
-							Enable Storage
-						</label>
-					</div>
-					{#if storageEnabled}
-						<Form
-							schema={{
-								title: 'Storage',
-								type: 'object',
-								properties: {
-									accessMode: {
-										...lodash.get(jsonSchema, 'properties.spec.properties.accessMode'),
-										title: 'Access Mode',
-										enum: ['ReadWriteOnce', 'ReadOnlyMany', 'ReadWriteMany']
-									},
-									storageSize: {
-										...lodash.get(jsonSchema, 'properties.spec.properties.storageSize'),
-										title: 'Storage Size'
-									},
-									mountPath: {
-										...lodash.get(jsonSchema, 'properties.spec.properties.mountPath'),
-										title: 'Mount Path'
-									}
-								}
-							} as Schema}
-							uiSchema={{
-								'ui:options': {
-									translations: {
-										submit: 'Next'
-									}
-								},
-								accessMode: {
-									'ui:components': {
-										stringField: 'enumField'
-									}
-								}
-							} as UiSchemaRoot}
-							initialValue={{
-								accessMode: null,
-								storageSize: '1Gi',
-								mountPath: null
-							} as FormValue}
-							handleSubmit={{
-								posthook: () => {
-									handleNext();
-								}
-							}}
-							bind:values={storageValues}
-						>
-							{#snippet actions()}
-								<div class="flex w-full items-center justify-between gap-3">
-									<Button
-										onclick={() => {
-											handlePrevious();
-										}}
-									>
-										Previous
-									</Button>
-									<SubmitButton />
-								</div>
-							{/snippet}
-						</Form>
-					{:else}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button onclick={() => handlePrevious()}>Previous</Button>
-							<Button
-								onclick={() => {
-									storageValues = {};
-									handleNext();
-								}}
-							>
-								Next
-							</Button>
-						</div>
-					{/if}
-				</div>
-			</Tabs.Content>
-
-			<!-- Step 5: Resources -->
-			<Tabs.Content value={steps[4]}>
 				<Form
 					schema={{
 						title: 'Resources',
@@ -460,19 +359,19 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						resourcesRequestsCpu: '100m',
-						resourcesRequestsMemory: '128Mi',
-						resourcesLimitsCpu: '500m',
-						resourcesLimitsMemory: '512Mi',
-						resourcesGpu: '0',
-						resourcesGpumem: '0'
+						resourcesRequestsCpu: object.spec?.resourcesRequestsCpu ?? '100m',
+						resourcesRequestsMemory: object.spec?.resourcesRequestsMemory ?? '128Mi',
+						resourcesLimitsCpu: object.spec?.resourcesLimitsCpu ?? '500m',
+						resourcesLimitsMemory: object.spec?.resourcesLimitsMemory ?? '512Mi',
+						resourcesGpu: object.spec?.resourcesGpu ?? '0',
+						resourcesGpumem: object.spec?.resourcesGpumem ?? '0'
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
 						}
 					}}
-					bind:values={resourceFormValues}
+					bind:values={resourceValues}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -489,8 +388,8 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 6: YAML Preview & Submit -->
-			<Tabs.Content value={steps[5]} class="min-h-[77vh]">
+			<!-- Step 4: YAML Preview & Submit -->
+			<Tabs.Content value={steps[3]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{
@@ -512,48 +411,32 @@
 
 							isSubmitting = true;
 
-							let parsed: any;
-							try {
-								parsed = load(value);
-							} catch {
-								toast.error('Invalid YAML. Please check the content.');
-								isSubmitting = false;
-								return;
-							}
-
-							const isValid = validate(parsed);
-
-							if (!isValid) {
-								console.error('Validation errors:', validate.errors);
-								toast.error('Validation failed. Please check the YAML.');
-								isSubmitting = false;
-								return;
-							}
-
-							const name = lodash.get(parsed, 'metadata.name');
+							const name = object.metadata?.name;
+							const manifest = new TextEncoder().encode(value);
 
 							toast.promise(
 								async () => {
-									const manifest = new TextEncoder().encode(value);
-
-									await resourceClient.create({
+									await resourceClient.apply({
 										cluster,
 										namespace,
 										group,
 										version,
 										resource,
-										manifest
+										name,
+										manifest,
+										fieldManager: 'otterscale-web-ui',
+										force: true
 									});
 								},
 								{
-									loading: `Creating ${kind} ${name}...`,
+									loading: `Updating ${kind} ${name}...`,
 									success: () => {
 										open = false;
-										return `Successfully created ${kind} ${name}`;
+										return `Successfully updated ${kind} ${name}`;
 									},
 									error: (error) => {
-										console.error(`Failed to create ${kind} ${name}:`, error);
-										return `Failed to create ${kind} ${name}: ${(error as ConnectError).message}`;
+										console.error(`Failed to update ${kind} ${name}:`, error);
+										return `Failed to update ${kind} ${name}: ${(error as ConnectError).message}`;
 									},
 									finally() {
 										isSubmitting = false;
@@ -562,7 +445,7 @@
 							);
 						}}
 					>
-						Create
+						Update
 					</Button>
 				</div>
 			</Tabs.Content>

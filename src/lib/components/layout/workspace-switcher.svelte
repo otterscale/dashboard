@@ -7,6 +7,7 @@
 	import BoxIcon from '@lucide/svelte/icons/box';
 	import BriefcaseIcon from '@lucide/svelte/icons/briefcase';
 	import ChartPieIcon from '@lucide/svelte/icons/chart-pie';
+	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
 	import CircleDashedIcon from '@lucide/svelte/icons/circle-dashed';
 	import CommandIcon from '@lucide/svelte/icons/command';
@@ -52,6 +53,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import type { User } from '$lib/server/session';
 	import { role } from '$lib/stores';
+	import { cn } from '$lib/utils';
 
 	let {
 		cluster,
@@ -77,8 +79,10 @@
 	);
 	let workspaceSchema: any = $state();
 	let createWorkspaceOpen = $state(false);
+	let isMac = $state(false);
 
 	onMount(async () => {
+		isMac = navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
 		try {
 			const res = await resourceClient.schema({
 				cluster,
@@ -316,11 +320,18 @@
 								)?.role}</span
 							>
 						</div>
-						<DropdownMenu.Shortcut class="flex items-center gap-0.5 text-sm">
-							{#if index < 9}
+						<DropdownMenu.Shortcut
+							class={cn('flex gap-0.5 text-sm', {
+								invisible: index >= 9,
+								'items-center': isMac
+							})}
+						>
+							{#if isMac}
 								<CommandIcon class="size-3" />
-								<span class="font-mono">{index + 1}</span>
+							{:else}
+								<ChevronUpIcon class="size-3" />
 							{/if}
+							<span class="font-mono">{index + 1}</span>
 						</DropdownMenu.Shortcut>
 					</DropdownMenu.Item>
 				{/each}
