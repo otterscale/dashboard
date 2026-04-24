@@ -363,5 +363,10 @@
 	"import_cluster_managed_ready_suffix": " 已成功納管並可使用。",
 	"import_cluster_managed": "已納管",
 	"import_cluster_permissions": "權限",
-	"import_cluster_admin_count": "{count} 位 cluster-admin"
+	"import_cluster_admin_count": "{count} 位 cluster-admin",
+	"all_vms": "全部虛擬機器",
+	"vcpu": "vCPU",
+	"domain": "Domain 記憶體",
+	"resident": "常駐記憶體",
+	"available": "可用記憶體"
 }
