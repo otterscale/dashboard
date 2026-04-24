@@ -26,6 +26,7 @@
 		]);
 	});
 
+	const isClusterAdmin = $derived(page.data.isClusterAdmin === true);
 	const cluster = $derived(page.params.cluster ?? '');
 	// Unlike other pages, namespace here is obtained from query params.
 	// This is because admins can query resources across different namespaces.
@@ -38,5 +39,14 @@
 </script>
 
 {#key page.url.href}
-	<ResourceViewer {cluster} {namespace} {name} {group} {version} {kind} {resource} />
+	<ResourceViewer
+		{isClusterAdmin}
+		{cluster}
+		{namespace}
+		{name}
+		{group}
+		{version}
+		{kind}
+		{resource}
+	/>
 {/key}

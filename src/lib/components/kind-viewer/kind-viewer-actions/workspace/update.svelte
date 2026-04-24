@@ -314,7 +314,7 @@
 								},
 								'requests.nvidia.com/gpu': {
 									title: 'GPU Request',
-									type: 'integer'
+									type: 'string'
 								},
 								'requests.nvidia.com/gpumem': {
 									title: 'GPU Memory Request',
@@ -330,7 +330,7 @@
 								},
 								'limits.nvidia.com/gpu': {
 									title: 'GPU Limit',
-									type: 'integer'
+									type: 'string'
 								},
 								'limits.nvidia.com/gpumem': {
 									title: 'GPU Memory Limit',
@@ -510,6 +510,7 @@
 					<Monaco
 						options={{
 							language: 'yaml',
+							readOnly: true,
 							padding: { top: 24 },
 							automaticLayout: true,
 							folding: true,
@@ -522,6 +523,7 @@
 							lodash.set(values, 'apiVersion', `${group}/${version}`);
 							lodash.set(values, 'kind', kind);
 							lodash.set(values, 'metadata', lodash.get(object, 'metadata'));
+							lodash.set(values, 'spec.resourceQuota', lodash.get(object, 'spec.resourceQuota'));
 							lodash.set(values, 'spec.limitRange', {
 								limits: [
 									{
@@ -537,16 +539,6 @@
 									}
 								]
 							});
-							if (role !== 'Cluster Admin') {
-								lodash.set(values, 'spec.resourceQuota', {
-									hard: {
-										'requests.cpu': '16',
-										'requests.memory': '32Gi',
-										'limits.cpu': '16',
-										'limits.memory': '32Gi'
-									}
-								});
-							}
 						}}
 						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
 					/>
