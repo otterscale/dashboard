@@ -26,6 +26,7 @@
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { Toggle } from '$lib/components/ui/toggle/index.js';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { cn } from '$lib/utils';
 
 	let { object }: { object: TenantOtterscaleIoV1Alpha1Workspace } = $props();
@@ -365,16 +366,24 @@
 								>
 							</Item.Content>
 							<Item.Actions>
-								<Toggle
-									aria-label="Toggle Resource Quota Grid"
-									size="sm"
-									onclick={() => {
-										isResourceQuotasGrid = !isResourceQuotasGrid;
-									}}
-									class="data-[state=on]:*:[svg]:fill-muted-foreground/50"
-								>
-									<Grid />
-								</Toggle>
+								<Tooltip.Root>
+									<Tooltip.Trigger>
+										{#snippet child({ props })}
+											<Toggle
+												{...props}
+												aria-label="Toggle Resource Quota Grid"
+												size="sm"
+												onclick={() => {
+													isResourceQuotasGrid = !isResourceQuotasGrid;
+												}}
+												class="data-[state=on]:*:[svg]:fill-muted-foreground/50"
+											>
+												<Grid />
+											</Toggle>
+										{/snippet}
+									</Tooltip.Trigger>
+									<Tooltip.Content>Toggle Grid Layout</Tooltip.Content>
+								</Tooltip.Root>
 							</Item.Actions>
 						</Item.Root>
 					</Card.Title>

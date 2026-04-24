@@ -23,6 +23,7 @@
 		parseHarborProjectName
 	} from '$lib/components/artifact-viewer/utils.svelte.ts';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
 	import { breadcrumbs } from '$lib/stores';
 
@@ -170,9 +171,22 @@
 	{#if isMounted}
 		<ArtifactViewer {cluster} {namespace} {charts}>
 			{#snippet reload()}
-				<Button onclick={handleReload} disabled={isFetching} variant="outline">
-					<RefreshCwIcon />
-				</Button>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<Button
+								{...props}
+								onclick={handleReload}
+								disabled={isFetching}
+								variant="outline"
+								size="icon"
+							>
+								<RefreshCwIcon />
+							</Button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content>Reload</Tooltip.Content>
+				</Tooltip.Root>
 			{/snippet}
 		</ArtifactViewer>
 	{/if}
