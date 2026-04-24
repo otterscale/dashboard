@@ -7,6 +7,7 @@
 	import BoxIcon from '@lucide/svelte/icons/box';
 	import BriefcaseIcon from '@lucide/svelte/icons/briefcase';
 	import ChartPieIcon from '@lucide/svelte/icons/chart-pie';
+	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
 	import CircleDashedIcon from '@lucide/svelte/icons/circle-dashed';
 	import CommandIcon from '@lucide/svelte/icons/command';
@@ -52,7 +53,6 @@
 	import { m } from '$lib/paraglide/messages';
 	import type { User } from '$lib/server/session';
 	import { role } from '$lib/stores';
-	import { ChevronUpIcon } from '@lucide/svelte';
 	import { cn } from '$lib/utils';
 
 	let {
