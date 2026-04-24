@@ -18,24 +18,17 @@
 	let isLoading = $state(true);
 	let hasError = $state(false);
 
-	const vmFilter = $derived(vmName === '.*' ? '' : `name="${vmName}"`);
-	const vmRegex = $derived(vmName);
-
 	onMount(async () => {
 		try {
-			const f = vmFilter ? `{${vmFilter}}` : '';
-			const [vcpuRes, usingRes, totalRes] = await Promise.all([
+			const [usingRes, totalRes] = await Promise.all([
 				client.instantQuery(
-					`sum(kubevirt_vmi_vcpu_seconds_total${f ? f : `{name=~"${vmRegex}"}`}) by (name)`
+					`sum(rate(kubevirt_vmi_cpu_usage_seconds_total{name=~"${vmName}"}[5m]))`
 				),
-				client.instantQuery(
-					`sum(rate(kubevirt_vmi_cpu_usage_seconds_total{name=~"${vmRegex}"}[5m]))`
-				),
-				client.instantQuery(`count(kubevirt_vmi_vcpu_seconds_total{name=~"${vmRegex}"})`)
+				client.instantQuery(`count(kubevirt_vmi_vcpu_seconds_total{name=~"${vmName}"})`)
 			]);
-			vcpuCount = vcpuRes.result.length;
 			usingVal = usingRes.result[0]?.value?.value ?? null;
 			totalVal = totalRes.result[0]?.value?.value ?? null;
+			vcpuCount = totalVal !== null ? Math.round(totalVal) : null;
 		} catch {
 			hasError = true;
 		}

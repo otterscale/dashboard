@@ -45,7 +45,10 @@
 		{:else}
 			{@const duration = formatDuration(uptime)}
 			<p class="flex h-[200px] items-center justify-center text-5xl font-semibold">
-				{duration.value.toFixed(1)}
+				{duration.value.toLocaleString(undefined, {
+					minimumFractionDigits: 1,
+					maximumFractionDigits: 1
+				})}
 				{duration.unit}
 			</p>
 		{/if}

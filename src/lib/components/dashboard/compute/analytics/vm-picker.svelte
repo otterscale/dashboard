@@ -95,7 +95,11 @@
 					options.push({ value: '.*', label: m.all_vms() });
 				}
 				vmOptions.set(options);
-				selectedVM = options[0]?.value;
+				// Preserve current selection if still available, otherwise default to '.*' (All VMs)
+				const stillAvailable = selectedVM && options.some((o) => o.value === selectedVM);
+				selectedVM = stillAvailable
+					? selectedVM
+					: (options.find((o) => o.value === '.*')?.value ?? options[0]?.value);
 			} catch {
 				if (cancelled) return;
 				vmOptions.set([]);
