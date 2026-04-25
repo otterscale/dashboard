@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { createClient, type Transport } from '@connectrpc/connect';
 	import Box from '@lucide/svelte/icons/box';
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import CircleX from '@lucide/svelte/icons/circle-x';
@@ -10,9 +11,14 @@
 	import Shield from '@lucide/svelte/icons/shield';
 	import Users from '@lucide/svelte/icons/users';
 	import Zap from '@lucide/svelte/icons/zap';
-	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
+	import { ResourceService, WatchEvent_Type } from '@otterscale/api/resource/v1';
+	import type {
+		AppsV1Deployment,
+		CoreV1Pod,
+		TenantOtterscaleIoV1Alpha1Workspace
+	} from '@otterscale/types';
 	import { InstantVector, PrometheusDriver } from 'prometheus-query';
-	import { onMount } from 'svelte';
+	import { getContext, onDestroy, onMount } from 'svelte';
 
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -28,7 +34,124 @@
 	import { Toggle } from '$lib/components/ui/toggle/index.js';
 	import { cn } from '$lib/utils';
 
+	import DeploymentViewer from '../related-resources-viewer/deployment.svelte';
+	import PodViewer from '../related-resources-viewer/pod.svelte';
+
 	let { object }: { object: TenantOtterscaleIoV1Alpha1Workspace } = $props();
+
+	const transport: Transport = getContext('transport');
+	const resourceClient = createClient(ResourceService, transport);
+
+	const cluster = $derived(page.params.cluster ?? '');
+	const watchNamespace = $derived(object?.status?.namespaceRef?.name ?? '');
+
+	type TargetResource = AppsV1Deployment | CoreV1Pod;
+	const abortController = new AbortController();
+
+	const getKey = (o: any) => o?.metadata?.uid ?? o?.metadata?.name ?? '';
+
+	function sleep(ms: number) {
+		return new Promise<void>((resolve) => {
+			const timer = setTimeout(resolve, ms);
+			abortController.signal.addEventListener('abort', () => {
+				clearTimeout(timer);
+				resolve();
+			});
+		});
+	}
+
+	async function listAndWatch<T extends TargetResource>(
+		namespace: string,
+		identifier: { group: string; version: string; resource: string },
+		setObjects: (items: T[]) => void,
+		updateObject: (updater: (previous: T[]) => T[]) => void
+	) {
+		while (!abortController.signal.aborted) {
+			let resourceVersion = '';
+
+			// === 1. List: Get initial snapshot ===
+			try {
+				const response = await resourceClient.list(
+					{
+						cluster,
+						namespace,
+						...identifier
+					},
+					{ signal: abortController.signal }
+				);
+				const items = response.items.map((item) => item.object as T);
+				setObjects(items);
+				resourceVersion = response.resourceVersion;
+			} catch (error) {
+				if (abortController.signal.aborted) return;
+				console.error(`Failed to list ${identifier.resource}:`, error);
+				await sleep(3000);
+				continue;
+			}
+
+			// === 2. Watch: Stream events starting from this resourceVersion ===
+			try {
+				const stream = resourceClient.watch(
+					{
+						cluster,
+						namespace,
+						...identifier,
+						resourceVersion
+					},
+					{ signal: abortController.signal }
+				);
+
+				for await (const event of stream) {
+					if (event.type === WatchEvent_Type.BOOKMARK) {
+						if (event.resourceVersion) resourceVersion = event.resourceVersion;
+						continue;
+					}
+
+					if (event.type === WatchEvent_Type.ERROR) {
+						console.warn(`Watch error for ${identifier.resource}, relisting...`);
+						break;
+					}
+
+					const resourceObject = event.resource?.object as T | undefined;
+					if (!resourceObject) continue;
+					const key = getKey(resourceObject);
+					if (!key) continue;
+
+					if (event.resourceVersion) resourceVersion = event.resourceVersion;
+
+					switch (event.type) {
+						case WatchEvent_Type.ADDED:
+						case WatchEvent_Type.MODIFIED: {
+							updateObject((previous) => {
+								const index = previous.findIndex((o) => getKey(o) === key);
+								if (index >= 0) {
+									const next = previous.slice();
+									next[index] = resourceObject;
+									return next;
+								}
+								return [...previous, resourceObject];
+							});
+							break;
+						}
+						case WatchEvent_Type.DELETED: {
+							updateObject((previous) => previous.filter((o) => getKey(o) !== key));
+							break;
+						}
+					}
+				}
+			} catch (error) {
+				if (abortController.signal.aborted) return;
+				console.error(`Watch stream error for ${identifier.resource}:`, error);
+			}
+
+			if (!abortController.signal.aborted) {
+				await sleep(1000);
+			}
+		}
+	}
+
+	let deployments = $state<AppsV1Deployment[]>([]);
+	let pods = $state<CoreV1Pod[]>([]);
 
 	let resourceQuotaUsed: Record<string, string> = $state({});
 	let isLoaded = $state(false);
@@ -141,6 +264,25 @@
 	onMount(async () => {
 		await fetchResourceQuotaMetrics();
 		isLoaded = true;
+
+		if (watchNamespace && cluster) {
+			listAndWatch<AppsV1Deployment>(
+				watchNamespace,
+				{ group: 'apps', version: 'v1', resource: 'deployments' },
+				(items) => (deployments = items),
+				(updater) => (deployments = updater(deployments))
+			);
+			listAndWatch<CoreV1Pod>(
+				watchNamespace,
+				{ group: '', version: 'v1', resource: 'pods' },
+				(items) => (pods = items),
+				(updater) => (pods = updater(pods))
+			);
+		}
+	});
+
+	onDestroy(() => {
+		abortController.abort();
 	});
 
 	function getGridLayout(key: string) {
@@ -587,6 +729,54 @@
 					{/if}
 				</Card.Content>
 			</Card.Root>
+		</Field.Set>
+
+		<!-- Deployments -->
+		<Field.Set>
+			<Label class={typographyVariants({ variant: 'h4' })}>Deployments</Label>
+			{#if deployments.length > 0}
+				<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+					{#each deployments as deployment (deployment.metadata?.uid ?? deployment.metadata?.name)}
+						<DeploymentViewer {deployment} {cluster} namespace={watchNamespace} />
+					{/each}
+				</div>
+			{:else}
+				<Empty.Root class="h-full">
+					<Empty.Header>
+						<Empty.Media variant="icon">
+							<Box />
+						</Empty.Media>
+						<Empty.Title>No Deployments Found</Empty.Title>
+						<Empty.Description>
+							No deployments were found in the {watchNamespace} namespace.
+						</Empty.Description>
+					</Empty.Header>
+				</Empty.Root>
+			{/if}
+		</Field.Set>
+
+		<!-- Pods -->
+		<Field.Set>
+			<Label class={typographyVariants({ variant: 'h4' })}>Pods</Label>
+			{#if pods.length > 0}
+				<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+					{#each pods as pod (pod.metadata?.uid ?? pod.metadata?.name)}
+						<PodViewer {pod} {cluster} namespace={watchNamespace} />
+					{/each}
+				</div>
+			{:else}
+				<Empty.Root class="h-full">
+					<Empty.Header>
+						<Empty.Media variant="icon">
+							<Box />
+						</Empty.Media>
+						<Empty.Title>No Pods Found</Empty.Title>
+						<Empty.Description>
+							No pods were found in the {watchNamespace} namespace.
+						</Empty.Description>
+					</Empty.Header>
+				</Empty.Root>
+			{/if}
 		</Field.Set>
 
 		<Field.Set>

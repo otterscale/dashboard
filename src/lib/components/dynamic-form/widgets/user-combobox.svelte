@@ -99,6 +99,7 @@
 				if (!response.ok) return;
 				const user: KeycloakUser = await response.json();
 				labelCache[subject] = getDisplayName(user);
+				onFetch?.([user]);
 			})
 			.catch(() => {});
 	});
