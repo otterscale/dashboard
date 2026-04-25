@@ -192,6 +192,15 @@
 					{
 						title: m.artifact(),
 						url: resourceUrl('model.otterscale.io', 'v1alpha1', 'ModelArtifact', 'modelartifacts')
+					},
+					{
+						title: m.model_template(),
+						url: resourceUrl(
+							'serving.kserve.io',
+							'v1alpha2',
+							'LLMInferenceServiceConfig',
+							'llminferenceserviceconfigs'
+						)
 					}
 				]
 			},
