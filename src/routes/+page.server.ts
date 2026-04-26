@@ -6,36 +6,36 @@ import { env as publicEnv } from '$env/dynamic/public';
 
 import type { PageServerLoad } from './$types';
 
-interface EnvVar {
-	value: string | undefined;
-	name: string;
-}
+// interface EnvVar {
+// 	value: string | undefined;
+// 	name: string;
+// }
 
-const REQUIRED_ENV_VARS: readonly EnvVar[] = [
-	{ value: env.API_URL, name: 'API_URL' },
-	{ value: publicEnv.PUBLIC_WEB_URL, name: 'PUBLIC_WEB_URL' },
-	{ value: publicEnv.PUBLIC_HARBOR_URL, name: 'PUBLIC_HARBOR_URL' },
-	{ value: env.KEYCLOAK_REALM_URL, name: 'KEYCLOAK_REALM_URL' },
-	{ value: env.KEYCLOAK_CLIENT_ID, name: 'KEYCLOAK_CLIENT_ID' },
-	{ value: env.KEYCLOAK_CLIENT_SECRET, name: 'KEYCLOAK_CLIENT_SECRET' },
-	{ value: env.REDIS_URL, name: 'REDIS_URL' }
-];
+// const REQUIRED_ENV_VARS: readonly EnvVar[] = [
+// 	{ value: env.API_URL, name: 'API_URL' },
+// 	{ value: publicEnv.PUBLIC_WEB_URL, name: 'PUBLIC_WEB_URL' },
+// 	{ value: publicEnv.PUBLIC_HARBOR_URL, name: 'PUBLIC_HARBOR_URL' },
+// 	{ value: env.KEYCLOAK_REALM_URL, name: 'KEYCLOAK_REALM_URL' },
+// 	{ value: env.KEYCLOAK_CLIENT_ID, name: 'KEYCLOAK_CLIENT_ID' },
+// 	{ value: env.KEYCLOAK_CLIENT_SECRET, name: 'KEYCLOAK_CLIENT_SECRET' },
+// 	{ value: env.REDIS_URL, name: 'REDIS_URL' }
+// ];
 
-const checkRequiredEnvVars = (envVars: readonly EnvVar[]): void => {
-	for (const { value, name } of envVars) {
-		if (!value) {
-			console.error(`Missing required environment variable: ${name}`);
-			throw error(503, `${name} is not set`);
-		}
-	}
-};
+// const checkRequiredEnvVars = (envVars: readonly EnvVar[]): void => {
+// 	for (const { value, name } of envVars) {
+// 		if (!value) {
+// 			console.error(`Missing required environment variable: ${name}`);
+// 			throw error(503, `${name} is not set`);
+// 		}
+// 	}
+// };
 
-export const load: PageServerLoad = async ({ locals }) => {
-	checkRequiredEnvVars(REQUIRED_ENV_VARS);
+// export const load: PageServerLoad = async ({ locals }) => {
+// 	checkRequiredEnvVars(REQUIRED_ENV_VARS);
 
-	if (!locals.session) {
-		throw redirect(307, resolve('/login'));
-	}
+// 	if (!locals.session) {
+// 		throw redirect(307, resolve('/login'));
+// 	}
 
-	throw redirect(307, resolve('/(auth)/console'));
-};
+// 	throw redirect(307, resolve('/(auth)/console'));
+// };

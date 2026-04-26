@@ -47,6 +47,7 @@
 		handleSubmit,
 		actions,
 		values = $bindable(),
+		liveValues = $bindable(),
 		class: className
 	}: {
 		schema: Schema;
@@ -59,6 +60,7 @@
 		};
 		actions?: Snippet;
 		values?: FormValue;
+		liveValues?: FormValue;
 		class?: string;
 	} = $props();
 	// Clean schema from unnecessary keywords to JSON Schema Draft-07.
@@ -196,6 +198,10 @@
 		}
 	}
 	setFormContext(form);
+
+	$effect(() => {
+		liveValues = getValueSnapshot(form);
+	});
 </script>
 
 <div class={cn('h-full', className)}>

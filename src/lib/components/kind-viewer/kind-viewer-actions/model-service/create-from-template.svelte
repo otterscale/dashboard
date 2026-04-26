@@ -3,27 +3,23 @@
 	import Plus from '@lucide/svelte/icons/plus';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
-	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
+	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
 	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
-	import { getContext, onMount } from 'svelte';
-	import { SvelteMap, SvelteSet, SvelteURL } from 'svelte/reactivity';
+	import { getContext } from 'svelte';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
-	import { env as publicEnv } from '$env/dynamic/public';
 	import Form from '$lib/components/dynamic-form/form.svelte';
-	import ComboboxWidget from '$lib/components/dynamic-form/widgets/combobox.svelte';
-	import { fetchAllGpuNodes, type NodeInfo } from '$lib/components/gpu-allocation';
+	import { type NodeInfo } from '$lib/components/gpu-allocation';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
-	import type { ArtifactType } from '$lib/server/harbor';
 
 	let {
 		cluster,
@@ -52,22 +48,18 @@
 		kind,
 		metadata: {},
 		spec: {
-			accelerator: {},
-			decode: {},
-			engine: {},
-			model: {},
-			routingProxy: {
-				image: 'ghcr.io/llm-d/llm-d-routing-sidecar:v0.6.0'
-			}
+			baseRefs: []
 		}
 	});
 	let value = $derived(stringify(values));
-
-	let mode: any = $state({});
-	let placement: any = $state({});
+	let nodeSelector: {
+		node?: string;
+		type?: string[];
+		uuid?: string[];
+	} = $state({});
 
 	// Steps Manager
-	const steps = Array.from({ length: 7 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -85,84 +77,83 @@
 	let open = $state(false);
 	let isSubmitting = $state(false);
 
-	const imageToArtifact = new SvelteMap<string, ArtifactType>();
-	let timer: ReturnType<typeof setTimeout> | null = null;
-	function fetchModelArtifacts(): Promise<{ label: string; value: string }[]> {
-		return new Promise((resolve) => {
-			if (timer) clearTimeout(timer);
-
-			timer = setTimeout(async () => {
-				try {
-					const response = await fetch(`/bff/harbor/models?project=${namespace}`);
-					if (response.ok) {
-						const harborUrl = new SvelteURL(publicEnv.PUBLIC_HARBOR_URL ?? '');
-						const modelArtifacts: ArtifactType[] = await response.json();
-
-						const modelRepositories: string[] = [];
-						modelArtifacts.forEach((artifact) => {
-							if (Array.isArray(artifact.tags) && artifact.tags.length > 0) {
-								const artifactTagNames = artifact.tags.map((tag) => tag.name);
-								const [artifactTagName] = artifactTagNames;
-								imageToArtifact.set(
-									`${harborUrl.host}/${artifact.repository_name}:${artifactTagName}`,
-									artifact
-								);
-								modelRepositories.push(`${artifact.repository_name}:${artifactTagName}`);
-							}
-						});
-
-						resolve(
-							modelRepositories.map((repository: string) => ({
-								label: repository,
-								value: `${harborUrl.host}/${repository}`
-							}))
-						);
-					} else {
-						console.error('Failed to fetch models:', response.statusText);
-						resolve([]);
+	function getGPUInformation(): NodeInfo[] {
+		return [
+			{
+				name: 'Node 1',
+				devices: [
+					{
+						id: 'gpu-0',
+						index: 0,
+						type: 'A100',
+						count: 0,
+						devcore: 0,
+						devmem: 0,
+						health: false
 					}
-				} catch (error) {
-					console.error('Error fetching models:', error);
-					resolve([]);
-				}
-			}, 300);
-		});
-	}
-	let gpuNodes: NodeInfo[] = $state([]);
-
-	onMount(async () => {
-		try {
-			gpuNodes = await fetchAllGpuNodes(resourceClient, cluster);
-		} catch {
-			console.error('Failed to fetch GPU nodes');
-		}
-	});
-
-	const nodeNameOptions = $derived(
-		gpuNodes.map((n) => ({
-			label: `${n.name} (${n.devices.length} GPUs)`,
-			value: n.name
-		}))
-	);
-
-	const gpuTypeOptions = $derived(() => {
-		const types = new SvelteSet<string>();
-		for (const node of gpuNodes) {
-			for (const device of node.devices) {
-				if (device.type) types.add(device.type);
+				]
+			},
+			{
+				name: 'Node 2',
+				devices: [
+					{
+						id: 'gpu-0',
+						index: 0,
+						type: 'A200',
+						count: 0,
+						devcore: 0,
+						devmem: 0,
+						health: false
+					},
+					{
+						id: 'gpu-1',
+						index: 1,
+						type: 'H100',
+						count: 0,
+						devcore: 0,
+						devmem: 0,
+						health: false
+					}
+				]
 			}
-		}
-		return [...types].map((t) => ({ label: t, value: t }));
-	});
+		];
+	}
 
-	const gpuUuidOptions = $derived(
-		gpuNodes.flatMap((node) =>
-			node.devices.map((device) => ({
-				label: `${node.name} - GPU ${device.index}`,
-				value: device.id
-			}))
-		)
-	);
+	function buildNodeSelectorSchema(nodes: NodeInfo[]): Schema {
+		return {
+			title: 'Node Selector',
+			type: 'object',
+			properties: {
+				node: {
+					type: 'string',
+					enum: nodes.map((n) => n.name)
+				}
+			},
+			dependencies: {
+				node: {
+					oneOf: nodes.map((node) => {
+						const types = [...new Set(node.devices.map((device) => device.type))];
+						const uuids = [...new Set(node.devices.map((device) => device.id))];
+						return {
+							properties: {
+								node: { enum: [node.name] },
+								type: {
+									type: 'array',
+									uniqueItems: true,
+									items: { type: 'string', enum: types }
+								},
+								uuid: {
+									type: 'array',
+									uniqueItems: true,
+									items: { type: 'string', enum: uuids }
+								}
+							}
+						};
+					})
+				}
+			}
+		} as Schema;
+	}
 </script>
 
 <Dialog.Root
@@ -240,67 +231,23 @@
 			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
-						...(lodash.omit(lodash.get(jsonSchema, 'properties.spec.properties.model'), [
-							'required',
-							'properties'
-						]) as any),
-						title: 'Model',
-						properties: {
-							image: {
-								...(lodash.get(
-									jsonSchema,
-									'properties.spec.properties.model.properties.image'
-								) as any),
-								title: 'Image'
-							}
-						},
-						required: lodash
-							.get(jsonSchema, 'properties.spec.properties.model.required')
-							.filter((property: string) => property !== 'name')
+						...lodash.get(jsonSchema, 'properties.spec.properties.baseRefs'),
+						title: 'Base References'
 					} as Schema}
 					uiSchema={{
 						'ui:options': {
 							translations: {
 								submit: 'Next'
 							}
-						},
-						image: {
-							'ui:components': {
-								textWidget: ComboboxWidget
-							},
-							'ui:options': {
-								TailoredComboboxEnumerations: fetchModelArtifacts,
-								TailoredComboboxVisibility: 10,
-								TailoredComboboxInput: {
-									placeholder: 'Name'
-								},
-								TailoredComboboxEmptyText: 'No names available.'
-							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{
-						image: null,
-						imagePullSecrets: [{ name: 'workspace-image-pull-secret' }]
-					} as FormValue}
+					initialValue={[] as FormValue}
 					handleSubmit={{
 						posthook: (form) => {
 							handleNext();
-
-							const formValue = getValueSnapshot(form);
-							const image = String(lodash.get(formValue, 'image'));
-							const artifact = imageToArtifact.get(image) as ArtifactType;
-							if (artifact) {
-								const extraAttributes = artifact.extra_attrs;
-								const name = [
-									...(lodash.get(extraAttributes, 'descriptor.authors', []) as string[]),
-									lodash.get(extraAttributes, 'descriptor.name')
-								].join('/');
-
-								lodash.set(values, 'spec.model.name', name);
-							}
 						}
 					}}
-					bind:values={values['spec']['model']}
+					bind:values={values['spec']['baseRefs']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -318,577 +265,68 @@
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[2]}>
-				<Form
-					schema={{
-						...(lodash.get(jsonSchema, 'properties.spec.properties.accelerator') as any),
-						title: 'Accelerator'
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						},
-						type: {
-							'ui:components': {
-								stringField: 'enumField',
-								selectWidget: 'comboboxWidget'
-							},
-							'ui:options': {
-								disabledEnumValues: lodash
-									.get(jsonSchema, 'properties.spec.properties.accelerator.properties.type.enum')
-									.filter((accelerator: string) => accelerator !== 'nvidia')
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{
-						type: 'nvidia'
-					} as FormValue}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-					bind:values={values['spec']['accelerator']}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-
-			<Tabs.Content value={steps[3]}>
-				{@const decodeSchema = {
-					...(lodash.omit(
-						lodash.get(jsonSchema, 'properties.spec.properties.decode'),
-						'properties'
-					) as any),
-					title: 'Decode',
-					properties: {
-						parallelism: {
-							...(lodash.omit(
-								lodash.get(jsonSchema, 'properties.spec.properties.decode.properties.parallelism'),
-								['description', 'properties']
-							) as any),
-							properties: {
-								tensor: {
-									...lodash.get(
-										jsonSchema,
-										'properties.spec.properties.decode.properties.parallelism.properties.tensor'
-									),
-									title: 'Tensor'
-								}
-							}
-						},
-						replicas: {
-							...lodash.get(jsonSchema, 'properties.spec.properties.decode.properties.replicas'),
-							title: 'Replicas'
-						},
-						resources: {
-							...lodash.omit(
-								lodash.get(jsonSchema, 'properties.spec.properties.decode.properties.resources'),
-								'properties'
-							),
-							title: 'Resources',
-							properties: {
-								requests: {
-									...(lodash.omit(
-										lodash.get(
-											jsonSchema,
-											'properties.spec.properties.decode.properties.resources.properties.requests'
-										),
-										'additionalProperties'
-									) as any),
-									title: 'Requests',
-									properties: {
-										'nvidia.com/gpumem': {
-											title: 'GPU Memory',
-											type: 'string'
-										}
+				{#await getGPUInformation()}
+					Loading...
+				{:then GPUInformation}
+					{@const nodeSelectorSchema = buildNodeSelectorSchema(GPUInformation)}
+					{#key nodeSelector.node}
+						<Form
+							schema={nodeSelectorSchema}
+							uiSchema={{
+								'ui:options': {
+									translations: {
+										submit: 'Next'
 									}
-								}
-							}
-						}
-					}
-				}}
-				{@const prefillSchema = {
-					...(lodash.omit(
-						lodash.get(jsonSchema, 'properties.spec.properties.prefill'),
-						'properties'
-					) as any),
-					title: 'Prefill',
-					properties: {
-						parallelism: {
-							...(lodash.omit(
-								lodash.get(jsonSchema, 'properties.spec.properties.prefill.properties.parallelism'),
-								['description', 'properties']
-							) as any),
-							properties: {
-								tensor: {
-									...lodash.get(
-										jsonSchema,
-										'properties.spec.properties.prefill.properties.parallelism.properties.tensor'
-									),
-									title: 'Tensor'
-								}
-							}
-						},
-						replicas: {
-							...lodash.get(jsonSchema, 'properties.spec.properties.prefill.properties.replicas'),
-							title: 'Replicas'
-						},
-						resources: {
-							...lodash.omit(
-								lodash.get(jsonSchema, 'properties.spec.properties.prefill.properties.resources'),
-								'properties'
-							),
-							title: 'Resources',
-							properties: {
-								requests: {
-									...(lodash.omit(
-										lodash.get(
-											jsonSchema,
-											'properties.spec.properties.prefill.properties.resources.properties.requests'
-										),
-										'additionalProperties'
-									) as any),
-									title: 'Requests',
-									properties: {
-										'nvidia.com/gpumem': {
-											title: 'GPU Memory',
-											type: 'string'
-										}
+								},
+								node: {
+									'ui:components': {
+										stringField: 'enumField',
+										selectWidget: 'comboboxWidget'
 									}
-								}
-							}
-						}
-					}
-				}}
-				<Form
-					schema={{
-						type: 'object',
-						properties: {
-							mode: {
-								title: 'Mode',
-								type: 'string',
-								enum: ['Intelligent', 'Disaggregation'],
-								default: 'Intelligent'
-							}
-						},
-						allOf: [
-							{
-								if: {
-									properties: {
-										mode: {
-											const: 'Intelligent'
+								},
+								type: {
+									items: {
+										'ui:components': {
+											stringField: 'enumField',
+											selectWidget: 'comboboxWidget'
 										}
 									}
 								},
-								then: {
-									type: 'object',
-									properties: {
-										decode: decodeSchema
-									},
-									required: ['decode']
-								}
-							},
-							{
-								if: {
-									properties: {
-										mode: {
-											const: 'Disaggregation'
-										}
-									}
-								},
-								then: {
-									type: 'object',
-									properties: {
-										decode: decodeSchema,
-										prefill: prefillSchema
-									},
-									required: ['decode', 'prefill']
-								}
-							},
-							{
-								required: ['mode']
-							}
-						]
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						},
-						mode: {
-							'ui:components': {
-								stringField: 'enumField'
-							}
-						},
-						decode: {
-							parallelism: {
-								'ui:options': {
-									hideTitle: true
-								}
-							},
-							resources: {
-								'ui:options': {
-									hideTitle: true
-								}
-							}
-						},
-						prefill: {
-							parallelism: {
-								'ui:options': {
-									hideTitle: true
-								}
-							},
-							resources: {
-								'ui:options': {
-									hideTitle: true
-								}
-							}
-						}
-					} as UiSchemaRoot}
-					transformer={(value: FormValue) => {
-						const formValue: any = value;
-						lodash.set(
-							formValue,
-							['decode', 'resources', 'requests', 'nvidia.com/gpu'],
-							lodash.get(formValue, 'decode.parallelism.tensor')
-						);
-						lodash.set(
-							formValue,
-							['decode', 'resources', 'limits', 'nvidia.com/gpu'],
-							lodash.get(formValue, ['decode', 'resources', 'requests', 'nvidia.com/gpu'])
-						);
-						lodash.set(
-							formValue,
-							['decode', 'resources', 'limits', 'nvidia.com/gpumem'],
-							lodash.get(formValue, ['decode', 'resources', 'requests', 'nvidia.com/gpumem'])
-						);
-
-						if (lodash.get(formValue, 'mode') === 'Disaggregation') {
-							lodash.set(
-								formValue,
-								['prefill', 'resources', 'requests', 'nvidia.com/gpu'],
-								lodash.get(formValue, 'prefill.parallelism.tensor')
-							);
-							lodash.set(
-								formValue,
-								['prefill', 'resources', 'limits', 'nvidia.com/gpu'],
-								lodash.get(formValue, ['prefill', 'resources', 'requests', 'nvidia.com/gpu'])
-							);
-							lodash.set(
-								formValue,
-								['prefill', 'resources', 'limits', 'nvidia.com/gpumem'],
-								lodash.get(formValue, ['prefill', 'resources', 'requests', 'nvidia.com/gpumem'])
-							);
-						} else {
-							lodash.set(values, 'spec.prefill.resources', {});
-						}
-						return formValue;
-					}}
-					initialValue={{
-						mode: 'Intelligent'
-					} as FormValue}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-							lodash.set(values, 'spec.decode', lodash.get(mode, 'decode'));
-							if (lodash.get(mode, 'mode') === 'Disaggregation') {
-								lodash.set(values, 'spec.prefill', lodash.get(mode, 'prefill'));
-							} else {
-								lodash.unset(values, 'spec.prefill');
-							}
-						}
-					}}
-					bind:values={mode}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-
-			<Tabs.Content value={steps[4]}>
-				<Form
-					schema={{
-						type: 'object',
-						title: 'GPU Placement',
-						description:
-							'Configure GPU/Node scheduling constraints (HAMI). Leave all fields empty for automatic scheduling. GPU Type and UUID support multiple AND-combined selections.',
-						properties: {
-							nodeName: {
-								title: 'Node',
-								type: 'string',
-								description: 'Select a GPU node (nodeSelector: kubernetes.io/hostname)',
-								...(nodeNameOptions.length > 0 && {
-									enum: nodeNameOptions.map((o) => o.value)
-								})
-							},
-							gpuType: {
-								title: 'GPU Type',
-								type: 'array',
-								description: 'Select GPU types (annotation: nvidia.com/use-gputype)',
-								items: {
-									type: 'string',
-									...(gpuTypeOptions().length > 0 && {
-										enum: gpuTypeOptions().map((o) => o.value)
-									})
-								},
-								uniqueItems: true
-							},
-							gpuUuid: {
-								title: 'GPU UUID',
-								type: 'array',
-								description: 'Select GPU UUIDs (annotation: nvidia.com/use-gpuuuid)',
-								items: {
-									type: 'string',
-									...(gpuUuidOptions.length > 0 && {
-										enum: gpuUuidOptions.map((o) => o.value)
-									})
-								},
-								uniqueItems: true
-							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						},
-						nodeName: {
-							'ui:components': {
-								stringField: 'enumField'
-							},
-							'ui:options': {
-								useLabel: true,
-								title: 'Node'
-							}
-						},
-						gpuType: {
-							'ui:components': {
-								arrayField: 'multiEnumField',
-								checkboxesWidget: 'multiSelectWidget'
-							},
-							'ui:options': {
-								useLabel: true,
-								title: 'GPU Type'
-							}
-						},
-						gpuUuid: {
-							'ui:components': {
-								arrayField: 'multiEnumField',
-								checkboxesWidget: 'multiSelectWidget'
-							},
-							'ui:options': {
-								useLabel: true,
-								title: 'GPU UUID',
-								enumNames: gpuUuidOptions.map((o) => o.label)
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{} as FormValue}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-
-							const nodeName: string = lodash.get(placement, 'nodeName', '');
-							const gpuTypes: string[] = lodash.get(placement, 'gpuType', []);
-							const gpuUuids: string[] = lodash.get(placement, 'gpuUuid', []);
-
-							// Clear any previous placement values
-							lodash.unset(values, 'spec.decode.nodeSelector');
-							lodash.unset(values, 'spec.decode.annotations');
-							lodash.unset(values, 'spec.prefill.nodeSelector');
-							lodash.unset(values, 'spec.prefill.annotations');
-
-							const isDisaggregation = lodash.get(mode, 'mode') === 'Disaggregation';
-
-							// Nodes → nodeSelector
-							if (nodeName) {
-								const selector = { 'kubernetes.io/hostname': nodeName };
-								lodash.set(values, 'spec.decode.nodeSelector', selector);
-								if (isDisaggregation) {
-									lodash.set(values, 'spec.prefill.nodeSelector', selector);
-								}
-							}
-
-							// GPU Type & GPU UUID → spec.decode.annotations / spec.prefill.annotations (HAMI spec)
-							const annotations: Record<string, string> = {};
-							if (gpuTypes.length > 0) {
-								annotations['nvidia.com/use-gputype'] = gpuTypes.join(',');
-							}
-							if (gpuUuids.length > 0) {
-								annotations['nvidia.com/use-gpuuuid'] = gpuUuids.join(',');
-							}
-
-							if (Object.keys(annotations).length > 0) {
-								lodash.set(values, 'spec.decode.annotations', annotations);
-								if (isDisaggregation) {
-									lodash.set(values, 'spec.prefill.annotations', annotations);
-								}
-							}
-						}
-					}}
-					bind:values={placement}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-
-			<Tabs.Content value={steps[5]}>
-				<Form
-					schema={{
-						...(lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.engine'),
-							'properties'
-						) as any),
-						title: 'Engine',
-						properties: {
-							args: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.engine.properties.args'),
-								title: 'Arguments'
-							},
-							env: {
-								...lodash.omit(
-									lodash.get(jsonSchema, 'properties.spec.properties.engine.properties.env'),
-									'items'
-								),
-								title: 'Environment Variables',
-								items: {
-									...lodash.omit(
-										lodash.get(
-											jsonSchema,
-											'properties.spec.properties.engine.properties.env.items'
-										),
-										'properties'
-									),
-									properties: {
-										name: {
-											...lodash.get(
-												jsonSchema,
-												'properties.spec.properties.engine.properties.env.items.properties.name'
-											),
-											title: 'Name'
-										},
-										value: {
-											...lodash.get(
-												jsonSchema,
-												'properties.spec.properties.engine.properties.env.items.properties.value'
-											),
-											title: 'Value'
+								uuid: {
+									items: {
+										'ui:components': {
+											stringField: 'enumField',
+											selectWidget: 'comboboxWidget'
 										}
 									}
 								}
-							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						},
-						args: {
-							'ui:options': {
-								itemTitle: () => 'argument'
-							}
-						},
-						env: {
-							'ui:options': {
-								itemTitle: () => 'environment variable'
-							},
-							items: {
-								'ui:options': {
-									layouts: {
-										'object-properties': {
-											class: 'grid grid-cols-2 gap-3'
-										}
-									}
+							} as UiSchemaRoot}
+							initialValue={{ node: nodeSelector.node } as FormValue}
+							handleSubmit={{
+								posthook: () => {
+									handleNext();
 								}
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{
-						args: [
-							'--max-model-len',
-							'8192',
-							'--kv-transfer-config',
-							`{"kv_connector":"NixlConnector", "kv_role":"kv_both"}`,
-							'--disable-uvicorn-access-log'
-						]
-					} as FormValue}
-					transformer={(value: FormValue) => {
-						const formValue: any = value;
-						lodash.set(formValue, 'env', [
-							{
-								name: 'VLLM_NIXL_SIDE_CHANNEL_HOST',
-								valueFrom: { fieldRef: { fieldPath: 'status.podIP' } }
-							},
-							{
-								name: 'VLLM_NIXL_SIDE_CHANNEL_PORT',
-								value: '5557'
-							},
-							{ name: 'UCX_TLS', value: 'cuda_ipc,cuda_copy,tcp' },
-							{ name: 'VLLM_LOGGING_LEVEL', value: 'INFO' }
-						]);
-						return formValue;
-					}}
-					handleSubmit={{
-						posthook: () => {
-							handleNext();
-						}
-					}}
-					bind:values={values['spec']['engine']}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
+							}}
+							bind:liveValues={nodeSelector}
+						>
+							{#snippet actions()}
+								<div class="flex w-full items-center justify-between gap-3">
+									<Button
+										onclick={() => {
+											handlePrevious();
+										}}
+									>
+										Previous
+									</Button>
+									<SubmitButton />
+								</div>
+							{/snippet}
+						</Form>
+					{/key}
+				{/await}
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[6]} class="min-h-[77vh]">
+			<Tabs.Content value={steps[3]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{
