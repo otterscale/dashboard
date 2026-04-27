@@ -148,12 +148,8 @@
 		...defaults,
 		theme,
 		extraUiOptions,
-		get schema() {
-			return schema;
-		},
-		get uiSchema() {
-			return uiSchema;
-		},
+		schema,
+		uiSchema,
 		initialValue,
 		validator,
 		onSubmit,

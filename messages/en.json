@@ -38,6 +38,7 @@
 	"all_models": "All Models",
 	"model_service": "Model",
 	"model_template": "Template",
+	"model_cache": "Cache",
 	"all_namespaces": "All Workspaces",
 	"workloads": "Workloads",
 	"storage": "Storage",
