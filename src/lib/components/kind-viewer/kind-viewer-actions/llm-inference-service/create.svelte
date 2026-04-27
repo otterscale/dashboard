@@ -66,11 +66,6 @@
 			}))
 		);
 	}
-	let nodeSelector: {
-		node?: string[];
-		type?: string[];
-		uuid?: string[];
-	} = $state({});
 
 	// Steps Manager
 	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
@@ -92,7 +87,6 @@
 	let isSubmitting = $state(false);
 
 	let selectedTemplateName = $state('');
-	let selectedGPUs = $state([]);
 </script>
 
 <Dialog.Root
@@ -328,6 +322,7 @@
 									handleSubmit={{
 										posthook: (form) => {
 											const value = getValueSnapshot(form);
+											lodash.unset(values, ['spec', 'template']);
 
 											const nodes = lodash.get(value, 'node', []) as string[];
 											if (nodes.length > 0) {
@@ -336,17 +331,6 @@
 													['spec', 'template', 'spec', 'nodeSelector', 'kubernetes.io/hostname'],
 													nodes.join(',')
 												);
-											} else {
-												lodash.unset(values, [
-													'spec',
-													'template',
-													'spec',
-													'nodeSelector',
-													'kubernetes.io/hostname'
-												]);
-											}
-											if (nodes.length === 0) {
-												lodash.unset(values, ['spec', 'template', 'spec', 'nodeSelector']);
 											}
 
 											const types = lodash.get(value, 'type', []) as string[];
@@ -356,14 +340,6 @@
 													['spec', 'template', 'metadata', 'annotations', 'nvidia.com/use-gputype'],
 													types.join(',')
 												);
-											} else {
-												lodash.unset(values, [
-													'spec',
-													'template',
-													'metadata',
-													'annotations',
-													'nvidia.com/use-gputype'
-												]);
 											}
 											const uuids = lodash.get(value, 'uuid', []) as string[];
 											if (uuids.length > 0) {
@@ -372,17 +348,6 @@
 													['spec', 'template', 'metadata', 'annotations', 'nvidia.com/use-gpuuuid'],
 													uuids.join(',')
 												);
-											} else {
-												lodash.unset(values, [
-													'spec',
-													'template',
-													'metadata',
-													'annotations',
-													'nvidia.com/use-gpuuuid'
-												]);
-											}
-											if ([...types, ...uuids].length === 0) {
-												lodash.unset(values, ['spec', 'template', 'metadata', 'annotations']);
 											}
 
 											handleNext();
@@ -570,6 +535,9 @@
 									initialValue={{} as FormValue}
 									handleSubmit={{
 										posthook: (form) => {
+											lodash.unset(values, ['spec', 'template']);
+											lodash.unset(values, ['spec', 'prefill']);
+
 											const value = getValueSnapshot(form);
 
 											const decodeNodes = lodash.get(value, 'decode.node', []) as string[];
@@ -579,17 +547,6 @@
 													['spec', 'template', 'spec', 'nodeSelector', 'kubernetes.io/hostname'],
 													decodeNodes.join(',')
 												);
-											} else {
-												lodash.unset(values, [
-													'spec',
-													'template',
-													'spec',
-													'nodeSelector',
-													'kubernetes.io/hostname'
-												]);
-											}
-											if (decodeNodes.length === 0) {
-												lodash.unset(values, ['spec', 'template', 'spec', 'nodeSelector']);
 											}
 
 											const decodeTypes = lodash.get(value, 'decode.type', []) as string[];
@@ -599,14 +556,6 @@
 													['spec', 'template', 'metadata', 'annotations', 'nvidia.com/use-gputype'],
 													decodeTypes.join(',')
 												);
-											} else {
-												lodash.unset(values, [
-													'spec',
-													'template',
-													'metadata',
-													'annotations',
-													'nvidia.com/use-gputype'
-												]);
 											}
 											const decodeUUIDs = lodash.get(value, 'decode.uuid', []) as string[];
 											if (decodeUUIDs.length > 0) {
@@ -615,19 +564,7 @@
 													['spec', 'template', 'metadata', 'annotations', 'nvidia.com/use-gpuuuid'],
 													decodeUUIDs.join(',')
 												);
-											} else {
-												lodash.unset(values, [
-													'spec',
-													'template',
-													'metadata',
-													'annotations',
-													'nvidia.com/use-gpuuuid'
-												]);
 											}
-											if ([...decodeTypes, ...decodeUUIDs].length === 0) {
-												lodash.unset(values, ['spec', 'template', 'metadata', 'annotations']);
-											}
-
 											const prefillNodes = lodash.get(value, 'prefill.node', []) as string[];
 											if (prefillNodes.length > 0) {
 												lodash.set(
@@ -642,26 +579,7 @@
 													],
 													prefillNodes.join(',')
 												);
-											} else {
-												lodash.unset(values, [
-													'spec',
-													'prefill',
-													'template',
-													'spec',
-													'nodeSelector',
-													'kubernetes.io/hostname'
-												]);
 											}
-											if (prefillNodes.length === 0) {
-												lodash.unset(values, [
-													'spec',
-													'prefill',
-													'template',
-													'spec',
-													'nodeSelector'
-												]);
-											}
-
 											const prefillTypes = lodash.get(value, 'prefill.type', []) as string[];
 											if (prefillTypes.length > 0) {
 												lodash.set(
@@ -676,15 +594,6 @@
 													],
 													prefillTypes.join(',')
 												);
-											} else {
-												lodash.unset(values, [
-													'spec',
-													'prefill',
-													'template',
-													'metadata',
-													'annotations',
-													'nvidia.com/use-gputype'
-												]);
 											}
 											const prefillUUIDs = lodash.get(value, 'prefill.uuid', []) as string[];
 											if (prefillUUIDs.length > 0) {
@@ -700,26 +609,7 @@
 													],
 													prefillUUIDs.join(',')
 												);
-											} else {
-												lodash.unset(values, [
-													'spec',
-													'prefill',
-													'template',
-													'metadata',
-													'annotations',
-													'nvidia.com/use-gpuuuid'
-												]);
 											}
-											if ([...prefillTypes, ...prefillUUIDs].length === 0) {
-												lodash.unset(values, [
-													'spec',
-													'prefill',
-													'template',
-													'metadata',
-													'annotations'
-												]);
-											}
-
 											handleNext();
 										}
 									}}
@@ -1055,6 +945,10 @@
 									initialValue={{} as FormValue}
 									handleSubmit={{
 										posthook: (form) => {
+											lodash.unset(values, ['spec', 'template']);
+											lodash.unset(values, ['spec', 'worker']);
+											lodash.unset(values, ['spec', 'prefill']);
+
 											const value = getValueSnapshot(form);
 
 											const decodeLeaderNodes = lodash.get(
@@ -1068,19 +962,7 @@
 													['spec', 'template', 'spec', 'nodeSelector', 'kubernetes.io/hostname'],
 													decodeLeaderNodes.join(',')
 												);
-											} else {
-												lodash.unset(values, [
-													'spec',
-													'template',
-													'spec',
-													'nodeSelector',
-													'kubernetes.io/hostname'
-												]);
 											}
-											if (decodeLeaderNodes.length === 0) {
-												lodash.unset(values, ['spec', 'template', 'spec', 'nodeSelector']);
-											}
-
 											const decodeLeaderTypes = lodash.get(
 												value,
 												'decodeLeader.type',
@@ -1092,14 +974,6 @@
 													['spec', 'template', 'metadata', 'annotations', 'nvidia.com/use-gputype'],
 													decodeLeaderTypes.join(',')
 												);
-											} else {
-												lodash.unset(values, [
-													'spec',
-													'template',
-													'metadata',
-													'annotations',
-													'nvidia.com/use-gputype'
-												]);
 											}
 											const decodeLeaderUUIDs = lodash.get(
 												value,
@@ -1112,19 +986,7 @@
 													['spec', 'template', 'metadata', 'annotations', 'nvidia.com/use-gpuuuid'],
 													decodeLeaderUUIDs.join(',')
 												);
-											} else {
-												lodash.unset(values, [
-													'spec',
-													'template',
-													'metadata',
-													'annotations',
-													'nvidia.com/use-gpuuuid'
-												]);
 											}
-											if ([...decodeLeaderTypes, ...decodeLeaderUUIDs].length === 0) {
-												lodash.unset(values, ['spec', 'template', 'metadata', 'annotations']);
-											}
-
 											const decodeWorkerNodes = lodash.get(
 												value,
 												'decodeWorker.node',
@@ -1136,19 +998,7 @@
 													['spec', 'worker', 'spec', 'nodeSelector', 'kubernetes.io/hostname'],
 													decodeWorkerNodes.join(',')
 												);
-											} else {
-												lodash.unset(values, [
-													'spec',
-													'worker',
-													'spec',
-													'nodeSelector',
-													'kubernetes.io/hostname'
-												]);
 											}
-											if (decodeWorkerNodes.length === 0) {
-												lodash.unset(values, ['spec', 'worker', 'spec', 'nodeSelector']);
-											}
-
 											const decodeWorkerTypes = lodash.get(
 												value,
 												'decodeWorker.type',
@@ -1160,14 +1010,6 @@
 													['spec', 'worker', 'metadata', 'annotations', 'nvidia.com/use-gputype'],
 													decodeWorkerTypes.join(',')
 												);
-											} else {
-												lodash.unset(values, [
-													'spec',
-													'worker',
-													'metadata',
-													'annotations',
-													'nvidia.com/use-gputype'
-												]);
 											}
 											const decodeWorkerUUIDs = lodash.get(
 												value,
@@ -1180,19 +1022,7 @@
 													['spec', 'worker', 'metadata', 'annotations', 'nvidia.com/use-gpuuuid'],
 													decodeWorkerUUIDs.join(',')
 												);
-											} else {
-												lodash.unset(values, [
-													'spec',
-													'worker',
-													'metadata',
-													'annotations',
-													'nvidia.com/use-gpuuuid'
-												]);
 											}
-											if ([...decodeWorkerTypes, ...decodeWorkerUUIDs].length === 0) {
-												lodash.unset(values, ['spec', 'worker', 'metadata', 'annotations']);
-											}
-
 											const prefillLeaderNodes = lodash.get(
 												value,
 												'prefillLeader.node',
@@ -1211,26 +1041,7 @@
 													],
 													prefillLeaderNodes.join(',')
 												);
-											} else {
-												lodash.unset(values, [
-													'spec',
-													'prefill',
-													'template',
-													'spec',
-													'nodeSelector',
-													'kubernetes.io/hostname'
-												]);
 											}
-											if (prefillLeaderNodes.length === 0) {
-												lodash.unset(values, [
-													'spec',
-													'prefill',
-													'template',
-													'spec',
-													'nodeSelector'
-												]);
-											}
-
 											const prefillLeaderTypes = lodash.get(
 												value,
 												'prefillLeader.type',
@@ -1249,15 +1060,6 @@
 													],
 													prefillLeaderTypes.join(',')
 												);
-											} else {
-												lodash.unset(values, [
-													'spec',
-													'prefill',
-													'template',
-													'metadata',
-													'annotations',
-													'nvidia.com/use-gputype'
-												]);
 											}
 											const prefillLeaderUUIDs = lodash.get(
 												value,
@@ -1277,26 +1079,7 @@
 													],
 													prefillLeaderUUIDs.join(',')
 												);
-											} else {
-												lodash.unset(values, [
-													'spec',
-													'prefill',
-													'template',
-													'metadata',
-													'annotations',
-													'nvidia.com/use-gpuuuid'
-												]);
 											}
-											if ([...prefillLeaderTypes, ...prefillLeaderUUIDs].length === 0) {
-												lodash.unset(values, [
-													'spec',
-													'prefill',
-													'template',
-													'metadata',
-													'annotations'
-												]);
-											}
-
 											const prefillWorkerNodes = lodash.get(
 												value,
 												'prefillWorker.node',
@@ -1315,20 +1098,7 @@
 													],
 													prefillWorkerNodes.join(',')
 												);
-											} else {
-												lodash.unset(values, [
-													'spec',
-													'prefill',
-													'worker',
-													'spec',
-													'nodeSelector',
-													'kubernetes.io/hostname'
-												]);
 											}
-											if (prefillWorkerNodes.length === 0) {
-												lodash.unset(values, ['spec', 'prefill', 'worker', 'spec', 'nodeSelector']);
-											}
-
 											const prefillWorkerTypes = lodash.get(
 												value,
 												'prefillWorker.type',
@@ -1347,15 +1117,6 @@
 													],
 													prefillWorkerTypes.join(',')
 												);
-											} else {
-												lodash.unset(values, [
-													'spec',
-													'prefill',
-													'worker',
-													'metadata',
-													'annotations',
-													'nvidia.com/use-gputype'
-												]);
 											}
 											const prefillWorkerUUIDs = lodash.get(
 												value,
@@ -1375,24 +1136,6 @@
 													],
 													prefillWorkerUUIDs.join(',')
 												);
-											} else {
-												lodash.unset(values, [
-													'spec',
-													'prefill',
-													'worker',
-													'metadata',
-													'annotations',
-													'nvidia.com/use-gpuuuid'
-												]);
-											}
-											if ([...prefillWorkerTypes, ...prefillWorkerUUIDs].length === 0) {
-												lodash.unset(values, [
-													'spec',
-													'prefill',
-													'worker',
-													'metadata',
-													'annotations'
-												]);
 											}
 
 											handleNext();
