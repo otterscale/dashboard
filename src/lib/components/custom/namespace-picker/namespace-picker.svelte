@@ -106,11 +106,11 @@
 
 		const sorted = [...nameToNs.keys()].sort((a, b) => a.localeCompare(b));
 		const options: WorkspaceOption[] = [
-			{ value: '', label: m.all_namespaces() },
 			...sorted.map((name) => ({
 				value: nameToNs.get(name)!,
 				label: name
-			}))
+			})),
+			{ value: '', label: m.all_namespaces() }
 		];
 		workspaceOptions.set(options);
 
