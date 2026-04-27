@@ -320,7 +320,7 @@
 								},
 								'requests.nvidia.com/gpu': {
 									title: 'GPU Request',
-									type: 'integer'
+									type: 'string'
 								},
 								'requests.nvidia.com/gpumem': {
 									title: 'GPU Memory Request',
@@ -336,7 +336,7 @@
 								},
 								'limits.nvidia.com/gpu': {
 									title: 'GPU Limit',
-									type: 'integer'
+									type: 'string'
 								},
 								'limits.nvidia.com/gpumem': {
 									title: 'GPU Memory Limit',

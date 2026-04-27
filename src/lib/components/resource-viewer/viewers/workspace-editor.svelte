@@ -7,6 +7,7 @@
 	import { role } from '$lib/stores';
 
 	let {
+		role,
 		cluster,
 		group,
 		version,
@@ -16,6 +17,7 @@
 		object,
 		onsuccess
 	}: {
+		role: string;
 		cluster: string;
 		group: string;
 		version: string;
@@ -30,18 +32,17 @@
 <Tooltip.Root>
 	<Tooltip.Trigger>
 		{#snippet child({ props: tooltipProps })}
-			<Update {cluster} {group} {version} {kind} {resource} {schema} {object} {onsuccess}>
-				{#snippet trigger(props)}
-					<button
-						{...tooltipProps}
-						{...props}
-						disabled={$role === 'view'}
-						class={buttonVariants({ variant: 'outline', size: 'icon-lg' })}
-					>
-						<Pencil />
-					</button>
-				{/snippet}
-			</Update>
+			<Update {role} {cluster} {group} {version} {kind} {resource} {schema} {object} {onsuccess}>
+        {#snippet trigger(props)}
+          <button
+            {...props}
+            disabled={role === 'view'}
+            class={buttonVariants({ variant: 'outline', size: 'icon' })}
+          >
+            <Pencil />
+          </button>
+        {/snippet}
+      </Update>
 		{/snippet}
 	</Tooltip.Trigger>
 	<Tooltip.Content>Edit Resource</Tooltip.Content>
