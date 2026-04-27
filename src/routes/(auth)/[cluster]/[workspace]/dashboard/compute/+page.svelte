@@ -16,10 +16,12 @@
 		}
 	]);
 
-	const cluster = $derived(page.params.cluster ?? '');
-	const namespace = $derived(page.data.namespace ?? '');
+	const cluster = $derived(page.params.cluster!);
+	const currentWorkspace = $derived(page.params.workspace!);
+	const defaultNamespace = $derived(page.data.namespace ?? '');
+	const isClusterAdmin = $derived(page.data.isClusterAdmin === true);
 </script>
 
-{#key `${cluster}:${namespace}`}
-	<Dashboard {cluster} {namespace} />
+{#key cluster}
+	<Dashboard {cluster} {defaultNamespace} {isClusterAdmin} {currentWorkspace} />
 {/key}
