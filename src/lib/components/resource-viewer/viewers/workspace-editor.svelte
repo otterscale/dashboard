@@ -34,7 +34,13 @@
 		{#snippet child({ props: tooltipProps })}
 			<Update {role} {cluster} {group} {version} {kind} {resource} {schema} {object} {onsuccess}>
 				{#snippet trigger(props)}
-					<Button {...tooltipProps} variant="outline" size="icon-lg" disabled={role === 'view'}>
+					<Button
+						{...tooltipProps}
+						{...props}
+						variant="outline"
+						size="icon-lg"
+						disabled={role === 'view'}
+					>
 						<Pencil />
 					</Button>
 				{/snippet}
