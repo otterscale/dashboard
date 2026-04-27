@@ -2,7 +2,6 @@
 	import Pencil from '@lucide/svelte/icons/pencil';
 
 	import Update from '$lib/components/kind-viewer/kind-viewer-actions/workspace/update.svelte';
-	import { buttonVariants } from '$lib/components/ui/button';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
