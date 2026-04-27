@@ -3,9 +3,9 @@
 
 	import Update from '$lib/components/kind-viewer/kind-viewer-actions/workspace/update.svelte';
 	import { buttonVariants } from '$lib/components/ui/button';
-	import { role } from '$lib/stores';
 
 	let {
+		role,
 		cluster,
 		group,
 		version,
@@ -15,6 +15,7 @@
 		object,
 		onsuccess
 	}: {
+		role: string;
 		cluster: string;
 		group: string;
 		version: string;
@@ -26,11 +27,11 @@
 	} = $props();
 </script>
 
-<Update {cluster} {group} {version} {kind} {resource} {schema} {object} {onsuccess}>
+<Update {role} {cluster} {group} {version} {kind} {resource} {schema} {object} {onsuccess}>
 	{#snippet trigger(props)}
 		<button
 			{...props}
-			disabled={$role === 'view'}
+			disabled={role === 'view'}
 			class={buttonVariants({ variant: 'outline', size: 'icon' })}
 		>
 			<Pencil />

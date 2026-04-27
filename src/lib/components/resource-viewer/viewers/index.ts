@@ -10,6 +10,7 @@ type ViewerProps = { object: any; schema?: any };
 type ViewerType = Component<ViewerProps>;
 
 type EditorProps = {
+	role?: string;
 	cluster: string;
 	group: string;
 	version: string;

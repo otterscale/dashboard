@@ -31,6 +31,7 @@
 	import { getEditor, getResourceViewer } from './viewers';
 
 	let {
+		isClusterAdmin,
 		cluster,
 		namespace,
 		group,
@@ -39,6 +40,7 @@
 		resource,
 		name
 	}: {
+		isClusterAdmin: boolean;
 		cluster: string;
 		namespace: string;
 		group: string;
@@ -383,6 +385,7 @@
 					</Sheet.Root>
 					{#if Editor}
 						<Editor
+							role={isClusterAdmin ? 'Cluster Admin' : undefined}
 							{cluster}
 							{group}
 							{version}
