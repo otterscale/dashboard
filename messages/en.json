@@ -36,6 +36,7 @@
 	"model": "Model",
 	"models": "Models",
 	"all_models": "All Models",
+	"model_service": "Model",
 	"model_template": "Template",
 	"all_namespaces": "All Workspaces",
 	"workloads": "Workloads",

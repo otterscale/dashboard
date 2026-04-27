@@ -14,7 +14,6 @@
 	import { stringify } from 'yaml';
 
 	import Form from '$lib/components/dynamic-form/form.svelte';
-	import { fetchAllGpuNodes, type NodeInfo } from '$lib/components/gpu-allocation';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
@@ -76,42 +75,6 @@
 	// Flag for Dialog
 	let open = $state(false);
 	let isSubmitting = $state(false);
-
-	function buildNodeSelectorSchema(nodes: NodeInfo[]): Schema {
-		return {
-			title: 'Node Selector',
-			type: 'object',
-			properties: {
-				node: {
-					type: 'string',
-					enum: nodes.map((n) => n.name)
-				}
-			},
-			dependencies: {
-				node: {
-					oneOf: nodes.map((node) => {
-						const types = [...new Set(node.devices.map((device) => device.type))];
-						const uuids = [...new Set(node.devices.map((device) => device.id))];
-						return {
-							properties: {
-								node: { enum: [node.name] },
-								type: {
-									type: 'array',
-									uniqueItems: true,
-									items: { type: 'string', enum: types }
-								},
-								uuid: {
-									type: 'array',
-									uniqueItems: true,
-									items: { type: 'string', enum: uuids }
-								}
-							}
-						};
-					})
-				}
-			}
-		} as Schema;
-	}
 </script>
 
 <Dialog.Root
@@ -223,65 +186,71 @@
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[2]}>
-				{#await fetchAllGpuNodes(resourceClient, cluster)}
-					Loading...
-				{:then GPUInformation}
-					{@const nodeSelectorSchema = buildNodeSelectorSchema(GPUInformation)}
-					{#key nodeSelector.node}
-						<Form
-							schema={nodeSelectorSchema}
-							uiSchema={{
-								'ui:options': {
-									translations: {
-										submit: 'Next'
-									}
-								},
-								node: {
-									'ui:components': {
-										stringField: 'enumField',
-										selectWidget: 'comboboxWidget'
-									}
-								},
-								type: {
-									items: {
-										'ui:components': {
-											stringField: 'enumField',
-											selectWidget: 'comboboxWidget'
-										}
-									}
-								},
-								uuid: {
-									items: {
-										'ui:components': {
-											stringField: 'enumField',
-											selectWidget: 'comboboxWidget'
-										}
-									}
+				<Form
+					schema={{
+						title: 'GPU Selector',
+						type: 'object',
+						properties: {
+							node: { type: 'string' },
+							type: {
+								type: 'array',
+								items: {
+									type: 'string'
 								}
-							} as UiSchemaRoot}
-							initialValue={{ node: nodeSelector.node } as FormValue}
-							handleSubmit={{
-								posthook: () => {
-									handleNext();
+							},
+							uuid: { type: 'array', items: { type: 'string' } }
+						}
+					}}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						},
+						node: {
+							'ui:components': {
+								stringField: 'enumField',
+								selectWidget: 'comboboxWidget'
+							}
+						},
+						type: {
+							items: {
+								'ui:components': {
+									stringField: 'enumField',
+									selectWidget: 'comboboxWidget'
 								}
-							}}
-							bind:liveValues={nodeSelector}
-						>
-							{#snippet actions()}
-								<div class="flex w-full items-center justify-between gap-3">
-									<Button
-										onclick={() => {
-											handlePrevious();
-										}}
-									>
-										Previous
-									</Button>
-									<SubmitButton />
-								</div>
-							{/snippet}
-						</Form>
-					{/key}
-				{/await}
+							}
+						},
+						uuid: {
+							items: {
+								'ui:components': {
+									stringField: 'enumField',
+									selectWidget: 'comboboxWidget'
+								}
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={{ node: nodeSelector.node } as FormValue}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					// bind:snapshot={nodeSelector}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[3]} class="min-h-[77vh]">

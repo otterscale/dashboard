@@ -47,7 +47,7 @@
 		handleSubmit,
 		actions,
 		values = $bindable(),
-		liveValues = $bindable(),
+		snapshot = $bindable(),
 		class: className
 	}: {
 		schema: Schema;
@@ -60,7 +60,7 @@
 		};
 		actions?: Snippet;
 		values?: FormValue;
-		liveValues?: FormValue;
+		snapshot?: FormValue;
 		class?: string;
 	} = $props();
 	// Clean schema from unnecessary keywords to JSON Schema Draft-07.
@@ -148,8 +148,12 @@
 		...defaults,
 		theme,
 		extraUiOptions,
-		schema,
-		uiSchema,
+		get schema() {
+			return schema;
+		},
+		get uiSchema() {
+			return uiSchema;
+		},
 		initialValue,
 		validator,
 		onSubmit,
@@ -199,9 +203,11 @@
 	}
 	setFormContext(form);
 
-	$effect(() => {
-		liveValues = getValueSnapshot(form);
-	});
+	if (snapshot) {
+		$effect(() => {
+			snapshot = getValueSnapshot(form);
+		});
+	}
 </script>
 
 <div class={cn('h-full', className)}>

@@ -36,6 +36,7 @@
 	"model": "模型",
 	"models": "模型",
 	"all_models": "全部模型",
+	"model_service": "模型",
 	"model_template": "模板",
 	"all_namespaces": "全部工作區",
 	"workloads": "工作負載",
