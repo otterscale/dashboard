@@ -15,6 +15,90 @@ import { renderComponent } from '$lib/components/ui/data-table';
 
 import { buildResourceDetailUrl } from './resource-url';
 
+// Ref: https://github.com/kubernetes/kubernetes/blob/master/pkg/printers/internalversion/printers.go printPod()
+function getPodStatus(object: CoreV1Pod): string {
+	const initContainerStatuses = object?.status?.initContainerStatuses ?? [];
+	const containerStatuses = object?.status?.containerStatuses ?? [];
+	const initContainers = object?.spec?.initContainers ?? [];
+
+	let reason: string = object?.status?.phase ?? 'Unknown';
+
+	// Pod-level reason takes precedence over phase
+	if (object?.status?.reason) {
+		reason = object.status.reason;
+	}
+
+	// Check init containers
+	let initializing = false;
+	for (let i = 0; i < initContainerStatuses.length; i++) {
+		const container = initContainerStatuses[i];
+		if (container.state?.terminated?.exitCode === 0) {
+			continue;
+		} else if (container.state?.terminated) {
+			const terminated = container.state.terminated;
+			if (terminated.reason) {
+				reason = `Init:${terminated.reason}`;
+			} else if (terminated.signal) {
+				reason = `Init:Signal:${terminated.signal}`;
+			} else {
+				reason = `Init:ExitCode:${terminated.exitCode}`;
+			}
+			initializing = true;
+		} else if (
+			container.state?.waiting?.reason &&
+			container.state.waiting.reason !== 'PodInitializing'
+		) {
+			reason = `Init:${container.state.waiting.reason}`;
+			initializing = true;
+		} else {
+			reason = `Init:${i}/${initContainers.length}`;
+			initializing = true;
+		}
+		break;
+	}
+
+	// Check regular containers (iterate in reverse so last container wins, matching kubectl behaviour)
+	if (!initializing) {
+		let hasRunning = false;
+		for (let i = containerStatuses.length - 1; i >= 0; i--) {
+			const container = containerStatuses[i];
+			if (container.state?.waiting?.reason) {
+				reason = container.state.waiting.reason;
+			} else if (container.state?.terminated?.reason) {
+				reason = container.state.terminated.reason;
+			} else if (container.state?.terminated) {
+				const terminated = container.state.terminated;
+				if (terminated.signal) {
+					reason = `Signal:${terminated.signal}`;
+				} else {
+					reason = `ExitCode:${terminated.exitCode}`;
+				}
+			} else if (container.ready && container.state?.running) {
+				hasRunning = true;
+			}
+		}
+
+		// If all containers show "Completed" but at least one is still running, show Running/NotReady
+		if (reason === 'Completed' && hasRunning) {
+			const hasReadyCondition = (object?.status?.conditions ?? []).some(
+				(c) => c.type === 'Ready' && c.status === 'True'
+			);
+			reason = hasReadyCondition ? 'Running' : 'NotReady';
+		}
+	}
+
+	// deletionTimestamp overrides everything → Terminating (unless NodeLost)
+	if (object?.metadata?.deletionTimestamp) {
+		if (object?.status?.reason === 'NodeLost') {
+			reason = 'Unknown';
+		} else {
+			reason = 'Terminating';
+		}
+	}
+
+	return reason;
+}
+
 // kubectl get pod -o wide
 // NAME   READY   STATUS   RESTARTS   AGE   IP   NODE   NOMINATED NODE   READINESS GATES
 type PodAttribute =
@@ -57,7 +141,7 @@ function getPodData(object: CoreV1Pod): Record<PodAttribute, JsonValue> {
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.metadata?.namespace ?? null,
 		Ready: `${readyContainers}/${totalContainers}`,
-		Status: object?.status?.phase ?? null,
+		Status: getPodStatus(object),
 		Restarts: totalRestarts,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		IP: object?.status?.podIP ?? null,
