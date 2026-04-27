@@ -14,7 +14,7 @@
 	import { stringify } from 'yaml';
 
 	import Form from '$lib/components/dynamic-form/form.svelte';
-	import { type NodeInfo } from '$lib/components/gpu-allocation';
+	import { fetchAllGpuNodes, type NodeInfo } from '$lib/components/gpu-allocation';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
@@ -76,48 +76,6 @@
 	// Flag for Dialog
 	let open = $state(false);
 	let isSubmitting = $state(false);
-
-	function getGPUInformation(): NodeInfo[] {
-		return [
-			{
-				name: 'Node 1',
-				devices: [
-					{
-						id: 'gpu-0',
-						index: 0,
-						type: 'A100',
-						count: 0,
-						devcore: 0,
-						devmem: 0,
-						health: false
-					}
-				]
-			},
-			{
-				name: 'Node 2',
-				devices: [
-					{
-						id: 'gpu-0',
-						index: 0,
-						type: 'A200',
-						count: 0,
-						devcore: 0,
-						devmem: 0,
-						health: false
-					},
-					{
-						id: 'gpu-1',
-						index: 1,
-						type: 'H100',
-						count: 0,
-						devcore: 0,
-						devmem: 0,
-						health: false
-					}
-				]
-			}
-		];
-	}
 
 	function buildNodeSelectorSchema(nodes: NodeInfo[]): Schema {
 		return {
@@ -243,7 +201,7 @@
 					} as UiSchemaRoot}
 					initialValue={[] as FormValue}
 					handleSubmit={{
-						posthook: (form) => {
+						posthook: () => {
 							handleNext();
 						}
 					}}
@@ -265,7 +223,7 @@
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[2]}>
-				{#await getGPUInformation()}
+				{#await fetchAllGpuNodes(resourceClient, cluster)}
 					Loading...
 				{:then GPUInformation}
 					{@const nodeSelectorSchema = buildNodeSelectorSchema(GPUInformation)}
