@@ -138,31 +138,69 @@
 		}
 	});
 
-	const nodeNameOptions = $derived(
-		gpuNodes.map((n) => ({
-			label: `${n.name} (${n.devices.length} GPUs)`,
-			value: n.name
-		}))
-	);
+	const selectedNodeName = $derived((lodash.get(placement, 'nodeName', '') ?? '') as string);
+	const selectedGpuTypes = $derived((lodash.get(placement, 'gpuType', []) ?? []) as string[]);
+	const selectedGpuUuids = $derived((lodash.get(placement, 'gpuUuid', []) ?? []) as string[]);
 
-	const gpuTypeOptions = $derived(() => {
-		const types = new SvelteSet<string>();
+	const nodeNameOptions = $derived.by(() => {
+		const counts = new SvelteMap<string, number>();
 		for (const node of gpuNodes) {
 			for (const device of node.devices) {
+				if (selectedGpuTypes.length > 0 && !selectedGpuTypes.includes(device.type)) continue;
+				if (selectedGpuUuids.length > 0 && !selectedGpuUuids.includes(device.id)) continue;
+				counts.set(node.name, (counts.get(node.name) ?? 0) + 1);
+			}
+		}
+		return [...counts].map(([name, count]) => ({
+			label: `${name} (${count} GPUs)`,
+			value: name
+		}));
+	});
+
+	const gpuTypeOptions = $derived.by(() => {
+		const types = new SvelteSet<string>();
+		for (const node of gpuNodes) {
+			if (selectedNodeName && node.name !== selectedNodeName) continue;
+			for (const device of node.devices) {
+				if (selectedGpuUuids.length > 0 && !selectedGpuUuids.includes(device.id)) continue;
 				if (device.type) types.add(device.type);
 			}
 		}
 		return [...types].map((t) => ({ label: t, value: t }));
 	});
 
-	const gpuUuidOptions = $derived(
-		gpuNodes.flatMap((node) =>
-			node.devices.map((device) => ({
-				label: `${node.name} - GPU ${device.index}`,
-				value: device.id
-			}))
-		)
-	);
+	const gpuUuidOptions = $derived.by(() => {
+		const options: { label: string; value: string }[] = [];
+		for (const node of gpuNodes) {
+			if (selectedNodeName && node.name !== selectedNodeName) continue;
+			for (const device of node.devices) {
+				if (selectedGpuTypes.length > 0 && !selectedGpuTypes.includes(device.type)) continue;
+				options.push({
+					label: `${node.name} - GPU ${device.index}`,
+					value: device.id
+				});
+			}
+		}
+		return options;
+	});
+
+	$effect(() => {
+		if (gpuNodes.length === 0) return;
+
+		if (selectedNodeName && !nodeNameOptions.some((o) => o.value === selectedNodeName)) {
+			lodash.unset(placement, 'nodeName');
+		}
+
+		const validTypes = selectedGpuTypes.filter((t) => gpuTypeOptions.some((o) => o.value === t));
+		if (validTypes.length !== selectedGpuTypes.length) {
+			lodash.set(placement, 'gpuType', validTypes);
+		}
+
+		const validUuids = selectedGpuUuids.filter((u) => gpuUuidOptions.some((o) => o.value === u));
+		if (validUuids.length !== selectedGpuUuids.length) {
+			lodash.set(placement, 'gpuUuid', validUuids);
+		}
+	});
 </script>
 
 <Dialog.Root
@@ -651,8 +689,8 @@
 								description: 'Select GPU types (annotation: nvidia.com/use-gputype)',
 								items: {
 									type: 'string',
-									...(gpuTypeOptions().length > 0 && {
-										enum: gpuTypeOptions().map((o) => o.value)
+									...(gpuTypeOptions.length > 0 && {
+										enum: gpuTypeOptions.map((o) => o.value)
 									})
 								},
 								uniqueItems: true
@@ -709,6 +747,7 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{} as FormValue}
+					// liveValues
 					handleSubmit={{
 						posthook: () => {
 							handleNext();

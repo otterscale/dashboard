@@ -47,6 +47,7 @@
 		handleSubmit,
 		actions,
 		values = $bindable(),
+		liveValues = false,
 		class: className
 	}: {
 		schema: Schema;
@@ -59,6 +60,7 @@
 		};
 		actions?: Snippet;
 		values?: FormValue;
+		liveValues?: boolean;
 		class?: string;
 	} = $props();
 	// Clean schema from unnecessary keywords to JSON Schema Draft-07.
@@ -146,12 +148,26 @@
 		...defaults,
 		theme,
 		extraUiOptions,
-		schema,
-		uiSchema,
+		get schema() {
+			return schema;
+		},
+		get uiSchema() {
+			return uiSchema;
+		},
 		initialValue,
 		validator,
 		onSubmit,
-		onSubmitError
+		onSubmitError,
+		...(liveValues
+			? {
+					value: [
+						() => values as FormValue,
+						(v: FormValue) => {
+							values = v;
+						}
+					]
+				}
+			: {})
 	});
 	// YAML
 	// Reorder attributes in YAML editor to match the form schema, making it more intuitive for users to find and edit values.
