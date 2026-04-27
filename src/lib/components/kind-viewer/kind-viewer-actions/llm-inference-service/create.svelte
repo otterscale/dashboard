@@ -76,7 +76,91 @@
 		);
 	}
 	onMount(async () => {
-		const allGPUNodes = await fetchAllGpuNodes(resourceClient, cluster);
+		let allGPUNodes = await fetchAllGpuNodes(resourceClient, cluster);
+		allGPUNodes = [
+			{
+				name: 'ws2050-4090x4-96-55',
+				devices: [
+					{
+						id: 'GPU-cd6d4b7c-c1fd-25d1-94e9-51f38b6c2948',
+						index: 0,
+						count: 10,
+						devcore: 100,
+						devmem: 24564,
+						type: 'NVIDIA GeForce RTX 4090',
+						health: true
+					},
+					{
+						id: 'GPU-7fdb622f-8484-da06-2353-14941a478a6c',
+						index: 1,
+						count: 10,
+						devcore: 100,
+						devmem: 24564,
+						type: 'NVIDIA GeForce RTX 4090',
+						health: true
+					},
+					{
+						id: 'GPU-b5d865eb-543d-8e6d-b207-e82949dff1e9',
+						index: 2,
+						count: 10,
+						devcore: 100,
+						devmem: 24564,
+						type: 'NVIDIA GeForce RTX 4090',
+						health: true
+					},
+					{
+						id: 'GPU-50283c61-c4fc-af7b-aecb-4fcd8f1603de',
+						index: 3,
+						count: 10,
+						devcore: 100,
+						devmem: 24564,
+						type: 'NVIDIA GeForce RTX 4090',
+						health: true
+					}
+				]
+			},
+			{
+				name: 'ws2050-4090x4-96-56',
+				devices: [
+					{
+						id: 'GPU-ba431b92-a251-3a0b-dfe6-4afbc185dab1',
+						index: 0,
+						count: 10,
+						devcore: 100,
+						devmem: 24564,
+						type: 'NVIDIA GeForce RTX 4090',
+						health: true
+					},
+					{
+						id: 'GPU-3e543ff0-a03d-d8b8-837b-f3674a54b0a6',
+						index: 1,
+						count: 10,
+						devcore: 100,
+						devmem: 24564,
+						type: 'NVIDIA GeForce RTX 4090',
+						health: true
+					},
+					{
+						id: 'GPU-663aa370-535a-33b8-e01f-b325fb2025c7',
+						index: 2,
+						count: 10,
+						devcore: 100,
+						devmem: 24564,
+						type: 'NVIDIA GeForce RTX 4090',
+						health: true
+					},
+					{
+						id: 'GPU-c15ecdf3-444a-2d02-29e9-e978b2514335',
+						index: 3,
+						count: 10,
+						devcore: 100,
+						devmem: 24564,
+						type: 'NVIDIA GeForce RTX 4090',
+						health: true
+					}
+				]
+			}
+		];
 		allGPUDevices = getAllGPUDevices(allGPUNodes);
 	});
 
@@ -100,7 +184,6 @@
 	let isSubmitting = $state(false);
 </script>
 
-<!-- <pre>{JSON.stringify(allGPUDevices, null, 2)}</pre> -->
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
@@ -223,8 +306,7 @@
 									enum: ['test'],
 									type: 'string'
 								}
-							},
-							uuid: { type: 'array', items: { type: 'string' } }
+							}
 						}
 					} as Schema}
 					uiSchema={{
