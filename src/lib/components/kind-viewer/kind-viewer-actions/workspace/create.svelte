@@ -25,6 +25,7 @@
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	let {
 		role,
@@ -419,13 +420,18 @@
 	}}
 >
 	{#if showTrigger}
-		<Dialog.Trigger>
-			{#snippet child({ props })}
-				<Button {...props} variant="outline" size="icon">
-					<Plus />
-				</Button>
-			{/snippet}
-		</Dialog.Trigger>
+		<Tooltip.Root>
+			<Tooltip.Trigger>
+				<Dialog.Trigger>
+					{#snippet child({ props })}
+						<Button {...props} variant="outline" size="icon">
+							<Plus />
+						</Button>
+					{/snippet}
+				</Dialog.Trigger>
+			</Tooltip.Trigger>
+			<Tooltip.Content>Create Resource</Tooltip.Content>
+		</Tooltip.Root>
 	{/if}
 	<Dialog.Content
 		class="max-h-[95vh] min-w-[38vw] overflow-auto"

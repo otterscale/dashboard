@@ -15,6 +15,7 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
 
 	let {
@@ -207,50 +208,57 @@
 	});
 </script>
 
-<Dialog.Root
-	bind:open
-	onOpenChangeComplete={(isOpen) => {
-		if (!isOpen) {
-			editorInstance = undefined;
-			value = initialValue;
-		}
-	}}
->
-	<Dialog.Trigger>
-		{#snippet child({ props })}
-			<Button {...props} variant="outline" size="icon">
-				<Plus />
-			</Button>
-		{/snippet}
-	</Dialog.Trigger>
-	<Dialog.Content class="min-w-[77vw]" onInteractOutside={(e) => e.preventDefault()}>
-		<Dialog.Header>
-			<Item.Root class="p-0">
-				<Item.Content class="text-left">
-					<Item.Title class="text-lg font-bold">{kind}</Item.Title>
-					<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
-				</Item.Content>
-			</Item.Root>
-		</Dialog.Header>
-		<div class="grid grid-cols-2 gap-4 *:max-h-[62vh] *:min-h-[62vh]">
-			<SchemaViewer schema={jsonSchema} class="h-full max-h-screen min-h-0 overflow-auto" />
-			<Monaco
-				options={{
-					language: 'yaml',
-					padding: { top: 24 },
-					automaticLayout: true
-				}}
-				theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
-				bind:value
-				bind:editor={editorInstance}
-				bind:monaco={monacoInstance}
-			/>
-		</div>
-		<Dialog.Footer>
-			<Button class="mr-auto" variant="outline" onclick={() => (open = false)}>{m.cancel()}</Button>
-			<Button onclick={handleConfirm}>
-				{m.confirm()}
-			</Button>
-		</Dialog.Footer>
-	</Dialog.Content>
-</Dialog.Root>
+<Tooltip.Root>
+	<Dialog.Root
+		bind:open
+		onOpenChangeComplete={(isOpen) => {
+			if (!isOpen) {
+				editorInstance = undefined;
+				value = initialValue;
+			}
+		}}
+	>
+		<Tooltip.Trigger>
+			<Dialog.Trigger>
+				{#snippet child({ props })}
+					<Button {...props} variant="outline" size="icon">
+						<Plus />
+					</Button>
+				{/snippet}
+			</Dialog.Trigger>
+		</Tooltip.Trigger>
+		<Dialog.Content class="min-w-[77vw]" onInteractOutside={(e) => e.preventDefault()}>
+			<Dialog.Header>
+				<Item.Root class="p-0">
+					<Item.Content class="text-left">
+						<Item.Title class="text-lg font-bold">{kind}</Item.Title>
+						<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
+					</Item.Content>
+				</Item.Root>
+			</Dialog.Header>
+			<div class="grid grid-cols-2 gap-4 *:max-h-[62vh] *:min-h-[62vh]">
+				<SchemaViewer schema={jsonSchema} class="h-full max-h-screen min-h-0 overflow-auto" />
+				<Monaco
+					options={{
+						language: 'yaml',
+						padding: { top: 24 },
+						automaticLayout: true
+					}}
+					theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
+					bind:value
+					bind:editor={editorInstance}
+					bind:monaco={monacoInstance}
+				/>
+			</div>
+			<Dialog.Footer>
+				<Button class="mr-auto" variant="outline" onclick={() => (open = false)}
+					>{m.cancel()}</Button
+				>
+				<Button onclick={handleConfirm}>
+					{m.confirm()}
+				</Button>
+			</Dialog.Footer>
+		</Dialog.Content>
+	</Dialog.Root>
+	<Tooltip.Content>Create Resource</Tooltip.Content>
+</Tooltip.Root>
