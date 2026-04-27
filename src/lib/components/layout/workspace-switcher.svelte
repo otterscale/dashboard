@@ -7,7 +7,6 @@
 	import BoxIcon from '@lucide/svelte/icons/box';
 	import BriefcaseIcon from '@lucide/svelte/icons/briefcase';
 	import ChartPieIcon from '@lucide/svelte/icons/chart-pie';
-	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
 	import CircleDashedIcon from '@lucide/svelte/icons/circle-dashed';
 	import CommandIcon from '@lucide/svelte/icons/command';
@@ -329,7 +328,8 @@
 							{#if isMac}
 								<CommandIcon class="size-3" />
 							{:else}
-								<ChevronUpIcon class="size-3" />
+								<span class="font-mono tracking-tight">Ctrl</span>
+								<span class="font-mono">+</span>
 							{/if}
 							<span class="font-mono">{index + 1}</span>
 						</DropdownMenu.Shortcut>
