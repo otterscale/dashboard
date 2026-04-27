@@ -4,6 +4,7 @@
 	import Update from '$lib/components/kind-viewer/kind-viewer-actions/workspace/update.svelte';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import Button from '$lib/components/ui/button/button.svelte';
 
 	let {
 		role,
@@ -33,13 +34,9 @@
 		{#snippet child({ props: tooltipProps })}
 			<Update {role} {cluster} {group} {version} {kind} {resource} {schema} {object} {onsuccess}>
 				{#snippet trigger(props)}
-					<button
-						{...props}
-						disabled={role === 'view'}
-						class={buttonVariants({ variant: 'outline', size: 'icon' })}
-					>
+					<Button {...tooltipProps} variant="outline" size="icon-lg" disabled={role === 'view'}>
 						<Pencil />
-					</button>
+					</Button>
 				{/snippet}
 			</Update>
 		{/snippet}
