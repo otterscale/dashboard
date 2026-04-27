@@ -3,17 +3,18 @@
 	import Plus from '@lucide/svelte/icons/plus';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
-	import { SubmitButton } from '@sjsf/form';
+	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
 	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
-	import { getContext } from 'svelte';
+	import { getContext, onMount } from 'svelte';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
 	import Form from '$lib/components/dynamic-form/form.svelte';
+	import { fetchAllGpuNodes, type NodeInfo } from '$lib/components/gpu-allocation';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
@@ -57,6 +58,28 @@
 		uuid?: string[];
 	} = $state({});
 
+	// ===== Faceted GPU selector =====
+	type GPUDevice = { uuid: string; type: string; node: string };
+	type GPUSelection = { nodes: string[]; types: string[]; uuids: string[] };
+
+	let allGPUDevices: GPUDevice[] = $state([]);
+	let GPUSelector: GPUSelection = $state({ nodes: [], types: [], uuids: [] });
+
+	// Flatten NodeInfo[] into a single Device[] (the source of truth).
+	function getAllGPUDevices(nodes: NodeInfo[]): GPUDevice[] {
+		return nodes.flatMap((node) =>
+			node.devices.map((device) => ({
+				uuid: device.id,
+				type: device.type,
+				node: node.name
+			}))
+		);
+	}
+	onMount(async () => {
+		const allGPUNodes = await fetchAllGpuNodes(resourceClient, cluster);
+		allGPUDevices = getAllGPUDevices(allGPUNodes);
+	});
+
 	// Steps Manager
 	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
@@ -77,6 +100,7 @@
 	let isSubmitting = $state(false);
 </script>
 
+<!-- <pre>{JSON.stringify(allGPUDevices, null, 2)}</pre> -->
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
@@ -186,6 +210,7 @@
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[2]}>
+				<pre>{JSON.stringify(nodeSelector, null, 2)}</pre>
 				<Form
 					schema={{
 						title: 'GPU Selector',
@@ -195,12 +220,13 @@
 							type: {
 								type: 'array',
 								items: {
+									enum: ['test'],
 									type: 'string'
 								}
 							},
 							uuid: { type: 'array', items: { type: 'string' } }
 						}
-					}}
+					} as Schema}
 					uiSchema={{
 						'ui:options': {
 							translations: {
@@ -236,7 +262,9 @@
 							handleNext();
 						}
 					}}
-					// bind:snapshot={nodeSelector}
+					onFormChange={(form) => {
+						nodeSelector = getValueSnapshot(form);
+					}}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">

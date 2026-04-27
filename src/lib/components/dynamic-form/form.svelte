@@ -47,7 +47,7 @@
 		handleSubmit,
 		actions,
 		values = $bindable(),
-		snapshot = $bindable(),
+		onFormChange,
 		class: className
 	}: {
 		schema: Schema;
@@ -60,7 +60,7 @@
 		};
 		actions?: Snippet;
 		values?: FormValue;
-		snapshot?: FormValue;
+		onFormChange?: (snapshot: FormState<FormValue>) => void;
 		class?: string;
 	} = $props();
 	// Clean schema from unnecessary keywords to JSON Schema Draft-07.
@@ -203,9 +203,9 @@
 	}
 	setFormContext(form);
 
-	if (snapshot) {
+	if (onFormChange) {
 		$effect(() => {
-			snapshot = getValueSnapshot(form);
+			onFormChange(form);
 		});
 	}
 </script>
