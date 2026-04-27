@@ -302,8 +302,8 @@
 								{
 									title: m.model_cache(),
 									url: resourceUrl(
-										'localmodelcaches.serving.kserve.io',
-										'v1alpha2',
+										'serving.kserve.io',
+										'v1alpha1',
 										'LocalModelCache',
 										'localmodelcaches'
 									)
