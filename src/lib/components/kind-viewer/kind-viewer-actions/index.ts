@@ -22,6 +22,7 @@ import JobActions from './job/actions.svelte';
 import LLMInferenceServiceActions from './llm-inference-service/actions.svelte';
 import LLMInferenceServiceCreate from './llm-inference-service/create.svelte';
 import LLMInferenceServiceConfigActions from './llm-inference-service-config/actions.svelte';
+import LocalModelCacheCreate from './local-model-cache/create.svelte';
 import ModelArtifactActions from './model-artifact/actions.svelte';
 import ModelArtifactCreate from './model-artifact/create.svelte';
 import ModelServiceActions from './model-service/actions.svelte';
@@ -78,6 +79,8 @@ function getCreate(kind: string): CreateType {
 			return HelmRepositoryCreate as CreateType;
 		case 'LLMInferenceService':
 			return LLMInferenceServiceCreate as CreateType;
+		case 'LocalModelCache':
+			return LocalModelCacheCreate as CreateType;
 		case 'ModelArtifact':
 			return ModelArtifactCreate as CreateType;
 		case 'ModelService':
