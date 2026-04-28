@@ -90,6 +90,20 @@
 		return `sum(kube_pod_container_resource_limits{namespace="${nsLit}",resource="${resLit}"} and on (namespace, pod, container) kube_pod_container_status_ready{namespace="${nsLit}"} == 1)`;
 	}
 
+	/**
+	 * gpumem (nvidia.com/gpumem) is a per-GPU value, so total used memory =
+	 * sum over containers of (gpu_count × gpumem_per_gpu).
+	 */
+	function podContainerReadyGpuMemTotalSum(ns: string): string {
+		const nsLit = escapePromqlStringLiteral(ns);
+		const gpuRes = escapePromqlStringLiteral(KSM_POD_RES_NVIDIA_GPU);
+		const memRes = escapePromqlStringLiteral(KSM_POD_RES_NVIDIA_GPUMEM);
+		const ready = `kube_pod_container_status_ready{namespace="${nsLit}"} == 1`;
+		const gpu = `kube_pod_container_resource_limits{namespace="${nsLit}",resource="${gpuRes}"}`;
+		const mem = `kube_pod_container_resource_limits{namespace="${nsLit}",resource="${memRes}"}`;
+		return `sum((${gpu} * on (namespace, pod, container) ${mem}) and on (namespace, pod, container) ${ready})`;
+	}
+
 	async function queryScalar(q: string): Promise<number | null> {
 		try {
 			const r = await prometheusDriver.instantQuery(q, new Date());
@@ -124,7 +138,7 @@
 			queryScalar(rqSum('limits.memory', 'hard')),
 			queryScalar(podContainerReadyLimitSum(namespace, KSM_POD_RES_NVIDIA_GPU)),
 			queryScalar(rqSum('limits.nvidia.com/gpu', 'hard')),
-			queryScalar(podContainerReadyLimitSum(namespace, KSM_POD_RES_NVIDIA_GPUMEM)),
+			queryScalar(podContainerReadyGpuMemTotalSum(namespace)),
 			queryScalar(rqSum('limits.nvidia.com/gpumem', 'hard'))
 		]);
 
@@ -242,13 +256,13 @@
 	{:else}
 		<Card.Content class="grid gap-4 md:grid-cols-2">
 			<!-- CPU: same pattern as cluster analytics usage-rate-chart-cpu -->
-			<Statistics.Root type="ratio" class="border-0 bg-transparent p-0 shadow-none">
+			<Statistics.Root type="ratio" class="overflow-visible border-0 bg-transparent p-0 shadow-none">
 				<Statistics.Header>
 					<div class="flex justify-between gap-4">
 						<Statistics.Title>{m.cpu()}</Statistics.Title>
 						{#if cpuHard !== null}
 							<div class="flex items-center gap-1 text-xl">
-								<p class="font-bold">{formatCpuCores(cpuHard)} {m.cpu()}</p>
+								<p class="font-bold">{formatCpuCores(cpuHard)} </p>
 							</div>
 						{/if}
 					</div>
@@ -301,7 +315,7 @@
 			</Statistics.Root>
 
 			<!-- Memory: same pattern as cluster analytics usage-rate-chart-ram -->
-			<Statistics.Root type="ratio" class="border-0 bg-transparent p-0 shadow-none">
+			<Statistics.Root type="ratio" class="overflow-visible border-0 bg-transparent p-0 shadow-none">
 				<Statistics.Header>
 					<div class="flex justify-between gap-4">
 						<Statistics.Title>{m.ram()}</Statistics.Title>
@@ -363,7 +377,7 @@
 			</Statistics.Root>
 
 			<!-- GPU: nvidia.com/gpu -->
-			<Statistics.Root type="ratio" class="border-0 bg-transparent p-0 shadow-none">
+			<Statistics.Root type="ratio" class="overflow-visible border-0 bg-transparent p-0 shadow-none">
 				<Statistics.Header>
 					<div class="flex justify-between gap-4">
 						<Statistics.Title>GPU</Statistics.Title>
@@ -450,7 +464,7 @@
 			</Statistics.Root>
 
 			<!-- GPU Memory: nvidia.com/gpumem -->
-			<Statistics.Root type="ratio" class="border-0 bg-transparent p-0 shadow-none">
+			<Statistics.Root type="ratio" class="overflow-visible border-0 bg-transparent p-0 shadow-none">
 				<Statistics.Header>
 					<div class="flex justify-between gap-4">
 						<Statistics.Title>GPU Memory</Statistics.Title>

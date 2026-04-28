@@ -102,28 +102,48 @@
 				nvidia_com_gpumem: 'nvidia.com/gpumem'
 			};
 
-			const [limitsResponse, requestsResponse] = await Promise.all([
-				prometheusDriver.instantQuery(
-					`sum by (resource) (kube_pod_container_resource_limits{namespace="${namespace}"} and on (namespace, pod) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`
-				),
-				prometheusDriver.instantQuery(
-					`sum by (resource) (kube_pod_container_resource_requests{namespace="${namespace}"} and on (namespace, pod) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`
-				)
-			]);
+			// gpumem is a per-GPU value; total used = gpu_count × gpumem_per_gpu per container
+			const gpuMemLimitsTotalQuery = `sum((kube_pod_container_resource_limits{namespace="${namespace}",resource="nvidia_com_gpu"} * on (namespace, pod, container) kube_pod_container_resource_limits{namespace="${namespace}",resource="nvidia_com_gpumem"}) and on (namespace, pod, container) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`;
+			const gpuMemRequestsTotalQuery = `sum((kube_pod_container_resource_requests{namespace="${namespace}",resource="nvidia_com_gpu"} * on (namespace, pod, container) kube_pod_container_resource_requests{namespace="${namespace}",resource="nvidia_com_gpumem"}) and on (namespace, pod, container) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`;
+
+			const [limitsResponse, requestsResponse, gpuMemLimitsTotal, gpuMemRequestsTotal] =
+				await Promise.all([
+					prometheusDriver.instantQuery(
+						`sum by (resource) (kube_pod_container_resource_limits{namespace="${namespace}"} and on (namespace, pod) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`
+					),
+					prometheusDriver.instantQuery(
+						`sum by (resource) (kube_pod_container_resource_requests{namespace="${namespace}"} and on (namespace, pod) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`
+					),
+					prometheusDriver.instantQuery(gpuMemLimitsTotalQuery),
+					prometheusDriver.instantQuery(gpuMemRequestsTotalQuery)
+				]);
 
 			const usedMap: Record<string, string> = {};
 			for (const v of limitsResponse.result as InstantVector[]) {
 				const metricResource = (v.metric.labels as Record<string, string>).resource;
 				if (!metricResource) continue;
+				// gpumem handled separately below
+				if (metricResource === 'nvidia_com_gpumem') continue;
 				const quotaResource = gpuResourceMap[metricResource] ?? metricResource;
 				usedMap[`limits.${quotaResource}`] = formatResourceValue(
 					`limits.${quotaResource}`,
 					v.value.value
 				);
 			}
+			// gpumem limits: use gpu × gpumem total
+			const gpuMemLimitsVec = (gpuMemLimitsTotal.result as InstantVector[])[0];
+			if (gpuMemLimitsVec) {
+				usedMap['limits.nvidia.com/gpumem'] = formatResourceValue(
+					'limits.nvidia.com/gpumem',
+					gpuMemLimitsVec.value.value
+				);
+			}
+
 			for (const v of requestsResponse.result as InstantVector[]) {
 				const metricResource = (v.metric.labels as Record<string, string>).resource;
 				if (!metricResource) continue;
+				// gpumem handled separately below
+				if (metricResource === 'nvidia_com_gpumem') continue;
 				const quotaResource = gpuResourceMap[metricResource] ?? metricResource;
 				usedMap[`requests.${quotaResource}`] = formatResourceValue(
 					`requests.${quotaResource}`,
@@ -133,6 +153,19 @@
 					usedMap[quotaResource] = formatResourceValue(quotaResource, v.value.value);
 				}
 			}
+			// gpumem requests: use gpu × gpumem total
+			const gpuMemRequestsVec = (gpuMemRequestsTotal.result as InstantVector[])[0];
+			if (gpuMemRequestsVec) {
+				usedMap['requests.nvidia.com/gpumem'] = formatResourceValue(
+					'requests.nvidia.com/gpumem',
+					gpuMemRequestsVec.value.value
+				);
+				usedMap['nvidia.com/gpumem'] = formatResourceValue(
+					'nvidia.com/gpumem',
+					gpuMemRequestsVec.value.value
+				);
+			}
+
 			resourceQuotaUsed = usedMap;
 		} catch (error) {
 			console.error('Failed to fetch ResourceQuota metrics from Prometheus:', error);
