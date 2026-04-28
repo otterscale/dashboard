@@ -256,13 +256,16 @@
 	{:else}
 		<Card.Content class="grid gap-4 md:grid-cols-2">
 			<!-- CPU: same pattern as cluster analytics usage-rate-chart-cpu -->
-			<Statistics.Root type="ratio" class="overflow-visible border-0 bg-transparent p-0 shadow-none">
+			<Statistics.Root
+				type="ratio"
+				class="overflow-visible border-0 bg-transparent p-0 shadow-none"
+			>
 				<Statistics.Header>
 					<div class="flex justify-between gap-4">
 						<Statistics.Title>{m.cpu()}</Statistics.Title>
 						{#if cpuHard !== null}
 							<div class="flex items-center gap-1 text-xl">
-								<p class="font-bold">{formatCpuCores(cpuHard)} </p>
+								<p class="font-bold">{formatCpuCores(cpuHard)}</p>
 							</div>
 						{/if}
 					</div>
@@ -315,7 +318,10 @@
 			</Statistics.Root>
 
 			<!-- Memory: same pattern as cluster analytics usage-rate-chart-ram -->
-			<Statistics.Root type="ratio" class="overflow-visible border-0 bg-transparent p-0 shadow-none">
+			<Statistics.Root
+				type="ratio"
+				class="overflow-visible border-0 bg-transparent p-0 shadow-none"
+			>
 				<Statistics.Header>
 					<div class="flex justify-between gap-4">
 						<Statistics.Title>{m.ram()}</Statistics.Title>
@@ -377,7 +383,10 @@
 			</Statistics.Root>
 
 			<!-- GPU: nvidia.com/gpu -->
-			<Statistics.Root type="ratio" class="overflow-visible border-0 bg-transparent p-0 shadow-none">
+			<Statistics.Root
+				type="ratio"
+				class="overflow-visible border-0 bg-transparent p-0 shadow-none"
+			>
 				<Statistics.Header>
 					<div class="flex justify-between gap-4">
 						<Statistics.Title>GPU</Statistics.Title>
@@ -464,7 +473,10 @@
 			</Statistics.Root>
 
 			<!-- GPU Memory: nvidia.com/gpumem -->
-			<Statistics.Root type="ratio" class="overflow-visible border-0 bg-transparent p-0 shadow-none">
+			<Statistics.Root
+				type="ratio"
+				class="overflow-visible border-0 bg-transparent p-0 shadow-none"
+			>
 				<Statistics.Header>
 					<div class="flex justify-between gap-4">
 						<Statistics.Title>GPU Memory</Statistics.Title>
