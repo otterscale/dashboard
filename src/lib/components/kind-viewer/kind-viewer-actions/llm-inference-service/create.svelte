@@ -212,7 +212,6 @@
 			</Tabs.Content>
 
 			<Tabs.Content value={steps[2]}>
-				<!-- <pre>{JSON.stringify(nodeSelector, null, 2)}</pre> -->
 				{#await fetchAllGpuNodes(resourceClient, cluster)}
 					Loading
 				{:then allGPUNodes}
@@ -225,16 +224,10 @@
 					{:then response}
 						{@const isSingleNode =
 							lodash.has(response.object, 'spec.template') &&
-							!lodash.has(response.object, 'spec.prefill') &&
-							!lodash.has(response.object, 'spec.worker')}
-						{@const isPrefillDecodeReplica =
+							!lodash.has(response.object, 'spec.prefill')}
+						{@const isPrefillDecode =
 							lodash.has(response.object, 'spec.template') &&
-							lodash.has(response.object, 'spec.prefill') &&
-							!lodash.has(response.object, 'spec.worker')}
-						{@const isPrefillDecodeLeaderWorkerSet =
-							lodash.has(response.object, 'spec.template') &&
-							lodash.has(response.object, 'spec.prefill') &&
-							lodash.has(response.object, 'spec.worker')}
+							lodash.has(response.object, 'spec.prefill')}
 						{#key selectedTemplateName}
 							{#if isSingleNode}
 								<Form
@@ -276,12 +269,7 @@
 										},
 										type: {
 											'ui:options': {
-												itemTitle: () => null,
-												layouts: {
-													'array-items': {
-														class: 'grid grid-cols-2 gap-3'
-													}
-												}
+												itemTitle: () => null
 											},
 											items: {
 												'ui:components': {
@@ -292,12 +280,7 @@
 										},
 										node: {
 											'ui:options': {
-												itemTitle: () => null,
-												layouts: {
-													'array-items': {
-														class: 'grid grid-cols-2 gap-3'
-													}
-												}
+												itemTitle: () => null
 											},
 											items: {
 												'ui:components': {
@@ -324,6 +307,7 @@
 											const value = getValueSnapshot(form);
 											lodash.unset(values, ['spec', 'template']);
 											lodash.unset(values, ['spec', 'annotations']);
+											lodash.unset(values, ['spec', 'prefill']);
 
 											const nodes = lodash.get(value, 'node', []) as string[];
 											if (nodes.length > 0) {
@@ -368,7 +352,7 @@
 										</div>
 									{/snippet}
 								</Form>
-							{:else if isPrefillDecodeReplica}
+							{:else if isPrefillDecode}
 								<Form
 									schema={{
 										title: 'GPU Selector',
@@ -445,12 +429,7 @@
 										prefill: {
 											type: {
 												'ui:options': {
-													itemTitle: () => null,
-													layouts: {
-														'array-items': {
-															class: 'grid grid-cols-2 gap-3'
-														}
-													}
+													itemTitle: () => null
 												},
 												items: {
 													'ui:components': {
@@ -461,12 +440,7 @@
 											},
 											node: {
 												'ui:options': {
-													itemTitle: () => null,
-													layouts: {
-														'array-items': {
-															class: 'grid grid-cols-2 gap-3'
-														}
-													}
+													itemTitle: () => null
 												},
 												items: {
 													'ui:components': {
@@ -490,12 +464,7 @@
 										decode: {
 											type: {
 												'ui:options': {
-													itemTitle: () => null,
-													layouts: {
-														'array-items': {
-															class: 'grid grid-cols-2 gap-3'
-														}
-													}
+													itemTitle: () => null
 												},
 												items: {
 													'ui:components': {
@@ -506,12 +475,7 @@
 											},
 											node: {
 												'ui:options': {
-													itemTitle: () => null,
-													layouts: {
-														'array-items': {
-															class: 'grid grid-cols-2 gap-3'
-														}
-													}
+													itemTitle: () => null
 												},
 												items: {
 													'ui:components': {
@@ -537,8 +501,8 @@
 									handleSubmit={{
 										posthook: (form) => {
 											lodash.unset(values, ['spec', 'template']);
-											lodash.unset(values, ['spec', 'prefill']);
 											lodash.unset(values, ['spec', 'annotations']);
+											lodash.unset(values, ['spec', 'prefill']);
 
 											const value = getValueSnapshot(form);
 
@@ -591,450 +555,6 @@
 													prefillUUIDs.join(',')
 												);
 											}
-											handleNext();
-										}
-									}}
-								>
-									{#snippet actions()}
-										<div class="flex w-full items-center justify-between gap-3">
-											<Button
-												onclick={() => {
-													handlePrevious();
-												}}
-											>
-												Previous
-											</Button>
-											<SubmitButton />
-										</div>
-									{/snippet}
-								</Form>
-							{:else if isPrefillDecodeLeaderWorkerSet}
-								<Form
-									schema={{
-										title: 'GPU Selector',
-										type: 'object',
-										properties: {
-											prefillLeader: {
-												title: 'Prefill Leader',
-												type: 'object',
-												properties: {
-													type: {
-														title: 'Type',
-														type: 'array',
-														items: {
-															type: 'string',
-															enum: [...allTypes]
-														}
-													},
-													node: {
-														title: 'Node',
-														type: 'array',
-														items: {
-															type: 'string',
-															enum: [...allNodes]
-														}
-													},
-													uuid: {
-														title: 'UUID',
-														type: 'array',
-														items: {
-															type: 'string',
-															enum: [...allUUIDs]
-														}
-													}
-												}
-											},
-											prefillWorker: {
-												title: 'Prefill Worker',
-												type: 'object',
-												properties: {
-													type: {
-														title: 'Type',
-														type: 'array',
-														items: {
-															type: 'string',
-															enum: [...allTypes]
-														}
-													},
-													node: {
-														title: 'Node',
-														type: 'array',
-														items: {
-															type: 'string',
-															enum: [...allNodes]
-														}
-													},
-													uuid: {
-														title: 'UUID',
-														type: 'array',
-														items: {
-															type: 'string',
-															enum: [...allUUIDs]
-														}
-													}
-												}
-											},
-											decodeLeader: {
-												title: 'Decode Leader',
-												type: 'object',
-												properties: {
-													type: {
-														title: 'Type',
-														type: 'array',
-														items: {
-															type: 'string',
-															enum: [...allTypes]
-														}
-													},
-													node: {
-														title: 'Node',
-														type: 'array',
-														items: {
-															type: 'string',
-															enum: [...allNodes]
-														}
-													},
-													uuid: {
-														title: 'UUID',
-														type: 'array',
-														items: {
-															type: 'string',
-															enum: [...allUUIDs]
-														}
-													}
-												}
-											},
-											decodeWorker: {
-												title: 'Decode Worker',
-												type: 'object',
-												properties: {
-													type: {
-														title: 'Type',
-														type: 'array',
-														items: {
-															type: 'string',
-															enum: [...allTypes]
-														}
-													},
-													node: {
-														title: 'Node',
-														type: 'array',
-														items: {
-															type: 'string',
-															enum: [...allNodes]
-														}
-													},
-													uuid: {
-														title: 'UUID',
-														type: 'array',
-														items: {
-															type: 'string',
-															enum: [...allUUIDs]
-														}
-													}
-												}
-											}
-										}
-									}}
-									uiSchema={{
-										'ui:options': {
-											translations: {
-												submit: 'Next'
-											}
-										},
-										decodeLeader: {
-											type: {
-												'ui:options': {
-													itemTitle: () => null,
-													layouts: {
-														'array-items': {
-															class: 'grid grid-cols-2 gap-3'
-														}
-													}
-												},
-												items: {
-													'ui:components': {
-														stringField: 'enumField',
-														selectWidget: 'comboboxWidget'
-													}
-												}
-											},
-											node: {
-												'ui:options': {
-													itemTitle: () => null,
-													layouts: {
-														'array-items': {
-															class: 'grid grid-cols-2 gap-3'
-														}
-													}
-												},
-												items: {
-													'ui:components': {
-														stringField: 'enumField',
-														selectWidget: 'comboboxWidget'
-													}
-												}
-											},
-											uuid: {
-												'ui:options': {
-													itemTitle: () => null
-												},
-												items: {
-													'ui:components': {
-														stringField: 'enumField',
-														selectWidget: 'comboboxWidget'
-													}
-												}
-											}
-										},
-										decodeWorker: {
-											type: {
-												'ui:options': {
-													itemTitle: () => null,
-													layouts: {
-														'array-items': {
-															class: 'grid grid-cols-2 gap-3'
-														}
-													}
-												},
-												items: {
-													'ui:components': {
-														stringField: 'enumField',
-														selectWidget: 'comboboxWidget'
-													}
-												}
-											},
-											node: {
-												'ui:options': {
-													itemTitle: () => null,
-													layouts: {
-														'array-items': {
-															class: 'grid grid-cols-2 gap-3'
-														}
-													}
-												},
-												items: {
-													'ui:components': {
-														stringField: 'enumField',
-														selectWidget: 'comboboxWidget'
-													}
-												}
-											},
-											uuid: {
-												'ui:options': {
-													itemTitle: () => null
-												},
-												items: {
-													'ui:components': {
-														stringField: 'enumField',
-														selectWidget: 'comboboxWidget'
-													}
-												}
-											}
-										},
-										prefillLeader: {
-											type: {
-												'ui:options': {
-													itemTitle: () => null,
-													layouts: {
-														'array-items': {
-															class: 'grid grid-cols-2 gap-3'
-														}
-													}
-												},
-												items: {
-													'ui:components': {
-														stringField: 'enumField',
-														selectWidget: 'comboboxWidget'
-													}
-												}
-											},
-											node: {
-												'ui:options': {
-													itemTitle: () => null,
-													layouts: {
-														'array-items': {
-															class: 'grid grid-cols-2 gap-3'
-														}
-													}
-												},
-												items: {
-													'ui:components': {
-														stringField: 'enumField',
-														selectWidget: 'comboboxWidget'
-													}
-												}
-											},
-											uuid: {
-												'ui:options': {
-													itemTitle: () => null
-												},
-												items: {
-													'ui:components': {
-														stringField: 'enumField',
-														selectWidget: 'comboboxWidget'
-													}
-												}
-											}
-										},
-										prefillWorker: {
-											type: {
-												'ui:options': {
-													itemTitle: () => null,
-													layouts: {
-														'array-items': {
-															class: 'grid grid-cols-2 gap-3'
-														}
-													}
-												},
-												items: {
-													'ui:components': {
-														stringField: 'enumField',
-														selectWidget: 'comboboxWidget'
-													}
-												}
-											},
-											node: {
-												'ui:options': {
-													itemTitle: () => null,
-													layouts: {
-														'array-items': {
-															class: 'grid grid-cols-2 gap-3'
-														}
-													}
-												},
-												items: {
-													'ui:components': {
-														stringField: 'enumField',
-														selectWidget: 'comboboxWidget'
-													}
-												}
-											},
-											uuid: {
-												'ui:options': {
-													itemTitle: () => null
-												},
-												items: {
-													'ui:components': {
-														stringField: 'enumField',
-														selectWidget: 'comboboxWidget'
-													}
-												}
-											}
-										}
-									} as UiSchemaRoot}
-									initialValue={{} as FormValue}
-									handleSubmit={{
-										posthook: (form) => {
-											lodash.unset(values, ['spec', 'template']);
-											lodash.unset(values, ['spec', 'worker']);
-											lodash.unset(values, ['spec', 'prefill']);
-											lodash.unset(values, ['spec', 'annotations']);
-
-											const value = getValueSnapshot(form);
-
-											const decodeLeaderNodes = lodash.get(
-												value,
-												'decodeLeader.node',
-												[]
-											) as string[];
-											if (decodeLeaderNodes.length > 0) {
-												lodash.set(
-													values,
-													['spec', 'template', 'nodeSelector', 'kubernetes.io/hostname'],
-													decodeLeaderNodes.join(',')
-												);
-											}
-											const decodeWorkerNodes = lodash.get(
-												value,
-												'decodeWorker.node',
-												[]
-											) as string[];
-											if (decodeWorkerNodes.length > 0) {
-												lodash.set(
-													values,
-													['spec', 'worker', 'nodeSelector', 'kubernetes.io/hostname'],
-													decodeWorkerNodes.join(',')
-												);
-											}
-											const decodeTypes = [
-												...new Set([
-													...(lodash.get(value, 'decodeLeader.type', []) as string[]),
-													...(lodash.get(value, 'decodeWorker.type', []) as string[])
-												])
-											];
-											if (decodeTypes.length > 0) {
-												lodash.set(
-													values,
-													['spec', 'annotations', 'nvidia.com/use-gputype'],
-													decodeTypes.join(',')
-												);
-											}
-											const decodeUUIDs = [
-												...new Set([
-													...(lodash.get(value, 'decodeLeader.uuid', []) as string[]),
-													...(lodash.get(value, 'decodeWorker.uuid', []) as string[])
-												])
-											];
-											if (decodeUUIDs.length > 0) {
-												lodash.set(
-													values,
-													['spec', 'annotations', 'nvidia.com/use-gpuuuid'],
-													decodeUUIDs.join(',')
-												);
-											}
-
-											const prefillLeaderNodes = lodash.get(
-												value,
-												'prefillLeader.node',
-												[]
-											) as string[];
-											if (prefillLeaderNodes.length > 0) {
-												lodash.set(
-													values,
-													['spec', 'prefill', 'template', 'nodeSelector', 'kubernetes.io/hostname'],
-													prefillLeaderNodes.join(',')
-												);
-											}
-											const prefillWorkerNodes = lodash.get(
-												value,
-												'prefillWorker.node',
-												[]
-											) as string[];
-											if (prefillWorkerNodes.length > 0) {
-												lodash.set(
-													values,
-													['spec', 'prefill', 'worker', 'nodeSelector', 'kubernetes.io/hostname'],
-													prefillWorkerNodes.join(',')
-												);
-											}
-											const prefillTypes = [
-												...new Set([
-													...(lodash.get(value, 'prefillLeader.type', []) as string[]),
-													...(lodash.get(value, 'prefillWorker.type', []) as string[])
-												])
-											];
-											if (prefillTypes.length > 0) {
-												lodash.set(
-													values,
-													['spec', 'prefill', 'annotations', 'nvidia.com/use-gputype'],
-													prefillTypes.join(',')
-												);
-											}
-											const prefillUUIDs = [
-												...new Set([
-													...(lodash.get(value, 'prefillLeader.uuid', []) as string[]),
-													...(lodash.get(value, 'prefillWorker.uuid', []) as string[])
-												])
-											];
-											if (prefillUUIDs.length > 0) {
-												lodash.set(
-													values,
-													['spec', 'prefill', 'annotations', 'nvidia.com/use-gpuuuid'],
-													prefillUUIDs.join(',')
-												);
-											}
-
 											handleNext();
 										}
 									}}
