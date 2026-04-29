@@ -90,6 +90,14 @@
 		);
 	}
 
+	function splitCsv(raw: unknown): string[] {
+		if (typeof raw !== 'string' || raw.length === 0) return [];
+		return raw
+			.split(',')
+			.map((v) => v.trim())
+			.filter(Boolean);
+	}
+
 	// Steps Manager (2 steps: GPU selector + YAML review)
 	const steps = Array.from({ length: 2 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
@@ -145,21 +153,13 @@
 		<Tabs.Root value={currentStep}>
 			<!-- Step 1: GPU Selector -->
 			<Tabs.Content value={steps[0]}>
-				{#await fetchAllGpuNodes(resourceClient, 'cluster-4090')}
+				{#await fetchAllGpuNodes(resourceClient, cluster)}
 					Loading
 				{:then allGPUNodes}
 					{@const isSingleNode =
-						lodash.has(object, 'spec.template') &&
-						!lodash.has(object, 'spec.prefill') &&
-						!lodash.has(object, 'spec.worker')}
-					{@const isPrefillDecodeReplica =
-						lodash.has(object, 'spec.template') &&
-						lodash.has(object, 'spec.prefill') &&
-						!lodash.has(object, 'spec.worker')}
-					{@const isPrefillDecodeLeaderWorkerSet =
-						lodash.has(object, 'spec.template') &&
-						lodash.has(object, 'spec.prefill') &&
-						lodash.has(object, 'spec.worker')}
+						lodash.has(object, 'spec.template') && !lodash.has(object, 'spec.prefill')}
+					{@const isPrefillDecode =
+						lodash.has(object, 'spec.template') && lodash.has(object, 'spec.prefill')}
 					{@const allGPUDevices = getAllGPUDevices(allGPUNodes)}
 					{@const allNodes = new Set(allGPUDevices.map((device) => device.node))}
 					{@const allTypes = new Set(allGPUDevices.map((device) => device.type))}
@@ -204,12 +204,7 @@
 								},
 								type: {
 									'ui:options': {
-										itemTitle: () => null,
-										layouts: {
-											'array-items': {
-												class: 'grid grid-cols-2 gap-3'
-											}
-										}
+										itemTitle: () => null
 									},
 									items: {
 										'ui:components': {
@@ -220,12 +215,7 @@
 								},
 								node: {
 									'ui:options': {
-										itemTitle: () => null,
-										layouts: {
-											'array-items': {
-												class: 'grid grid-cols-2 gap-3'
-											}
-										}
+										itemTitle: () => null
 									},
 									items: {
 										'ui:components': {
@@ -246,40 +236,46 @@
 									}
 								}
 							} as UiSchemaRoot}
-							initialValue={{} as FormValue}
+							initialValue={{
+								type: splitCsv(
+									lodash.get(object, ['spec', 'annotations', 'nvidia.com/use-gputype'])
+								),
+								node: splitCsv(
+									lodash.get(object, ['spec', 'template', 'nodeSelector', 'kubernetes.io/hostname'])
+								),
+								uuid: splitCsv(
+									lodash.get(object, ['spec', 'annotations', 'nvidia.com/use-gpuuuid'])
+								)
+							} as FormValue}
 							handleSubmit={{
 								posthook: (form) => {
-									const formValue = getValueSnapshot(form);
-									// Restore original spec.template from object, then apply GPU overrides on top
-									lodash.set(
-										values,
-										['spec', 'template'],
-										lodash.get(object, ['spec', 'template'])
-									);
+									const value = getValueSnapshot(form);
+									lodash.unset(values, ['spec', 'template']);
+									lodash.unset(values, ['spec', 'annotations']);
+									lodash.unset(values, ['spec', 'prefill']);
 
-									const nodes = lodash.get(formValue, 'node', []) as string[];
+									const nodes = lodash.get(value, 'node', []) as string[];
 									if (nodes.length > 0) {
 										lodash.set(
 											values,
-											['spec', 'template', 'spec', 'nodeSelector', 'kubernetes.io/hostname'],
+											['spec', 'template', 'nodeSelector', 'kubernetes.io/hostname'],
 											nodes.join(',')
 										);
 									}
 
-									const types = lodash.get(formValue, 'type', []) as string[];
+									const types = lodash.get(value, 'type', []) as string[];
 									if (types.length > 0) {
 										lodash.set(
 											values,
-											['spec', 'template', 'metadata', 'annotations', 'nvidia.com/use-gputype'],
+											['spec', 'annotations', 'nvidia.com/use-gputype'],
 											types.join(',')
 										);
 									}
-
-									const uuids = lodash.get(formValue, 'uuid', []) as string[];
+									const uuids = lodash.get(value, 'uuid', []) as string[];
 									if (uuids.length > 0) {
 										lodash.set(
 											values,
-											['spec', 'template', 'metadata', 'annotations', 'nvidia.com/use-gpuuuid'],
+											['spec', 'annotations', 'nvidia.com/use-gpuuuid'],
 											uuids.join(',')
 										);
 									}
@@ -302,7 +298,7 @@
 								</div>
 							{/snippet}
 						</Form>
-					{:else if isPrefillDecodeReplica}
+					{:else if isPrefillDecode}
 						<Form
 							schema={{
 								title: 'GPU Selector',
@@ -353,492 +349,174 @@
 								}
 							}}
 							uiSchema={{
-								'ui:options': { translations: { submit: 'Next' } },
+								'ui:options': {
+									translations: {
+										submit: 'Next'
+									}
+								},
 								prefill: {
 									type: {
 										'ui:options': {
-											itemTitle: () => null,
-											layouts: { 'array-items': { class: 'grid grid-cols-2 gap-3' } }
+											itemTitle: () => null
 										},
 										items: {
-											'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' }
+											'ui:components': {
+												stringField: 'enumField',
+												selectWidget: 'comboboxWidget'
+											}
 										}
 									},
 									node: {
 										'ui:options': {
-											itemTitle: () => null,
-											layouts: { 'array-items': { class: 'grid grid-cols-2 gap-3' } }
+											itemTitle: () => null
 										},
 										items: {
-											'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' }
+											'ui:components': {
+												stringField: 'enumField',
+												selectWidget: 'comboboxWidget'
+											}
 										}
 									},
 									uuid: {
-										'ui:options': { itemTitle: () => null },
+										'ui:options': {
+											itemTitle: () => null
+										},
 										items: {
-											'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' }
+											'ui:components': {
+												stringField: 'enumField',
+												selectWidget: 'comboboxWidget'
+											}
 										}
 									}
 								},
 								decode: {
 									type: {
 										'ui:options': {
-											itemTitle: () => null,
-											layouts: { 'array-items': { class: 'grid grid-cols-2 gap-3' } }
+											itemTitle: () => null
 										},
 										items: {
-											'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' }
+											'ui:components': {
+												stringField: 'enumField',
+												selectWidget: 'comboboxWidget'
+											}
 										}
 									},
 									node: {
 										'ui:options': {
-											itemTitle: () => null,
-											layouts: { 'array-items': { class: 'grid grid-cols-2 gap-3' } }
+											itemTitle: () => null
 										},
 										items: {
-											'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' }
+											'ui:components': {
+												stringField: 'enumField',
+												selectWidget: 'comboboxWidget'
+											}
 										}
 									},
 									uuid: {
-										'ui:options': { itemTitle: () => null },
+										'ui:options': {
+											itemTitle: () => null
+										},
 										items: {
-											'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' }
+											'ui:components': {
+												stringField: 'enumField',
+												selectWidget: 'comboboxWidget'
+											}
 										}
 									}
 								}
 							} as UiSchemaRoot}
-							initialValue={{} as FormValue}
+							initialValue={{
+								decode: {
+									type: splitCsv(
+										lodash.get(object, ['spec', 'annotations', 'nvidia.com/use-gputype'])
+									),
+									node: splitCsv(
+										lodash.get(object, [
+											'spec',
+											'template',
+											'nodeSelector',
+											'kubernetes.io/hostname'
+										])
+									),
+									uuid: splitCsv(
+										lodash.get(object, ['spec', 'annotations', 'nvidia.com/use-gpuuuid'])
+									)
+								},
+								prefill: {
+									type: splitCsv(
+										lodash.get(object, ['spec', 'prefill', 'annotations', 'nvidia.com/use-gputype'])
+									),
+									node: splitCsv(
+										lodash.get(object, [
+											'spec',
+											'prefill',
+											'template',
+											'nodeSelector',
+											'kubernetes.io/hostname'
+										])
+									),
+									uuid: splitCsv(
+										lodash.get(object, ['spec', 'prefill', 'annotations', 'nvidia.com/use-gpuuuid'])
+									)
+								}
+							} as FormValue}
 							handleSubmit={{
 								posthook: (form) => {
-									// Restore originals from object, then apply GPU overrides on top
-									lodash.set(
-										values,
-										['spec', 'template'],
-										lodash.get(object, ['spec', 'template'])
-									);
-									lodash.set(values, ['spec', 'prefill'], lodash.get(object, ['spec', 'prefill']));
+									lodash.unset(values, ['spec', 'template']);
+									lodash.unset(values, ['spec', 'annotations']);
+									lodash.unset(values, ['spec', 'prefill']);
 
-									const formValue = getValueSnapshot(form);
+									const value = getValueSnapshot(form);
 
-									const decodeNodes = lodash.get(formValue, 'decode.node', []) as string[];
+									const decodeNodes = lodash.get(value, 'decode.node', []) as string[];
 									if (decodeNodes.length > 0) {
 										lodash.set(
 											values,
-											['spec', 'template', 'spec', 'nodeSelector', 'kubernetes.io/hostname'],
+											['spec', 'template', 'nodeSelector', 'kubernetes.io/hostname'],
 											decodeNodes.join(',')
 										);
 									}
-									const decodeTypes = lodash.get(formValue, 'decode.type', []) as string[];
+
+									const decodeTypes = lodash.get(value, 'decode.type', []) as string[];
 									if (decodeTypes.length > 0) {
 										lodash.set(
 											values,
-											['spec', 'template', 'metadata', 'annotations', 'nvidia.com/use-gputype'],
+											['spec', 'annotations', 'nvidia.com/use-gputype'],
 											decodeTypes.join(',')
 										);
 									}
-									const decodeUUIDs = lodash.get(formValue, 'decode.uuid', []) as string[];
+									const decodeUUIDs = lodash.get(value, 'decode.uuid', []) as string[];
 									if (decodeUUIDs.length > 0) {
 										lodash.set(
 											values,
-											['spec', 'template', 'metadata', 'annotations', 'nvidia.com/use-gpuuuid'],
+											['spec', 'annotations', 'nvidia.com/use-gpuuuid'],
 											decodeUUIDs.join(',')
 										);
 									}
-
-									const prefillNodes = lodash.get(formValue, 'prefill.node', []) as string[];
+									const prefillNodes = lodash.get(value, 'prefill.node', []) as string[];
 									if (prefillNodes.length > 0) {
 										lodash.set(
 											values,
-											[
-												'spec',
-												'prefill',
-												'template',
-												'spec',
-												'nodeSelector',
-												'kubernetes.io/hostname'
-											],
+											['spec', 'prefill', 'template', 'nodeSelector', 'kubernetes.io/hostname'],
 											prefillNodes.join(',')
 										);
 									}
-									const prefillTypes = lodash.get(formValue, 'prefill.type', []) as string[];
+									const prefillTypes = lodash.get(value, 'prefill.type', []) as string[];
 									if (prefillTypes.length > 0) {
 										lodash.set(
 											values,
-											[
-												'spec',
-												'prefill',
-												'template',
-												'metadata',
-												'annotations',
-												'nvidia.com/use-gputype'
-											],
+											['spec', 'prefill', 'annotations', 'nvidia.com/use-gputype'],
 											prefillTypes.join(',')
 										);
 									}
-									const prefillUUIDs = lodash.get(formValue, 'prefill.uuid', []) as string[];
+									const prefillUUIDs = lodash.get(value, 'prefill.uuid', []) as string[];
 									if (prefillUUIDs.length > 0) {
 										lodash.set(
 											values,
-											[
-												'spec',
-												'prefill',
-												'template',
-												'metadata',
-												'annotations',
-												'nvidia.com/use-gpuuuid'
-											],
+											['spec', 'prefill', 'annotations', 'nvidia.com/use-gpuuuid'],
 											prefillUUIDs.join(',')
 										);
 									}
-
-									handleNext();
-								}
-							}}
-						>
-							{#snippet actions()}
-								<div class="flex w-full items-center justify-between gap-3">
-									<Button onclick={() => handlePrevious()} disabled={currentIndex === 0}>
-										Previous
-									</Button>
-									<SubmitButton />
-								</div>
-							{/snippet}
-						</Form>
-					{:else if isPrefillDecodeLeaderWorkerSet}
-						<Form
-							schema={{
-								title: 'GPU Selector',
-								type: 'object',
-								properties: {
-									prefillLeader: {
-										title: 'Prefill Leader',
-										type: 'object',
-										properties: {
-											type: {
-												title: 'Type',
-												type: 'array',
-												items: { type: 'string', enum: [...allTypes] }
-											},
-											node: {
-												title: 'Node',
-												type: 'array',
-												items: { type: 'string', enum: [...allNodes] }
-											},
-											uuid: {
-												title: 'UUID',
-												type: 'array',
-												items: { type: 'string', enum: [...allUUIDs] }
-											}
-										}
-									},
-									prefillWorker: {
-										title: 'Prefill Worker',
-										type: 'object',
-										properties: {
-											type: {
-												title: 'Type',
-												type: 'array',
-												items: { type: 'string', enum: [...allTypes] }
-											},
-											node: {
-												title: 'Node',
-												type: 'array',
-												items: { type: 'string', enum: [...allNodes] }
-											},
-											uuid: {
-												title: 'UUID',
-												type: 'array',
-												items: { type: 'string', enum: [...allUUIDs] }
-											}
-										}
-									},
-									decodeLeader: {
-										title: 'Decode Leader',
-										type: 'object',
-										properties: {
-											type: {
-												title: 'Type',
-												type: 'array',
-												items: { type: 'string', enum: [...allTypes] }
-											},
-											node: {
-												title: 'Node',
-												type: 'array',
-												items: { type: 'string', enum: [...allNodes] }
-											},
-											uuid: {
-												title: 'UUID',
-												type: 'array',
-												items: { type: 'string', enum: [...allUUIDs] }
-											}
-										}
-									},
-									decodeWorker: {
-										title: 'Decode Worker',
-										type: 'object',
-										properties: {
-											type: {
-												title: 'Type',
-												type: 'array',
-												items: { type: 'string', enum: [...allTypes] }
-											},
-											node: {
-												title: 'Node',
-												type: 'array',
-												items: { type: 'string', enum: [...allNodes] }
-											},
-											uuid: {
-												title: 'UUID',
-												type: 'array',
-												items: { type: 'string', enum: [...allUUIDs] }
-											}
-										}
-									}
-								}
-							}}
-							uiSchema={(() => {
-								const subUi = (key: string) => ({
-									type: {
-										'ui:options': {
-											itemTitle: () => null,
-											layouts: { 'array-items': { class: 'grid grid-cols-2 gap-3' } }
-										},
-										items: {
-											'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' }
-										}
-									},
-									node: {
-										'ui:options': {
-											itemTitle: () => null,
-											layouts: { 'array-items': { class: 'grid grid-cols-2 gap-3' } }
-										},
-										items: {
-											'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' }
-										}
-									},
-									uuid: {
-										'ui:options': { itemTitle: () => null },
-										items: {
-											'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' }
-										}
-									}
-								});
-								return {
-									'ui:options': { translations: { submit: 'Next' } },
-									decodeLeader: subUi('decodeLeader'),
-									decodeWorker: subUi('decodeWorker'),
-									prefillLeader: subUi('prefillLeader'),
-									prefillWorker: subUi('prefillWorker')
-								} as UiSchemaRoot;
-							})()}
-							initialValue={{} as FormValue}
-							handleSubmit={{
-								posthook: (form) => {
-									// Restore originals from object, then apply GPU overrides on top
-									lodash.set(
-										values,
-										['spec', 'template'],
-										lodash.get(object, ['spec', 'template'])
-									);
-									lodash.set(values, ['spec', 'worker'], lodash.get(object, ['spec', 'worker']));
-									lodash.set(values, ['spec', 'prefill'], lodash.get(object, ['spec', 'prefill']));
-
-									const formValue = getValueSnapshot(form);
-
-									// decodeLeader → spec.template
-									const decodeLeaderNodes = lodash.get(
-										formValue,
-										'decodeLeader.node',
-										[]
-									) as string[];
-									if (decodeLeaderNodes.length > 0) {
-										lodash.set(
-											values,
-											['spec', 'template', 'spec', 'nodeSelector', 'kubernetes.io/hostname'],
-											decodeLeaderNodes.join(',')
-										);
-									}
-									const decodeLeaderTypes = lodash.get(
-										formValue,
-										'decodeLeader.type',
-										[]
-									) as string[];
-									if (decodeLeaderTypes.length > 0) {
-										lodash.set(
-											values,
-											['spec', 'template', 'metadata', 'annotations', 'nvidia.com/use-gputype'],
-											decodeLeaderTypes.join(',')
-										);
-									}
-									const decodeLeaderUUIDs = lodash.get(
-										formValue,
-										'decodeLeader.uuid',
-										[]
-									) as string[];
-									if (decodeLeaderUUIDs.length > 0) {
-										lodash.set(
-											values,
-											['spec', 'template', 'metadata', 'annotations', 'nvidia.com/use-gpuuuid'],
-											decodeLeaderUUIDs.join(',')
-										);
-									}
-
-									// decodeWorker → spec.worker
-									const decodeWorkerNodes = lodash.get(
-										formValue,
-										'decodeWorker.node',
-										[]
-									) as string[];
-									if (decodeWorkerNodes.length > 0) {
-										lodash.set(
-											values,
-											['spec', 'worker', 'spec', 'nodeSelector', 'kubernetes.io/hostname'],
-											decodeWorkerNodes.join(',')
-										);
-									}
-									const decodeWorkerTypes = lodash.get(
-										formValue,
-										'decodeWorker.type',
-										[]
-									) as string[];
-									if (decodeWorkerTypes.length > 0) {
-										lodash.set(
-											values,
-											['spec', 'worker', 'metadata', 'annotations', 'nvidia.com/use-gputype'],
-											decodeWorkerTypes.join(',')
-										);
-									}
-									const decodeWorkerUUIDs = lodash.get(
-										formValue,
-										'decodeWorker.uuid',
-										[]
-									) as string[];
-									if (decodeWorkerUUIDs.length > 0) {
-										lodash.set(
-											values,
-											['spec', 'worker', 'metadata', 'annotations', 'nvidia.com/use-gpuuuid'],
-											decodeWorkerUUIDs.join(',')
-										);
-									}
-
-									// prefillLeader → spec.prefill.template
-									const prefillLeaderNodes = lodash.get(
-										formValue,
-										'prefillLeader.node',
-										[]
-									) as string[];
-									if (prefillLeaderNodes.length > 0) {
-										lodash.set(
-											values,
-											[
-												'spec',
-												'prefill',
-												'template',
-												'spec',
-												'nodeSelector',
-												'kubernetes.io/hostname'
-											],
-											prefillLeaderNodes.join(',')
-										);
-									}
-									const prefillLeaderTypes = lodash.get(
-										formValue,
-										'prefillLeader.type',
-										[]
-									) as string[];
-									if (prefillLeaderTypes.length > 0) {
-										lodash.set(
-											values,
-											[
-												'spec',
-												'prefill',
-												'template',
-												'metadata',
-												'annotations',
-												'nvidia.com/use-gputype'
-											],
-											prefillLeaderTypes.join(',')
-										);
-									}
-									const prefillLeaderUUIDs = lodash.get(
-										formValue,
-										'prefillLeader.uuid',
-										[]
-									) as string[];
-									if (prefillLeaderUUIDs.length > 0) {
-										lodash.set(
-											values,
-											[
-												'spec',
-												'prefill',
-												'template',
-												'metadata',
-												'annotations',
-												'nvidia.com/use-gpuuuid'
-											],
-											prefillLeaderUUIDs.join(',')
-										);
-									}
-
-									// prefillWorker → spec.prefill.worker
-									const prefillWorkerNodes = lodash.get(
-										formValue,
-										'prefillWorker.node',
-										[]
-									) as string[];
-									if (prefillWorkerNodes.length > 0) {
-										lodash.set(
-											values,
-											[
-												'spec',
-												'prefill',
-												'worker',
-												'spec',
-												'nodeSelector',
-												'kubernetes.io/hostname'
-											],
-											prefillWorkerNodes.join(',')
-										);
-									}
-									const prefillWorkerTypes = lodash.get(
-										formValue,
-										'prefillWorker.type',
-										[]
-									) as string[];
-									if (prefillWorkerTypes.length > 0) {
-										lodash.set(
-											values,
-											[
-												'spec',
-												'prefill',
-												'worker',
-												'metadata',
-												'annotations',
-												'nvidia.com/use-gputype'
-											],
-											prefillWorkerTypes.join(',')
-										);
-									}
-									const prefillWorkerUUIDs = lodash.get(
-										formValue,
-										'prefillWorker.uuid',
-										[]
-									) as string[];
-									if (prefillWorkerUUIDs.length > 0) {
-										lodash.set(
-											values,
-											[
-												'spec',
-												'prefill',
-												'worker',
-												'metadata',
-												'annotations',
-												'nvidia.com/use-gpuuuid'
-											],
-											prefillWorkerUUIDs.join(',')
-										);
-									}
-
 									handleNext();
 								}
 							}}
