@@ -2,7 +2,7 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import FormIcon from '@lucide/svelte/icons/form';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
+	import type { FormValue, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
 	import { load } from 'js-yaml';
@@ -90,20 +90,6 @@
 		);
 	}
 
-	// Determine layout from existing object
-	const isSingleNode =
-		lodash.has(object, 'spec.template') &&
-		!lodash.has(object, 'spec.prefill') &&
-		!lodash.has(object, 'spec.worker');
-	const isPrefillDecodeReplica =
-		lodash.has(object, 'spec.template') &&
-		lodash.has(object, 'spec.prefill') &&
-		!lodash.has(object, 'spec.worker');
-	const isPrefillDecodeLeaderWorkerSet =
-		lodash.has(object, 'spec.template') &&
-		lodash.has(object, 'spec.prefill') &&
-		lodash.has(object, 'spec.worker');
-
 	// Steps Manager (2 steps: GPU selector + YAML review)
 	const steps = Array.from({ length: 2 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
@@ -159,9 +145,21 @@
 		<Tabs.Root value={currentStep}>
 			<!-- Step 1: GPU Selector -->
 			<Tabs.Content value={steps[0]}>
-				{#await fetchAllGpuNodes(resourceClient, cluster)}
+				{#await fetchAllGpuNodes(resourceClient, 'cluster-4090')}
 					Loading
 				{:then allGPUNodes}
+					{@const isSingleNode =
+						lodash.has(object, 'spec.template') &&
+						!lodash.has(object, 'spec.prefill') &&
+						!lodash.has(object, 'spec.worker')}
+					{@const isPrefillDecodeReplica =
+						lodash.has(object, 'spec.template') &&
+						lodash.has(object, 'spec.prefill') &&
+						!lodash.has(object, 'spec.worker')}
+					{@const isPrefillDecodeLeaderWorkerSet =
+						lodash.has(object, 'spec.template') &&
+						lodash.has(object, 'spec.prefill') &&
+						lodash.has(object, 'spec.worker')}
 					{@const allGPUDevices = getAllGPUDevices(allGPUNodes)}
 					{@const allNodes = new Set(allGPUDevices.map((device) => device.node))}
 					{@const allTypes = new Set(allGPUDevices.map((device) => device.type))}
@@ -253,7 +251,11 @@
 								posthook: (form) => {
 									const formValue = getValueSnapshot(form);
 									// Restore original spec.template from object, then apply GPU overrides on top
-									lodash.set(values, ['spec', 'template'], lodash.get(object, ['spec', 'template']));
+									lodash.set(
+										values,
+										['spec', 'template'],
+										lodash.get(object, ['spec', 'template'])
+									);
 
 									const nodes = lodash.get(formValue, 'node', []) as string[];
 									if (nodes.length > 0) {
@@ -358,18 +360,24 @@
 											itemTitle: () => null,
 											layouts: { 'array-items': { class: 'grid grid-cols-2 gap-3' } }
 										},
-										items: { 'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' } }
+										items: {
+											'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' }
+										}
 									},
 									node: {
 										'ui:options': {
 											itemTitle: () => null,
 											layouts: { 'array-items': { class: 'grid grid-cols-2 gap-3' } }
 										},
-										items: { 'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' } }
+										items: {
+											'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' }
+										}
 									},
 									uuid: {
 										'ui:options': { itemTitle: () => null },
-										items: { 'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' } }
+										items: {
+											'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' }
+										}
 									}
 								},
 								decode: {
@@ -378,18 +386,24 @@
 											itemTitle: () => null,
 											layouts: { 'array-items': { class: 'grid grid-cols-2 gap-3' } }
 										},
-										items: { 'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' } }
+										items: {
+											'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' }
+										}
 									},
 									node: {
 										'ui:options': {
 											itemTitle: () => null,
 											layouts: { 'array-items': { class: 'grid grid-cols-2 gap-3' } }
 										},
-										items: { 'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' } }
+										items: {
+											'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' }
+										}
 									},
 									uuid: {
 										'ui:options': { itemTitle: () => null },
-										items: { 'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' } }
+										items: {
+											'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' }
+										}
 									}
 								}
 							} as UiSchemaRoot}
@@ -397,7 +411,11 @@
 							handleSubmit={{
 								posthook: (form) => {
 									// Restore originals from object, then apply GPU overrides on top
-									lodash.set(values, ['spec', 'template'], lodash.get(object, ['spec', 'template']));
+									lodash.set(
+										values,
+										['spec', 'template'],
+										lodash.get(object, ['spec', 'template'])
+									);
 									lodash.set(values, ['spec', 'prefill'], lodash.get(object, ['spec', 'prefill']));
 
 									const formValue = getValueSnapshot(form);
@@ -431,7 +449,14 @@
 									if (prefillNodes.length > 0) {
 										lodash.set(
 											values,
-											['spec', 'prefill', 'template', 'spec', 'nodeSelector', 'kubernetes.io/hostname'],
+											[
+												'spec',
+												'prefill',
+												'template',
+												'spec',
+												'nodeSelector',
+												'kubernetes.io/hostname'
+											],
 											prefillNodes.join(',')
 										);
 									}
@@ -439,7 +464,14 @@
 									if (prefillTypes.length > 0) {
 										lodash.set(
 											values,
-											['spec', 'prefill', 'template', 'metadata', 'annotations', 'nvidia.com/use-gputype'],
+											[
+												'spec',
+												'prefill',
+												'template',
+												'metadata',
+												'annotations',
+												'nvidia.com/use-gputype'
+											],
 											prefillTypes.join(',')
 										);
 									}
@@ -447,7 +479,14 @@
 									if (prefillUUIDs.length > 0) {
 										lodash.set(
 											values,
-											['spec', 'prefill', 'template', 'metadata', 'annotations', 'nvidia.com/use-gpuuuid'],
+											[
+												'spec',
+												'prefill',
+												'template',
+												'metadata',
+												'annotations',
+												'nvidia.com/use-gpuuuid'
+											],
 											prefillUUIDs.join(',')
 										);
 									}
@@ -475,36 +514,84 @@
 										title: 'Prefill Leader',
 										type: 'object',
 										properties: {
-											type: { title: 'Type', type: 'array', items: { type: 'string', enum: [...allTypes] } },
-											node: { title: 'Node', type: 'array', items: { type: 'string', enum: [...allNodes] } },
-											uuid: { title: 'UUID', type: 'array', items: { type: 'string', enum: [...allUUIDs] } }
+											type: {
+												title: 'Type',
+												type: 'array',
+												items: { type: 'string', enum: [...allTypes] }
+											},
+											node: {
+												title: 'Node',
+												type: 'array',
+												items: { type: 'string', enum: [...allNodes] }
+											},
+											uuid: {
+												title: 'UUID',
+												type: 'array',
+												items: { type: 'string', enum: [...allUUIDs] }
+											}
 										}
 									},
 									prefillWorker: {
 										title: 'Prefill Worker',
 										type: 'object',
 										properties: {
-											type: { title: 'Type', type: 'array', items: { type: 'string', enum: [...allTypes] } },
-											node: { title: 'Node', type: 'array', items: { type: 'string', enum: [...allNodes] } },
-											uuid: { title: 'UUID', type: 'array', items: { type: 'string', enum: [...allUUIDs] } }
+											type: {
+												title: 'Type',
+												type: 'array',
+												items: { type: 'string', enum: [...allTypes] }
+											},
+											node: {
+												title: 'Node',
+												type: 'array',
+												items: { type: 'string', enum: [...allNodes] }
+											},
+											uuid: {
+												title: 'UUID',
+												type: 'array',
+												items: { type: 'string', enum: [...allUUIDs] }
+											}
 										}
 									},
 									decodeLeader: {
 										title: 'Decode Leader',
 										type: 'object',
 										properties: {
-											type: { title: 'Type', type: 'array', items: { type: 'string', enum: [...allTypes] } },
-											node: { title: 'Node', type: 'array', items: { type: 'string', enum: [...allNodes] } },
-											uuid: { title: 'UUID', type: 'array', items: { type: 'string', enum: [...allUUIDs] } }
+											type: {
+												title: 'Type',
+												type: 'array',
+												items: { type: 'string', enum: [...allTypes] }
+											},
+											node: {
+												title: 'Node',
+												type: 'array',
+												items: { type: 'string', enum: [...allNodes] }
+											},
+											uuid: {
+												title: 'UUID',
+												type: 'array',
+												items: { type: 'string', enum: [...allUUIDs] }
+											}
 										}
 									},
 									decodeWorker: {
 										title: 'Decode Worker',
 										type: 'object',
 										properties: {
-											type: { title: 'Type', type: 'array', items: { type: 'string', enum: [...allTypes] } },
-											node: { title: 'Node', type: 'array', items: { type: 'string', enum: [...allNodes] } },
-											uuid: { title: 'UUID', type: 'array', items: { type: 'string', enum: [...allUUIDs] } }
+											type: {
+												title: 'Type',
+												type: 'array',
+												items: { type: 'string', enum: [...allTypes] }
+											},
+											node: {
+												title: 'Node',
+												type: 'array',
+												items: { type: 'string', enum: [...allNodes] }
+											},
+											uuid: {
+												title: 'UUID',
+												type: 'array',
+												items: { type: 'string', enum: [...allUUIDs] }
+											}
 										}
 									}
 								}
@@ -516,18 +603,24 @@
 											itemTitle: () => null,
 											layouts: { 'array-items': { class: 'grid grid-cols-2 gap-3' } }
 										},
-										items: { 'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' } }
+										items: {
+											'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' }
+										}
 									},
 									node: {
 										'ui:options': {
 											itemTitle: () => null,
 											layouts: { 'array-items': { class: 'grid grid-cols-2 gap-3' } }
 										},
-										items: { 'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' } }
+										items: {
+											'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' }
+										}
 									},
 									uuid: {
 										'ui:options': { itemTitle: () => null },
-										items: { 'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' } }
+										items: {
+											'ui:components': { stringField: 'enumField', selectWidget: 'comboboxWidget' }
+										}
 									}
 								});
 								return {
@@ -542,66 +635,208 @@
 							handleSubmit={{
 								posthook: (form) => {
 									// Restore originals from object, then apply GPU overrides on top
-									lodash.set(values, ['spec', 'template'], lodash.get(object, ['spec', 'template']));
+									lodash.set(
+										values,
+										['spec', 'template'],
+										lodash.get(object, ['spec', 'template'])
+									);
 									lodash.set(values, ['spec', 'worker'], lodash.get(object, ['spec', 'worker']));
 									lodash.set(values, ['spec', 'prefill'], lodash.get(object, ['spec', 'prefill']));
 
 									const formValue = getValueSnapshot(form);
 
 									// decodeLeader → spec.template
-									const decodeLeaderNodes = lodash.get(formValue, 'decodeLeader.node', []) as string[];
+									const decodeLeaderNodes = lodash.get(
+										formValue,
+										'decodeLeader.node',
+										[]
+									) as string[];
 									if (decodeLeaderNodes.length > 0) {
-										lodash.set(values, ['spec', 'template', 'spec', 'nodeSelector', 'kubernetes.io/hostname'], decodeLeaderNodes.join(','));
+										lodash.set(
+											values,
+											['spec', 'template', 'spec', 'nodeSelector', 'kubernetes.io/hostname'],
+											decodeLeaderNodes.join(',')
+										);
 									}
-									const decodeLeaderTypes = lodash.get(formValue, 'decodeLeader.type', []) as string[];
+									const decodeLeaderTypes = lodash.get(
+										formValue,
+										'decodeLeader.type',
+										[]
+									) as string[];
 									if (decodeLeaderTypes.length > 0) {
-										lodash.set(values, ['spec', 'template', 'metadata', 'annotations', 'nvidia.com/use-gputype'], decodeLeaderTypes.join(','));
+										lodash.set(
+											values,
+											['spec', 'template', 'metadata', 'annotations', 'nvidia.com/use-gputype'],
+											decodeLeaderTypes.join(',')
+										);
 									}
-									const decodeLeaderUUIDs = lodash.get(formValue, 'decodeLeader.uuid', []) as string[];
+									const decodeLeaderUUIDs = lodash.get(
+										formValue,
+										'decodeLeader.uuid',
+										[]
+									) as string[];
 									if (decodeLeaderUUIDs.length > 0) {
-										lodash.set(values, ['spec', 'template', 'metadata', 'annotations', 'nvidia.com/use-gpuuuid'], decodeLeaderUUIDs.join(','));
+										lodash.set(
+											values,
+											['spec', 'template', 'metadata', 'annotations', 'nvidia.com/use-gpuuuid'],
+											decodeLeaderUUIDs.join(',')
+										);
 									}
 
 									// decodeWorker → spec.worker
-									const decodeWorkerNodes = lodash.get(formValue, 'decodeWorker.node', []) as string[];
+									const decodeWorkerNodes = lodash.get(
+										formValue,
+										'decodeWorker.node',
+										[]
+									) as string[];
 									if (decodeWorkerNodes.length > 0) {
-										lodash.set(values, ['spec', 'worker', 'spec', 'nodeSelector', 'kubernetes.io/hostname'], decodeWorkerNodes.join(','));
+										lodash.set(
+											values,
+											['spec', 'worker', 'spec', 'nodeSelector', 'kubernetes.io/hostname'],
+											decodeWorkerNodes.join(',')
+										);
 									}
-									const decodeWorkerTypes = lodash.get(formValue, 'decodeWorker.type', []) as string[];
+									const decodeWorkerTypes = lodash.get(
+										formValue,
+										'decodeWorker.type',
+										[]
+									) as string[];
 									if (decodeWorkerTypes.length > 0) {
-										lodash.set(values, ['spec', 'worker', 'metadata', 'annotations', 'nvidia.com/use-gputype'], decodeWorkerTypes.join(','));
+										lodash.set(
+											values,
+											['spec', 'worker', 'metadata', 'annotations', 'nvidia.com/use-gputype'],
+											decodeWorkerTypes.join(',')
+										);
 									}
-									const decodeWorkerUUIDs = lodash.get(formValue, 'decodeWorker.uuid', []) as string[];
+									const decodeWorkerUUIDs = lodash.get(
+										formValue,
+										'decodeWorker.uuid',
+										[]
+									) as string[];
 									if (decodeWorkerUUIDs.length > 0) {
-										lodash.set(values, ['spec', 'worker', 'metadata', 'annotations', 'nvidia.com/use-gpuuuid'], decodeWorkerUUIDs.join(','));
+										lodash.set(
+											values,
+											['spec', 'worker', 'metadata', 'annotations', 'nvidia.com/use-gpuuuid'],
+											decodeWorkerUUIDs.join(',')
+										);
 									}
 
 									// prefillLeader → spec.prefill.template
-									const prefillLeaderNodes = lodash.get(formValue, 'prefillLeader.node', []) as string[];
+									const prefillLeaderNodes = lodash.get(
+										formValue,
+										'prefillLeader.node',
+										[]
+									) as string[];
 									if (prefillLeaderNodes.length > 0) {
-										lodash.set(values, ['spec', 'prefill', 'template', 'spec', 'nodeSelector', 'kubernetes.io/hostname'], prefillLeaderNodes.join(','));
+										lodash.set(
+											values,
+											[
+												'spec',
+												'prefill',
+												'template',
+												'spec',
+												'nodeSelector',
+												'kubernetes.io/hostname'
+											],
+											prefillLeaderNodes.join(',')
+										);
 									}
-									const prefillLeaderTypes = lodash.get(formValue, 'prefillLeader.type', []) as string[];
+									const prefillLeaderTypes = lodash.get(
+										formValue,
+										'prefillLeader.type',
+										[]
+									) as string[];
 									if (prefillLeaderTypes.length > 0) {
-										lodash.set(values, ['spec', 'prefill', 'template', 'metadata', 'annotations', 'nvidia.com/use-gputype'], prefillLeaderTypes.join(','));
+										lodash.set(
+											values,
+											[
+												'spec',
+												'prefill',
+												'template',
+												'metadata',
+												'annotations',
+												'nvidia.com/use-gputype'
+											],
+											prefillLeaderTypes.join(',')
+										);
 									}
-									const prefillLeaderUUIDs = lodash.get(formValue, 'prefillLeader.uuid', []) as string[];
+									const prefillLeaderUUIDs = lodash.get(
+										formValue,
+										'prefillLeader.uuid',
+										[]
+									) as string[];
 									if (prefillLeaderUUIDs.length > 0) {
-										lodash.set(values, ['spec', 'prefill', 'template', 'metadata', 'annotations', 'nvidia.com/use-gpuuuid'], prefillLeaderUUIDs.join(','));
+										lodash.set(
+											values,
+											[
+												'spec',
+												'prefill',
+												'template',
+												'metadata',
+												'annotations',
+												'nvidia.com/use-gpuuuid'
+											],
+											prefillLeaderUUIDs.join(',')
+										);
 									}
 
 									// prefillWorker → spec.prefill.worker
-									const prefillWorkerNodes = lodash.get(formValue, 'prefillWorker.node', []) as string[];
+									const prefillWorkerNodes = lodash.get(
+										formValue,
+										'prefillWorker.node',
+										[]
+									) as string[];
 									if (prefillWorkerNodes.length > 0) {
-										lodash.set(values, ['spec', 'prefill', 'worker', 'spec', 'nodeSelector', 'kubernetes.io/hostname'], prefillWorkerNodes.join(','));
+										lodash.set(
+											values,
+											[
+												'spec',
+												'prefill',
+												'worker',
+												'spec',
+												'nodeSelector',
+												'kubernetes.io/hostname'
+											],
+											prefillWorkerNodes.join(',')
+										);
 									}
-									const prefillWorkerTypes = lodash.get(formValue, 'prefillWorker.type', []) as string[];
+									const prefillWorkerTypes = lodash.get(
+										formValue,
+										'prefillWorker.type',
+										[]
+									) as string[];
 									if (prefillWorkerTypes.length > 0) {
-										lodash.set(values, ['spec', 'prefill', 'worker', 'metadata', 'annotations', 'nvidia.com/use-gputype'], prefillWorkerTypes.join(','));
+										lodash.set(
+											values,
+											[
+												'spec',
+												'prefill',
+												'worker',
+												'metadata',
+												'annotations',
+												'nvidia.com/use-gputype'
+											],
+											prefillWorkerTypes.join(',')
+										);
 									}
-									const prefillWorkerUUIDs = lodash.get(formValue, 'prefillWorker.uuid', []) as string[];
+									const prefillWorkerUUIDs = lodash.get(
+										formValue,
+										'prefillWorker.uuid',
+										[]
+									) as string[];
 									if (prefillWorkerUUIDs.length > 0) {
-										lodash.set(values, ['spec', 'prefill', 'worker', 'metadata', 'annotations', 'nvidia.com/use-gpuuuid'], prefillWorkerUUIDs.join(','));
+										lodash.set(
+											values,
+											[
+												'spec',
+												'prefill',
+												'worker',
+												'metadata',
+												'annotations',
+												'nvidia.com/use-gpuuuid'
+											],
+											prefillWorkerUUIDs.join(',')
+										);
 									}
 
 									handleNext();
