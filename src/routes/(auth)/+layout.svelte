@@ -187,12 +187,22 @@
 				isActive: true,
 				items: [
 					{
-						title: m.model(),
-						url: resourceUrl('model.otterscale.io', 'v1alpha1', 'ModelService', 'modelservices')
+						title: m.model_service(),
+						url: resourceUrl(
+							'serving.kserve.io',
+							'v1alpha2',
+							'LLMInferenceService',
+							'llminferenceservices'
+						)
 					},
 					{
-						title: m.artifact(),
-						url: resourceUrl('model.otterscale.io', 'v1alpha1', 'ModelArtifact', 'modelartifacts')
+						title: m.model_template(),
+						url: resourceUrl(
+							'serving.kserve.io',
+							'v1alpha2',
+							'LLMInferenceServiceConfig',
+							'llminferenceserviceconfigs'
+						)
 					}
 				]
 			},
@@ -289,6 +299,15 @@
 								{
 									title: m.workspace(),
 									url: resourceUrl('tenant.otterscale.io', 'v1alpha1', 'Workspace', 'workspaces')
+								},
+								{
+									title: m.model_cache(),
+									url: resourceUrl(
+										'serving.kserve.io',
+										'v1alpha1',
+										'LocalModelCache',
+										'localmodelcaches'
+									)
 								},
 								{
 									title: m.module(),

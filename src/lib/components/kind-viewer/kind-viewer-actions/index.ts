@@ -19,6 +19,10 @@ import HelmRepositoryCreate from './helm-repository/create.svelte';
 import InstanceTypeActions from './instance-type/actions.svelte';
 import InstanceTypeCreate from './instance-type/create.svelte';
 import JobActions from './job/actions.svelte';
+import LLMInferenceServiceActions from './llm-inference-service/actions.svelte';
+import LLMInferenceServiceCreate from './llm-inference-service/create.svelte';
+import LLMInferenceServiceConfigActions from './llm-inference-service-config/actions.svelte';
+import LocalModelCacheCreate from './local-model-cache/create.svelte';
 import ModelArtifactActions from './model-artifact/actions.svelte';
 import ModelArtifactCreate from './model-artifact/create.svelte';
 import ModelServiceActions from './model-service/actions.svelte';
@@ -67,30 +71,34 @@ function getCreate(kind: string): CreateType {
 	switch (kind) {
 		case 'Application':
 			return ApplicationCreate as CreateType;
-		case 'HelmRepository':
-			return HelmRepositoryCreate as CreateType;
 		case 'ClusterRoleBinding':
 			return ClusterRoleBindingCreate as CreateType;
-		case 'ModelService':
-			return ModelServiceCreate as CreateType;
-		case 'ModelArtifact':
-			return ModelArtifactCreate as CreateType;
-		case 'Workspace':
-			return WorkspaceCreate as CreateType;
-		case 'VirtualMachine':
-			return VirtualMachineCreate as CreateType;
 		case 'DataVolume':
 			return DataVolumeCreate as CreateType;
-		case 'VirtualMachineInstancetype':
-			return InstanceTypeCreate as CreateType;
-		case 'ObjectBucketClaim':
-			return ObjectBucketClaimCreate as CreateType;
+		case 'HelmRepository':
+			return HelmRepositoryCreate as CreateType;
+		case 'LLMInferenceService':
+			return LLMInferenceServiceCreate as CreateType;
+		case 'LocalModelCache':
+			return LocalModelCacheCreate as CreateType;
+		case 'ModelArtifact':
+			return ModelArtifactCreate as CreateType;
+		case 'ModelService':
+			return ModelServiceCreate as CreateType;
 		case 'Node':
 			return NodeCreate as CreateType;
-		case 'Task':
-			return TaskCreate as CreateType;
+		case 'ObjectBucketClaim':
+			return ObjectBucketClaimCreate as CreateType;
 		case 'Schedule':
 			return ScheduleCreate as CreateType;
+		case 'Task':
+			return TaskCreate as CreateType;
+		case 'VirtualMachine':
+			return VirtualMachineCreate as CreateType;
+		case 'VirtualMachineInstancetype':
+			return InstanceTypeCreate as CreateType;
+		case 'Workspace':
+			return WorkspaceCreate as CreateType;
 		default:
 			return DefaultCreate as CreateType;
 	}
@@ -102,44 +110,48 @@ function getActions(kind: string): ActionsType {
 			return ApplicationActions as ActionsType;
 		case 'ClusterRoleBinding':
 			return ClusterRoleBindingActions as ActionsType;
-		case 'Pod':
-			return PodActions as ActionsType;
-		case 'Deployment':
-			return DeploymentActions as ActionsType;
-		case 'StatefulSet':
-			return StatefulSetActions as ActionsType;
-		case 'DaemonSet':
-			return DaemonSetActions as ActionsType;
-		case 'Job':
-			return JobActions as ActionsType;
 		case 'CronJob':
 			return CronJobActions as ActionsType;
+		case 'DaemonSet':
+			return DaemonSetActions as ActionsType;
+		case 'DataVolume':
+			return DataVolumeActions as ActionsType;
+		case 'Deployment':
+			return DeploymentActions as ActionsType;
 		case 'HelmRelease':
 			return HelmReleaseActions as CreateType;
 		case 'HelmRepository':
 			return HelmRepositoryActions as ActionsType;
+		case 'Job':
+			return JobActions as ActionsType;
+		case 'LLMInferenceService':
+			return LLMInferenceServiceActions as ActionsType;
+		case 'LLMInferenceServiceConfig':
+			return LLMInferenceServiceConfigActions as ActionsType;
+		case 'ModelArtifact':
+			return ModelArtifactActions as ActionsType;
 		case 'ModelService':
 			return ModelServiceActions as ActionsType;
 		case 'Node':
 			return NodeActions as ActionsType;
-		case 'ModelArtifact':
-			return ModelArtifactActions as ActionsType;
-		case 'ResourceQuota':
-			return ResourceQuotaActions as ActionsType;
-		case 'Workspace':
-			return WorkspaceActions as ActionsType;
-		case 'VirtualMachine':
-			return VirtualMachineActions as ActionsType;
-		case 'DataVolume':
-			return DataVolumeActions as ActionsType;
-		case 'VirtualMachineInstancetype':
-			return InstanceTypeActions as ActionsType;
 		case 'ObjectBucketClaim':
 			return ObjectBucketClaimActions as ActionsType;
-		case 'Task':
-			return TaskActions as ActionsType;
+		case 'Pod':
+			return PodActions as ActionsType;
+		case 'ResourceQuota':
+			return ResourceQuotaActions as ActionsType;
 		case 'Schedule':
 			return ScheduleActions as ActionsType;
+		case 'StatefulSet':
+			return StatefulSetActions as ActionsType;
+		case 'Task':
+			return TaskActions as ActionsType;
+		case 'VirtualMachine':
+			return VirtualMachineActions as ActionsType;
+		case 'VirtualMachineInstancetype':
+			return InstanceTypeActions as ActionsType;
+		case 'Workspace':
+			return WorkspaceActions as ActionsType;
 		default:
 			return DefaultActions as ActionsType;
 	}

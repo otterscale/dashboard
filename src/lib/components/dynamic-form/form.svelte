@@ -47,6 +47,7 @@
 		handleSubmit,
 		actions,
 		values = $bindable(),
+		onFormChange,
 		class: className
 	}: {
 		schema: Schema;
@@ -59,6 +60,7 @@
 		};
 		actions?: Snippet;
 		values?: FormValue;
+		onFormChange?: (snapshot: FormState<FormValue>) => void;
 		class?: string;
 	} = $props();
 	// Clean schema from unnecessary keywords to JSON Schema Draft-07.
@@ -196,6 +198,12 @@
 		}
 	}
 	setFormContext(form);
+
+	if (onFormChange) {
+		$effect(() => {
+			onFormChange(form);
+		});
+	}
 </script>
 
 <div class={cn('h-full', className)}>
