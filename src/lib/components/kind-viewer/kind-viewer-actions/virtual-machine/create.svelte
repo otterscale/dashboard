@@ -441,20 +441,6 @@
 		}
 	}
 
-	// Get maximum GPU count for the selected resource
-	function getMaxGpuCount(): number {
-		if (
-			!gpuPassthroughConfig.selectedResource ||
-			typeof gpuPassthroughConfig.selectedResource !== 'string' ||
-			gpuPassthroughConfig.selectedResource === ''
-		) {
-			return 0;
-		}
-
-		const quantity = gpuResourceQuantities.get(gpuPassthroughConfig.selectedResource);
-		return quantity ? Math.max(1, quantity) : 1;
-	}
-
 	// Fetch nodes for dropdown
 	async function fetchNodesAsEnumerations(
 		search: string
@@ -483,13 +469,22 @@
 	// Container for GPU passthrough selection
 	let gpuPassthroughConfig: any = $state({
 		selectedResource: '',
-		gpuCount: '1'
+		gpuCount: ''
 	});
 
 	// Container for Node selection
 	let nodeSelector: any = $state({
 		node: ''
 	});
+
+	// Derived maximum GPU count for the selected resource — reactive to quantity cache updates
+	const maxGpuCount = $derived(
+		gpuPassthroughConfig.selectedResource &&
+		typeof gpuPassthroughConfig.selectedResource === 'string' &&
+		gpuPassthroughConfig.selectedResource !== ''
+			? Math.max(1, gpuResourceQuantities.get(gpuPassthroughConfig.selectedResource) ?? 1)
+			: 0
+	);
 
 	// Load available GPU resources when dialog opens
 	$effect(() => {
@@ -500,22 +495,13 @@
 		}
 	});
 
-	// Update GPU count when selected resource changes
+	// Update GPU resource quantities cache when selected resource or node changes
 	$effect(() => {
 		if (gpuPassthroughConfig.selectedResource && gpuPassthroughConfig.selectedResource !== '') {
-			// Fetch GPU resources for node to update quantities cache
+			// If a node is selected, refresh its per-node quantities into the cache
 			if (nodeSelector.node && nodeSelector.node !== '') {
-				fetchGpuResourcesForNode(nodeSelector.node).then(() => {
-					// Reset GPU count to 1 when resource changes
-					gpuPassthroughConfig.gpuCount = '1';
-				});
-			} else {
-				// If no node selected, we already have quantities from allAvailableGpuResources fetch
-				gpuPassthroughConfig.gpuCount = '1';
+				fetchGpuResourcesForNode(nodeSelector.node);
 			}
-		} else {
-			// Clear GPU count if no resource selected
-			gpuPassthroughConfig.gpuCount = '1';
 		}
 	});
 
@@ -956,6 +942,7 @@
 			</Tabs.Content>
 			<!-- Step 7: GPU Passthrough -->
 			<Tabs.Content value={steps[6]}>
+				{#key gpuPassthroughConfig.selectedResource}
 				<Form
 					schema={{
 						type: 'object',
@@ -980,7 +967,7 @@
 											gpuCount: {
 												type: 'string',
 												title: 'Number of GPUs',
-												enum: Array.from({ length: Math.max(1, getMaxGpuCount()) }, (_, i) =>
+												enum: Array.from({ length: maxGpuCount }, (_, i) =>
 													String(i + 1)
 												)
 											}
@@ -1018,7 +1005,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{ selectedResource: '', gpuCount: '1' } as FormValue}
+					initialValue={{ selectedResource: gpuPassthroughConfig.selectedResource, gpuCount: '' } as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
@@ -1039,6 +1026,7 @@
 						</div>
 					{/snippet}
 				</Form>
+				{/key}
 			</Tabs.Content>
 			<!-- Step 8: Cloud-Init -->
 			<Tabs.Content value={steps[7]}>
