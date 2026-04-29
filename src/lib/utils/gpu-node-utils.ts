@@ -69,12 +69,7 @@ export async function fetchAllGpuResources(
 		for (const nodeItem of nodes) {
 			const allocatable = (nodeItem.object as any)?.status?.allocatable ?? {};
 			Object.keys(allocatable).forEach((resourceKey) => {
-				if (
-					resourceKey.startsWith('nvidia.com/') &&
-					!resourceKey.endsWith('vgpu') &&
-					!resourceKey.includes('/vgpu') &&
-					parseInt(allocatable[resourceKey]) > 0
-				) {
+				if (resourceKey.startsWith('nvidia.com/') && parseInt(allocatable[resourceKey]) > 0) {
 					gpuResources.add(resourceKey);
 					const quantity = parseInt(allocatable[resourceKey]) || 0;
 					const currentMax = quantities.get(resourceKey) || 0;
@@ -122,12 +117,7 @@ export async function fetchGpuResourcesForNode(
 		const quantities = new Map<string, number>();
 
 		Object.keys(allocatable).forEach((resourceKey) => {
-			if (
-				resourceKey.startsWith('nvidia.com/') &&
-				!resourceKey.endsWith('vgpu') &&
-				!resourceKey.includes('/vgpu') &&
-				parseInt(allocatable[resourceKey]) > 0
-			) {
+			if (resourceKey.startsWith('nvidia.com/') && parseInt(allocatable[resourceKey]) > 0) {
 				gpuResources.push(resourceKey);
 				quantities.set(resourceKey, parseInt(allocatable[resourceKey]) || 0);
 			}
