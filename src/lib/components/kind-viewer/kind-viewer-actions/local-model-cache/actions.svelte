@@ -56,7 +56,7 @@
 			>
 				<Describe {cluster} {group} {version} {resource} {object} />
 			</DropdownMenu.Item>
-			<DropdownMenu.Item
+			<!-- <DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
@@ -73,7 +73,7 @@
 						actionsOpen = false;
 					}}
 				/>
-			</DropdownMenu.Item>
+			</DropdownMenu.Item> -->
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
