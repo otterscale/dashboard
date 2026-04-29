@@ -43,6 +43,7 @@
 	import { Separator } from '$lib/components/ui/separator';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
 	import { breadcrumbs } from '$lib/stores';
 
@@ -528,54 +529,88 @@
 				</Breadcrumb.Root>
 			</div>
 			<div class="flex items-center gap-2 px-4">
-				<Button variant="ghost" size="icon" class="size-7" onclick={() => (aboutOpen = true)}>
-					<InfoIcon />
-					<span class="sr-only">About</span>
-				</Button>
-				<Button variant="ghost" size="icon" class="size-7" onclick={startTour}>
-					<CircleQuestionMarkIcon />
-					<span class="sr-only">Guide Tour</span>
-				</Button>
-				<DropdownMenu.Root>
-					<DropdownMenu.Trigger>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
 						{#snippet child({ props })}
-							<Button {...props} id="cluster-guide-step" variant="ghost" size="icon" class="size-7">
-								<LayersIcon />
-								<span class="sr-only">Toggle Clusters</span>
+							<Button
+								{...props}
+								variant="ghost"
+								size="icon"
+								class="size-7"
+								onclick={() => (aboutOpen = true)}
+							>
+								<InfoIcon />
+								<span class="sr-only">About</span>
 							</Button>
-							{#if !activeCluster}
-								<span class="absolute top-3.5 right-3.5 flex size-2.5 transition-all">
-									<span
-										class="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"
-									></span>
-									<span class="relative inline-flex size-2.5 rounded-full bg-blue-500"></span>
-								</span>
-							{/if}
 						{/snippet}
-					</DropdownMenu.Trigger>
-					<DropdownMenu.Content class="w-40" align="end">
-						<DropdownMenu.Group>
-							<DropdownMenu.Label>{m.cluster()}</DropdownMenu.Label>
-							{#if links.length > 0}
-								<DropdownMenu.Separator />
-								<DropdownMenu.RadioGroup bind:value={activeCluster} onValueChange={onClusterChange}>
-									{#each links as link, index (index)}
-										<DropdownMenu.RadioItem value={link.cluster}
-											>{link.cluster}</DropdownMenu.RadioItem
-										>
-									{/each}
-								</DropdownMenu.RadioGroup>
-							{/if}
-							{#if data.user.roles.includes('admin')}
-								<DropdownMenu.Separator />
-								<DropdownMenu.Item onclick={() => (importOpen = true)}>
-									<PlusIcon class="mr-2 size-4" />
-									{m.add_cluster()}
-								</DropdownMenu.Item>
-							{/if}
-						</DropdownMenu.Group>
-					</DropdownMenu.Content>
-				</DropdownMenu.Root>
+					</Tooltip.Trigger>
+					<Tooltip.Content>About OtterScale</Tooltip.Content>
+				</Tooltip.Root>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<Button {...props} variant="ghost" size="icon" class="size-7" onclick={startTour}>
+								<CircleQuestionMarkIcon />
+								<span class="sr-only">Guide Tour</span>
+							</Button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content>Start Guide Tour</Tooltip.Content>
+				</Tooltip.Root>
+				<Tooltip.Root>
+					<DropdownMenu.Root>
+						<Tooltip.Trigger>
+							<DropdownMenu.Trigger>
+								{#snippet child({ props })}
+									<Button
+										{...props}
+										id="cluster-guide-step"
+										variant="ghost"
+										size="icon"
+										class="size-7"
+									>
+										<LayersIcon />
+										<span class="sr-only">Toggle Clusters</span>
+									</Button>
+									{#if !activeCluster}
+										<span class="absolute top-3.5 right-3.5 flex size-2.5 transition-all">
+											<span
+												class="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"
+											></span>
+											<span class="relative inline-flex size-2.5 rounded-full bg-blue-500"></span>
+										</span>
+									{/if}
+								{/snippet}
+							</DropdownMenu.Trigger>
+						</Tooltip.Trigger>
+						<DropdownMenu.Content class="w-40" align="end">
+							<DropdownMenu.Group>
+								<DropdownMenu.Label>{m.cluster()}</DropdownMenu.Label>
+								{#if links.length > 0}
+									<DropdownMenu.Separator />
+									<DropdownMenu.RadioGroup
+										bind:value={activeCluster}
+										onValueChange={onClusterChange}
+									>
+										{#each links as link, index (index)}
+											<DropdownMenu.RadioItem value={link.cluster}
+												>{link.cluster}</DropdownMenu.RadioItem
+											>
+										{/each}
+									</DropdownMenu.RadioGroup>
+								{/if}
+								{#if data.user.roles.includes('admin')}
+									<DropdownMenu.Separator />
+									<DropdownMenu.Item onclick={() => (importOpen = true)}>
+										<PlusIcon class="mr-2 size-4" />
+										{m.add_cluster()}
+									</DropdownMenu.Item>
+								{/if}
+							</DropdownMenu.Group>
+						</DropdownMenu.Content>
+					</DropdownMenu.Root>
+					<Tooltip.Content>Switch Cluster</Tooltip.Content>
+				</Tooltip.Root>
 				<DialogImportCluster
 					bind:open={importOpen}
 					onsuccess={async () => {

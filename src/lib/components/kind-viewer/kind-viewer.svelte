@@ -21,6 +21,7 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import { Toggle } from '$lib/components/ui/toggle';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	import type { DataSchemaType, UISchemaType } from '../dynamic-table/utils';
 	import type { ActionsType, CreateType } from './kind-viewer-actions';
@@ -291,18 +292,26 @@
 		<DynamicTable {dataset} {columnDefinitions} {uiSchemas}>
 			{#snippet accessReview()}
 				{#if isClusterAdmin}
-					<Toggle
-						bind:pressed={clustered}
-						onPressedChange={(pressed) => {
-							clustered = pressed;
-							resetAndReload();
-						}}
-						aria-label="switch clustered"
-						variant="outline"
-						class="data-[state=on]:*:text-destructive"
-					>
-						<UsersRoundIcon class="size-4" />
-					</Toggle>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Toggle
+									{...props}
+									bind:pressed={clustered}
+									onPressedChange={(pressed) => {
+										clustered = pressed;
+										resetAndReload();
+									}}
+									aria-label="switch clustered"
+									variant="outline"
+									class="data-[state=on]:*:text-destructive"
+								>
+									<UsersRoundIcon class="size-4" />
+								</Toggle>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>Toggle Cluster-wide View</Tooltip.Content>
+					</Tooltip.Root>
 				{/if}
 			{/snippet}
 			{#snippet create()}
@@ -318,13 +327,20 @@
 				/>
 			{/snippet}
 			{#snippet reload()}
-				<Button onclick={handleReload} variant="outline" size="icon">
-					{#if isWatching}
-						<CableIcon class="size-4" />
-					{:else}
-						<UnplugIcon class="size-4 text-destructive" />
-					{/if}
-				</Button>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<Button {...props} onclick={handleReload} variant="outline" size="icon">
+								{#if isWatching}
+									<CableIcon class="size-4" />
+								{:else}
+									<UnplugIcon class="size-4 text-destructive" />
+								{/if}
+							</Button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content>{isWatching ? 'Watching' : 'Reconnect'}</Tooltip.Content>
+				</Tooltip.Root>
 			{/snippet}
 			{#snippet rowActions({ row })}
 				<Actions

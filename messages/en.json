@@ -363,5 +363,10 @@
 	"import_cluster_managed_ready_suffix": " is now managed and ready to use.",
 	"import_cluster_managed": "Managed",
 	"import_cluster_permissions": "Permissions",
-	"import_cluster_admin_count": "{count} cluster-admin"
+	"import_cluster_admin_count": "{count} cluster-admin",
+	"all_vms": "All VMs",
+	"vcpu": "vCPU",
+	"domain": "Domain",
+	"resident": "Resident",
+	"available": "Available"
 }
