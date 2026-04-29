@@ -25,6 +25,7 @@
 	import { getChartData, type ModuleAttribute } from '$lib/components/module-viewer/table-layout';
 	import type { ModuleType } from '$lib/components/module-viewer/types';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
 	import { breadcrumbs } from '$lib/stores';
 
@@ -326,13 +327,22 @@
 	<main class="pb-8">
 		<ModuleViewer {cluster} {namespace} {data} {fromHarbor}>
 			{#snippet reload()}
-				<Button onclick={handleReload} variant="outline" size="icon">
-					{#if isWatching}
-						<CableIcon class="size-4" />
-					{:else}
-						<UnplugIcon class="size-4 text-destructive" />
-					{/if}
-				</Button>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<Button {...props} onclick={handleReload} variant="outline" size="icon">
+								{#if isWatching}
+									<CableIcon class="size-4" />
+								{:else}
+									<UnplugIcon class="size-4 text-destructive" />
+								{/if}
+							</Button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content>
+						<p>{isWatching ? 'Watching' : 'Reconnect'}</p>
+					</Tooltip.Content>
+				</Tooltip.Root>
 			{/snippet}
 		</ModuleViewer>
 	</main>

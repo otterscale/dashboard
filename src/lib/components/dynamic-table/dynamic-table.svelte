@@ -53,6 +53,7 @@
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
 	import * as Sheet from '$lib/components/ui/sheet';
 	import * as Table from '$lib/components/ui/table';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { cn } from '$lib/utils';
 
 	import type { UISchemaType } from './utils';
@@ -356,48 +357,71 @@
 	<div class="flex w-full items-center gap-2">
 		<!-- Filters -->
 		<ButtonGroup.Root>
-			<Button
-				variant={mode === 'table' ? 'secondary' : 'outline'}
-				size="icon"
-				onclick={() => (mode = 'table')}
-				aria-pressed={mode === 'table'}
-			>
-				<SheetIcon />
-			</Button>
-			<Button
-				disabled={!gridsLayout}
-				variant={mode === 'grid' ? 'secondary' : 'outline'}
-				size="icon"
-				onclick={() => (mode = 'grid')}
-				aria-pressed={mode === 'grid'}
-			>
-				<LayoutGridIcon />
-			</Button>
+			<Tooltip.Root>
+				<Tooltip.Trigger>
+					{#snippet child({ props })}
+						<Button
+							{...props}
+							variant={mode === 'table' ? 'secondary' : 'outline'}
+							size="icon"
+							onclick={() => (mode = 'table')}
+							aria-pressed={mode === 'table'}
+						>
+							<SheetIcon />
+						</Button>
+					{/snippet}
+				</Tooltip.Trigger>
+				<Tooltip.Content>Table View</Tooltip.Content>
+			</Tooltip.Root>
+			<Tooltip.Root>
+				<Tooltip.Trigger>
+					{#snippet child({ props })}
+						<Button
+							{...props}
+							disabled={!gridsLayout}
+							variant={mode === 'grid' ? 'secondary' : 'outline'}
+							size="icon"
+							onclick={() => (mode = 'grid')}
+							aria-pressed={mode === 'grid'}
+						>
+							<LayoutGridIcon />
+						</Button>
+					{/snippet}
+				</Tooltip.Trigger>
+				<Tooltip.Content>Grid View</Tooltip.Content>
+			</Tooltip.Root>
 		</ButtonGroup.Root>
-		<DropdownMenu.Root>
-			<DropdownMenu.Trigger disabled={mode === 'grid'}>
-				{#snippet child({ props })}
-					<Button variant="outline" size="icon" {...props}>
-						<Columns3Icon size={16} aria-hidden="true" />
-					</Button>
-				{/snippet}
-			</DropdownMenu.Trigger>
-			<DropdownMenu.Content align="start">
-				<DropdownMenu.Label>Toggle columns</DropdownMenu.Label>
-				{#each table.getAllColumns().filter((column) => column.getCanHide()) as column (column.id)}
-					<DropdownMenu.Item
-						class={column.getIsVisible()
-							? 'text-primary **:text-primary'
-							: 'text-muted-foreground/50 **:text-muted-foreground/50'}
-						closeOnSelect={false}
-						onSelect={() => column.toggleVisibility(!column.getIsVisible())}
-					>
-						<CheckIcon class={column.getIsVisible() ? 'visible' : 'invisible'} />
-						{column.id}
-					</DropdownMenu.Item>
-				{/each}
-			</DropdownMenu.Content>
-		</DropdownMenu.Root>
+		<Tooltip.Root>
+			<DropdownMenu.Root>
+				<Tooltip.Trigger>
+					<DropdownMenu.Trigger disabled={mode === 'grid'}>
+						{#snippet child({ props })}
+							<Button variant="outline" size="icon" {...props}>
+								<Columns3Icon size={16} aria-hidden="true" />
+							</Button>
+						{/snippet}
+					</DropdownMenu.Trigger>
+				</Tooltip.Trigger>
+				<DropdownMenu.Content align="start">
+					<DropdownMenu.Label>Toggle columns</DropdownMenu.Label>
+					{#each table
+						.getAllColumns()
+						.filter((column) => column.getCanHide()) as column (column.id)}
+						<DropdownMenu.Item
+							class={column.getIsVisible()
+								? 'text-primary **:text-primary'
+								: 'text-muted-foreground/50 **:text-muted-foreground/50'}
+							closeOnSelect={false}
+							onSelect={() => column.toggleVisibility(!column.getIsVisible())}
+						>
+							<CheckIcon class={column.getIsVisible() ? 'visible' : 'invisible'} />
+							{column.id}
+						</DropdownMenu.Item>
+					{/each}
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
+			<Tooltip.Content>Toggle Columns</Tooltip.Content>
+		</Tooltip.Root>
 		<ButtonGroup.Root class="w-full">
 			<InputGroup.Root>
 				<InputGroup.Addon>
@@ -423,86 +447,95 @@
 					</Kbd.Group>
 				</InputGroup.Addon>
 			</InputGroup.Root>
-			<Sheet.Root>
-				<Sheet.Trigger
-					aria-label="Document"
-					class={buttonVariants({ variant: 'outline', size: 'icon' })}
-				>
-					<BookIcon size={16} />
-				</Sheet.Trigger>
-				<Sheet.Content side="right" class="min-w-[23vw]">
-					<Sheet.Header>
-						<Sheet.Title>Filtrex Query Language Documentation</Sheet.Title>
-						<Sheet.Description>
-							Filtrex is a simple, safe, and powerful expression language for filtering and
-							searching data. You can use Filtrex queries in the search box to filter table rows
-							using custom logic.
-						</Sheet.Description>
-					</Sheet.Header>
-					<div class="overflow-auto p-4 text-sm">
-						<h3 class="font-semibold">Basic Syntax</h3>
-						<div class="p-4 font-mono">
-							<p>Field comparison: age &gt; 18</p>
-							<p>String matching: name == "Alice"</p>
-							<p>Logical operators: status == "active" and score &gt; 80</p>
-							<p>Field names with spaces: 'full name' == "Alice Smith"</p>
-						</div>
+			<Tooltip.Root>
+				<Tooltip.Trigger>
+					{#snippet child({ props })}
+						<Sheet.Root>
+							<Sheet.Trigger
+								{...props}
+								aria-label="Document"
+								class={buttonVariants({ variant: 'outline', size: 'icon' })}
+							>
+								<BookIcon size={16} />
+							</Sheet.Trigger>
+							<Sheet.Content side="right" class="min-w-[23vw]">
+								<Sheet.Header>
+									<Sheet.Title>Filtrex Query Language Documentation</Sheet.Title>
+									<Sheet.Description>
+										Filtrex is a simple, safe, and powerful expression language for filtering and
+										searching data. You can use Filtrex queries in the search box to filter table
+										rows using custom logic.
+									</Sheet.Description>
+								</Sheet.Header>
+								<div class="overflow-auto p-4 text-sm">
+									<h3 class="font-semibold">Basic Syntax</h3>
+									<div class="p-4 font-mono">
+										<p>Field comparison: age &gt; 18</p>
+										<p>String matching: name == "Alice"</p>
+										<p>Logical operators: status == "active" and score &gt; 80</p>
+										<p>Field names with spaces: 'full name' == "Alice Smith"</p>
+									</div>
 
-						<br />
+									<br />
 
-						<h3 class="font-semibold">Operators</h3>
-						<div class="p-4 font-mono">
-							<p>and, or, not</p>
-							<p>==, ~=, &gt;, &gt;=, &lt;, &lt;=</p>
-						</div>
+									<h3 class="font-semibold">Operators</h3>
+									<div class="p-4 font-mono">
+										<p>and, or, not</p>
+										<p>==, ~=, &gt;, &gt;=, &lt;, &lt;=</p>
+									</div>
 
-						<br />
+									<br />
 
-						<h3 class="font-semibold">Functions</h3>
-						<div class="p-4 font-mono">
-							<p>length(array) — Get array length</p>
-							<p>Time(date) — Convert date to timestamp</p>
-							<p>now() — Current timestamp</p>
-							<p>Seconds(n), Minutes(n), Hours(n), Days(n), Years(n)</p>
-						</div>
+									<h3 class="font-semibold">Functions</h3>
+									<div class="p-4 font-mono">
+										<p>length(array) — Get array length</p>
+										<p>Time(date) — Convert date to timestamp</p>
+										<p>now() — Current timestamp</p>
+										<p>Seconds(n), Minutes(n), Hours(n), Days(n), Years(n)</p>
+									</div>
 
-						<br />
+									<br />
 
-						<h3 class="font-semibold">Constants</h3>
-						<div class="p-4 font-mono">
-							<p>true, false</p>
-						</div>
+									<h3 class="font-semibold">Constants</h3>
+									<div class="p-4 font-mono">
+										<p>true, false</p>
+									</div>
 
-						<br />
+									<br />
 
-						<h3 class="font-semibold">Tips</h3>
-						<div class="p-4 font-mono">
-							<p>Use <kbd>ctrl</kbd> + <kbd>⏎</kbd> to search.</p>
-							<p>Press <kbd>/</kbd> to focus the search box.</p>
-							<p>Press <kbd>esc</kbd> to clear the filter.</p>
-						</div>
+									<h3 class="font-semibold">Tips</h3>
+									<div class="p-4 font-mono">
+										<p>Use <kbd>ctrl</kbd> + <kbd>⏎</kbd> to search.</p>
+										<p>Press <kbd>/</kbd> to focus the search box.</p>
+										<p>Press <kbd>esc</kbd> to clear the filter.</p>
+									</div>
 
-						<br />
+									<br />
 
-						<h3 class="font-semibold">Note</h3>
-						<div class="text-warning p-4 font-mono">
-							<p>
-								Operations between quantities with units (e.g., <code>Mi</code>, <code>k</code>) are
-								<b>not supported yet</b>.
-							</p>
-						</div>
-					</div>
-					<Sheet.Footer>
-						<p class="mt-4 text-xs text-muted-foreground">
-							For advanced usage, refer to the <a
-								href="https://github.com/joewalnes/filtrex"
-								target="_blank"
-								class="underline">Filtrex documentation</a
-							>.
-						</p>
-					</Sheet.Footer>
-				</Sheet.Content>
-			</Sheet.Root>
+									<h3 class="font-semibold">Note</h3>
+									<div class="text-warning p-4 font-mono">
+										<p>
+											Operations between quantities with units (e.g., <code>Mi</code>,
+											<code>k</code>) are
+											<b>not supported yet</b>.
+										</p>
+									</div>
+								</div>
+								<Sheet.Footer>
+									<p class="mt-4 text-xs text-muted-foreground">
+										For advanced usage, refer to the <a
+											href="https://github.com/joewalnes/filtrex"
+											target="_blank"
+											class="underline">Filtrex documentation</a
+										>.
+									</p>
+								</Sheet.Footer>
+							</Sheet.Content>
+						</Sheet.Root>
+					{/snippet}
+				</Tooltip.Trigger>
+				<Tooltip.Content>Search Documentation</Tooltip.Content>
+			</Tooltip.Root>
 		</ButtonGroup.Root>
 		<!-- Accessors -->
 		<div class="ml-auto flex items-center gap-2">

@@ -26,6 +26,7 @@
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	import type { EditorType, ViewerType } from './viewers';
 	import { getEditor, getResourceViewer } from './viewers';
@@ -337,52 +338,59 @@
 				</Item.Content>
 				<Item.Actions>
 					{@const Editor: EditorType = getEditor(resource)}
-					<Sheet.Root>
-						<Sheet.Trigger>
-							<Button variant="outline" size="icon-lg">
-								<File />
-							</Button>
-						</Sheet.Trigger>
-						<Sheet.Content
-							side="right"
-							class="flex h-full max-w-[62vw] min-w-[50vw] flex-col gap-0 overflow-y-auto p-4"
-						>
-							<Sheet.Header class="shruk-0 space-y-4">
-								<Sheet.Title>
-									{name}
-									<p class="text-muted-foreground">
-										{!group ? 'core' : group}/{version}/{kind}/{resource}
-									</p>
-								</Sheet.Title>
-								<Sheet.Description>
-									{schema?.description}
-								</Sheet.Description>
-							</Sheet.Header>
-							{#if object}
-								<Code.Root
-									code={stringify(object)}
-									lang="yaml"
-									class="no-shiki-limit m-4 border-none bg-muted"
-								/>
-							{:else}
-								<Empty.Root class="m-4 bg-muted/50">
-									<Empty.Header>
-										<Empty.Media variant="icon">
-											<Braces size={36} />
-										</Empty.Media>
-										<Empty.Title>No Data</Empty.Title>
-										<Empty.Description>
-											No data is currently available for this resource.
-											<br />
-											To populate this resource, please add properties or values through the resource
-											editor.
-										</Empty.Description>
-									</Empty.Header>
-									<Empty.Content></Empty.Content>
-								</Empty.Root>
-							{/if}
-						</Sheet.Content>
-					</Sheet.Root>
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Sheet.Root>
+									<Sheet.Trigger>
+										<Button {...props} variant="outline" size="icon-lg">
+											<File />
+										</Button>
+									</Sheet.Trigger>
+									<Sheet.Content
+										side="right"
+										class="flex h-full max-w-[62vw] min-w-[50vw] flex-col gap-0 overflow-y-auto p-4"
+									>
+										<Sheet.Header class="shruk-0 space-y-4">
+											<Sheet.Title>
+												{name}
+												<p class="text-muted-foreground">
+													{!group ? 'core' : group}/{version}/{kind}/{resource}
+												</p>
+											</Sheet.Title>
+											<Sheet.Description>
+												{schema?.description}
+											</Sheet.Description>
+										</Sheet.Header>
+										{#if object}
+											<Code.Root
+												code={stringify(object)}
+												lang="yaml"
+												class="no-shiki-limit m-4 border-none bg-muted"
+											/>
+										{:else}
+											<Empty.Root class="m-4 bg-muted/50">
+												<Empty.Header>
+													<Empty.Media variant="icon">
+														<Braces size={36} />
+													</Empty.Media>
+													<Empty.Title>No Data</Empty.Title>
+													<Empty.Description>
+														No data is currently available for this resource.
+														<br />
+														To populate this resource, please add properties or values through the resource
+														editor.
+													</Empty.Description>
+												</Empty.Header>
+												<Empty.Content></Empty.Content>
+											</Empty.Root>
+										{/if}
+									</Sheet.Content>
+								</Sheet.Root>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>View Resource</Tooltip.Content>
+					</Tooltip.Root>
 					{#if Editor}
 						<Editor
 							role={isClusterAdmin ? 'Cluster Admin' : undefined}

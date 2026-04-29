@@ -30,7 +30,8 @@
 
 	const endpointMap: Record<string, string> = {
 		ModelService: 'ModelGatewayEndpoint',
-		ObjectBucketClaim: 'ObjectGatewayEndpoint'
+		ObjectBucketClaim: 'ObjectGatewayEndpoint',
+		Service: 'ServiceEndpoint'
 	};
 
 	const isClusterAdmin = $derived(page.data.isClusterAdmin === true);

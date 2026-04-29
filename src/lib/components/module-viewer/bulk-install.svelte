@@ -21,6 +21,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	import type { ModuleAttribute } from './table-layout';
 	import { type ModuleType } from './types';
@@ -297,13 +298,18 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Trigger disabled={rows.length === 0}>
-		{#snippet child({ props })}
-			<Button variant="outline" {...props}>
-				<DownloadIcon size={16} />
-			</Button>
-		{/snippet}
-	</Dialog.Trigger>
+	<Tooltip.Root>
+		<Tooltip.Trigger>
+			<Dialog.Trigger disabled={rows.length === 0}>
+				{#snippet child({ props })}
+					<Button variant="outline" {...props}>
+						<DownloadIcon size={16} />
+					</Button>
+				{/snippet}
+			</Dialog.Trigger>
+		</Tooltip.Trigger>
+		<Tooltip.Content>Bulk Install</Tooltip.Content>
+	</Tooltip.Root>
 	<Dialog.Content class="max-h-[80vh] overflow-auto">
 		<Dialog.Header>
 			<Item.Root class="p-0">

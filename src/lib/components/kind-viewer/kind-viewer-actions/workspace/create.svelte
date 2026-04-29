@@ -25,6 +25,7 @@
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	let {
 		role,
@@ -205,9 +206,6 @@
 						'ui:components': {
 							stringField: 'enumField',
 							selectWidget: 'comboboxWidget'
-						},
-						'ui:options': {
-							disabledEnumValues: ['admin']
 						}
 					}
 				}
@@ -217,19 +215,29 @@
 				{
 					subject: page.data.user.sub,
 					role: 'admin',
-					name: page.data.user.name
+					name: page.data.user.name,
+					username: page.data.user.username,
+					serviceAccount: false
 				}
 			] as FormValue,
 			transformer: (value: FormValue) => {
 				let members = value as SchemaObjectValue[];
 				members = members.map((member) => {
 					const keycloakUser = getKeycloakUserBySubject(member.subject as string);
-					return {
-						...member,
-						name: getDisplayName(keycloakUser) ?? null,
-						serviceAccount: isServiceAccount(keycloakUser?.username),
-						username: keycloakUser?.username ?? null
-					};
+					if (member.subject === page.data.user.sub) {
+						return {
+							...member,
+							username: page.data.user.username,
+							serviceAccount: false
+						};
+					} else {
+						return {
+							...member,
+							name: getDisplayName(keycloakUser) ?? null,
+							serviceAccount: isServiceAccount(keycloakUser?.username),
+							username: keycloakUser?.username ?? null
+						};
+					}
 				});
 				return members;
 			},
@@ -419,13 +427,18 @@
 	}}
 >
 	{#if showTrigger}
-		<Dialog.Trigger>
-			{#snippet child({ props })}
-				<Button {...props} variant="outline" size="icon">
-					<Plus />
-				</Button>
-			{/snippet}
-		</Dialog.Trigger>
+		<Tooltip.Root>
+			<Tooltip.Trigger>
+				<Dialog.Trigger>
+					{#snippet child({ props })}
+						<Button {...props} variant="outline" size="icon">
+							<Plus />
+						</Button>
+					{/snippet}
+				</Dialog.Trigger>
+			</Tooltip.Trigger>
+			<Tooltip.Content>Create Resource</Tooltip.Content>
+		</Tooltip.Root>
 	{/if}
 	<Dialog.Content
 		class="max-h-[95vh] min-w-[38vw] overflow-auto"
