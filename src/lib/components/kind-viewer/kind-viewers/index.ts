@@ -138,18 +138,6 @@ import {
 	getLocalModelNodeUISchemas
 } from './local-model-node.js';
 import {
-	getModelArtifactColumnDefinitions,
-	getModelArtifactData,
-	getModelArtifactDataSchemas,
-	getModelArtifactUISchemas
-} from './model-artifact.js';
-import {
-	getModelServiceColumnDefinitions,
-	getModelServiceData,
-	getModelServiceDataSchemas,
-	getModelServiceUISchemas
-} from './model-service.js';
-import {
 	getNamespaceColumnDefinitions,
 	getNamespaceData,
 	getNamespaceDataSchemas,
@@ -307,10 +295,6 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 			return getWorkspaceDataSchemas();
 		case 'HelmRepository':
 			return getHelmRepositoryDataSchemas();
-		case 'ModelService':
-			return getModelServiceDataSchemas();
-		case 'ModelArtifact':
-			return getModelArtifactDataSchemas();
 		case 'HTTPRoute':
 			return getHTTPRouteDataSchemas();
 		case 'Gateway':
@@ -396,12 +380,8 @@ function getData(apiResource: APIResource, object: any): Record<string, JsonValu
 			return getResourceQuotaData(object);
 		case 'Workspace':
 			return getWorkspaceData(object);
-		case 'ModelService':
-			return getModelServiceData(object);
 		case 'HelmRepository':
 			return getHelmRepositoryData(object);
-		case 'ModelArtifact':
-			return getModelArtifactData(object);
 		case 'HTTPRoute':
 			return getHTTPRouteData(object);
 		case 'Gateway':
@@ -489,10 +469,6 @@ function getUISchemas(kind: string): Record<string, UISchemaType> {
 			return getWorkspaceUISchemas();
 		case 'HelmRepository':
 			return getHelmRepositoryUISchemas();
-		case 'ModelService':
-			return getModelServiceUISchemas();
-		case 'ModelArtifact':
-			return getModelArtifactUISchemas();
 		case 'HTTPRoute':
 			return getHTTPRouteUISchemas();
 		case 'Gateway':
@@ -585,10 +561,6 @@ function getColumnDefinitions(
 			return getWorkspaceColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'HelmRepository':
 			return getHelmRepositoryColumnDefinitions(apiResource, uiSchemas, dataSchemas);
-		case 'ModelService':
-			return getModelServiceColumnDefinitions(apiResource, uiSchemas, dataSchemas);
-		case 'ModelArtifact':
-			return getModelArtifactColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'HTTPRoute':
 			return getHTTPRouteColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'Gateway':
