@@ -6,8 +6,8 @@
 	let {
 		class: className,
 		role = 'status',
+		// we add name, color, and stroke for compatibility with different icon libraries props
 		name,
-		// we add color and stroke for compatibility with different icon libraries props
 		color,
 		stroke,
 		'aria-label': ariaLabel = 'Loading',
