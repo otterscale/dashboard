@@ -47,9 +47,9 @@
 		class="absolute -right-10 bottom-0 size-36 text-8xl tracking-tight text-nowrap text-primary/5 uppercase group-hover:hidden"
 	/>
 	<Card.Header>
-		<Card.Title>{m.power_usage()}</Card.Title>
+		<Card.Title>{m.gpu_power_usage()}</Card.Title>
 		<Card.Description class="text-md flex h-6 items-center"
-			>{m.cluster_dashboard_power_usage_description()}</Card.Description
+			>{m.cluster_dashboard_gpu_power_usage_description()}</Card.Description
 		>
 	</Card.Header>
 	{#if !isLoaded}
