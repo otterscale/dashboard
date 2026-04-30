@@ -132,6 +132,12 @@ import {
 	getLocalModelCacheUISchemas
 } from './local-model-cache.js';
 import {
+	getLocalModelNodeColumnDefinitions,
+	getLocalModelNodeData,
+	getLocalModelNodeDataSchemas,
+	getLocalModelNodeUISchemas
+} from './local-model-node.js';
+import {
 	getModelArtifactColumnDefinitions,
 	getModelArtifactData,
 	getModelArtifactDataSchemas,
@@ -327,6 +333,8 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 			return getScheduleDataSchemas();
 		case 'LocalModelCache':
 			return getLocalModelCacheDataSchemas();
+		case 'LocalModelNode':
+			return getLocalModelNodeDataSchemas();
 		case 'LLMInferenceService':
 			return getLLMInferenceServiceDataSchemas();
 		case 'LLMInferenceServiceConfig':
@@ -416,6 +424,8 @@ function getData(apiResource: APIResource, object: any): Record<string, JsonValu
 			return getScheduleData(object);
 		case 'LocalModelCache':
 			return getLocalModelCacheData(object);
+		case 'LocalModelNode':
+			return getLocalModelNodeData(object);
 		case 'LLMInferenceService':
 			return getLLMInferenceServiceData(object);
 		case 'LLMInferenceServiceConfig':
@@ -505,6 +515,8 @@ function getUISchemas(kind: string): Record<string, UISchemaType> {
 			return getScheduleUISchemas();
 		case 'LocalModelCache':
 			return getLocalModelCacheUISchemas();
+		case 'LocalModelNode':
+			return getLocalModelNodeUISchemas();
 		case 'LLMInferenceService':
 			return getLLMInferenceServiceUISchemas();
 		case 'LLMInferenceServiceConfig':
@@ -599,6 +611,8 @@ function getColumnDefinitions(
 			return getScheduleColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'LocalModelCache':
 			return getLocalModelCacheColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'LocalModelNode':
+			return getLocalModelNodeColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'LLMInferenceService':
 			return getLLMInferenceServiceColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'LLMInferenceServiceConfig':
