@@ -32,7 +32,7 @@ type LLMInferenceServiceConfigAttribute =
 	| 'Model Name'
 	| 'Model URI'
 	| 'Mode'
-	| 'Creation Timestamp'
+	| 'Age'
 	| 'raw';
 
 function getLLMInferenceServiceConfigDataSchemas(): Record<
@@ -45,7 +45,7 @@ function getLLMInferenceServiceConfigDataSchemas(): Record<
 		'Model Name': 'text',
 		'Model URI': 'text',
 		Mode: 'text',
-		'Creation Timestamp': 'time',
+		Age: 'time',
 		raw: 'object'
 	};
 }
@@ -59,7 +59,7 @@ function getLLMInferenceServiceConfigData(
 		'Model Name': object?.spec?.model?.name ?? null,
 		'Model URI': object?.spec?.model?.uri ?? null,
 		Mode: object?.spec?.prefill ? 'Prefill/Decode' : object?.spec?.template ? 'Single' : '',
-		'Creation Timestamp': object?.metadata?.creationTimestamp ?? null,
+		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
 	};
 }
@@ -74,7 +74,7 @@ function getLLMInferenceServiceConfigUISchemas(): Record<
 		'Model Name': 'text',
 		'Model URI': 'text',
 		Mode: 'text',
-		'Creation Timestamp': 'time',
+		Age: 'time',
 		raw: 'object'
 	};
 }
@@ -218,7 +218,7 @@ function getLLMInferenceServiceConfigColumnDefinitions(
 			accessorKey: 'Mode'
 		},
 		{
-			id: 'Creation Timestamp',
+			id: 'Age',
 			header: ({
 				column
 			}: {
@@ -240,7 +240,7 @@ function getLLMInferenceServiceConfigColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'Creation Timestamp'
+			accessorKey: 'Age'
 		}
 	];
 }

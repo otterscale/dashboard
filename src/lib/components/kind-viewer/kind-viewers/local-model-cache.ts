@@ -44,7 +44,7 @@ type LocalModelCacheAttribute =
 	| 'Service Account'
 	| 'Copies'
 	| 'Inference Services'
-	| 'Creation Timestamp'
+	| 'Age'
 	| 'raw';
 
 function getLocalModelCacheDataSchemas(): Record<LocalModelCacheAttribute, DataSchemaType> {
@@ -56,7 +56,7 @@ function getLocalModelCacheDataSchemas(): Record<LocalModelCacheAttribute, DataS
 		'Service Account': 'text',
 		Copies: 'text',
 		'Inference Services': 'number',
-		'Creation Timestamp': 'time',
+		Age: 'time',
 		raw: 'object'
 	};
 }
@@ -73,7 +73,7 @@ function getLocalModelCacheData(
 		'Service Account': object?.spec?.serviceAccountName ?? null,
 		Copies: `${copies?.available ?? '-'} / ${copies?.total ?? '-'}`,
 		'Inference Services': (object?.status?.inferenceServices ?? []).length,
-		'Creation Timestamp': object?.metadata?.creationTimestamp ?? null,
+		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
 	};
 }
@@ -87,7 +87,7 @@ function getLocalModelCacheUISchemas(): Record<LocalModelCacheAttribute, UISchem
 		'Service Account': 'text',
 		Copies: 'text',
 		'Inference Services': 'array-of-object',
-		'Creation Timestamp': 'time',
+		Age: 'time',
 		raw: 'object'
 	};
 }
@@ -249,7 +249,9 @@ function getLocalModelCacheColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas,
 					metadata: {
-						items: ((row.original.raw as LocalModelCacheObject)?.status?.inferenceServices ?? []).map(
+						items: (
+							(row.original.raw as LocalModelCacheObject)?.status?.inferenceServices ?? []
+						).map(
 							(service) =>
 								({
 									title: service?.name,
@@ -261,7 +263,7 @@ function getLocalModelCacheColumnDefinitions(
 			accessorKey: 'Inference Services'
 		},
 		{
-			id: 'Creation Timestamp',
+			id: 'Age',
 			header: ({ column }: { column: Column<Record<LocalModelCacheAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
@@ -279,7 +281,7 @@ function getLocalModelCacheColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'Creation Timestamp'
+			accessorKey: 'Age'
 		}
 	];
 }
