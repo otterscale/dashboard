@@ -23,10 +23,6 @@ import LLMInferenceServiceActions from './llm-inference-service/actions.svelte';
 import LLMInferenceServiceCreate from './llm-inference-service/create.svelte';
 import LLMInferenceServiceConfigActions from './llm-inference-service-config/actions.svelte';
 import LocalModelCacheCreate from './local-model-cache/create.svelte';
-import ModelArtifactActions from './model-artifact/actions.svelte';
-import ModelArtifactCreate from './model-artifact/create.svelte';
-import ModelServiceActions from './model-service/actions.svelte';
-import ModelServiceCreate from './model-service/create.svelte';
 import NodeActions from './node/actions.svelte';
 import NodeCreate from './node/create.svelte';
 import PodActions from './pod/actions.svelte';
@@ -81,10 +77,6 @@ function getCreate(kind: string): CreateType {
 			return LLMInferenceServiceCreate as CreateType;
 		case 'LocalModelCache':
 			return LocalModelCacheCreate as CreateType;
-		case 'ModelArtifact':
-			return ModelArtifactCreate as CreateType;
-		case 'ModelService':
-			return ModelServiceCreate as CreateType;
 		case 'Node':
 			return NodeCreate as CreateType;
 		case 'ObjectBucketClaim':
@@ -128,10 +120,6 @@ function getActions(kind: string): ActionsType {
 			return LLMInferenceServiceActions as ActionsType;
 		case 'LLMInferenceServiceConfig':
 			return LLMInferenceServiceConfigActions as ActionsType;
-		case 'ModelArtifact':
-			return ModelArtifactActions as ActionsType;
-		case 'ModelService':
-			return ModelServiceActions as ActionsType;
 		case 'Node':
 			return NodeActions as ActionsType;
 		case 'ObjectBucketClaim':

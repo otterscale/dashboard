@@ -1,8 +1,6 @@
 import type { Component } from 'svelte';
 
-import ApplicationsViewer from './applications-viewer.svelte';
 import DefaultViewer from './default-viewer.svelte';
-import ModelServicesViewer from './model-service-viewer.svelte';
 import WorkspaceEditor from './workspace-editor.svelte';
 import WorkspaceViewer from './workspaces-viewer.svelte';
 
@@ -23,12 +21,6 @@ type EditorProps = {
 type EditorType = Component<EditorProps> | null;
 
 function getResourceViewer(resource: string): ViewerType {
-	if (resource === 'applications') {
-		return ApplicationsViewer as ViewerType;
-	}
-	if (resource === 'modelservices') {
-		return ModelServicesViewer as ViewerType;
-	}
 	if (resource === 'workspaces') {
 		return WorkspaceViewer as ViewerType;
 	}

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
-	import type { ModelOtterscaleIoV1Alpha1ModelService } from '@otterscale/types';
+	import type { ServingKserveIoV1Alpha1LLMInferenceService } from '@otterscale/types';
 	import type { Schema } from 'ajv';
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
@@ -29,7 +29,7 @@
 		kind: string;
 		resource: string;
 		schema: Schema;
-		object: ModelOtterscaleIoV1Alpha1ModelService;
+		object: ServingKserveIoV1Alpha1LLMInferenceService;
 	} = $props();
 
 	let actionsOpen = $state(false);
