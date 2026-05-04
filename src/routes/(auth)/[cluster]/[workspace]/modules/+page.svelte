@@ -325,7 +325,7 @@
 
 {#key cluster + String(fromHarbor)}
 	<main class="pb-8">
-		<ModuleViewer {cluster} {namespace} {data} {fromHarbor}>
+		<ModuleViewer {cluster} {namespace} {data}>
 			{#snippet reload()}
 				<Tooltip.Root>
 					<Tooltip.Trigger>

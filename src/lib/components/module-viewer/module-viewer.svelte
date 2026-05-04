@@ -24,13 +24,11 @@
 		cluster,
 		namespace,
 		data,
-		fromHarbor,
 		reload
 	}: {
 		cluster: string;
 		namespace: string;
 		data: any[];
-		fromHarbor: boolean;
 		reload: any;
 	} = $props();
 
@@ -54,7 +52,7 @@
 			{#if table.getRowModel().rows?.length}
 				<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
 					{#each table.getRowModel().rows as row (row.id)}
-						<Grid {row} {cluster} {fromHarbor} />
+						<Grid {row} {cluster} />
 					{/each}
 				</div>
 			{:else}
@@ -79,10 +77,10 @@
 			{/if}
 		{/snippet}
 		{#snippet bulkCreate({ table })}
-			<BulkInstall {table} {cluster} {fromHarbor} />
+			<BulkInstall {table} {cluster} />
 		{/snippet}
 		{#snippet rowActions({ row })}
-			<Actions {row} {cluster} {fromHarbor} />
+			<Actions {row} {cluster} />
 		{/snippet}
 	</DynamicTable>
 </div>
