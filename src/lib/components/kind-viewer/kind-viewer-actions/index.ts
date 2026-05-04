@@ -24,7 +24,6 @@ import LLMInferenceServiceCreate from './llm-inference-service/create.svelte';
 import LLMInferenceServiceConfigActions from './llm-inference-service-config/actions.svelte';
 import LocalModelCacheCreate from './local-model-cache/create.svelte';
 import NodeActions from './node/actions.svelte';
-import NodeCreate from './node/create.svelte';
 import PodActions from './pod/actions.svelte';
 import ResourceQuotaActions from './resource-quota/actions.svelte';
 import ScheduleActions from './schedule/actions.svelte';
@@ -32,6 +31,7 @@ import ScheduleCreate from './schedule/create.svelte';
 import StatefulSetActions from './statefulset/actions.svelte';
 import TaskActions from './task/actions.svelte';
 import TaskCreate from './task/create.svelte';
+import DisabledCreate from './utils/disabled-create.svelte';
 import VirtualMachineActions from './virtual-machine/actions.svelte';
 import VirtualMachineCreate from './virtual-machine/create.svelte';
 import WorkspaceActions from './workspace/actions.svelte';
@@ -63,7 +63,7 @@ type ActionsType = Component<{
 	onsuccess?: () => void;
 }> | null;
 
-function getCreate(kind: string): CreateType {
+function getCreate(kind: string, namespace?: string): CreateType {
 	switch (kind) {
 		case 'Application':
 			return ApplicationCreate as CreateType;
@@ -78,7 +78,7 @@ function getCreate(kind: string): CreateType {
 		case 'LocalModelCache':
 			return LocalModelCacheCreate as CreateType;
 		case 'Node':
-			return NodeCreate as CreateType;
+			return DisabledCreate as CreateType;
 		case 'ObjectBucketClaim':
 			return ObjectBucketClaimCreate as CreateType;
 		case 'Schedule':
@@ -91,6 +91,11 @@ function getCreate(kind: string): CreateType {
 			return InstanceTypeCreate as CreateType;
 		case 'Workspace':
 			return WorkspaceCreate as CreateType;
+		case 'LLMInferenceServiceConfig':
+			if (namespace === 'otterscale-system') {
+				return DisabledCreate as CreateType;
+			}
+			return DefaultCreate as CreateType;
 		default:
 			return DefaultCreate as CreateType;
 	}

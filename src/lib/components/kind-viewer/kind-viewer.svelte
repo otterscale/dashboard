@@ -268,7 +268,7 @@
 		}
 	}
 
-	const Create: CreateType = $derived(getCreate(apiResource.kind));
+	const Create: CreateType = $derived(getCreate(apiResource.kind, namespace));
 	const Actions: ActionsType = $derived(getActions(apiResource.kind));
 </script>
 

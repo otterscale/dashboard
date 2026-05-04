@@ -373,6 +373,8 @@
 					hard: {
 						'requests.cpu': '16',
 						'requests.memory': '32Gi',
+						'requests.nvidia.com/gpu': '0',
+						'requests.nvidia.com/gpumem': '0',
 						'limits.cpu': '16',
 						'limits.memory': '32Gi',
 						'limits.nvidia.com/gpu': '0',
@@ -481,6 +483,7 @@
 					<Monaco
 						options={{
 							language: 'yaml',
+							readOnly: true,
 							padding: { top: 24 },
 							automaticLayout: true,
 							folding: true,
@@ -512,8 +515,12 @@
 									hard: {
 										'requests.cpu': '16',
 										'requests.memory': '32Gi',
+										'requests.nvidia.com/gpu': '0',
+										'requests.nvidia.com/gpumem': '0',
 										'limits.cpu': '16',
-										'limits.memory': '32Gi'
+										'limits.memory': '32Gi',
+										'limits.nvidia.com/gpu': '0',
+										'limits.nvidia.com/gpumem': '0'
 									}
 								});
 							}
