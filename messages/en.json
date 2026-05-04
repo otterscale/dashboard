@@ -141,7 +141,7 @@
 	"gpu_utilization": "GPU Utilization",
 	"gpu_allocation": "GPU Allocation",
 	"gpu_allocation_title": "GPU Allocation — {name}",
-	"gpu_allocation_model_description": "LLMInferenceService → GPU → Node relationship diagram",
+	"gpu_allocation_model_description": "LLMInferenceService → Pod → GPU → Node relationship diagram",
 	"gpu_allocation_node_description": "Pod → GPU → Node relationship diagram",
 	"gpu_allocation_loading": "Loading GPU allocation...",
 	"gpu_allocation_fetch_error": "Failed to fetch GPU allocation: {message}",

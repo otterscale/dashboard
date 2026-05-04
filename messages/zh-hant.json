@@ -141,7 +141,7 @@
 	"gpu_utilization": "GPU 使用率",
 	"gpu_allocation": "GPU 分配",
 	"gpu_allocation_title": "GPU 分配 — {name}",
-	"gpu_allocation_model_description": "LLMInferenceService → GPU → Node 關聯圖",
+	"gpu_allocation_model_description": "LLMInferenceService → Pod → GPU → Node 關聯圖",
 	"gpu_allocation_node_description": "Pod → GPU → Node 關聯圖",
 	"gpu_allocation_loading": "正在載入 GPU 分配資訊...",
 	"gpu_allocation_fetch_error": "無法取得 GPU 分配資訊：{message}",

@@ -20,6 +20,7 @@ export interface PodInfo {
 	nodeName: string;
 	allocations: GpuAllocation[];
 	status: string;
+	role?: string; // llm-d.ai/role: decode | prefill | both
 }
 
 export interface GpuInfo {
@@ -34,10 +35,10 @@ export interface NodeInfo {
 }
 
 export interface TopologyData {
-	modelService?: { name: string; namespace: string };
+	llmInferenceService?: { name: string; namespace: string };
 	pods: PodInfo[];
 	gpus: GpuInfo[];
 	nodes: NodeInfo[];
 }
 
-export type TopologyView = 'model-service' | 'node';
+export type TopologyView = 'llm-inference-service' | 'node';

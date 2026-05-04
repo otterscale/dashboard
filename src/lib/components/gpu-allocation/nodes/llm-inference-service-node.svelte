@@ -15,7 +15,7 @@
 		<div class="flex size-6 items-center justify-center rounded-md bg-primary/10">
 			<Bot size={14} class="text-primary" />
 		</div>
-		<span class="truncate text-sm font-semibold">ModelService</span>
+		<span class="truncate text-sm font-semibold">LLMInferenceService</span>
 	</div>
 	<div class="space-y-1 px-3 py-2">
 		<div class="truncate text-xs font-medium">{data.name}</div>
