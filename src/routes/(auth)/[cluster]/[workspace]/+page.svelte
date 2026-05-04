@@ -79,7 +79,7 @@
 		}
 
 		if (kind === 'LLMInferenceService') {
-			const ns = namespace || <string>'<namespace>';
+			const ns = namespace || '<namespace>';
 			const modelPlaceholder = '<modelname>';
 			return `Available at ${endpoint}/${ns}/${modelPlaceholder}`;
 		}
