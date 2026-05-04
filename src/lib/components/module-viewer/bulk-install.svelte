@@ -5,11 +5,10 @@
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { RuntimeService } from '@otterscale/api/runtime/v1';
 	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
-	import type { Row, Table } from '@tanstack/table-core';
+	import type { Table } from '@tanstack/table-core';
 	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { getContext } from 'svelte';
-	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
@@ -23,7 +22,6 @@
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
-	import type { ModuleAttribute } from './table-layout';
 	import { type ModuleType } from './types';
 
 	let {
@@ -40,6 +38,7 @@
 	const version = 'v2';
 	const kind = 'HelmRelease';
 	const resource = 'helmreleases';
+	const namespace = 'otterscale-system';
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
@@ -51,8 +50,6 @@
 
 	let open = $state(false);
 	let isSubmitting = $state(false);
-
-	type ResultType = { status: 'installed'; name: string } | { status: 'skipped'; name: string };
 
 	async function fetchValuesFromHarbor(
 		chart: ModuleType,
@@ -109,105 +106,32 @@
 		return dependsOn.split(',').filter(Boolean);
 	}
 
-	/**
-	 * Layered Topological Sort (Kahn's Algorithm variant)
-	 *
-	 * Groups selected modules into installation layers, where all modules
-	 * within the same layer can be installed in parallel. Each layer only
-	 * contains modules whose dependencies are satisfied by previously placed
-	 * layers or already-installed modules.
-	 *
-	 * Unresolvable modules (circular deps or missing deps) are collected into
-	 * a final "dead-end" layer for the caller to handle as failures.
-	 */
-	function buildInstallLayers(
-		selectedRows: Row<Record<ModuleAttribute, JsonValue>>[],
-		installedSet: Set<string>
-	): Row<Record<ModuleAttribute, JsonValue>>[][] {
-		// Build a lookup map from module name → row for quick access during sorting
-		const rowByModuleName = new SvelteMap<string, Row<Record<ModuleAttribute, JsonValue>>>();
-		for (const row of selectedRows) {
-			const chart = row.original.chart as unknown as ModuleType;
-			rowByModuleName.set(chart.name, row);
-		}
-
-		// "Placed" tracks all modules whose dependencies are already satisfied —
-		// seeded with already-installed modules so they count as resolved from the start
-		const placedModuleNames = new SvelteSet<string>(installedSet);
-
-		// "Remaining" is the working set of modules not yet assigned to a layer
-		const remainingModuleNames = new SvelteSet(rowByModuleName.keys());
-
-		const installLayers: Row<Record<ModuleAttribute, JsonValue>>[][] = [];
-
-		while (remainingModuleNames.size > 0) {
-			// Collect all modules whose dependencies are fully satisfied this round
-			const currentLayer: Row<Record<ModuleAttribute, JsonValue>>[] = [];
-
-			for (const moduleName of remainingModuleNames) {
-				const row = rowByModuleName.get(moduleName)!;
-				const chart = row.original.chart as unknown as ModuleType;
-				const dependencies = getDependencies(chart);
-
-				if (dependencies.every((dependency) => placedModuleNames.has(dependency))) {
-					currentLayer.push(row);
-				}
-			}
-
-			if (currentLayer.length === 0) {
-				// No progress was made — remaining modules have unresolvable dependencies
-				// (circular dependency or dependency not present in the selected set).
-				// Collect them into a final dead-end layer so the caller can mark them as failures.
-				const deadEndLayer = [...remainingModuleNames].map(
-					(moduleName) => rowByModuleName.get(moduleName)!
-				);
-				installLayers.push(deadEndLayer);
-				break;
-			}
-
-			// Promote this layer's modules into "placed" so the next round can depend on them
-			for (const row of currentLayer) {
-				const chart = row.original.chart as unknown as ModuleType;
-				remainingModuleNames.delete(chart.name);
-				placedModuleNames.add(chart.name);
-			}
-
-			installLayers.push(currentLayer);
-		}
-
-		return installLayers;
-	}
-
 	async function handleInstall(
-		row: Row<Record<ModuleAttribute, JsonValue>>,
-		installedSet: Set<string>
-	): Promise<ResultType> {
-		const chart = row.original.chart as unknown as ModuleType;
-		const dependencies = getDependencies(chart);
-		const dependenciesReady = dependencies.every((dependency) => installedSet.has(dependency));
-
-		if (!dependenciesReady) {
-			return { status: 'skipped', name: chart.name };
-		}
-
-		const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
-
+		chart: ModuleType,
+		helmRepository: SourceToolkitFluxcdIoV1HelmRepository,
+		selectedNames: Set<string>
+	): Promise<string> {
 		const helmValues = fromHarbor
 			? await fetchValuesFromHarbor(chart, helmRepository)
 			: await fetchValuesFromIndex(chart, helmRepository);
+
+		const dependsOn = getDependencies(chart)
+			.filter((name) => selectedNames.has(name))
+			.map((name) => ({ name, namespace }));
 
 		const manifest = {
 			apiVersion: `${group}/${version}`,
 			kind,
 			metadata: {
 				name: chart.name,
-				namespace: 'otterscale-system'
+				namespace
 			},
 			spec: {
 				releaseName: chart.name,
 				targetNamespace: lodash.get(chart, ['annotations', 'module.otterscale.io/namespace']),
 				install: { createNamespace: true },
 				interval: '15m',
+				...(dependsOn.length > 0 && { dependsOn }), // expand if non-empty
 				chart: {
 					spec: {
 						chart: chart.name,
@@ -226,69 +150,53 @@
 
 		await resourceClient.create({
 			cluster,
-			namespace: 'otterscale-system',
+			namespace,
 			group,
 			version,
 			resource,
 			manifest: new TextEncoder().encode(stringify(manifest))
 		});
 
-		return { status: 'installed', name: chart.name };
+		return chart.name;
 	}
 
 	async function handleBulkInstall() {
 		if (isSubmitting) return;
 		isSubmitting = true;
 
-		// Fetch currently installed HelmReleases from the cluster in real time
-		const listResponse = await resourceClient.list({
-			cluster,
-			namespace: 'otterscale-system',
-			group,
-			version,
-			resource
-		});
-
-		const installedSet = new SvelteSet<string>(
-			listResponse.items
-				.map((item) => (item.object?.['metadata'] as Record<string, unknown>)?.['name'] as string)
-				.filter(Boolean)
+		const selectedNames = new Set(
+			rows.map((row) => (row.original.chart as unknown as ModuleType).name)
 		);
 
-		const layers = buildInstallLayers(rows, installedSet);
+		const results = await Promise.allSettled(
+			rows.map((row) => {
+				const chart = row.original.chart as unknown as ModuleType;
+				const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
+				return handleInstall(chart, helmRepository, selectedNames);
+			})
+		);
 
 		let successes = 0;
 		let fails = 0;
-		let skipped = 0;
 
-		for (const layer of layers) {
-			const results = await Promise.allSettled(
-				layer.map((row) => handleInstall(row, installedSet))
-			);
-
-			for (const result of results) {
-				if (result.status === 'fulfilled') {
-					if (result.value.status === 'skipped') {
-						skipped += 1;
-						toast.info(`Skipped ${result.value.name}`);
-					} else {
-						successes += 1;
-						installedSet.add(result.value.name);
-						toast.success(`Successfully installed ${result.value.name}`);
-					}
-				} else {
-					fails += 1;
-					const message =
-						result.reason instanceof ConnectError ? result.reason.message : String(result.reason);
-					toast.error(`Failed to install: ${message}`);
-				}
+		for (const result of results) {
+			if (result.status === 'fulfilled') {
+				successes += 1;
+				toast.success(`Successfully created ${result.value}`);
+			} else {
+				fails += 1;
+				const message =
+					result.reason instanceof ConnectError ? result.reason.message : String(result.reason);
+				toast.error(`Failed to create: ${message}`);
 			}
 		}
 
 		if (fails === 0) {
-			toast.success(`${successes} installed, ${skipped} skipped`);
+			toast.success(
+				`${successes} HelmRelease(s) created — FluxCD will reconcile in dependency order`
+			);
 		} else {
-			toast.warning(`${successes} installed, ${fails} failed, ${skipped} skipped`);
+			toast.warning(`${successes} created, ${fails} failed`);
 		}
 
 		table.resetRowSelection();
