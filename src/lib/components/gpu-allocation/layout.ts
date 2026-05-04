@@ -2,7 +2,7 @@ import dagre from '@dagrejs/dagre';
 import type { Edge, Node } from '@xyflow/svelte';
 
 const NODE_DIMENSIONS: Record<string, { width: number; height: number }> = {
-	modelService: { width: 220, height: 100 },
+	llmInferenceService: { width: 220, height: 100 },
 	pod: { width: 220, height: 100 },
 	gpu: { width: 200, height: 90 },
 	k8sNode: { width: 220, height: 100 }

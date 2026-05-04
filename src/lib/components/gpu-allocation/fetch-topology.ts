@@ -12,25 +12,37 @@ import type { GpuInfo, NodeInfo, PodInfo, TopologyData } from './types';
 
 type ResourceClient = Client<typeof ResourceService>;
 
+// Labels set by kserve on pods owned by an LLMInferenceService.
+// See pkg/constants in kserve: KubernetesAppNameLabelKey / KubernetesPartOfLabelKey / LLMDRoleLabelKey.
+const LABEL_APP_NAME = 'app.kubernetes.io/name';
+const LABEL_PART_OF = 'app.kubernetes.io/part-of';
+const LABEL_ROLE = 'llm-d.ai/role';
+const PART_OF_VALUE = 'llminferenceservice';
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getAnnotations(obj: any): Record<string, string> {
 	return obj?.metadata?.annotations ?? {};
 }
 
-export async function fetchModelServiceTopology(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getLabels(obj: any): Record<string, string> {
+	return obj?.metadata?.labels ?? {};
+}
+
+export async function fetchLLMInferenceServiceTopology(
 	client: ResourceClient,
 	cluster: string,
 	namespace: string,
-	modelName: string
+	serviceName: string
 ): Promise<TopologyData> {
-	// 1. List pods for this model
+	// 1. List pods belonging to this LLMInferenceService (covers both decode and prefill workloads)
 	const podResponse = await client.list({
 		cluster,
 		group: '',
 		version: 'v1',
 		resource: 'pods',
 		namespace,
-		labelSelector: `llm-d.ai/model=${modelName}`
+		labelSelector: `${LABEL_APP_NAME}=${serviceName},${LABEL_PART_OF}=${PART_OF_VALUE}`
 	});
 
 	const rawPods = podResponse.items.map((item) => item.object);
@@ -41,6 +53,7 @@ export async function fetchModelServiceTopology(
 
 	for (const pod of rawPods) {
 		const annotations = getAnnotations(pod);
+		const labels = getLabels(pod);
 		const nodeName = getPodNodeName(pod);
 		if (nodeName) nodeNames.add(nodeName);
 
@@ -49,7 +62,8 @@ export async function fetchModelServiceTopology(
 			namespace: (pod as Record<string, any>)?.metadata?.namespace ?? '', // eslint-disable-line @typescript-eslint/no-explicit-any
 			nodeName,
 			allocations: parsePodGpuAllocations(annotations[ANNOTATION_DEVICES_ALLOCATED]),
-			status: (pod as Record<string, any>)?.status?.phase ?? 'Unknown' // eslint-disable-line @typescript-eslint/no-explicit-any
+			status: (pod as Record<string, any>)?.status?.phase ?? 'Unknown', // eslint-disable-line @typescript-eslint/no-explicit-any
+			role: labels[LABEL_ROLE]
 		});
 	}
 
@@ -96,7 +110,7 @@ export async function fetchModelServiceTopology(
 	crossReferencePodGpus(pods, gpus);
 
 	return {
-		modelService: { name: modelName, namespace },
+		llmInferenceService: { name: serviceName, namespace },
 		pods,
 		gpus,
 		nodes
@@ -155,12 +169,14 @@ export async function fetchNodeTopology(
 		const podAnnotations = getAnnotations(pod);
 		if (!podAnnotations[ANNOTATION_DEVICES_ALLOCATED]) continue;
 
+		const labels = getLabels(pod);
 		pods.push({
 			name: (pod as Record<string, any>)?.metadata?.name ?? '', // eslint-disable-line @typescript-eslint/no-explicit-any
 			namespace: (pod as Record<string, any>)?.metadata?.namespace ?? '', // eslint-disable-line @typescript-eslint/no-explicit-any
 			nodeName,
 			allocations: parsePodGpuAllocations(podAnnotations[ANNOTATION_DEVICES_ALLOCATED]),
-			status: (pod as Record<string, any>)?.status?.phase ?? 'Unknown' // eslint-disable-line @typescript-eslint/no-explicit-any
+			status: (pod as Record<string, any>)?.status?.phase ?? 'Unknown', // eslint-disable-line @typescript-eslint/no-explicit-any
+			role: labels[LABEL_ROLE]
 		});
 	}
 

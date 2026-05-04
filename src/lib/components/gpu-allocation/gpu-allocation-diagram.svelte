@@ -14,7 +14,7 @@
 	import { computeLayout } from './layout';
 	import GpuNode from './nodes/gpu-node.svelte';
 	import K8sNodeNode from './nodes/k8s-node-node.svelte';
-	import ModelServiceNode from './nodes/model-service-node.svelte';
+	import LLMInferenceServiceNode from './nodes/llm-inference-service-node.svelte';
 	import PodNode from './nodes/pod-node.svelte';
 	import type { TopologyData, TopologyView } from './types';
 
@@ -27,7 +27,7 @@
 	} = $props();
 
 	const nodeTypes: NodeTypes = {
-		modelService: ModelServiceNode as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+		llmInferenceService: LLMInferenceServiceNode as any, // eslint-disable-line @typescript-eslint/no-explicit-any
 		pod: PodNode as any, // eslint-disable-line @typescript-eslint/no-explicit-any
 		gpu: GpuNode as any, // eslint-disable-line @typescript-eslint/no-explicit-any
 		k8sNode: K8sNodeNode as any // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -37,22 +37,59 @@
 		const rawNodes: Node[] = [];
 		const rawEdges: Edge[] = [];
 
-		if (view === 'model-service' && topologyData.modelService) {
-			// Layer 1: ModelService
+		if (view === 'llm-inference-service' && topologyData.llmInferenceService) {
+			// Layer 1: LLMInferenceService
 			rawNodes.push({
-				id: 'ms',
-				type: 'modelService',
+				id: 'isvc',
+				type: 'llmInferenceService',
 				position: { x: 0, y: 0 },
 				data: {
-					name: topologyData.modelService.name,
-					namespace: topologyData.modelService.namespace
+					name: topologyData.llmInferenceService.name,
+					namespace: topologyData.llmInferenceService.namespace
 				}
 			});
 
-			// Layer 2: GPUs (only those allocated by model's pods)
-			const allocatedGpuIds = new Set(
-				topologyData.pods.flatMap((p) => p.allocations.map((a) => a.uuid))
-			);
+			// Layer 2: Pods belonging to the service (only those with GPU allocations)
+			const podsWithGpus = topologyData.pods.filter((p) => p.allocations.length > 0);
+
+			for (const pod of podsWithGpus) {
+				const podId = `pod-${pod.namespace}-${pod.name}`;
+
+				rawNodes.push({
+					id: podId,
+					type: 'pod',
+					position: { x: 0, y: 0 },
+					data: {
+						name: pod.name,
+						status: pod.status,
+						gpuCount: pod.allocations.length,
+						role: pod.role ?? ''
+					}
+				});
+
+				rawEdges.push({
+					id: `isvc-${podId}`,
+					source: 'isvc',
+					target: podId,
+					type: 'smoothstep',
+					animated: true
+				});
+
+				// Edges from pod to GPUs it allocates
+				for (const alloc of pod.allocations) {
+					const gpuId = `gpu-${alloc.uuid}`;
+					rawEdges.push({
+						id: `${podId}-${gpuId}`,
+						source: podId,
+						target: gpuId,
+						type: 'smoothstep',
+						animated: true
+					});
+				}
+			}
+
+			// Layer 3: GPUs (only those allocated by the service's pods)
+			const allocatedGpuIds = new Set(podsWithGpus.flatMap((p) => p.allocations.map((a) => a.uuid)));
 
 			for (const gpu of topologyData.gpus) {
 				if (!allocatedGpuIds.has(gpu.device.id)) continue;
@@ -72,17 +109,9 @@
 						usedMem: totalUsedMem
 					}
 				});
-
-				rawEdges.push({
-					id: `ms-${gpuId}`,
-					source: 'ms',
-					target: gpuId,
-					type: 'smoothstep',
-					animated: true
-				});
 			}
 
-			// Layer 3: Nodes
+			// Layer 4: Nodes
 			for (const node of topologyData.nodes) {
 				const nodeId = `node-${node.name}`;
 				const gpuType = node.devices[0]?.type ?? '';
@@ -98,7 +127,7 @@
 					}
 				});
 
-				// Edge from each GPU on this node to the node
+				// Edge from each allocated GPU on this node to the node
 				for (const device of node.devices) {
 					const gpuId = `gpu-${device.id}`;
 					if (allocatedGpuIds.has(device.id)) {
@@ -123,7 +152,8 @@
 					data: {
 						name: pod.name,
 						status: pod.status,
-						gpuCount: pod.allocations.length
+						gpuCount: pod.allocations.length,
+						role: pod.role ?? ''
 					}
 				});
 

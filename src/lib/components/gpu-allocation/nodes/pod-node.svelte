@@ -13,6 +13,18 @@
 	};
 
 	const statusColor = $derived(statusColorMap[data.status as string] ?? 'bg-muted-foreground');
+
+	const roleLabelMap: Record<string, string> = {
+		decode: 'Decode',
+		prefill: 'Prefill',
+		both: 'Decode + Prefill'
+	};
+
+	const roleLabel = $derived(
+		typeof data.role === 'string' && data.role.length > 0
+			? (roleLabelMap[data.role] ?? data.role)
+			: ''
+	);
 </script>
 
 {#if data.hasTargetEdge}
@@ -29,7 +41,16 @@
 			<Box size={14} class="text-chart-2" />
 		</div>
 		<span class="truncate text-sm font-semibold">Pod</span>
-		<span class="ml-auto inline-block size-2 shrink-0 rounded-full {statusColor}"></span>
+		{#if roleLabel}
+			<span
+				class="ml-auto rounded-full bg-chart-2/10 px-2 py-0.5 text-[10px] font-medium text-chart-2"
+			>
+				{roleLabel}
+			</span>
+		{/if}
+		<span
+			class="inline-block size-2 shrink-0 rounded-full {statusColor} {roleLabel ? '' : 'ml-auto'}"
+		></span>
 	</div>
 	<div class="space-y-1 px-3 py-2">
 		<div class="truncate text-xs font-medium">{data.name}</div>

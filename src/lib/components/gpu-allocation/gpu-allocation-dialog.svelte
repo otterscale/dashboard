@@ -8,7 +8,7 @@
 	import * as Item from '$lib/components/ui/item';
 	import { m } from '$lib/paraglide/messages';
 
-	import { fetchModelServiceTopology, fetchNodeTopology } from './fetch-topology';
+	import { fetchLLMInferenceServiceTopology, fetchNodeTopology } from './fetch-topology';
 	import GpuAllocationDiagram from './gpu-allocation-diagram.svelte';
 	import type { TopologyData, TopologyView } from './types';
 
@@ -43,8 +43,8 @@
 		topologyData = null;
 
 		try {
-			if (view === 'model-service') {
-				topologyData = await fetchModelServiceTopology(client, cluster, namespace, name);
+			if (view === 'llm-inference-service') {
+				topologyData = await fetchLLMInferenceServiceTopology(client, cluster, namespace, name);
 			} else {
 				topologyData = await fetchNodeTopology(client, cluster, object);
 			}
@@ -84,7 +84,7 @@
 				{m.gpu_allocation_title({ name })}
 			</Dialog.Title>
 			<Dialog.Description>
-				{#if view === 'model-service'}
+				{#if view === 'llm-inference-service'}
 					{m.gpu_allocation_model_description()}
 				{:else}
 					{m.gpu_allocation_node_description()}
@@ -109,7 +109,7 @@
 				<div
 					class="flex h-full items-center justify-center rounded-md border bg-muted text-xs text-muted-foreground"
 				>
-					{#if view === 'model-service'}
+					{#if view === 'llm-inference-service'}
 						{m.gpu_allocation_empty_model()}
 					{:else}
 						{m.gpu_allocation_empty_node()}
