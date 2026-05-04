@@ -8,7 +8,7 @@ export function escapePromqlStringLiteral(value: string): string {
 }
 
 /**
- * Label selector for vLLM dashboard metrics: namespace, or namespace + `model_service` for one ModelService.
+ * Label selector for vLLM dashboard metrics: namespace, or namespace + `llm_inference_service` for one ModelService.
  * `selectedModel === '.*'` means all ModelServices in the namespace (namespace filter only).
  */
 function vllmMetricsLabelSelector(
@@ -20,14 +20,14 @@ function vllmMetricsLabelSelector(
 	if (!ns) {
 		if (sm === '.*') return '';
 		const msEsc = escapePromqlStringLiteral(sm);
-		return `model_service="${msEsc}"`;
+		return `llm_inference_service="${msEsc}"`;
 	}
 	const nsEsc = escapePromqlStringLiteral(ns);
 	if (sm === '.*') {
 		return `namespace="${nsEsc}"`;
 	}
 	const msEsc = escapePromqlStringLiteral(sm);
-	return `namespace="${nsEsc}",model_service="${msEsc}"`;
+	return `namespace="${nsEsc}",llm_inference_service="${msEsc}"`;
 }
 
 /** Wrap a vLLM metric name with `{ ... }` selector (empty selector → `{}`). */

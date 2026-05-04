@@ -52,15 +52,18 @@
 		try {
 			const response = await client.list({
 				cluster: cluster,
-				group: 'model.otterscale.io',
-				version: 'v1alpha1',
-				resource: 'modelservices',
+				group: 'serving.kserve.io',
+				version: 'v1alpha2',
+				resource: 'llminferenceservices',
 				// Empty namespace means "all namespaces" for cluster admins
 				namespace: namespace
 			});
 			latestModels = response.items.length;
 		} catch (error) {
-			console.error(`Fail to fetch latest available models in cluster ${cluster}:`, error);
+			console.error(
+				`Fail to fetch latest available LLMInferenceServices in cluster ${cluster}:`,
+				error
+			);
 		}
 	}
 
