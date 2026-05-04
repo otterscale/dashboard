@@ -235,20 +235,17 @@
 										title: 'GPU Selector',
 										type: 'object',
 										properties: {
+											node: {
+												title: 'Node',
+												type: 'string',
+												enum: [...allNodes]
+											},
 											type: {
 												title: 'Type',
 												type: 'array',
 												items: {
 													type: 'string',
 													enum: [...allTypes]
-												}
-											},
-											node: {
-												title: 'Node',
-												type: 'array',
-												items: {
-													type: 'string',
-													enum: [...allNodes]
 												}
 											},
 											uuid: {
@@ -279,14 +276,8 @@
 											}
 										},
 										node: {
-											'ui:options': {
-												itemTitle: () => null
-											},
-											items: {
-												'ui:components': {
-													stringField: 'enumField',
-													selectWidget: 'comboboxWidget'
-												}
+											'ui:components': {
+												stringField: 'enumField'
 											}
 										},
 										uuid: {
@@ -309,12 +300,12 @@
 											lodash.unset(values, ['spec', 'annotations']);
 											lodash.unset(values, ['spec', 'prefill']);
 
-											const nodes = lodash.get(value, 'node', []) as string[];
-											if (nodes.length > 0) {
+											const node = lodash.get(value, 'node', null) as string[];
+											if (node) {
 												lodash.set(
 													values,
 													['spec', 'template', 'nodeSelector', 'kubernetes.io/hostname'],
-													nodes.join(',')
+													node
 												);
 											}
 
@@ -362,20 +353,17 @@
 												title: 'Decode',
 												type: 'object',
 												properties: {
+													node: {
+														title: 'Node',
+														type: 'string',
+														enum: [...allNodes]
+													},
 													type: {
 														title: 'Type',
 														type: 'array',
 														items: {
 															type: 'string',
 															enum: [...allTypes]
-														}
-													},
-													node: {
-														title: 'Node',
-														type: 'array',
-														items: {
-															type: 'string',
-															enum: [...allNodes]
 														}
 													},
 													uuid: {
@@ -392,20 +380,17 @@
 												title: 'Prefill',
 												type: 'object',
 												properties: {
+													node: {
+														title: 'Node',
+														type: 'string',
+														enum: [...allNodes]
+													},
 													type: {
 														title: 'Type',
 														type: 'array',
 														items: {
 															type: 'string',
 															enum: [...allTypes]
-														}
-													},
-													node: {
-														title: 'Node',
-														type: 'array',
-														items: {
-															type: 'string',
-															enum: [...allNodes]
 														}
 													},
 													uuid: {
@@ -439,14 +424,8 @@
 												}
 											},
 											node: {
-												'ui:options': {
-													itemTitle: () => null
-												},
-												items: {
-													'ui:components': {
-														stringField: 'enumField',
-														selectWidget: 'comboboxWidget'
-													}
+												'ui:components': {
+													stringField: 'enumField'
 												}
 											},
 											uuid: {
@@ -474,14 +453,8 @@
 												}
 											},
 											node: {
-												'ui:options': {
-													itemTitle: () => null
-												},
-												items: {
-													'ui:components': {
-														stringField: 'enumField',
-														selectWidget: 'comboboxWidget'
-													}
+												'ui:components': {
+													stringField: 'enumField'
 												}
 											},
 											uuid: {
@@ -506,12 +479,12 @@
 
 											const value = getValueSnapshot(form);
 
-											const decodeNodes = lodash.get(value, 'decode.node', []) as string[];
-											if (decodeNodes.length > 0) {
+											const decodeNode = lodash.get(value, 'decode.node', null) as string[];
+											if (decodeNode) {
 												lodash.set(
 													values,
 													['spec', 'template', 'nodeSelector', 'kubernetes.io/hostname'],
-													decodeNodes.join(',')
+													decodeNode
 												);
 											}
 
@@ -531,12 +504,12 @@
 													decodeUUIDs.join(',')
 												);
 											}
-											const prefillNodes = lodash.get(value, 'prefill.node', []) as string[];
-											if (prefillNodes.length > 0) {
+											const prefillNode = lodash.get(value, 'prefill.node', null) as string[];
+											if (prefillNode) {
 												lodash.set(
 													values,
 													['spec', 'prefill', 'template', 'nodeSelector', 'kubernetes.io/hostname'],
-													prefillNodes.join(',')
+													prefillNode
 												);
 											}
 											const prefillTypes = lodash.get(value, 'prefill.type', []) as string[];

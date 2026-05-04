@@ -29,7 +29,7 @@
 	});
 
 	const endpointMap: Record<string, string> = {
-		ModelService: 'ModelGatewayEndpoint',
+		LLMInferenceService: 'ModelGatewayEndpoint',
 		ObjectBucketClaim: 'ObjectGatewayEndpoint',
 		Service: 'ServiceEndpoint'
 	};
@@ -69,7 +69,22 @@
 		});
 		const config = (response.object as CoreV1ConfigMap).data;
 
-		return config?.[endpointKey] ? `Available at ${config[endpointKey]}` : 'Unavailable';
+		const endpoint = config?.[endpointKey];
+		if (!endpoint) return 'Unavailable';
+
+		// Append kind-specific suffixes. Use placeholders when concrete values are
+		// not available in this context.
+		if (kind === 'Service') {
+			return `Available at ${endpoint}:<NodePort>`;
+		}
+
+		if (kind === 'LLMInferenceService') {
+			const ns = namespace || '<namespace>';
+			const modelPlaceholder = '<modelname>';
+			return `Available at ${endpoint}/${ns}/${modelPlaceholder}`;
+		}
+
+		return `Available at ${endpoint}`;
 	}
 </script>
 
