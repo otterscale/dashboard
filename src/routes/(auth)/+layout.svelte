@@ -120,8 +120,19 @@
 		isMounted = true;
 	});
 
-	function resourceUrl(group: string, version: string, kind: string, resource: string) {
+	function resourceUrl(
+		group: string,
+		version: string,
+		kind: string,
+		resource: string,
+		namespace?: string
+	) {
 		const workspace = page.params.workspace ?? '_';
+		if (namespace) {
+			return resolve(
+				`/(auth)/${activeCluster}/${workspace}?group=${group}&version=${version}&kind=${kind}&resource=${resource}&namespace=${namespace}`
+			);
+		}
 		return resolve(
 			`/(auth)/${activeCluster}/${workspace}?group=${group}&version=${version}&kind=${kind}&resource=${resource}`
 		);
@@ -196,12 +207,22 @@
 						)
 					},
 					{
-						title: m.model_template(),
+						title: m.model_configuration(),
 						url: resourceUrl(
 							'serving.kserve.io',
 							'v1alpha2',
 							'LLMInferenceServiceConfig',
 							'llminferenceserviceconfigs'
+						)
+					},
+					{
+						title: m.model_template(),
+						url: resourceUrl(
+							'serving.kserve.io',
+							'v1alpha2',
+							'LLMInferenceServiceConfig',
+							'llminferenceserviceconfigs',
+							'otterscale-system'
 						)
 					}
 				]

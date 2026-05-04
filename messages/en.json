@@ -37,6 +37,7 @@
 	"models": "Models",
 	"all_models": "All Models",
 	"model_service": "Model",
+	"model_configuration": "Configuration",
 	"model_template": "Template",
 	"model_cache": "Cache",
 	"all_namespaces": "All Workspaces",

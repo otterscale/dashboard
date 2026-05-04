@@ -36,7 +36,7 @@
 
 	const isClusterAdmin = $derived(page.data.isClusterAdmin === true);
 	const cluster = $derived(page.params.cluster ?? '');
-	const namespace = $derived(page.data.namespace ?? '');
+	const namespace = $derived(page.url.searchParams.get('namespace') ?? page.data.namespace ?? '');
 	const group = $derived(page.url.searchParams.get('group') ?? '');
 	const version = $derived(page.url.searchParams.get('version') ?? '');
 	const kind = $derived(page.url.searchParams.get('kind') ?? '');
