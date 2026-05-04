@@ -577,7 +577,7 @@
 				<SelectContent
 					class="[&_*[role=option]]:ps-2 [&_*[role=option]]:pe-8 [&_*[role=option]>span]:start-auto [&_*[role=option]>span]:end-2"
 				>
-					{#each [5, 10, 15] as pageSize (pageSize)}
+					{#each [5, 10, 20, 50, 100] as pageSize (pageSize)}
 						<SelectItem value={pageSize.toString()}>
 							{pageSize}
 						</SelectItem>

@@ -8,17 +8,14 @@
 
 	import type { ModuleAttribute } from '../table-layout';
 	import Install from './install.svelte';
-	import { getSetUp, type SetUpType } from './setup/index.ts';
 	import View from './view.svelte';
 
 	let {
 		row,
-		cluster,
-		fromHarbor = true
+		cluster
 	}: {
 		row: Row<Record<ModuleAttribute, JsonValue>>;
 		cluster: string;
-		fromHarbor: boolean;
 	} = $props();
 
 	let actionsOpen = $state(false);
@@ -42,37 +39,19 @@
 				<View {row} />
 			</DropdownMenu.Item>
 
-			{#if row.original.installable}
-				<DropdownMenu.Item
-					onSelect={(e) => {
-						e.preventDefault();
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Install
+					{row}
+					{cluster}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
 					}}
-				>
-					<Install
-						{row}
-						{cluster}
-						{fromHarbor}
-						onOpenChangeComplete={() => {
-							actionsOpen = false;
-						}}
-					/>
-				</DropdownMenu.Item>
-				{@const SetUp: SetUpType = getSetUp(row.original['Chart Name'] as string)}
-				<DropdownMenu.Item
-					onSelect={(e) => {
-						e.preventDefault();
-					}}
-				>
-					<SetUp
-						{row}
-						{cluster}
-						{fromHarbor}
-						onOpenChangeComplete={() => {
-							actionsOpen = false;
-						}}
-					/>
-				</DropdownMenu.Item>
-			{/if}
+				/>
+			</DropdownMenu.Item>
 		</DropdownMenu.Group>
 	</DropdownMenu.Content>
 </DropdownMenu.Root>

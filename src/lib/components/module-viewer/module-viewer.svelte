@@ -79,10 +79,10 @@
 			{/if}
 		{/snippet}
 		{#snippet bulkCreate({ table })}
-			<BulkInstall {table} {cluster} {fromHarbor} />
+			<BulkInstall {table} {cluster} />
 		{/snippet}
 		{#snippet rowActions({ row })}
-			<Actions {row} {cluster} {fromHarbor} />
+			<Actions {row} {cluster} />
 		{/snippet}
 	</DynamicTable>
 </div>
