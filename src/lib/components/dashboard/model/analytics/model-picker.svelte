@@ -91,9 +91,9 @@
 				try {
 					const response = await resourceClient.list({
 						cluster: clusterId,
-						group: 'model.otterscale.io',
-						version: 'v1alpha1',
-						resource: 'modelservices',
+						group: 'serving.kserve.io',
+						version: 'v1alpha2',
+						resource: 'llminferenceservices',
 						namespace: ns
 					});
 					for (const item of response.items) {
@@ -101,7 +101,7 @@
 						if (name) modelNames.add(name);
 					}
 				} catch (error) {
-					console.error('Failed to list ModelServices for analytics picker:', error);
+					console.error('Failed to list LLMInferenceServices for analytics picker:', error);
 				}
 			}
 
