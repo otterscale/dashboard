@@ -75,6 +75,7 @@
 						targetNamespace: lodash.get(chart, ['annotations', 'module.otterscale.io/namespace']),
 						install: { createNamespace: true },
 						interval: '15m',
+						timeout: '1h',
 						...(dependsOn.length > 0 && { dependsOn }),
 						chart: {
 							spec: {
