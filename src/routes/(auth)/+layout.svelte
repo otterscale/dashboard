@@ -128,14 +128,12 @@
 		namespace?: string
 	) {
 		const workspace = page.params.workspace ?? '_';
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
+		const params = new URLSearchParams({ group, version, kind, resource });
 		if (namespace) {
-			return resolve(
-				`/(auth)/${activeCluster}/${workspace}?group=${group}&version=${version}&kind=${kind}&resource=${resource}&namespace=${namespace}`
-			);
+			params.set('namespace', namespace);
 		}
-		return resolve(
-			`/(auth)/${activeCluster}/${workspace}?group=${group}&version=${version}&kind=${kind}&resource=${resource}`
-		);
+		return resolve(`/(auth)/${activeCluster}/${workspace}?${params}`);
 	}
 
 	const navData = $derived({
