@@ -80,25 +80,27 @@
 					}}
 				/>
 			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<Edit
-					{cluster}
-					{namespace}
-					{group}
-					{version}
-					{kind}
-					{resource}
-					{schema}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
+			{#if namespace !== 'otterscale-system'}
+				<DropdownMenu.Item
+					onSelect={(e) => {
+						e.preventDefault();
 					}}
-				/>
-			</DropdownMenu.Item>
+				>
+					<Edit
+						{cluster}
+						{namespace}
+						{group}
+						{version}
+						{kind}
+						{resource}
+						{schema}
+						{object}
+						onOpenChangeComplete={() => {
+							actionsOpen = false;
+						}}
+					/>
+				</DropdownMenu.Item>
+			{/if}
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
