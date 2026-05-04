@@ -301,24 +301,6 @@
 									url: resourceUrl('tenant.otterscale.io', 'v1alpha1', 'Workspace', 'workspaces')
 								},
 								{
-									title: 'Local Model Node',
-									url: resourceUrl(
-										'serving.kserve.io',
-										'v1alpha1',
-										'LocalModelNode',
-										'localmodelnodes'
-									)
-								},
-								{
-									title: m.model_cache(),
-									url: resourceUrl(
-										'serving.kserve.io',
-										'v1alpha1',
-										'LocalModelCache',
-										'localmodelcaches'
-									)
-								},
-								{
 									title: m.module(),
 									url: page.params.workspace
 										? resolve('/(auth)/[cluster]/[workspace]/modules', {
