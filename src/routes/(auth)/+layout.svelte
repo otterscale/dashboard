@@ -239,12 +239,12 @@
 						url: resourceUrl('kro.run', 'v1alpha1', 'Application', 'applications')
 					},
 					{
-						title: m.task(),
-						url: resourceUrl('kro.run', 'v1alpha1', 'Task', 'tasks')
-					},
-					{
 						title: m.schedule(),
 						url: resourceUrl('kro.run', 'v1alpha1', 'Schedule', 'schedules')
+					},
+					{
+						title: m.task(),
+						url: resourceUrl('kro.run', 'v1alpha1', 'Task', 'tasks')
 					}
 				]
 			},
@@ -275,10 +275,6 @@
 				title: m.storage(),
 				icon: HardDriveIcon,
 				items: [
-					{
-						title: m.block_pool(),
-						url: resourceUrl('ceph.rook.io', 'v1', 'CephBlockPool', 'cephblockpools')
-					},
 					{
 						title: m.object_storage(),
 						url: resourceUrl(
