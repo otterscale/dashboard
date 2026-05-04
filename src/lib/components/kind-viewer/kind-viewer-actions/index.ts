@@ -1,7 +1,5 @@
 import type { Component } from 'svelte';
 
-import { namespace } from '$lib/paraglide/messages';
-
 import ApplicationActions from './application/actions.svelte';
 import ApplicationCreate from './application/create.svelte';
 import ObjectBucketClaimActions from './ceph-object-bucket-claim/actions.svelte';
