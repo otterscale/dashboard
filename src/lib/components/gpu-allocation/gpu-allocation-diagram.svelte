@@ -89,7 +89,9 @@
 			}
 
 			// Layer 3: GPUs (only those allocated by the service's pods)
-			const allocatedGpuIds = new Set(podsWithGpus.flatMap((p) => p.allocations.map((a) => a.uuid)));
+			const allocatedGpuIds = new Set(
+				podsWithGpus.flatMap((p) => p.allocations.map((a) => a.uuid))
+			);
 
 			for (const gpu of topologyData.gpus) {
 				if (!allocatedGpuIds.has(gpu.device.id)) continue;
