@@ -171,7 +171,7 @@
 								>
 									<span class="aspect-square shrink-0 rounded-sm border bg-(--color-bg)"></span>
 									<span class="text-muted-foreground">{name}</span>
-									<p class="font-mono">{Number(value).toFixed(2)} {m.per_second()}</p>
+									<p class="font-mono">{Number(value).toFixed(0)}/{m.per_second()}</p>
 								</div>
 							{/snippet}
 						</Chart.Tooltip>
