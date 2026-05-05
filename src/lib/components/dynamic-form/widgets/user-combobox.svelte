@@ -49,7 +49,7 @@
 		retrieveUiOption,
 		uiOptionProps
 	} from '@sjsf/form';
-	import { tick } from 'svelte';
+	import { onMount, tick } from 'svelte';
 
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Command from '$lib/components/ui/command/index.js';
@@ -91,6 +91,18 @@
 		}, 300);
 	});
 
+	onMount(() => {
+		const subject = value as string | undefined;
+		if (!subject || labelCache[subject]) return;
+		fetch(`/rest/users/${encodeURIComponent(subject)}`)
+			.then(async (response) => {
+				if (!response.ok) return;
+				const user: KeycloakUser = await response.json();
+				labelCache[subject] = getDisplayName(user);
+				onFetch?.([user]);
+			})
+			.catch(() => {});
+	});
 	$effect(() => {
 		const subject = value as string | undefined;
 		if (!subject || labelCache[subject]) return;
