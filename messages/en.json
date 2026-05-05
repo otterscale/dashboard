@@ -170,7 +170,7 @@
 	"kv_cache_usage": "KV Cache Usage",
 	"instances": "Instances",
 	"instance_type": "Instance Type",
-	"per_second": "per s.",
+	"per_second": "sec",
 	"input_edit": "Input/Edit",
 	"required": "Required",
 	"editor": "Editor",

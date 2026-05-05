@@ -170,7 +170,7 @@
 	"kv_cache_usage": "KV Cache 使用率",
 	"instances": "執行個體",
 	"instance_type": "執行個體類型",
-	"per_second": "/ 秒",
+	"per_second": "秒",
 	"input_edit": "輸入／編輯",
 	"required": "必填",
 	"editor": "編輯器",
