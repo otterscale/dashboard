@@ -3,6 +3,7 @@
 	import type { ServingKserveIoV1Alpha1LLMInferenceService } from '@otterscale/types';
 	import type { Schema } from 'ajv';
 
+	import { page } from '$app/state';
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import Edit from '$lib/components/kind-viewer/kind-viewer-actions/default/edit.svelte';
@@ -68,7 +69,6 @@
 			>
 				<Duplicate
 					{cluster}
-					{namespace}
 					{group}
 					{version}
 					{kind}
@@ -80,7 +80,7 @@
 					}}
 				/>
 			</DropdownMenu.Item>
-			{#if namespace !== 'otterscale-system'}
+			{#if page.url.searchParams.get('namespace') !== 'otterscale-system'}
 				<DropdownMenu.Item
 					onSelect={(e) => {
 						e.preventDefault();
@@ -100,26 +100,26 @@
 						}}
 					/>
 				</DropdownMenu.Item>
-			{/if}
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<Delete
-					{cluster}
-					{namespace}
-					{group}
-					{version}
-					{kind}
-					{resource}
-					{schema}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
+				<DropdownMenu.Item
+					onSelect={(e) => {
+						e.preventDefault();
 					}}
-				/>
-			</DropdownMenu.Item>
+				>
+					<Delete
+						{cluster}
+						{namespace}
+						{group}
+						{version}
+						{kind}
+						{resource}
+						{schema}
+						{object}
+						onOpenChangeComplete={() => {
+							actionsOpen = false;
+						}}
+					/>
+				</DropdownMenu.Item>
+			{/if}
 		</DropdownMenu.Group>
 	</DropdownMenu.Content>
 </DropdownMenu.Root>

@@ -11,15 +11,16 @@
 	import { toast } from 'svelte-sonner';
 	import { parseDocument, stringify } from 'yaml';
 
+	import { page } from '$app/state';
 	import SchemaViewer from '$lib/components/schema-viewer/schema-viewer.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { m } from '$lib/paraglide/messages';
+	
 
 	let {
 		cluster,
-		namespace,
 		group,
 		version,
 		kind,
@@ -29,7 +30,6 @@
 		onOpenChangeComplete
 	}: {
 		cluster: string;
-		namespace?: string;
 		group: string;
 		version: string;
 		kind: string;
@@ -45,7 +45,7 @@
 			kind: lodash.get(object, 'kind'),
 			metadata: {
 				name: '',
-				namespace: namespace
+				namespace: page.data.namespace
 			},
 			spec: lodash.get(object, 'spec')
 		})
@@ -194,7 +194,7 @@
 			async () => {
 				await resourceClient.create({
 					cluster,
-					namespace,
+					namespace: page.data.namespace,
 					group,
 					version,
 					resource,
@@ -216,7 +216,6 @@
 		);
 	}
 </script>
-
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {

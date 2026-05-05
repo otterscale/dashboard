@@ -326,6 +326,8 @@
 												);
 											}
 
+											lodash.set(values, ['spec', 'model'], lodash.get(response.object, ['spec', 'model']))
+
 											handleNext();
 										}
 									}}
@@ -528,6 +530,9 @@
 													prefillUUIDs.join(',')
 												);
 											}
+
+											lodash.set(values, ['spec', 'model'], lodash.get(response.object, ['spec', 'model']))
+
 											handleNext();
 										}
 									}}
