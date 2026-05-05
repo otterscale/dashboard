@@ -96,9 +96,7 @@
 
 	let isModuleFetching = $state(false);
 
-	const minimumVersion = semver.valid(version)
-		? `${semver.major(version)}.${semver.minor(version)}.0`
-		: '1.0.0';
+	const dashboardVersion = semver.valid(version) ? version : '1.0.0';
 
 	let indexModules: ModuleType[] = $state([]);
 
@@ -177,8 +175,10 @@
 			return entireModules
 				.filter((module: ModuleType) => {
 					const moduleVersion = module.version;
-					const moduleMinorVersion = `${semver.major(moduleVersion)}.${semver.minor(moduleVersion)}.0`;
-					return semver.gte(moduleMinorVersion, minimumVersion);
+					return (
+						semver.major(moduleVersion) === semver.major(dashboardVersion) &&
+						semver.minor(moduleVersion) === semver.minor(dashboardVersion)
+					);
 				})
 				.filter((module: ModuleType) => module.name.startsWith('otterscale-'));
 		} catch (error) {
