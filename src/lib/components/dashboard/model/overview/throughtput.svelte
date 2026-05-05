@@ -186,7 +186,7 @@
 									<div class="grid gap-1.5">
 										<span class="text-muted-foreground">{name}</span>
 									</div>
-									<p class="font-mono">{Number(value).toFixed(2)} {m.per_second()}</p>
+									<p class="font-mono">{Number(value).toFixed(0)}/{m.per_second()}</p>
 								</div>
 							{/snippet}
 						</Chart.Tooltip>
