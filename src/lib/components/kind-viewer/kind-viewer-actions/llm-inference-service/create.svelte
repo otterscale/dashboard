@@ -326,7 +326,11 @@
 												);
 											}
 
-											lodash.set(values, ['spec', 'model'], lodash.get(response.object, ['spec', 'model']))
+											lodash.set(
+												values,
+												['spec', 'model'],
+												lodash.get(response.object, ['spec', 'model'])
+											);
 
 											handleNext();
 										}
@@ -531,7 +535,11 @@
 												);
 											}
 
-											lodash.set(values, ['spec', 'model'], lodash.get(response.object, ['spec', 'model']))
+											lodash.set(
+												values,
+												['spec', 'model'],
+												lodash.get(response.object, ['spec', 'model'])
+											);
 
 											handleNext();
 										}

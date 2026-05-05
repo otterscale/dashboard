@@ -10,9 +10,7 @@
 	import Shield from '@lucide/svelte/icons/shield';
 	import Users from '@lucide/svelte/icons/users';
 	import Zap from '@lucide/svelte/icons/zap';
-	import type {
-		TenantOtterscaleIoV1Alpha1Workspace
-	} from '@otterscale/types';
+	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import { InstantVector, PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 

@@ -17,7 +17,6 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { m } from '$lib/paraglide/messages';
-	
 
 	let {
 		cluster,
@@ -216,6 +215,7 @@
 		);
 	}
 </script>
+
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
