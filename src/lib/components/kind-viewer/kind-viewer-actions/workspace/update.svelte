@@ -95,40 +95,7 @@
 					'items'
 				),
 				title: 'Members',
-				items: [
-					{
-						...lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.members.items') as any,
-							['properties', 'required']
-						),
-						required: [
-							...(lodash.get(
-								jsonSchema,
-								'properties.spec.properties.members.items.required'
-							) as any),
-							'name'
-						],
-						properties: {
-							name: {
-								...(lodash.get(
-									jsonSchema,
-									'properties.spec.properties.members.items.properties.name'
-								) as any),
-								title: 'Name',
-								readOnly: true
-							},
-							role: {
-								...(lodash.get(
-									jsonSchema,
-									'properties.spec.properties.members.items.properties.role'
-								) as any),
-								title: 'Role',
-								readOnly: true
-							}
-						}
-					}
-				],
-				additionalItems: {
+				items: {
 					...lodash.omit(
 						lodash.get(jsonSchema, 'properties.spec.properties.members.items') as any,
 						['properties', 'required']
@@ -138,7 +105,6 @@
 						'name'
 					],
 					properties: {
-						// For user friendly, use subject to identifier user and render username.
 						subject: {
 							...(lodash.get(
 								jsonSchema,
@@ -165,15 +131,6 @@
 					}
 				},
 				items: {
-					'ui:options': {
-						layouts: {
-							'object-properties': {
-								class: 'grid grid-cols-2 gap-3'
-							}
-						}
-					}
-				},
-				additionalItems: {
 					'ui:options': {
 						layouts: {
 							'object-properties': {
@@ -223,20 +180,12 @@
 				let members = value as SchemaObjectValue[];
 				members = members.map((member) => {
 					const keycloakUser = getKeycloakUserBySubject(member.subject as string);
-					if (member.subject === page.data.user.sub) {
-						return {
-							...member,
-							username: page.data.user.username,
-							serviceAccount: false
-						};
-					} else {
-						return {
-							...member,
-							name: getDisplayName(keycloakUser) ?? null,
-							serviceAccount: isServiceAccount(keycloakUser?.username),
-							username: keycloakUser?.username ?? null
-						};
-					}
+					return {
+						...member,
+						name: getDisplayName(keycloakUser) ?? null,
+						serviceAccount: isServiceAccount(keycloakUser?.username),
+						username: keycloakUser?.username ?? null
+					};
 				});
 				return members;
 			},
