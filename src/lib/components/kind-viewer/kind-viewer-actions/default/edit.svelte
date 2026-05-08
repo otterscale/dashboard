@@ -1,4 +1,5 @@
 <script lang="ts" module>
+	const unfoldFields = ['name', 'namespace', 'labels', 'annotations', 'finalizers'];
 	async function fold(editor: import('monaco-editor').editor.IStandaloneCodeEditor) {
 		const yaml = editor.getValue();
 		const document = parseDocument(yaml);
@@ -23,13 +24,7 @@
 								) => {
 									if (isPair(subPair) && isScalar(subPair.key)) {
 										const subKey = String(subPair.key.value);
-										const unfoldFields = [
-											'name',
-											'namespace',
-											'labels',
-											'annotations',
-											'finalizers'
-										];
+
 										if (!unfoldFields.includes(subKey)) {
 											if (model && subPair.key.range) {
 												const lineNumber = model.getPositionAt(subPair.key.range[0]).lineNumber;
