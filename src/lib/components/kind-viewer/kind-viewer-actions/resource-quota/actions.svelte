@@ -1,9 +1,7 @@
 <script lang="ts">
-	import type { JsonValue } from '@bufbuild/protobuf';
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
-	import type { Row } from '@tanstack/table-core';
 
-	import Delete from '$lib/components/dynamic-form/resource-quota/delete-dialog.svelte';
+	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import Edit from '$lib/components/kind-viewer/kind-viewer-actions/default/edit.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
@@ -17,7 +15,6 @@
 		version,
 		kind,
 		resource,
-		row,
 		schema,
 		object
 	}: {
@@ -27,7 +24,6 @@
 		version: string;
 		kind: string;
 		resource: string;
-		row: Row<Record<string, JsonValue>>;
 		schema: any;
 		object: any;
 	} = $props();
@@ -86,11 +82,16 @@
 				}}
 			>
 				<Delete
-					name={String(row.original['Name'])}
+					{schema}
+					{object}
+					{cluster}
+					{namespace}
+					{group}
+					{version}
+					{kind}
+					{resource}
 					onOpenChangeComplete={() => {
-						if (actionsOpen) {
-							actionsOpen = false;
-						}
+						actionsOpen = false;
 					}}
 				/>
 			</DropdownMenu.Item>
