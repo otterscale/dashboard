@@ -56,7 +56,7 @@
 						name,
 						labels: {
 							'otterscale.io/gpu': 'true',
-							'nvidia.com/gpu.workload.config': null
+							'nvidia.com/gpu.workload.config': ''
 						}
 					}
 				});
@@ -107,7 +107,7 @@
 					metadata: {
 						name,
 						labels: {
-							'otterscale.io/gpu': null,
+							'otterscale.io/gpu': '',
 							'nvidia.com/gpu.workload.config': 'vm-passthrough'
 						}
 					}
