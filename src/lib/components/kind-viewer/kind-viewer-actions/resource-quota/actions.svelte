@@ -1,7 +1,5 @@
 <script lang="ts">
-	import type { JsonValue } from '@bufbuild/protobuf';
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
-	import type { Row } from '@tanstack/table-core';
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
