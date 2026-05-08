@@ -7,8 +7,8 @@
 	import { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
-	import * as Statistics from '$lib/components/custom/statistics/index';
 	import { ReloadManager } from '$lib/components/custom/reloader';
+	import * as Statistics from '$lib/components/custom/statistics/index';
 	import * as Chart from '$lib/components/ui/chart';
 	import { m } from '$lib/paraglide/messages';
 	import { computeStep, vllmMetricWithSelector } from '$lib/prometheus';
