@@ -9,7 +9,7 @@
 	import { PrometheusDriver } from 'prometheus-query';
 	import { untrack } from 'svelte';
 
-	import * as Statistics from '$lib/components/custom/data-table/statistics/index';
+	import * as Statistics from '$lib/components/custom/statistics/index';
 	import ChartContainer from '$lib/components/ui/chart/chart-container.svelte';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import Input from '$lib/components/ui/input/input.svelte';

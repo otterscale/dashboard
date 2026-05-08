@@ -6,8 +6,8 @@
 	import { type PrometheusDriver, ResponseType } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
-	import * as Statistics from '$lib/components/custom/data-table/statistics/index';
 	import { ReloadManager } from '$lib/components/custom/reloader';
+	import * as Statistics from '$lib/components/custom/statistics/index';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
 	import * as Card from '$lib/components/ui/card';
