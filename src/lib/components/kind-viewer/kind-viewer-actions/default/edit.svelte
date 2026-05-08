@@ -1,8 +1,69 @@
+<script lang="ts" module>
+	async function fold(editor: import('monaco-editor').editor.IStandaloneCodeEditor) {
+		const yaml = editor.getValue();
+		const document = parseDocument(yaml);
+		const model = editor.getModel();
+
+		const linesToFold: number[] = [];
+
+		if (document.contents) {
+			visit(document.contents, {
+				Pair(_, pair) {
+					if (isScalar(pair.key) && pair.key.value === 'metadata') {
+						const metadataValues: any = pair.value; // eslint-disable-line @typescript-eslint/no-explicit-any
+						const metadataIsMap =
+							isMap(metadataValues) ||
+							(metadataValues &&
+								metadataValues.items &&
+								metadataValues.constructor?.name === 'YAMLMap');
+						if (metadataIsMap) {
+							metadataValues.items.forEach(
+								(
+									subPair: any // eslint-disable-line @typescript-eslint/no-explicit-any
+								) => {
+									if (isPair(subPair) && isScalar(subPair.key)) {
+										const subKey = String(subPair.key.value);
+										const unfoldFields = [
+											'name',
+											'namespace',
+											'labels',
+											'annotations',
+											'finalizers'
+										];
+										if (!unfoldFields.includes(subKey)) {
+											if (model && subPair.key.range) {
+												const lineNumber = model.getPositionAt(subPair.key.range[0]).lineNumber;
+												linesToFold.push(lineNumber);
+											}
+										}
+									}
+								}
+							);
+						}
+						// Skip traversing inside metadata further since we already processed its keys.
+						return visit.SKIP;
+					}
+				}
+			});
+		}
+
+		if (linesToFold.length > 0) {
+			// Sort from bottom to top to avoid line shift issues during folding
+			for (const line of [...new Set(linesToFold)].sort((a, b) => b - a)) {
+				editor.setPosition({ lineNumber: line, column: 1 });
+				await editor.getAction('editor.fold')?.run();
+			}
+
+			editor.setPosition({ lineNumber: 1, column: 1 });
+		}
+	}
+</script>
+
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import Ajv, { type Schema } from 'ajv';
+	import Ajv, { type Schema, type ValidateFunction } from 'ajv';
 	import * as jsonpatch from 'fast-json-patch';
 	import { JSON_SCHEMA, load } from 'js-yaml';
 	import lodash from 'lodash';
@@ -10,6 +71,7 @@
 	import { getContext, tick } from 'svelte';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
+	import type { Node } from 'yaml';
 	import { isMap, isPair, isScalar, parseDocument, stringify, visit } from 'yaml';
 
 	import SchemaViewer from '$lib/components/schema-viewer/schema-viewer.svelte';
@@ -36,73 +98,31 @@
 		kind: string;
 		resource: string;
 		schema: Schema;
-		object: any;
+		object: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 		onOpenChangeComplete: () => void;
 	} = $props();
 
-	let value = $state(stringify(object));
+	let value = $state('');
+	let open = $state(false);
 
 	let editorInstance: import('monaco-editor').editor.IStandaloneCodeEditor | undefined =
 		$state(undefined);
 	let monacoInstance: typeof import('monaco-editor') | undefined = $state(undefined);
+
+	// Validator
 	const jsonSchemaValidator = new Ajv({
 		allErrors: true,
 		strict: false,
 		logger: false
 	});
-	const validate = jsonSchemaValidator.compile(jsonSchema);
 
-	// Initialize
-	async function fold(editor: import('monaco-editor').editor.IStandaloneCodeEditor) {
-		const yaml = editor.getValue();
-		const document = parseDocument(yaml);
-		const model = editor.getModel();
-
-		const linesToFold: number[] = [];
-
-		if (document.contents) {
-			visit(document.contents, {
-				Pair(_, pair) {
-					if (isScalar(pair.key) && pair.key.value === 'metadata') {
-						const metadataValues: any = pair.value;
-						const metadataIsMap =
-							isMap(metadataValues) ||
-							(metadataValues &&
-								metadataValues.items &&
-								metadataValues.constructor?.name === 'YAMLMap');
-						if (metadataIsMap) {
-							metadataValues.items.forEach((subPair: any) => {
-								if (isPair(subPair) && isScalar(subPair.key)) {
-									const subKey = String(subPair.key.value);
-									const unfoldFields = ['name', 'namespace', 'labels', 'annotations', 'finalizers'];
-									if (!unfoldFields.includes(subKey)) {
-										if (model && subPair.key.range) {
-											const lineNumber = model.getPositionAt(subPair.key.range[0]).lineNumber;
-											linesToFold.push(lineNumber);
-										}
-									}
-								}
-							});
-						}
-						// Skip traversing inside metadata further since we already processed its keys.
-						return visit.SKIP;
-					}
-				}
-			});
-		}
-
-		if (linesToFold.length > 0) {
-			// Sort from bottom to top to avoid line shift issues during folding
-			for (const line of [...new Set(linesToFold)].sort((a, b) => b - a)) {
-				editor.setPosition({ lineNumber: line, column: 1 });
-				await editor.getAction('editor.fold')?.run();
-			}
-
-			editor.setPosition({ lineNumber: 1, column: 1 });
-		}
-	}
-	function performValidation() {
-		if (!editorInstance || !monacoInstance) return;
+	let validate: ValidateFunction | undefined = $state(undefined);
+	function performValidation(
+		editorInstance: import('monaco-editor').editor.IStandaloneCodeEditor | undefined,
+		monacoInstance: typeof import('monaco-editor') | undefined,
+		validate: ValidateFunction | undefined
+	) {
+		if (!editorInstance || !monacoInstance || !validate) return;
 
 		const monaco = monacoInstance;
 		const markers: import('monaco-editor').editor.IMarkerData[] = [];
@@ -146,12 +166,14 @@
 
 				// Locate Errors
 				targetPath = error.instancePath.split('/').filter((path) => path !== '');
-				const node = document.getIn(targetPath, true) as any;
+				const node = document.getIn(targetPath, true) as unknown as Node;
 				const severity =
-					node?.value === null ? monaco.MarkerSeverity.Hint : monaco.MarkerSeverity.Error;
+					node && isScalar(node) && node.value === null
+						? monaco.MarkerSeverity.Hint
+						: monaco.MarkerSeverity.Error;
 
 				if (node && node.range) {
-					const [start, end] = node.range.map((point: any) => model.getPositionAt(point));
+					const [start, end] = node.range.map((point) => model.getPositionAt(point));
 
 					if (error.keyword === 'required') {
 						markers.push({
@@ -187,19 +209,21 @@
 
 		monaco.editor.setModelMarkers(model, 'yaml-validator', markers);
 	}
+
+	// Validate
 	let isReady = $state(false);
 	$effect(() => {
-		if (editorInstance && monacoInstance) {
+		if (editorInstance && monacoInstance && validate) {
 			tick().then(() => {
 				requestAnimationFrame(async () => {
 					await fold(editorInstance!);
 					isReady = true;
 				});
 			});
-			performValidation();
+			performValidation(editorInstance, monacoInstance, validate);
 
 			const disposable = editorInstance.onDidChangeModelContent(() => {
-				performValidation();
+				performValidation(editorInstance, monacoInstance, validate);
 			});
 
 			return () => disposable.dispose();
@@ -209,11 +233,11 @@
 	// Submit
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-
-	let open = $state(false);
 	let isSubmitting = $state(false);
-	function handleConfirm() {
+	function handleConfirm(validate: ValidateFunction | undefined) {
 		if (isSubmitting) return;
+
+		if (!validate) return;
 
 		const document = parseDocument(value);
 		if (document.errors.length > 0) {
@@ -221,7 +245,7 @@
 			return;
 		}
 
-		const parsed = document.toJS() as Record<string, any>;
+		const parsed = document.toJS();
 		if (!validate(parsed)) {
 			toast.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
 			return;
@@ -229,7 +253,9 @@
 
 		isSubmitting = true;
 
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const initialStructuredValue: any = load(stringify(object), { schema: JSON_SCHEMA });
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const currentStructuredValue: any = load(value, { schema: JSON_SCHEMA });
 
 		const patches = jsonpatch.compare(initialStructuredValue, currentStructuredValue);
@@ -302,13 +328,23 @@
 
 <Dialog.Root
 	bind:open
+	onOpenChange={(isOpen) => {
+		if (!isOpen) return;
+
+		value = stringify(object);
+		validate = jsonSchemaValidator.compile(jsonSchema);
+		// editorInstance and monacoInstance are initialized by Monaco component.
+	}}
 	onOpenChangeComplete={(isOpen) => {
 		onOpenChangeComplete?.();
-		if (!isOpen) {
-			editorInstance = undefined;
-			value = stringify(object);
-			isReady = false;
-		}
+
+		if (isOpen) return;
+
+		value = '';
+		validate = undefined;
+		editorInstance = undefined;
+		monacoInstance = undefined;
+		isReady = false;
 	}}
 >
 	<Dialog.Trigger>
@@ -353,7 +389,7 @@
 		</div>
 		<Dialog.Footer>
 			<Button class="mr-auto" variant="outline" onclick={() => (open = false)}>{m.cancel()}</Button>
-			<Button onclick={handleConfirm}>
+			<Button onclick={() => handleConfirm(validate)}>
 				{m.confirm()}
 			</Button>
 		</Dialog.Footer>
