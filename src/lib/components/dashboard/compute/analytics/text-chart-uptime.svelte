@@ -4,7 +4,7 @@
 	import { PrometheusDriver } from 'prometheus-query';
 	import { onMount } from 'svelte';
 
-	import * as Statistics from '$lib/components/custom/data-table/statistics/index';
+	import * as Statistics from '$lib/components/custom/statistics/index';
 	import { formatDuration } from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
 
