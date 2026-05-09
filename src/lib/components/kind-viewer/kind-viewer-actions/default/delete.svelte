@@ -1,10 +1,17 @@
+<script lang="ts" module>
+	const jsonSchemaValidator = new Ajv({
+		allErrors: true,
+		strict: true
+	});
+</script>
+
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
-	import Ajv from 'ajv';
+	import Ajv, { type ValidateFunction } from 'ajv';
 	import lodash from 'lodash';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -30,44 +37,52 @@
 		version: string;
 		kind: string;
 		resource: string;
-		schema?: any;
-		object: any;
+		schema: Schema;
+		object: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 		onOpenChangeComplete: () => void;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	const jsonSchema = {
-		type: 'object',
-		required: ['name'],
-		properties: {
-			name: {
-				title: 'Name',
-				type: 'string',
-				pattern: object?.metadata?.name
-			}
-		}
-	} as Schema;
-
-	// Validation
-	const jsonSchemaValidator = new Ajv({
-		allErrors: true,
-		strict: true
-	});
-	const validate = jsonSchemaValidator.compile(jsonSchema);
-
-	// Container for Data.
-	let values: any = $state({
-		name: ''
-	});
+	let jsonSchema: Schema | undefined = $state(undefined);
+	let validate: ValidateFunction | undefined = $state(undefined);
+	let values = $state({ name: '' });
 
 	// Flags
 	let open = $state(false);
 	let isDeleting = $state(false);
 </script>
 
-<Dialog.Root bind:open {onOpenChangeComplete}>
+<Dialog.Root
+	bind:open
+	onOpenChange={(isOpen) => {
+		if (!isOpen) return;
+
+		jsonSchema = {
+			type: 'object',
+			required: ['name'],
+			properties: {
+				name: {
+					title: 'Name',
+					type: 'string',
+					pattern: object?.metadata?.name
+				}
+			}
+		} as Schema;
+		validate = jsonSchemaValidator.compile(jsonSchema);
+		values = { name: '' };
+	}}
+	onOpenChangeComplete={(isOpen) => {
+		onOpenChangeComplete?.();
+
+		if (isOpen) return;
+
+		jsonSchema = undefined;
+		validate = undefined;
+		values = { name: '' };
+	}}
+>
 	<Dialog.Trigger>
 		{#snippet child({ props })}
 			<Item.Root {...props} class="w-full p-0 text-xs **:text-destructive" size="sm">
@@ -103,6 +118,8 @@
 				posthook: () => {
 					if (isDeleting) return;
 					isDeleting = true;
+
+					if (!validate) return;
 
 					const isValid = validate(values);
 					if (!isValid) return;

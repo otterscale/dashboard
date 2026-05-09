@@ -14,7 +14,7 @@
 		onOpenChangeComplete
 	}: {
 		schema: Schema;
-		object: any;
+		object: any; // eslint-disable-next-line @typescript-eslint/no-explicit-any
 		onOpenChangeComplete?: () => void;
 	} = $props();
 
