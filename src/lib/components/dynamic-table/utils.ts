@@ -159,6 +159,30 @@ function format(value: string) {
 	}
 }
 
+function jsonValueToDate(value: JsonValue | undefined): Date | null {
+	// Type Check
+	if (value === undefined || value === null) return null;
+	if (typeof value === 'boolean') return null;
+
+	// Value Check
+	if (typeof value === 'string' && value.trim() === '') return null;
+
+	// Transfer
+	let date: Date | null = null;
+	if (typeof value === 'number') {
+		date = new Date(value);
+	} else if (typeof value === 'string') {
+		date = new Date(value);
+	} else {
+		date = new Date(String(value));
+	}
+
+	// Transfered Value Check
+	if (Number.isNaN(date.getTime())) return null
+
+	return date;
+}
+
 function getRelativeTime(now: number, timestamp: number) {
 	const milliseconds = Math.max(timestamp, 0);
 
@@ -251,17 +275,6 @@ function getDefaultDataSchema(type: JsonValue | undefined, format?: JsonValue): 
 	return undefined;
 }
 
-function jsonValueToDisplayDate(value: JsonValue | undefined): Date | null {
-	if (value === undefined || value === null || value === '') return null;
-	if (typeof value === 'boolean') return null;
-	const d =
-		typeof value === 'number'
-			? new Date(value)
-			: typeof value === 'string'
-				? new Date(value)
-				: new Date(String(value));
-	return Number.isNaN(d.getTime()) ? null : d;
-}
 
 export {
 	format,
@@ -271,7 +284,7 @@ export {
 	getDefaultUISchema,
 	getRatio,
 	getRelativeTime,
-	jsonValueToDisplayDate,
+	jsonValueToDate,
 	quantityToScalar
 };
 export type { DataSchemaType, UISchemaType };
