@@ -178,7 +178,7 @@ function jsonValueToDate(value: JsonValue | undefined): Date | null {
 	}
 
 	// Transfered Value Check
-	if (Number.isNaN(date.getTime())) return null
+	if (Number.isNaN(date.getTime())) return null;
 
 	return date;
 }
@@ -274,7 +274,6 @@ function getDefaultDataSchema(type: JsonValue | undefined, format?: JsonValue): 
 	}
 	return undefined;
 }
-
 
 export {
 	format,
