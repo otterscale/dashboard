@@ -199,11 +199,9 @@
 	}
 	setFormContext(form);
 
-	if (onFormChange) {
-		$effect(() => {
-			onFormChange(form);
-		});
-	}
+	$effect(() => {
+		onFormChange?.(form);
+	});
 </script>
 
 <div class={cn('h-full', className)}>

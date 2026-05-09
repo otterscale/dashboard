@@ -91,7 +91,10 @@
 		>;
 	} = $props();
 
-	let mode = $state<'table' | 'grid'>(gridsLayout ? 'grid' : 'table');
+	// gridsLayout is set once, capturing the initial value is intentional.
+	// svelte-ignore state_referenced_locally
+	const hasGridlayout = !!gridsLayout;
+	let mode = $state<'table' | 'grid'>(hasGridlayout ? 'grid' : 'table');
 
 	const columns: ColumnDef<Record<string, JsonValue>>[] = [
 		{
@@ -115,6 +118,8 @@
 			enableSorting: false,
 			size: 30
 		},
+		// columnDefinitions are set once, capturing the initial value is intentional.
+		// svelte-ignore state_referenced_locally
 		...columnDefinitions,
 		{
 			id: 'actions',
@@ -164,7 +169,7 @@
 	let columnVisibility = $state<VisibilityState>({});
 	let columnSizing = $state<ColumnSizingState>({});
 	let sorting = $state<SortingState>([]);
-	let pagination = $state<PaginationState>({ pageIndex: 0, pageSize: gridsLayout ? 9 : 10 });
+	let pagination = $state<PaginationState>({ pageIndex: 0, pageSize: hasGridlayout ? 9 : 10 });
 
 	let table = createSvelteTable<Record<string, JsonValue>>({
 		columns,
@@ -723,11 +728,16 @@
 								{/if}
 								{#if header.column.getCanResize()}
 									<div
+										role="slider"
+										aria-orientation="vertical"
+										aria-label="Resize column"
+										aria-valuenow={header.getSize()}
+										tabindex="-1"
 										class="user-select-none absolute top-0 -right-2 z-10 flex h-full w-4 cursor-col-resize touch-none justify-center"
 										ondblclick={() => header.column.resetSize()}
 										onmousedown={header.getResizeHandler()}
 										ontouchstart={header.getResizeHandler()}
-									/>
+									></div>
 								{/if}
 							</Table.Head>
 						{/each}
