@@ -51,6 +51,8 @@
 		metadata: ArrayOfObjectMetadata;
 	} = $props();
 
+	// Validate once at init, metadata is set by table config and never mutates
+	// svelte-ignore state_referenced_locally
 	if (!metadata) {
 		throw Error(
 			`Expected metadata of ${column.id} for ArrayOfObjectCell, but got metadata:`,

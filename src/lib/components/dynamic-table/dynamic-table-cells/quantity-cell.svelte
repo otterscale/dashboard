@@ -23,6 +23,8 @@
 		metadata: QuantityMetadata;
 	} = $props();
 
+	// Validate once at init, metadata is set by table config and never mutates
+	// svelte-ignore state_referenced_locally
 	if (!metadata) {
 		throw Error(`Expected metadata of ${column.id} for QuantityCell, but got metadata:`, metadata);
 	}
@@ -32,8 +34,10 @@
 
 {#if data}
 	{#if metadata.type === 'continuous'}
+		<!-- Continuous quantity in Kubernetes: integer without unit  -->
 		{data}
 	{:else if metadata.type === 'discrete'}
+		<!-- Discrete quantity in Kubernetes: integer with optional binary prefix  -->
 		{@const { value, unit } = formatWithBinarySuffix(BigInt(quantityToScalar(data)))}
 		{`${value.toFixed(0)} ${unit}`}
 	{/if}
