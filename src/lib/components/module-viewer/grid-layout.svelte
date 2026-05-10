@@ -23,12 +23,12 @@
 	} = $props();
 </script>
 
-<Card.Root class={!row.original.installable ? 'bg-muted' : 'bg-card'}>
+<Card.Root class={!row.original['installable'] ? 'bg-muted' : 'bg-card'}>
 	<Card.Header>
 		<Item.Root class="items-start p-0">
 			<Item.Media>
 				<Avatar.Root>
-					<Avatar.Image src={row.original.icon as string} alt="helm" />
+					<Avatar.Image src={row.original['icon'] as string} alt="helm" />
 					<Avatar.Fallback>
 						<SiHelm class="size-4" />
 					</Avatar.Fallback>
@@ -37,10 +37,10 @@
 			<Item.Content class="text-left">
 				<Item.Title class="font-bold">
 					{row.original['Chart Name']}
-					<Badge variant="outline">{row.original.Version}</Badge>
+					<Badge variant="outline">{row.original['Version']}</Badge>
 				</Item.Title>
 				<Item.Description>
-					{@const tags: string[] = row.original.Labels as string[]}
+					{@const tags: string[] = row.original['Labels'] as string[]}
 					{#if tags.length}
 						<div class="flex h-full gap-2 overflow-hidden">
 							{#each tags.slice(0, 3) as tag, index (index)}
@@ -57,7 +57,7 @@
 							{/if}
 						</div>
 					{:else}
-						{@const type = row.original.Type as string}
+						{@const type = row.original['Type'] as string}
 						<span class="flex items-center gap-1">
 							<TagIcon size={12} />
 							{type}
@@ -81,12 +81,12 @@
 	</Card.Content>
 	<Card.Footer class="items-between flex gap-4 text-xs text-gray-500">
 		{@const dependsOn = lodash.get(
-			row.original.annotations,
+			row.original['annotations'],
 			'module.otterscale.io/depends-on',
 			''
 		) as string}
 		{@const dependencies = dependsOn.split(',').filter(Boolean)}
-		{@const installedModules = (row.original.installedModules ?? []) as string[]}
+		{@const installedModules = (row.original['installedModules'] ?? []) as string[]}
 		{@const prerequisites = dependencies.filter(
 			(dependency) => !installedModules.includes(dependency)
 		)}
@@ -101,7 +101,7 @@
 			{/if}
 		</div>
 		<div class="ml-auto">
-			{#if row.original.Installed}
+			{#if row.original['Installed']}
 				<Badge>Installed</Badge>
 			{/if}
 		</div>

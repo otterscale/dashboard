@@ -39,20 +39,20 @@
 
 	let open = $state(false);
 	let isSubmitting = $state(false);
-
-	function getDependencies(chart: ModuleType): string[] {
-		const dependsOn = chart.annotations?.['module.otterscale.io/depends-on'] ?? '';
-		return dependsOn.split(',').filter(Boolean);
-	}
-
 	async function handleInstall(
 		chart: ModuleType,
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository,
-		selectedNames: Set<string>
+		selectedModuleNames: Set<string>
 	): Promise<string> {
-		const dependsOn = getDependencies(chart)
-			.filter((name) => selectedNames.has(name))
-			.map((name) => ({ name, namespace }));
+		const dependencies =
+			chart.annotations?.['module.otterscale.io/depends-on'].split(',').filter(Boolean) ?? [];
+		const dependenciesOfSelectedModuleNames = dependencies.filter((name) =>
+			selectedModuleNames.has(name)
+		);
+		const dependenciesOfSelectedModules = dependenciesOfSelectedModuleNames.map((name) => ({
+			name,
+			namespace
+		}));
 
 		const manifest = {
 			apiVersion: `${group}/${version}`,
@@ -67,7 +67,9 @@
 				install: { createNamespace: true },
 				interval: '15m',
 				timeout: '1h',
-				...(dependsOn.length > 0 && { dependsOn }),
+				...(dependenciesOfSelectedModules.length > 0 && {
+					dependsOn: dependenciesOfSelectedModules
+				}),
 				chart: {
 					spec: {
 						chart: chart.name,
@@ -100,7 +102,7 @@
 		if (isSubmitting) return;
 		isSubmitting = true;
 
-		const selectedNames = new Set(
+		const selectedModuleNames = new Set(
 			rows.map((row) => (row.original.chart as unknown as ModuleType).name)
 		);
 
@@ -108,7 +110,7 @@
 			rows.map((row) => {
 				const chart = row.original.chart as unknown as ModuleType;
 				const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
-				return handleInstall(chart, helmRepository, selectedNames);
+				return handleInstall(chart, helmRepository, selectedModuleNames);
 			})
 		);
 
