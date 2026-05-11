@@ -6,9 +6,4 @@
 	let { object }: { object: any } = $props();
 </script>
 
-<Code.Root
-	variant="secondary"
-	lang="yaml"
-	class="no-shiki-limit w-full border-none"
-	code={stringify(object)}
-/>
+<Code.Root variant="secondary" lang="yaml" class="w-full border-none" code={stringify(object)} />
