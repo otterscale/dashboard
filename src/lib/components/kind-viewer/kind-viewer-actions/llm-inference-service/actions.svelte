@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 	import type { ServingKserveIoV1Alpha1LLMInferenceService } from '@otterscale/types';
-	import type { Schema } from 'ajv';
+	import type { Schema } from '@sjsf/form';
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';

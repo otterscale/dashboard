@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { GpuIcon } from '@lucide/svelte';
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
-	import type { Schema } from 'ajv';
+	import type { Schema } from '@sjsf/form';
 
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
