@@ -1,7 +1,5 @@
 import type { Component } from 'svelte';
 
-import ApplicationActions from './application/actions.svelte';
-import ApplicationCreate from './application/create.svelte';
 import ObjectBucketClaimActions from './ceph-object-bucket-claim/actions.svelte';
 import ObjectBucketClaimCreate from './ceph-object-bucket-claim/create.svelte';
 import ClusterRoleBindingActions from './cluster-role-binding/actions.svelte';
@@ -22,7 +20,6 @@ import JobActions from './job/actions.svelte';
 import LLMInferenceServiceActions from './llm-inference-service/actions.svelte';
 import LLMInferenceServiceCreate from './llm-inference-service/create.svelte';
 import LLMInferenceServiceConfigActions from './llm-inference-service-config/actions.svelte';
-import LocalModelCacheCreate from './local-model-cache/create.svelte';
 import NodeActions from './node/actions.svelte';
 import PodActions from './pod/actions.svelte';
 import ResourceQuotaActions from './resource-quota/actions.svelte';
@@ -65,8 +62,6 @@ type ActionsType = Component<{
 
 function getCreate(kind: string, namespace?: string): CreateType {
 	switch (kind) {
-		case 'Application':
-			return ApplicationCreate as CreateType;
 		case 'ClusterRoleBinding':
 			return ClusterRoleBindingCreate as CreateType;
 		case 'DataVolume':
@@ -75,8 +70,6 @@ function getCreate(kind: string, namespace?: string): CreateType {
 			return HelmRepositoryCreate as CreateType;
 		case 'LLMInferenceService':
 			return LLMInferenceServiceCreate as CreateType;
-		case 'LocalModelCache':
-			return LocalModelCacheCreate as CreateType;
 		case 'Node':
 			return DisabledCreate as CreateType;
 		case 'ObjectBucketClaim':
@@ -103,8 +96,6 @@ function getCreate(kind: string, namespace?: string): CreateType {
 
 function getActions(kind: string): ActionsType {
 	switch (kind) {
-		case 'Application':
-			return ApplicationActions as ActionsType;
 		case 'ClusterRoleBinding':
 			return ClusterRoleBindingActions as ActionsType;
 		case 'CronJob':

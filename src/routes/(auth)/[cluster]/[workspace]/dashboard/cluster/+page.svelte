@@ -92,11 +92,11 @@
 						<div
 							class="grid auto-rows-[minmax(140px,auto)] grid-cols-2 gap-4 pt-4 md:gap-6 lg:grid-cols-1 2xl:grid-cols-4"
 						>
-							<WidgetGrid {widgets} {prometheusDriver} {cluster} bind:isReloading />
+							<WidgetGrid {widgets} {prometheusDriver} bind:isReloading />
 						</div>
 					</Tabs.Content>
 					<Tabs.Content value="analytics">
-						<Dashboard {cluster} client={prometheusDriver} bind:selectedInstance />
+						<Dashboard client={prometheusDriver} bind:selectedInstance />
 					</Tabs.Content>
 				</Tabs.Root>
 			</div>
