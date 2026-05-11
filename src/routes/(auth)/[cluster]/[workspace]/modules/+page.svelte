@@ -41,7 +41,7 @@
 	]);
 
 	// Parameters
-	const cluster = $derived(page.params.cluster!);
+	const cluster = $derived(page.params.cluster ?? '');
 	const namespace = 'otterscale-system';
 
 	// Clients
