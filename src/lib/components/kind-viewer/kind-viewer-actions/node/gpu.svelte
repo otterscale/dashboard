@@ -12,12 +12,14 @@
 		cluster,
 		group,
 		version,
+		kind,
 		resource,
 		object
 	}: {
 		cluster: string;
 		group: string;
 		version: string;
+		kind: string;
 		resource: string;
 		object: CoreV1Node;
 	} = $props();
@@ -43,7 +45,6 @@
 
 		isSubmitting = true;
 
-		const kind = 'Node';
 		const apiVersion = `${group}/${version}`;
 		const name = object?.metadata?.name;
 
@@ -99,7 +100,6 @@
 
 		isSubmitting = true;
 
-		const kind = 'Node';
 		const apiVersion = `${group}/${version}`;
 		const name = object?.metadata?.name;
 

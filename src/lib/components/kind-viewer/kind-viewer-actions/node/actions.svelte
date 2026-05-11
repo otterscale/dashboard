@@ -31,6 +31,8 @@
 		object: any;
 	} = $props();
 
+	const kind = 'Node';
+
 	let actionsOpen = $state(false);
 </script>
 
@@ -85,7 +87,7 @@
 					</Item.Root>
 				</DropdownMenu.SubTrigger>
 				<DropdownMenu.SubContent>
-					<GPU {cluster} {group} {version} {resource} {object} />
+					<GPU {cluster} {group} {version} {kind} {resource} {object} />
 				</DropdownMenu.SubContent>
 			</DropdownMenu.Sub>
 		</DropdownMenu.Group>
