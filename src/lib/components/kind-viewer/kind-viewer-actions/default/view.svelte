@@ -14,13 +14,11 @@
 		onOpenChangeComplete
 	}: {
 		schema: Schema;
-		object: any; // eslint-disable-next-line @typescript-eslint/no-explicit-any
+		object: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 		onOpenChangeComplete?: () => void;
 	} = $props();
 
 	let open = $state(false);
-
-	const name = $derived(object?.metadata?.name);
 </script>
 
 <Dialog.Root bind:open {onOpenChangeComplete}>
@@ -39,7 +37,7 @@
 			<Item.Root class="p-0">
 				<Item.Content class="text-left">
 					<Item.Title class="text-lg font-bold">
-						View - {name}
+						{object.kind}
 					</Item.Title>
 					<Item.Description>{lodash.get(schema, 'description')}</Item.Description>
 				</Item.Content>

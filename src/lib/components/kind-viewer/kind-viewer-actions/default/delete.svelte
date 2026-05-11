@@ -11,7 +11,7 @@
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
-	import Ajv, { type ValidateFunction } from 'ajv';
+	import Ajv from 'ajv';
 	import lodash from 'lodash';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -42,12 +42,11 @@
 		onOpenChangeComplete: () => void;
 	} = $props();
 
+	let values = $state({ name: '' });
+
+	// Submit
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-
-	let jsonSchema: Schema | undefined = $state(undefined);
-	let validate: ValidateFunction | undefined = $state(undefined);
-	let values = $state({ name: '' });
 
 	// Flags
 	let open = $state(false);
@@ -59,18 +58,6 @@
 	onOpenChange={(isOpen) => {
 		if (!isOpen) return;
 
-		jsonSchema = {
-			type: 'object',
-			required: ['name'],
-			properties: {
-				name: {
-					title: 'Name',
-					type: 'string',
-					pattern: object?.metadata?.name
-				}
-			}
-		} as Schema;
-		validate = jsonSchemaValidator.compile(jsonSchema);
 		values = { name: '' };
 	}}
 	onOpenChangeComplete={(isOpen) => {
@@ -78,8 +65,6 @@
 
 		if (isOpen) return;
 
-		jsonSchema = undefined;
-		validate = undefined;
 		values = { name: '' };
 	}}
 >
@@ -95,7 +80,21 @@
 			</Item.Root>
 		{/snippet}
 	</Dialog.Trigger>
-	<Dialog.Content class="max-h-[95vh] min-w-[23vw] overflow-auto">
+	<Dialog.Content
+		class="max-h-[95vh] min-w-[23vw] overflow-auto"
+		onInteractOutside={(e) => e.preventDefault()}
+	>
+		{@const jsonSchema = {
+			type: 'object',
+			required: ['name'],
+			properties: {
+				name: {
+					title: 'Name',
+					type: 'string',
+					pattern: object?.metadata?.name
+				}
+			}
+		} as Schema}
 		<Item.Root class="p-0">
 			<Item.Content class="text-left">
 				<Item.Title class="text-xl font-bold">{kind}</Item.Title>
@@ -103,7 +102,7 @@
 			</Item.Content>
 		</Item.Root>
 		<Form
-			schema={lodash.get(jsonSchema, 'properties.name') as any}
+			schema={lodash.get(jsonSchema, 'properties.name') as Schema}
 			uiSchema={{
 				'ui:options': {
 					help: `Entering the ${kind.toLowerCase()} name.`,
@@ -119,7 +118,7 @@
 					if (isDeleting) return;
 					isDeleting = true;
 
-					if (!validate) return;
+					const validate = jsonSchemaValidator.compile(jsonSchema);
 
 					const isValid = validate(values);
 					if (!isValid) return;

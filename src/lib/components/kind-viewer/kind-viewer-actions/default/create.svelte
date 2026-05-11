@@ -5,11 +5,11 @@
 	import Ajv, { type Schema, type ValidateFunction } from 'ajv';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
-	import { getContext, onMount, tick } from 'svelte';
+	import { getContext, onMount } from 'svelte';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import type { Node } from 'yaml';
-	import { isMap, isPair, isScalar, parseDocument, stringify, visit } from 'yaml';
+	import { parseDocument, stringify } from 'yaml';
 
 	import { filterRequiredSchema, getInitialValues } from '$lib/components/dynamic-form/utils';
 	import SchemaViewer from '$lib/components/schema-viewer/schema-viewer.svelte';
@@ -41,6 +41,7 @@
 	let value = $state('');
 	let open = $state(false);
 
+	// Bind to Monaco
 	let editorInstance: import('monaco-editor').editor.IStandaloneCodeEditor | undefined =
 		$state(undefined);
 	let monacoInstance: typeof import('monaco-editor') | undefined = $state(undefined);
@@ -52,6 +53,7 @@
 		logger: false
 	});
 
+	// Validate Once
 	let validate: ValidateFunction | undefined = $state(undefined);
 	function performValidation(
 		editorInstance: import('monaco-editor').editor.IStandaloneCodeEditor | undefined,
@@ -142,8 +144,7 @@
 		monaco.editor.setModelMarkers(model, 'yaml-validator', markers);
 	}
 
-	// Validate
-	let isReady = $state(false);
+	// Validate Continuously
 	$effect(() => {
 		if (editorInstance && monacoInstance && validate) {
 			// Setup validation listener when editor is ready
@@ -229,7 +230,8 @@
 
 			value = initialValue;
 			validate = jsonSchemaValidator.compile(jsonSchema);
-			// editorInstance and monacoInstance are initialized by Monaco component.
+			// editorInstance initialized by Monaco component.
+			// monacoInstance initialized by Monaco component.
 		}}
 		onOpenChangeComplete={(isOpen) => {
 			if (isOpen) return;
@@ -238,7 +240,6 @@
 			validate = undefined;
 			editorInstance = undefined;
 			monacoInstance = undefined;
-			isReady = false;
 		}}
 	>
 		<Tooltip.Trigger>
@@ -261,22 +262,20 @@
 			</Dialog.Header>
 			<div class="grid grid-cols-2 gap-4 *:max-h-[62vh] *:min-h-[62vh]">
 				<SchemaViewer schema={jsonSchema} class="h-full max-h-screen min-h-0 overflow-auto" />
-				<div class="transition-opacity duration-300 {isReady ? 'opacity-100' : 'opacity-0'}">
-					<Monaco
-						options={{
-							language: 'yaml',
-							padding: { top: 24 },
-							automaticLayout: true,
-							folding: true,
-							foldingStrategy: 'indentation',
-							showFoldingControls: 'always'
-						}}
-						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
-						bind:value
-						bind:editor={editorInstance}
-						bind:monaco={monacoInstance}
-					/>
-				</div>
+				<Monaco
+					options={{
+						language: 'yaml',
+						padding: { top: 24 },
+						automaticLayout: true,
+						folding: true,
+						foldingStrategy: 'indentation',
+						showFoldingControls: 'always'
+					}}
+					theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
+					bind:value
+					bind:editor={editorInstance}
+					bind:monaco={monacoInstance}
+				/>
 			</div>
 			<Dialog.Footer>
 				<Button class="mr-auto" variant="outline" onclick={() => (open = false)}
