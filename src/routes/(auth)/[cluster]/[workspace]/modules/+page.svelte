@@ -23,7 +23,7 @@
 	} from '$lib/components/artifact-viewer/utils.svelte';
 	import { ModuleViewer } from '$lib/components/module-viewer';
 	import { getChartData, type ModuleAttribute } from '$lib/components/module-viewer/table-layout';
-	import type { ModuleType } from '$lib/components/module-viewer/types';
+	import type { HarborModule, IndexModule, ModuleType } from '$lib/components/module-viewer/types';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
@@ -41,13 +41,14 @@
 	]);
 
 	// Parameters
-	const cluster = $derived(page.params.cluster ?? '');
+	const cluster = page.params.cluster!;
 	const namespace = 'otterscale-system';
 
 	// Clients
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
+	// data
 	let data: Record<ModuleAttribute, JsonValue>[] = $state([]);
 
 	// Helm Repository
@@ -105,8 +106,8 @@
 
 		try {
 			const entireModules = fromHarbor
-				? await fetchEntireHarborModules(helmRepository)
-				: await fetchEntireIndexModules(helmRepository);
+				? await fetchEntireModulesFromHarbor(helmRepository)
+				: await fetchEntireModulesFromIndex(helmRepository);
 
 			return entireModules
 				.filter((module: ModuleType) => {
@@ -125,7 +126,7 @@
 			isModuleFetching = false;
 		}
 	}
-	async function fetchEntireHarborModules(
+	async function fetchEntireModulesFromHarbor(
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
 	): Promise<ModuleType[]> {
 		const harborHost = parseHarborHost(helmRepository);
@@ -133,7 +134,7 @@
 		const pageSize = 50;
 
 		let currentPage = 1;
-		let entireHarborModules: ModuleType[] = [];
+		let entireModules: ModuleType[] = [];
 
 		while (true) {
 			const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')}&latest_in_repository=true&page=${currentPage}&page_size=${pageSize}`;
@@ -150,14 +151,14 @@
 				break;
 			}
 
-			const harborModules: any = await response.json();
+			const harborModules: HarborModule[] = await response.json();
 			if (harborModules.length === 0) {
 				break;
 			}
 
-			entireHarborModules = [
-				...entireHarborModules,
-				...harborModules.map((module: any) => {
+			entireModules = [
+				...entireModules,
+				...harborModules.map((module: HarborModule) => {
 					return {
 						apiVersion: module.extra_attrs.apiVersion,
 						appVersion: module.extra_attrs.appVersion,
@@ -169,16 +170,16 @@
 						icon: module.icon,
 						keywords: module.labels ?? [],
 						type: module.type
-					};
+					} as ModuleType;
 				})
 			];
 
 			currentPage = currentPage + 1;
 		}
 
-		return entireHarborModules;
+		return entireModules;
 	}
-	async function fetchEntireIndexModules(
+	async function fetchEntireModulesFromIndex(
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
 	): Promise<ModuleType[]> {
 		const response = await fetch('/bff/helm/repository/index', {
@@ -193,7 +194,8 @@
 			return [];
 		}
 
-		return await response.json();
+		const entireModules = (await response.json()) as IndexModule[] as ModuleType[];
+		return entireModules;
 	}
 
 	// Releases
