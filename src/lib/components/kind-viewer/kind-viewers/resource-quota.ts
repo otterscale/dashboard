@@ -61,8 +61,8 @@ function getResourceQuotaData(
 			'continuous'
 		),
 		'GPU Request': getRatio(
-			object?.status?.used?.['requests.gpu'] ?? null,
-			object?.status?.hard?.['requests.gpu'] ?? null,
+			object?.status?.used?.['requests.nvidia.com/gpu'] ?? null,
+			object?.status?.hard?.['requests.nvidia.com/gpu'] ?? null,
 			'discrete'
 		),
 		'Memory Request': getRatio(
@@ -162,9 +162,9 @@ function getResourceQuotaColumnDefinitions(
 					uiSchemas: uiSchemas,
 					metadata: {
 						numerator:
-							(row.original['raw'] as CoreV1ResourceQuota).status?.used?.['limits.cpu'] ?? null,
+							(row.original['raw'] as CoreV1ResourceQuota).status?.used?.['limits.cpu'] ?? ' - ',
 						denominator:
-							(row.original['raw'] as CoreV1ResourceQuota).status?.hard?.['limits.cpu'] ?? null
+							(row.original['raw'] as CoreV1ResourceQuota).status?.hard?.['limits.cpu'] ?? ' - '
 					} satisfies RatioMetadata
 				}),
 			accessorKey: 'CPU Limit',
@@ -190,9 +190,9 @@ function getResourceQuotaColumnDefinitions(
 					uiSchemas: uiSchemas,
 					metadata: {
 						numerator:
-							(row.original['raw'] as CoreV1ResourceQuota).status?.used?.['requests.cpu'] ?? null,
+							(row.original['raw'] as CoreV1ResourceQuota).status?.used?.['requests.cpu'] ?? ' - ',
 						denominator:
-							(row.original['raw'] as CoreV1ResourceQuota).status?.hard?.['requests.cpu'] ?? null
+							(row.original['raw'] as CoreV1ResourceQuota).status?.hard?.['requests.cpu'] ?? ' - '
 					} satisfies RatioMetadata
 				}),
 			accessorKey: 'CPU Request',
@@ -218,9 +218,9 @@ function getResourceQuotaColumnDefinitions(
 					uiSchemas: uiSchemas,
 					metadata: {
 						numerator:
-							(row.original['raw'] as CoreV1ResourceQuota).status?.used?.['limits.memory'] ?? null,
+							(row.original['raw'] as CoreV1ResourceQuota).status?.used?.['limits.memory'] ?? ' - ',
 						denominator:
-							(row.original['raw'] as CoreV1ResourceQuota).status?.hard?.['limits.memory'] ?? null
+							(row.original['raw'] as CoreV1ResourceQuota).status?.hard?.['limits.memory'] ?? ' - '
 					} satisfies RatioMetadata
 				}),
 			accessorKey: 'Memory Limit',
@@ -247,9 +247,10 @@ function getResourceQuotaColumnDefinitions(
 					metadata: {
 						numerator:
 							(row.original['raw'] as CoreV1ResourceQuota).status?.used?.['requests.memory'] ??
-							null,
+							' - ',
 						denominator:
-							(row.original['raw'] as CoreV1ResourceQuota).status?.hard?.['requests.memory'] ?? null
+							(row.original['raw'] as CoreV1ResourceQuota).status?.hard?.['requests.memory'] ??
+							' - '
 					} satisfies RatioMetadata
 				}),
 			accessorKey: 'Memory Request',
@@ -276,12 +277,12 @@ function getResourceQuotaColumnDefinitions(
 					metadata: {
 						numerator:
 							(row.original['raw'] as CoreV1ResourceQuota).status?.used?.[
-								'requests.otterscale.com/vgpu'
-							] ?? null,
+								'requests.nvidia.com/gpu'
+							] ?? ' - ',
 						denominator:
 							(row.original['raw'] as CoreV1ResourceQuota).status?.hard?.[
-								'requests.otterscale.com/vgpu'
-							] ?? null
+								'requests.nvidia.com/gpu'
+							] ?? ' - '
 					} satisfies RatioMetadata
 				}),
 			accessorKey: 'GPU Request',
