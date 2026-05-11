@@ -5,7 +5,7 @@
 	import Ajv, { type Schema, type ValidateFunction } from 'ajv';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
-	import { getContext, onMount } from 'svelte';
+	import { getContext } from 'svelte';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import type { Node } from 'yaml';
@@ -37,9 +37,10 @@
 		schema: Schema;
 	} = $props();
 
-	let initialValue = $state('');
+	let isReady = $state(false);
 	let value = $state('');
 	let open = $state(false);
+	let abortController: AbortController | undefined;
 
 	// Bind to Monaco
 	let editorInstance: import('monaco-editor').editor.IStandaloneCodeEditor | undefined =
@@ -208,30 +209,40 @@
 			}
 		);
 	}
-
-	onMount(async () => {
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		let initialValues: any = await getInitialValues(filterRequiredSchema(jsonSchema));
-
-		lodash.set(initialValues, 'apiVersion', group ? `${group}/${version}` : version);
-		lodash.set(initialValues, 'kind', kind);
-		if (namespace) {
-			lodash.set(initialValues, 'metadata.namespace', namespace);
-		}
-		initialValue = stringify(initialValues);
-	});
 </script>
 
 <Tooltip.Root>
 	<Dialog.Root
 		bind:open
-		onOpenChange={(isOpen) => {
-			if (!isOpen) return;
+		onOpenChange={async (isOpen) => {
+			if (!isOpen) {
+				abortController?.abort();
+				abortController = undefined;
+				return;
+			}
 
-			value = initialValue;
-			validate = jsonSchemaValidator.compile(jsonSchema);
+			abortController?.abort();
+			abortController = new AbortController();
+			const { signal } = abortController;
+
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const initialValues: any = await getInitialValues(filterRequiredSchema(jsonSchema));
+			if (signal.aborted) return;
+
+			lodash.set(initialValues, 'apiVersion', group ? `${group}/${version}` : version);
+			lodash.set(initialValues, 'kind', kind);
+			if (namespace) {
+				lodash.set(initialValues, 'metadata.namespace', namespace);
+			}
+
+			const compiledValidator = jsonSchemaValidator.compile(jsonSchema);
+			if (signal.aborted) return;
+
+			value = stringify(initialValues);
+			validate = compiledValidator;
 			// editorInstance initialized by Monaco component.
 			// monacoInstance initialized by Monaco component.
+			isReady = true;
 		}}
 		onOpenChangeComplete={(isOpen) => {
 			if (isOpen) return;
@@ -240,6 +251,7 @@
 			validate = undefined;
 			editorInstance = undefined;
 			monacoInstance = undefined;
+			isReady = false;
 		}}
 	>
 		<Tooltip.Trigger>
@@ -262,20 +274,22 @@
 			</Dialog.Header>
 			<div class="grid grid-cols-2 gap-4 *:max-h-[62vh] *:min-h-[62vh]">
 				<SchemaViewer schema={jsonSchema} class="h-full max-h-screen min-h-0 overflow-auto" />
-				<Monaco
-					options={{
-						language: 'yaml',
-						padding: { top: 24 },
-						automaticLayout: true,
-						folding: true,
-						foldingStrategy: 'indentation',
-						showFoldingControls: 'always'
-					}}
-					theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
-					bind:value
-					bind:editor={editorInstance}
-					bind:monaco={monacoInstance}
-				/>
+				<div class="transition-opacity duration-300 {isReady ? 'opacity-100' : 'opacity-0'}">
+					<Monaco
+						options={{
+							language: 'yaml',
+							padding: { top: 24 },
+							automaticLayout: true,
+							folding: true,
+							foldingStrategy: 'indentation',
+							showFoldingControls: 'always'
+						}}
+						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
+						bind:value
+						bind:editor={editorInstance}
+						bind:monaco={monacoInstance}
+					/>
+				</div>
 			</div>
 			<Dialog.Footer>
 				<Button class="mr-auto" variant="outline" onclick={() => (open = false)}
