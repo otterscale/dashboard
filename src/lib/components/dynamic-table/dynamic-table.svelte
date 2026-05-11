@@ -155,6 +155,7 @@
 		Hours: (time: number) => time * 60 * 60 * 1000,
 		Days: (time: number) => time * 24 * 60 * 60 * 1000,
 		Years: (time: number) => time * 365 * 24 * 60 * 60 * 1000,
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		size: (object: any) => {
 			return object ? Object.keys(object).length : undefined;
 		}
@@ -580,7 +581,7 @@
 					{table.getState().pagination.pageSize.toString() ?? 'Select number of results'}
 				</SelectTrigger>
 				<SelectContent
-					class="[&_*[role=option]]:ps-2 [&_*[role=option]]:pe-8 [&_*[role=option]>span]:start-auto [&_*[role=option]>span]:end-2"
+					class="[&_*[role=option]]:ps-2 [&_*[role=option]]:pe-8 [&_*[role=option]>span]:inset-s-auto [&_*[role=option]>span]:inset-e-2"
 				>
 					{#each [5, 10, 20, 50, 100] as pageSize (pageSize)}
 						<SelectItem value={pageSize.toString()}>
