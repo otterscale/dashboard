@@ -27,7 +27,8 @@
 		group: string;
 		version: string;
 		resource: string;
-		object: any; // eslint-disable-next-line @typescript-eslint/no-explicit-any
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		object: any;
 		onOpenChangeComplete?: () => void;
 		trigger?: Snippet;
 	} = $props();

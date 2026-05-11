@@ -58,6 +58,7 @@
 	});
 	const validate = jsonSchemaValidator.compile(jsonSchema);
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	let values: any = $state({
 		replicas: 0
 	});
@@ -132,7 +133,7 @@
 			</Item.Content>
 		</Item.Root>
 		<Form
-			schema={lodash.get(jsonSchema, 'properties.replicas') as any}
+			schema={lodash.get(jsonSchema, 'properties.replicas') as Schema}
 			uiSchema={{
 				'ui:options': {
 					help: 'Enter the desired number of replicas.'
