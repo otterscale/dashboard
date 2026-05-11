@@ -1,6 +1,6 @@
 <script lang="ts">
 	import EyeIcon from '@lucide/svelte/icons/eye';
-	import type { Schema } from 'ajv';
+	import type { Schema } from '@sjsf/form';
 	import lodash from 'lodash';
 	import { stringify } from 'yaml';
 
@@ -14,13 +14,11 @@
 		onOpenChangeComplete
 	}: {
 		schema: Schema;
-		object: any;
+		object: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 		onOpenChangeComplete?: () => void;
 	} = $props();
 
 	let open = $state(false);
-
-	const name = $derived(object?.metadata?.name);
 </script>
 
 <Dialog.Root bind:open {onOpenChangeComplete}>
@@ -39,7 +37,7 @@
 			<Item.Root class="p-0">
 				<Item.Content class="text-left">
 					<Item.Title class="text-lg font-bold">
-						View - {name}
+						{object.kind}
 					</Item.Title>
 					<Item.Description>{lodash.get(schema, 'description')}</Item.Description>
 				</Item.Content>
