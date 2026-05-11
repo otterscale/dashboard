@@ -29,8 +29,6 @@
 		onOpenChangeComplete: () => void;
 	} = $props();
 
-	const chart: ModuleType = row.original.chart as unknown as ModuleType;
-
 	const group = 'helm.toolkit.fluxcd.io';
 	const version = 'v2';
 	const kind = 'HelmRelease';
@@ -40,26 +38,26 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
-
 	let open = $state(false);
 	let isSubmitting = $state(false);
-
-	function getDependencies(chart: ModuleType): string[] {
-		const dependsOn = chart.annotations?.['module.otterscale.io/depends-on'] ?? '';
-		return dependsOn.split(',').filter(Boolean);
-	}
 
 	async function handleInstall() {
 		if (isSubmitting) return;
 		isSubmitting = true;
 
-		const name = chart.name;
+		const helmRepository = row.original['helmRepository'] as SourceToolkitFluxcdIoV1HelmRepository;
+		const module: ModuleType = row.original['chart'] as unknown as ModuleType;
+
+		const name = module.name;
 
 		toast.promise(
 			async () => {
-				const dependsOn = getDependencies(chart).map((depName) => ({
-					name: depName,
+				const dependencies = lodash
+					.get(module, ['annotations', 'module.otterscale.io/depends-on'], '')
+					.split(',')
+					.filter(Boolean);
+				const dependenciesOfSelectedModule = dependencies.map((name) => ({
+					name,
 					namespace
 				}));
 
@@ -67,20 +65,22 @@
 					apiVersion: `${group}/${version}`,
 					kind,
 					metadata: {
-						name: chart.name,
+						name: module.name,
 						namespace
 					},
 					spec: {
-						releaseName: chart.name,
-						targetNamespace: lodash.get(chart, ['annotations', 'module.otterscale.io/namespace']),
+						releaseName: module.name,
+						targetNamespace: lodash.get(module, ['annotations', 'module.otterscale.io/namespace']),
 						install: { createNamespace: true },
 						interval: '15m',
 						timeout: '1h',
-						...(dependsOn.length > 0 && { dependsOn }),
+						...(dependenciesOfSelectedModule.length > 0 && {
+							dependsOn: dependenciesOfSelectedModule
+						}),
 						chart: {
 							spec: {
-								chart: chart.name,
-								version: chart.version,
+								chart: module.name,
+								version: module.version,
 								sourceRef: {
 									apiVersion: helmRepository?.apiVersion,
 									kind: helmRepository?.kind,
@@ -141,7 +141,7 @@
 		<Dialog.Header>
 			<Item.Root class="p-0">
 				<Item.Content class="text-left">
-					<Item.Title class="text-xl font-bold">Install {chart.name}</Item.Title>
+					<Item.Title class="text-xl font-bold">Install</Item.Title>
 					<Item.Description>
 						This will install with default values into the cluster {cluster}. Are you sure you want
 						to proceed?
@@ -149,6 +149,17 @@
 				</Item.Content>
 			</Item.Root>
 		</Dialog.Header>
+		{@const module = row.original.chart as unknown as ModuleType}
+		<Item.Root class="rounded-md border p-0">
+			<Item.Content class="text-left">
+				<Item.Title class="text-sm font-medium">
+					{module.name}
+				</Item.Title>
+				<Item.Description class="text-xs">
+					v{module.version}
+				</Item.Description>
+			</Item.Content>
+		</Item.Root>
 		<Button onclick={handleInstall} disabled={isSubmitting}>
 			{#if isSubmitting}
 				<Spinner />

@@ -39,39 +39,43 @@
 
 	let open = $state(false);
 	let isSubmitting = $state(false);
-
-	function getDependencies(chart: ModuleType): string[] {
-		const dependsOn = chart.annotations?.['module.otterscale.io/depends-on'] ?? '';
-		return dependsOn.split(',').filter(Boolean);
-	}
-
 	async function handleInstall(
-		chart: ModuleType,
+		module: ModuleType,
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository,
-		selectedNames: Set<string>
+		selectedModuleNames: Set<string>
 	): Promise<string> {
-		const dependsOn = getDependencies(chart)
-			.filter((name) => selectedNames.has(name))
-			.map((name) => ({ name, namespace }));
+		const dependencies = lodash
+			.get(module, ['annotations', 'module.otterscale.io/depends-on'], '')
+			.split(',')
+			.filter(Boolean);
+		const dependenciesOfSelectedModuleNames = dependencies.filter((name) =>
+			selectedModuleNames.has(name)
+		);
+		const dependenciesOfSelectedModules = dependenciesOfSelectedModuleNames.map((name) => ({
+			name,
+			namespace
+		}));
 
 		const manifest = {
 			apiVersion: `${group}/${version}`,
 			kind,
 			metadata: {
-				name: chart.name,
+				name: module.name,
 				namespace
 			},
 			spec: {
-				releaseName: chart.name,
-				targetNamespace: lodash.get(chart, ['annotations', 'module.otterscale.io/namespace']),
+				releaseName: module.name,
+				targetNamespace: lodash.get(module, ['annotations', 'module.otterscale.io/namespace']),
 				install: { createNamespace: true },
 				interval: '15m',
 				timeout: '1h',
-				...(dependsOn.length > 0 && { dependsOn }),
+				...(dependenciesOfSelectedModules.length > 0 && {
+					dependsOn: dependenciesOfSelectedModules
+				}),
 				chart: {
 					spec: {
-						chart: chart.name,
-						version: chart.version,
+						chart: module.name,
+						version: module.version,
 						sourceRef: {
 							apiVersion: helmRepository?.apiVersion,
 							kind: helmRepository?.kind,
@@ -93,22 +97,22 @@
 			manifest: new TextEncoder().encode(stringify(manifest))
 		});
 
-		return chart.name;
+		return module.name;
 	}
 
 	async function handleBulkInstall() {
 		if (isSubmitting) return;
 		isSubmitting = true;
 
-		const selectedNames = new Set(
+		const selectedModuleNames = new Set(
 			rows.map((row) => (row.original.chart as unknown as ModuleType).name)
 		);
 
 		const results = await Promise.allSettled(
 			rows.map((row) => {
-				const chart = row.original.chart as unknown as ModuleType;
+				const module = row.original.chart as unknown as ModuleType;
 				const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
-				return handleInstall(chart, helmRepository, selectedNames);
+				return handleInstall(module, helmRepository, selectedModuleNames);
 			})
 		);
 
@@ -167,14 +171,14 @@
 		</Dialog.Header>
 		<div class="space-y-2">
 			{#each rows as row (row.id)}
-				{@const chart = row.original.chart as unknown as ModuleType}
+				{@const module = row.original.chart as unknown as ModuleType}
 				<Item.Root class="rounded-md border p-0">
 					<Item.Content class="text-left">
 						<Item.Title class="text-sm font-medium">
-							{chart.name}
+							{module.name}
 						</Item.Title>
 						<Item.Description class="text-xs">
-							v{chart.version}
+							v{module.version}
 						</Item.Description>
 					</Item.Content>
 				</Item.Root>

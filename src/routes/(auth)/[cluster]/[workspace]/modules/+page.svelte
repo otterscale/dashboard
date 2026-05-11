@@ -23,7 +23,7 @@
 	} from '$lib/components/artifact-viewer/utils.svelte';
 	import { ModuleViewer } from '$lib/components/module-viewer';
 	import { getChartData, type ModuleAttribute } from '$lib/components/module-viewer/table-layout';
-	import type { ModuleType } from '$lib/components/module-viewer/types';
+	import type { HarborModule, IndexModule, ModuleType } from '$lib/components/module-viewer/types';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
@@ -48,18 +48,12 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
+	// data
 	let data: Record<ModuleAttribute, JsonValue>[] = $state([]);
 
 	// Helm Repository
-	let helmRepository: SourceToolkitFluxcdIoV1HelmRepository | undefined = $state(undefined);
+	let helmRepository = $state<SourceToolkitFluxcdIoV1HelmRepository | undefined>(undefined);
 	let isHelmRepositoryFetching = $state(false);
-	const fromHarbor: boolean = $derived(
-		helmRepository
-			? lodash.get(helmRepository, ['metadata', 'labels', 'tenant.otterscale.io/from-harbor']) ===
-					'true'
-			: false
-	);
-
 	async function fetchHelmRepository(): Promise<SourceToolkitFluxcdIoV1HelmRepository | undefined> {
 		if (isHelmRepositoryFetching) return;
 
@@ -93,84 +87,27 @@
 			isHelmRepositoryFetching = false;
 		}
 	}
-
-	let isModuleFetching = $state(false);
+	const fromHarbor: boolean = $derived(
+		helmRepository
+			? lodash.get(helmRepository, ['metadata', 'labels', 'tenant.otterscale.io/from-harbor']) ===
+					'true'
+			: false
+	);
 
 	const dashboardVersion = semver.valid(version) ? version : '1.0.0';
-
-	let indexModules: ModuleType[] = $state([]);
-
-	async function fetchIndexModules(
+	let modules = $state<ModuleType[]>([]);
+	let isModuleFetching = $state(false);
+	async function fetchModules(
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
 	): Promise<ModuleType[] | undefined> {
 		if (isModuleFetching) return;
 
 		isModuleFetching = true;
 
-		let entireModules: ModuleType[] = [];
-
-		let currentPage = 1;
-		const pageSize = 50;
-
 		try {
-			if (fromHarbor) {
-				const harborHost = parseHarborHost(helmRepository);
-				const harborProjectName = parseHarborProjectName(helmRepository);
-				while (true) {
-					const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')}&latest_in_repository=true&page=${currentPage}&page_size=${pageSize}`;
-					const response = await fetch('/bff/helm/repository/harbor', {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({
-							harborHost,
-							apiPath: artifactsUrl
-						})
-					});
-
-					if (!response.ok) {
-						break;
-					}
-
-					const harborModules: any = await response.json();
-					if (harborModules.length === 0) {
-						break;
-					}
-
-					entireModules = [
-						...entireModules,
-						...harborModules.map((module: any) => {
-							return {
-								apiVersion: module.extra_attrs.apiVersion,
-								appVersion: module.extra_attrs.appVersion,
-								annotations: module.extra_attrs.annotations,
-								name: module.extra_attrs.name,
-								description: module.extra_attrs.description,
-								version: module.extra_attrs.version,
-								digest: module.digest,
-								icon: module.icon,
-								keywords: module.labels ?? [],
-								type: module.type
-							};
-						})
-					];
-
-					currentPage = currentPage + 1;
-				}
-			} else {
-				const response = await fetch('/bff/helm/repository/index', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						repositoryUrl: helmRepository.spec?.url ?? ''
-					})
-				});
-
-				if (!response.ok) {
-					return;
-				}
-
-				entireModules = await response.json();
-			}
+			const entireModules = fromHarbor
+				? await fetchEntireModulesFromHarbor(helmRepository)
+				: await fetchEntireModulesFromIndex(helmRepository);
 
 			return entireModules
 				.filter((module: ModuleType) => {
@@ -189,12 +126,82 @@
 			isModuleFetching = false;
 		}
 	}
+	async function fetchEntireModulesFromHarbor(
+		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
+	): Promise<ModuleType[]> {
+		const harborHost = parseHarborHost(helmRepository);
+		const harborProjectName = parseHarborProjectName(helmRepository);
+		const pageSize = 50;
+
+		let currentPage = 1;
+		let entireModules: ModuleType[] = [];
+
+		while (true) {
+			const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')}&latest_in_repository=true&page=${currentPage}&page_size=${pageSize}`;
+			const response = await fetch('/bff/helm/repository/harbor', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					harborHost,
+					apiPath: artifactsUrl
+				})
+			});
+
+			if (!response.ok) {
+				break;
+			}
+
+			const harborModules: HarborModule[] = await response.json();
+			if (harborModules.length === 0) {
+				break;
+			}
+
+			entireModules = [
+				...entireModules,
+				...harborModules.map((module: HarborModule) => {
+					return {
+						apiVersion: module.extra_attrs.apiVersion,
+						appVersion: module.extra_attrs.appVersion,
+						annotations: module.extra_attrs.annotations,
+						name: module.extra_attrs.name,
+						description: module.extra_attrs.description,
+						version: module.extra_attrs.version,
+						digest: module.digest,
+						icon: module.icon,
+						keywords: module.labels ?? [],
+						type: module.type
+					} as ModuleType;
+				})
+			];
+
+			currentPage = currentPage + 1;
+		}
+
+		return entireModules;
+	}
+	async function fetchEntireModulesFromIndex(
+		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
+	): Promise<ModuleType[]> {
+		const response = await fetch('/bff/helm/repository/index', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				repositoryUrl: helmRepository.spec?.url ?? ''
+			})
+		});
+
+		if (!response.ok) {
+			return [];
+		}
+
+		const entireModules = (await response.json()) as IndexModule[] as ModuleType[];
+		return entireModules;
+	}
 
 	// Releases
-	let isReleaseFetching = $state(false);
 	let releases: HelmToolkitFluxcdIoV2HelmRelease[] = $state([]);
+	let isReleaseFetching = $state(false);
 	let releaseResourceVersion: string | undefined = $state(undefined);
-
 	async function listReleases() {
 		if (isReleaseFetching) return;
 
@@ -222,10 +229,8 @@
 			isReleaseFetching = false;
 		}
 	}
-
 	let watchAbortController: AbortController | null = null;
 	let isWatching = $state(false);
-
 	async function watchReleases() {
 		if (isReleaseFetching || isWatching || isDestroyed) return;
 
@@ -300,8 +305,8 @@
 		helmRepository = await fetchHelmRepository();
 		if (!helmRepository) return;
 
-		indexModules = (await fetchIndexModules(helmRepository)) ?? [];
-		if (!indexModules.length) return;
+		modules = (await fetchModules(helmRepository)) ?? [];
+		if (!modules.length) return;
 
 		await listReleases();
 		watchReleases();
@@ -311,7 +316,7 @@
 			releases.map((release) => release.spec?.chart?.spec.chart).filter(Boolean)
 		) as Set<string>;
 
-		data = indexModules.map((module) => getChartData(module, installedModules, helmRepository!));
+		data = modules.map((module) => getChartData(module, installedModules, helmRepository!));
 	});
 
 	let isDestroyed = false;
@@ -323,7 +328,7 @@
 	});
 </script>
 
-{#key cluster + String(fromHarbor)}
+{#key cluster + helmRepository?.metadata?.uid}
 	<main class="pb-8">
 		<ModuleViewer {cluster} {namespace} {data}>
 			{#snippet reload()}

@@ -47,7 +47,7 @@
 		<Code.Root
 			variant="secondary"
 			lang="yaml"
-			code={stringify(row.original.chart)}
+			code={stringify(row.original['chart'])}
 			class="w-full border-none"
 		/>
 	</Dialog.Content>
