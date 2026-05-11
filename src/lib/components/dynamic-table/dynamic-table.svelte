@@ -96,6 +96,8 @@
 	const hasGridlayout = !!gridsLayout;
 	let mode = $state<'table' | 'grid'>(hasGridlayout ? 'grid' : 'table');
 
+	// columnDefinitions are set once, capturing the initial value is intentional.
+	// svelte-ignore state_referenced_locally
 	const columns: ColumnDef<Record<string, JsonValue>>[] = [
 		{
 			id: 'select',
@@ -118,8 +120,6 @@
 			enableSorting: false,
 			size: 30
 		},
-		// columnDefinitions are set once, capturing the initial value is intentional.
-		// svelte-ignore state_referenced_locally
 		...columnDefinitions,
 		{
 			id: 'actions',
