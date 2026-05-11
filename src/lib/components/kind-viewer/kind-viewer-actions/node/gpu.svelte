@@ -33,10 +33,6 @@
 			!lodash.get(object?.metadata?.labels, 'nvidia.com/gpu.workload.config')
 	);
 
-	const kind = 'Node';
-	const apiVersion = `${group}/${version}`;
-	const name = $derived(lodash.get(object, 'metadata.name') as string);
-
 	let isSubmitting = $state(false);
 </script>
 
@@ -46,6 +42,10 @@
 		if (isSubmitting) return;
 
 		isSubmitting = true;
+
+		const kind = 'Node';
+		const apiVersion = `${group}/${version}`;
+		const name = object?.metadata?.name;
 
 		toast.promise(
 			async () => {
@@ -98,6 +98,10 @@
 		if (isSubmitting) return;
 
 		isSubmitting = true;
+
+		const kind = 'Node';
+		const apiVersion = `${group}/${version}`;
+		const name = object?.metadata?.name;
 
 		toast.promise(
 			async () => {
