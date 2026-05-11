@@ -132,7 +132,6 @@
 							<WidgetGrid
 								{widgets}
 								{prometheusDriver}
-								{cluster}
 								namespace={selectedNamespace ?? ''}
 								{start}
 								{end}

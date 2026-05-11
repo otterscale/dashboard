@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type { Schema } from 'ajv';
+	import type { Schema } from '@sjsf/form';
 	import { getContext, onMount } from 'svelte';
 
 	import { page } from '$app/state';

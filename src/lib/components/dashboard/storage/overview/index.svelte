@@ -15,14 +15,12 @@
 
 	let {
 		client,
-		cluster,
 		start,
 		end,
 		endIsNow = false,
 		isReloading = $bindable()
 	}: {
 		client: PrometheusDriver;
-		cluster: string;
 		start: Date;
 		end: Date;
 		endIsNow?: boolean;
@@ -32,36 +30,36 @@
 
 <div class="grid auto-rows-auto grid-cols-2 gap-5 pt-4 md:grid-cols-4 lg:grid-cols-10">
 	<div class="col-span-2">
-		<TextClusterHealth {client} {cluster} bind:isReloading />
+		<TextClusterHealth {client} bind:isReloading />
 	</div>
 	<div class="col-span-2">
-		<TextTimeTillFull {client} {cluster} bind:isReloading />
+		<TextTimeTillFull {client} bind:isReloading />
 	</div>
 	<div class="col-span-2 row-span-2">
-		<UsageCapacity {client} {cluster} bind:isReloading />
+		<UsageCapacity {client} bind:isReloading />
 	</div>
 	<div class="col-span-2 row-span-2">
-		<AreaCapacity {client} {cluster} {start} {end} {endIsNow} bind:isReloading />
+		<AreaCapacity {client} {start} {end} {endIsNow} bind:isReloading />
 	</div>
 	<div class="col-span-2 row-span-2">
-		<PieOSDType {client} {cluster} bind:isReloading />
+		<PieOSDType {client} bind:isReloading />
 	</div>
 	<div class="col-span-2">
-		<TextQuorum {client} {cluster} bind:isReloading />
+		<TextQuorum {client} bind:isReloading />
 	</div>
 	<div class="col-span-2">
-		<TextOSDs {client} {cluster} bind:isReloading />
+		<TextOSDs {client} bind:isReloading />
 	</div>
 	<div class="col-span-4 row-span-2">
-		<BarOSDThroughtput {client} {cluster} {start} {end} {endIsNow} bind:isReloading />
+		<BarOSDThroughtput {client} {start} {end} {endIsNow} bind:isReloading />
 	</div>
 	<div class="col-span-4 row-span-2">
-		<BarOSDIOPS {client} {cluster} {start} {end} {endIsNow} bind:isReloading />
+		<BarOSDIOPS {client} {start} {end} {endIsNow} bind:isReloading />
 	</div>
 	<div class="col-span-2">
-		<AreaOSDReadLatency {client} {cluster} {start} {end} {endIsNow} bind:isReloading />
+		<AreaOSDReadLatency {client} {start} {end} {endIsNow} bind:isReloading />
 	</div>
 	<div class="col-span-2">
-		<AreaOSDWriteLatency {client} {cluster} {start} {end} {endIsNow} bind:isReloading />
+		<AreaOSDWriteLatency {client} {start} {end} {endIsNow} bind:isReloading />
 	</div>
 </div>

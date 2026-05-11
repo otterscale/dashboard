@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { GpuIcon } from '@lucide/svelte';
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
-	import type { Schema } from 'ajv';
+	import type { Schema } from '@sjsf/form';
 
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
@@ -30,6 +30,8 @@
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		object: any;
 	} = $props();
+
+	const kind = 'Node';
 
 	let actionsOpen = $state(false);
 </script>
@@ -85,7 +87,7 @@
 					</Item.Root>
 				</DropdownMenu.SubTrigger>
 				<DropdownMenu.SubContent>
-					<GPU {cluster} {group} {version} {resource} {object} />
+					<GPU {cluster} {group} {version} {kind} {resource} {object} />
 				</DropdownMenu.SubContent>
 			</DropdownMenu.Sub>
 		</DropdownMenu.Group>
