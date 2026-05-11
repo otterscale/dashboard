@@ -41,7 +41,7 @@
 	]);
 
 	// Parameters
-	const cluster = page.params.cluster!;
+	const cluster = $derived(page.params.cluster!);
 	const namespace = 'otterscale-system';
 
 	// Clients
@@ -328,7 +328,7 @@
 	});
 </script>
 
-{#key cluster + JSON.stringify(helmRepository)}
+{#key cluster + helmRepository?.metadata?.uid}
 	<main class="pb-8">
 		<ModuleViewer {cluster} {namespace} {data}>
 			{#snippet reload()}

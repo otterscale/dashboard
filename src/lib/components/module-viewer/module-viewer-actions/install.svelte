@@ -52,11 +52,10 @@
 
 		toast.promise(
 			async () => {
-				const dependencies =
-					lodash
-						.get(module, ['annotations', 'module.otterscale.io/depends-on'], '')
-						.split(',')
-						.filter(Boolean) ?? [];
+				const dependencies = lodash
+					.get(module, ['annotations', 'module.otterscale.io/depends-on'], '')
+					.split(',')
+					.filter(Boolean);
 				const dependenciesOfSelectedModule = dependencies.map((name) => ({
 					name,
 					namespace

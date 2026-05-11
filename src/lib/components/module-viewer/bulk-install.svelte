@@ -44,11 +44,10 @@
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository,
 		selectedModuleNames: Set<string>
 	): Promise<string> {
-		const dependencies =
-			lodash
-				.get(module, ['annotations', 'module.otterscale.io/depends-on'], '')
-				.split(',')
-				.filter(Boolean) ?? [];
+		const dependencies = lodash
+			.get(module, ['annotations', 'module.otterscale.io/depends-on'], '')
+			.split(',')
+			.filter(Boolean);
 		const dependenciesOfSelectedModuleNames = dependencies.filter((name) =>
 			selectedModuleNames.has(name)
 		);
