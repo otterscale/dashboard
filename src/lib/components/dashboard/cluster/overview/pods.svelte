@@ -12,16 +12,13 @@
 
 	let {
 		prometheusDriver,
-		cluster: _cluster,
 		namespace = '',
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
-		cluster: string;
 		namespace?: string;
 		isReloading: boolean;
 	} = $props();
-	void _cluster;
 
 	let maxAllocatablePods: SampleValue | undefined = $state(undefined);
 	let runningPods: SampleValue | undefined = $state(undefined);

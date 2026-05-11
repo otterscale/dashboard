@@ -5,19 +5,19 @@
 	import { m } from '$lib/paraglide/messages';
 	import { breadcrumbs } from '$lib/stores';
 
-	const cluster = $derived(page.params.cluster ?? '');
-	const workspace = $derived(page.params.workspace ?? '');
-	const namespace = $derived(page.data.namespace ?? '');
-
 	breadcrumbs.set([
 		{
 			title: m.workspace_dashboard_title(),
 			url: resolve('/(auth)/[cluster]/[workspace]/overview', {
-				cluster,
-				workspace
+				cluster: page.params.cluster!,
+				workspace: page.data.namespace!
 			})
 		}
 	]);
+
+	const cluster = $derived(page.params.cluster ?? '');
+	const workspace = $derived(page.params.workspace ?? '');
+	const namespace = $derived(page.data.namespace ?? '');
 </script>
 
 {#key cluster + workspace + namespace}

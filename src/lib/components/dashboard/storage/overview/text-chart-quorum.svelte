@@ -10,12 +10,8 @@
 	import { m } from '$lib/paraglide/messages';
 
 	// Props
-	let {
-		client,
-		cluster: _,
-		isReloading = $bindable()
-	}: { client: PrometheusDriver; cluster: string; isReloading: boolean } = $props();
-	void _;
+	let { client, isReloading = $bindable() }: { client: PrometheusDriver; isReloading: boolean } =
+		$props();
 
 	// Constants
 	const CHART_TITLE = m.quorum_status();

@@ -16,20 +16,17 @@
 	// Props
 	let {
 		client,
-		cluster: _,
 		start,
 		end,
 		endIsNow = false,
 		isReloading = $bindable()
 	}: {
 		client: PrometheusDriver;
-		cluster: string;
 		start: Date;
 		end: Date;
 		endIsNow?: boolean;
 		isReloading: boolean;
 	} = $props();
-	void _;
 
 	// Constants
 	const CHART_TITLE = m.osd();

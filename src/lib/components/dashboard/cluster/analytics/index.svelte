@@ -16,14 +16,11 @@
 
 	let {
 		client,
-		cluster: _cluster,
 		selectedInstance = $bindable()
 	}: {
-		cluster?: string;
 		client: PrometheusDriver;
 		selectedInstance: string | undefined;
 	} = $props();
-	void _cluster;
 </script>
 
 <div class="flex flex-col gap-4">

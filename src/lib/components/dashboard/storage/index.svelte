@@ -102,7 +102,6 @@
 					{#key dashboardTimeRangeKey}
 						<Overview
 							client={prometheusDriver}
-							{cluster}
 							{start}
 							{end}
 							endIsNow={pickerToIsNow}
@@ -111,7 +110,7 @@
 					{/key}
 				</Tabs.Content>
 				<Tabs.Content value="analytics">
-					<!-- <Analytics client={prometheusDriver} {cluster} /> -->
+					<!-- <Analytics /> -->
 				</Tabs.Content>
 			</Tabs.Root>
 		</div>

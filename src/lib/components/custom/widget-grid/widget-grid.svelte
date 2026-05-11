@@ -6,7 +6,6 @@
 	let {
 		widgets,
 		prometheusDriver,
-		cluster,
 		namespace,
 		start,
 		end,
@@ -15,7 +14,6 @@
 	}: {
 		widgets: WidgetDefinition[];
 		prometheusDriver: PrometheusDriver;
-		cluster: string;
 		namespace?: string;
 		start?: Date;
 		end?: Date;
@@ -32,7 +30,6 @@
 			{prometheusDriver}
 			bind:isReloading
 			{...start != null && end != null ? { start, end, endIsNow } : {}}
-			{...widget.needsCluster ? { cluster } : {}}
 			{...widget.needsNamespace ? { namespace } : {}}
 			{...props}
 		/>
