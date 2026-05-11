@@ -58,7 +58,8 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import Ajv, { type Schema, type ValidateFunction } from 'ajv';
+	import type { Schema } from '@sjsf/form';
+	import Ajv, { type ValidateFunction } from 'ajv';
 	import * as jsonpatch from 'fast-json-patch';
 	import { JSON_SCHEMA, load } from 'js-yaml';
 	import lodash from 'lodash';

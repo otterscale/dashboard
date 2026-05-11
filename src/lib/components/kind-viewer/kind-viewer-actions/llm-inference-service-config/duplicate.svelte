@@ -2,7 +2,8 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { PlusIcon } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import Ajv, { type Schema } from 'ajv';
+	import type { Schema } from '@sjsf/form';
+	import Ajv from 'ajv';
 	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
@@ -91,7 +92,7 @@
 		const representation = document.toJS();
 		const valid = validate(representation);
 		if (!valid && validate.errors) {
-			validate.errors.forEach((error) => {
+			validate.errors.forEach((error: any) => {
 				let targetPath: string[] = [];
 				let errorMessage = '';
 
@@ -104,7 +105,7 @@
 				}
 
 				// Locate Errors
-				targetPath = error.instancePath.split('/').filter((path) => path !== '');
+				targetPath = error.instancePath.split('/').filter((path: any) => path !== '');
 				const node = document.getIn(targetPath, true) as any;
 				const severity =
 					node?.value === null ? monaco.MarkerSeverity.Hint : monaco.MarkerSeverity.Error;
