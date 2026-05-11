@@ -728,11 +728,7 @@
 								{/if}
 								{#if header.column.getCanResize()}
 									<div
-										role="slider"
-										aria-orientation="vertical"
-										aria-label="Resize column"
-										aria-valuenow={header.getSize()}
-										tabindex="-1"
+										aria-hidden="true"
 										class="user-select-none absolute top-0 -right-2 z-10 flex h-full w-4 cursor-col-resize touch-none justify-center"
 										ondblclick={() => header.column.resetSize()}
 										onmousedown={header.getResizeHandler()}
