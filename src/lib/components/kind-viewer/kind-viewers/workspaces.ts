@@ -10,8 +10,12 @@ import type {
 	ArrayOfObjectMetadata
 } from '$lib/components/dynamic-table/dynamic-table-cells/array-of-object-cell.svelte';
 import type { LinkMetadata } from '$lib/components/dynamic-table/dynamic-table-cells/link-cell.svelte';
-import type { QuantityMetadata } from '$lib/components/dynamic-table/dynamic-table-cells/quantity-cell.svelte';
-import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
+import type { RatioMetadata } from '$lib/components/dynamic-table/dynamic-table-cells/ratio-cell.svelte';
+import {
+	type DataSchemaType,
+	getRatio,
+	type UISchemaType
+} from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
 
 import { buildResourceDetailUrl } from './resource-url';
@@ -24,7 +28,7 @@ type WorkspaceAttribute =
 	| 'CPU Quota'
 	| 'Memory Quota'
 	| 'GPU Quota'
-	| 'Creation Timestamp'
+	| 'Age'
 	| 'raw';
 
 function getWorkspaceDataSchemas(): Record<WorkspaceAttribute, DataSchemaType> {
@@ -33,10 +37,10 @@ function getWorkspaceDataSchemas(): Record<WorkspaceAttribute, DataSchemaType> {
 		Namespace: 'text',
 		Admin: 'text',
 		Members: 'number',
-		'CPU Quota': 'text',
-		'Memory Quota': 'text',
-		'GPU Quota': 'text',
-		'Creation Timestamp': 'time',
+		'CPU Quota': 'number',
+		'Memory Quota': 'number',
+		'GPU Quota': 'number',
+		Age: 'time',
 		raw: 'object'
 	};
 }
@@ -49,10 +53,22 @@ function getWorkspaceData(
 		Namespace: object?.spec?.namespace ?? null,
 		Admin: object?.spec?.members.find((member) => member.role === 'admin')?.name ?? null,
 		Members: (object?.spec?.members ?? []).length,
-		'CPU Quota': `${object?.spec?.resourceQuota?.hard?.['requests.cpu'] ?? '-'} / ${object?.spec?.resourceQuota?.hard?.['limits.cpu'] ?? '-'}`,
-		'Memory Quota': `${object?.spec?.resourceQuota?.hard?.['requests.memory'] ?? '-'} / ${object?.spec?.resourceQuota?.hard?.['limits.memory'] ?? '-'}`,
-		'GPU Quota': `${object?.spec?.resourceQuota?.hard?.['requests.nvidia.com/gpu'] ?? '-'} / ${object?.spec?.resourceQuota?.hard?.['limits.nvidia.com/gpu'] ?? '-'}`,
-		'Creation Timestamp': object?.metadata?.creationTimestamp as JsonValue,
+		'CPU Quota': getRatio(
+			object?.spec?.resourceQuota?.hard?.['requests.cpu'] ?? null,
+			object?.spec?.resourceQuota?.hard?.['limits.cpu'] ?? null,
+			'continuous'
+		),
+		'Memory Quota': getRatio(
+			object?.spec?.resourceQuota?.hard?.['requests.memory'] ?? null,
+			object?.spec?.resourceQuota?.hard?.['limits.memory'] ?? null,
+			'discrete'
+		),
+		'GPU Quota': getRatio(
+			object?.spec?.resourceQuota?.hard?.['requests.nvidia.com/gpu'] ?? null,
+			object?.spec?.resourceQuota?.hard?.['limits.nvidia.com/gpu'] ?? null,
+			'discrete'
+		),
+		Age: object?.metadata?.creationTimestamp as JsonValue,
 		raw: object as JsonObject
 	};
 }
@@ -63,10 +79,10 @@ function getWorkspaceUISchemas(): Record<WorkspaceAttribute, UISchemaType> {
 		Namespace: 'text',
 		Admin: 'text',
 		Members: 'array-of-object',
-		'CPU Quota': 'text',
-		'Memory Quota': 'text',
-		'GPU Quota': 'text',
-		'Creation Timestamp': 'time',
+		'CPU Quota': 'ratio',
+		'Memory Quota': 'ratio',
+		'GPU Quota': 'ratio',
+		Age: 'time',
 		raw: 'object'
 	};
 }
@@ -196,8 +212,13 @@ function getWorkspaceColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas,
 					metadata: {
-						type: 'continuous'
-					} satisfies QuantityMetadata
+						numerator:
+							(row.original['raw'] as TenantOtterscaleIoV1Alpha1Workspace).spec?.resourceQuota
+								?.hard?.['requests.cpu'] ?? ' - ',
+						denominator:
+							(row.original['raw'] as TenantOtterscaleIoV1Alpha1Workspace).spec?.resourceQuota
+								?.hard?.['limits.cpu'] ?? ' - '
+					} satisfies RatioMetadata
 				}),
 			accessorKey: 'CPU Quota'
 		},
@@ -220,8 +241,13 @@ function getWorkspaceColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas,
 					metadata: {
-						type: 'discrete'
-					} satisfies QuantityMetadata
+						numerator:
+							(row.original['raw'] as TenantOtterscaleIoV1Alpha1Workspace).spec?.resourceQuota
+								?.hard?.['requests.memory'] ?? ' - ',
+						denominator:
+							(row.original['raw'] as TenantOtterscaleIoV1Alpha1Workspace).spec?.resourceQuota
+								?.hard?.['limits.memory'] ?? ' - '
+					} satisfies RatioMetadata
 				}),
 			accessorKey: 'Memory Quota'
 		},
@@ -244,13 +270,18 @@ function getWorkspaceColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas,
 					metadata: {
-						type: 'discrete'
-					} satisfies QuantityMetadata
+						numerator:
+							(row.original['raw'] as TenantOtterscaleIoV1Alpha1Workspace).spec?.resourceQuota
+								?.hard?.['requests.nvidia.com/gpu'] ?? ' - ',
+						denominator:
+							(row.original['raw'] as TenantOtterscaleIoV1Alpha1Workspace).spec?.resourceQuota
+								?.hard?.['limits.nvidia.com/gpu'] ?? ' - '
+					} satisfies RatioMetadata
 				}),
 			accessorKey: 'GPU Quota'
 		},
 		{
-			id: 'Creation Timestamp',
+			id: 'Age',
 			header: ({ column }: { column: Column<Record<WorkspaceAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
@@ -268,7 +299,7 @@ function getWorkspaceColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'Creation Timestamp'
+			accessorKey: 'Age'
 		}
 	];
 }

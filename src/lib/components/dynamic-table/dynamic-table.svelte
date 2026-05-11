@@ -91,8 +91,13 @@
 		>;
 	} = $props();
 
-	let mode = $state<'table' | 'grid'>(gridsLayout ? 'grid' : 'table');
+	// gridsLayout is set once, capturing the initial value is intentional.
+	// svelte-ignore state_referenced_locally
+	const hasGridlayout = !!gridsLayout;
+	let mode = $state<'table' | 'grid'>(hasGridlayout ? 'grid' : 'table');
 
+	// columnDefinitions are set once, capturing the initial value is intentional.
+	// svelte-ignore state_referenced_locally
 	const columns: ColumnDef<Record<string, JsonValue>>[] = [
 		{
 			id: 'select',
@@ -150,6 +155,7 @@
 		Hours: (time: number) => time * 60 * 60 * 1000,
 		Days: (time: number) => time * 24 * 60 * 60 * 1000,
 		Years: (time: number) => time * 365 * 24 * 60 * 60 * 1000,
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		size: (object: any) => {
 			return object ? Object.keys(object).length : undefined;
 		}
@@ -164,7 +170,7 @@
 	let columnVisibility = $state<VisibilityState>({});
 	let columnSizing = $state<ColumnSizingState>({});
 	let sorting = $state<SortingState>([]);
-	let pagination = $state<PaginationState>({ pageIndex: 0, pageSize: gridsLayout ? 9 : 10 });
+	let pagination = $state<PaginationState>({ pageIndex: 0, pageSize: hasGridlayout ? 9 : 10 });
 
 	let table = createSvelteTable<Record<string, JsonValue>>({
 		columns,
@@ -575,7 +581,7 @@
 					{table.getState().pagination.pageSize.toString() ?? 'Select number of results'}
 				</SelectTrigger>
 				<SelectContent
-					class="[&_*[role=option]]:ps-2 [&_*[role=option]]:pe-8 [&_*[role=option]>span]:start-auto [&_*[role=option]>span]:end-2"
+					class="[&_*[role=option]]:ps-2 [&_*[role=option]]:pe-8 [&_*[role=option]>span]:inset-s-auto [&_*[role=option]>span]:inset-e-2"
 				>
 					{#each [5, 10, 20, 50, 100] as pageSize (pageSize)}
 						<SelectItem value={pageSize.toString()}>
@@ -723,11 +729,12 @@
 								{/if}
 								{#if header.column.getCanResize()}
 									<div
+										aria-hidden="true"
 										class="user-select-none absolute top-0 -right-2 z-10 flex h-full w-4 cursor-col-resize touch-none justify-center"
 										ondblclick={() => header.column.resetSize()}
 										onmousedown={header.getResizeHandler()}
 										ontouchstart={header.getResizeHandler()}
-									/>
+									></div>
 								{/if}
 							</Table.Head>
 						{/each}

@@ -44,6 +44,7 @@
 		properties: {}
 	} as Schema;
 
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	let values: any = $state({});
 
 	let open = $state(false);
@@ -110,7 +111,7 @@
 			</Item.Content>
 		</Item.Root>
 		<Form
-			schema={jsonSchema as any}
+			schema={jsonSchema as Schema}
 			uiSchema={{}}
 			initialValue={{} as FormValue}
 			bind:values

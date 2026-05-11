@@ -12,16 +12,13 @@
 
 	let {
 		prometheusDriver,
-		cluster: _cluster,
 		namespace = '',
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
-		cluster: string;
 		namespace?: string;
 		isReloading: boolean;
 	} = $props();
-	void _cluster;
 
 	let deployments: SampleValue | undefined = $state(undefined);
 	async function fetchdeployments() {

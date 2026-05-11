@@ -128,6 +128,20 @@ function formatWithBinarySuffix(value: bigint): { value: number; unit: string } 
 	};
 }
 
+/**
+ * Compute `numerator / denominator` rounded to `digits` decimal places.
+ *
+ * - `continuous`: floating-point division for fractional operands
+ *   (CPU cores, percentages, load averages). Returns a `toFixed` string.
+ * - `discrete`: BigInt division with a 10^digits scale factor, downcast
+ *   to Number. Use for integer quantities that may exceed 2^53, e.g.
+ *   byte counts from storage units (`Ki`, `Mi`, `Gi`, ...). Caller MUST
+ *   ensure `quantityToScalar` resolves to integer scalars on this path;
+ *   `BigInt("1.5")` throws.
+ *
+ * Returns `null` if either operand is `null`, the denominator is zero,
+ * or `type` is unrecognized.
+ */
 function getRatio(
 	numerator: number | string | null,
 	denominator: number | string | null,
@@ -140,15 +154,19 @@ function getRatio(
 	const denominatorScalar = quantityToScalar(String(denominator));
 
 	if (type === 'continuous') {
-		return (Number(numeratorScalar) / Number(denominatorScalar)).toFixed(digits);
-	} else if (type === 'discrete') {
+		if (Number(denominatorScalar) === 0) return null;
+		return Number((Number(numeratorScalar) / Number(denominatorScalar)).toFixed(digits));
+	}
+
+	if (type === 'discrete') {
+		if (BigInt(denominatorScalar) === 0n) return null;
 		return (
 			Number((BigInt(numeratorScalar) * BigInt(10) ** BigInt(digits)) / BigInt(denominatorScalar)) /
 			10 ** digits
 		);
-	} else {
-		return null;
 	}
+
+	return null;
 }
 
 function format(value: string) {

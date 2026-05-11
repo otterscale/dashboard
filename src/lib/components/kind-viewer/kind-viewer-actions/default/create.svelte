@@ -2,12 +2,13 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import Ajv from 'ajv';
+	import Ajv, { type Schema, type ValidateFunction } from 'ajv';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
-	import { getContext, onMount } from 'svelte';
+	import { getContext } from 'svelte';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
+	import type { Node } from 'yaml';
 	import { parseDocument, stringify } from 'yaml';
 
 	import { filterRequiredSchema, getInitialValues } from '$lib/components/dynamic-form/utils';
@@ -33,43 +34,34 @@
 		version: string;
 		kind: string;
 		resource: string;
-		schema: any;
+		schema: Schema;
 	} = $props();
 
-	const transport: Transport = getContext('transport');
-	const resourceClient = createClient(ResourceService, transport);
+	let isReady = $state(false);
+	let value = $state('');
+	let open = $state(false);
+	let abortController: AbortController | undefined;
 
+	// Bind to Monaco
+	let editorInstance: import('monaco-editor').editor.IStandaloneCodeEditor | undefined =
+		$state(undefined);
+	let monacoInstance: typeof import('monaco-editor') | undefined = $state(undefined);
+
+	// Validator
 	const jsonSchemaValidator = new Ajv({
 		allErrors: true,
 		strict: false,
 		logger: false
 	});
-	const validate = jsonSchemaValidator.compile(jsonSchema);
 
-	let initialValue = $state('');
-
-	let value = $derived(initialValue);
-	let open = $state(false);
-	let isSubmitting = $state(false);
-	let editorInstance: import('monaco-editor').editor.IStandaloneCodeEditor | undefined =
-		$state(undefined);
-	let monacoInstance: typeof import('monaco-editor') | undefined = $state(undefined);
-
-	$effect(() => {
-		if (editorInstance && monacoInstance) {
-			// Setup validation listener when editor is ready
-			performValidation();
-
-			const disposable = editorInstance.onDidChangeModelContent(() => {
-				performValidation();
-			});
-
-			return () => disposable.dispose();
-		}
-	});
-
-	function performValidation() {
-		if (!editorInstance || !monacoInstance) return;
+	// Validate Once
+	let validate: ValidateFunction | undefined = $state(undefined);
+	function performValidation(
+		editorInstance: import('monaco-editor').editor.IStandaloneCodeEditor | undefined,
+		monacoInstance: typeof import('monaco-editor') | undefined,
+		validate: ValidateFunction | undefined
+	) {
+		if (!editorInstance || !monacoInstance || !validate) return;
 
 		const monaco = monacoInstance;
 		const markers: import('monaco-editor').editor.IMarkerData[] = [];
@@ -113,9 +105,10 @@
 
 				// Locate Errors
 				targetPath = error.instancePath.split('/').filter((path) => path !== '');
-				const node = document.getIn(targetPath, true) as any;
+				const node = document.getIn(targetPath, true) as unknown as Node;
+				const severity = monaco.MarkerSeverity.Error;
 				if (node && node.range) {
-					const [start, end] = node.range.map((point: any) => model.getPositionAt(point));
+					const [start, end] = node.range.map((point) => model.getPositionAt(point));
 
 					if (error.keyword === 'required') {
 						markers.push({
@@ -124,7 +117,7 @@
 							endLineNumber: end.lineNumber,
 							endColumn: model.getLineMaxColumn(end.lineNumber),
 							message: errorMessage,
-							severity: monaco.MarkerSeverity.Hint
+							severity: severity
 						});
 					} else {
 						markers.push({
@@ -133,7 +126,7 @@
 							endLineNumber: end.lineNumber,
 							endColumn: end.column,
 							message: errorMessage,
-							severity: monaco.MarkerSeverity.Hint
+							severity: severity
 						});
 					}
 				} else {
@@ -143,7 +136,7 @@
 						endLineNumber: 1,
 						endColumn: model.getLineMaxColumn(1),
 						message: errorMessage,
-						severity: monaco.MarkerSeverity.Hint
+						severity: severity
 					});
 				}
 			});
@@ -152,8 +145,28 @@
 		monaco.editor.setModelMarkers(model, 'yaml-validator', markers);
 	}
 
-	function handleConfirm() {
+	// Validate Continuously
+	$effect(() => {
+		if (editorInstance && monacoInstance && validate) {
+			// Setup validation listener when editor is ready
+			performValidation(editorInstance, monacoInstance, validate);
+
+			const disposable = editorInstance.onDidChangeModelContent(() => {
+				performValidation(editorInstance, monacoInstance, validate);
+			});
+
+			return () => disposable.dispose();
+		}
+	});
+
+	// Submit
+	const transport: Transport = getContext('transport');
+	const resourceClient = createClient(ResourceService, transport);
+	let isSubmitting = $state(false);
+	function handleConfirm(validate: ValidateFunction | undefined) {
 		if (isSubmitting) return;
+
+		if (!validate) return;
 
 		const document = parseDocument(value);
 		if (document.errors.length > 0) {
@@ -161,6 +174,7 @@
 			return;
 		}
 
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const parsed = document.toJS() as Record<string, any>;
 		if (!validate(parsed)) {
 			toast.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
@@ -195,27 +209,49 @@
 			}
 		);
 	}
-
-	onMount(async () => {
-		let initialValues: any = await getInitialValues(filterRequiredSchema(jsonSchema));
-
-		lodash.set(initialValues, 'apiVersion', group ? `${group}/${version}` : version);
-		lodash.set(initialValues, 'kind', kind);
-		if (namespace) {
-			lodash.set(initialValues, 'metadata.namespace', namespace);
-		}
-		initialValue = stringify(initialValues);
-	});
 </script>
 
 <Tooltip.Root>
 	<Dialog.Root
 		bind:open
-		onOpenChangeComplete={(isOpen) => {
+		onOpenChange={async (isOpen) => {
 			if (!isOpen) {
-				editorInstance = undefined;
-				value = initialValue;
+				abortController?.abort();
+				abortController = undefined;
+				return;
 			}
+
+			abortController?.abort();
+			abortController = new AbortController();
+			const { signal } = abortController;
+
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const initialValues: any = await getInitialValues(filterRequiredSchema(jsonSchema));
+			if (signal.aborted) return;
+
+			lodash.set(initialValues, 'apiVersion', group ? `${group}/${version}` : version);
+			lodash.set(initialValues, 'kind', kind);
+			if (namespace) {
+				lodash.set(initialValues, 'metadata.namespace', namespace);
+			}
+
+			const compiledValidator = jsonSchemaValidator.compile(jsonSchema);
+			if (signal.aborted) return;
+
+			value = stringify(initialValues);
+			validate = compiledValidator;
+			// editorInstance initialized by Monaco component.
+			// monacoInstance initialized by Monaco component.
+			isReady = true;
+		}}
+		onOpenChangeComplete={(isOpen) => {
+			if (isOpen) return;
+
+			value = '';
+			validate = undefined;
+			editorInstance = undefined;
+			monacoInstance = undefined;
+			isReady = false;
 		}}
 	>
 		<Tooltip.Trigger>
@@ -238,23 +274,28 @@
 			</Dialog.Header>
 			<div class="grid grid-cols-2 gap-4 *:max-h-[62vh] *:min-h-[62vh]">
 				<SchemaViewer schema={jsonSchema} class="h-full max-h-screen min-h-0 overflow-auto" />
-				<Monaco
-					options={{
-						language: 'yaml',
-						padding: { top: 24 },
-						automaticLayout: true
-					}}
-					theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
-					bind:value
-					bind:editor={editorInstance}
-					bind:monaco={monacoInstance}
-				/>
+				<div class="transition-opacity duration-300 {isReady ? 'opacity-100' : 'opacity-0'}">
+					<Monaco
+						options={{
+							language: 'yaml',
+							padding: { top: 24 },
+							automaticLayout: true,
+							folding: true,
+							foldingStrategy: 'indentation',
+							showFoldingControls: 'always'
+						}}
+						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
+						bind:value
+						bind:editor={editorInstance}
+						bind:monaco={monacoInstance}
+					/>
+				</div>
 			</div>
 			<Dialog.Footer>
 				<Button class="mr-auto" variant="outline" onclick={() => (open = false)}
 					>{m.cancel()}</Button
 				>
-				<Button onclick={handleConfirm}>
+				<Button onclick={() => handleConfirm(validate)}>
 					{m.confirm()}
 				</Button>
 			</Dialog.Footer>

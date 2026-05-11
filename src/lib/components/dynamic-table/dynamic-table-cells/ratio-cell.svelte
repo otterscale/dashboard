@@ -1,8 +1,6 @@
 <script lang="ts" module>
 	import type { JsonValue } from '@bufbuild/protobuf';
 
-	import { Progress } from '$lib/components/ui/progress/index.js';
-
 	export type RatioMetadata = {
 		numerator: JsonValue;
 		denominator: JsonValue;
@@ -32,18 +30,17 @@
 	const data = $derived(row.original[column.id] as number);
 </script>
 
-{#if metadata.denominator !== undefined}
-	<div class="flex flex-col gap-1">
-		<Progress value={data} max={1} class="w-full" />
-		<Tooltip.Provider>
-			<Tooltip.Root>
-				<Tooltip.Trigger class="ml-auto">
-					{(Number(data) * 100).toFixed(2)}%
-				</Tooltip.Trigger>
-				<Tooltip.Content>
-					{metadata.numerator}/{metadata.denominator}
-				</Tooltip.Content>
-			</Tooltip.Root>
-		</Tooltip.Provider>
-	</div>
+{#if data !== null}
+	<Tooltip.Provider>
+		<Tooltip.Root>
+			<Tooltip.Trigger class="ml-auto">
+				{metadata.numerator}/{metadata.denominator}
+			</Tooltip.Trigger>
+			<Tooltip.Content>
+				{(Number(data) * 100).toFixed(2)}%
+			</Tooltip.Content>
+		</Tooltip.Root>
+	</Tooltip.Provider>
+{:else}
+	{metadata.numerator}/{metadata.denominator}
 {/if}
