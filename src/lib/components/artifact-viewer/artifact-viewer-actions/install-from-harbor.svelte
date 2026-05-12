@@ -125,7 +125,9 @@
 
 	let selectedChart: ArtifactChartType = $derived(charts[0] || ({} as ArtifactChartType));
 	function getVersions() {
-		return charts.map((chart) => lodash.get(chart.extra_attrs, 'version') as unknown as string);
+		return charts
+			.filter((chart) => chart.tags)
+			.map((chart) => lodash.get(chart.extra_attrs, 'version') as unknown as string);
 	}
 	function getSelectedChart(version: string) {
 		return (
