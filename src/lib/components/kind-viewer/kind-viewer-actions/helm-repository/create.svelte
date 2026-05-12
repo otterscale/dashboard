@@ -41,43 +41,45 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-
-	// Container for Data
-	let values = $state({
-		apiVersion: `${group}/${version}`,
-		kind,
-		metadata: {},
-		spec: {}
-	});
-	let value = $derived(stringify(values));
-
-	// Steps Manager
 	const steps = Array.from({ length: 3 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
+
+	let values = $state(getInitialValues());
 	let currentStep = $state(firstStep);
+	let isSubmitting = $state(false);
+	let open = $state(false);
+
+	let value = $derived(stringify(values));
 	const currentIndex = $derived(steps.indexOf(currentStep));
+
+	function getInitialValues() {
+		return {
+			apiVersion: `${group}/${version}`,
+			kind,
+			metadata: {},
+			spec: {}
+		};
+	}
+	function initiate() {
+		values = getInitialValues();
+		currentStep = firstStep;
+		isSubmitting = false;
+	}
 	function handleNext() {
 		currentStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
 	}
 	function handlePrevious() {
 		currentStep = steps[Math.max(currentIndex - 1, 0)];
 	}
-	function reset() {
-		currentStep = firstStep;
-	}
-
-	// Flag for Dialog
-	let open = $state(false);
-	let isSubmitting = $state(false);
 </script>
 
 <Tooltip.Root>
 	<Dialog.Root
 		bind:open
 		onOpenChangeComplete={(isOpen) => {
-			if (!isOpen) {
-				reset();
-			}
+			if (isOpen) return;
+
+			initiate();
 		}}
 	>
 		<Tooltip.Trigger>
@@ -106,8 +108,12 @@
 				<Tabs.Content value={steps[0]}>
 					<Form
 						schema={{
-							...lodash.omit(lodash.get(jsonSchema, 'properties.metadata') as Schema, 'properties'),
+							...(lodash.omit(lodash.get(jsonSchema, 'properties.metadata') as Schema, [
+								'properties',
+								'required'
+							]) as any),
 							title: 'Metadata',
+							required: [...lodash.get(jsonSchema, 'properties.metadata.required', []), 'name'],
 							properties: {
 								name: {
 									...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema),
@@ -184,27 +190,31 @@
 				<Tabs.Content value={steps[1]}>
 					<Form
 						schema={{
-							...lodash.omit(lodash.get(jsonSchema, 'properties.spec') as Schema, 'properties'),
+							...(lodash.omit(
+								lodash.get(jsonSchema, 'properties.spec') as Schema,
+								'properties'
+							) as any),
 							properties: {
 								type: {
-									...(lodash.get(jsonSchema, 'properties.spec.properties.type') as Schema),
-									title: 'Type'
+									...lodash.omit(
+										lodash.get(jsonSchema, 'properties.spec.properties.type') as Schema,
+										['enum']
+									),
+									title: 'Type',
+									enum: [
+										...lodash
+											.get(jsonSchema, 'properties.spec.properties.type.enum', [])
+											.filter((type) => type !== 'default'),
+										'index'
+									]
 								},
 								url: {
 									...(lodash.get(jsonSchema, 'properties.spec.properties.url') as Schema),
 									title: 'URL'
 								},
-								secretRef: {
-									...(lodash.get(jsonSchema, 'properties.spec.properties.secretRef') as Schema),
-									title: 'Secret Reference'
-								},
 								insecure: {
 									...(lodash.get(jsonSchema, 'properties.spec.properties.insecure') as Schema),
 									title: 'Insecure'
-								},
-								certSecretRef: {
-									...(lodash.get(jsonSchema, 'properties.spec.properties.certSecretRef') as Schema),
-									title: 'Certificate Secret Reference'
 								}
 							}
 						} as Schema}
@@ -217,11 +227,6 @@
 							type: {
 								'ui:components': {
 									stringField: 'enumField'
-								},
-								'ui:options': {
-									disabledEnumValues: lodash
-										.get(jsonSchema, 'properties.spec.properties.type.enum', [])
-										.filter((type) => type !== 'oci')
 								}
 							},
 							secretRef: {
