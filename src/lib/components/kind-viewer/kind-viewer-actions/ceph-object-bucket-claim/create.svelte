@@ -49,7 +49,7 @@
 	let values = $state(getInitialValues());
 	let currentStep = $state(firstStep);
 	let isSubmitting = $state(false);
-	
+
 	let value = $derived(stringify(values));
 	const currentIndex = $derived(steps.indexOf(currentStep));
 
