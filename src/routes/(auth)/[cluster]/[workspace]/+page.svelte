@@ -72,17 +72,13 @@
 		const endpoint = config?.[endpointKey];
 		if (!endpoint) return 'Unavailable';
 
-		// Append kind-specific suffixes. Use placeholders when concrete values are
-		// not available in this context.
-		if (kind === 'Service') {
-			return `Available at ${endpoint}:<NodePort>`;
-		}
-
-		if (kind === 'LLMInferenceService') {
-			return `Available at ${endpoint}/${namespace || '<Namespace>'}/<Name>`;
-		}
-
-		return `Available at ${endpoint}`;
+		const ns = namespace || '<Namespace>';
+		const suffixMap: Record<string, string> = {
+			Service: ':<NodePort>',
+			LLMInferenceService: `/${ns}/<Name>`,
+			ObjectBucketClaim: `/${ns}-<Name>`
+		};
+		return `Available at ${endpoint}${suffixMap[kind] ?? ''}`;
 	}
 </script>
 
