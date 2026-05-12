@@ -23,20 +23,18 @@
 </script>
 
 <div class={className}>
-	<Tooltip.Provider>
-		<Tooltip.Root>
-			<Tooltip.Trigger>
-				{#if children}
-					{@render children()}
-				{:else}
-					<h3>{column.id}</h3>
-				{/if}
-			</Tooltip.Trigger>
-			{#if dataSchema}
-				<Tooltip.Content>
-					{dataSchema}
-				</Tooltip.Content>
+	<Tooltip.Root>
+		<Tooltip.Trigger>
+			{#if children}
+				{@render children()}
+			{:else}
+				<h3>{column.id}</h3>
 			{/if}
-		</Tooltip.Root>
-	</Tooltip.Provider>
+		</Tooltip.Trigger>
+		{#if dataSchema}
+			<Tooltip.Content>
+				{dataSchema}
+			</Tooltip.Content>
+		{/if}
+	</Tooltip.Root>
 </div>

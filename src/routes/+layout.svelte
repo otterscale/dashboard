@@ -12,6 +12,7 @@
 	import { resolve } from '$app/paths';
 	import { Toaster } from '$lib/components/ui/sonner';
 	import { Spinner } from '$lib/components/ui/spinner';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	let { children } = $props();
 
@@ -49,8 +50,10 @@
 <ModeWatcher />
 <Toaster toastOptions={{ class: '!pointer-events-auto' }} richColors {loadingIcon} />
 
-<div class="app">
-	<main>
-		{@render children()}
-	</main>
-</div>
+<Tooltip.Provider>
+	<div class="app">
+		<main>
+			{@render children()}
+		</main>
+	</div>
+</Tooltip.Provider>
