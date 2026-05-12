@@ -292,7 +292,7 @@
 								maxValue={1}
 								series={[{ key: 'data', color: chartConfig.data.color }]}
 								props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
-								tooltip={false}
+								tooltipContext={false}
 							>
 								{#snippet aboveMarks()}
 									{@const percentage = formatPercentage(cpuUsed!, cpuHard!, 1)}
@@ -355,7 +355,7 @@
 								maxValue={1}
 								series={[{ key: 'data', color: chartConfig.data.color }]}
 								props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
-								tooltip={false}
+								tooltipContext={false}
 							>
 								{#snippet aboveMarks()}
 									{@const percentage = formatPercentage(memUsed!, memHard!, 1)}
@@ -418,7 +418,7 @@
 								maxValue={1}
 								series={[{ key: 'data', color: chartConfig.data.color }]}
 								props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
-								tooltip={false}
+								tooltipContext={false}
 							>
 								{#snippet aboveMarks()}
 									<Text
@@ -447,7 +447,7 @@
 								maxValue={1}
 								series={[{ key: 'data', color: chartConfig.data.color }]}
 								props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
-								tooltip={false}
+								tooltipContext={false}
 							>
 								{#snippet aboveMarks()}
 									{@const percentage = formatPercentage(gpuUsed!, gpuHard!, 1)}
@@ -509,7 +509,7 @@
 								maxValue={1}
 								series={[{ key: 'data', color: chartConfig.data.color }]}
 								props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
-								tooltip={false}
+								tooltipContext={false}
 							>
 								{#snippet aboveMarks()}
 									<Text
@@ -538,7 +538,7 @@
 								maxValue={1}
 								series={[{ key: 'data', color: chartConfig.data.color }]}
 								props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
-								tooltip={false}
+								tooltipContext={false}
 							>
 								{#snippet aboveMarks()}
 									{@const percentage = formatPercentage(gpuMemUsed!, gpuMemHard!, 1)}

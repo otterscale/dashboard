@@ -1,7 +1,7 @@
 <script lang="ts">
 	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
-	import { BarChart, type ChartContextValue, Highlight } from 'layerchart';
+	import { BarChart, type ChartState, Highlight } from 'layerchart';
 	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 	import { cubicInOut } from 'svelte/easing';
@@ -62,7 +62,7 @@
 
 	// State
 	let activeChart = $state<ChartKey>('Read');
-	let context = $state<ChartContextValue>();
+	let context = $state<ChartState>();
 
 	// Derived state
 	const queries = $derived({

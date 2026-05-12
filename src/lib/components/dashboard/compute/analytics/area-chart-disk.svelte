@@ -52,6 +52,13 @@
 
 	const chartConfig = $derived(generateChartConfig(rawData));
 	const series = $derived(getSeries(chartConfig));
+
+	const areaProps = {
+		curve: curveMonotoneX,
+		'fill-opacity': 0.4,
+		line: { class: 'stroke-1' },
+		motion: 'tween'
+	} as const;
 </script>
 
 <Statistics.Root type="count" class="overflow-visible">
@@ -81,12 +88,7 @@
 					xScale={scaleUtc()}
 					{series}
 					props={{
-						area: {
-							curve: curveMonotoneX,
-							'fill-opacity': 0.4,
-							line: { class: 'stroke-1' },
-							motion: 'tween'
-						},
+						area: areaProps,
 						xAxis: {
 							ticks: getChartXAxisTicks(formatChartTimeRange(TIME_RANGE_HOURS)),
 							format: (date: Date) =>
@@ -95,9 +97,9 @@
 						yAxis: { format: () => '' }
 					}}
 				>
-					{#snippet marks({ series: chartSeries, getAreaProps })}
+					{#snippet marks({ context })}
 						<defs>
-							{#each chartSeries as s (s.key)}
+							{#each context.series.visibleSeries as s (s.key)}
 								{@const key = s.key.replace(/\s+/g, '')}
 								<linearGradient id="vmdisk_fill{key}" x1="0" y1="0" x2="0" y2="1">
 									<stop offset="5%" stop-color={s.color} stop-opacity={1.0} />
@@ -105,9 +107,9 @@
 								</linearGradient>
 							{/each}
 						</defs>
-						{#each chartSeries as s, index (s.key)}
+						{#each context.series.visibleSeries as s (s.key)}
 							{@const key = s.key.replace(/\s+/g, '')}
-							<Area {...getAreaProps(s, index)} fill="url(#vmdisk_fill{key})" />
+							<Area seriesKey={s.key} {...areaProps} fill="url(#vmdisk_fill{key})" />
 						{/each}
 					{/snippet}
 					{#snippet tooltip()}

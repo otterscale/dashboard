@@ -44,6 +44,13 @@
 		generation: { label: 'Generation', color: 'var(--chart-2)' }
 	} satisfies Chart.ChartConfig;
 
+	const areaProps = {
+		curve: curveMonotoneX,
+		'fill-opacity': 0.4,
+		line: { class: 'stroke-1' },
+		motion: 'tween'
+	} as const;
+
 	async function fetchPrompts(startMs: number, endMs: number, step: number) {
 		try {
 			const response = await prometheusDriver.rangeQuery(
@@ -149,12 +156,7 @@
 						}
 					]}
 					props={{
-						area: {
-							curve: curveMonotoneX,
-							'fill-opacity': 0.4,
-							line: { class: 'stroke-1' },
-							motion: 'tween'
-						},
+						area: areaProps,
 						xAxis: {
 							format: (v: Date) =>
 								`${v.getHours().toString().padStart(2, '0')}:${v.getMinutes().toString().padStart(2, '0')}`
@@ -191,14 +193,14 @@
 							{/snippet}
 						</Chart.Tooltip>
 					{/snippet}
-					{#snippet marks({ series, getAreaProps })}
-						{#each series as s, i (s.key)}
+					{#snippet marks({ context })}
+						{#each context.series.visibleSeries as s (s.key)}
 							<LinearGradient
 								stops={[s.color ?? '', 'color-mix(in lch, ' + s.color + ' 10%, transparent)']}
 								vertical
 							>
 								{#snippet children({ gradient })}
-									<Area {...getAreaProps(s, i)} fill={gradient} />
+									<Area seriesKey={s.key} {...areaProps} fill={gradient} />
 								{/snippet}
 							</LinearGradient>
 						{/each}

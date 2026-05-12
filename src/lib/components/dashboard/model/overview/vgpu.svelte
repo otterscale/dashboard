@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { scaleBand } from 'd3-scale';
-	import { BarChart, type ChartContextValue, Highlight } from 'layerchart';
+	import { BarChart, type ChartState, Highlight } from 'layerchart';
 	import { InstantVector, PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 	import { cubicInOut } from 'svelte/easing';
@@ -24,7 +24,7 @@
 		label: { color: 'var(--background)' }
 	} satisfies Chart.ChartConfig;
 
-	let context = $state<ChartContextValue>();
+	let context = $state<ChartState>();
 
 	async function fetch() {
 		try {

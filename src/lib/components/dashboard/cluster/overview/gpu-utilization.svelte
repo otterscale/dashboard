@@ -99,7 +99,7 @@
 						arc: { track: { fill: 'var(--muted)' }, motion: 'tween' },
 						tooltip: { context: { hideDelay: 350 } }
 					}}
-					tooltip={false}
+					tooltipContext={false}
 				>
 					{#snippet aboveMarks()}
 						<Text
