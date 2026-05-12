@@ -28,8 +28,7 @@
 		version,
 		kind,
 		resource,
-		schema: jsonSchema,
-		open = $bindable(false)
+		schema: jsonSchema
 	}: {
 		cluster: string;
 		namespace: string;
@@ -38,7 +37,6 @@
 		kind: string;
 		resource: string;
 		schema: Schema;
-		open?: boolean;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -49,6 +47,7 @@
 	let values = $state(getInitialValues());
 	let currentStep = $state(firstStep);
 	let isSubmitting = $state(false);
+	let open = $state(false);
 
 	let value = $derived(stringify(values));
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -118,9 +117,12 @@
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
-						...lodash.omit(lodash.get(jsonSchema, 'properties.metadata') as Schema, ['properties']),
+						...lodash.omit(lodash.get(jsonSchema, 'properties.metadata') as Schema, [
+							'properties',
+							'required'
+						]),
 						title: 'Metadata',
-						required: ['name'],
+						required: [...lodash.get(jsonSchema, 'properties.metadata.required', []), 'name'],
 						properties: {
 							name: {
 								...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema),
