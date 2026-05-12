@@ -108,10 +108,10 @@
 				<Tabs.Content value={steps[0]}>
 					<Form
 						schema={{
-							...(lodash.omit(lodash.get(jsonSchema, 'properties.metadata') as Schema, [
+							...lodash.omit(lodash.get(jsonSchema, 'properties.metadata') as Schema, [
 								'properties',
 								'required'
-							]) as any),
+							]),
 							title: 'Metadata',
 							required: [...lodash.get(jsonSchema, 'properties.metadata.required', []), 'name'],
 							properties: {
@@ -190,10 +190,7 @@
 				<Tabs.Content value={steps[1]}>
 					<Form
 						schema={{
-							...(lodash.omit(
-								lodash.get(jsonSchema, 'properties.spec') as Schema,
-								'properties'
-							) as any),
+							...lodash.omit(lodash.get(jsonSchema, 'properties.spec') as Schema, 'properties'),
 							properties: {
 								type: {
 									...lodash.omit(
