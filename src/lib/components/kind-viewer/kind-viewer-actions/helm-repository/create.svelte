@@ -36,14 +36,14 @@
 		version: string;
 		kind: string;
 		resource: string;
-		schema?: any;
+		schema: Schema;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
 	// Container for Data
-	let values: any = $state({
+	let values = $state({
 		apiVersion: `${group}/${version}`,
 		kind,
 		metadata: {},
@@ -106,18 +106,19 @@
 				<Tabs.Content value={steps[0]}>
 					<Form
 						schema={{
-							...(lodash.omit(lodash.get(jsonSchema, 'properties.metadata'), 'properties') as any),
+							...lodash.omit(lodash.get(jsonSchema, 'properties.metadata') as Schema, 'properties'),
 							title: 'Metadata',
 							properties: {
 								name: {
-									...lodash.get(jsonSchema, 'properties.metadata.properties.name'),
+									...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema),
 									title: 'Name'
 								},
 								labels: {
 									title: 'Labels',
-									...lodash.omit(lodash.get(jsonSchema, 'properties.metadata.properties.labels'), [
-										'additionalProperties'
-									]),
+									...lodash.omit(
+										lodash.get(jsonSchema, 'properties.metadata.properties.labels') as Schema,
+										['additionalProperties']
+									),
 									properties: {
 										'tenant.otterscale.io/from-harbor': {
 											type: 'boolean',
@@ -183,26 +184,26 @@
 				<Tabs.Content value={steps[1]}>
 					<Form
 						schema={{
-							...(lodash.omit(lodash.get(jsonSchema, 'properties.spec'), 'properties') as any),
+							...lodash.omit(lodash.get(jsonSchema, 'properties.spec') as Schema, 'properties'),
 							properties: {
 								type: {
-									...lodash.get(jsonSchema, 'properties.spec.properties.type'),
+									...(lodash.get(jsonSchema, 'properties.spec.properties.type') as Schema),
 									title: 'Type'
 								},
 								url: {
-									...lodash.get(jsonSchema, 'properties.spec.properties.url'),
+									...(lodash.get(jsonSchema, 'properties.spec.properties.url') as Schema),
 									title: 'URL'
 								},
 								secretRef: {
-									...lodash.get(jsonSchema, 'properties.spec.properties.secretRef'),
+									...(lodash.get(jsonSchema, 'properties.spec.properties.secretRef') as Schema),
 									title: 'Secret Reference'
 								},
 								insecure: {
-									...lodash.get(jsonSchema, 'properties.spec.properties.insecure'),
+									...(lodash.get(jsonSchema, 'properties.spec.properties.insecure') as Schema),
 									title: 'Insecure'
 								},
 								certSecretRef: {
-									...lodash.get(jsonSchema, 'properties.spec.properties.certSecretRef'),
+									...(lodash.get(jsonSchema, 'properties.spec.properties.certSecretRef') as Schema),
 									title: 'Certificate Secret Reference'
 								}
 							}
@@ -219,8 +220,8 @@
 								},
 								'ui:options': {
 									disabledEnumValues: lodash
-										.get(jsonSchema, 'properties.spec.properties.type.enum')
-										.filter((type: string) => type !== 'oci')
+										.get(jsonSchema, 'properties.spec.properties.type.enum', [])
+										.filter((type) => type !== 'oci')
 								}
 							},
 							secretRef: {
