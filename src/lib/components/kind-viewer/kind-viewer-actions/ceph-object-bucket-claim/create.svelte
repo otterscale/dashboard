@@ -37,27 +37,16 @@
 		version: string;
 		kind: string;
 		resource: string;
-		schema: any;
+		schema: Schema;
 		open?: boolean;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	// Validation
-	const jsonSchemaValidator = new Ajv({
-		allErrors: true,
-		strict: false
-	});
-	const validate = jsonSchemaValidator.compile(jsonSchema);
-
-	// Container for Data.
-	let values: any = $state({
-		apiVersion: `${group}/${version}`,
-		kind,
+	let values = $state({
 		metadata: {},
 		spec: {
-			storageClassName: 'ceph-bucket',
 			additionalConfig: {}
 		}
 	});
@@ -96,9 +85,9 @@
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
-		if (!isOpen) {
-			reset();
-		}
+		if (isOpen) return;
+
+		reset();
 	}}
 >
 	<Dialog.Trigger>
@@ -123,11 +112,12 @@
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
-						...lodash.omit(lodash.get(jsonSchema, 'properties.metadata'), 'properties'),
+						...lodash.omit(lodash.get(jsonSchema, 'properties.metadata') as Schema, ['properties']),
 						title: 'Metadata',
+						required: ['name'],
 						properties: {
 							name: {
-								...lodash.get(jsonSchema, 'properties.metadata.properties.name'),
+								...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema),
 								title: 'Name'
 							}
 						}
@@ -145,8 +135,13 @@
 					handleSubmit={{
 						posthook: (form: FormState<FormValue>) => {
 							handleNext();
+
 							const formValue = getValueSnapshot(form);
-							lodash.set(values, 'spec.bucketName', lodash.get(formValue, 'name'));
+							lodash.set(
+								values,
+								'spec.bucketName',
+								`${namespace}-${lodash.get(formValue, 'name')}`
+							);
 						}
 					}}
 					bind:values={values['metadata']}
@@ -162,18 +157,19 @@
 			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
-						...lodash.omit(lodash.get(jsonSchema, 'properties.spec.properties.additionalConfig'), [
-							'properties'
-						]),
+						...lodash.omit(
+							lodash.get(jsonSchema, 'properties.spec.properties.additionalConfig') as Schema,
+							['properties']
+						),
 						properties: {
 							maxSize: {
-								type: 'string',
+								type: 'number',
 								description:
 									'The maximum size of the bucket as a quota on the user account automatically created for the bucket. Please note minimum recommended value is 4K.',
 								title: 'Size'
 							},
 							bucketMaxSize: {
-								type: 'string',
+								type: 'number',
 								description:
 									'(disabled by default) The maximum size of the bucket as an individual bucket quota.',
 								title: 'Bucket Size'
@@ -238,6 +234,11 @@
 							scrollBeyondLastLine: false
 						}}
 						bind:value
+						on:ready={() => {
+							lodash.set(values, 'apiVersion', `${group}/${version}`);
+							lodash.set(values, 'kind', kind);
+							lodash.set(values, ['spec', 'storageClassName'], 'ceph-bucket');
+						}}
 						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
 					/>
 					<div class="mt-auto flex items-center justify-between gap-3">
@@ -253,6 +254,13 @@
 								if (isSubmitting) return;
 
 								isSubmitting = true;
+
+								// Validator
+								const jsonSchemaValidator = new Ajv({
+									allErrors: true,
+									strict: false
+								});
+								const validate = jsonSchemaValidator.compile(jsonSchema);
 
 								const isValid = validate(load(value));
 
@@ -271,7 +279,7 @@
 
 										await resourceClient.create({
 											cluster,
-											namespace: values.metadata.namespace,
+											namespace,
 											group,
 											version,
 											resource,
