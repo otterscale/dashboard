@@ -37,49 +37,44 @@
 		version: string;
 		kind: string;
 		resource: string;
-		schema: any;
+		schema: Schema;
 		open?: boolean;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-
-	// Validation
-	const jsonSchemaValidator = new Ajv({
-		allErrors: true,
-		strict: false
-	});
-	const validate = jsonSchemaValidator.compile(jsonSchema);
-
-	// Container for Data.
-	let values: any = $state({
-		apiVersion: `${group}/${version}`,
-		kind,
-		metadata: {},
-		spec: {
-			storageClassName: 'ceph-bucket',
-			additionalConfig: {}
-		}
-	});
-	let value = $derived(stringify(values));
-
-	// Steps
 	const steps = Array.from({ length: 3 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
+
+	let values = $state(getInitialValues());
 	let currentStep = $state(firstStep);
+	let isSubmitting = $state(false);
+
+	let value = $derived(stringify(values));
 	const currentIndex = $derived(steps.indexOf(currentStep));
+
+	function getInitialValues() {
+		return {
+			apiVersion: `${group}/${version}`,
+			kind: kind,
+			metadata: {},
+			spec: {
+				storageClassName: 'ceph-bucket',
+				additionalConfig: {}
+			}
+		};
+	}
+	function initiate() {
+		values = getInitialValues();
+		currentStep = firstStep;
+		isSubmitting = false;
+	}
 	function handleNext() {
 		currentStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
 	}
 	function handlePrevious() {
 		currentStep = steps[Math.max(currentIndex - 1, 0)];
 	}
-	function reset() {
-		currentStep = firstStep;
-	}
-
-	// Flag for Dialog
-	let isSubmitting = $state(false);
 </script>
 
 {#snippet document()}
@@ -96,9 +91,9 @@
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
-		if (!isOpen) {
-			reset();
-		}
+		if (isOpen) return;
+
+		initiate();
 	}}
 >
 	<Dialog.Trigger>
@@ -123,11 +118,12 @@
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
-						...lodash.omit(lodash.get(jsonSchema, 'properties.metadata'), 'properties'),
+						...lodash.omit(lodash.get(jsonSchema, 'properties.metadata') as Schema, ['properties']),
 						title: 'Metadata',
+						required: ['name'],
 						properties: {
 							name: {
-								...lodash.get(jsonSchema, 'properties.metadata.properties.name'),
+								...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema),
 								title: 'Name'
 							}
 						}
@@ -145,8 +141,13 @@
 					handleSubmit={{
 						posthook: (form: FormState<FormValue>) => {
 							handleNext();
+
 							const formValue = getValueSnapshot(form);
-							lodash.set(values, 'spec.bucketName', lodash.get(formValue, 'name'));
+							lodash.set(
+								values,
+								'spec.bucketName',
+								`${namespace}-${lodash.get(formValue, 'name')}`
+							);
 						}
 					}}
 					bind:values={values['metadata']}
@@ -162,17 +163,20 @@
 			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
-						...lodash.omit(lodash.get(jsonSchema, 'properties.spec.properties.additionalConfig'), [
-							'properties'
-						]),
+						...lodash.omit(
+							lodash.get(jsonSchema, 'properties.spec.properties.additionalConfig') as Schema,
+							['properties']
+						),
 						properties: {
 							maxSize: {
+								// Support Kubernetes quantity units
 								type: 'string',
 								description:
 									'The maximum size of the bucket as a quota on the user account automatically created for the bucket. Please note minimum recommended value is 4K.',
 								title: 'Size'
 							},
 							bucketMaxSize: {
+								// Support Kubernetes quantity units
 								type: 'string',
 								description:
 									'(disabled by default) The maximum size of the bucket as an individual bucket quota.',
@@ -254,6 +258,13 @@
 
 								isSubmitting = true;
 
+								// Validator
+								const jsonSchemaValidator = new Ajv({
+									allErrors: true,
+									strict: false
+								});
+								const validate = jsonSchemaValidator.compile(jsonSchema);
+
 								const isValid = validate(load(value));
 
 								if (!isValid) {
@@ -271,7 +282,7 @@
 
 										await resourceClient.create({
 											cluster,
-											namespace: values.metadata.namespace,
+											namespace,
 											group,
 											version,
 											resource,

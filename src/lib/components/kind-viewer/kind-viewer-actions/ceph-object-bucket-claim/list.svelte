@@ -2,7 +2,11 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import { ListIcon } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type { CoreV1ConfigMap, CoreV1Secret } from '@otterscale/types';
+	import type {
+		CoreV1ConfigMap,
+		CoreV1Secret,
+		ObjectbucketIoV1Alpha1ObjectBucketClaim
+	} from '@otterscale/types';
 	import lodash from 'lodash';
 	import { getContext } from 'svelte';
 
@@ -19,7 +23,7 @@
 	}: {
 		cluster: string;
 		namespace: string;
-		object: any;
+		object: ObjectbucketIoV1Alpha1ObjectBucketClaim;
 		onOpenChangeComplete?: () => void;
 	} = $props();
 
