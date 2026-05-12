@@ -2,6 +2,7 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import FormIcon from '@lucide/svelte/icons/form';
 	import { ResourceService } from '@otterscale/api/resource/v1';
+	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
@@ -37,22 +38,15 @@
 		version: string;
 		kind: string;
 		resource: string;
-		schema?: any;
-		object?: any;
+		schema: Schema;
+		object: SourceToolkitFluxcdIoV1HelmRepository;
 		onOpenChangeComplete: () => void;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-
-	// Container for Data
-	let values: any = $state({
-		apiVersion: `${group}/${version}`,
-		kind,
-		metadata: object.metadata,
-		spec: {}
-	});
-
+	const steps = Array.from({ length: 2 }, (_, index) => String(index + 1));
+	const [firstStep] = steps;
 	const systemFields = [
 		'clusterName',
 		'creationTimestamp',
@@ -71,6 +65,11 @@
 		'uid'
 	];
 
+	let values = $state(getInitialValues());
+	let currentStep = $state(firstStep);
+	let isSubmitting = $state(false);
+	let open = $state(false);
+
 	let value = $derived.by(() => {
 		const filtered = lodash.cloneDeep(values);
 		if (filtered.metadata) {
@@ -80,34 +79,36 @@
 		}
 		return stringify(filtered);
 	});
-
-	// Steps Manager
-	const steps = Array.from({ length: 2 }, (_, index) => String(index + 1));
-	const [firstStep] = steps;
-	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
+
+	function getInitialValues() {
+		return {
+			apiVersion: `${group}/${version}`,
+			kind,
+			metadata: object.metadata,
+			spec: {}
+		};
+	}
+	function initiate() {
+		values = getInitialValues();
+		currentStep = firstStep;
+		isSubmitting = false;
+	}
 	function handleNext() {
 		currentStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
 	}
 	function handlePrevious() {
 		currentStep = steps[Math.max(currentIndex - 1, 0)];
 	}
-	function reset() {
-		currentStep = firstStep;
-	}
-
-	// Flag for Dialog
-	let open = $state(false);
-	let isSubmitting = $state(false);
 </script>
 
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
 		onOpenChangeComplete?.();
-		if (!isOpen) {
-			reset();
-		}
+		if (isOpen) return;
+
+		initiate();
 	}}
 >
 	<Dialog.Trigger>
@@ -124,12 +125,13 @@
 	</Dialog.Trigger>
 	<Dialog.Content
 		class="max-h-[95vh] min-w-[38vw] overflow-auto"
-		onInteractOutside={(e) => e.preventDefault()}
+		onInteractOutside={(e) => {
+			e.preventDefault();
+		}}
 	>
 		<Item.Root class="p-0">
-			<Progress value={currentIndex + 1} max={steps.length} class="mt-1 mr-6" /><Item.Content
-				class="text-left"
-			>
+			<Progress value={currentIndex + 1} max={steps.length} class="mt-1 mr-6" />
+			<Item.Content class="text-left">
 				<Item.Title class="text-xl font-bold">{kind}</Item.Title>
 				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
 			</Item.Content>
@@ -138,27 +140,19 @@
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
-						...(lodash.omit(lodash.get(jsonSchema, 'properties.spec'), 'properties') as any),
+						...lodash.omit(lodash.get(jsonSchema, 'properties.spec') as Schema, 'properties'),
 						properties: {
 							type: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.type'),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.type') as Schema),
 								title: 'Type'
 							},
 							url: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.url'),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.url') as Schema),
 								title: 'URL'
 							},
 							insecure: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.insecure'),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.insecure') as Schema),
 								title: 'Insecure'
-							},
-							secretRef: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.secretRef'),
-								title: 'Secret Reference'
-							},
-							certSecretRef: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.certSecretRef'),
-								title: 'Certificate Secret Reference'
 							}
 						}
 					} as Schema}
@@ -171,11 +165,6 @@
 						type: {
 							'ui:components': {
 								stringField: 'enumField'
-							},
-							'ui:options': {
-								disabledEnumValues: lodash
-									.get(jsonSchema, 'properties.spec.properties.type.enum')
-									.filter((type: string) => type !== 'oci')
 							}
 						},
 						secretRef: {
@@ -209,6 +198,7 @@
 								onclick={() => {
 									handlePrevious();
 								}}
+								disabled={currentIndex === 0}
 							>
 								Previous
 							</Button>
