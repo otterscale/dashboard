@@ -129,16 +129,14 @@
 				<BotIcon class="size-4.5" />
 				{m.models()}
 			</div>
-			<Tooltip.Provider>
-				<Tooltip.Root>
-					<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-						<InfoIcon class="size-5 text-muted-foreground" />
-					</Tooltip.Trigger>
-					<Tooltip.Content>
-						<p>{m.llm_dashboard_models_tooltip()}</p>
-					</Tooltip.Content>
-				</Tooltip.Root>
-			</Tooltip.Provider>
+			<Tooltip.Root>
+				<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+					<InfoIcon class="size-5 text-muted-foreground" />
+				</Tooltip.Trigger>
+				<Tooltip.Content>
+					<p>{m.llm_dashboard_models_tooltip()}</p>
+				</Tooltip.Content>
+			</Tooltip.Root>
 		</Card.Title>
 	</Card.Header>
 	{#if !isLoaded}

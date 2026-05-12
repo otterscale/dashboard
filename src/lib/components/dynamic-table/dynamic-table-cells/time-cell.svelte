@@ -20,24 +20,22 @@
 
 {#if data}
 	{@const { value, unit } = getRelativeTime($now, data.getTime())}
-	<Tooltip.Provider>
-		<Tooltip.Root>
-			<Tooltip.Trigger>
-				{value}
-				{unit}
-			</Tooltip.Trigger>
-			<Tooltip.Content>
-				{new Intl.DateTimeFormat('en-CA', {
-					year: 'numeric',
-					month: '2-digit',
-					day: '2-digit',
-					hour: '2-digit',
-					minute: '2-digit',
-					second: '2-digit',
-					hour12: false,
-					timeZoneName: 'longOffset'
-				}).format(data)}
-			</Tooltip.Content>
-		</Tooltip.Root>
-	</Tooltip.Provider>
+	<Tooltip.Root>
+		<Tooltip.Trigger>
+			{value}
+			{unit}
+		</Tooltip.Trigger>
+		<Tooltip.Content>
+			{new Intl.DateTimeFormat('en-CA', {
+				year: 'numeric',
+				month: '2-digit',
+				day: '2-digit',
+				hour: '2-digit',
+				minute: '2-digit',
+				second: '2-digit',
+				hour12: false,
+				timeZoneName: 'longOffset'
+			}).format(data)}
+		</Tooltip.Content>
+	</Tooltip.Root>
 {/if}

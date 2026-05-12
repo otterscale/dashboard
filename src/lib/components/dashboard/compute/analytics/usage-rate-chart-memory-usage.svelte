@@ -68,7 +68,7 @@
 					maxValue={1}
 					series={[{ key: 'data', color: chartConfig.data.color }]}
 					props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
-					tooltip={false}
+					tooltipContext={false}
 				>
 					{#snippet aboveMarks()}
 						{@const percentage = formatPercentage(usedVal, domainVal as number, 1) ?? '—'}

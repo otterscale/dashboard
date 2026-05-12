@@ -207,52 +207,50 @@
 <div class={cn('h-full', className)}>
 	<Tabs.Root bind:value={mode} class="h-full">
 		<!-- Mode Switcher -->
-		<Tooltip.Provider>
-			<ButtonGroup.Root class="ml-auto" data-slot="dynamic-form-mode-controller">
-				<Button
-					variant="ghost"
-					size="icon-sm"
-					disabled={mode === 'form'}
-					onclick={async () => {
-						await changeMode('form');
-					}}
-				>
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							<FormIcon />
-						</Tooltip.Trigger>
-						<Tooltip.Content class="flex items-center gap-1">
-							Form
-							<Kbd.Group>
-								<Kbd.Root>ctrl</Kbd.Root>
-								<Kbd.Root>F</Kbd.Root>
-							</Kbd.Group>
-						</Tooltip.Content>
-					</Tooltip.Root>
-				</Button>
-				<Button
-					variant="ghost"
-					size="icon-sm"
-					disabled={mode === 'yaml'}
-					onclick={async () => {
-						await changeMode('yaml');
-					}}
-				>
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							<FileCodeCornerIcon />
-						</Tooltip.Trigger>
-						<Tooltip.Content class="flex items-center gap-1">
-							YAML
-							<Kbd.Group>
-								<Kbd.Root>ctrl</Kbd.Root>
-								<Kbd.Root>Y</Kbd.Root>
-							</Kbd.Group>
-						</Tooltip.Content>
-					</Tooltip.Root>
-				</Button>
-			</ButtonGroup.Root>
-		</Tooltip.Provider>
+		<ButtonGroup.Root class="ml-auto" data-slot="dynamic-form-mode-controller">
+			<Button
+				variant="ghost"
+				size="icon-sm"
+				disabled={mode === 'form'}
+				onclick={async () => {
+					await changeMode('form');
+				}}
+			>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						<FormIcon />
+					</Tooltip.Trigger>
+					<Tooltip.Content class="flex items-center gap-1">
+						Form
+						<Kbd.Group>
+							<Kbd.Root>ctrl</Kbd.Root>
+							<Kbd.Root>F</Kbd.Root>
+						</Kbd.Group>
+					</Tooltip.Content>
+				</Tooltip.Root>
+			</Button>
+			<Button
+				variant="ghost"
+				size="icon-sm"
+				disabled={mode === 'yaml'}
+				onclick={async () => {
+					await changeMode('yaml');
+				}}
+			>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						<FileCodeCornerIcon />
+					</Tooltip.Trigger>
+					<Tooltip.Content class="flex items-center gap-1">
+						YAML
+						<Kbd.Group>
+							<Kbd.Root>ctrl</Kbd.Root>
+							<Kbd.Root>Y</Kbd.Root>
+						</Kbd.Group>
+					</Tooltip.Content>
+				</Tooltip.Root>
+			</Button>
+		</ButtonGroup.Root>
 		<Tabs.Content value="form" class="h-full">
 			<!-- Form -->
 			<Form attributes={{ novalidate: true, class: 'h-full' }}>

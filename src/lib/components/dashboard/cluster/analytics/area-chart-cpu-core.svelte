@@ -64,6 +64,13 @@
 	const top3Series = $derived(topKSeries.slice(0, TOP_HIGHLIGHT_COUNT));
 	const series = $derived(getSeries(chartConfig));
 
+	const areaProps = {
+		curve: curveMonotoneX,
+		'fill-opacity': 0.4,
+		line: { class: 'stroke-1' },
+		motion: 'tween'
+	} as const;
+
 	function calculateTopKSeries(data: DataPoint[], k: number): string[] {
 		const config = generateChartConfig(data);
 		return Object.keys(config)
@@ -130,12 +137,7 @@
 					{series}
 					seriesLayout="stack"
 					props={{
-						area: {
-							curve: curveMonotoneX,
-							'fill-opacity': 0.4,
-							line: { class: 'stroke-1' },
-							motion: 'tween'
-						},
+						area: areaProps,
 						xAxis: {
 							ticks: getChartXAxisTicks(formatChartTimeRange(TIME_RANGE_HOURS)),
 							format: (date: Date) =>
@@ -146,9 +148,9 @@
 						}
 					}}
 				>
-					{#snippet marks({ series: chartSeries, getAreaProps })}
+					{#snippet marks({ context })}
 						<defs>
-							{#each chartSeries as s (s.key)}
+							{#each context.series.visibleSeries as s (s.key)}
 								{@const gradientId = s.key.replace(/\s+/g, '')}
 								<linearGradient id="fill{gradientId}" x1="0" y1="0" x2="0" y2="1">
 									<stop offset="5%" stop-color={s.color} stop-opacity={1.0} />
@@ -157,9 +159,9 @@
 							{/each}
 						</defs>
 
-						{#each chartSeries as s, index (s.key)}
+						{#each context.series.visibleSeries as s (s.key)}
 							{@const gradientId = s.key.replace(/\s+/g, '')}
-							<Area {...getAreaProps(s, index)} fill="url(#fill{gradientId})" />
+							<Area seriesKey={s.key} {...areaProps} fill="url(#fill{gradientId})" />
 						{/each}
 					{/snippet}
 

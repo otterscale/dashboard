@@ -31,16 +31,14 @@
 </script>
 
 {#if data !== null}
-	<Tooltip.Provider>
-		<Tooltip.Root>
-			<Tooltip.Trigger class="ml-auto">
-				{metadata.numerator}/{metadata.denominator}
-			</Tooltip.Trigger>
-			<Tooltip.Content>
-				{(Number(data) * 100).toFixed(2)}%
-			</Tooltip.Content>
-		</Tooltip.Root>
-	</Tooltip.Provider>
+	<Tooltip.Root>
+		<Tooltip.Trigger class="ml-auto">
+			{metadata.numerator}/{metadata.denominator}
+		</Tooltip.Trigger>
+		<Tooltip.Content>
+			{(Number(data) * 100).toFixed(2)}%
+		</Tooltip.Content>
+	</Tooltip.Root>
 {:else}
 	{metadata.numerator}/{metadata.denominator}
 {/if}

@@ -23,14 +23,12 @@
 				</Dialog.Title>
 				<Badge variant="secondary" class="text-xs font-medium">
 					{#if env.PUBLIC_APP_VERSION}
-						<Tooltip.Provider>
-							<Tooltip.Root ignoreNonKeyboardFocus>
-								<Tooltip.Trigger>{version}</Tooltip.Trigger>
-								<Tooltip.Content>
-									<p>{env.PUBLIC_APP_VERSION}</p>
-								</Tooltip.Content>
-							</Tooltip.Root>
-						</Tooltip.Provider>
+						<Tooltip.Root ignoreNonKeyboardFocus>
+							<Tooltip.Trigger>{version}</Tooltip.Trigger>
+							<Tooltip.Content>
+								<p>{env.PUBLIC_APP_VERSION}</p>
+							</Tooltip.Content>
+						</Tooltip.Root>
 					{:else}
 						{version}
 					{/if}

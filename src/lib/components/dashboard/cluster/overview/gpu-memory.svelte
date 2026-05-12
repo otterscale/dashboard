@@ -122,7 +122,7 @@
 						arc: { track: { fill: 'var(--muted)' }, motion: 'tween' },
 						tooltip: { context: { hideDelay: 350 } }
 					}}
-					tooltip={false}
+					tooltipContext={false}
 				>
 					{#snippet aboveMarks()}
 						{@const { value, unit } = formatCapacity(Number(allocatableMemory))}

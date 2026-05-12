@@ -111,7 +111,7 @@
 					props={{
 						arc: { track: { fill: 'var(--muted)' }, motion: 'tween' }
 					}}
-					tooltip={false}
+					tooltipContext={false}
 				>
 					{#snippet aboveMarks()}
 						<Text

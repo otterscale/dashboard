@@ -15,11 +15,9 @@
 	const data = $derived(row.original[column.id] as unknown as string);
 </script>
 
-<Tooltip.Provider>
-	<Tooltip.Root>
-		<Tooltip.Trigger class="block max-w-full truncate text-left">
-			{data}
-		</Tooltip.Trigger>
-		<Tooltip.Content>{data}</Tooltip.Content>
-	</Tooltip.Root>
-</Tooltip.Provider>
+<Tooltip.Root>
+	<Tooltip.Trigger class="block max-w-full truncate text-left">
+		{data}
+	</Tooltip.Trigger>
+	<Tooltip.Content>{data}</Tooltip.Content>
+</Tooltip.Root>

@@ -65,94 +65,92 @@
 	<ScrollArea class="h-screen">
 		<div class="flex flex-col gap-4 py-4 pt-0">
 			{#each notifications as notification}
-				<Tooltip.Provider>
-					<Tooltip.Root>
-						<Tooltip.Trigger>
-							<div
-								class="flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-all hover:bg-accent"
-							>
-								<div class="flex w-full items-center gap-2">
-									{#if !notification.read}
-										<span class="flex h-2 w-2 rounded-full bg-blue-600"></span>
-									{/if}
-									<div class="text-sm font-semibold">{notification.from ?? siteConfig.title}</div>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						<div
+							class="flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-all hover:bg-accent"
+						>
+							<div class="flex w-full items-center gap-2">
+								{#if !notification.read}
+									<span class="flex h-2 w-2 rounded-full bg-blue-600"></span>
+								{/if}
+								<div class="text-sm font-semibold">{notification.from ?? siteConfig.title}</div>
 
-									<div class="ml-auto text-xs [&_svg]:size-5">
-										<DropdownMenu.Root>
-											<DropdownMenu.Trigger>
-												<EllipsisIcon />
-											</DropdownMenu.Trigger>
-											<DropdownMenu.Content side="left" align="start">
-												<DropdownMenu.Group>
-													{#if notification.read}
-														<DropdownMenu.Item
-															onclick={() => {
-																unreadNotifition(notification.id);
-															}}
-														>
-															<MailIcon />
-															<span>{m.mark_as_unread()}</span>
-														</DropdownMenu.Item>
-													{:else}
-														<DropdownMenu.Item
-															onclick={() => {
-																readNotifition(notification.id);
-															}}
-														>
-															<MailOpenIcon />
-															<span>{m.mark_as_read()}</span>
-														</DropdownMenu.Item>
-													{/if}
-													{#if notification.archived}
-														<DropdownMenu.Item
-															onclick={() => {
-																unarchiveNotifition(notification.id);
-															}}
-														>
-															<ArchiveRestoreIcon />
-															<span>{m.mark_as_unarchived()}</span>
-														</DropdownMenu.Item>
-													{:else}
-														<DropdownMenu.Item
-															onclick={() => {
-																archiveNotifition(notification.id);
-															}}
-														>
-															<ArchiveIcon />
-															<span>{m.mark_as_archived()}</span>
-														</DropdownMenu.Item>
-													{/if}
-													<DropdownMenu.Separator />
+								<div class="ml-auto text-xs [&_svg]:size-5">
+									<DropdownMenu.Root>
+										<DropdownMenu.Trigger>
+											<EllipsisIcon />
+										</DropdownMenu.Trigger>
+										<DropdownMenu.Content side="left" align="start">
+											<DropdownMenu.Group>
+												{#if notification.read}
 													<DropdownMenu.Item
 														onclick={() => {
-															deleteNotifition(notification.id);
+															unreadNotifition(notification.id);
 														}}
 													>
-														<Trash2Icon class="text-red-500" />
-														<span class="text-red-500">{m.delete()}</span>
+														<MailIcon />
+														<span>{m.mark_as_unread()}</span>
 													</DropdownMenu.Item>
-												</DropdownMenu.Group>
-											</DropdownMenu.Content>
-										</DropdownMenu.Root>
-									</div>
-								</div>
-								<div class="flex flex-col space-y-1">
-									<span class="text-xs font-medium">{notification.title}</span>
-									<span class="line-clamp-2 text-left text-xs text-muted-foreground">
-										{notification.content.substring(0, 300)}
-									</span>
-								</div>
-
-								<div class="text-xs">
-									{formatTimeAgo(notification.created)}
+												{:else}
+													<DropdownMenu.Item
+														onclick={() => {
+															readNotifition(notification.id);
+														}}
+													>
+														<MailOpenIcon />
+														<span>{m.mark_as_read()}</span>
+													</DropdownMenu.Item>
+												{/if}
+												{#if notification.archived}
+													<DropdownMenu.Item
+														onclick={() => {
+															unarchiveNotifition(notification.id);
+														}}
+													>
+														<ArchiveRestoreIcon />
+														<span>{m.mark_as_unarchived()}</span>
+													</DropdownMenu.Item>
+												{:else}
+													<DropdownMenu.Item
+														onclick={() => {
+															archiveNotifition(notification.id);
+														}}
+													>
+														<ArchiveIcon />
+														<span>{m.mark_as_archived()}</span>
+													</DropdownMenu.Item>
+												{/if}
+												<DropdownMenu.Separator />
+												<DropdownMenu.Item
+													onclick={() => {
+														deleteNotifition(notification.id);
+													}}
+												>
+													<Trash2Icon class="text-red-500" />
+													<span class="text-red-500">{m.delete()}</span>
+												</DropdownMenu.Item>
+											</DropdownMenu.Group>
+										</DropdownMenu.Content>
+									</DropdownMenu.Root>
 								</div>
 							</div>
-						</Tooltip.Trigger>
-						<Tooltip.Content side="left" class="w-[350px] break-words whitespace-pre-wrap">
-							<span class="break-words whitespace-pre-wrap">{notification.content}</span>
-						</Tooltip.Content>
-					</Tooltip.Root>
-				</Tooltip.Provider>
+							<div class="flex flex-col space-y-1">
+								<span class="text-xs font-medium">{notification.title}</span>
+								<span class="line-clamp-2 text-left text-xs text-muted-foreground">
+									{notification.content.substring(0, 300)}
+								</span>
+							</div>
+
+							<div class="text-xs">
+								{formatTimeAgo(notification.created)}
+							</div>
+						</div>
+					</Tooltip.Trigger>
+					<Tooltip.Content side="left" class="w-[350px] break-words whitespace-pre-wrap">
+						<span class="break-words whitespace-pre-wrap">{notification.content}</span>
+					</Tooltip.Content>
+				</Tooltip.Root>
 			{/each}
 		</div>
 	</ScrollArea>
