@@ -43,32 +43,38 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-
-	let values = $state({
-		metadata: {},
-		spec: {
-			additionalConfig: {}
-		}
-	});
-	let value = $derived(stringify(values));
-
-	// Steps
 	const steps = Array.from({ length: 3 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
+
+	let values = $state(getInitialValues());
 	let currentStep = $state(firstStep);
+	let isSubmitting = $state(false);
+	
+	let value = $derived(stringify(values));
 	const currentIndex = $derived(steps.indexOf(currentStep));
+
+	function getInitialValues() {
+		return {
+			apiVersion: `${group}/${version}`,
+			kind: kind,
+			metadata: {},
+			spec: {
+				storageClassName: 'ceph-bucket',
+				additionalConfig: {}
+			}
+		};
+	}
+	function initiate() {
+		values = getInitialValues();
+		currentStep = firstStep;
+		isSubmitting = false;
+	}
 	function handleNext() {
 		currentStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
 	}
 	function handlePrevious() {
 		currentStep = steps[Math.max(currentIndex - 1, 0)];
 	}
-	function reset() {
-		currentStep = firstStep;
-	}
-
-	// Flag for Dialog
-	let isSubmitting = $state(false);
 </script>
 
 {#snippet document()}
@@ -87,7 +93,7 @@
 	onOpenChangeComplete={(isOpen) => {
 		if (isOpen) return;
 
-		reset();
+		initiate();
 	}}
 >
 	<Dialog.Trigger>
@@ -163,13 +169,15 @@
 						),
 						properties: {
 							maxSize: {
-								type: 'number',
+								// Support Kubernetes quantity units
+								type: 'string',
 								description:
 									'The maximum size of the bucket as a quota on the user account automatically created for the bucket. Please note minimum recommended value is 4K.',
 								title: 'Size'
 							},
 							bucketMaxSize: {
-								type: 'number',
+								// Support Kubernetes quantity units
+								type: 'string',
 								description:
 									'(disabled by default) The maximum size of the bucket as an individual bucket quota.',
 								title: 'Bucket Size'
@@ -234,11 +242,6 @@
 							scrollBeyondLastLine: false
 						}}
 						bind:value
-						on:ready={() => {
-							lodash.set(values, 'apiVersion', `${group}/${version}`);
-							lodash.set(values, 'kind', kind);
-							lodash.set(values, ['spec', 'storageClassName'], 'ceph-bucket');
-						}}
 						theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs-light'}
 					/>
 					<div class="mt-auto flex items-center justify-between gap-3">
