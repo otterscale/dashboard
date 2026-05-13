@@ -189,17 +189,17 @@
 
 							const name = lodash.get(load(value), 'metadata.name');
 
+							const isValid = validate(load(value));
+
+							if (!isValid) {
+								console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
+								toast.error('Validation failed. Please check the YAML.');
+								isSubmitting = false;
+								return;
+							}
+
 							toast.promise(
 								async () => {
-									const isValid = validate(load(value));
-
-									if (!isValid) {
-										console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
-										toast.error('Validation failed. Please check the YAML.');
-										isSubmitting = false;
-										return;
-									}
-
 									const manifest = new TextEncoder().encode(value);
 
 									await resourceClient.create({
