@@ -81,6 +81,7 @@
 		metadata: {},
 		spec: {
 			interval: '15m',
+			timeout: '1h',
 			chart: {
 				spec: {}
 			},
