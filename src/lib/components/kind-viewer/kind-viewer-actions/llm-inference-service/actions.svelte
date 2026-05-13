@@ -2,6 +2,7 @@
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 	import type { ServingKserveIoV1Alpha1LLMInferenceService } from '@otterscale/types';
 	import type { Schema } from '@sjsf/form';
+	import type { ValidateFunction } from 'ajv';
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
@@ -21,6 +22,7 @@
 		kind,
 		resource,
 		schema,
+		validate,
 		object
 	}: {
 		cluster: string;
@@ -30,6 +32,7 @@
 		kind: string;
 		resource: string;
 		schema: Schema;
+		validate: ValidateFunction;
 		object: ServingKserveIoV1Alpha1LLMInferenceService;
 	} = $props();
 
@@ -108,6 +111,7 @@
 					{kind}
 					{resource}
 					{schema}
+					{validate}
 					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
