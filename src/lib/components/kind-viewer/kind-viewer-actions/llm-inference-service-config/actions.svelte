@@ -1,7 +1,8 @@
 <script lang="ts">
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
-	import type { ServingKserveIoV1Alpha1LLMInferenceService } from '@otterscale/types';
+	import type { ServingKserveIoV1Alpha2LLMInferenceServiceConfig } from '@otterscale/types';
 	import type { Schema } from '@sjsf/form';
+	import type { ValidateFunction } from 'ajv';
 
 	import { page } from '$app/state';
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
@@ -11,7 +12,7 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
-	import Duplicate from './duplicate.svelte';
+	import Copy from './copy.svelte';
 
 	let {
 		cluster,
@@ -21,6 +22,7 @@
 		kind,
 		resource,
 		schema,
+		validate,
 		object
 	}: {
 		cluster: string;
@@ -30,7 +32,8 @@
 		kind: string;
 		resource: string;
 		schema: Schema;
-		object: ServingKserveIoV1Alpha1LLMInferenceService;
+		validate?: ValidateFunction;
+		object: ServingKserveIoV1Alpha2LLMInferenceServiceConfig;
 	} = $props();
 
 	let actionsOpen = $state(false);
@@ -67,13 +70,15 @@
 					e.preventDefault();
 				}}
 			>
-				<Duplicate
+				<Copy
 					{cluster}
+					{namespace}
 					{group}
 					{version}
 					{kind}
 					{resource}
 					{schema}
+					{validate}
 					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;

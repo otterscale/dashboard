@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { type JsonValue } from '@bufbuild/protobuf';
 	import { createClient, type Transport } from '@connectrpc/connect';
+	import { EllipsisIcon } from '@lucide/svelte';
 	import BanIcon from '@lucide/svelte/icons/ban';
 	import CableIcon from '@lucide/svelte/icons/cable';
+	import PlusIcon from '@lucide/svelte/icons/plus';
 	import UnplugIcon from '@lucide/svelte/icons/unplug';
 	import UsersRoundIcon from '@lucide/svelte/icons/users-round';
 	import {
@@ -13,7 +15,9 @@
 		WatchEvent_Type,
 		type WatchRequest
 	} from '@otterscale/api/resource/v1';
+	import type { Schema } from '@sjsf/form';
 	import type { ColumnDef } from '@tanstack/table-core';
+	import Ajv, { type ValidateFunction } from 'ajv';
 	import { getContext, onDestroy, onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
@@ -41,8 +45,9 @@
 	} = $props();
 
 	let clustered = $derived(isClusterAdmin);
-	// eslint-disable-next-line
-	let schema: any = $state({});
+
+	let schema: Schema | undefined = $state(undefined);
+	let validate: ValidateFunction | undefined = $state(undefined);
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
@@ -62,11 +67,16 @@
 				kind: apiResource.kind
 			} as SchemaRequest);
 
-			schema = schemaResponse.schema ?? {};
+			return schemaResponse.schema as Schema;
 		} catch (error) {
 			console.error('Failed to fetch schema:', error);
-			return null;
+			return undefined;
 		}
+	}
+
+	const jsonSchemaValidator = new Ajv({ allErrors: true, strict: false });
+	function getValidate(schema: Schema) {
+		return jsonSchemaValidator.compile($state.snapshot(schema));
 	}
 
 	let fetchError: Error | null = $state(null);
@@ -240,10 +250,15 @@
 	}
 
 	onMount(async () => {
+		// For Dynamic Table
 		columnDefinitions = getColumnDefinitions(apiResource, uiSchemas, dataSchemas, cluster);
-		await fetchSchema();
 		await listResources();
 		watchResources();
+		// For Dynamic Form
+		schema = await fetchSchema();
+		if (schema) {
+			validate = getValidate(schema);
+		}
 	});
 
 	let isDestroyed = false;
@@ -315,16 +330,22 @@
 				{/if}
 			{/snippet}
 			{#snippet create()}
-				<Create
-					role={isClusterAdmin ? 'Cluster Admin' : undefined}
-					{schema}
-					{cluster}
-					{namespace}
-					group={apiResource.group}
-					version={apiResource.version}
-					kind={apiResource.kind}
-					resource={apiResource.resource}
-				/>
+				{#if schema}
+					<Create
+						role={isClusterAdmin ? 'Cluster Admin' : undefined}
+						{schema}
+						{cluster}
+						{namespace}
+						group={apiResource.group}
+						version={apiResource.version}
+						kind={apiResource.kind}
+						resource={apiResource.resource}
+					/>
+				{:else}
+					<Button variant="outline" size="icon">
+						<PlusIcon />
+					</Button>
+				{/if}
 			{/snippet}
 			{#snippet reload()}
 				<Tooltip.Root>
@@ -343,21 +364,30 @@
 				</Tooltip.Root>
 			{/snippet}
 			{#snippet rowActions({ row })}
-				<Actions
-					role={isClusterAdmin ? 'Cluster Admin' : undefined}
-					{row}
-					{schema}
-					object={row.original.raw}
-					{cluster}
-					group={apiResource.group}
-					version={apiResource.version}
-					kind={apiResource.kind}
-					resource={apiResource.resource}
-					namespace={namespace
-						? (row.original.raw as Record<string, Record<string, string>>)?.metadata?.namespace ||
-							namespace
-						: namespace}
-				/>
+				{#if schema}
+					<Actions
+						role={isClusterAdmin ? 'Cluster Admin' : undefined}
+						{row}
+						object={row.original.raw}
+						{schema}
+						{validate}
+						{cluster}
+						namespace={namespace
+							? (row.original.raw as Record<string, Record<string, string>>)?.metadata?.namespace ||
+								namespace
+							: namespace}
+						group={apiResource.group}
+						version={apiResource.version}
+						kind={apiResource.kind}
+						resource={apiResource.resource}
+					/>
+				{:else}
+					<div class="flex justify-end">
+						<Button size="icon" variant="ghost" class="shadow-none" aria-label="Actions" disabled>
+							<EllipsisIcon size={16} aria-hidden="true" />
+						</Button>
+					</div>
+				{/if}
 			{/snippet}
 		</DynamicTable>
 	{/if}
