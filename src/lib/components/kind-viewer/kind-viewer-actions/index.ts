@@ -47,6 +47,7 @@ type CreateType = Component<{
 	kind?: string;
 	resource?: string;
 	schema?: Schema;
+	validate?: ValidateFunction;
 }> | null;
 type ActionsType = Component<{
 	role?: string;

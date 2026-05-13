@@ -32,7 +32,7 @@
 		kind: string;
 		resource: string;
 		schema: Schema;
-		validate?: ValidateFunction;
+		validate: ValidateFunction;
 		object: ServingKserveIoV1Alpha2LLMInferenceServiceConfig;
 	} = $props();
 
@@ -99,6 +99,7 @@
 						{kind}
 						{resource}
 						{schema}
+						{validate}
 						{object}
 						onOpenChangeComplete={() => {
 							actionsOpen = false;

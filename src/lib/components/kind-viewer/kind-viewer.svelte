@@ -74,7 +74,7 @@
 		}
 	}
 
-	const jsonSchemaValidator = new Ajv({ allErrors: true, strict: false });
+	const jsonSchemaValidator = new Ajv({ allErrors: true, strict: false, logger: false });
 	function getValidate(schema: Schema) {
 		return jsonSchemaValidator.compile($state.snapshot(schema));
 	}
@@ -334,6 +334,7 @@
 					<Create
 						role={isClusterAdmin ? 'Cluster Admin' : undefined}
 						{schema}
+						{validate}
 						{cluster}
 						{namespace}
 						group={apiResource.group}
@@ -342,7 +343,7 @@
 						resource={apiResource.resource}
 					/>
 				{:else}
-					<Button variant="outline" size="icon">
+					<Button variant="outline" size="icon" disabled>
 						<PlusIcon />
 					</Button>
 				{/if}
