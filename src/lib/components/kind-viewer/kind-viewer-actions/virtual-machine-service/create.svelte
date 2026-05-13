@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { ResourceService, type SchemaRequest } from '@otterscale/api/resource/v1';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
-	import { getContext, onMount } from 'svelte';
+	import { getContext } from 'svelte';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
@@ -21,85 +21,66 @@
 		cluster,
 		namespace,
 		vmName,
+		schema: jsonSchema,
 		open = $bindable(false),
 		onsuccess
 	}: {
 		cluster: string;
 		namespace: string;
 		vmName: string;
+		schema: Schema;
 		open?: boolean;
 		onsuccess?: () => void;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-
-	// Fetch Service JSON Schema
-	// eslint-disable-next-line
-	let jsonSchema: any = $state({});
-
-	async function fetchSchema() {
-		try {
-			const schemaResponse = await resourceClient.schema({
-				cluster: cluster,
-				group: '',
-				version: 'v1',
-				kind: 'Service'
-			} as SchemaRequest);
-
-			jsonSchema = schemaResponse.schema ?? {};
-		} catch (error) {
-			console.error('Failed to fetch Service schema:', error);
-		}
-	}
-
-	onMount(() => {
-		fetchSchema();
-	});
-
-	// Container for Data
-	let values: any = $state({
-		apiVersion: 'v1',
-		kind: 'Service',
-		metadata: {
-			name: vmName,
-			namespace,
-			labels: {
-				'otterscale.com/virtual-machine.name': vmName
-			}
-		},
-		spec: {
-			type: 'NodePort',
-			selector: {
-				'kubevirt.io/vm': vmName
-			},
-			ports: {}
-		}
-	});
-	let value = $derived(stringify(values));
-
-	// Steps Manager
 	const steps = Array.from({ length: 2 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
+
+	let values = $state(getInitialValues());
 	let currentStep = $state(firstStep);
+	let isSubmitting = $state(false);
+
+	let value = $derived(stringify(values));
 	const currentIndex = $derived(steps.indexOf(currentStep));
+
+	function getInitialValues() {
+		return {
+			apiVersion: 'v1',
+			kind: 'Service',
+			metadata: {
+				name: vmName,
+				namespace,
+				labels: {
+					'otterscale.com/virtual-machine.name': vmName
+				}
+			},
+			spec: {
+				type: 'NodePort',
+				selector: {
+					'kubevirt.io/vm': vmName
+				},
+				ports: []
+			}
+		};
+	}
+	function initiate() {
+		values = getInitialValues();
+		currentStep = firstStep;
+		isSubmitting = false;
+	}
 	function handleNext() {
 		currentStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
 	}
-	function reset() {
-		currentStep = firstStep;
-	}
-
-	// Flag for Dialog
-	let isSubmitting = $state(false);
 </script>
 
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
-		if (!isOpen) {
-			reset();
-		}
+		if (isOpen) return;
+
+		initiate();
 	}}
 >
 	<Dialog.Content
@@ -123,37 +104,37 @@
 				<Form
 					schema={{
 						...lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.ports') as any,
+							lodash.get(jsonSchema, 'properties.spec.properties.ports') as Schema,
 							'items'
 						),
 						title: 'Ports',
 						items: {
 							...lodash.omit(
-								lodash.get(jsonSchema, 'properties.spec.properties.ports.items') as any,
+								lodash.get(jsonSchema, 'properties.spec.properties.ports.items') as Schema,
 								['properties', 'required']
 							),
 							required: ['name', 'protocol', 'port', 'targetPort'],
 							properties: {
 								name: {
-									...lodash.get(
+									...(lodash.get(
 										jsonSchema,
 										'properties.spec.properties.ports.items.properties.name'
-									),
+									) as Schema),
 									title: 'Name'
 								},
 								protocol: {
-									...lodash.get(
+									...(lodash.get(
 										jsonSchema,
 										'properties.spec.properties.ports.items.properties.protocol'
-									),
+									) as Schema),
 									title: 'Protocol',
 									enum: ['TCP', 'UDP', 'SCTP']
 								},
 								port: {
-									...lodash.get(
+									...(lodash.get(
 										jsonSchema,
 										'properties.spec.properties.ports.items.properties.port'
-									),
+									) as Schema),
 									title: 'Port'
 								},
 								targetPort: {
@@ -161,17 +142,17 @@
 										lodash.get(
 											jsonSchema,
 											'properties.spec.properties.ports.items.properties.targetPort'
-										),
+										) as Schema,
 										'oneOf'
 									),
 									type: 'integer',
 									title: 'Target Port'
 								},
 								nodePort: {
-									...lodash.get(
+									...(lodash.get(
 										jsonSchema,
 										'properties.spec.properties.ports.items.properties.nodePort'
-									),
+									) as Schema),
 									title: 'Node Port (optional)'
 								}
 							}

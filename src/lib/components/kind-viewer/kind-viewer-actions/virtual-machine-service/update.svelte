@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import { ResourceService, type SchemaRequest } from '@otterscale/api/resource/v1';
+	import type { CoreV1Service } from '@otterscale/types';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import lodash from 'lodash';
@@ -28,17 +29,36 @@
 		cluster: string;
 		namespace: string;
 		vmName: string;
-		service: any;
+		service: CoreV1Service;
 		open?: boolean;
 		onsuccess?: () => void;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
+	const steps = Array.from({ length: 2 }, (_, index) => String(index + 1));
+	const [firstStep] = steps;
 
 	// Fetch Service JSON Schema
 	// eslint-disable-next-line
 	let jsonSchema: any = $state({});
+	let values = $state(getInitialValues());
+	let currentStep = $state(firstStep);
+	let isSubmitting = $state(false);
+
+	let value = $derived(stringify(values));
+	const currentIndex = $derived(steps.indexOf(currentStep));
+
+	// Extract existing ports for Form initialValue
+	const existingPorts = $derived(
+		(service.spec?.ports ?? []).map((p) => ({
+			name: p.name ?? '',
+			protocol: p.protocol ?? 'TCP',
+			port: p.port ?? 80,
+			targetPort: p.targetPort ?? p.port ?? 80,
+			...(p.nodePort ? { nodePort: p.nodePort } : {})
+		}))
+	);
 
 	async function fetchSchema() {
 		try {
@@ -55,63 +75,47 @@
 		}
 	}
 
-	onMount(() => {
-		fetchSchema();
-	});
-
-	// Extract existing ports from service object
-	const existingPorts = lodash.get(service, 'spec.ports', []).map((p: any) => ({
-		name: p.name ?? '',
-		protocol: p.protocol ?? 'TCP',
-		port: p.port ?? 80,
-		targetPort: p.targetPort ?? p.port ?? 80,
-		...(p.nodePort ? { nodePort: p.nodePort } : {})
-	}));
-
-	// Container for Data
-	let values: any = $state({
-		apiVersion: 'v1',
-		kind: 'Service',
-		metadata: {
-			name: lodash.get(service, 'metadata.name', vmName),
-			namespace,
-			labels: {
-				...lodash.get(service, 'metadata.labels', {}),
-				'otterscale.com/virtual-machine.name': vmName
+	function getInitialValues() {
+		return {
+			apiVersion: 'v1',
+			kind: 'Service',
+			metadata: {
+				name: service.metadata?.name ?? vmName,
+				namespace,
+				labels: {
+					...(service.metadata?.labels ?? {}),
+					'otterscale.com/virtual-machine.name': vmName
+				}
+			},
+			spec: {
+				type: service.spec?.type ?? 'NodePort',
+				selector: service.spec?.selector ?? {
+					'kubevirt.io/vm': vmName
+				},
+				ports: []
 			}
-		},
-		spec: {
-			type: lodash.get(service, 'spec.type', 'NodePort'),
-			selector: lodash.get(service, 'spec.selector', {
-				'kubevirt.io/vm': vmName
-			}),
-			ports: {}
-		}
-	});
-	let value = $derived(stringify(values));
-
-	// Steps Manager
-	const steps = Array.from({ length: 2 }, (_, index) => String(index + 1));
-	const [firstStep] = steps;
-	let currentStep = $state(firstStep);
-	const currentIndex = $derived(steps.indexOf(currentStep));
+		};
+	}
+	function initiate() {
+		values = getInitialValues();
+		currentStep = firstStep;
+		isSubmitting = false;
+	}
 	function handleNext() {
 		currentStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
 	}
-	function reset() {
-		currentStep = firstStep;
-	}
 
-	// Flag for Dialog
-	let isSubmitting = $state(false);
+	onMount(() => {
+		fetchSchema();
+	});
 </script>
 
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
-		if (!isOpen) {
-			reset();
-		}
+		if (isOpen) return;
+
+		initiate();
 	}}
 >
 	<Dialog.Content
@@ -133,13 +137,13 @@
 				<Form
 					schema={{
 						...lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.ports') as any,
+							lodash.get(jsonSchema, 'properties.spec.properties.ports') as Schema,
 							'items'
 						),
 						title: 'Ports',
 						items: {
 							...lodash.omit(
-								lodash.get(jsonSchema, 'properties.spec.properties.ports.items') as any,
+								lodash.get(jsonSchema, 'properties.spec.properties.ports.items') as Schema,
 								['properties', 'required']
 							),
 							required: ['name', 'protocol', 'port', 'targetPort'],
