@@ -23,6 +23,12 @@
 		metadata: ItemMetadata;
 	} = $props();
 
+	// Validate once at init, metadata is set by table config and never mutates
+	// svelte-ignore state_referenced_locally
+	if (!metadata) {
+		throw Error(`Expected metadata of ${column.id} for ItemCell, but got metadata:`, metadata);
+	}
+
 	const data = $derived(row.original[column.id] as unknown as string);
 </script>
 
@@ -31,9 +37,22 @@
 		<Item.Root class="p-0">
 			<Item.Content>
 				<Item.Title>{data}</Item.Title>
-				<Item.Description>{metadata.description}</Item.Description>
+				<Item.Description>
+					{@const description =
+						typeof metadata.description === 'function'
+							? metadata.description()
+							: metadata.description}
+					{description}
+				</Item.Description>
 			</Item.Content>
 		</Item.Root>
 	</Tooltip.Trigger>
-	<Tooltip.Content>{metadata.hint ?? data}</Tooltip.Content>
+	<Tooltip.Content>
+		{@const hint = metadata.hint
+			? typeof metadata.hint === 'function'
+				? metadata.hint()
+				: metadata.hint
+			: data}
+		{hint}
+	</Tooltip.Content>
 </Tooltip.Root>
