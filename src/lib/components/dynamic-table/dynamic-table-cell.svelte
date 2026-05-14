@@ -11,6 +11,7 @@
 	} from './dynamic-table-cells/array-of-object-cell.svelte';
 	import BooleanCell from './dynamic-table-cells/boolean-cell.svelte';
 	import EmptyCell from './dynamic-table-cells/empty-cell.svelte';
+	import ItemCell, { type ItemMetadata } from './dynamic-table-cells/item-cell.svelte';
 	import LinkCell, { type LinkMetadata } from './dynamic-table-cells/link-cell.svelte';
 	import NumberCell from './dynamic-table-cells/number-cell.svelte';
 	import ObjectCell from './dynamic-table-cells/object-cell.svelte';
@@ -38,7 +39,8 @@
 			| LinkMetadata
 			| RatioMetadata
 			| ObjectOfKeyValueMetadata
-			| QuantityMetadata;
+			| QuantityMetadata
+			| ItemMetadata;
 	} = $props();
 
 	const uiSchema = $derived(uiSchemas[column.id]);
@@ -52,6 +54,8 @@
 	<ArrayOfObjectCell {row} {column} metadata={metadata as ArrayOfObjectMetadata} />
 {:else if uiSchema === 'boolean'}
 	<BooleanCell {row} {column} />
+{:else if uiSchema === 'item'}
+	<ItemCell {row} {column} metadata={metadata as ItemMetadata} />
 {:else if uiSchema === 'link'}
 	<LinkCell {row} {column} metadata={metadata as LinkMetadata} />
 {:else if uiSchema === 'number'}
