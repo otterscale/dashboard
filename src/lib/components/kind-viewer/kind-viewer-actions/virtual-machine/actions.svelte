@@ -1,5 +1,7 @@
 <script lang="ts">
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
+	import type { KubevirtIoV1VirtualMachine } from '@otterscale/types';
+	import type { Schema } from '@sjsf/form';
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
@@ -23,8 +25,8 @@
 		kind,
 		resource
 	}: {
-		schema: any;
-		object: any;
+		schema: Schema;
+		object: KubevirtIoV1VirtualMachine;
 		cluster: string;
 		namespace: string;
 		group: string;

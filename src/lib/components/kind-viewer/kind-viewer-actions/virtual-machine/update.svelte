@@ -2,6 +2,12 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { FormIcon } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
+	import type {
+		CdiKubevirtIoV1Beta1DataVolume,
+		CoreV1Node,
+		InstancetypeKubevirtIoV1Beta1VirtualMachineInstancetype,
+		KubevirtIoV1VirtualMachine
+	} from '@otterscale/types';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
@@ -9,6 +15,7 @@
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
@@ -32,8 +39,8 @@
 		resource,
 		onOpenChangeComplete
 	}: {
-		schema: any;
-		object: any;
+		schema: Schema;
+		object: KubevirtIoV1VirtualMachine;
 		cluster: string;
 		group: string;
 		version: string;
@@ -45,80 +52,260 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	// Extract existing values from object
-	const existingNamespace = lodash.get(object, 'metadata.namespace', '');
-	const existingInstanceTypeKind = lodash.get(
-		object,
-		'spec.instancetype.kind',
-		'VirtualMachineInstancetype'
-	);
-	const existingInstanceTypeName = lodash.get(object, 'spec.instancetype.name', '');
-	const existingVolumes: any[] = lodash.get(object, 'spec.template.spec.volumes', []);
-	const existingDisks: any[] = lodash.get(object, 'spec.template.spec.domain.devices.disks', []);
-
-	// Detect boot disk: find the os-disk (first volume) — could be containerDisk or dataVolume
-	const existingBootVolume =
-		existingVolumes.find((v: any) => v.name === 'os-disk') ?? existingVolumes[0];
-	const existingBootDisk = existingDisks.find((d: any) => d.name === 'os-disk') ?? existingDisks[0];
-	// Extract additional disks (all dataVolume entries except the boot one)
-	const existingAdditionalDisks = existingVolumes
-		.filter((v: any) => v.dataVolume && v.name !== (existingBootVolume?.name ?? 'os-disk'))
-		.map((v: any) => v.dataVolume.name);
-	const existingCloudInit =
-		existingVolumes.find((v: any) => v.cloudInitNoCloud)?.cloudInitNoCloud?.userData ?? '';
-
-	// Extract existing Node Selector
-	const existingNodeSelector = lodash.get(
-		object,
-		['spec', 'template', 'spec', 'nodeSelector', 'kubernetes.io/hostname'],
-		''
-	);
-
-	// Extract existing GPU devices
-	const existingGpuDevices: any[] = lodash.get(
-		object,
-		'spec.template.spec.domain.devices.gpus',
-		[]
-	);
-	const existingGpuResource =
-		existingGpuDevices.find((gpu: any) => !gpu.deviceName?.toUpperCase().includes('AUDIO'))
-			?.deviceName ?? '';
-
 	// Container for Data
-	let values: any = $state({
-		apiVersion: group ? `${group}/${version}` : version,
-		kind,
-		spec: {
-			runStrategy: lodash.get(object, 'spec.runStrategy', 'Halted'),
-			instancetype: {
-				kind: {},
-				name: {}
+	let values = $state(getInitialValues());
+
+	function getInitialValues() {
+		const namespace = object.metadata?.namespace ?? '';
+		const name = object.metadata?.name ?? '';
+		const volumes = object.spec?.template?.spec?.volumes ?? [];
+		const disks = object.spec?.template?.spec?.domain?.devices?.disks ?? [];
+		// Detect boot disk: find the os-disk (first volume) — could be containerDisk or dataVolume
+		const bootVolume = volumes.find((v) => v.name === 'os-disk') ?? volumes[0];
+		const bootDisk = disks.find((d) => d.name === 'os-disk') ?? disks[0];
+		const additionalDisks = volumes
+			.filter((v) => v.dataVolume && v.name !== (bootVolume?.name ?? 'os-disk'))
+			.map((v) => v.dataVolume!.name);
+		const cloudInit = volumes.find((v) => v.cloudInitNoCloud)?.cloudInitNoCloud?.userData ?? '';
+
+		return {
+			apiVersion: group ? `${group}/${version}` : version,
+			kind,
+			// Snapshot fields from object (re-captured each initiate)
+			namespace,
+			name,
+			bootVolume,
+			bootDisk,
+			spec: {
+				runStrategy: (object.spec?.runStrategy ?? 'Halted') as string,
+				instancetype: {
+					kind: (object.spec?.instancetype?.kind ?? 'VirtualMachineInstancetype') as string,
+					name: (object.spec?.instancetype?.name ?? null) as string | null
+				}
+			},
+			// UI-only fields (not in API schema) — boot disk is immutable, only additionalDisks editable
+			additionalDisks,
+			cloudInit
+		};
+	}
+
+	function getInitialGpuPassthroughConfig() {
+		const gpus = object.spec?.template?.spec?.domain?.devices?.gpus ?? [];
+		const existingGpuResource =
+			gpus.find((gpu) => !gpu.deviceName?.toUpperCase().includes('AUDIO'))?.deviceName ?? '';
+		return {
+			selectedResource: existingGpuResource,
+			gpuCount: '1'
+		};
+	}
+
+	function getInitialNodeSelector() {
+		return {
+			node: object.spec?.template?.spec?.nodeSelector?.['kubernetes.io/hostname'] ?? ''
+		};
+	}
+
+	// Build disks and volumes — boot disk is preserved from existing object
+	function buildDisksAndVolumes() {
+		// Start with the immutable boot disk/volume from the existing object
+		const disks: Record<string, unknown>[] = [
+			values.bootDisk
+				? { ...values.bootDisk }
+				: { name: 'os-disk', disk: { bus: 'virtio' }, bootOrder: 1 }
+		];
+		const volumes: Record<string, unknown>[] = [
+			values.bootVolume ? { ...values.bootVolume } : { name: 'os-disk' }
+		];
+
+		values.additionalDisks.forEach((dvName, index) => {
+			if (!dvName?.trim()) return;
+			const diskName = `data-disk-${index + 1}`;
+			disks.push({ name: diskName, disk: { bus: 'virtio' } });
+			volumes.push({ name: diskName, dataVolume: { name: dvName } });
+		});
+
+		if (values.cloudInit.trim()) {
+			disks.push({ name: 'cloud-init-disk', disk: { bus: 'virtio' } });
+			volumes.push({
+				name: 'cloud-init-disk',
+				cloudInitNoCloud: { userData: values.cloudInit }
+			});
+		}
+
+		return { disks, volumes };
+	}
+
+	// Build GPU passthrough devices
+	function buildGpuDevices() {
+		if (!gpuPassthroughConfig.selectedResource) return undefined;
+
+		const gpuCount = Math.max(1, parseInt(gpuPassthroughConfig.gpuCount) || 1);
+
+		// Find corresponding AUDIO device prefix
+		const match = gpuPassthroughConfig.selectedResource.match(/nvidia\.com\/([A-Z0-9-]+)_/);
+		const audioDeviceName = match
+			? `nvidia.com/${match[1]}_HIGH_DEFINITION_AUDIO_CONTROLLER`
+			: null;
+
+		const gpuDevices: Record<string, unknown>[] = [];
+		for (let i = 1; i <= gpuCount; i++) {
+			gpuDevices.push({
+				deviceName: gpuPassthroughConfig.selectedResource,
+				name: `gpu${i}`
+			});
+			if (audioDeviceName && allAvailableGpuResources.includes(audioDeviceName)) {
+				gpuDevices.push({
+					deviceName: audioDeviceName,
+					name: `gpu${i}-audio`
+				});
 			}
-		},
-		// UI-only fields (not in API schema) — boot disk is immutable, only additionalDisks editable
-		additionalDisks: [] as string[],
-		cloudInit: {}
+		}
+		return gpuDevices;
+	}
+
+	// Derived submission values (proper VirtualMachine structure)
+	const submissionValues = $derived.by(() => {
+		const { disks, volumes } = buildDisksAndVolumes();
+		const gpus = buildGpuDevices();
+
+		const devices = {
+			disks,
+			interfaces: [{ name: 'nic1', bridge: {} }],
+			...(gpus ? { gpus } : {})
+		};
+
+		return {
+			apiVersion: group ? `${group}/${version}` : version,
+			kind,
+			metadata: {
+				name: values.name,
+				namespace: values.namespace,
+				annotations: {
+					'kubevirt.io/allow-pod-bridge-network-live-migration': 'true'
+				}
+			},
+			spec: {
+				runStrategy: values.spec.runStrategy,
+				instancetype: values.spec.instancetype,
+				template: {
+					metadata: {
+						labels: { 'kubevirt.io/vm': values.name }
+					},
+					spec: {
+						...(nodeSelector.node
+							? { nodeSelector: { 'kubernetes.io/hostname': nodeSelector.node } }
+							: {}),
+						domain: { devices },
+						networks: [{ name: 'nic1', pod: {} }],
+						volumes
+					}
+				}
+			}
+		};
 	});
+	let value = $derived(stringify(submissionValues));
 
-	// Container for GPU passthrough selection
-	let gpuPassthroughConfig: any = $state({
-		selectedResource: existingGpuResource,
-		gpuCount: '1'
-	});
+	// Steps Manager
+	const steps = Array.from({ length: 7 }, (_, index) => String(index + 1));
+	const [firstStep] = steps;
+	let currentStep = $state(firstStep);
+	const currentIndex = $derived(steps.indexOf(currentStep));
+	function handleNext() {
+		currentStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
+	}
+	function handlePrevious() {
+		currentStep = steps[Math.max(currentIndex - 1, 0)];
+	}
+	async function initiate() {
+		values = getInitialValues();
+		gpuPassthroughConfig = getInitialGpuPassthroughConfig();
+		nodeSelector = getInitialNodeSelector();
+		allAvailableGpuResources = [];
+		gpuResourceQuantities.clear();
+		currentStep = firstStep;
+		isSubmitting = false;
+		allAvailableGpuResources = await fetchAllGpuResources();
+	}
 
-	// Container for Node selection
-	let nodeSelector: any = $state({
-		node: existingNodeSelector
-	});
+	function formatMemory(quantity: string): string {
+		if (!quantity) return quantity;
+		const giMatch = quantity.match(/^(\d+(?:\.\d+)?)Gi$/);
+		if (giMatch) return `${giMatch[1]} GB`;
+		const miMatch = quantity.match(/^(\d+(?:\.\d+)?)Mi$/);
+		if (miMatch) {
+			const mb = parseFloat(miMatch[1]);
+			return mb >= 1024 && mb % 1024 === 0 ? `${mb / 1024} GB` : `${mb} MB`;
+		}
+		const tiMatch = quantity.match(/^(\d+(?:\.\d+)?)Ti$/);
+		if (tiMatch) return `${tiMatch[1]} TB`;
+		return quantity;
+	}
 
-	// Cache for all available GPU resources
-	let allAvailableGpuResources: string[] = $state([]);
+	// Fetch Instance Types
+	async function fetchInstanceTypesAsEnumerations(
+		search: string
+	): Promise<{ label: string; value: string }[]> {
+		try {
+			const itKind = values.spec.instancetype.kind;
+			if (!itKind) return [];
+			const isClusterScoped = itKind === 'VirtualMachineClusterInstancetype';
+			const response = await resourceClient.list({
+				cluster,
+				group: 'instancetype.kubevirt.io',
+				version: 'v1beta1',
+				resource: isClusterScoped
+					? 'virtualmachineclusterinstancetypes'
+					: 'virtualmachineinstancetypes',
+				...(isClusterScoped ? {} : { namespace: values.namespace })
+			});
+			return response.items
+				.map((item) => {
+					const obj = item.object as InstancetypeKubevirtIoV1Beta1VirtualMachineInstancetype;
+					const name = obj?.metadata?.name ?? '';
+					if (!name || !name.toLowerCase().includes(search.toLowerCase())) return null;
+					const cpuCores = obj?.spec?.cpu?.guest;
+					const memoryRaw = obj?.spec?.memory?.guest;
+					const specs: string[] = [];
+					if (cpuCores) specs.push(`CPU: ${cpuCores} Core`);
+					if (memoryRaw) specs.push(`RAM: ${formatMemory(String(memoryRaw))}`);
+					const label = specs.length ? `${name} (${specs.join(' , ')})` : name;
+					return { label, value: name };
+				})
+				.filter((item): item is { label: string; value: string } => item !== null);
+		} catch (error) {
+			console.error('Error fetching instance types:', error);
+			return [];
+		}
+	}
 
-	// Cache for GPU resource quantities per node
-	let gpuResourceQuantities: Map<string, number> = $state(new Map());
+	// Fetch additional DataVolumes (exclude http and pvc/clone sources)
+	const EXCLUDED_ADDITIONAL_DV_SOURCES = ['http', 'pvc'];
 
-	async function fetchNodesWithVmxLabel(): Promise<any[]> {
-		return gpuNodeUtils.fetchNodesWithVmxLabel(resourceClient, cluster);
+	async function fetchAdditionalDataVolumesAsEnumerations(
+		search: string
+	): Promise<{ label: string; value: string }[]> {
+		try {
+			const response = await resourceClient.list({
+				cluster,
+				namespace: values.namespace,
+				group: 'cdi.kubevirt.io',
+				version: 'v1beta1',
+				resource: 'datavolumes'
+			});
+			return response.items
+				.filter((item) => {
+					const source = (item.object as CdiKubevirtIoV1Beta1DataVolume)?.spec?.source as
+						| Record<string, unknown>
+						| undefined;
+					return source && !EXCLUDED_ADDITIONAL_DV_SOURCES.some((key) => source[key] != null);
+				})
+				.map((item) => (item.object as CdiKubevirtIoV1Beta1DataVolume)?.metadata?.name ?? '')
+				.filter((name) => name && name.toLowerCase().includes(search.toLowerCase()))
+				.map((name) => ({ label: name, value: name }));
+		} catch (error) {
+			console.error('Error fetching additional data volumes:', error);
+			return [];
+		}
 	}
 
 	async function fetchAllGpuResources(): Promise<string[]> {
@@ -151,7 +338,7 @@
 			let gpuResourcesList: string[];
 
 			// If a node is selected in step 4, fetch GPU resources only for that node
-			if (nodeSelector.node && typeof nodeSelector.node === 'string' && nodeSelector.node !== '') {
+			if (nodeSelector.node) {
 				gpuResourcesList = await fetchGpuResourcesForNode(nodeSelector.node);
 			} else {
 				// Otherwise, use all available GPU resources from nodes with GPU passthrough support
@@ -176,13 +363,7 @@
 
 	// Get maximum GPU count for the selected resource
 	function getMaxGpuCount(): number {
-		if (
-			!gpuPassthroughConfig.selectedResource ||
-			typeof gpuPassthroughConfig.selectedResource !== 'string' ||
-			gpuPassthroughConfig.selectedResource === ''
-		) {
-			return 0;
-		}
+		if (!gpuPassthroughConfig.selectedResource) return 0;
 
 		const quantity = gpuResourceQuantities.get(gpuPassthroughConfig.selectedResource);
 		return quantity ? Math.max(1, quantity) : 1;
@@ -193,11 +374,11 @@
 		search: string
 	): Promise<{ label: string; value: string }[]> {
 		try {
-			const nodes = await fetchNodesWithVmxLabel();
+			const nodes = await gpuNodeUtils.fetchNodesWithVmxLabel(resourceClient, cluster);
 			const nodeOptions = nodes
-				.map((item: any) => (item.object as any)?.metadata?.name as string)
-				.filter((name: string) => name && name.toLowerCase().includes(search.toLowerCase()))
-				.map((name: string) => ({ label: name, value: name }));
+				.map((item) => (item.object as CoreV1Node)?.metadata?.name ?? '')
+				.filter((name) => name && name.toLowerCase().includes(search.toLowerCase()))
+				.map((name) => ({ label: name, value: name }));
 
 			// Add empty option at the beginning
 			return [{ label: 'No selection', value: '' }, ...nodeOptions];
@@ -207,226 +388,17 @@
 		}
 	}
 
-	// Build disks and volumes — boot disk is preserved from existing object
-	function buildDisksAndVolumes(): { disks: any[]; volumes: any[] } {
-		// Start with the immutable boot disk/volume from the existing object
-		const disks: any[] = [
-			existingBootDisk
-				? { ...existingBootDisk }
-				: { name: 'os-disk', disk: { bus: 'virtio' }, bootOrder: 1 }
-		];
-		const volumes: any[] = [existingBootVolume ? { ...existingBootVolume } : { name: 'os-disk' }];
+	// Cache for all available GPU resources
+	let allAvailableGpuResources: string[] = $state([]);
 
-		const additionalDiskNames: string[] = Array.isArray(values.additionalDisks)
-			? values.additionalDisks
-			: [];
+	// Cache for GPU resource quantities per node
+	let gpuResourceQuantities = new SvelteMap<string, number>();
 
-		additionalDiskNames.forEach((dvName: any, index: number) => {
-			if (typeof dvName === 'string' && dvName.trim()) {
-				const diskName = `data-disk-${index + 1}`;
-				disks.push({ name: diskName, disk: { bus: 'virtio' } });
-				volumes.push({ name: diskName, dataVolume: { name: dvName } });
-			}
-		});
+	// Container for GPU passthrough selection
+	let gpuPassthroughConfig = $state(getInitialGpuPassthroughConfig());
 
-		const cloudInitData = typeof values.cloudInit === 'string' ? values.cloudInit : '';
-		if (cloudInitData.trim()) {
-			disks.push({ name: 'cloud-init-disk', disk: { bus: 'virtio' } });
-			volumes.push({
-				name: 'cloud-init-disk',
-				cloudInitNoCloud: { userData: cloudInitData }
-			});
-		}
-
-		return { disks, volumes };
-	}
-
-	// Derived submission values (proper VirtualMachine structure)
-	const submissionValues = $derived.by(() => {
-		const { disks, volumes } = buildDisksAndVolumes();
-
-		// Build devices object with disks and interfaces
-		const devices: any = {
-			disks,
-			interfaces: [{ name: 'nic1', bridge: {} }]
-		};
-
-		// Add GPUs if selected
-		if (
-			gpuPassthroughConfig.selectedResource &&
-			typeof gpuPassthroughConfig.selectedResource === 'string' &&
-			gpuPassthroughConfig.selectedResource !== ''
-		) {
-			const gpuDevices: any[] = [];
-			const gpuCount = Math.max(1, parseInt(gpuPassthroughConfig.gpuCount) || 1);
-
-			// Find corresponding AUDIO device prefix
-			const match = gpuPassthroughConfig.selectedResource.match(/nvidia\.com\/([A-Z0-9-]+)_/);
-			const audioDeviceName = match
-				? `nvidia.com/${match[1]}_HIGH_DEFINITION_AUDIO_CONTROLLER`
-				: null;
-
-			// Add GPU devices based on count
-			for (let i = 1; i <= gpuCount; i++) {
-				gpuDevices.push({
-					deviceName: gpuPassthroughConfig.selectedResource,
-					name: `gpu${i}`
-				});
-
-				// Add corresponding AUDIO device if available
-				if (audioDeviceName && allAvailableGpuResources.includes(audioDeviceName)) {
-					gpuDevices.push({
-						deviceName: audioDeviceName,
-						name: `gpu${i}-audio`
-					});
-				}
-			}
-
-			devices.gpus = gpuDevices;
-		}
-
-		return {
-			apiVersion: group ? `${group}/${version}` : version,
-			kind,
-			metadata: {
-				name: lodash.get(object, 'metadata.name'),
-				namespace: existingNamespace,
-				annotations: {
-					'kubevirt.io/allow-pod-bridge-network-live-migration': 'true'
-				}
-			},
-			spec: {
-				runStrategy: values.spec.runStrategy,
-				instancetype: values.spec.instancetype,
-				template: {
-					metadata: {
-						labels: {
-							'kubevirt.io/vm': lodash.get(object, 'metadata.name')
-						}
-					},
-					spec: {
-						...(nodeSelector.node &&
-						typeof nodeSelector.node === 'string' &&
-						nodeSelector.node !== ''
-							? { nodeSelector: { 'kubernetes.io/hostname': nodeSelector.node } }
-							: {}),
-						domain: {
-							devices
-						},
-						networks: [{ name: 'nic1', pod: {} }],
-						volumes
-					}
-				}
-			}
-		};
-	});
-	let value = $derived(stringify(submissionValues));
-
-	// Steps Manager
-	const steps = Array.from({ length: 7 }, (_, index) => String(index + 1));
-	const [firstStep] = steps;
-	let currentStep = $state(firstStep);
-	const currentIndex = $derived(steps.indexOf(currentStep));
-	function handleNext() {
-		currentStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
-	}
-	function handlePrevious() {
-		currentStep = steps[Math.max(currentIndex - 1, 0)];
-	}
-	function reset() {
-		currentStep = firstStep;
-	}
-
-	function formatMemory(quantity: string): string {
-		if (!quantity) return quantity;
-		const giMatch = quantity.match(/^(\d+(?:\.\d+)?)Gi$/);
-		if (giMatch) return `${giMatch[1]} GB`;
-		const miMatch = quantity.match(/^(\d+(?:\.\d+)?)Mi$/);
-		if (miMatch) {
-			const mb = parseFloat(miMatch[1]);
-			return mb >= 1024 && mb % 1024 === 0 ? `${mb / 1024} GB` : `${mb} MB`;
-		}
-		const tiMatch = quantity.match(/^(\d+(?:\.\d+)?)Ti$/);
-		if (tiMatch) return `${tiMatch[1]} TB`;
-		return quantity;
-	}
-
-	// Fetch Instance Types
-	async function fetchInstanceTypesAsEnumerations(
-		search: string
-	): Promise<{ label: string; value: string }[]> {
-		try {
-			const itKind = values.spec.instancetype.kind as string;
-			if (typeof itKind !== 'string' || !itKind) return [];
-			const isClusterScoped = itKind === 'VirtualMachineClusterInstancetype';
-			const listRequest: any = {
-				cluster,
-				group: 'instancetype.kubevirt.io',
-				version: 'v1beta1',
-				resource: isClusterScoped
-					? 'virtualmachineclusterinstancetypes'
-					: 'virtualmachineinstancetypes'
-			};
-			if (!isClusterScoped) {
-				listRequest.namespace = existingNamespace;
-			}
-			const response = await resourceClient.list(listRequest);
-			return response.items
-				.map((item: any) => {
-					const obj = item.object as any;
-					const name = obj?.metadata?.name as string;
-					if (!name || !name.toLowerCase().includes(search.toLowerCase())) return null;
-					const cpuCores = obj?.spec?.cpu?.guest;
-					const memoryRaw = obj?.spec?.memory?.guest;
-					const specs: string[] = [];
-					if (cpuCores) specs.push(`CPU: ${cpuCores} Core`);
-					if (memoryRaw) specs.push(`RAM: ${formatMemory(memoryRaw)}`);
-					const label = specs.length ? `${name} (${specs.join(' , ')})` : name;
-					return { label, value: name };
-				})
-				.filter((item): item is { label: string; value: string } => item !== null);
-		} catch (error) {
-			console.error('Error fetching instance types:', error);
-			return [];
-		}
-	}
-
-	// Fetch additional DataVolumes (exclude http and pvc/clone sources)
-	const EXCLUDED_ADDITIONAL_DV_SOURCES = ['http', 'pvc'];
-
-	async function fetchAdditionalDataVolumesAsEnumerations(
-		search: string
-	): Promise<{ label: string; value: string }[]> {
-		try {
-			const response = await resourceClient.list({
-				cluster,
-				namespace: existingNamespace,
-				group: 'cdi.kubevirt.io',
-				version: 'v1beta1',
-				resource: 'datavolumes'
-			});
-			return response.items
-				.filter((item: any) => {
-					const source = (item.object as any)?.spec?.source;
-					return source && !EXCLUDED_ADDITIONAL_DV_SOURCES.some((key) => source[key] != null);
-				})
-				.map((item: any) => (item.object as any)?.metadata?.name as string)
-				.filter((name: string) => name && name.toLowerCase().includes(search.toLowerCase()))
-				.map((name: string) => ({ label: name, value: name }));
-		} catch (error) {
-			console.error('Error fetching additional data volumes:', error);
-			return [];
-		}
-	}
-
-	// Load available GPU resources when dialog opens
-	$effect(() => {
-		if (open) {
-			fetchAllGpuResources().then((resources) => {
-				allAvailableGpuResources = resources;
-			});
-		}
-	});
+	// Container for Node selection
+	let nodeSelector = $state(getInitialNodeSelector());
 
 	// Update GPU count when selected resource changes
 	$effect(() => {
@@ -455,10 +427,10 @@
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
+		if (isOpen) return;
+
+		initiate();
 		onOpenChangeComplete?.();
-		if (!isOpen) {
-			reset();
-		}
 	}}
 >
 	<Dialog.Trigger>
@@ -489,9 +461,9 @@
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
-						...lodash.get(jsonSchema, 'properties.spec.properties.instancetype.properties.kind', {
+						...(lodash.get(jsonSchema, 'properties.spec.properties.instancetype.properties.kind', {
 							type: 'string'
-						}),
+						}) as Schema),
 						title: 'Instance Type Kind',
 						enum: ['VirtualMachineInstancetype', 'VirtualMachineClusterInstancetype']
 					} as Schema}
@@ -505,7 +477,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={(existingInstanceTypeKind ?? 'VirtualMachineInstancetype') as FormValue}
+					initialValue={values.spec.instancetype.kind as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
@@ -524,9 +496,9 @@
 			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
-						...lodash.get(jsonSchema, 'properties.spec.properties.instancetype.properties.name', {
+						...(lodash.get(jsonSchema, 'properties.spec.properties.instancetype.properties.name', {
 							type: 'string'
-						}),
+						}) as Schema),
 						title: 'Instance Type'
 					} as Schema}
 					uiSchema={{
@@ -547,7 +519,7 @@
 							TailoredComboboxPopoverClass: 'w-[380px]'
 						}
 					} as UiSchemaRoot}
-					initialValue={(existingInstanceTypeName ?? null) as FormValue}
+					initialValue={values.spec.instancetype.name as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
@@ -604,7 +576,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={existingAdditionalDisks as FormValue}
+					initialValue={values.additionalDisks as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
@@ -662,7 +634,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{ node: existingNodeSelector } as FormValue}
+					initialValue={nodeSelector as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
@@ -748,7 +720,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{ selectedResource: existingGpuResource, gpuCount: '1' } as FormValue}
+					initialValue={gpuPassthroughConfig as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
@@ -787,7 +759,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={(existingCloudInit ||
+					initialValue={(values.cloudInit ||
 						'#cloud-config\npassword: password\nchpasswd:\n  expire: false') as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -813,7 +785,6 @@
 			<!-- Step 7: Review & Edit -->
 			<Tabs.Content value={steps[6]}>
 				<div class="flex h-full flex-col gap-3">
-					<!-- <Code.Root lang="yaml" class="w-full" hideLines code={stringify(submissionValues, null, 2)} /> -->
 					<Monaco
 						options={{
 							language: 'yaml',
@@ -857,7 +828,7 @@
 									await resourceClient.apply({
 										cluster,
 										name,
-										namespace: existingNamespace,
+										namespace: values.namespace,
 										group,
 										version,
 										resource,
