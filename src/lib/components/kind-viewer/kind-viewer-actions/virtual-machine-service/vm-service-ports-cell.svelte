@@ -319,6 +319,7 @@
 		namespace={vmNamespace}
 		{vmName}
 		{service}
+		schema={jsonSchema}
 		bind:open={updateOpen}
 		onsuccess={() => {
 			fetchService();

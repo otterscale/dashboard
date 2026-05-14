@@ -62,7 +62,7 @@
 		return {
 			apiVersion: group ? `${group}/${version}` : version,
 			kind,
-			metadata: { name: null as string | null },
+			metadata: { name: '' },
 			spec: {
 				instancetype: {
 					kind: 'VirtualMachineInstancetype' as string,
@@ -482,7 +482,7 @@
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
-		if (!isOpen) return;
+		if (isOpen) return;
 
 		initiate();
 	}}

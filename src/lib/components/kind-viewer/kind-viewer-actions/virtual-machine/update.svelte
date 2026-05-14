@@ -66,8 +66,7 @@
 		const additionalDisks = volumes
 			.filter((v) => v.dataVolume && v.name !== (bootVolume?.name ?? 'os-disk'))
 			.map((v) => v.dataVolume!.name);
-		const cloudInit =
-			volumes.find((v) => v.cloudInitNoCloud)?.cloudInitNoCloud?.userData ?? '';
+		const cloudInit = volumes.find((v) => v.cloudInitNoCloud)?.cloudInitNoCloud?.userData ?? '';
 
 		return {
 			apiVersion: group ? `${group}/${version}` : version,
@@ -428,9 +427,9 @@
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
-		if (isOpen) {
-			initiate();
-		}
+		if (isOpen) return;
+
+		initiate();
 		onOpenChangeComplete?.();
 	}}
 >
