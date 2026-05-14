@@ -55,13 +55,14 @@ export async function fetchLLMInferenceServiceTopology(
 		const annotations = getAnnotations(pod);
 		const labels = getLabels(pod);
 		const nodeName = getPodNodeName(pod);
-		if (nodeName) nodeNames.add(nodeName);
+		const allocations = parsePodGpuAllocations(annotations[ANNOTATION_DEVICES_ALLOCATED]);
+		if (nodeName && allocations.length > 0) nodeNames.add(nodeName);
 
 		pods.push({
 			name: (pod as Record<string, any>)?.metadata?.name ?? '', // eslint-disable-line @typescript-eslint/no-explicit-any
 			namespace: (pod as Record<string, any>)?.metadata?.namespace ?? '', // eslint-disable-line @typescript-eslint/no-explicit-any
 			nodeName,
-			allocations: parsePodGpuAllocations(annotations[ANNOTATION_DEVICES_ALLOCATED]),
+			allocations,
 			status: (pod as Record<string, any>)?.status?.phase ?? 'Unknown', // eslint-disable-line @typescript-eslint/no-explicit-any
 			role: labels[LABEL_ROLE]
 		});

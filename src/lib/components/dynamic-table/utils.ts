@@ -232,6 +232,7 @@ type UISchemaType =
 	| 'quantity'
 	| 'time'
 	| 'text'
+	| 'item'
 	| 'array'
 	| 'array-of-enumeration'
 	| 'array-of-object'

@@ -59,7 +59,7 @@
 	import PencilIcon from '@lucide/svelte/icons/pencil';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { Schema } from '@sjsf/form';
-	import Ajv, { type ValidateFunction } from 'ajv';
+	import { type ValidateFunction } from 'ajv';
 	import * as jsonpatch from 'fast-json-patch';
 	import { JSON_SCHEMA, load } from 'js-yaml';
 	import lodash from 'lodash';
@@ -84,6 +84,7 @@
 		kind,
 		resource,
 		schema: jsonSchema,
+		validate,
 		object,
 		onOpenChangeComplete
 	}: {
@@ -94,6 +95,7 @@
 		kind: string;
 		resource: string;
 		schema: Schema;
+		validate: ValidateFunction;
 		object: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 		onOpenChangeComplete: () => void;
 	} = $props();
@@ -105,20 +107,11 @@
 		$state(undefined);
 	let monacoInstance: typeof import('monaco-editor') | undefined = $state(undefined);
 
-	// Validator
-	const jsonSchemaValidator = new Ajv({
-		allErrors: true,
-		strict: false,
-		logger: false
-	});
-
-	let validate: ValidateFunction | undefined = $state(undefined);
 	function performValidation(
 		editorInstance: import('monaco-editor').editor.IStandaloneCodeEditor | undefined,
-		monacoInstance: typeof import('monaco-editor') | undefined,
-		validate: ValidateFunction | undefined
+		monacoInstance: typeof import('monaco-editor') | undefined
 	) {
-		if (!editorInstance || !monacoInstance || !validate) return;
+		if (!editorInstance || !monacoInstance) return;
 
 		const monaco = monacoInstance;
 		const markers: import('monaco-editor').editor.IMarkerData[] = [];
@@ -209,17 +202,17 @@
 	// Validate
 	let isReady = $state(false);
 	$effect(() => {
-		if (editorInstance && monacoInstance && validate) {
+		if (editorInstance && monacoInstance) {
 			tick().then(() => {
 				requestAnimationFrame(async () => {
 					await fold(editorInstance!);
 					isReady = true;
 				});
 			});
-			performValidation(editorInstance, monacoInstance, validate);
+			performValidation(editorInstance, monacoInstance);
 
 			const disposable = editorInstance.onDidChangeModelContent(() => {
-				performValidation(editorInstance, monacoInstance, validate);
+				performValidation(editorInstance, monacoInstance);
 			});
 
 			return () => disposable.dispose();
@@ -230,10 +223,8 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 	let isSubmitting = $state(false);
-	function handleConfirm(validate: ValidateFunction | undefined) {
+	function handleConfirm() {
 		if (isSubmitting) return;
-
-		if (!validate) return;
 
 		const document = parseDocument(value);
 		if (document.errors.length > 0) {
@@ -328,7 +319,6 @@
 		if (!isOpen) return;
 
 		value = stringify(object);
-		validate = jsonSchemaValidator.compile(jsonSchema);
 		// editorInstance and monacoInstance are initialized by Monaco component.
 	}}
 	onOpenChangeComplete={(isOpen) => {
@@ -337,7 +327,6 @@
 		if (isOpen) return;
 
 		value = '';
-		validate = undefined;
 		editorInstance = undefined;
 		monacoInstance = undefined;
 		isReady = false;
@@ -385,7 +374,7 @@
 		</div>
 		<Dialog.Footer>
 			<Button class="mr-auto" variant="outline" onclick={() => (open = false)}>{m.cancel()}</Button>
-			<Button onclick={() => handleConfirm(validate)}>
+			<Button onclick={handleConfirm}>
 				{m.confirm()}
 			</Button>
 		</Dialog.Footer>

@@ -1,3 +1,5 @@
+import type { Schema } from '@sjsf/form';
+import { type ValidateFunction } from 'ajv';
 import type { Component } from 'svelte';
 
 import ObjectBucketClaimActions from './ceph-object-bucket-claim/actions.svelte';
@@ -44,12 +46,14 @@ type CreateType = Component<{
 	version?: string;
 	kind?: string;
 	resource?: string;
-	schema?: any;
+	schema?: Schema;
+	validate?: ValidateFunction;
 }> | null;
 type ActionsType = Component<{
 	role?: string;
 	row?: any;
-	schema?: any;
+	schema?: Schema;
+	validate?: ValidateFunction;
 	object?: any;
 	cluster?: string;
 	namespace?: string;

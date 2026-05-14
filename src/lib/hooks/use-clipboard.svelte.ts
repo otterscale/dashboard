@@ -1,9 +1,16 @@
+import copy from 'clipboard-copy';
+
 type Options = {
 	/** The time before the copied status is reset. */
 	delay: number;
 };
 
 /** Use this hook to copy text to the clipboard and show a copied state.
+ *
+ * Backed by `clipboard-copy`, which prefers the Async Clipboard API
+ * (`navigator.clipboard.writeText`) in secure contexts (HTTPS / localhost)
+ * and gracefully falls back to `document.execCommand('copy')` in insecure
+ * contexts such as accessing the dashboard via a raw IP over plain HTTP.
  *
  * ## Usage
  * ```svelte
@@ -51,21 +58,15 @@ export class UseClipboard {
 		}
 
 		try {
-			await navigator.clipboard.writeText(text);
-
+			await copy(text);
 			this.#copiedStatus = 'success';
-
-			this.timeout = setTimeout(() => {
-				this.#copiedStatus = undefined;
-			}, this.delay);
 		} catch {
-			// an error can occur when not in the browser or if the user hasn't given clipboard access
 			this.#copiedStatus = 'failure';
-
-			this.timeout = setTimeout(() => {
-				this.#copiedStatus = undefined;
-			}, this.delay);
 		}
+
+		this.timeout = setTimeout(() => {
+			this.#copiedStatus = undefined;
+		}, this.delay);
 
 		return this.#copiedStatus;
 	}
