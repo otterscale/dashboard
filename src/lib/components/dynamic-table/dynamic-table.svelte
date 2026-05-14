@@ -277,6 +277,7 @@
 			number: 'end',
 			time: 'end',
 			text: 'start',
+			item: 'start',
 			array: 'center',
 			'array-of-object': 'center',
 			object: 'center',
