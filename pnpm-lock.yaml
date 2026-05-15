@@ -263,8 +263,8 @@ importers:
         specifier: ^17.6.0
         version: 17.6.0
       layerchart:
-        specifier: 2.0.0-next.48
-        version: 2.0.0-next.48(@sveltejs/kit@2.59.1(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.55.5(@typescript-eslint/types@8.59.3))(vite@7.3.3(@types/node@24.12.4)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.9.0)))(svelte@5.55.5(@typescript-eslint/types@8.59.3))(typescript@5.9.3)(vite@7.3.3(@types/node@24.12.4)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.9.0)))(svelte@5.55.5(@typescript-eslint/types@8.59.3))
+        specifier: 2.0.0-next.63
+        version: 2.0.0-next.63(@sveltejs/kit@2.59.1(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.55.5(@typescript-eslint/types@8.59.3))(vite@7.3.3(@types/node@24.12.4)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.9.0)))(svelte@5.55.5(@typescript-eslint/types@8.59.3))(typescript@5.9.3)(vite@7.3.3(@types/node@24.12.4)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.9.0)))(svelte@5.55.5(@typescript-eslint/types@8.59.3))
       mdsvex:
         specifier: ^0.12.7
         version: 0.12.7(svelte@5.55.5(@typescript-eslint/types@8.59.3))
@@ -1342,6 +1342,7 @@ packages:
 
   '@ungap/structured-clone@1.3.0':
     resolution: {integrity: sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g==}
+    deprecated: Potential CWE-502 - Update to 1.3.1 or higher
 
   '@vitest/browser-playwright@4.1.6':
     resolution: {integrity: sha512-4csoeyl/qwHyxU2zNL0++WaoDr8YJDXOQPwWPNJoTZ+QzcdO3INYKgF5Zfz730Io7zbkuv914aZmfQ+QE+1Hvw==}
@@ -2233,8 +2234,8 @@ packages:
     resolution: {integrity: sha512-3i5pmOiZvMDj00qhrIVbH0AnioVTx22DMP7Vn5At4yJO46iy+FM8Y/g61ltenLVSo3fiO8h8Q3QOFgf/gQ72ww==}
     engines: {node: '>=20.0.0'}
 
-  layerchart@2.0.0-next.48:
-    resolution: {integrity: sha512-XoEYBztamA8lMxtF/Jz3aDX0HMk8dI+o4fK9fSl8ecT2Tdx3DQUjtKGtlQAOFdwC/AWifeLmKq5cMTQt9COZPQ==}
+  layerchart@2.0.0-next.63:
+    resolution: {integrity: sha512-pX/mShq+cOTcdjLsLk0ILjBYxucOneeQcTuuYTE5fu9e3tUX7PwWvH36jXWiIMzRhn3m5Ojds8EVfeXiv4NXEg==}
     peerDependencies:
       svelte: ^5.0.0
 
@@ -5146,7 +5147,7 @@ snapshots:
 
   kysely@0.28.16: {}
 
-  layerchart@2.0.0-next.48(@sveltejs/kit@2.59.1(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.55.5(@typescript-eslint/types@8.59.3))(vite@7.3.3(@types/node@24.12.4)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.9.0)))(svelte@5.55.5(@typescript-eslint/types@8.59.3))(typescript@5.9.3)(vite@7.3.3(@types/node@24.12.4)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.9.0)))(svelte@5.55.5(@typescript-eslint/types@8.59.3)):
+  layerchart@2.0.0-next.63(@sveltejs/kit@2.59.1(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.55.5(@typescript-eslint/types@8.59.3))(vite@7.3.3(@types/node@24.12.4)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.9.0)))(svelte@5.55.5(@typescript-eslint/types@8.59.3))(typescript@5.9.3)(vite@7.3.3(@types/node@24.12.4)(jiti@2.6.1)(lightningcss@1.32.0)(yaml@2.9.0)))(svelte@5.55.5(@typescript-eslint/types@8.59.3)):
     dependencies:
       '@dagrejs/dagre': 2.0.4
       '@layerstack/svelte-actions': 1.0.1-next.18
