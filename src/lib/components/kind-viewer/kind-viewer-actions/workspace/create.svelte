@@ -6,41 +6,13 @@
 		username: string;
 		isServiceAccount: boolean;
 	}
-
-	const defaultResourceQuota = {
-		hard: {
-			'requests.cpu': '16',
-			'requests.memory': '32Gi',
-			'requests.nvidia.com/gpu': '0',
-			'requests.nvidia.com/gpumem': '0',
-			'limits.cpu': '16',
-			'limits.memory': '32Gi',
-			'limits.nvidia.com/gpu': '0',
-			'limits.nvidia.com/gpumem': '0'
-		}
-	};
-	const defaultLimitRange = {
-		limits: [
-			{
-				type: 'Container',
-				default: {
-					cpu: '4',
-					memory: '8Gi'
-				},
-				defaultRequest: {
-					cpu: '0.5',
-					memory: '1Gi'
-				}
-			}
-		]
-	};
 </script>
 
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
+	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, setValue, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
 	import { load } from 'js-yaml';
@@ -96,6 +68,7 @@
 	const [firstStep] = steps;
 
 	let values = $state(getInitialValues());
+	let resourceLimitation = $state(getInitialResourceLimitation());
 	let currentStep = $state(firstStep);
 	let isSubmitting = $state(false);
 	let membersFormReference = $state(null);
@@ -118,17 +91,22 @@
 						serviceAccount: false
 					}
 				],
-				resourceQuota: {},
 				networkIsolation: {
 					enabled: false
-				},
-				limitRange: defaultLimitRange
+				}
 			}
+		};
+	}
+	function getInitialResourceLimitation() {
+		return {
+			unlimit: undefined,
+			ResourceQuota: {}
 		};
 	}
 
 	function initiate() {
 		values = getInitialValues();
+		resourceLimitation = getInitialResourceLimitation();
 		currentStep = firstStep;
 		isSubmitting = false;
 	}
@@ -466,101 +444,187 @@
 				</Form>
 			</Tabs.Content>
 
-			{#if role === 'Cluster Admin'}
-				<Tabs.Content value={steps[3]}>
-					<Form
-						schema={{
-							...lodash.omit(
-								lodash.get(jsonSchema, 'properties.spec.properties.resourceQuota') as Schema,
-								['properties']
-							),
-							title: 'Resource Quota',
-							properties: {
-								hard: {
-									title: 'Hard',
-									...lodash.omit(
-										lodash.get(
-											jsonSchema,
-											'properties.spec.properties.resourceQuota.properties.hard'
-										) as Schema,
-										['additionalProperties']
-									),
+			<Tabs.Content value={steps[3]}>
+				{@const editable = role === 'Cluster Admin'}
+				<Form
+					schema={{
+						...lodash.omit(
+							lodash.get(jsonSchema, 'properties.spec.properties.resourceQuota') as Schema,
+							['properties']
+						),
+						title: 'Resource Quota',
+						properties: {
+							unlimit: {
+								title: 'Unlimited',
+								type: 'boolean'
+							}
+						},
+						allOf: [
+							{
+								if: {
 									properties: {
-										'requests.cpu': {
-											title: 'CPU Request',
-											type: 'string'
-										},
-										'requests.memory': {
-											title: 'Memory Request',
-											type: 'string'
-										},
-										'requests.nvidia.com/gpu': {
-											title: 'GPU Device Request',
-											type: 'string'
-										},
-										'requests.nvidia.com/gpumem': {
-											title: 'GPU Memory Request',
-											type: 'string'
-										},
-										'limits.cpu': {
-											title: 'CPU Limit',
-											type: 'string'
-										},
-										'limits.memory': {
-											title: 'Memory Limit',
-											type: 'string'
-										},
-										'limits.nvidia.com/gpu': {
-											title: 'GPU Device Limit',
-											type: 'string'
-										},
-										'limits.nvidia.com/gpumem': {
-											title: 'GPU Memory Limit',
-											type: 'string'
-										}
+										unlimit: { const: false }
 									}
+								},
+								then: {
+									properties: {
+										hard: {
+											title: 'Hard',
+											...lodash.omit(
+												lodash.get(
+													jsonSchema,
+													'properties.spec.properties.resourceQuota.properties.hard'
+												) as Schema,
+												['additionalProperties']
+											),
+											properties: {
+												'requests.cpu': {
+													title: 'CPU Request',
+													type: 'string',
+													readOnly: !editable
+												},
+												'requests.memory': {
+													title: 'Memory Request',
+													type: 'string',
+													readOnly: !editable
+												},
+												'requests.nvidia.com/gpu': {
+													title: 'GPU Device Request',
+													type: 'string',
+													readOnly: !editable
+												},
+												'requests.nvidia.com/gpumem': {
+													title: 'GPU Memory Request',
+													type: 'string',
+													readOnly: !editable
+												},
+												'limits.cpu': {
+													title: 'CPU Limit',
+													type: 'string',
+													readOnly: !editable
+												},
+												'limits.memory': {
+													title: 'Memory Limit',
+													type: 'string',
+													readOnly: !editable
+												},
+												'limits.nvidia.com/gpu': {
+													title: 'GPU Device Limit',
+													type: 'string',
+													readOnly: !editable
+												},
+												'limits.nvidia.com/gpumem': {
+													title: 'GPU Memory Limit',
+													type: 'string',
+													readOnly: !editable
+												}
+											}
+										}
+									},
+									required: ['hard']
 								}
 							}
-						} as Schema}
-						uiSchema={{
+						]
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						},
+						// unlimit: {
+						// 	'ui:options': {
+						// 		help: 'When enabled, no resource limits will be enforced for this namespace. Disable to set specific resource quotas.',
+						// 		shadcn4Checkbox: {
+						// 			disabled: !editable
+						// 		}
+						// 	}
+						// },
+						hard: {
 							'ui:options': {
-								translations: {
-									submit: 'Next'
-								}
-							},
-							hard: {
-								'ui:options': {
-									layouts: {
-										'object-properties': {
-											class: 'grid grid-cols-2 gap-3'
-										}
+								layouts: {
+									'object-properties': {
+										class:
+											'grid grid-cols-2 gap-3 [&_input]:read-only:focus-visible:ring-0 [&_input]:read-only:focus-visible:ring-offset-0 [&_input]:read-only:focus-visible:border-input [&_input]:read-only:cursor-default'
 									}
 								}
 							}
-						} as UiSchemaRoot}
-						initialValue={defaultResourceQuota as FormValue}
-						handleSubmit={{
-							posthook: () => {
-								handleNext();
+						}
+					} as UiSchemaRoot}
+					initialValue={{
+						unlimit: false,
+						hard: {
+							'requests.cpu': '16',
+							'requests.memory': '32Gi',
+							'requests.nvidia.com/gpu': '0',
+							'requests.nvidia.com/gpumem': '0',
+							'limits.cpu': '16',
+							'limits.memory': '32Gi',
+							'limits.nvidia.com/gpu': '0',
+							'limits.nvidia.com/gpumem': '0'
+						}
+					} as FormValue}
+					handleSubmit={{
+						posthook: (form: FormState<FormValue>) => {
+							handleNext();
+
+							const formValue = getValueSnapshot(form);
+
+							const isUnlimit = lodash.get(formValue, 'unlimit', undefined);
+							if (isUnlimit) {
+								lodash.unset(values, ['spec', 'resourceQuota']);
+								lodash.unset(values, ['spec', 'limitRange']);
+							} else {
+								lodash.set(
+									values,
+									['spec', 'resourceQuota', 'hard'],
+									lodash.get(formValue, 'hard', {
+										'requests.cpu': '16',
+										'requests.memory': '32Gi',
+										'requests.nvidia.com/gpu': '0',
+										'requests.nvidia.com/gpumem': '0',
+										'limits.cpu': '16',
+										'limits.memory': '32Gi',
+										'limits.nvidia.com/gpu': '0',
+										'limits.nvidia.com/gpumem': '0'
+									})
+								);
+								lodash.set(values, ['spec', 'limitRange'], {
+									limitRange: {
+										limits: [
+											{
+												type: 'Container',
+												default: {
+													cpu: '4',
+													memory: '8Gi'
+												},
+												defaultRequest: {
+													cpu: '0.5',
+													memory: '1Gi'
+												}
+											}
+										]
+									}
+								});
 							}
-						}}
-						bind:values={values['spec']['resourceQuota']}
-					>
-						{#snippet actions()}
-							<div class="flex w-full items-center justify-between gap-3">
-								<Button
-									onclick={() => {
-										handlePrevious();
-									}}
-								>
-									Previous
-								</Button>
-								<SubmitButton />
-							</div>
-						{/snippet}
-					</Form>
-				</Tabs.Content>
-			{/if}
+						}
+					}}
+					bind:values={resourceLimitation}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
 
 			<Tabs.Content value={steps[formCount]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
