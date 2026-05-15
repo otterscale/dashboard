@@ -532,14 +532,6 @@
 								submit: 'Next'
 							}
 						},
-						// unlimit: {
-						// 	'ui:options': {
-						// 		help: 'When enabled, no resource limits will be enforced for this namespace. Disable to set specific resource quotas.',
-						// 		shadcn4Checkbox: {
-						// 			disabled: !editable
-						// 		}
-						// 	}
-						// },
 						hard: {
 							'ui:options': {
 								layouts: {
@@ -575,10 +567,8 @@
 								lodash.unset(values, ['spec', 'resourceQuota']);
 								lodash.unset(values, ['spec', 'limitRange']);
 							} else {
-								lodash.set(
-									values,
-									['spec', 'resourceQuota', 'hard'],
-									lodash.get(formValue, 'hard', {
+								lodash.set(values, ['spec', 'resourceQuota'], {
+									hard: lodash.get(formValue, 'hard', {
 										'requests.cpu': '16',
 										'requests.memory': '32Gi',
 										'requests.nvidia.com/gpu': '0',
@@ -588,23 +578,21 @@
 										'limits.nvidia.com/gpu': '0',
 										'limits.nvidia.com/gpumem': '0'
 									})
-								);
+								});
 								lodash.set(values, ['spec', 'limitRange'], {
-									limitRange: {
-										limits: [
-											{
-												type: 'Container',
-												default: {
-													cpu: '4',
-													memory: '8Gi'
-												},
-												defaultRequest: {
-													cpu: '0.5',
-													memory: '1Gi'
-												}
+									limits: [
+										{
+											type: 'Container',
+											default: {
+												cpu: '4',
+												memory: '8Gi'
+											},
+											defaultRequest: {
+												cpu: '0.5',
+												memory: '1Gi'
 											}
-										]
-									}
+										}
+									]
 								});
 							}
 						}
