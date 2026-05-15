@@ -2,6 +2,11 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { ExternalLink, Plus } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
+	import type {
+		CdiKubevirtIoV1Beta1DataVolume,
+		CoreV1Node,
+		InstancetypeKubevirtIoV1Beta1VirtualMachineInstancetype
+	} from '@otterscale/types';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
@@ -9,6 +14,7 @@
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
@@ -34,7 +40,7 @@
 		showTrigger = true,
 		onsuccess
 	}: {
-		schema: any;
+		schema: Schema;
 		cluster: string;
 		namespace: string;
 		group: string;
@@ -50,34 +56,38 @@
 	const resourceClient = createClient(ResourceService, transport);
 
 	// Container for Data
-	let values: any = $state({
-		apiVersion: group ? `${group}/${version}` : version,
-		kind,
-		metadata: { name: {} },
-		spec: {
-			instancetype: {
-				kind: {},
-				name: {}
+	let values = $state(getInitialValues());
+
+	function getInitialValues() {
+		return {
+			apiVersion: group ? `${group}/${version}` : version,
+			kind,
+			metadata: { name: '' },
+			spec: {
+				instancetype: {
+					kind: 'VirtualMachineInstancetype' as string,
+					name: null as string | null
+				}
+			},
+			// UI-only fields (not in API schema)
+			diskSourceType: 'dataVolume' as string,
+			containerDiskConfig: {
+				containerDiskImage: null as string | null,
+				additionalDisks: [] as string[]
+			},
+			diskConfig: {
+				bootDisk: null as string | null,
+				additionalDisks: [] as string[]
+			},
+			cloudInit: '',
+			// PVC info inherited from selected boot DV
+			bootDvPvcInfo: {
+				accessModes: ['ReadWriteOnce'] as string[],
+				volumeMode: 'Filesystem' as string,
+				storage: ''
 			}
-		},
-		// UI-only fields (not in API schema)
-		diskSourceType: {},
-		containerDiskConfig: {
-			containerDiskImage: null,
-			additionalDisks: []
-		},
-		diskConfig: {
-			bootDisk: null,
-			additionalDisks: []
-		},
-		cloudInit: {},
-		// PVC info inherited from selected boot DV
-		bootDvPvcInfo: {
-			accessModes: ['ReadWriteOnce'],
-			volumeMode: 'Filesystem',
-			storage: ''
-		}
-	});
+		};
+	}
 
 	// Fetch PVC spec from selected boot DataVolume to inherit into dataVolumeTemplates
 	async function fetchBootDvPvcInfo(dvName: string | null): Promise<void> {
@@ -91,13 +101,13 @@
 				resource: 'datavolumes',
 				name: dvName
 			});
-			const dv = response.object as any;
-			const pvcSpec = lodash.get(dv, 'spec.pvc');
+			const dv = response.object as CdiKubevirtIoV1Beta1DataVolume;
+			const pvcSpec = dv.spec?.pvc;
 			if (pvcSpec) {
 				values.bootDvPvcInfo = {
 					accessModes: pvcSpec.accessModes ?? ['ReadWriteOnce'],
 					volumeMode: pvcSpec.volumeMode ?? 'Filesystem',
-					storage: lodash.get(pvcSpec, 'resources.requests.storage', '')
+					storage: String(pvcSpec.resources?.requests?.storage ?? '')
 				};
 			}
 		} catch (error) {
@@ -105,122 +115,94 @@
 		}
 	}
 
-	// Build disks and volumes
-	function buildDisksAndVolumes(): { disks: any[]; volumes: any[]; isContainerDisk: boolean } {
-		const vmName = typeof values.metadata.name === 'string' ? values.metadata.name : '';
+	// Build VM storage (disks, volumes, and dataVolumeTemplates)
+	function buildVmStorage() {
+		const vmName = values.metadata.name ?? '';
 		const isContainerDisk = values.diskSourceType === 'containerDisk';
+		const diskSource = isContainerDisk ? values.containerDiskConfig : values.diskConfig;
 
-		const disks: any[] = [{ name: 'os-disk', disk: { bus: 'virtio' }, bootOrder: 1 }];
-		const volumes: any[] = [];
+		const disks: Record<string, unknown>[] = [
+			{ name: 'os-disk', disk: { bus: 'virtio' }, bootOrder: 1 }
+		];
+		const volumes: Record<string, unknown>[] = [];
+		const dataVolumeTemplates: Record<string, unknown>[] = [];
 
+		// Boot disk: container image, or DataVolume clone + its template
 		if (isContainerDisk) {
-			const image =
-				typeof values.containerDiskConfig?.containerDiskImage === 'string'
-					? values.containerDiskConfig.containerDiskImage
-					: '';
-			volumes.push({ name: 'os-disk', containerDisk: { image } });
+			volumes.push({
+				name: 'os-disk',
+				containerDisk: { image: values.containerDiskConfig.containerDiskImage ?? '' }
+			});
 		} else {
 			volumes.push({ name: 'os-disk', dataVolume: { name: vmName } });
-		}
-
-		const diskSource = isContainerDisk ? values.containerDiskConfig : values.diskConfig;
-		const additionalDvNames: string[] = Array.isArray(diskSource?.additionalDisks)
-			? diskSource.additionalDisks
-			: [];
-		additionalDvNames.forEach((dvName: any, index: number) => {
-			if (typeof dvName === 'string' && dvName.trim()) {
-				const diskName = `data-disk-${index + 1}`;
-				disks.push({ name: diskName, disk: { bus: 'virtio' } });
-				volumes.push({ name: diskName, dataVolume: { name: dvName } });
-			}
-		});
-
-		const cloudInitData = typeof values.cloudInit === 'string' ? values.cloudInit : '';
-		if (cloudInitData.trim()) {
-			disks.push({ name: 'cloud-init-disk', disk: { bus: 'virtio' } });
-			volumes.push({
-				name: 'cloud-init-disk',
-				cloudInitNoCloud: { userData: cloudInitData }
+			const { accessModes, volumeMode, storage } = values.bootDvPvcInfo;
+			dataVolumeTemplates.push({
+				metadata: { name: vmName },
+				spec: {
+					source: { pvc: { namespace, name: values.diskConfig.bootDisk ?? '' } },
+					pvc: { accessModes, volumeMode, resources: { requests: { storage } } }
+				}
 			});
 		}
 
-		return { disks, volumes, isContainerDisk };
+		// Additional data disks
+		diskSource.additionalDisks.forEach((dvName, index) => {
+			if (!dvName?.trim()) return;
+			const diskName = `data-disk-${index + 1}`;
+			disks.push({ name: diskName, disk: { bus: 'virtio' } });
+			volumes.push({ name: diskName, dataVolume: { name: dvName } });
+		});
+
+		// Cloud-init
+		if (values.cloudInit.trim()) {
+			disks.push({ name: 'cloud-init-disk', disk: { bus: 'virtio' } });
+			volumes.push({
+				name: 'cloud-init-disk',
+				cloudInitNoCloud: { userData: values.cloudInit }
+			});
+		}
+
+		return { disks, volumes, dataVolumeTemplates };
 	}
 
-	// Build dataVolumeTemplates to clone the selected boot DV
-	function buildDataVolumeTemplates(): any[] {
-		const vmName = typeof values.metadata.name === 'string' ? values.metadata.name : '';
-		const bootDvName =
-			typeof values.diskConfig?.bootDisk === 'string' ? values.diskConfig.bootDisk : '';
-		const { accessModes, volumeMode, storage } = values.bootDvPvcInfo;
+	// Build GPU passthrough devices
+	function buildGpuDevices() {
+		if (!gpuPassthroughConfig.selectedResource) return undefined;
 
-		return [
-			{
-				metadata: { name: vmName },
-				spec: {
-					source: {
-						pvc: {
-							namespace,
-							name: bootDvName
-						}
-					},
-					pvc: {
-						accessModes,
-						volumeMode,
-						resources: {
-							requests: {
-								storage
-							}
-						}
-					}
-				}
+		const gpuCount = Math.max(1, parseInt(gpuPassthroughConfig.gpuCount) || 1);
+
+		// Find corresponding AUDIO device prefix
+		const match = gpuPassthroughConfig.selectedResource.match(/nvidia\.com\/([A-Z0-9-]+)_/);
+		const audioDeviceName = match
+			? `nvidia.com/${match[1]}_HIGH_DEFINITION_AUDIO_CONTROLLER`
+			: null;
+
+		const gpuDevices: Record<string, unknown>[] = [];
+		for (let i = 1; i <= gpuCount; i++) {
+			gpuDevices.push({
+				deviceName: gpuPassthroughConfig.selectedResource,
+				name: `gpu${i}`
+			});
+			if (audioDeviceName && allAvailableGpuResources.includes(audioDeviceName)) {
+				gpuDevices.push({
+					deviceName: audioDeviceName,
+					name: `gpu${i}-audio`
+				});
 			}
-		];
+		}
+		return gpuDevices;
 	}
 
 	// Derived submission values (proper VirtualMachine structure)
 	const submissionValues = $derived.by(() => {
-		const { disks, volumes, isContainerDisk } = buildDisksAndVolumes();
+		const { disks, volumes, dataVolumeTemplates } = buildVmStorage();
+		const gpus = buildGpuDevices();
 
-		// Build devices object with disks and interfaces
-		const devices: any = {
+		const devices = {
 			disks,
-			interfaces: [{ name: 'nic1', bridge: {} }]
+			interfaces: [{ name: 'nic1', bridge: {} }],
+			...(gpus ? { gpus } : {})
 		};
-
-		// Add GPUs if selected
-		if (
-			gpuPassthroughConfig.selectedResource &&
-			typeof gpuPassthroughConfig.selectedResource === 'string' &&
-			gpuPassthroughConfig.selectedResource !== ''
-		) {
-			const gpuDevices: any[] = [];
-			const gpuCount = Math.max(1, parseInt(gpuPassthroughConfig.gpuCount) || 1);
-
-			// Find corresponding AUDIO device prefix
-			const match = gpuPassthroughConfig.selectedResource.match(/nvidia\.com\/([A-Z0-9-]+)_/);
-			const audioDeviceName = match
-				? `nvidia.com/${match[1]}_HIGH_DEFINITION_AUDIO_CONTROLLER`
-				: null;
-
-			// Add GPU devices based on count
-			for (let i = 1; i <= gpuCount; i++) {
-				gpuDevices.push({
-					deviceName: gpuPassthroughConfig.selectedResource,
-					name: `gpu${i}`
-				});
-
-				// Add corresponding AUDIO device if available
-				if (audioDeviceName && allAvailableGpuResources.includes(audioDeviceName)) {
-					gpuDevices.push({
-						deviceName: audioDeviceName,
-						name: `gpu${i}-audio`
-					});
-				}
-			}
-
-			devices.gpus = gpuDevices;
-		}
 
 		return {
 			apiVersion: group ? `${group}/${version}` : version,
@@ -235,22 +217,16 @@
 			spec: {
 				runStrategy: 'Halted',
 				instancetype: values.spec.instancetype,
-				...(isContainerDisk ? {} : { dataVolumeTemplates: buildDataVolumeTemplates() }),
+				...(dataVolumeTemplates.length ? { dataVolumeTemplates } : {}),
 				template: {
 					metadata: {
-						labels: {
-							'kubevirt.io/vm': values.metadata.name
-						}
+						labels: { 'kubevirt.io/vm': values.metadata.name }
 					},
 					spec: {
-						...(nodeSelector.node &&
-						typeof nodeSelector.node === 'string' &&
-						nodeSelector.node !== ''
+						...(nodeSelector.node
 							? { nodeSelector: { 'kubernetes.io/hostname': nodeSelector.node } }
 							: {}),
-						domain: {
-							devices
-						},
+						domain: { devices },
 						networks: [{ name: 'nic1', pod: {} }],
 						volumes
 					}
@@ -271,8 +247,15 @@
 	function handlePrevious() {
 		currentStep = steps[Math.max(currentIndex - 1, 0)];
 	}
-	function reset() {
+	async function initiate() {
+		values = getInitialValues();
+		gpuPassthroughConfig = getInitialGpuPassthroughConfig();
+		nodeSelector = getInitialNodeSelector();
+		allAvailableGpuResources = [];
+		gpuResourceQuantities.clear();
 		currentStep = firstStep;
+		isSubmitting = false;
+		allAvailableGpuResources = await fetchAllGpuResources();
 	}
 
 	function formatMemory(quantity: string): string {
@@ -294,31 +277,28 @@
 		search: string
 	): Promise<{ label: string; value: string }[]> {
 		try {
-			const itKind = values.spec.instancetype.kind as string;
-			if (typeof itKind !== 'string' || !itKind) return [];
+			const itKind = values.spec.instancetype.kind;
+			if (!itKind) return [];
 			const isClusterScoped = itKind === 'VirtualMachineClusterInstancetype';
-			const listRequest: any = {
+			const response = await resourceClient.list({
 				cluster,
 				group: 'instancetype.kubevirt.io',
 				version: 'v1beta1',
 				resource: isClusterScoped
 					? 'virtualmachineclusterinstancetypes'
-					: 'virtualmachineinstancetypes'
-			};
-			if (!isClusterScoped) {
-				listRequest.namespace = namespace;
-			}
-			const response = await resourceClient.list(listRequest);
+					: 'virtualmachineinstancetypes',
+				...(isClusterScoped ? {} : { namespace })
+			});
 			return response.items
-				.map((item: any) => {
-					const obj = item.object as any;
-					const name = obj?.metadata?.name as string;
+				.map((item) => {
+					const obj = item.object as InstancetypeKubevirtIoV1Beta1VirtualMachineInstancetype;
+					const name = obj?.metadata?.name ?? '';
 					if (!name || !name.toLowerCase().includes(search.toLowerCase())) return null;
 					const cpuCores = obj?.spec?.cpu?.guest;
 					const memoryRaw = obj?.spec?.memory?.guest;
 					const specs: string[] = [];
 					if (cpuCores) specs.push(`CPU: ${cpuCores} Core`);
-					if (memoryRaw) specs.push(`RAM: ${formatMemory(memoryRaw)}`);
+					if (memoryRaw) specs.push(`RAM: ${formatMemory(String(memoryRaw))}`);
 					const label = specs.length ? `${name} (${specs.join(' , ')})` : name;
 					return { label, value: name };
 				})
@@ -333,8 +313,9 @@
 	const EXCLUDED_BOOT_DV_SOURCES = ['blank', 'pvc'];
 	const EXCLUDED_ADDITIONAL_DV_SOURCES = ['http', 'pvc'];
 
-	async function fetchBootDataVolumesAsEnumerations(
-		search: string
+	async function fetchDataVolumesAsEnumerations(
+		search: string,
+		excludedSources: string[]
 	): Promise<{ label: string; value: string }[]> {
 		try {
 			const response = await resourceClient.list({
@@ -345,47 +326,19 @@
 				resource: 'datavolumes'
 			});
 			return response.items
-				.filter((item: any) => {
-					const source = (item.object as any)?.spec?.source;
-					return source && !EXCLUDED_BOOT_DV_SOURCES.some((key) => source[key] != null);
+				.filter((item) => {
+					const source = (item.object as CdiKubevirtIoV1Beta1DataVolume)?.spec?.source as
+						| Record<string, unknown>
+						| undefined;
+					return source && !excludedSources.some((key) => source[key] != null);
 				})
-				.map((item: any) => (item.object as any)?.metadata?.name as string)
-				.filter((name: string) => name && name.toLowerCase().includes(search.toLowerCase()))
-				.map((name: string) => ({ label: name, value: name }));
+				.map((item) => (item.object as CdiKubevirtIoV1Beta1DataVolume)?.metadata?.name ?? '')
+				.filter((name) => name && name.toLowerCase().includes(search.toLowerCase()))
+				.map((name) => ({ label: name, value: name }));
 		} catch (error) {
-			console.error('Error fetching boot data volumes:', error);
+			console.error('Error fetching data volumes:', error);
 			return [];
 		}
-	}
-
-	// Fetch additional DataVolumes (exclude http and pvc/clone sources)
-	async function fetchAdditionalDataVolumesAsEnumerations(
-		search: string
-	): Promise<{ label: string; value: string }[]> {
-		try {
-			const response = await resourceClient.list({
-				cluster,
-				namespace,
-				group: 'cdi.kubevirt.io',
-				version: 'v1beta1',
-				resource: 'datavolumes'
-			});
-			return response.items
-				.filter((item: any) => {
-					const source = (item.object as any)?.spec?.source;
-					return source && !EXCLUDED_ADDITIONAL_DV_SOURCES.some((key) => source[key] != null);
-				})
-				.map((item: any) => (item.object as any)?.metadata?.name as string)
-				.filter((name: string) => name && name.toLowerCase().includes(search.toLowerCase()))
-				.map((name: string) => ({ label: name, value: name }));
-		} catch (error) {
-			console.error('Error fetching additional data volumes:', error);
-			return [];
-		}
-	}
-
-	async function fetchNodesWithVmxLabel(): Promise<any[]> {
-		return gpuNodeUtils.fetchNodesWithVmxLabel(resourceClient, cluster);
 	}
 
 	async function fetchAllGpuResources(): Promise<string[]> {
@@ -418,7 +371,7 @@
 			let gpuResourcesList: string[];
 
 			// If a node is selected in step 6, fetch GPU resources only for that node
-			if (nodeSelector.node && typeof nodeSelector.node === 'string' && nodeSelector.node !== '') {
+			if (nodeSelector.node) {
 				gpuResourcesList = await fetchGpuResourcesForNode(nodeSelector.node);
 			} else {
 				// Otherwise, use all available GPU resources from nodes with GPU passthrough support
@@ -443,13 +396,7 @@
 
 	// Get maximum GPU count for the selected resource
 	function getMaxGpuCount(): number {
-		if (
-			!gpuPassthroughConfig.selectedResource ||
-			typeof gpuPassthroughConfig.selectedResource !== 'string' ||
-			gpuPassthroughConfig.selectedResource === ''
-		) {
-			return 0;
-		}
+		if (!gpuPassthroughConfig.selectedResource) return 0;
 
 		const quantity = gpuResourceQuantities.get(gpuPassthroughConfig.selectedResource);
 		return quantity ? Math.max(1, quantity) : 1;
@@ -460,11 +407,11 @@
 		search: string
 	): Promise<{ label: string; value: string }[]> {
 		try {
-			const nodes = await fetchNodesWithVmxLabel();
+			const nodes = await gpuNodeUtils.fetchNodesWithVmxLabel(resourceClient, cluster);
 			const nodeOptions = nodes
-				.map((item: any) => (item.object as any)?.metadata?.name as string)
-				.filter((name: string) => name && name.toLowerCase().includes(search.toLowerCase()))
-				.map((name: string) => ({ label: name, value: name }));
+				.map((item) => (item.object as CoreV1Node)?.metadata?.name ?? '')
+				.filter((name) => name && name.toLowerCase().includes(search.toLowerCase()))
+				.map((name) => ({ label: name, value: name }));
 
 			// Add empty option at the beginning
 			return [{ label: 'No selection', value: '' }, ...nodeOptions];
@@ -478,27 +425,25 @@
 	let allAvailableGpuResources: string[] = $state([]);
 
 	// Cache for GPU resource quantities per node
-	let gpuResourceQuantities: Map<string, number> = $state(new Map());
+	let gpuResourceQuantities = new SvelteMap<string, number>();
 
 	// Container for GPU passthrough selection
-	let gpuPassthroughConfig: any = $state({
-		selectedResource: '',
-		gpuCount: '1'
-	});
+	let gpuPassthroughConfig = $state(getInitialGpuPassthroughConfig());
 
 	// Container for Node selection
-	let nodeSelector: any = $state({
-		node: ''
-	});
+	let nodeSelector = $state(getInitialNodeSelector());
 
-	// Load available GPU resources when dialog opens
-	$effect(() => {
-		if (open) {
-			fetchAllGpuResources().then((resources) => {
-				allAvailableGpuResources = resources;
-			});
-		}
-	});
+	function getInitialGpuPassthroughConfig() {
+		return {
+			selectedResource: '',
+			gpuCount: '1'
+		};
+	}
+	function getInitialNodeSelector() {
+		return {
+			node: ''
+		};
+	}
 
 	// Update GPU count when selected resource changes
 	$effect(() => {
@@ -537,9 +482,9 @@
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
-		if (!isOpen) {
-			reset();
-		}
+		if (isOpen) return;
+
+		initiate();
 	}}
 >
 	{#if showTrigger}
@@ -569,7 +514,7 @@
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
-						...(lodash.get(jsonSchema, 'properties.metadata.properties.name') ?? {
+						...((lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema) ?? {
 							type: 'string'
 						}),
 						title: 'Name'
@@ -600,9 +545,9 @@
 			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
-						...lodash.get(jsonSchema, 'properties.spec.properties.instancetype.properties.kind', {
+						...(lodash.get(jsonSchema, 'properties.spec.properties.instancetype.properties.kind', {
 							type: 'string'
-						}),
+						}) as Schema),
 						title: 'Instance Type Kind',
 						enum: ['VirtualMachineInstancetype', 'VirtualMachineClusterInstancetype']
 					} as Schema}
@@ -642,9 +587,9 @@
 			<Tabs.Content value={steps[2]}>
 				<Form
 					schema={{
-						...lodash.get(jsonSchema, 'properties.spec.properties.instancetype.properties.name', {
+						...(lodash.get(jsonSchema, 'properties.spec.properties.instancetype.properties.name', {
 							type: 'string'
-						}),
+						}) as Schema),
 						title: 'Instance Type'
 					} as Schema}
 					uiSchema={{
@@ -772,7 +717,8 @@
 										selectWidget: ComboboxWidget
 									},
 									'ui:options': {
-										TailoredComboboxEnumerations: fetchAdditionalDataVolumesAsEnumerations,
+										TailoredComboboxEnumerations: (s: string) =>
+											fetchDataVolumesAsEnumerations(s, EXCLUDED_ADDITIONAL_DV_SOURCES),
 										TailoredComboboxVisibility: 10,
 										TailoredComboboxInput: {
 											placeholder: 'Select DataVolume'
@@ -836,7 +782,8 @@
 									selectWidget: ComboboxWidget
 								},
 								'ui:options': {
-									TailoredComboboxEnumerations: fetchBootDataVolumesAsEnumerations,
+									TailoredComboboxEnumerations: (s: string) =>
+										fetchDataVolumesAsEnumerations(s, EXCLUDED_BOOT_DV_SOURCES),
 									TailoredComboboxVisibility: 10,
 									TailoredComboboxInput: {
 										placeholder: 'Select Boot DataVolume'
@@ -857,7 +804,8 @@
 										selectWidget: ComboboxWidget
 									},
 									'ui:options': {
-										TailoredComboboxEnumerations: fetchAdditionalDataVolumesAsEnumerations,
+										TailoredComboboxEnumerations: (s: string) =>
+											fetchDataVolumesAsEnumerations(s, EXCLUDED_ADDITIONAL_DV_SOURCES),
 										TailoredComboboxVisibility: 10,
 										TailoredComboboxInput: {
 											placeholder: 'Select DataVolume'

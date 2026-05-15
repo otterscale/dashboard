@@ -8,7 +8,8 @@
 	import ChevronLeft from '@lucide/svelte/icons/chevron-left';
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import File from '@lucide/svelte/icons/file';
-	import { ResourceService } from '@otterscale/api/resource/v1';
+	import { ResourceService, type SchemaRequest } from '@otterscale/api/resource/v1';
+	import type { Schema } from '@sjsf/form';
 	import {
 		type ColumnDef,
 		getCoreRowModel,
@@ -54,6 +55,24 @@
 	let servicePorts: ArrayOfObjectItemsType = $state([]);
 	let portsCount = $derived(servicePorts.length);
 
+	// Service JSON Schema (shared by create/update dialogs)
+	let jsonSchema: Schema = $state({});
+
+	async function fetchSchema() {
+		try {
+			const schemaResponse = await resourceClient.schema({
+				cluster: cluster,
+				group: '',
+				version: 'v1',
+				kind: 'Service'
+			} as SchemaRequest);
+
+			jsonSchema = (schemaResponse.schema ?? {}) as Schema;
+		} catch (error) {
+			console.error('Failed to fetch Service schema:', error);
+		}
+	}
+
 	async function fetchService() {
 		try {
 			const response = await resourceClient.list({
@@ -87,6 +106,7 @@
 	}
 
 	onMount(() => {
+		fetchSchema();
 		fetchService();
 	});
 
@@ -285,6 +305,7 @@
 	{cluster}
 	namespace={vmNamespace}
 	{vmName}
+	schema={jsonSchema}
 	bind:open={createOpen}
 	onsuccess={() => {
 		fetchService();
@@ -298,6 +319,7 @@
 		namespace={vmNamespace}
 		{vmName}
 		{service}
+		schema={jsonSchema}
 		bind:open={updateOpen}
 		onsuccess={() => {
 			fetchService();
