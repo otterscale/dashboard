@@ -40,6 +40,7 @@
 	import { cn } from '$lib/utils';
 
 	let {
+		reference = $bindable<FormState<FormValue> | null>(null),
 		schema,
 		initialValue,
 		uiSchema,
@@ -50,6 +51,7 @@
 		onFormChange,
 		class: className
 	}: {
+		reference?: FormState<FormValue> | null;
 		schema: Schema;
 		initialValue: FormValue;
 		uiSchema?: UiSchemaRoot;
@@ -63,6 +65,7 @@
 		onFormChange?: (snapshot: FormState<FormValue>) => void;
 		class?: string;
 	} = $props();
+
 	// Clean schema from unnecessary keywords to JSON Schema Draft-07.
 	function transfer(value: FormValue): FormValue {
 		let temporaryValue = value;
@@ -72,26 +75,28 @@
 		setValue(form, temporaryValue);
 		return getValueSnapshot(form);
 	}
+
 	const extraUiOptions = chain(
 		fromRecord({
 			useLabel: false,
 			layouts: {
 				field: {
-					class: '*:data-[slot=field-description]:line-clamp-1'
+					class: '*:data-[slot=field-description]:line-clamp-2'
 				},
 				'field-meta': {
-					class: '*:data-[slot=field-description]:line-clamp-1'
+					class: '*:data-[slot=field-description]:line-clamp-2'
 				},
 				'array-field': {
 					class: '*:data-[slot=field-description]:line-clamp-2'
 				},
 				'object-field': {
-					class: '*:data-[slot=field-description]:line-clamp-3'
+					class: '*:data-[slot=field-description]:line-clamp-2'
 				}
 			}
 		}),
 		fromFactories({})
 	);
+
 	const theme = overrideByRecord(defaults.theme, {
 		// Fields
 		objectPropertyField: ObjectPropertyField,
@@ -102,6 +107,7 @@
 		objectPropertyTemplate: ObjectPropertyTemplate,
 		objectTemplate: ObjectTemplate
 	});
+
 	let validationResult: ValidationResult<FormValue> | null = $state(null);
 	function validator(options: ValidatorFactoryOptions) {
 		const validator = defaults.validator<FormValue>(options);
@@ -132,6 +138,7 @@
 			}
 		} satisfies FormValueValidator<FormValue>;
 	}
+
 	function onSubmit() {
 		handleSubmit?.prehook?.(form);
 		values = getValueSnapshot(form);
@@ -144,17 +151,21 @@
 	) {
 		if (result.errors.length > 0) createFocusOnFirstError()(result, event, form);
 	}
+
 	const form = createForm<FormValue>({
 		...defaults,
 		theme,
 		extraUiOptions,
 		schema,
 		uiSchema,
-		initialValue,
+		get initialValue() {
+			return initialValue;
+		},
 		validator,
 		onSubmit,
 		onSubmitError
 	});
+	reference = form;
 	// YAML
 	// Reorder attributes in YAML editor to match the form schema, making it more intuitive for users to find and edit values.
 	// This is achieved by creating a new object based on the form schema and populating it with values from the current form state, ensuring that the order of attributes in the YAML editor reflects the structure defined in the form schema.
@@ -207,7 +218,7 @@
 <div class={cn('h-full', className)}>
 	<Tabs.Root bind:value={mode} class="h-full">
 		<!-- Mode Switcher -->
-		<ButtonGroup.Root class="ml-auto" data-slot="dynamic-form-mode-controller">
+		<ButtonGroup.Root class="ml-auto hidden" data-slot="dynamic-form-mode-controller">
 			<Button
 				variant="ghost"
 				size="icon-sm"
