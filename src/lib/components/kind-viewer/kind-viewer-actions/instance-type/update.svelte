@@ -121,7 +121,10 @@
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
-						...(lodash.get(jsonSchema, 'properties.spec.properties.cpu.properties.guest') as Schema),
+						...(lodash.get(
+							jsonSchema,
+							'properties.spec.properties.cpu.properties.guest'
+						) as Schema),
 						title: 'CPU'
 					} as Schema}
 					uiSchema={{
@@ -151,7 +154,10 @@
 				<Form
 					schema={{
 						...lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.memory.properties.guest') as Schema,
+							lodash.get(
+								jsonSchema,
+								'properties.spec.properties.memory.properties.guest'
+							) as Schema,
 							'anyOf'
 						),
 						type: 'string',

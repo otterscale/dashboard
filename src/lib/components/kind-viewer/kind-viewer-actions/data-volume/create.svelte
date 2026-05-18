@@ -326,7 +326,7 @@
 			</Tabs.Content>
 			<!-- Step 3: Source Details -->
 			<Tabs.Content value={steps[2]}>
-				{#if sourceType === 'blank' /* || sourceType === 'upload' */}
+				{#if sourceType === 'blank'}
 					<div class="flex min-h-[50vh] flex-col gap-3">
 						<div class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
 							{#if sourceType === 'blank'}

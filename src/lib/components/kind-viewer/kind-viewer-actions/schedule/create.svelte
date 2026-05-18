@@ -126,10 +126,7 @@
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
-						...lodash.omit(
-							lodash.get(jsonSchema, 'properties.metadata') as Schema,
-							'properties'
-						),
+						...lodash.omit(lodash.get(jsonSchema, 'properties.metadata') as Schema, 'properties'),
 						title: 'Metadata',
 						properties: {
 							name: {
@@ -281,9 +278,9 @@
 					schema={{
 						title: 'Container',
 						type: 'object',
-						required: (
-							lodash.get(jsonSchema, 'properties.spec.required', []) as string[]
-						).filter((f) => ['name', 'image', 'cronSchedule'].includes(f)),
+						required: (lodash.get(jsonSchema, 'properties.spec.required', []) as string[]).filter(
+							(f) => ['name', 'image', 'cronSchedule'].includes(f)
+						),
 						properties: {
 							name: {
 								...(lodash.get(jsonSchema, 'properties.spec.properties.name') as Schema),
@@ -396,10 +393,7 @@
 								title: 'GPU'
 							},
 							resourcesGpumem: {
-								...(lodash.get(
-									jsonSchema,
-									'properties.spec.properties.resourcesGpumem'
-								) as Schema),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.resourcesGpumem') as Schema),
 								title: 'GPU Memory'
 							}
 						}

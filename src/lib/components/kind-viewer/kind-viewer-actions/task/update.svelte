@@ -278,9 +278,9 @@
 					schema={{
 						title: 'Container',
 						type: 'object',
-						required: (
-							lodash.get(jsonSchema, 'properties.spec.required', []) as string[]
-						).filter((f) => ['name', 'image'].includes(f)),
+						required: (lodash.get(jsonSchema, 'properties.spec.required', []) as string[]).filter(
+							(f) => ['name', 'image'].includes(f)
+						),
 						properties: {
 							name: {
 								...(lodash.get(jsonSchema, 'properties.spec.properties.name') as Schema),
@@ -391,10 +391,7 @@
 								title: 'GPU'
 							},
 							resourcesGpumem: {
-								...(lodash.get(
-									jsonSchema,
-									'properties.spec.properties.resourcesGpumem'
-								) as Schema),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.resourcesGpumem') as Schema),
 								title: 'GPU Memory'
 							}
 						}

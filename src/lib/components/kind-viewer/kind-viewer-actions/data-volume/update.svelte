@@ -327,7 +327,7 @@
 			</Tabs.Content>
 			<!-- Step 2: Source Details -->
 			<Tabs.Content value={steps[1]}>
-				{#if sourceType === 'blank' /* || sourceType === 'upload' */}
+				{#if sourceType === 'blank'}
 					<div class="flex min-h-[50vh] flex-col gap-3">
 						<div class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
 							{#if sourceType === 'blank'}
@@ -544,10 +544,7 @@
 					<Form
 						schema={{
 							...lodash.omit(
-								lodash.get(
-									jsonSchema,
-									'properties.spec.properties.source.properties.s3'
-								) as Schema,
+								lodash.get(jsonSchema, 'properties.spec.properties.source.properties.s3') as Schema,
 								'properties'
 							),
 							properties: {
