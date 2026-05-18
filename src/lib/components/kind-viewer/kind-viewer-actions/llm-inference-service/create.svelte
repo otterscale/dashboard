@@ -72,6 +72,12 @@
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
+
+	function extractBucketName(uri: string): string {
+		const match = uri.match(/^\/\/([^/]+)/);
+		return match ? match[1] : uri.replace(/^s3:\/\//, '').split('/')[0];
+	}
+
 	function handleNext() {
 		currentStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
 	}
@@ -332,6 +338,21 @@
 												lodash.get(response.object, ['spec', 'model'])
 											);
 
+											const newModelUri = lodash.get(
+												response.object,
+												['spec', 'model', 'uri'],
+												''
+											) as string;
+											if (newModelUri.startsWith('s3://')) {
+												lodash.set(
+													values,
+													['spec', 'template', 'serviceAccountName'],
+													extractBucketName(newModelUri)
+												);
+											} else {
+												lodash.unset(values, ['spec', 'template', 'serviceAccountName']);
+											}
+
 											handleNext();
 										}
 									}}
@@ -540,6 +561,21 @@
 												['spec', 'model'],
 												lodash.get(response.object, ['spec', 'model'])
 											);
+
+											const newModelUri = lodash.get(
+												response.object,
+												['spec', 'model', 'uri'],
+												''
+											) as string;
+											if (newModelUri.startsWith('s3://')) {
+												lodash.set(
+													values,
+													['spec', 'template', 'serviceAccountName'],
+													extractBucketName(newModelUri)
+												);
+											} else {
+												lodash.unset(values, ['spec', 'template', 'serviceAccountName']);
+											}
 
 											handleNext();
 										}

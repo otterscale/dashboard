@@ -277,6 +277,7 @@
 								}
 
 								const name = lodash.get(values, 'metadata.name');
+								const bucketName = lodash.get(values, 'spec.bucketName');
 
 								toast.promise(
 									async () => {
@@ -289,6 +290,44 @@
 											version,
 											resource,
 											manifest
+										});
+
+										const obcResponse = await resourceClient.get({
+											cluster,
+											namespace,
+											group,
+											version,
+											resource,
+											name
+										});
+										const obcUid = lodash.get(obcResponse.object, 'metadata.uid') as string;
+
+										const serviceAccountYaml = stringify({
+											apiVersion: 'v1',
+											kind: 'ServiceAccount',
+											metadata: {
+												name: bucketName,
+												namespace: namespace,
+												ownerReferences: [
+													{
+														apiVersion: `${group}/${version}`,
+														kind: 'ObjectBucketClaim',
+														name: name,
+														uid: obcUid,
+														blockOwnerDeletion: true
+													}
+												]
+											},
+											secrets: [{ name: name }]
+										});
+
+										await resourceClient.create({
+											cluster,
+											namespace,
+											group: '',
+											version: 'v1',
+											resource: 'serviceaccounts',
+											manifest: new TextEncoder().encode(serviceAccountYaml)
 										});
 									},
 									{
