@@ -2,6 +2,7 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { FormIcon } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
+	import type { InstancetypeKubevirtIoV1Beta1VirtualMachineInstancetype } from '@otterscale/types';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
@@ -30,8 +31,8 @@
 		resource,
 		onOpenChangeComplete
 	}: {
-		schema: any;
-		object: any;
+		schema: Schema;
+		object: InstancetypeKubevirtIoV1Beta1VirtualMachineInstancetype;
 		cluster: string;
 		group: string;
 		version: string;
@@ -43,26 +44,28 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	// Extract existing values from object
-	const existingNamespace = lodash.get(object, 'metadata.namespace', '');
-	const existingName = lodash.get(object, 'metadata.name', '');
-	const existingCpuGuest = lodash.get(object, 'spec.cpu.guest', 1);
-	const existingMemoryGuest = lodash.get(object, 'spec.memory.guest', '1Gi');
+	const existingNamespace = $derived(object.metadata?.namespace ?? '');
+	const existingCpuGuest = $derived(object.spec?.cpu?.guest ?? 1);
+	const existingMemoryGuest = $derived(String(object.spec?.memory?.guest ?? '1Gi'));
 
 	// Container for Data
-	let values: any = $state({
-		apiVersion: group ? `${group}/${version}` : version,
-		kind,
-		metadata: {
-			name: existingName,
-			namespace: existingNamespace
-		},
-		spec: {
-			cpu: { guest: existingCpuGuest },
-			memory: { guest: existingMemoryGuest }
-		}
-	});
+	let values = $state(getInitialValues());
 	let value = $derived(stringify(values));
+
+	function getInitialValues() {
+		return {
+			apiVersion: group ? `${group}/${version}` : version,
+			kind,
+			metadata: {
+				name: object.metadata?.name ?? '',
+				namespace: existingNamespace
+			},
+			spec: {
+				cpu: { guest: existingCpuGuest as number },
+				memory: { guest: existingMemoryGuest }
+			}
+		};
+	}
 
 	// Steps Manager
 	const steps = Array.from({ length: 3 }, (_, index) => String(index + 1));
@@ -118,7 +121,10 @@
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
-						...lodash.get(jsonSchema, 'properties.spec.properties.cpu.properties.guest'),
+						...(lodash.get(
+							jsonSchema,
+							'properties.spec.properties.cpu.properties.guest'
+						) as Schema),
 						title: 'CPU'
 					} as Schema}
 					uiSchema={{
@@ -148,7 +154,10 @@
 				<Form
 					schema={{
 						...lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.memory.properties.guest'),
+							lodash.get(
+								jsonSchema,
+								'properties.spec.properties.memory.properties.guest'
+							) as Schema,
 							'anyOf'
 						),
 						type: 'string',

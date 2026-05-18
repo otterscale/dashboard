@@ -9,6 +9,7 @@
 	import ChevronRight from '@lucide/svelte/icons/chevron-right';
 	import File from '@lucide/svelte/icons/file';
 	import { ResourceService, type SchemaRequest } from '@otterscale/api/resource/v1';
+	import type { CoreV1Service } from '@otterscale/types';
 	import type { Schema } from '@sjsf/form';
 	import {
 		type ColumnDef,
@@ -51,7 +52,7 @@
 	const resourceClient = createClient(ResourceService, transport);
 
 	// Service data
-	let service: any = $state(null);
+	let service: CoreV1Service | null = $state(null);
 	let servicePorts: ArrayOfObjectItemsType = $state([]);
 	let portsCount = $derived(servicePorts.length);
 
@@ -87,9 +88,9 @@
 			const matchedService = response.items[0] ?? null;
 
 			if (matchedService) {
-				service = matchedService.object;
-				const ports = (service as any)?.spec?.ports ?? [];
-				servicePorts = ports.map((p: any) => ({
+				service = matchedService.object as CoreV1Service;
+				const ports = service.spec?.ports ?? [];
+				servicePorts = ports.map((p) => ({
 					title: p.name ?? `${p.port}`,
 					description: `${p.port}${p.nodePort ? `:${p.nodePort}` : ''}/${p.protocol ?? 'TCP'}`,
 					raw: p as JsonObject

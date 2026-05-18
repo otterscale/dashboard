@@ -2,6 +2,7 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { ResourceService } from '@otterscale/api/resource/v1';
+	import type { RbacAuthorizationK8SIoV1ClusterRole } from '@otterscale/types';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
@@ -32,7 +33,7 @@
 		showTrigger = true,
 		onsuccess
 	}: {
-		schema: any;
+		schema: Schema;
 		cluster: string;
 		group: string;
 		version: string;
@@ -47,15 +48,22 @@
 	const resourceClient = createClient(ResourceService, transport);
 
 	// Container for Data.
-	let values: any = $state({
-		apiVersion: group ? `${group}/${version}` : version,
-		kind,
-		metadata: { name: {} },
-		roleRef: { name: {} },
-		subjectKind: {},
-		subjects: {},
-		serviceAccount: {}
-	});
+	let values = $state(getInitialValues());
+
+	function getInitialValues() {
+		return {
+			apiVersion: group ? `${group}/${version}` : version,
+			kind,
+			metadata: { name: '' as string },
+			roleRef: { name: '' as string },
+			subjectKind: 'User' as string,
+			subjects: '' as string,
+			serviceAccount: {
+				name: '' as string,
+				namespace: '' as string
+			}
+		};
+	}
 
 	// Derived submission values (proper ClusterRoleBinding structure)
 	const submissionValues = $derived.by(() => {
@@ -129,9 +137,11 @@
 						resource: 'clusterroles'
 					});
 					const roles = response.items
-						.map((item: any) => (item.object as any)?.metadata?.name as string)
-						.filter((name: string) => name && name.toLowerCase().startsWith(search.toLowerCase()));
-					resolve(roles.map((name: string) => ({ label: name, value: name })));
+						.map(
+							(item) => (item.object as RbacAuthorizationK8SIoV1ClusterRole)?.metadata?.name ?? ''
+						)
+						.filter((name) => name && name.toLowerCase().startsWith(search.toLowerCase()));
+					resolve(roles.map((name) => ({ label: name, value: name })));
 				} catch (error) {
 					console.error('Error fetching cluster roles:', error);
 					resolve([]);
@@ -220,7 +230,7 @@
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
-						...(lodash.get(jsonSchema, 'properties.metadata.properties.name') ?? {
+						...((lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema) ?? {
 							type: 'string'
 						}),
 						title: 'Name'

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
+	import type { CdiKubevirtIoV1Beta1DataVolume } from '@otterscale/types';
+	import type { Schema } from '@sjsf/form';
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
@@ -19,8 +21,8 @@
 		kind,
 		resource
 	}: {
-		schema: any;
-		object: any;
+		schema: Schema;
+		object: CdiKubevirtIoV1Beta1DataVolume;
 		cluster: string;
 		namespace: string;
 		group: string;
