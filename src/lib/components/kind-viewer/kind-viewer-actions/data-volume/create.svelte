@@ -2,6 +2,11 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { ExternalLink, Plus } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
+	import type {
+		CoreV1Namespace,
+		CoreV1PersistentVolumeClaim,
+		StorageK8SIoV1StorageClass
+	} from '@otterscale/types';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
@@ -33,7 +38,7 @@
 		showTrigger = true,
 		onsuccess
 	}: {
-		schema: any;
+		schema: Schema;
 		cluster: string;
 		namespace: string;
 		group: string;
@@ -49,37 +54,41 @@
 	const resourceClient = createClient(ResourceService, transport);
 
 	// Container for Data
-	let values: any = $state({
-		apiVersion: group ? `${group}/${version}` : version,
-		kind,
-		metadata: { name: {} },
-		sourceType: 'blank',
-		// Storage config
-		storageSize: '10Gi',
-		spec: {
-			source: {
-				http: {},
-				registry: {},
-				pvc: {},
-				s3: {},
-				gcs: {}
-			},
-			pvc: {
-				accessModes: '',
-				storageClassName: '',
-				volumeMode: ''
+	let values = $state(getInitialValues());
+
+	function getInitialValues() {
+		return {
+			apiVersion: group ? `${group}/${version}` : version,
+			kind,
+			metadata: { name: '' as string },
+			sourceType: 'blank' as string,
+			// Storage config
+			storageSize: '10Gi' as string,
+			spec: {
+				source: {
+					http: {} as FormValue,
+					registry: {} as FormValue,
+					pvc: {} as { namespace?: string; name?: string },
+					s3: {} as FormValue,
+					gcs: {} as FormValue
+				},
+				pvc: {
+					accessModes: '' as string,
+					storageClassName: '' as string,
+					volumeMode: '' as string
+				}
 			}
-		}
-	});
+		};
+	}
 
 	// Build source object based on selected source type
-	function buildSource(): Record<string, any> {
-		const st = values.sourceType as string;
+	function buildSource(): Record<string, unknown> {
+		const st = values.sourceType;
 		switch (st) {
 			case 'blank':
 				return { blank: {} };
-			case 'upload':
-				return { upload: {} };
+			// case 'upload':
+			// 	return { upload: {} };
 			case 'http':
 				return { http: values.spec.source.http };
 			case 'registry':
@@ -142,9 +151,9 @@
 				resource: 'storageclasses'
 			});
 			const names = response.items
-				.map((item: any) => (item.object as any)?.metadata?.name as string)
-				.filter((name: string) => name && name.toLowerCase().includes(search.toLowerCase()));
-			return names.map((name: string) => ({ label: name, value: name }));
+				.map((item) => (item.object as StorageK8SIoV1StorageClass)?.metadata?.name ?? '')
+				.filter((name) => name && name.toLowerCase().includes(search.toLowerCase()));
+			return names.map((name) => ({ label: name, value: name }));
 		} catch (error) {
 			console.error('Error fetching storage classes:', error);
 			return [];
@@ -156,7 +165,7 @@
 		search: string
 	): Promise<{ label: string; value: string }[]> {
 		try {
-			const ns = (values.spec.source.pvc.namespace as string) || namespace;
+			const ns = values.spec.source.pvc.namespace || namespace;
 			const response = await resourceClient.list({
 				cluster,
 				namespace: ns,
@@ -165,9 +174,9 @@
 				resource: 'persistentvolumeclaims'
 			});
 			const names = response.items
-				.map((item: any) => (item.object as any)?.metadata?.name as string)
-				.filter((name: string) => name && name.toLowerCase().includes(search.toLowerCase()));
-			return names.map((name: string) => ({ label: name, value: name }));
+				.map((item) => (item.object as CoreV1PersistentVolumeClaim)?.metadata?.name ?? '')
+				.filter((name) => name && name.toLowerCase().includes(search.toLowerCase()));
+			return names.map((name) => ({ label: name, value: name }));
 		} catch (error) {
 			console.error('Error fetching PVCs:', error);
 			return [];
@@ -186,9 +195,9 @@
 				resource: 'namespaces'
 			});
 			const names = response.items
-				.map((item: any) => (item.object as any)?.metadata?.name as string)
-				.filter((name: string) => name && name.toLowerCase().includes(search.toLowerCase()));
-			return names.map((name: string) => ({ label: name, value: name }));
+				.map((item) => (item.object as CoreV1Namespace)?.metadata?.name ?? '')
+				.filter((name) => name && name.toLowerCase().includes(search.toLowerCase()));
+			return names.map((name) => ({ label: name, value: name }));
 		} catch (error) {
 			console.error('Error fetching namespaces:', error);
 			return [];
@@ -199,7 +208,7 @@
 	let isSubmitting = $state(false);
 
 	// Reactive source type for conditional rendering
-	const sourceType = $derived(values.sourceType as string);
+	const sourceType = $derived(values.sourceType);
 </script>
 
 {#snippet externalLink()}
@@ -248,7 +257,7 @@
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
-						...(lodash.get(jsonSchema, 'properties.metadata.properties.name') ?? {
+						...((lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema) ?? {
 							type: 'string'
 						}),
 						title: 'Name'
@@ -281,7 +290,7 @@
 					schema={{
 						type: 'string',
 						title: 'Source Type',
-						enum: ['blank', 'http', 'registry', 'pvc', 's3', 'gcs', 'upload']
+						enum: ['blank', 'http', 'registry', 'pvc', 's3', 'gcs' /*, 'upload'*/]
 					} as Schema}
 					uiSchema={{
 						'ui:components': {
@@ -317,14 +326,16 @@
 			</Tabs.Content>
 			<!-- Step 3: Source Details -->
 			<Tabs.Content value={steps[2]}>
-				{#if sourceType === 'blank' || sourceType === 'upload'}
+				{#if sourceType === 'blank' /* || sourceType === 'upload' */}
 					<div class="flex min-h-[50vh] flex-col gap-3">
 						<div class="flex flex-1 items-center justify-center text-sm text-muted-foreground">
 							{#if sourceType === 'blank'}
 								Empty volume — no source configuration needed.
+							{/if}
+							<!--
 							{:else}
 								Upload source selected — data will be uploaded after creation.
-							{/if}
+							-->
 						</div>
 						<div class="flex w-full items-center justify-between gap-3">
 							<Button
@@ -347,7 +358,10 @@
 					<Form
 						schema={{
 							...lodash.omit(
-								lodash.get(jsonSchema, 'properties.spec.properties.source.properties.http'),
+								lodash.get(
+									jsonSchema,
+									'properties.spec.properties.source.properties.http'
+								) as Schema,
 								'properties'
 							),
 							properties: {
@@ -355,7 +369,7 @@
 									lodash.get(
 										jsonSchema,
 										'properties.spec.properties.source.properties.http.properties'
-									),
+									) as Record<string, Schema>,
 									['url', 'secretRef', 'certConfigMap']
 								)
 							},
@@ -402,7 +416,10 @@
 					<Form
 						schema={{
 							...lodash.omit(
-								lodash.get(jsonSchema, 'properties.spec.properties.source.properties.registry'),
+								lodash.get(
+									jsonSchema,
+									'properties.spec.properties.source.properties.registry'
+								) as Schema,
 								'properties'
 							),
 							properties: {
@@ -410,7 +427,7 @@
 									lodash.get(
 										jsonSchema,
 										'properties.spec.properties.source.properties.registry.properties'
-									),
+									) as Record<string, Schema>,
 									['url', 'secretRef', 'pullMethod']
 								)
 							},
@@ -453,7 +470,10 @@
 					<Form
 						schema={{
 							...lodash.omit(
-								lodash.get(jsonSchema, 'properties.spec.properties.source.properties.pvc'),
+								lodash.get(
+									jsonSchema,
+									'properties.spec.properties.source.properties.pvc'
+								) as Schema,
 								'properties'
 							),
 							properties: {
@@ -461,7 +481,7 @@
 									lodash.get(
 										jsonSchema,
 										'properties.spec.properties.source.properties.pvc.properties'
-									),
+									) as Record<string, Schema>,
 									['name', 'namespace']
 								)
 							},
@@ -523,7 +543,7 @@
 					<Form
 						schema={{
 							...lodash.omit(
-								lodash.get(jsonSchema, 'properties.spec.properties.source.properties.s3'),
+								lodash.get(jsonSchema, 'properties.spec.properties.source.properties.s3') as Schema,
 								'properties'
 							),
 							properties: {
@@ -531,7 +551,7 @@
 									lodash.get(
 										jsonSchema,
 										'properties.spec.properties.source.properties.s3.properties'
-									),
+									) as Record<string, Schema>,
 									['url', 'secretRef']
 								)
 							},
@@ -569,7 +589,10 @@
 					<Form
 						schema={{
 							...lodash.omit(
-								lodash.get(jsonSchema, 'properties.spec.properties.source.properties.gcs'),
+								lodash.get(
+									jsonSchema,
+									'properties.spec.properties.source.properties.gcs'
+								) as Schema,
 								'properties'
 							),
 							properties: {
@@ -577,7 +600,7 @@
 									lodash.get(
 										jsonSchema,
 										'properties.spec.properties.source.properties.gcs.properties'
-									),
+									) as Record<string, Schema>,
 									['url', 'secretRef']
 								)
 							},
@@ -621,7 +644,7 @@
 							lodash.get(
 								jsonSchema,
 								'properties.spec.properties.pvc.properties.resources.properties.requests'
-							),
+							) as Schema,
 							'anyOf'
 						),
 						type: 'string',
@@ -660,25 +683,34 @@
 			<Tabs.Content value={steps[4]}>
 				<Form
 					schema={{
-						...lodash.omit(lodash.get(jsonSchema, 'properties.spec.properties.pvc'), 'properties'),
+						...lodash.omit(
+							lodash.get(jsonSchema, 'properties.spec.properties.pvc') as Schema,
+							'properties'
+						),
 						title: 'Storage',
 						properties: {
 							accessModes: {
 								...lodash.omit(
-									lodash.get(jsonSchema, 'properties.spec.properties.pvc.properties.accessModes'),
+									lodash.get(
+										jsonSchema,
+										'properties.spec.properties.pvc.properties.accessModes'
+									) as Schema,
 									['items', 'type']
 								),
 								enum: ['ReadWriteOnce', 'ReadWriteMany', 'ReadOnlyMany'],
 								title: 'Access Modes'
 							},
 							storageClassName: {
-								...lodash.get(
+								...(lodash.get(
 									jsonSchema,
 									'properties.spec.properties.pvc.properties.storageClassName'
-								)
+								) as Schema)
 							},
 							volumeMode: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.pvc.properties.volumeMode'),
+								...(lodash.get(
+									jsonSchema,
+									'properties.spec.properties.pvc.properties.volumeMode'
+								) as Schema),
 								enum: ['Filesystem', 'Block'],
 								title: 'Volume Mode'
 							}

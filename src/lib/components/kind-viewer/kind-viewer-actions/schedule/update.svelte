@@ -35,10 +35,35 @@
 		version: string;
 		kind: string;
 		resource: string;
-		schema: any;
-		object: any;
+		schema: Schema;
+		object: ScheduleObject;
 		onOpenChangeComplete: () => void;
 	} = $props();
+
+	type ScheduleSpec = {
+		name?: string;
+		image?: string;
+		command?: string[];
+		args?: string[];
+		cronSchedule?: string;
+		containerPort?: number;
+		concurrencyPolicy?: string;
+		suspend?: boolean;
+		successfulJobsHistoryLimit?: number;
+		failedJobsHistoryLimit?: number;
+		restartPolicy?: string;
+		resourcesRequestsCpu?: string;
+		resourcesRequestsMemory?: string;
+		resourcesLimitsCpu?: string;
+		resourcesLimitsMemory?: string;
+		resourcesGpu?: string;
+		resourcesGpumem?: string;
+	};
+
+	type ScheduleObject = {
+		metadata?: { name?: string; namespace?: string; [k: string]: unknown };
+		spec?: ScheduleSpec;
+	};
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
@@ -61,27 +86,33 @@
 		'uid'
 	];
 
-	let values: any = $state({
-		apiVersion: group ? `${group}/${version}` : version,
-		kind,
-		metadata: object.metadata,
-		spec: {}
-	});
-	let settingsValues: any = $state({});
-	let specValues: any = $state({});
-	let resourceValues: any = $state({});
+	let values = $state(getInitialValues());
+	let settingsValues = $state<FormValue>({});
+	let specValues = $state<FormValue>({});
+	let resourceValues = $state<FormValue>({});
+
+	function getInitialValues() {
+		return {
+			apiVersion: group ? `${group}/${version}` : version,
+			kind,
+			metadata: (object.metadata ?? {}) as Record<string, unknown>,
+			spec: {} as Record<string, unknown>
+		};
+	}
 
 	$effect(() => {
-		values.spec = { ...settingsValues, ...specValues, ...resourceValues };
+		values.spec = {
+			...(settingsValues as Record<string, unknown>),
+			...(specValues as Record<string, unknown>),
+			...(resourceValues as Record<string, unknown>)
+		};
 	});
 
 	let value = $state('');
 	$effect(() => {
-		const filtered = lodash.cloneDeep(values);
-		if (filtered.metadata) {
-			for (const field of systemFields) {
-				delete filtered.metadata[field];
-			}
+		const filtered = lodash.cloneDeep(values) as typeof values & { status?: unknown };
+		for (const field of systemFields) {
+			delete filtered.metadata[field];
 		}
 		delete filtered.status;
 		value = stringify(filtered);
@@ -142,27 +173,36 @@
 				<Form
 					schema={{
 						title: 'Setting',
-						...lodash.omit(lodash.get(jsonSchema, 'properties.spec'), 'properties'),
+						...lodash.omit(lodash.get(jsonSchema, 'properties.spec') as Schema, 'properties'),
 						properties: {
 							concurrencyPolicy: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.concurrencyPolicy'),
+								...(lodash.get(
+									jsonSchema,
+									'properties.spec.properties.concurrencyPolicy'
+								) as Schema),
 								title: 'Concurrency Policy',
 								enum: ['Allow', 'Forbid', 'Replace']
 							},
 							suspend: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.suspend'),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.suspend') as Schema),
 								title: 'Suspend'
 							},
 							successfulJobsHistoryLimit: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.successfulJobsHistoryLimit'),
+								...(lodash.get(
+									jsonSchema,
+									'properties.spec.properties.successfulJobsHistoryLimit'
+								) as Schema),
 								title: 'Successful Jobs History Limit'
 							},
 							failedJobsHistoryLimit: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.failedJobsHistoryLimit'),
+								...(lodash.get(
+									jsonSchema,
+									'properties.spec.properties.failedJobsHistoryLimit'
+								) as Schema),
 								title: 'Failed Jobs History Limit'
 							},
 							restartPolicy: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.restartPolicy'),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.restartPolicy') as Schema),
 								title: 'Restart Policy',
 								enum: ['OnFailure', 'Never']
 							}
@@ -236,32 +276,32 @@
 					schema={{
 						title: 'Container',
 						type: 'object',
-						required: lodash
-							.get(jsonSchema, 'properties.spec.required', [])
-							.filter((f: string) => ['name', 'image', 'cronSchedule'].includes(f)),
+						required: (
+							lodash.get(jsonSchema, 'properties.spec.required', []) as string[]
+						).filter((f) => ['name', 'image', 'cronSchedule'].includes(f)),
 						properties: {
 							name: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.name'),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.name') as Schema),
 								title: 'Name'
 							},
 							image: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.image'),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.image') as Schema),
 								title: 'Image'
 							},
 							command: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.command'),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.command') as Schema),
 								title: 'Command'
 							},
 							args: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.args'),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.args') as Schema),
 								title: 'Arguments'
 							},
 							cronSchedule: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.cronSchedule'),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.cronSchedule') as Schema),
 								title: 'Cron Schedule'
 							},
 							containerPort: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.containerPort'),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.containerPort') as Schema),
 								title: 'Container Port'
 							}
 						}
@@ -322,27 +362,42 @@
 						type: 'object',
 						properties: {
 							resourcesRequestsCpu: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesRequestsCpu'),
+								...(lodash.get(
+									jsonSchema,
+									'properties.spec.properties.resourcesRequestsCpu'
+								) as Schema),
 								title: 'CPU Request'
 							},
 							resourcesRequestsMemory: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesRequestsMemory'),
+								...(lodash.get(
+									jsonSchema,
+									'properties.spec.properties.resourcesRequestsMemory'
+								) as Schema),
 								title: 'Memory Request'
 							},
 							resourcesLimitsCpu: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesLimitsCpu'),
+								...(lodash.get(
+									jsonSchema,
+									'properties.spec.properties.resourcesLimitsCpu'
+								) as Schema),
 								title: 'CPU Limit'
 							},
 							resourcesLimitsMemory: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesLimitsMemory'),
+								...(lodash.get(
+									jsonSchema,
+									'properties.spec.properties.resourcesLimitsMemory'
+								) as Schema),
 								title: 'Memory Limit'
 							},
 							resourcesGpu: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesGpu'),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.resourcesGpu') as Schema),
 								title: 'GPU'
 							},
 							resourcesGpumem: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesGpumem'),
+								...(lodash.get(
+									jsonSchema,
+									'properties.spec.properties.resourcesGpumem'
+								) as Schema),
 								title: 'GPU Memory'
 							}
 						}

@@ -32,7 +32,7 @@
 		showTrigger = true,
 		onsuccess
 	}: {
-		schema: any;
+		schema: Schema;
 		cluster: string;
 		namespace: string;
 		group: string;
@@ -48,16 +48,20 @@
 	const resourceClient = createClient(ResourceService, transport);
 
 	// Container for Data
-	let values: any = $state({
-		apiVersion: group ? `${group}/${version}` : version,
-		kind,
-		metadata: { name: {} },
-		spec: {
-			cpu: { guest: 1 },
-			memory: { guest: '1Gi' }
-		}
-	});
+	let values = $state(getInitialValues());
 	let value = $derived(stringify(values));
+
+	function getInitialValues() {
+		return {
+			apiVersion: group ? `${group}/${version}` : version,
+			kind,
+			metadata: { name: '' as string },
+			spec: {
+				cpu: { guest: 1 as number },
+				memory: { guest: '1Gi' as string }
+			}
+		};
+	}
 
 	// Steps Manager
 	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
@@ -113,7 +117,7 @@
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
-						...(lodash.get(jsonSchema, 'properties.metadata.properties.name') ?? {
+						...((lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema) ?? {
 							type: 'string'
 						}),
 						title: 'Name'
@@ -144,7 +148,7 @@
 			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
-						...lodash.get(jsonSchema, 'properties.spec.properties.cpu.properties.guest'),
+						...(lodash.get(jsonSchema, 'properties.spec.properties.cpu.properties.guest') as Schema),
 						title: 'CPU'
 					} as Schema}
 					uiSchema={{
@@ -181,7 +185,7 @@
 				<Form
 					schema={{
 						...lodash.omit(
-							lodash.get(jsonSchema, 'properties.spec.properties.memory.properties.guest'),
+							lodash.get(jsonSchema, 'properties.spec.properties.memory.properties.guest') as Schema,
 							'anyOf'
 						),
 						type: 'string',
