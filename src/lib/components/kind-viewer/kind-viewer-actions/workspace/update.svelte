@@ -103,12 +103,14 @@
 		return {
 			apiVersion: `${group}/${version}`,
 			kind: kind,
-			metadata: lodash.get(object, 'metadata', {}),
+			metadata: lodash.get(object, 'metadata', {}) as SchemaValue,
 			spec: {
-				members: lodash.get(object, 'spec.members', []),
-				networkIsolation: lodash.get(object, 'spec.networkIsolation', { enabled: false }),
+				members: lodash.get(object, 'spec.members', []) as SchemaValue,
+				networkIsolation: lodash.get(object, 'spec.networkIsolation', {
+					enabled: false
+				}) as SchemaValue,
 				...(lodash.has(object, 'spec.resourceQuota')
-					? { resourceQuota: lodash.get(object, 'spec.resourceQuota') }
+					? { resourceQuota: lodash.get(object, 'spec.resourceQuota') as SchemaValue }
 					: {})
 			}
 		};
@@ -125,7 +127,7 @@
 				'limits.memory': '32Gi',
 				'limits.nvidia.com/gpu': '0',
 				'limits.nvidia.com/gpumem': '0'
-			})
+			}) as SchemaValue
 		};
 	}
 
@@ -578,7 +580,7 @@
 									return;
 								}
 
-								const name = lodash.get(values, 'metadata.name');
+								const name = lodash.get(values, 'metadata.name') as string;
 
 								toast.promise(
 									async () => {
