@@ -12,6 +12,7 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { ResourceService } from '@otterscale/api/resource/v1';
+	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, setValue, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
@@ -55,7 +56,7 @@
 		resource: string;
 		schema: Schema;
 		role?: string;
-		onsuccess?: (workspace?: FormValue) => void;
+		onsuccess?: (workspace?: TenantOtterscaleIoV1Alpha1Workspace) => void;
 		open?: boolean;
 		showTrigger?: boolean;
 	} = $props();
@@ -677,7 +678,7 @@
 									{
 										loading: `Creating ${kind} ${name}...`,
 										success: () => {
-											onsuccess?.(values);
+											onsuccess?.(values as TenantOtterscaleIoV1Alpha1Workspace);
 											return `Successfully created ${kind} ${name}`;
 										},
 										error: (error) => {

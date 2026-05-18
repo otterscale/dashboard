@@ -2,7 +2,8 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import FormIcon from '@lucide/svelte/icons/form';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
+	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
+	import type { FormState, FormValue, Schema, SchemaValue, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, setValue, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
 	import { load } from 'js-yaml';
@@ -48,10 +49,10 @@
 		kind: string;
 		resource: string;
 		schema: Schema;
-		object?: any;
+		object?: TenantOtterscaleIoV1Alpha1Workspace;
 		onOpenChangeComplete?: () => void;
-		trigger?: Snippet<[Record<string, any>]>;
-		onsuccess?: (workspace?: FormValue) => void;
+		trigger?: Snippet<[Record<string, unknown>]>;
+		onsuccess?: (workspace?: TenantOtterscaleIoV1Alpha1Workspace) => void;
 		open?: boolean;
 	} = $props();
 
@@ -89,8 +90,9 @@
 	let value = $derived.by(() => {
 		const filtered = lodash.cloneDeep(values);
 		if (filtered.metadata) {
+			const metadata = filtered.metadata as Record<string, unknown>;
 			for (const field of systemFields) {
-				delete filtered.metadata[field];
+				delete metadata[field];
 			}
 		}
 		return stringify(filtered);
@@ -472,7 +474,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={resourceLimitation as FormValue}
+					initialValue={resourceLimitation}
 					handleSubmit={{
 						posthook: (form: FormState<FormValue>) => {
 							handleNext();
@@ -596,7 +598,7 @@
 									{
 										loading: `Updating ${kind} ${name}...`,
 										success: () => {
-											onsuccess?.(values);
+											onsuccess?.(values as TenantOtterscaleIoV1Alpha1Workspace);
 											return `Successfully updated ${kind} ${name}`;
 										},
 										error: (error) => {
