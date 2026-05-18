@@ -1,5 +1,7 @@
 <script lang="ts">
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
+	import type { CoreV1ResourceQuota } from '@otterscale/types';
+	import type { Schema } from '@sjsf/form';
 	import type { ValidateFunction } from 'ajv';
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
@@ -26,9 +28,9 @@
 		version: string;
 		kind: string;
 		resource: string;
-		schema: any;
+		schema: Schema;
 		validate: ValidateFunction;
-		object: any;
+		object: CoreV1ResourceQuota;
 	} = $props();
 
 	let actionsOpen = $state(false);

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
+	import type { AppsV1Deployment } from '@otterscale/types';
+	import type { Schema } from '@sjsf/form';
 	import type { ValidateFunction } from 'ajv';
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
@@ -24,9 +26,9 @@
 		kind,
 		resource
 	}: {
-		schema: any;
+		schema: Schema;
 		validate: ValidateFunction;
-		object: any;
+		object: AppsV1Deployment;
 		cluster: string;
 		namespace: string;
 		group: string;

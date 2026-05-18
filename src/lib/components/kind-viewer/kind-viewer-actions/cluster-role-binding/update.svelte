@@ -2,6 +2,10 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import FormIcon from '@lucide/svelte/icons/form';
 	import { ResourceService } from '@otterscale/api/resource/v1';
+	import type {
+		RbacAuthorizationK8SIoV1ClusterRole,
+		RbacAuthorizationK8SIoV1ClusterRoleBinding
+	} from '@otterscale/types';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
@@ -31,8 +35,8 @@
 		resource,
 		onOpenChangeComplete
 	}: {
-		schema: any;
-		object: any;
+		schema: Schema;
+		object: RbacAuthorizationK8SIoV1ClusterRoleBinding;
 		cluster: string;
 		group: string;
 		version: string;
@@ -45,14 +49,21 @@
 	const resourceClient = createClient(ResourceService, transport);
 
 	// Container for Data.
-	let values: any = $state({
-		apiVersion: group ? `${group}/${version}` : version,
-		kind,
-		roleRef: { name: {} },
-		subjectKind: {},
-		subjects: {},
-		serviceAccount: {}
-	});
+	let values = $state(getInitialValues());
+
+	function getInitialValues() {
+		return {
+			apiVersion: group ? `${group}/${version}` : version,
+			kind,
+			roleRef: { name: '' as string },
+			subjectKind: 'User' as string,
+			subjects: '' as string,
+			serviceAccount: {
+				name: '' as string,
+				namespace: '' as string
+			}
+		};
+	}
 
 	// Derived submission values (proper ClusterRoleBinding structure)
 	const submissionValues = $derived.by(() => {
@@ -126,9 +137,11 @@
 						resource: 'clusterroles'
 					});
 					const roles = response.items
-						.map((item: any) => (item.object as any)?.metadata?.name as string)
-						.filter((name: string) => name && name.toLowerCase().includes(search.toLowerCase()));
-					resolve(roles.map((name: string) => ({ label: name, value: name })));
+						.map(
+							(item) => (item.object as RbacAuthorizationK8SIoV1ClusterRole)?.metadata?.name ?? ''
+						)
+						.filter((name) => name && name.toLowerCase().includes(search.toLowerCase()));
+					resolve(roles.map((name) => ({ label: name, value: name })));
 				} catch (error) {
 					console.error('Error fetching cluster roles:', error);
 					resolve([]);

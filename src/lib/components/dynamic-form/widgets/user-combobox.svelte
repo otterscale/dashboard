@@ -1,8 +1,6 @@
 <script lang="ts" module>
 	import '@sjsf/form/fields/extra-widgets/combobox';
 
-	import type { Command as CommandType } from 'bits-ui';
-
 	import type { ButtonProps } from '$lib/components/ui/button/button.svelte';
 
 	export interface KeycloakUser {
@@ -16,10 +14,7 @@
 	declare module '@sjsf/form' {
 		interface UiOptions {
 			TailoredUserComboboxVisibility?: number;
-			TailoredUserComboboxTrigger?: ButtonProps;
-			TailoredUserComboboxInput?: CommandType.InputProps;
-			TailoredUserComboboxEmptyText?: string;
-			TailoredUserComboboxOnFetch?: (users: KeycloakUser[]) => void;
+			TailoredUserComboboxOnSelect?: (user: KeycloakUser) => void;
 		}
 	}
 
@@ -45,11 +40,9 @@
 		disabledProp,
 		getFormContext,
 		handlersAttachment,
-		inputAttributes,
-		retrieveUiOption,
-		uiOptionProps
+		retrieveUiOption
 	} from '@sjsf/form';
-	import { onMount, tick } from 'svelte';
+	import { tick } from 'svelte';
 
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Command from '$lib/components/ui/command/index.js';
@@ -60,27 +53,28 @@
 
 	const ctx = getFormContext();
 
-	// Bind subject for identifier user
 	let { value = $bindable(), config, handlers }: ComponentProps['comboboxWidget'] = $props();
 	const { ...buttonHandlers } = $derived(handlers);
 
-	let filterValue = $state('');
-	let enumerations = $state<{ label: string; value: string }[]>([]);
-	let labelCache = $state<Record<string, string>>({});
+	const onSelect = $derived(
+		retrieveUiOption(ctx, config, 'TailoredUserComboboxOnSelect') as
+			| ((user: KeycloakUser) => void)
+			| undefined
+	);
+
 	let timer: ReturnType<typeof setTimeout> | null = null;
+	let searchTerm = $state('');
+	let enumerations = $state<{ label: string; value: string; user: KeycloakUser }[]>([]);
 	$effect(() => {
-		const search = filterValue;
 		if (timer) clearTimeout(timer);
 		timer = setTimeout(async () => {
 			try {
-				const response = await fetch(`/rest/users?search=${encodeURIComponent(search)}`);
+				const response = await fetch(`/rest/users?search=${encodeURIComponent(searchTerm)}`);
 				if (response.ok) {
-					const fetched: KeycloakUser[] = await response.json();
-					onFetch?.(fetched);
-					enumerations = fetched.map((user) => {
+					const fetchedUsers: KeycloakUser[] = await response.json();
+					enumerations = fetchedUsers.map((user) => {
 						const label = getDisplayName(user);
-						labelCache[user.id] = label;
-						return { label, value: user.id };
+						return { label, value: user.id, user: user };
 					});
 				} else {
 					enumerations = [];
@@ -90,68 +84,34 @@
 			}
 		}, 300);
 	});
-
-	onMount(() => {
-		const subject = value as string | undefined;
-		if (!subject || labelCache[subject]) return;
-		fetch(`/rest/users/${encodeURIComponent(subject)}`)
-			.then(async (response) => {
-				if (!response.ok) return;
-				const user: KeycloakUser = await response.json();
-				labelCache[subject] = getDisplayName(user);
-				onFetch?.([user]);
-			})
-			.catch(() => {});
-	});
-	$effect(() => {
-		const subject = value as string | undefined;
-		if (!subject || labelCache[subject]) return;
-		fetch(`/rest/users/${encodeURIComponent(subject)}`)
-			.then(async (response) => {
-				if (!response.ok) return;
-				const user: KeycloakUser = await response.json();
-				labelCache[subject] = getDisplayName(user);
-				onFetch?.([user]);
-			})
-			.catch(() => {});
-	});
-	const onFetch = $derived(
-		retrieveUiOption(ctx, config, 'TailoredUserComboboxOnFetch') as
-			| ((users: KeycloakUser[]) => void)
-			| undefined
+	const filteredEnumerations = $derived(
+		enumerations.filter((option) => option.label.includes(searchTerm))
 	);
 
 	const visibility: number = $derived(
 		(retrieveUiOption(ctx, config, 'TailoredUserComboboxVisibility') as number) ?? 10
 	);
 	let visibleOptions = $derived(visibility);
-	const filteredOptions = $derived(
-		enumerations.filter((option) => option.label.includes(filterValue))
-	);
-	$effect(() => {
-		if (open === false) {
-			filterValue = '';
-			visibleOptions = visibility;
-		}
-	});
-
-	const attributes = $derived(
-		inputAttributes(ctx, config, 'TailoredUserComboboxInput', handlers, {})
-	);
-	const emptyText = $derived(retrieveUiOption(ctx, config, 'TailoredUserComboboxEmptyText'));
-	let triggerText: string | undefined = $derived(value ? labelCache[value as string] : undefined);
 
 	let open = $state(false);
 	let triggerReference = $state<HTMLButtonElement>(null!);
 	function closeAndFocusTrigger() {
 		open = false;
 		tick().then(() => {
-			triggerReference.focus();
+			triggerReference?.focus();
 		});
 	}
 </script>
 
-<Popover.Root bind:open>
+<Popover.Root
+	bind:open
+	onOpenChangeComplete={(isOpen) => {
+		if (isOpen) return;
+
+		searchTerm = '';
+		visibleOptions = visibility;
+	}}
+>
 	<Popover.Trigger
 		class="w-full justify-between"
 		bind:ref={triggerReference}
@@ -168,13 +128,12 @@
 						role: 'combobox',
 						'aria-expanded': open
 					} satisfies ButtonProps,
-					uiOptionProps('TailoredUserComboboxTrigger'),
 					handlersAttachment(buttonHandlers),
 					ariaInvalidProp
 				)}
 			>
-				<span>
-					{triggerText ?? attributes.placeholder}
+				<span class="min-w-0 flex-1 truncate text-left">
+					{value ?? 'User'}
 				</span>
 				<ChevronsUpDown class="ml-2 size-4 shrink-0 opacity-50" />
 			</Button>
@@ -182,24 +141,25 @@
 	</Popover.Trigger>
 	<Popover.Content class="w-[var(--bits-popover-anchor-width)] min-w-xs p-0">
 		<Command.Root shouldFilter={false}>
-			<Command.Input bind:value={filterValue} />
+			<Command.Input bind:value={searchTerm} />
 			<Command.List>
-				{#if filteredOptions.length === 0}
+				{#if filteredEnumerations.length === 0}
 					<Empty.Root>
 						<Empty.Header>
 							<Empty.Media>
 								<SearchXIcon />
 							</Empty.Media>
-							<Empty.Description>{emptyText}</Empty.Description>
+							<Empty.Description>No users available.</Empty.Description>
 						</Empty.Header>
 					</Empty.Root>
 				{/if}
 				<Command.Group>
-					{#each filteredOptions.slice(0, visibleOptions) as option, index (index)}
+					{#each filteredEnumerations.slice(0, visibleOptions) as option, index (index)}
 						<Command.Item
 							value={option.value}
 							onSelect={() => {
 								value = option.value;
+								onSelect?.(option.user);
 								closeAndFocusTrigger();
 							}}
 						>
@@ -209,17 +169,18 @@
 							<Item.Root class="w-full p-0">
 								<Item.Content class="text-start">
 									<Item.Title>{option.label}</Item.Title>
+									<Item.Description>{option.value}</Item.Description>
 								</Item.Content>
 							</Item.Root>
 						</Command.Item>
 					{/each}
 				</Command.Group>
-				{#if filteredOptions.length > visibleOptions}
+				{#if filteredEnumerations.length > visibleOptions}
 					<Command.Separator />
 					<Command.Item
 						class="w-full rounded-t-none hover:bg-muted"
 						onclick={() => {
-							visibleOptions += visibility;
+							visibleOptions = visibility + visibleOptions;
 						}}
 					>
 						<div class="flex w-full items-center justify-center">
