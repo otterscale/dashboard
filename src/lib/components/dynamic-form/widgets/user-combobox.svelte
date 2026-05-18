@@ -133,7 +133,7 @@
 				)}
 			>
 				<span class="min-w-0 flex-1 truncate text-left">
-					{value}
+					{value ?? 'User'}
 				</span>
 				<ChevronsUpDown class="ml-2 size-4 shrink-0 opacity-50" />
 			</Button>
@@ -149,7 +149,7 @@
 							<Empty.Media>
 								<SearchXIcon />
 							</Empty.Media>
-							<Empty.Description>Empty</Empty.Description>
+							<Empty.Description>No users available.</Empty.Description>
 						</Empty.Header>
 					</Empty.Root>
 				{/if}

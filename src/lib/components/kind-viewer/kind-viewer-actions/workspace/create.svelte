@@ -99,7 +99,7 @@
 	}
 	function getInitialResourceLimitation() {
 		return {
-			unlimit: undefined,
+			unlimit: false,
 			ResourceQuota: {}
 		};
 	}
