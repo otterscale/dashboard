@@ -1,4 +1,4 @@
-import { type JsonValue } from '@bufbuild/protobuf';
+import { type JsonObject, type JsonValue } from '@bufbuild/protobuf';
 import type { APIResource } from '@otterscale/api/resource/v1';
 import type { Column, ColumnDef } from '@tanstack/table-core';
 import { type Row } from '@tanstack/table-core';
@@ -31,9 +31,19 @@ function getDefaultDataSchemas(): Record<DefaultAttribute, DataSchemaType> {
 	};
 }
 
+type DefaultObject = {
+	metadata?: {
+		name?: string;
+		namespace?: string;
+		labels?: Record<string, string>;
+		annotations?: Record<string, string>;
+		creationTimestamp?: string;
+	};
+} & JsonObject;
+
 function getDefaultData(
 	apiResource: APIResource,
-	object: any
+	object: DefaultObject
 ): Record<DefaultAttribute, JsonValue> {
 	return {
 		Name: object?.metadata?.name ?? null,
@@ -132,8 +142,8 @@ function getDefaultColumnDefinitions(
 					row: row,
 					column: column,
 					uiSchemas: uiSchemas,
-					metadata: ((row.original.raw as any).metadata.annotations ??
-						{}) satisfies ObjectOfKeyValueMetadata
+					metadata: ((row.original.raw as { metadata?: { annotations?: Record<string, string> } })
+						?.metadata?.annotations ?? {}) satisfies ObjectOfKeyValueMetadata
 				}),
 			accessorFn: (row: Record<DefaultAttribute, JsonValue>) =>
 				row['Annotations'] ? Object.keys(row['Annotations'] as object).length : null
@@ -156,8 +166,8 @@ function getDefaultColumnDefinitions(
 					row: row,
 					column: column,
 					uiSchemas: uiSchemas,
-					metadata: ((row.original.raw as any).metadata.labels ??
-						{}) satisfies ObjectOfKeyValueMetadata
+					metadata: ((row.original.raw as { metadata?: { labels?: Record<string, string> } })
+						?.metadata?.labels ?? {}) satisfies ObjectOfKeyValueMetadata
 				}),
 			accessorFn: (row: Record<DefaultAttribute, JsonValue>) =>
 				row['Labels'] ? Object.keys(row['Labels'] as object).length : null

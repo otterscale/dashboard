@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Schema } from '@sjsf/form';
 	import { stringify } from 'yaml';
 
 	import * as Code from '$lib/components/custom/code';
@@ -9,7 +10,8 @@
 	import * as Item from '$lib/components/ui/item';
 	import { cn } from '$lib/utils';
 
-	let { schema: jsonSchema, class: className }: { schema: any; class?: string } = $props();
+	let { schema: jsonSchema, class: className }: { schema: Schema | undefined; class?: string } =
+		$props();
 
 	let path: string[] = $state([]);
 	function navigateTo(key: string) {
@@ -22,27 +24,38 @@
 	const currentSchema = $derived.by(() => {
 		if (!path) return null;
 
-		let node = jsonSchema;
+		let node: Schema | undefined = jsonSchema;
 		for (const segment of path) {
-			if (node?.properties?.[segment]) {
-				node = node.properties[segment];
-			} else if (node?.items?.properties?.[segment]) {
-				node = node.items.properties[segment];
+			const propMatch = node?.properties?.[segment] as Schema | undefined;
+			const itemMatch = (node?.items as Schema | undefined)?.properties?.[segment] as
+				| Schema
+				| undefined;
+			if (propMatch) {
+				node = propMatch;
+			} else if (itemMatch) {
+				node = itemMatch;
 			} else {
 				return null;
 			}
 		}
-		return node;
+		return node ?? null;
 	});
 	const entries = $derived.by(() => {
 		if (!currentSchema) return [];
 
-		const properties = currentSchema.properties ?? currentSchema.items?.properties;
+		const properties = (currentSchema.properties ??
+			(currentSchema.items as Schema | undefined)?.properties) as
+			| Record<string, Schema>
+			| undefined;
 		if (!properties) return [];
-		const required = new Set(currentSchema.required ?? currentSchema.items?.required ?? []);
+		const required = new Set<string>(
+			currentSchema.required ?? (currentSchema.items as Schema | undefined)?.required ?? []
+		);
 
-		return Object.entries(properties).map(([property, propertySchema]: [string, any]) => {
-			const hasChildren = !!(propertySchema.properties || propertySchema.items?.properties);
+		return Object.entries(properties).map(([property, propertySchema]) => {
+			const hasChildren = !!(
+				propertySchema.properties || (propertySchema.items as Schema | undefined)?.properties
+			);
 			return {
 				key: property,
 				description: propertySchema.description ?? '',
@@ -54,13 +67,13 @@
 		});
 	});
 
-	function resolveType(schema: any): string {
-		if (schema.type && schema.format) return `${schema.type} | ${schema.format}`;
-		if (schema.type) return schema.type;
+	function resolveType(schema: Schema): string {
+		if (schema.type && schema.format) return `${String(schema.type)} | ${schema.format}`;
+		if (schema.type) return String(schema.type);
 		return 'unknown';
 	}
 
-	function getConstraints(schema: any): object {
+	function getConstraints(schema: Schema): object {
 		const excludedProperties = ['description', 'required', 'type', 'format', 'properties', 'items'];
 		const constraitns = Object.fromEntries(
 			Object.entries(schema).filter(([key]) => !excludedProperties.includes(key))

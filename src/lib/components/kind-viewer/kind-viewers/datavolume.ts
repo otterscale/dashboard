@@ -1,5 +1,6 @@
 import { type JsonObject, type JsonValue } from '@bufbuild/protobuf';
 import type { APIResource } from '@otterscale/api/resource/v1';
+import type { CdiKubevirtIoV1Beta1DataVolume } from '@otterscale/types';
 import type { Column, ColumnDef } from '@tanstack/table-core';
 import { type Row } from '@tanstack/table-core';
 
@@ -37,40 +38,48 @@ function getDataVolumeDataSchemas(): Record<DataVolumeAttribute, DataSchemaType>
 	};
 }
 
-function getDataVolumeData(object: any): Record<DataVolumeAttribute, JsonValue> {
-	// Determine source type from spec.source
+type LegacyStorageSpec = {
+	storage?: {
+		resources?: { requests?: { storage?: string | number } };
+		accessModes?: string[];
+	};
+};
+
+function getDataVolumeData(
+	object: CdiKubevirtIoV1Beta1DataVolume
+): Record<DataVolumeAttribute, JsonValue> {
+	// Determine source type from spec.source (variants are mutually exclusive per CDI CRD)
 	const source = object?.spec?.source;
 	let sourceDisplay: string | null = null;
 	if (source) {
-		const sourceType = Object.keys(source).find(
-			(k) => source[k] && Object.keys(source[k]).length >= 0
-		);
-		if (sourceType) {
-			const details = source[sourceType];
-			if (sourceType === 'http' || sourceType === 's3' || sourceType === 'gcs') {
-				sourceDisplay = `${sourceType}: ${details?.url ?? ''}`;
-			} else if (sourceType === 'registry') {
-				sourceDisplay = `registry: ${details?.url ?? details?.imageStream ?? ''}`;
-			} else if (sourceType === 'pvc') {
-				sourceDisplay = `pvc: ${details?.namespace ?? ''}/${details?.name ?? ''}`;
-			} else if (sourceType === 'snapshot') {
-				sourceDisplay = `snapshot: ${details?.namespace ?? ''}/${details?.name ?? ''}`;
-			} else {
-				sourceDisplay = sourceType;
-			}
+		if (source.http) sourceDisplay = `http: ${source.http.url ?? ''}`;
+		else if (source.s3) sourceDisplay = `s3: ${source.s3.url ?? ''}`;
+		else if (source.gcs) sourceDisplay = `gcs: ${source.gcs.url ?? ''}`;
+		else if (source.registry)
+			sourceDisplay = `registry: ${source.registry.url ?? source.registry.imageStream ?? ''}`;
+		else if (source.pvc)
+			sourceDisplay = `pvc: ${source.pvc.namespace ?? ''}/${source.pvc.name ?? ''}`;
+		else if (source.snapshot)
+			sourceDisplay = `snapshot: ${source.snapshot.namespace ?? ''}/${source.snapshot.name ?? ''}`;
+		else {
+			const [first] = Object.keys(source);
+			if (first) sourceDisplay = first;
 		}
 	} else if (object?.spec?.sourceRef) {
 		sourceDisplay = `ref: ${object.spec.sourceRef.kind}/${object.spec.sourceRef.name}`;
 	}
 
-	// Storage size from spec.pvc or spec.storage
+	// Storage size from spec.pvc or legacy spec.storage
 	const storage =
 		object?.spec?.pvc?.resources?.requests?.storage ??
-		object?.spec?.storage?.resources?.requests?.storage ??
+		(object?.spec as LegacyStorageSpec | undefined)?.storage?.resources?.requests?.storage ??
 		null;
 
-	// Access modes from spec.pvc or spec.storage
-	const accessModes = object?.spec?.pvc?.accessModes ?? object?.spec?.storage?.accessModes ?? null;
+	// Access modes from spec.pvc or legacy spec.storage
+	const accessModes =
+		object?.spec?.pvc?.accessModes ??
+		(object?.spec as LegacyStorageSpec | undefined)?.storage?.accessModes ??
+		null;
 	const accessModesDisplay = Array.isArray(accessModes) ? accessModes.join(', ') : null;
 
 	return {
