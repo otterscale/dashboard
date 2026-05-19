@@ -315,86 +315,86 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 function getData(apiResource: APIResource, object: JsonObject): Record<string, JsonValue> {
 	// Each Kind handler accepts its own specific K8s type; cast through `never` to satisfy
 	// all of those signatures in a single dispatch without per-case casts.
-	const o = object as never;
+	const resource = object as never;
 	switch (apiResource.kind) {
 		case 'CronJob':
-			return getCronJobData(o);
+			return getCronJobData(resource);
 		case 'DaemonSet':
-			return getDaemonSetData(o);
+			return getDaemonSetData(resource);
 		case 'Deployment':
-			return getDeploymentData(o);
+			return getDeploymentData(resource);
 		case 'Job':
-			return getJobData(o);
+			return getJobData(resource);
 		case 'Pod':
-			return getPodData(o);
+			return getPodData(resource);
 		case 'StatefulSet':
-			return getStatefulSetData(o);
+			return getStatefulSetData(resource);
 		case 'ConfigMap':
-			return getConfigMapData(o);
+			return getConfigMapData(resource);
 		case 'Secret':
-			return getSecretData(o);
+			return getSecretData(resource);
 		case 'Service':
-			return getServiceData(o);
+			return getServiceData(resource);
 		case 'NetworkPolicy':
-			return getNetworkPolicyData(o);
+			return getNetworkPolicyData(resource);
 		case 'PersistentVolumeClaim':
-			return getPVCData(o);
+			return getPVCData(resource);
 		case 'PersistentVolume':
-			return getPVData(o);
+			return getPVData(resource);
 		case 'StorageClass':
-			return getStorageClassData(o);
+			return getStorageClassData(resource);
 		case 'Namespace':
-			return getNamespaceData(o);
+			return getNamespaceData(resource);
 		case 'ServiceAccount':
-			return getServiceAccountData(o);
+			return getServiceAccountData(resource);
 		case 'Role':
-			return getRoleData(o);
+			return getRoleData(resource);
 		case 'RoleBinding':
-			return getRoleBindingData(o);
+			return getRoleBindingData(resource);
 		case 'ClusterRole':
-			return getClusterRoleData(o);
+			return getClusterRoleData(resource);
 		case 'ClusterRoleBinding':
-			return getClusterRoleBindingData(o);
+			return getClusterRoleBindingData(resource);
 		case 'LimitRange':
-			return getLimitRangeData(o);
+			return getLimitRangeData(resource);
 		case 'Event':
-			return getEventData(o);
+			return getEventData(resource);
 		case 'Node':
-			return getNodeData(o);
+			return getNodeData(resource);
 		case 'CustomResourceDefinition':
-			return getCRDData(o);
+			return getCRDData(resource);
 		case 'ResourceQuota':
-			return getResourceQuotaData(o);
+			return getResourceQuotaData(resource);
 		case 'Workspace':
-			return getWorkspaceData(o);
+			return getWorkspaceData(resource);
 		case 'HelmRepository':
-			return getHelmRepositoryData(o);
+			return getHelmRepositoryData(resource);
 		case 'HTTPRoute':
-			return getHTTPRouteData(o);
+			return getHTTPRouteData(resource);
 		case 'Gateway':
-			return getGatewayData(o);
+			return getGatewayData(resource);
 		case 'HelmRelease':
-			return getHelmReleaseData(o);
+			return getHelmReleaseData(resource);
 		case 'VirtualMachine':
-			return getVirtualMachineData(o);
+			return getVirtualMachineData(resource);
 		case 'DataVolume':
-			return getDataVolumeData(o);
+			return getDataVolumeData(resource);
 		case 'VirtualMachineInstancetype':
-			return getVirtualMachineInstancetypeData(o);
+			return getVirtualMachineInstancetypeData(resource);
 		case 'ObjectBucketClaim':
-			return getObjectBucketClaimData(o);
+			return getObjectBucketClaimData(resource);
 		case 'Application':
-			return getApplicationData(o);
+			return getApplicationData(resource);
 		case 'Task':
-			return getTaskData(o);
+			return getTaskData(resource);
 		case 'Schedule':
-			return getScheduleData(o);
+			return getScheduleData(resource);
 		case 'LLMInferenceService':
-			return getLLMInferenceServiceData(o);
+			return getLLMInferenceServiceData(resource);
 		case 'LLMInferenceServiceConfig':
-			return getLLMInferenceServiceConfigData(o);
+			return getLLMInferenceServiceConfigData(resource);
 		default:
-			return getDefaultData(apiResource, o);
+			return getDefaultData(apiResource, resource);
 	}
 }
 

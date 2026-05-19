@@ -59,7 +59,7 @@
 	import type { UISchemaType } from './utils';
 
 	let {
-		dataset,
+		data,
 		columnDefinitions,
 		uiSchemas,
 		// dataSchemas,
@@ -71,7 +71,7 @@
 		rowActions = createRawSnippet(() => ({ render: () => '' })),
 		gridsLayout
 	}: {
-		dataset: Record<string, JsonValue>[];
+		data: Record<string, JsonValue>[];
 		columnDefinitions: ColumnDef<Record<string, JsonValue>>[];
 		uiSchemas: Record<string, UISchemaType>;
 		// dataSchemas: Record<string, DataSchemaType>;
@@ -175,7 +175,7 @@
 	let table = createSvelteTable<Record<string, JsonValue>>({
 		columns,
 		get data() {
-			return dataset;
+			return data;
 		},
 		getCoreRowModel: getCoreRowModel(),
 		getFacetedUniqueValues: getFacetedUniqueValues(),
