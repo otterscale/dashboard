@@ -43,9 +43,6 @@
 		isReloading: boolean;
 	} = $props();
 
-	// widget-grid passes prometheusDriver to every tile; this widget uses Resource API only.
-	void prometheusDriver;
-
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
@@ -156,6 +153,8 @@
 
 	let isLoaded = $state(false);
 	onMount(async () => {
+		// widget-grid passes prometheusDriver to every tile; this widget uses Resource API only.
+		void prometheusDriver;
 		await fetch();
 		isLoaded = true;
 	});

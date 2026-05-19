@@ -1,4 +1,4 @@
-import type { JsonValue } from '@bufbuild/protobuf';
+import type { JsonObject, JsonValue } from '@bufbuild/protobuf';
 import type { APIResource } from '@otterscale/api/resource/v1';
 import type { ColumnDef } from '@tanstack/table-core';
 
@@ -312,86 +312,89 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 	}
 }
 
-function getData(apiResource: APIResource, object: any): Record<string, JsonValue> {
+function getData(apiResource: APIResource, object: JsonObject): Record<string, JsonValue> {
+	// Each Kind handler accepts its own specific K8s type; cast through `never` to satisfy
+	// all of those signatures in a single dispatch without per-case casts.
+	const o = object as never;
 	switch (apiResource.kind) {
 		case 'CronJob':
-			return getCronJobData(object);
+			return getCronJobData(o);
 		case 'DaemonSet':
-			return getDaemonSetData(object);
+			return getDaemonSetData(o);
 		case 'Deployment':
-			return getDeploymentData(object);
+			return getDeploymentData(o);
 		case 'Job':
-			return getJobData(object);
+			return getJobData(o);
 		case 'Pod':
-			return getPodData(object);
+			return getPodData(o);
 		case 'StatefulSet':
-			return getStatefulSetData(object);
+			return getStatefulSetData(o);
 		case 'ConfigMap':
-			return getConfigMapData(object);
+			return getConfigMapData(o);
 		case 'Secret':
-			return getSecretData(object);
+			return getSecretData(o);
 		case 'Service':
-			return getServiceData(object);
+			return getServiceData(o);
 		case 'NetworkPolicy':
-			return getNetworkPolicyData(object);
+			return getNetworkPolicyData(o);
 		case 'PersistentVolumeClaim':
-			return getPVCData(object);
+			return getPVCData(o);
 		case 'PersistentVolume':
-			return getPVData(object);
+			return getPVData(o);
 		case 'StorageClass':
-			return getStorageClassData(object);
+			return getStorageClassData(o);
 		case 'Namespace':
-			return getNamespaceData(object);
+			return getNamespaceData(o);
 		case 'ServiceAccount':
-			return getServiceAccountData(object);
+			return getServiceAccountData(o);
 		case 'Role':
-			return getRoleData(object);
+			return getRoleData(o);
 		case 'RoleBinding':
-			return getRoleBindingData(object);
+			return getRoleBindingData(o);
 		case 'ClusterRole':
-			return getClusterRoleData(object);
+			return getClusterRoleData(o);
 		case 'ClusterRoleBinding':
-			return getClusterRoleBindingData(object);
+			return getClusterRoleBindingData(o);
 		case 'LimitRange':
-			return getLimitRangeData(object);
+			return getLimitRangeData(o);
 		case 'Event':
-			return getEventData(object);
+			return getEventData(o);
 		case 'Node':
-			return getNodeData(object);
+			return getNodeData(o);
 		case 'CustomResourceDefinition':
-			return getCRDData(object);
+			return getCRDData(o);
 		case 'ResourceQuota':
-			return getResourceQuotaData(object);
+			return getResourceQuotaData(o);
 		case 'Workspace':
-			return getWorkspaceData(object);
+			return getWorkspaceData(o);
 		case 'HelmRepository':
-			return getHelmRepositoryData(object);
+			return getHelmRepositoryData(o);
 		case 'HTTPRoute':
-			return getHTTPRouteData(object);
+			return getHTTPRouteData(o);
 		case 'Gateway':
-			return getGatewayData(object);
+			return getGatewayData(o);
 		case 'HelmRelease':
-			return getHelmReleaseData(object);
+			return getHelmReleaseData(o);
 		case 'VirtualMachine':
-			return getVirtualMachineData(object);
+			return getVirtualMachineData(o);
 		case 'DataVolume':
-			return getDataVolumeData(object);
+			return getDataVolumeData(o);
 		case 'VirtualMachineInstancetype':
-			return getVirtualMachineInstancetypeData(object);
+			return getVirtualMachineInstancetypeData(o);
 		case 'ObjectBucketClaim':
-			return getObjectBucketClaimData(object);
+			return getObjectBucketClaimData(o);
 		case 'Application':
-			return getApplicationData(object);
+			return getApplicationData(o);
 		case 'Task':
-			return getTaskData(object);
+			return getTaskData(o);
 		case 'Schedule':
-			return getScheduleData(object);
+			return getScheduleData(o);
 		case 'LLMInferenceService':
-			return getLLMInferenceServiceData(object);
+			return getLLMInferenceServiceData(o);
 		case 'LLMInferenceServiceConfig':
-			return getLLMInferenceServiceConfigData(object);
+			return getLLMInferenceServiceConfigData(o);
 		default:
-			return getDefaultData(apiResource, object);
+			return getDefaultData(apiResource, o);
 	}
 }
 

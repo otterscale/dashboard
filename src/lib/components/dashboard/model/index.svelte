@@ -37,9 +37,11 @@
 	let prometheusDriver = $state<PrometheusDriver | null>(null);
 	let selectedTab = $state('overview');
 	/** Currently selected namespace; empty string means "all namespaces" */
-	let selectedNamespace = $state<string | undefined>(
-		defaultNamespace !== '' ? defaultNamespace : undefined
-	);
+	let selectedNamespace = $state<string | undefined>(getInitialNamespace());
+
+	function getInitialNamespace() {
+		return defaultNamespace !== '' ? defaultNamespace : undefined;
+	}
 	/** vLLM analytics model filter; lives next to NamespacePicker so chart grid does not shift vertically */
 	let selectedModel = $state<string | undefined>(undefined);
 
