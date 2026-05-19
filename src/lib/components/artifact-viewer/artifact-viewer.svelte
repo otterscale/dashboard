@@ -3,6 +3,7 @@
 	import Columns3Icon from '@lucide/svelte/icons/columns-3';
 	import EraserIcon from '@lucide/svelte/icons/eraser';
 	import type { ColumnDef } from '@tanstack/table-core';
+	import type { Snippet } from 'svelte';
 
 	import { DynamicTable } from '$lib/components/dynamic-table';
 	import type { DataSchemaType, UISchemaType } from '$lib/components/dynamic-table/utils';
@@ -25,7 +26,12 @@
 		namespace,
 		charts,
 		reload
-	}: { cluster: string; namespace: string; charts: any[]; reload: any } = $props();
+	}: {
+		cluster: string;
+		namespace: string;
+		charts: Record<ChartAttribute, JsonValue>[];
+		reload: Snippet;
+	} = $props();
 
 	const uiSchemas: Record<string, UISchemaType> = getChartUISchemas();
 	const dataSchemas: Record<string, DataSchemaType> = getChartDataSchemas();

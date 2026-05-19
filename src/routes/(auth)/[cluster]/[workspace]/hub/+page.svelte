@@ -16,7 +16,7 @@
 		getChartDataFromHarbor,
 		getChartDataFromIndex
 	} from '$lib/components/artifact-viewer/table-layout';
-	import type { ArtifactChartType } from '$lib/components/artifact-viewer/types';
+	import type { ArtifactChartType, IndexChartType } from '$lib/components/artifact-viewer/types';
 	import {
 		encodeHarborURIComponent,
 		parseHarborHost,
@@ -102,8 +102,8 @@
 					})
 				});
 				if (response.ok) {
-					const charts: any[] = await response.json();
-					chartsByHelmRepository = charts.map((chart) =>
+					const indexCharts: IndexChartType[] = await response.json();
+					chartsByHelmRepository = indexCharts.map((chart) =>
 						getChartDataFromIndex(chart, helmRepository)
 					);
 				}

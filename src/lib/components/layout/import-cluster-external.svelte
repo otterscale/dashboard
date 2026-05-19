@@ -11,6 +11,7 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import { type Link, LinkService } from '@otterscale/api/link/v1';
 	import { ResourceService } from '@otterscale/api/resource/v1';
+	import type { AppsV1Deployment } from '@otterscale/types';
 	import { getContext, onDestroy } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
@@ -195,9 +196,9 @@
 				});
 				if (signal.aborted) break;
 
-				const obj = response.object as Record<string, any>;
-				const conditions: any[] = obj?.status?.conditions ?? [];
-				const available = conditions.find((c: any) => c.type === 'Available');
+				const obj = response.object as AppsV1Deployment;
+				const conditions = obj?.status?.conditions ?? [];
+				const available = conditions.find((c) => c.type === 'Available');
 				if (available?.status === 'True') {
 					clusterStatus = 'done';
 					stepIndex = 3;
