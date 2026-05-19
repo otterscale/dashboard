@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
+	import { createClient, type Transport } from '@connectrpc/connect';
 	import { KeyIcon } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type {
@@ -124,7 +124,7 @@
 				success: () => `Successfully configured ${name} for KServe`,
 				error: (error) => {
 					console.error(`Failed to configure ${name} for KServe:`, error);
-					return `Failed to configure ${name} for KServe: ${(error as ConnectError).message}`;
+					return `Failed to configure ${name} for KServe: ${lodash.get(error, 'message')}`;
 				},
 				finally() {
 					isPatching = false;
