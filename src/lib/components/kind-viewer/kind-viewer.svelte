@@ -120,8 +120,10 @@
 				continueToken = response.continue;
 
 				for (const item of response.items) {
-					const data = getData(apiResource, item.object);
-					dataset.set(getKey(data), data);
+					if (item.object) {
+						const data = getData(apiResource, item.object);
+						dataset.set(getKey(data), data);
+					}
 				}
 
 				isMounted = true;
