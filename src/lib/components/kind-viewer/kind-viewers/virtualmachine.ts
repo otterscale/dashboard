@@ -1,5 +1,6 @@
 import { type JsonObject, type JsonValue } from '@bufbuild/protobuf';
 import type { APIResource } from '@otterscale/api/resource/v1';
+import type { KubevirtIoV1VirtualMachine } from '@otterscale/types';
 import type { Column, ColumnDef } from '@tanstack/table-core';
 import { type Row } from '@tanstack/table-core';
 
@@ -44,7 +45,9 @@ function getVirtualMachineDataSchemas(): Record<VirtualMachineAttribute, DataSch
 	};
 }
 
-function getVirtualMachineData(object: any): Record<VirtualMachineAttribute, JsonValue> {
+function getVirtualMachineData(
+	object: KubevirtIoV1VirtualMachine
+): Record<VirtualMachineAttribute, JsonValue> {
 	const instancetype = object?.spec?.instancetype;
 	const instanceTypeDisplay = instancetype
 		? `${instancetype.kind ?? 'VirtualMachineInstancetype'}/${instancetype.name}`
@@ -168,16 +171,16 @@ function getVirtualMachineColumnDefinitions(
 					column,
 					uiSchemas,
 					metadata: {
-						items: ((row.original.raw as any)?.spec?.template?.spec?.volumes ?? []).map(
-							(v: any) => {
-								const volumeType = Object.keys(v).find((k) => k !== 'name') ?? 'unknown';
-								return {
-									title: v.name,
-									description: volumeType,
-									raw: v as JsonObject
-								};
-							}
-						) as ArrayOfObjectItemsType
+						items: (
+							(row.original.raw as KubevirtIoV1VirtualMachine)?.spec?.template?.spec?.volumes ?? []
+						).map((v) => {
+							const volumeType = Object.keys(v).find((k) => k !== 'name') ?? 'unknown';
+							return {
+								title: v.name,
+								description: volumeType,
+								raw: v as JsonObject
+							};
+						}) as ArrayOfObjectItemsType
 					} satisfies ArrayOfObjectMetadata
 				}),
 			accessorKey: 'Volumes',

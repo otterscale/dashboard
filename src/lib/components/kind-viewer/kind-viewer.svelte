@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { type JsonValue } from '@bufbuild/protobuf';
+	import type { JsonObject, JsonValue } from '@bufbuild/protobuf';
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import { EllipsisIcon } from '@lucide/svelte';
 	import BanIcon from '@lucide/svelte/icons/ban';
@@ -114,7 +114,7 @@
 				resourceVersion = response.resourceVersion;
 				continueToken = response.continue;
 
-				const newData = response.items.map((item) => getData(apiResource, item.object));
+				const newData = response.items.map((item) => getData(apiResource, item.object ?? {}));
 				dataset = [...dataset, ...newData];
 
 				isMounted = true;
@@ -369,7 +369,7 @@
 					<Actions
 						role={isClusterAdmin ? 'Cluster Admin' : undefined}
 						{row}
-						object={row.original.raw}
+						object={row.original.raw as JsonObject | undefined}
 						{schema}
 						{validate}
 						{cluster}

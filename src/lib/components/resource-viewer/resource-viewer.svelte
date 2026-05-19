@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { JsonObject } from '@bufbuild/protobuf';
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import Ban from '@lucide/svelte/icons/ban';
 	import Braces from '@lucide/svelte/icons/braces';
@@ -11,6 +12,7 @@
 		WatchEvent_Type,
 		type WatchRequest
 	} from '@otterscale/api/resource/v1';
+	import type { Schema } from '@sjsf/form';
 	import { getContext, onDestroy, onMount } from 'svelte';
 	import { stringify } from 'yaml';
 
@@ -54,9 +56,27 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	let schema: any | undefined = $state(undefined);
-	let object: any | undefined = $state(undefined);
-	let error: any | null = $state(null);
+	type ResourceObject = {
+		kind?: string;
+		apiVersion?: string;
+		metadata?: {
+			name?: string;
+			namespace?: string;
+			creationTimestamp?: string;
+			generation?: number;
+			resourceVersion?: string;
+			labels?: Record<string, string>;
+			annotations?: Record<string, string>;
+		};
+		status?: {
+			namespaceRef?: { name?: string };
+		};
+	} & JsonObject;
+	type ViewerError = { name?: string; rawMessage?: string; message?: string };
+
+	let schema: Schema | undefined = $state(undefined);
+	let object: ResourceObject | undefined = $state(undefined);
+	let error: ViewerError | null = $state(null);
 
 	let isGetting = $state(false);
 	let getAbortController: AbortController | null = null;
@@ -309,7 +329,9 @@
 							}}
 							{@const creationTimestampData = {
 								name: 'Creation Timestamp',
-								information: new Date(object.metadata?.creationTimestamp).toLocaleString('sv-SE')
+								information: new Date(object.metadata?.creationTimestamp ?? '').toLocaleString(
+									'sv-SE'
+								)
 							}}
 							{@const generationData = {
 								name: 'Generation',
@@ -445,6 +467,8 @@
 				</Item.Footer>
 			</Item.Root>
 		</Field.Set>
-		<Inspector {object} {schema} />
+		{#if object}
+			<Inspector {object} {schema} />
+		{/if}
 	</Field.Group>
 {/if}

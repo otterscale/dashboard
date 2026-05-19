@@ -33,9 +33,19 @@ function getApplicationDataSchemas(): Record<ApplicationAttribute, DataSchemaTyp
 	};
 }
 
-function getApplicationData(object: any): Record<ApplicationAttribute, JsonValue> {
+type ApplicationObject = {
+	metadata?: { name?: string; namespace?: string; creationTimestamp?: string };
+	spec?: { serviceType?: string };
+	status?: {
+		state?: string;
+		nodePort?: number | string;
+		conditions?: { type?: string; status?: string }[];
+	};
+};
+
+function getApplicationData(object: ApplicationObject): Record<ApplicationAttribute, JsonValue> {
 	const readyCondition = object?.status?.conditions?.find(
-		(condition: any) => condition.type === 'Ready'
+		(condition) => condition.type === 'Ready'
 	);
 
 	return {

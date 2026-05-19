@@ -35,9 +35,19 @@ function getScheduleDataSchemas(): Record<ScheduleAttribute, DataSchemaType> {
 	};
 }
 
-function getScheduleData(object: any): Record<ScheduleAttribute, JsonValue> {
+type ScheduleObject = {
+	metadata?: { name?: string; namespace?: string; creationTimestamp?: string };
+	spec?: { cronSchedule?: string; suspend?: boolean | string };
+	status?: {
+		state?: string;
+		lastScheduleTime?: string;
+		conditions?: { type?: string; status?: string }[];
+	};
+};
+
+function getScheduleData(object: ScheduleObject): Record<ScheduleAttribute, JsonValue> {
 	const readyCondition = object?.status?.conditions?.find(
-		(condition: any) => condition.type === 'Ready'
+		(condition) => condition.type === 'Ready'
 	);
 
 	return {

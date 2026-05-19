@@ -1,5 +1,6 @@
 import type { Client } from '@connectrpc/connect';
-import type { ResourceService } from '@otterscale/api/resource/v1';
+import type { Resource, ResourceService } from '@otterscale/api/resource/v1';
+import type { CoreV1Node } from '@otterscale/types';
 
 type ResourceClient = Client<typeof ResourceService>;
 
@@ -16,7 +17,7 @@ const GPU_PASSTHROUGH_LABELS = {
 export async function fetchNodesWithVmxLabel(
 	resourceClient: ResourceClient,
 	cluster: string
-): Promise<any[]> {
+): Promise<Resource[]> {
 	try {
 		const response = await resourceClient.list({
 			cluster,
@@ -24,8 +25,8 @@ export async function fetchNodesWithVmxLabel(
 			version: 'v1',
 			resource: 'nodes'
 		});
-		return response.items.filter((item: any) => {
-			const nodeLabels = (item.object as any)?.metadata?.labels ?? {};
+		return response.items.filter((item) => {
+			const nodeLabels = (item.object as CoreV1Node)?.metadata?.labels ?? {};
 			return nodeLabels['cpu-feature.node.kubevirt.io/vmx'] === 'true';
 		});
 	} catch (error) {
@@ -37,7 +38,7 @@ export async function fetchNodesWithVmxLabel(
 export async function fetchNodesWithGpuPassthrough(
 	resourceClient: ResourceClient,
 	cluster: string
-): Promise<any[]> {
+): Promise<Resource[]> {
 	try {
 		const response = await resourceClient.list({
 			cluster,
@@ -45,8 +46,8 @@ export async function fetchNodesWithGpuPassthrough(
 			version: 'v1',
 			resource: 'nodes'
 		});
-		return response.items.filter((item: any) => {
-			const nodeLabels = (item.object as any)?.metadata?.labels ?? {};
+		return response.items.filter((item) => {
+			const nodeLabels = (item.object as CoreV1Node)?.metadata?.labels ?? {};
 			return Object.entries(GPU_PASSTHROUGH_LABELS).every(
 				([key, value]) => nodeLabels[key] === value
 			);
@@ -67,16 +68,16 @@ export async function fetchAllGpuResources(
 		const quantities = new Map<string, number>();
 
 		for (const nodeItem of nodes) {
-			const allocatable = (nodeItem.object as any)?.status?.allocatable ?? {};
+			const allocatable = (nodeItem.object as CoreV1Node)?.status?.allocatable ?? {};
 			Object.keys(allocatable).forEach((resourceKey) => {
 				if (
 					resourceKey.startsWith('nvidia.com/') &&
 					!resourceKey.endsWith('vgpu') &&
 					!resourceKey.includes('/vgpu') &&
-					parseInt(allocatable[resourceKey]) > 0
+					parseInt(String(allocatable[resourceKey])) > 0
 				) {
 					gpuResources.add(resourceKey);
-					const quantity = parseInt(allocatable[resourceKey]) || 0;
+					const quantity = parseInt(String(allocatable[resourceKey])) || 0;
 					const currentMax = quantities.get(resourceKey) || 0;
 					if (quantity > currentMax) {
 						quantities.set(resourceKey, quantity);
@@ -107,7 +108,7 @@ export async function fetchGpuResourcesForNode(
 			name: nodeName
 		});
 
-		const nodeObj = response.object as any;
+		const nodeObj = response.object as CoreV1Node;
 		const nodeLabels = nodeObj?.metadata?.labels ?? {};
 		const hasGpuWorkloadConfig = nodeLabels['nvidia.com/gpu.workload.config'] === 'vm-passthrough';
 		const hasGpuPresent = nodeLabels['nvidia.com/gpu.present'] === 'true';
@@ -126,10 +127,10 @@ export async function fetchGpuResourcesForNode(
 				resourceKey.startsWith('nvidia.com/') &&
 				!resourceKey.endsWith('vgpu') &&
 				!resourceKey.includes('/vgpu') &&
-				parseInt(allocatable[resourceKey]) > 0
+				parseInt(String(allocatable[resourceKey])) > 0
 			) {
 				gpuResources.push(resourceKey);
-				quantities.set(resourceKey, parseInt(allocatable[resourceKey]) || 0);
+				quantities.set(resourceKey, parseInt(String(allocatable[resourceKey])) || 0);
 			}
 		});
 

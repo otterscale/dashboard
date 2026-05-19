@@ -1,10 +1,12 @@
+import type { JsonObject } from '@bufbuild/protobuf';
+import type { Schema } from '@sjsf/form';
 import type { Component } from 'svelte';
 
 import DefaultViewer from './default-viewer.svelte';
 import WorkspaceEditor from './workspace-editor.svelte';
 import WorkspaceViewer from './workspaces-viewer.svelte';
 
-type ViewerProps = { object: any; schema?: any };
+type ViewerProps = { object: JsonObject; schema?: Schema };
 type ViewerType = Component<ViewerProps>;
 
 type EditorProps = {
@@ -14,8 +16,8 @@ type EditorProps = {
 	version: string;
 	kind: string;
 	resource: string;
-	schema?: any;
-	object?: any;
+	schema?: Schema;
+	object?: JsonObject;
 	onsuccess?: () => void;
 };
 type EditorType = Component<EditorProps> | null;

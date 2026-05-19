@@ -36,21 +36,25 @@
 		version: string;
 		kind: string;
 		resource: string;
-		schema: any;
+		schema: Schema;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
 	// Container for Data
-	let values: any = $state({
-		apiVersion: `${group}/${version}`,
-		kind,
-		metadata: {},
-		spec: {
-			baseRefs: []
-		}
-	});
+	let values = $state(getInitialValues());
+
+	function getInitialValues() {
+		return {
+			apiVersion: `${group}/${version}`,
+			kind,
+			metadata: {} as FormValue,
+			spec: {
+				baseRefs: [] as { name: string }[]
+			}
+		};
+	}
 	let value = $derived(stringify(values));
 
 	// ===== Faceted GPU selector =====
@@ -133,11 +137,11 @@
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
-						...(lodash.omit(lodash.get(jsonSchema, 'properties.metadata'), 'properties') as any),
+						...lodash.omit(lodash.get(jsonSchema, 'properties.metadata') as Schema, 'properties'),
 						title: 'Metadata',
 						properties: {
 							name: {
-								...lodash.get(jsonSchema, 'properties.metadata.properties.name'),
+								...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema),
 								title: 'Name'
 							}
 						}
@@ -179,7 +183,7 @@
 				{#await resourceClient.list( { cluster, namespace, group: 'serving.kserve.io', version: 'v1alpha2', resource: 'llminferenceserviceconfigs' } )}
 					Loading
 				{:then response}
-					{@const templateNames = response.items.map((item: any) =>
+					{@const templateNames = response.items.map((item) =>
 						lodash.get(item.object, 'metadata.name')
 					)}
 					<Form

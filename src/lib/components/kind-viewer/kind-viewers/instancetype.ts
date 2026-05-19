@@ -1,5 +1,6 @@
 import { type JsonObject, type JsonValue } from '@bufbuild/protobuf';
 import type { APIResource } from '@otterscale/api/resource/v1';
+import type { InstancetypeKubevirtIoV1Beta1VirtualMachineInstancetype } from '@otterscale/types';
 import type { Column, ColumnDef } from '@tanstack/table-core';
 import { type Row } from '@tanstack/table-core';
 
@@ -37,7 +38,7 @@ function getVirtualMachineInstancetypeDataSchemas(): Record<
 }
 
 function getVirtualMachineInstancetypeData(
-	object: any
+	object: InstancetypeKubevirtIoV1Beta1VirtualMachineInstancetype
 ): Record<VirtualMachineInstancetypeAttribute, JsonValue> {
 	const cpuGuest = object?.spec?.cpu?.guest ?? null;
 	const memoryGuest = object?.spec?.memory?.guest ?? null;
