@@ -64,7 +64,7 @@
 {#snippet list(notifications: Notification[])}
 	<ScrollArea class="h-screen">
 		<div class="flex flex-col gap-4 py-4 pt-0">
-			{#each notifications as notification}
+			{#each notifications as notification (notification.id)}
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						<div

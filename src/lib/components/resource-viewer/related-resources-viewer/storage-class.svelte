@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { FileSearchIcon } from '@lucide/svelte';
+	import type { StorageK8SIoV1StorageClass } from '@otterscale/types';
 
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import { buttonVariants } from '$lib/components/ui/button';
@@ -12,7 +13,7 @@
 		storageClass,
 		cluster
 	}: {
-		storageClass: any;
+		storageClass: StorageK8SIoV1StorageClass;
 		cluster: string;
 	} = $props();
 </script>

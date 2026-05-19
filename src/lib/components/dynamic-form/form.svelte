@@ -152,6 +152,8 @@
 		if (result.errors.length > 0) createFocusOnFirstError()(result, event, form);
 	}
 
+	// schema, uiSchema, and initialValue are set once, capturing the initial value is intentional.
+	// svelte-ignore state_referenced_locally
 	const form = createForm<FormValue>({
 		...defaults,
 		theme,

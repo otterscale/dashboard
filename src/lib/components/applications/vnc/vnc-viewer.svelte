@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { Transport } from '@connectrpc/connect';
+	import type RFB from '@novnc/novnc';
 	import { getContext, onDestroy, onMount } from 'svelte';
 
 	import { ConnectWebSocket } from './connect-websocket';
@@ -17,7 +18,7 @@
 	const transport: Transport = getContext('transport');
 
 	let container = $state<HTMLElement>();
-	let rfb: any = null;
+	let rfb: RFB | null = null;
 	let ws: ConnectWebSocket | null = null;
 	let isConnected = $state(false);
 	let error = $state('');
@@ -43,9 +44,9 @@
 				error = '';
 			});
 
-			rfb.addEventListener('disconnect', (e: CustomEvent) => {
+			rfb.addEventListener('disconnect', (e) => {
 				isConnected = false;
-				if (!e.detail.clean) {
+				if (!(e as CustomEvent<{ clean: boolean }>).detail.clean) {
 					error = 'VNC connection lost';
 				}
 			});

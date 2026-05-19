@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { FileSearchIcon } from '@lucide/svelte';
+	import type { CoreV1PersistentVolume } from '@otterscale/types';
 
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import { Badge } from '$lib/components/ui/badge';
@@ -13,7 +14,7 @@
 		persistentVolume,
 		cluster
 	}: {
-		persistentVolume: any;
+		persistentVolume: CoreV1PersistentVolume;
 		cluster: string;
 	} = $props();
 

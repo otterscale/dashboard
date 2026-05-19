@@ -45,8 +45,9 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 				}
 			});
 		}
-	} catch (error: any) {
-		console.error('[harbor-proxy] Failed to proxy request:', error);
-		throw error(500, `Failed to proxy Harbor request: ${error?.message || 'Unknown error'}`);
+	} catch (err) {
+		console.error('[harbor-proxy] Failed to proxy request:', err);
+		const message = err instanceof Error ? err.message : 'Unknown error';
+		throw error(500, `Failed to proxy Harbor request: ${message}`);
 	}
 };
