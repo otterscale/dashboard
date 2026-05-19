@@ -76,20 +76,6 @@
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
-
-	function extractBucketName(uri: string): string {
-		const match = uri.match(/^\/\/([^/]+)/);
-		return match ? match[1] : uri.replace(/^s3:\/\//, '').split('/')[0];
-	}
-
-	function applyServiceAccountFromUri(uri: string) {
-		if (uri.startsWith('s3://') || uri.startsWith('//')) {
-			lodash.set(values, ['spec', 'template', 'serviceAccountName'], extractBucketName(uri));
-		} else {
-			lodash.unset(values, ['spec', 'template', 'serviceAccountName']);
-		}
-	}
-
 	function handleNext() {
 		currentStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
 	}
@@ -350,13 +336,6 @@
 												lodash.get(response.object, ['spec', 'model'])
 											);
 
-											const newModelUri = lodash.get(
-												response.object,
-												['spec', 'model', 'uri'],
-												''
-											) as string;
-											applyServiceAccountFromUri(newModelUri);
-
 											handleNext();
 										}
 									}}
@@ -565,13 +544,6 @@
 												['spec', 'model'],
 												lodash.get(response.object, ['spec', 'model'])
 											);
-
-											const newModelUri = lodash.get(
-												response.object,
-												['spec', 'model', 'uri'],
-												''
-											) as string;
-											applyServiceAccountFromUri(newModelUri);
 
 											handleNext();
 										}
