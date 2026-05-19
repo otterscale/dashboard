@@ -1,5 +1,6 @@
 import { type JsonObject, type JsonValue } from '@bufbuild/protobuf';
 import type { APIResource } from '@otterscale/api/resource/v1';
+import type { ObjectbucketIoV1Alpha1ObjectBucketClaim } from '@otterscale/types';
 import type { Column, ColumnDef } from '@tanstack/table-core';
 import { type Row } from '@tanstack/table-core';
 
@@ -35,15 +36,17 @@ function getObjectBucketClaimDataSchemas(): Record<ObjectBucketClaimAttribute, D
 	};
 }
 
-function getObjectBucketClaimData(object: any): Record<ObjectBucketClaimAttribute, JsonValue> {
+function getObjectBucketClaimData(
+	object: ObjectbucketIoV1Alpha1ObjectBucketClaim
+): Record<ObjectBucketClaimAttribute, JsonValue> {
 	return {
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.metadata?.namespace ?? null,
 		'Storage Class': object?.spec?.storageClassName ?? null,
 		'Bucket Name': object?.spec?.bucketName ?? null,
-		'Bucket Owner': object?.spec?.additionalConfig?.bucketOwner ?? null,
-		'Bucket Policy': object?.spec?.additionalConfig?.bucketPolicy ?? null,
-		Phase: object?.status?.phase ?? null,
+		'Bucket Owner': (object?.spec?.additionalConfig?.bucketOwner as string | undefined) ?? null,
+		'Bucket Policy': (object?.spec?.additionalConfig?.bucketPolicy as string | undefined) ?? null,
+		Phase: (object?.status?.phase as string | undefined) ?? null,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
 	};

@@ -53,7 +53,7 @@
 	// AbortController is used to terminate all watch streams when the component is destroyed
 	const abortController = new AbortController();
 
-	const getKey = (o: any) => o?.metadata?.uid ?? o?.metadata?.name ?? '';
+	const getKey = (o: TargetResource) => o?.metadata?.uid ?? o?.metadata?.name ?? '';
 	async function listAndWatch<T extends TargetResource>(
 		identifier: { group: string; version: string; resource: string },
 		setObjects: (items: T[]) => void,
@@ -327,8 +327,7 @@
 						{@const details = cephCluster?.status?.ceph?.details ?? {}}
 						{#if Object.keys(details).length > 0}
 							<div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-								{#each Object.entries(details) as [key, value] (key)}
-									{@const detail = value as any}
+								{#each Object.entries(details) as [key, detail] (key)}
 									<Item.Root class="p-0">
 										<Item.Content>
 											<Item.Title class="text-sm font-medium"

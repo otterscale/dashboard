@@ -158,9 +158,7 @@
 		extraUiOptions,
 		schema,
 		uiSchema,
-		get initialValue() {
-			return initialValue;
-		},
+		initialValue,
 		validator,
 		onSubmit,
 		onSubmitError

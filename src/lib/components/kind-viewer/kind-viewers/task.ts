@@ -35,9 +35,20 @@ function getTaskDataSchemas(): Record<TaskAttribute, DataSchemaType> {
 	};
 }
 
-function getTaskData(object: any): Record<TaskAttribute, JsonValue> {
+type TaskObject = {
+	metadata?: { name?: string; namespace?: string; creationTimestamp?: string };
+	spec?: { suspend?: boolean | string };
+	status?: {
+		state?: string;
+		status?: string;
+		completions?: number | string;
+		conditions?: { type?: string; status?: string }[];
+	};
+};
+
+function getTaskData(object: TaskObject): Record<TaskAttribute, JsonValue> {
 	const readyCondition = object?.status?.conditions?.find(
-		(condition: any) => condition.type === 'Ready'
+		(condition) => condition.type === 'Ready'
 	);
 
 	return {

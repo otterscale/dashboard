@@ -1,5 +1,7 @@
 <script lang="ts">
 	import Pencil from '@lucide/svelte/icons/pencil';
+	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
+	import type { Schema } from '@sjsf/form';
 
 	import Update from '$lib/components/kind-viewer/kind-viewer-actions/workspace/update.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -22,8 +24,8 @@
 		version: string;
 		kind: string;
 		resource: string;
-		schema: any;
-		object?: any;
+		schema: Schema;
+		object?: TenantOtterscaleIoV1Alpha1Workspace;
 		onsuccess?: () => void;
 	} = $props();
 </script>

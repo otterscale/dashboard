@@ -2,7 +2,8 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import FormIcon from '@lucide/svelte/icons/form';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type { FormValue, UiSchemaRoot } from '@sjsf/form';
+	import type { ServingKserveIoV1Alpha1LLMInferenceService } from '@otterscale/types';
+	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
 	import { load } from 'js-yaml';
@@ -38,8 +39,8 @@
 		version: string;
 		kind: string;
 		resource: string;
-		schema: any;
-		object: any;
+		schema: Schema;
+		object: ServingKserveIoV1Alpha1LLMInferenceService;
 		onOpenChangeComplete: () => void;
 	} = $props();
 
@@ -47,7 +48,13 @@
 	const resourceClient = createClient(ResourceService, transport);
 
 	// Container for Data – initialised from the existing object
-	let values: any = $state(lodash.cloneDeep(object));
+	let values = $state(getInitialValues());
+
+	function getInitialValues() {
+		return lodash.cloneDeep(object) as ServingKserveIoV1Alpha1LLMInferenceService & {
+			metadata?: Record<string, unknown>;
+		};
+	}
 
 	const systemFields = [
 		'clusterName',
