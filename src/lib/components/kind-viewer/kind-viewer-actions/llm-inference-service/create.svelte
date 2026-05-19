@@ -78,6 +78,14 @@
 		return match ? match[1] : uri.replace(/^s3:\/\//, '').split('/')[0];
 	}
 
+	function applyServiceAccountFromUri(uri: string) {
+		if (uri.startsWith('s3://') || uri.startsWith('//')) {
+			lodash.set(values, ['spec', 'template', 'serviceAccountName'], extractBucketName(uri));
+		} else {
+			lodash.unset(values, ['spec', 'template', 'serviceAccountName']);
+		}
+	}
+
 	function handleNext() {
 		currentStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
 	}
@@ -343,15 +351,7 @@
 												['spec', 'model', 'uri'],
 												''
 											) as string;
-											if (newModelUri.startsWith('s3://')) {
-												lodash.set(
-													values,
-													['spec', 'template', 'serviceAccountName'],
-													extractBucketName(newModelUri)
-												);
-											} else {
-												lodash.unset(values, ['spec', 'template', 'serviceAccountName']);
-											}
+											applyServiceAccountFromUri(newModelUri);
 
 											handleNext();
 										}
@@ -567,15 +567,7 @@
 												['spec', 'model', 'uri'],
 												''
 											) as string;
-											if (newModelUri.startsWith('s3://')) {
-												lodash.set(
-													values,
-													['spec', 'template', 'serviceAccountName'],
-													extractBucketName(newModelUri)
-												);
-											} else {
-												lodash.unset(values, ['spec', 'template', 'serviceAccountName']);
-											}
+											applyServiceAccountFromUri(newModelUri);
 
 											handleNext();
 										}

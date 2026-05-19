@@ -267,7 +267,8 @@
 								});
 								const validate = jsonSchemaValidator.compile(jsonSchema);
 
-								const isValid = validate(load(value));
+								const parsed = load(value);
+								const isValid = validate(parsed);
 
 								if (!isValid) {
 									console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
@@ -276,14 +277,14 @@
 									return;
 								}
 
-								const name = lodash.get(values, 'metadata.name');
-								const bucketName = lodash.get(values, 'spec.bucketName');
+								const name = lodash.get(parsed, 'metadata.name');
+								const bucketName = lodash.get(parsed, 'spec.bucketName');
 
 								toast.promise(
 									async () => {
 										const manifest = new TextEncoder().encode(value);
 
-										await resourceClient.create({
+										const obcResponse = await resourceClient.create({
 											cluster,
 											namespace,
 											group,
@@ -291,16 +292,10 @@
 											resource,
 											manifest
 										});
-
-										const obcResponse = await resourceClient.get({
-											cluster,
-											namespace,
-											group,
-											version,
-											resource,
-											name
-										});
 										const obcUid = lodash.get(obcResponse.object, 'metadata.uid') as string;
+										if (!obcUid) {
+											throw new Error('Failed to retrieve UID for created ObjectBucketClaim');
+										}
 
 										const serviceAccountYaml = stringify({
 											apiVersion: 'v1',
