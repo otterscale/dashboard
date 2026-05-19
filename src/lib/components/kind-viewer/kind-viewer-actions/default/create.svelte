@@ -2,7 +2,8 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import { type Schema, type ValidateFunction } from 'ajv';
+	import type { Schema } from '@sjsf/form';
+	import { type ValidateFunction } from 'ajv';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';

@@ -48,7 +48,7 @@
 			</Item.Content>
 		</Item.Root>
 	</div>
-	<DynamicTable dataset={data} {columnDefinitions} {uiSchemas} {reload}>
+	<DynamicTable {data} {columnDefinitions} {uiSchemas} {reload}>
 		{#snippet gridsLayout({ table, handleClear })}
 			{#if table.getRowModel().rows?.length}
 				<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

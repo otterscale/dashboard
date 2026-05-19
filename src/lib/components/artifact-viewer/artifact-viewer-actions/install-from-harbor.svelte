@@ -5,7 +5,7 @@
 	import FileIcon from '@lucide/svelte/icons/file';
 	import { ResourceService, type SchemaRequest } from '@otterscale/api/resource/v1';
 	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
-	import { type Schema, SubmitButton, type UiSchemaRoot } from '@sjsf/form';
+	import { type FormValue, type Schema, SubmitButton, type UiSchemaRoot } from '@sjsf/form';
 	import type { Row } from '@tanstack/table-core';
 	import Ajv from 'ajv';
 	import lodash from 'lodash';
@@ -89,15 +89,17 @@
 	});
 	let value = $derived(stringify(values, { schema: 'yaml-1.1' }));
 
-	const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
+	const helmRepository = $derived(
+		row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository
+	);
 
 	let charts: ArtifactChartType[] = $state([]);
 	async function fetchCharts() {
 		const chart = row.original.chart as unknown as ArtifactChartType;
 
-		const [project, ...latestChartNameParts] = $derived(chart.repository_name.split('/'));
-		const repository = $derived(latestChartNameParts.join('/'));
-		const harborHost = $derived(parseHarborHost(helmRepository));
+		const [project, ...latestChartNameParts] = chart.repository_name.split('/');
+		const repository = latestChartNameParts.join('/');
+		const harborHost = parseHarborHost(helmRepository);
 
 		try {
 			const projectPath = encodeHarborURIComponent(project);
@@ -251,10 +253,7 @@
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
-						...(lodash.omit(
-							lodash.get(jsonSchema, 'properties.metadata') as Schema,
-							'properties'
-						) as any),
+						...lodash.omit(lodash.get(jsonSchema, 'properties.metadata') as Schema, 'properties'),
 						title: 'Metadata',
 						properties: {
 							name: {
@@ -340,7 +339,7 @@
 							name: helmRepository?.metadata?.name,
 							namespace: helmRepository?.metadata?.namespace
 						}
-					} as any}
+					} as FormValue}
 					bind:values={values['spec']['chart']['spec']}
 					handleSubmit={{
 						posthook: () => {

@@ -1,13 +1,14 @@
+import type { Schema } from '@sjsf/form';
 import * as JSONSchemaFaker from 'json-schema-faker';
 import traverse from 'json-schema-traverse';
 import lodash from 'lodash';
 
 // Filter a schema to only include required fields, while preserving essential Kubernetes structures.
-function filterRequiredSchema(schema: any): any {
+function filterRequiredSchema(schema: Schema): Schema {
 	const requiredSchema = lodash.cloneDeep(schema);
 
-	traverse(requiredSchema, {
-		cb: (currentSchema: any, jsonPointer: string) => {
+	traverse(requiredSchema as traverse.SchemaObject, {
+		cb: (currentSchema, jsonPointer) => {
 			// Root object: preserve top-level structure but remove status
 			if (jsonPointer === '') {
 				if (currentSchema.properties) {
@@ -35,12 +36,12 @@ function filterRequiredSchema(schema: any): any {
 	return requiredSchema;
 }
 
-async function getInitialValues(schema: any) {
+async function getInitialValues(schema: Schema) {
 	try {
 		const schemaWithDefaults = lodash.cloneDeep(schema);
-		traverse(schemaWithDefaults, {
+		traverse(schemaWithDefaults as traverse.SchemaObject, {
 			allKeys: true,
-			cb: (currentSchema: any) => {
+			cb: (currentSchema) => {
 				if (currentSchema.default === undefined) {
 					switch (currentSchema.type) {
 						case 'null':
@@ -61,12 +62,15 @@ async function getInitialValues(schema: any) {
 			}
 		});
 
-		const initialValues = await JSONSchemaFaker.generate(schemaWithDefaults, {
-			useDefaultValue: true,
-			fillProperties: true,
-			alwaysFakeOptionals: true,
-			maxItems: 1
-		});
+		const initialValues = await JSONSchemaFaker.generate(
+			schemaWithDefaults as JSONSchemaFaker.JsonSchema,
+			{
+				useDefaultValue: true,
+				fillProperties: true,
+				alwaysFakeOptionals: true,
+				maxItems: 1
+			}
+		);
 
 		return initialValues;
 	} catch (error) {

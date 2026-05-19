@@ -54,11 +54,10 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 		});
 
 		return json(entries);
-	} catch (err: any) {
+	} catch (err) {
 		console.error('[helm-repository-index] Failed to fetch repository index:', err);
-		throw error(
-			err?.status ?? 500,
-			`Failed to fetch Helm repository index: ${err?.message || 'Unknown error'}`
-		);
+		const status = (err as { status?: number })?.status ?? 500;
+		const message = err instanceof Error ? err.message : 'Unknown error';
+		throw error(status, `Failed to fetch Helm repository index: ${message}`);
 	}
 };

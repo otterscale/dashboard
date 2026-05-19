@@ -5,7 +5,7 @@
 	import { ResourceService, type SchemaRequest } from '@otterscale/api/resource/v1';
 	import { RuntimeService } from '@otterscale/api/runtime/v1';
 	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
-	import { type Schema, SubmitButton, type UiSchemaRoot } from '@sjsf/form';
+	import { type FormValue, type Schema, SubmitButton, type UiSchemaRoot } from '@sjsf/form';
 	import type { Row } from '@tanstack/table-core';
 	import Ajv from 'ajv';
 	import { load } from 'js-yaml';
@@ -90,7 +90,9 @@
 	});
 	let value = $derived(stringify(values));
 
-	const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
+	const helmRepository = $derived(
+		row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository
+	);
 
 	let charts: IndexChartType[] = $derived(
 		lodash.get(row.original.chart, 'versions', {}) as IndexChartType[]
@@ -184,10 +186,7 @@
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
-						...(lodash.omit(
-							lodash.get(jsonSchema, 'properties.metadata') as Schema,
-							'properties'
-						) as any),
+						...lodash.omit(lodash.get(jsonSchema, 'properties.metadata') as Schema, 'properties'),
 						title: 'Metadata',
 						properties: {
 							name: {
@@ -273,7 +272,7 @@
 							name: helmRepository?.metadata?.name,
 							namespace: helmRepository?.metadata?.namespace
 						}
-					} as any}
+					} as FormValue}
 					bind:values={values['spec']['chart']['spec']}
 					handleSubmit={{
 						posthook: () => {

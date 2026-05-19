@@ -37,6 +37,7 @@
 	import ZapIcon from '@lucide/svelte/icons/zap';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { type TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
+	import type { Schema } from '@sjsf/form';
 	import { type Component, getContext, onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
@@ -76,7 +77,7 @@
 			? workspaces.find((w) => w.metadata?.name === workspace)
 			: undefined
 	);
-	let workspaceSchema: any = $state();
+	let workspaceSchema = $state<Schema | undefined>();
 	let createWorkspaceOpen = $state(false);
 	let isMac = $state(false);
 

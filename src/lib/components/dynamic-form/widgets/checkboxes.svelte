@@ -66,8 +66,8 @@
 </script>
 
 {#each options as option (option.id)}
-	{@const optionValue: any = option?.value}
-	{@const disabled = optionValue.disabled || attributes.disabled}
+	{@const optionValue = option?.value as SchemaValue}
+	{@const disabled = !!((optionValue as { disabled?: boolean })?.disabled || attributes.disabled)}
 	<div class="flex items-center space-x-3">
 		<Checkbox
 			checked={selected.has(option.id)}

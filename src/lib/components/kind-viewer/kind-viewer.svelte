@@ -19,6 +19,7 @@
 	import type { ColumnDef } from '@tanstack/table-core';
 	import Ajv, { type ValidateFunction } from 'ajv';
 	import { getContext, onDestroy, onMount } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 
 	import { DynamicTable } from '$lib/components/dynamic-table';
@@ -80,7 +81,11 @@
 	}
 
 	let fetchError: Error | null = $state(null);
-	let dataset: Record<string, JsonValue>[] = $state([]);
+	const dataset = new SvelteMap<string, Record<string, JsonValue>>();
+	const data = $derived(Array.from(dataset.values()));
+	function getKey(datum: Record<string, JsonValue>): string {
+		return apiResource.namespaced ? `${datum['Namespace']}/${datum['Name']}` : `${datum['Name']}`;
+	}
 	let columnDefinitions: ColumnDef<Record<string, JsonValue>>[] | undefined = $state(undefined);
 
 	let listAbortController: AbortController | null = null;
@@ -114,8 +119,12 @@
 				resourceVersion = response.resourceVersion;
 				continueToken = response.continue;
 
-				const newData = response.items.map((item) => getData(apiResource, item.object ?? {}));
-				dataset = [...dataset, ...newData];
+				for (const item of response.items) {
+					if (item.object) {
+						const data = getData(apiResource, item.object);
+						dataset.set(getKey(data), data);
+					}
+				}
 
 				isMounted = true;
 
@@ -172,43 +181,13 @@
 
 				if (response.type === WatchEvent_Type.ADDED) {
 					const addedData = getData(apiResource, response.resource?.object);
-
-					const index = dataset.findIndex((object) => {
-						if (apiResource.namespaced) {
-							return object.Namespace === addedData.Namespace && object.Name === addedData.Name;
-						} else {
-							return object.Name === addedData.Name;
-						}
-					});
-
-					if (index < 0) {
-						dataset = [...dataset, addedData];
-					}
+					dataset.set(getKey(addedData), addedData);
 				} else if (response.type === WatchEvent_Type.MODIFIED) {
 					const modifiedData = getData(apiResource, response.resource?.object);
-
-					dataset = dataset.map((object) => {
-						if (
-							apiResource.namespaced &&
-							object.Namespace === modifiedData.Namespace &&
-							object.Name === modifiedData.Name
-						) {
-							return modifiedData;
-						} else if (!apiResource.namespaced && object.Name === modifiedData.Name) {
-							return modifiedData;
-						}
-
-						return object;
-					});
+					dataset.set(getKey(modifiedData), modifiedData);
 				} else if (response.type === WatchEvent_Type.DELETED) {
 					const deletedData = getData(apiResource, response.resource?.object);
-					dataset = dataset.filter((object) => {
-						if (apiResource.namespaced) {
-							return object.Namespace === deletedData.Namespace && object.Name !== deletedData.Name;
-						} else {
-							return object.Name !== deletedData.Name;
-						}
-					});
+					dataset.delete(getKey(deletedData));
 				} else {
 					console.error('Unknown response type: ', response);
 				}
@@ -237,7 +216,7 @@
 			watchAbortController.abort();
 		}
 
-		dataset = [];
+		dataset.clear();
 		resourceVersion = undefined;
 		fetchError = null;
 		isListing = false;
@@ -304,7 +283,7 @@
 	</Empty.Root>
 {:else if isMounted}
 	{#if columnDefinitions}
-		<DynamicTable {dataset} {columnDefinitions} {uiSchemas}>
+		<DynamicTable {data} {columnDefinitions} {uiSchemas}>
 			{#snippet accessReview()}
 				{#if isClusterAdmin}
 					<Tooltip.Root>
