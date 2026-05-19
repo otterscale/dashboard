@@ -84,7 +84,7 @@
 	const dataset = new SvelteMap<string, Record<string, JsonValue>>();
 	const data = $derived(Array.from(dataset.values()));
 	function getKey(datum: Record<string, JsonValue>): string {
-		return apiResource.namespaced ? `${datum.Namespace}/${datum.Name}` : `${datum.Name}`;
+		return apiResource.namespaced ? `${datum['Namespace']}/${datum['Name']}` : `${datum['Name']}`;
 	}
 	let columnDefinitions: ColumnDef<Record<string, JsonValue>>[] | undefined = $state(undefined);
 
