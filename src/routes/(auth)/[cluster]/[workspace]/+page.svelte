@@ -28,12 +28,6 @@
 		]);
 	});
 
-	const endpointMap: Record<string, string> = {
-		LLMInferenceService: 'ModelGatewayEndpoint',
-		ObjectBucketClaim: 'ObjectGatewayEndpoint',
-		Service: 'ServiceEndpoint'
-	};
-
 	const isClusterAdmin = $derived(page.data.isClusterAdmin === true);
 	const cluster = $derived(page.params.cluster ?? '');
 	const namespace = $derived(page.url.searchParams.get('namespace') ?? page.data.namespace ?? '');
@@ -49,36 +43,50 @@
 		const response = await client.discovery({ cluster } as DiscoveryRequest);
 
 		return response.apiResources.filter(
-			(r) => r && r.group === group && r.version === version && r.kind === kind
+			(apiResource) =>
+				apiResource &&
+				apiResource.group === group &&
+				apiResource.version === version &&
+				apiResource.kind === kind
 		);
 	}
 
 	async function getDescription(kind: string) {
-		const endpointKey = endpointMap[kind];
-		if (!endpointKey) {
-			return `${group || 'core'}/${version}`;
-		}
-
-		const response = await client.get({
+		const response = (await client.get({
 			cluster,
 			namespace,
 			name: 'workspace-config',
 			group: '',
 			version: 'v1',
 			resource: 'configmaps'
-		});
-		const config = (response.object as CoreV1ConfigMap).data;
+		})) as unknown as { object: CoreV1ConfigMap };
+		const configuration = response.object.data;
 
-		const endpoint = config?.[endpointKey];
-		if (!endpoint) return 'Unavailable';
+		let endpoint = '';
+		switch (kind) {
+			case 'LLMInferenceService':
+				endpoint = configuration?.['ModelGatewayEndpoint'] ?? 'Unavailable';
+				break;
+			case 'ObjectBucketClaim':
+				endpoint = configuration?.['ObjectGatewayEndpoint'] ?? 'Unavailable';
+				break;
+			case 'Service':
+				endpoint = configuration?.['ServiceEndpoint'] ?? 'Unavailable';
+				break;
+			default:
+				endpoint = 'Unavailable';
+		}
 
-		const ns = namespace || '<Namespace>';
-		const suffixMap: Record<string, string> = {
-			Service: ':<NodePort>',
-			LLMInferenceService: `/${ns}/<Name>`,
-			ObjectBucketClaim: `/${ns}-<Name>`
-		};
-		return `Available at ${endpoint}${suffixMap[kind] ?? ''}`;
+		switch (kind) {
+			case 'LLMInferenceService':
+				return `Available at ${endpoint}/${namespace || '<Namespace>'}/<Name>`;
+			case 'ObjectBucketClaim':
+				return `Available at ${endpoint}/${namespace || '<Namespace>'}-<Name>`;
+			case 'Service':
+				return `Available at ${endpoint}:<NodePort>`;
+			default:
+				return `${group || 'core'}/${version}`;
+		}
 	}
 </script>
 
