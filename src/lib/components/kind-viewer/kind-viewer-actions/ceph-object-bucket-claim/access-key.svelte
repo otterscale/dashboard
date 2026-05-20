@@ -2,15 +2,9 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import { KeyIcon } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type {
-		CoreV1ConfigMap,
-		CoreV1Secret,
-		ObjectbucketIoV1Alpha1ObjectBucketClaim
-	} from '@otterscale/types';
+	import type { CoreV1Secret, ObjectbucketIoV1Alpha1ObjectBucketClaim } from '@otterscale/types';
 	import lodash from 'lodash';
-	import { getContext, untrack } from 'svelte';
-	import { toast } from 'svelte-sonner';
-	import { stringify } from 'yaml';
+	import { getContext } from 'svelte';
 
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -32,15 +26,8 @@
 	const resourceClient = createClient(ResourceService, transport);
 
 	let open = $state(false);
-	let isPatching = $state(false);
 
 	const name = $derived(object?.metadata?.name ?? '');
-
-	$effect(() => {
-		if (open) {
-			untrack(() => applyKServeAnnotations());
-		}
-	});
 
 	async function fetchSecret(): Promise<CoreV1Secret | null> {
 		try {
@@ -56,81 +43,6 @@
 		} catch {
 			return null;
 		}
-	}
-
-	async function fetchWorkspaceConfiguration(): Promise<CoreV1ConfigMap | null> {
-		try {
-			const response = await resourceClient.get({
-				cluster,
-				namespace,
-				name: 'workspace-config',
-				group: '',
-				version: 'v1',
-				resource: 'configmaps'
-			});
-			return response.object as CoreV1ConfigMap;
-		} catch {
-			return null;
-		}
-	}
-
-	function applyKServeAnnotations() {
-		if (isPatching) return;
-		isPatching = true;
-
-		toast.promise(
-			async () => {
-				const workspaceConfiguration = await fetchWorkspaceConfiguration();
-				const endpoint = lodash.get(
-					workspaceConfiguration,
-					['data', 'ObjectGatewayEndpoint'],
-					''
-				) as string;
-				if (!endpoint) {
-					throw new Error('ObjectGatewayEndpoint not found in workspace-config');
-				}
-
-				const manifest = new TextEncoder().encode(
-					stringify({
-						apiVersion: 'v1',
-						kind: 'Secret',
-						metadata: {
-							name,
-							namespace,
-							annotations: {
-								'serving.kserve.io/s3-endpoint': endpoint,
-								'serving.kserve.io/s3-usehttps': '0',
-								'serving.kserve.io/s3-verifyssl': '0',
-								'serving.kserve.io/s3-useanoncredential': 'false'
-							}
-						}
-					})
-				);
-
-				await resourceClient.apply({
-					cluster,
-					namespace,
-					name,
-					group: '',
-					version: 'v1',
-					resource: 'secrets',
-					manifest,
-					fieldManager: 'otterscale-web-ui',
-					force: true
-				});
-			},
-			{
-				loading: `Configuring ${name} for KServe...`,
-				success: () => `Successfully configured ${name} for KServe`,
-				error: (error) => {
-					console.error(`Failed to configure ${name} for KServe:`, error);
-					return `Failed to configure ${name} for KServe: ${lodash.get(error, 'message')}`;
-				},
-				finally() {
-					isPatching = false;
-				}
-			}
-		);
 	}
 </script>
 

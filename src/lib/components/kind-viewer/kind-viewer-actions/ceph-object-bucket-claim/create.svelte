@@ -3,6 +3,7 @@
 	import { SquareArrowOutUpRightIcon } from '@lucide/svelte';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { ResourceService } from '@otterscale/api/resource/v1';
+	import type { CoreV1ConfigMap } from '@otterscale/types';
 	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
@@ -297,12 +298,36 @@
 											throw new Error('Failed to retrieve UID for created ObjectBucketClaim');
 										}
 
+										const workspaceConfigResponse = await resourceClient
+											.get({
+												cluster,
+												namespace,
+												name: 'workspace-config',
+												group: '',
+												version: 'v1',
+												resource: 'configmaps'
+											})
+											.catch(() => null);
+										const endpoint = lodash.get(
+											workspaceConfigResponse?.object as CoreV1ConfigMap | undefined,
+											['data', 'ObjectGatewayEndpoint'],
+											''
+										) as string;
+										if (!endpoint) {
+											throw new Error('ObjectGatewayEndpoint not found in workspace-config');
+										}
+
 										const serviceAccountYaml = stringify({
 											apiVersion: 'v1',
 											kind: 'ServiceAccount',
 											metadata: {
 												name: bucketName,
 												namespace: namespace,
+												annotations: {
+													'serving.kserve.io/s3-endpoint': endpoint,
+													'serving.kserve.io/s3-usehttps': '0',
+													'serving.kserve.io/s3-verifyssl': '0',
+												},
 												ownerReferences: [
 													{
 														apiVersion: `${group}/${version}`,
