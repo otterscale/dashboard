@@ -23,7 +23,7 @@
 	} = $props();
 </script>
 
-<Card.Root>
+<Card.Root class="border-0 bg-muted/30 shadow-none ring-0">
 	<Card.Header>
 		<Card.Title>{pod?.metadata?.name}</Card.Title>
 		<Card.Description>

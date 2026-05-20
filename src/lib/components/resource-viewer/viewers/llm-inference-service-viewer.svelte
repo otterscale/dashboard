@@ -18,7 +18,6 @@
 
 	import { page } from '$app/state';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
-	import { typographyVariants } from '$lib/components/typography/index.ts';
 	import { Badge } from '$lib/components/ui/badge';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
@@ -26,7 +25,6 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as Item from '$lib/components/ui/item';
-	import Label from '$lib/components/ui/label/label.svelte';
 	import { cn } from '$lib/utils';
 
 	import DeploymentViewer from '../related-resources-viewer/deployment.svelte';
@@ -157,7 +155,11 @@
 		});
 	}
 
-	const conditions = $derived(object?.status?.conditions ?? []);
+	const conditions = $derived(
+		[...(object?.status?.conditions ?? [])].sort(
+			(previous, next) => Number(previous.status === 'True') - Number(next.status === 'True')
+		)
+	);
 	const readyCondition = $derived(conditions.find((condition) => condition.type === 'Ready'));
 	const isReady = $derived(readyCondition?.status === 'True');
 
@@ -196,9 +198,9 @@
 	});
 </script>
 
-<Field.Group class="pb-8">
+<Field.Group>
 	<Field.Set>
-		<Card.Root class="flex h-full flex-col border-0 bg-muted/50 shadow-none">
+		<Card.Root class="flex h-full flex-col border-0 bg-muted/30 shadow-none ring-0">
 			<Card.Header>
 				<Card.Title>
 					<Item.Root class="p-0">
@@ -240,7 +242,7 @@
 									</Item.Actions>
 								</Item.Root>
 							{:else}
-								<Item.Root class="**:text-destructive">
+								<Item.Root class="p-0">
 									<Item.Content>
 										<Item.Title class="flex items-center gap-2 text-sm font-medium">
 											{condition.reason}
@@ -266,7 +268,15 @@
 	</Field.Set>
 
 	<Field.Set>
-		<Label class={typographyVariants({ variant: 'h6' })}>Deployments</Label>
+		<Item.Root class="p-0">
+			<Item.Content>
+				<Item.Title>Related Deployments</Item.Title>
+				<Item.Description>
+					{deployments.length} deployments related to {object.kind}
+					{object.metadata?.name}
+				</Item.Description>
+			</Item.Content>
+		</Item.Root>
 		{#if deployments.length > 0}
 			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
 				{#each deployments as deployment (deployment.metadata?.uid)}
@@ -274,7 +284,7 @@
 				{/each}
 			</div>
 		{:else}
-			<Empty.Root class="h-full">
+			<Empty.Root class="h-full bg-muted/30">
 				<Empty.Header>
 					<Empty.Media variant="icon">
 						<Layers />
@@ -289,7 +299,15 @@
 	</Field.Set>
 
 	<Field.Set>
-		<Label class={typographyVariants({ variant: 'h6' })}>Pods</Label>
+		<Item.Root class="p-0">
+			<Item.Content>
+				<Item.Title>Related Pods</Item.Title>
+				<Item.Description>
+					{pods.length} pods related to {object.kind}
+					{object.metadata?.name}
+				</Item.Description>
+			</Item.Content>
+		</Item.Root>
 		{#if pods.length > 0}
 			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
 				{#each pods as pod (pod.metadata?.uid)}
@@ -297,7 +315,7 @@
 				{/each}
 			</div>
 		{:else}
-			<Empty.Root class="h-full">
+			<Empty.Root class="h-full bg-muted/30">
 				<Empty.Header>
 					<Empty.Media variant="icon">
 						<Box />
@@ -312,7 +330,15 @@
 	</Field.Set>
 
 	<Field.Set>
-		<Label class={typographyVariants({ variant: 'h6' })}>Services</Label>
+		<Item.Root class="p-0">
+			<Item.Content>
+				<Item.Title>Related Services</Item.Title>
+				<Item.Description>
+					{services.length} services related to {object.kind}
+					{object.metadata?.name}
+				</Item.Description>
+			</Item.Content>
+		</Item.Root>
 		{#if services.length > 0}
 			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
 				{#each services as service (service.metadata?.uid)}
@@ -320,7 +346,7 @@
 				{/each}
 			</div>
 		{:else}
-			<Empty.Root class="h-full">
+			<Empty.Root class="h-full bg-muted/30">
 				<Empty.Header>
 					<Empty.Media variant="icon">
 						<Server />
@@ -335,7 +361,15 @@
 	</Field.Set>
 
 	<Field.Set>
-		<Label class={typographyVariants({ variant: 'h6' })}>HTTP Routes</Label>
+		<Item.Root class="p-0">
+			<Item.Content>
+				<Item.Title>HTTP Routes</Item.Title>
+				<Item.Description>
+					{httpRoutes.length} HTTP Routes related to {object.kind}
+					{object.metadata?.name}
+				</Item.Description>
+			</Item.Content>
+		</Item.Root>
 		{#if httpRoutes.length > 0}
 			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
 				{#each httpRoutes as httpRoute (httpRoute.metadata?.uid)}
@@ -401,7 +435,7 @@
 				{/each}
 			</div>
 		{:else}
-			<Empty.Root class="h-full">
+			<Empty.Root class="h-full bg-muted/30">
 				<Empty.Header>
 					<Empty.Media variant="icon">
 						<Route />

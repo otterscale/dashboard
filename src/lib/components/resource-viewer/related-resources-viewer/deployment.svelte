@@ -1,11 +1,10 @@
 <script lang="ts">
 	import {
-		CircleIcon,
+		ChevronUpIcon,
 		FileSearchIcon,
 		RotateCcwIcon,
 		ScrollTextIcon,
-		TerminalSquareIcon,
-		XIcon
+		TerminalSquareIcon
 	} from '@lucide/svelte';
 	import type { AppsV1Deployment } from '@otterscale/types';
 
@@ -16,6 +15,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
+	import * as Collapsible from '$lib/components/ui/collapsible';
 	import * as Dialog from '$lib/components/ui/dialog/index.ts';
 	import * as Item from '$lib/components/ui/item';
 	import { cn } from '$lib/utils';
@@ -31,7 +31,7 @@
 	} = $props();
 </script>
 
-<Card.Root>
+<Card.Root class="border-0 bg-muted/30 shadow-none ring-0">
 	<Card.Header>
 		<Card.Title>{deployment?.metadata?.name}</Card.Title>
 		<Card.Description>
@@ -93,21 +93,32 @@
 	<Card.Content class="flex flex-col gap-2">
 		{@const conditions = deployment?.status?.conditions ?? []}
 		{#each conditions as condition, index (index)}
-			<Item.Root class="p-0">
-				<Item.Media>
-					{#if condition.status === 'True'}
-						<CircleIcon />
-					{:else}
-						<XIcon />
-					{/if}
-				</Item.Media>
-				<Item.Content>
-					<Item.Title>{condition.type}</Item.Title>
-					<Item.Description>{condition.reason}</Item.Description>
+			<Collapsible.Root class="rounded-lg transition-colors duration-200">
+				<Collapsible.Trigger class="group w-full hover:underline">
+					<Item.Root class="p-0">
+						<Item.Media>
+							<Badge>{condition.status}</Badge>
+						</Item.Media>
+						<Item.Content>
+							<Item.Title>{condition.type}</Item.Title>
+							<Item.Description class="flex items-center gap-2">
+								{condition.reason}
+							</Item.Description>
+						</Item.Content>
+						<Item.Actions>
+							<ChevronUpIcon
+								size={12}
+								class="transition-transform duration-200 group-data-[state=open]:rotate-180"
+							/>
+						</Item.Actions>
+					</Item.Root>
+				</Collapsible.Trigger>
+				<Collapsible.Content
+					class="overflow-hidden rounded-lg p-4 text-sm break-all transition-all duration-300 ease-in-out"
+				>
 					{condition.message}
-				</Item.Content>
-				<Item.Actions>{condition.lastUpdateTime}</Item.Actions>
-			</Item.Root>
+				</Collapsible.Content>
+			</Collapsible.Root>
 		{/each}
 	</Card.Content>
 </Card.Root>
