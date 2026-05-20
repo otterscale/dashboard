@@ -64,7 +64,6 @@
 		while (!abortController.signal.aborted) {
 			let resourceVersion = '';
 
-			// === 1. List: Get initial snapshot ===
 			try {
 				const response = await resourceClient.list(
 					{
@@ -85,7 +84,6 @@
 				continue;
 			}
 
-			// === 2. Watch: Stream events starting from this resourceVersion ===
 			try {
 				const stream = resourceClient.watch(
 					{
@@ -105,7 +103,6 @@
 					}
 
 					if (event.type === WatchEvent_Type.ERROR) {
-						// Server-side error (e.g., resourceVersion too old) -> break, re-list-then-watch
 						console.warn(`Watch error for ${identifier.resource}, relisting...`);
 						break;
 					}
@@ -144,7 +141,6 @@
 				console.error(`Watch stream error for ${identifier.resource}:`, error);
 			}
 
-			// Stream ended or error -> wait briefly and re-list-then-watch
 			if (!abortController.signal.aborted) {
 				await sleep(1000);
 			}
@@ -161,21 +157,13 @@
 		});
 	}
 
-	// L1 - The LLMInferenceService itself
 	const conditions = $derived(object?.status?.conditions ?? []);
 	const readyCondition = $derived(conditions.find((condition) => condition.type === 'Ready'));
 	const isReady = $derived(readyCondition?.status === 'True');
 
-	// L3 - Deployments
 	let deployments = $state<AppsV1Deployment[]>([]);
-
-	// L3 - Services
 	let services = $state<CoreV1Service[]>([]);
-
-	// L3 - Pods
 	let pods = $state<CoreV1Pod[]>([]);
-
-	// L3 - HTTPRoutes
 	let httpRoutes = $state<GatewayNetworkingK8SIoV1HTTPRoute[]>([]);
 
 	onMount(() => {
@@ -209,7 +197,6 @@
 </script>
 
 <Field.Group class="pb-8">
-	<!-- L1 - LLMInferenceService -->
 	<Field.Set>
 		<Card.Root class="flex h-full flex-col border-0 bg-muted/50 shadow-none">
 			<Card.Header>
@@ -278,7 +265,6 @@
 		</Card.Root>
 	</Field.Set>
 
-	<!-- L3 - Deployments -->
 	<Field.Set>
 		<Label class={typographyVariants({ variant: 'h6' })}>Deployments</Label>
 		{#if deployments.length > 0}
@@ -302,7 +288,6 @@
 		{/if}
 	</Field.Set>
 
-	<!-- L3 - Pods -->
 	<Field.Set>
 		<Label class={typographyVariants({ variant: 'h6' })}>Pods</Label>
 		{#if pods.length > 0}
@@ -326,7 +311,6 @@
 		{/if}
 	</Field.Set>
 
-	<!-- L3 - Services -->
 	<Field.Set>
 		<Label class={typographyVariants({ variant: 'h6' })}>Services</Label>
 		{#if services.length > 0}
@@ -350,7 +334,6 @@
 		{/if}
 	</Field.Set>
 
-	<!-- L3 - HTTPRoutes -->
 	<Field.Set>
 		<Label class={typographyVariants({ variant: 'h6' })}>HTTP Routes</Label>
 		{#if httpRoutes.length > 0}
