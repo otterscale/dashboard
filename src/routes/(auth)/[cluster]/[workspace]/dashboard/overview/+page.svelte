@@ -8,7 +8,7 @@
 	breadcrumbs.set([
 		{
 			title: m.workspace_dashboard_title(),
-			url: resolve('/(auth)/[cluster]/[workspace]/overview', {
+			url: resolve('/(auth)/[cluster]/[workspace]/dashboard/overview', {
 				cluster: page.params.cluster!,
 				workspace: page.data.namespace!
 			})

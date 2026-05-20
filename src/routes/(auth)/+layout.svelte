@@ -102,7 +102,9 @@
 		const workspace = newWorkspaces[0]?.metadata?.name;
 
 		if (workspace) {
-			await goto(resolve('/(auth)/[cluster]/[workspace]/overview', { cluster, workspace }));
+			await goto(
+				resolve('/(auth)/[cluster]/[workspace]/dashboard/overview', { cluster, workspace })
+			);
 		} else {
 			await goto(resolve('/(auth)/[cluster]/console', { cluster }));
 		}
@@ -141,7 +143,7 @@
 			{
 				title: m.overview(),
 				url: page.params.workspace
-					? resolve('/(auth)/[cluster]/[workspace]/overview', {
+					? resolve('/(auth)/[cluster]/[workspace]/dashboard/overview', {
 							cluster: activeCluster,
 							workspace: page.params.workspace
 						})

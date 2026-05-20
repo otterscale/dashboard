@@ -3,7 +3,7 @@
 	import { scaleBand } from 'd3-scale';
 	import { BarChart, type ChartState, Highlight } from 'layerchart';
 	import { InstantVector, PrometheusDriver } from 'prometheus-query';
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, untrack } from 'svelte';
 	import { cubicInOut } from 'svelte/easing';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
@@ -116,7 +116,7 @@
 					props={{
 						bars: {
 							stroke: 'none',
-							initialY: context?.height,
+							initialY: untrack(() => context?.height),
 							initialHeight: 0,
 							motion: {
 								y: { type: 'tween', duration: 500, easing: cubicInOut },

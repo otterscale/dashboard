@@ -4,6 +4,7 @@
 	import type { WidgetDefinition } from './types';
 
 	let {
+		cluster,
 		widgets,
 		prometheusDriver,
 		namespace,
@@ -12,6 +13,7 @@
 		endIsNow = false,
 		isReloading = $bindable()
 	}: {
+		cluster: string;
 		widgets: WidgetDefinition[];
 		prometheusDriver: PrometheusDriver;
 		namespace?: string;
@@ -29,6 +31,7 @@
 		<Component
 			{prometheusDriver}
 			bind:isReloading
+			{cluster}
 			{...start != null && end != null ? { start, end, endIsNow } : {}}
 			{...widget.needsNamespace ? { namespace } : {}}
 			{...props}
