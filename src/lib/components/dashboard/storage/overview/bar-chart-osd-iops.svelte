@@ -66,10 +66,7 @@
 	// Copy the bound chart height into plain state via $effect (not $derived):
 	// reading context.height inside a $derived that feeds back into the chart's
 	// `props` triggers Svelte's `derived_references_self` error.
-	let chartHeight = $state<number>();
-	$effect(() => {
-		chartHeight = context?.height;
-	});
+	let chartHeight = $derived(context?.height);
 
 	// Derived state
 	const queries = $derived({
