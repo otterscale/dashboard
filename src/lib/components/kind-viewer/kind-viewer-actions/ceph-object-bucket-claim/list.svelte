@@ -128,7 +128,9 @@ curl -s "http://${endpoint}/${bucketName}/" \\
   -H "Date: $TIMESTAMP" \\
   -H "Authorization: AWS $ACCESS_KEY:$SIGNATURE"\
 `}
-				<Code.Root lang="bash" code={command} hideLines />
+				<Code.Root lang="bash" code={command} hideLines>
+					<Code.CopyButton />
+				</Code.Root>
 				<Button
 					class="mt-auto w-full"
 					onclick={() => {

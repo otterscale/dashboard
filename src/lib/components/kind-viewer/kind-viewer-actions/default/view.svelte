@@ -43,11 +43,8 @@
 				</Item.Content>
 			</Item.Root>
 		</Dialog.Header>
-		<Code.Root
-			variant="secondary"
-			lang="yaml"
-			code={stringify(object)}
-			class="w-full border-none"
-		/>
+		<Code.Root variant="secondary" lang="yaml" code={stringify(object)} class="w-full border-none">
+			<Code.CopyButton />
+		</Code.Root>
 	</Dialog.Content>
 </Dialog.Root>

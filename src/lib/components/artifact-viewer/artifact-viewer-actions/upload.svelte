@@ -90,7 +90,9 @@
 										2
 									)}
 									hideLines
-								/>
+								>
+									<Code.CopyButton />
+								</Code.Root>
 							</div>
 						</Collapsible.Content>
 					</Collapsible.Root>
@@ -109,7 +111,9 @@
 										'\n'
 									)}
 									hideLines
-								/>
+								>
+									<Code.CopyButton />
+								</Code.Root>
 							</div>
 						</Collapsible.Content>
 					</Collapsible.Root>
