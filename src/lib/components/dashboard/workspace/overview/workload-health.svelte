@@ -117,6 +117,7 @@
 
 	async function fetch() {
 		if (!namespace || !cluster) {
+			console.log(namespace, cluster);
 			rows = [];
 			return;
 		}
