@@ -326,7 +326,7 @@
 												annotations: {
 													'serving.kserve.io/s3-endpoint': endpoint,
 													'serving.kserve.io/s3-usehttps': '0',
-													'serving.kserve.io/s3-verifyssl': '0',
+													'serving.kserve.io/s3-verifyssl': '0'
 												},
 												ownerReferences: [
 													{
