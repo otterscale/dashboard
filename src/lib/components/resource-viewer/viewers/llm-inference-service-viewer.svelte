@@ -2,10 +2,8 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import { BotIcon } from '@lucide/svelte';
 	import Box from '@lucide/svelte/icons/box';
-	import BrainCircuit from '@lucide/svelte/icons/brain-circuit';
 	import FileSearchIcon from '@lucide/svelte/icons/file-search';
 	import Layers from '@lucide/svelte/icons/layers';
-	import Network from '@lucide/svelte/icons/network';
 	import Route from '@lucide/svelte/icons/route';
 	import Server from '@lucide/svelte/icons/server';
 	import { ResourceService, WatchEvent_Type } from '@otterscale/api/resource/v1';
