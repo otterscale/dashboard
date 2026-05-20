@@ -3,7 +3,7 @@
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { BarChart, type ChartState, Highlight } from 'layerchart';
 	import { PrometheusDriver } from 'prometheus-query';
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, untrack } from 'svelte';
 	import { cubicInOut } from 'svelte/easing';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
@@ -63,10 +63,6 @@
 	// State
 	let activeChart = $state<ChartKey>('Read');
 	let context = $state<ChartState>();
-	// Copy the bound chart height into plain state via $effect (not $derived):
-	// reading context.height inside a $derived that feeds back into the chart's
-	// `props` triggers Svelte's `derived_references_self` error.
-	let chartHeight = $derived(context?.height);
 
 	// Derived state
 	const queries = $derived({
@@ -225,7 +221,7 @@
 						bars: {
 							stroke: 'none',
 							rounded: 'none',
-							initialY: chartHeight,
+							initialY: untrack(() => context?.height),
 							initialHeight: 0,
 							motion: {
 								y: { type: 'tween', duration: 500, easing: cubicInOut },
