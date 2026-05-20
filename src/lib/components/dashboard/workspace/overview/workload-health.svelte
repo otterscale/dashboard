@@ -26,7 +26,7 @@
 	/** Same GVR as console nav / model.svelte (ResourceService.list). */
 	const WORKLOAD_SPECS: WorkloadListSpec[] = [
 		{ group: 'serving.kserve.io', version: 'v1alpha2', resource: 'llminferenceservices' },
-		{ group: 'workload.otterscale.io', version: 'v1alpha1', resource: 'applications' },
+		{ group: 'kro.run', version: 'v1alpha1', resource: 'applications' },
 		{ group: 'helm.toolkit.fluxcd.io', version: 'v2', resource: 'helmreleases' },
 		{ group: 'kubevirt.io', version: 'v1', resource: 'virtualmachines' }
 	];
