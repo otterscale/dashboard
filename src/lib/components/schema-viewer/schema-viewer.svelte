@@ -189,11 +189,8 @@
 			{/each}
 		</div>
 	{:else if currentSchema}
-		<Code.Root
-			class="h-fit w-full"
-			lang="yaml"
-			code={stringify(currentSchema, null, 2)}
-			hideLines
-		/>
+		<Code.Root class="h-fit w-full" lang="yaml" code={stringify(currentSchema, null, 2)} hideLines>
+			<Code.CopyButton />
+		</Code.Root>
 	{/if}
 </main>
