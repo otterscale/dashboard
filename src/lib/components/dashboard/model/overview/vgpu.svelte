@@ -25,6 +25,13 @@
 	} satisfies Chart.ChartConfig;
 
 	let context = $state<ChartState>();
+	// Copy the bound chart height into plain state via $effect (not $derived):
+	// reading context.height inside a $derived that feeds back into the chart's
+	// `props` triggers Svelte's `derived_references_self` error.
+	let chartHeight = $state<number>();
+	$effect(() => {
+		chartHeight = context?.height;
+	});
 
 	async function fetch() {
 		try {
@@ -116,7 +123,7 @@
 					props={{
 						bars: {
 							stroke: 'none',
-							initialY: context?.height,
+							initialY: chartHeight,
 							initialHeight: 0,
 							motion: {
 								y: { type: 'tween', duration: 500, easing: cubicInOut },
