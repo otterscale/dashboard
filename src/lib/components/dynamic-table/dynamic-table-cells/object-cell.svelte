@@ -109,7 +109,9 @@
 											hideLines
 											code={formatted}
 											class="border-none bg-transparent px-8"
-										/>
+										>
+											<Code.CopyButton />
+										</Code.Root>
 									</Collapsible.Content>
 								</Collapsible.Root>
 							{/if}

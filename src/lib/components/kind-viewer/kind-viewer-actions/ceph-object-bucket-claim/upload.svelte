@@ -134,7 +134,9 @@ curl -X PUT "http://${endpoint}/${bucketName}/$KEY" \\
   -H "Authorization: AWS $ACCESS_KEY:$SIGNATURE" \\
   -T "$FILE"\
 `}
-				<Code.Root lang="bash" code={command} hideLines />
+				<Code.Root lang="bash" code={command} hideLines>
+					<Code.CopyButton />
+				</Code.Root>
 				<Button
 					class="mt-auto w-full"
 					onclick={() => {

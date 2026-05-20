@@ -389,7 +389,9 @@
 												code={stringify(object)}
 												lang="yaml"
 												class="no-shiki-limit m-4 border-none bg-muted"
-											/>
+											>
+												<Code.CopyButton />
+											</Code.Root>
 										{:else}
 											<Empty.Root class="m-4 bg-muted/50">
 												<Empty.Header>
