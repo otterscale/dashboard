@@ -144,7 +144,8 @@ function getDaemonSetColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'Namespace'
+			accessorKey: 'Namespace',
+			meta: { defaultHidden: true }
 		},
 		{
 			id: 'Desired',
@@ -228,7 +229,8 @@ function getDaemonSetColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'Up-To-Date'
+			accessorKey: 'Up-To-Date',
+			meta: { defaultHidden: true }
 		},
 		{
 			id: 'Available',
@@ -249,7 +251,8 @@ function getDaemonSetColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'Available'
+			accessorKey: 'Available',
+			meta: { defaultHidden: true }
 		},
 		{
 			id: 'Node Selector',
@@ -283,27 +286,6 @@ function getDaemonSetColumnDefinitions(
 			meta: {
 				class: 'hidden xl:table-cell'
 			}
-		},
-		{
-			id: 'Age',
-			header: ({ column }: { column: Column<Record<DaemonSetAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<DaemonSetAttribute, JsonValue>>;
-				row: Row<Record<DaemonSetAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas
-				}),
-			accessorKey: 'Age'
 		},
 		{
 			id: 'Containers',
@@ -408,6 +390,27 @@ function getDaemonSetColumnDefinitions(
 			meta: {
 				class: 'hidden xl:table-cell'
 			}
+		},
+		{
+			id: 'Age',
+			header: ({ column }: { column: Column<Record<DaemonSetAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<DaemonSetAttribute, JsonValue>>;
+				row: Row<Record<DaemonSetAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Age'
 		}
 	];
 }

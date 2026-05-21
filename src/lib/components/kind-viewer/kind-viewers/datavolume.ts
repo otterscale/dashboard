@@ -174,7 +174,8 @@ function getDataVolumeColumnDefinitions(
 					column,
 					uiSchemas
 				}),
-			accessorKey: 'Namespace'
+			accessorKey: 'Namespace',
+			meta: { defaultHidden: true }
 		},
 		simpleColumn('Phase'),
 		simpleColumn('Progress'),

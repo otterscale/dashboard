@@ -167,7 +167,14 @@
 
 	let rowSelection = $state<RowSelectionState>({});
 	let columnFilters = $state<ColumnFiltersState>([]);
-	let columnVisibility = $state<VisibilityState>({});
+	// svelte-ignore state_referenced_locally
+	const initialColumnVisibility: VisibilityState = Object.fromEntries(
+		columnDefinitions
+			.filter((col) => (col.meta as { defaultHidden?: boolean } | undefined)?.defaultHidden === true)
+			.map((col) => [col.id ?? (col as { accessorKey?: string }).accessorKey, false])
+			.filter(([id]) => id != null)
+	);
+	let columnVisibility = $state<VisibilityState>(initialColumnVisibility);
 	let columnSizing = $state<ColumnSizingState>({});
 	let sorting = $state<SortingState>([]);
 	let pagination = $state<PaginationState>({ pageIndex: 0, pageSize: hasGridlayout ? 9 : 10 });

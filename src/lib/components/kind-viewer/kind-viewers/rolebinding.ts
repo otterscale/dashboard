@@ -122,7 +122,8 @@ function getRoleBindingColumnDefinitions(
 					column,
 					uiSchemas
 				}),
-			accessorKey: 'Namespace'
+			accessorKey: 'Namespace',
+			meta: { defaultHidden: true }
 		},
 		simpleColumn('Role'),
 		simpleColumn('Age'),

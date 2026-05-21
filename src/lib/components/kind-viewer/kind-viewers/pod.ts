@@ -221,7 +221,8 @@ function getPodColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'Namespace'
+			accessorKey: 'Namespace',
+			meta: { defaultHidden: true }
 		},
 		{
 			id: 'Ready',
@@ -285,27 +286,6 @@ function getPodColumnDefinitions(
 					uiSchemas: uiSchemas
 				}),
 			accessorKey: 'Restarts'
-		},
-		{
-			id: 'Age',
-			header: ({ column }: { column: Column<Record<PodAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<PodAttribute, JsonValue>>;
-				row: Row<Record<PodAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas
-				}),
-			accessorKey: 'Age'
 		},
 		{
 			id: 'IP',
@@ -408,6 +388,27 @@ function getPodColumnDefinitions(
 			meta: {
 				class: 'hidden xl:table-cell'
 			}
+		},
+		{
+			id: 'Age',
+			header: ({ column }: { column: Column<Record<PodAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<PodAttribute, JsonValue>>;
+				row: Row<Record<PodAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Age'
 		}
 	];
 }

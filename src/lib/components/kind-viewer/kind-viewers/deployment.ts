@@ -133,7 +133,8 @@ function getDeploymentColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'Namespace'
+			accessorKey: 'Namespace',
+			meta: { defaultHidden: true }
 		},
 		{
 			id: 'Ready',
@@ -197,27 +198,6 @@ function getDeploymentColumnDefinitions(
 					uiSchemas: uiSchemas
 				}),
 			accessorKey: 'Available'
-		},
-		{
-			id: 'Age',
-			header: ({ column }: { column: Column<Record<DeploymentAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<DeploymentAttribute, JsonValue>>;
-				row: Row<Record<DeploymentAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas
-				}),
-			accessorKey: 'Age'
 		},
 		{
 			id: 'Containers',
@@ -322,6 +302,27 @@ function getDeploymentColumnDefinitions(
 			meta: {
 				class: 'hidden xl:table-cell'
 			}
+		},
+		{
+			id: 'Age',
+			header: ({ column }: { column: Column<Record<DeploymentAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<DeploymentAttribute, JsonValue>>;
+				row: Row<Record<DeploymentAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Age'
 		}
 	];
 }

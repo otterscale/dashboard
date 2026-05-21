@@ -148,7 +148,8 @@ function getVirtualMachineColumnDefinitions(
 					column,
 					uiSchemas
 				}),
-			accessorKey: 'Namespace'
+			accessorKey: 'Namespace',
+			meta: { defaultHidden: true }
 		},
 		simpleColumn('Status'),
 		simpleColumn('Ready'),

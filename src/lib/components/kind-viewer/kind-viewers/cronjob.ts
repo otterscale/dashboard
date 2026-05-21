@@ -135,7 +135,8 @@ function getCronJobColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'Namespace'
+			accessorKey: 'Namespace',
+			meta: { defaultHidden: true }
 		},
 		{
 			id: 'Schedule',
@@ -157,27 +158,6 @@ function getCronJobColumnDefinitions(
 					uiSchemas: uiSchemas
 				}),
 			accessorKey: 'Schedule'
-		},
-		{
-			id: 'Time Zone',
-			header: ({ column }: { column: Column<Record<CronJobAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<CronJobAttribute, JsonValue>>;
-				row: Row<Record<CronJobAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas
-				}),
-			accessorKey: 'Time Zone'
 		},
 		{
 			id: 'Suspend',
@@ -254,7 +234,7 @@ function getCronJobColumnDefinitions(
 			accessorKey: 'Last Schedule'
 		},
 		{
-			id: 'Creation Timestamp',
+			id: 'Time Zone',
 			header: ({ column }: { column: Column<Record<CronJobAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
@@ -272,7 +252,8 @@ function getCronJobColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'Creation Timestamp'
+			accessorKey: 'Time Zone',
+			meta: { defaultHidden: true }
 		},
 		{
 			id: 'Containers',
@@ -344,6 +325,28 @@ function getCronJobColumnDefinitions(
 			meta: {
 				class: 'hidden xl:table-cell'
 			}
+		},
+		{
+			id: 'Creation Timestamp',
+			header: ({ column }: { column: Column<Record<CronJobAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<CronJobAttribute, JsonValue>>;
+				row: Row<Record<CronJobAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Creation Timestamp',
+			meta: { defaultHidden: true }
 		}
 	];
 }

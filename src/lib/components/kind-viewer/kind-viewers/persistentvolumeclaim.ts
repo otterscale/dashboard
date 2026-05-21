@@ -138,7 +138,8 @@ function getPVCColumnDefinitions(
 					column,
 					uiSchemas
 				}),
-			accessorKey: 'Namespace'
+			accessorKey: 'Namespace',
+			meta: { defaultHidden: true }
 		},
 		simpleTextColumn('Status'),
 		simpleTextColumn('Volume'),
