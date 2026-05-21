@@ -195,9 +195,9 @@
 					schema={{
 						title: 'Container',
 						type: 'object',
-						required: (
-							lodash.get(jsonSchema, 'properties.spec.required', []) as string[]
-						).filter((f) => ['name', 'image'].includes(f)),
+						required: (lodash.get(jsonSchema, 'properties.spec.required', []) as string[]).filter(
+							(f) => ['name', 'image'].includes(f)
+						),
 						properties: {
 							name: {
 								...(lodash.get(jsonSchema, 'properties.spec.properties.name') as Schema),
