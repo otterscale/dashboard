@@ -533,6 +533,13 @@
 								submit: 'Next'
 							}
 						},
+						unlimit: {
+							'ui:options': {
+								shadcn4Checkbox: {
+									disabled: !editable
+								}
+							}
+						},
 						hard: {
 							'ui:options': {
 								layouts: {
