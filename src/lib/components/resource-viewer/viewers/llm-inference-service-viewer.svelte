@@ -5,7 +5,7 @@
 	import Layers from '@lucide/svelte/icons/layers';
 	import Route from '@lucide/svelte/icons/route';
 	import Server from '@lucide/svelte/icons/server';
-	import { ResourceService, WatchEvent_Type } from '@otterscale/api/resource/v1';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type {
 		AppsV1Deployment,
 		AppsV1ReplicaSet,
@@ -30,7 +30,6 @@
 
 	import DeploymentViewer from '../related-resources-viewer/deployment.svelte';
 	import GatewayViewer from '../related-resources-viewer/gateway.svelte';
-	// import HorizontalPodAutoscalerViewer from '../related-resources-viewer/horizontal-pod-autoscaler.svelte';
 	import HttpRouteViewer from '../related-resources-viewer/http-route.svelte';
 	import InferencePoolViewer from '../related-resources-viewer/inference-pool.svelte';
 	import LeaderWorkerSetViewer from '../related-resources-viewer/leader-worker-set.svelte';
@@ -124,7 +123,6 @@
 	let inferencePools = $state<InferenceNetworkingK8SIoV1InferencePool[]>([]);
 	let gateways = $state<GatewayNetworkingK8SIoV1Gateway[]>([]);
 	let httpRoutes = $state<GatewayNetworkingK8SIoV1HTTPRoute[]>([]);
-	// let horizontalPodAutoscalers = $state<AutoscalingV2HorizontalPodAutoscaler[]>([]);
 
 	onMount(() => {
 		if (!serviceName) return;
@@ -165,10 +163,6 @@
 			{ group: 'gateway.networking.k8s.io', version: 'v1', resource: 'httproutes' },
 			(items) => (httpRoutes = items)
 		);
-		// listAndWatch<AutoscalingV2HorizontalPodAutoscaler>(
-		// 	{ group: 'autoscaling', version: 'v2', resource: 'horizontalpodautoscalers' },
-		// 	(items) => (horizontalPodAutoscalers = items),
-		// );
 	});
 
 	onDestroy(() => {
@@ -523,35 +517,4 @@
 			</Empty.Root>
 		{/if}
 	</Field.Set>
-
-	<!-- <Field.Set>
-		<Item.Root class="p-0">
-			<Item.Content>
-				<Item.Title>Related HorizontalPodAutoscalers</Item.Title>
-				<Item.Description>
-					{horizontalPodAutoscalers.length} HPAs related to {object.kind}
-					{object.metadata?.name}
-				</Item.Description>
-			</Item.Content>
-		</Item.Root>
-		{#if horizontalPodAutoscalers.length > 0}
-			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-				{#each horizontalPodAutoscalers as horizontalPodAutoscaler (horizontalPodAutoscaler.metadata?.uid)}
-					<HorizontalPodAutoscalerViewer {horizontalPodAutoscaler} {cluster} {namespace} />
-				{/each}
-			</div>
-		{:else}
-			<Empty.Root class="h-full bg-muted/30">
-				<Empty.Header>
-					<Empty.Media variant="icon">
-						<Layers />
-					</Empty.Media>
-					<Empty.Title>No HPAs Found</Empty.Title>
-					<Empty.Description>
-						No HorizontalPodAutoscalers owned by this LLMInferenceService were found.
-					</Empty.Description>
-				</Empty.Header>
-			</Empty.Root>
-		{/if}
-	</Field.Set> -->
 </Field.Group>
