@@ -85,13 +85,18 @@
 	function handlePrevious() {
 		currentStep = steps[Math.max(currentIndex - 1, 0)];
 	}
-	function reset() {
-		currentStep = firstStep;
-	}
-
 	// Flag for Dialog
 	let open = $state(false);
 	let isSubmitting = $state(false);
+
+	function initiate() {
+		values = getInitialValues();
+		settingsValues = {};
+		specValues = {};
+		resourceValues = {};
+		currentStep = firstStep;
+		isSubmitting = false;
+	}
 </script>
 
 <Dialog.Root
@@ -99,7 +104,7 @@
 	onOpenChangeComplete={(isOpen) => {
 		onOpenChangeComplete?.();
 		if (!isOpen) {
-			reset();
+			initiate();
 		}
 	}}
 >
@@ -331,7 +336,9 @@
 						name: values.metadata.name ?? null,
 						image: null,
 						cronSchedule: '*/5 * * * *',
-						containerPort: 8080
+						containerPort: 8080,
+						command: [],
+						args: []
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {

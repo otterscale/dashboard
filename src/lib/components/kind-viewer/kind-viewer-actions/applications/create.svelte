@@ -241,7 +241,9 @@
 						name: values.metadata?.name ?? null,
 						image: null,
 						containerPort: 80,
-						replicas: 1
+						replicas: 1,
+						command: [],
+						args: []
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {

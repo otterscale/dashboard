@@ -127,12 +127,17 @@
 	function handlePrevious() {
 		currentStep = steps[Math.max(currentIndex - 1, 0)];
 	}
-	function reset() {
-		currentStep = firstStep;
-	}
-
 	let open = $state(false);
 	let isSubmitting = $state(false);
+
+	function initiate() {
+		values = getInitialValues();
+		settingsValues = {};
+		specValues = {};
+		resourceValues = {};
+		currentStep = firstStep;
+		isSubmitting = false;
+	}
 </script>
 
 <Dialog.Root
@@ -140,7 +145,7 @@
 	onOpenChangeComplete={(isOpen) => {
 		onOpenChangeComplete?.();
 		if (!isOpen) {
-			reset();
+			initiate();
 		}
 	}}
 >
@@ -326,8 +331,8 @@
 					initialValue={{
 						name: object.spec?.name ?? null,
 						image: object.spec?.image ?? null,
-						command: object.spec?.command ?? undefined,
-						args: object.spec?.args ?? undefined,
+						command: object.spec?.command ?? [],
+						args: object.spec?.args ?? [],
 						cronSchedule: object.spec?.cronSchedule ?? '*/5 * * * *',
 						containerPort: object.spec?.containerPort ?? 8080
 					} as FormValue}
