@@ -128,12 +128,17 @@
 	function handlePrevious() {
 		currentStep = steps[Math.max(currentIndex - 1, 0)];
 	}
-	function reset() {
-		currentStep = firstStep;
-	}
-
 	let open = $state(false);
 	let isSubmitting = $state(false);
+
+	function initiate() {
+		values = getInitialValues();
+		settingsValues = {};
+		specValues = {};
+		resourceValues = {};
+		currentStep = firstStep;
+		isSubmitting = false;
+	}
 </script>
 
 <Dialog.Root
@@ -141,7 +146,7 @@
 	onOpenChangeComplete={(isOpen) => {
 		onOpenChangeComplete?.();
 		if (!isOpen) {
-			reset();
+			initiate();
 		}
 	}}
 >
