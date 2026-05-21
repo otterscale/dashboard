@@ -67,15 +67,13 @@
 		identifier: { group: string; version: string; resource: string },
 		setResources: (items: T[]) => void
 	) {
-		const labelSelector = `app.kubernetes.io/part-of=llminferenceservice,app.kubernetes.io/name=${serviceName}`;
-
 		while (!abortController.signal.aborted) {
 			try {
 				const response = await resourceClient.list(
 					{
 						cluster,
 						namespace,
-						labelSelector,
+						labelSelector: `app.kubernetes.io/part-of=llminferenceservice,app.kubernetes.io/name=${serviceName}`,
 						...identifier
 					},
 					{ signal: abortController.signal }
@@ -97,11 +95,15 @@
 
 	function sleep(ms: number) {
 		return new Promise<void>((resolve) => {
-			const timer = setTimeout(resolve, ms);
-			abortController.signal.addEventListener('abort', () => {
+			const timer = setTimeout(() => {
+				abortController.signal.removeEventListener('abort', onAbort);
+				resolve();
+			}, ms);
+			const onAbort = () => {
 				clearTimeout(timer);
 				resolve();
-			});
+			};
+			abortController.signal.addEventListener('abort', onAbort, { once: true });
 		});
 	}
 
