@@ -2,11 +2,11 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import FormIcon from '@lucide/svelte/icons/form';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type { ServingKserveIoV1Alpha1LLMInferenceService } from '@otterscale/types';
+	import type { ServingKserveIoV1Alpha2LLMInferenceService } from '@otterscale/types';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
-	import { load } from 'js-yaml';
+	import { JSON_SCHEMA, load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
@@ -40,7 +40,7 @@
 		kind: string;
 		resource: string;
 		schema: Schema;
-		object: ServingKserveIoV1Alpha1LLMInferenceService;
+		object: ServingKserveIoV1Alpha2LLMInferenceService;
 		onOpenChangeComplete: () => void;
 	} = $props();
 
@@ -51,7 +51,7 @@
 	let values = $state(getInitialValues());
 
 	function getInitialValues() {
-		return lodash.cloneDeep(object) as ServingKserveIoV1Alpha1LLMInferenceService & {
+		return lodash.cloneDeep(object) as ServingKserveIoV1Alpha2LLMInferenceService & {
 			metadata?: Record<string, unknown>;
 		};
 	}
@@ -570,7 +570,7 @@
 							});
 							const validate = jsonSchemaValidator.compile(jsonSchema);
 
-							const isValid = validate(load(value));
+							const isValid = validate(load(value, { schema: JSON_SCHEMA }));
 
 							if (!isValid) {
 								console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
@@ -579,7 +579,7 @@
 								return;
 							}
 
-							const name = lodash.get(load(value), 'metadata.name');
+							const name = lodash.get(load(value, { schema: JSON_SCHEMA }), 'metadata.name');
 
 							toast.promise(
 								async () => {
