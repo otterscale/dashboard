@@ -126,17 +126,19 @@
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
-						...lodash.omit(lodash.get(jsonSchema, 'properties.metadata') as Schema, 'properties'),
+						...lodash.omit(lodash.get(jsonSchema, 'properties.metadata') as Schema, [
+							'properties',
+							'required'
+						]),
 						title: 'Metadata',
+						required: [
+							...(lodash.get(jsonSchema, 'properties.metadata.required', []) as string[]),
+							'name'
+						],
 						properties: {
 							name: {
 								...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema),
 								title: 'Name'
-							},
-							namespace: {
-								...(lodash.get(jsonSchema, 'properties.metadata.properties.namespace') as Schema),
-								title: 'Namespace',
-								readOnly: true
 							}
 						}
 					} as Schema}
