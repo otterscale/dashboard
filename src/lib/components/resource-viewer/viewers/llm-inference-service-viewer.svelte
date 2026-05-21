@@ -29,7 +29,6 @@
 	import * as Item from '$lib/components/ui/item';
 
 	import DeploymentViewer from '../related-resources-viewer/deployment.svelte';
-	import GatewayViewer from '../related-resources-viewer/gateway.svelte';
 	import HttpRouteViewer from '../related-resources-viewer/http-route.svelte';
 	import InferencePoolViewer from '../related-resources-viewer/inference-pool.svelte';
 	import LeaderWorkerSetViewer from '../related-resources-viewer/leader-worker-set.svelte';
@@ -62,9 +61,10 @@
 		| GatewayNetworkingK8SIoV1HTTPRoute
 		| AutoscalingV2HorizontalPodAutoscaler;
 
-	async function listAndWatch<T extends RelatedResource>(
+	async function listResources<T extends RelatedResource>(
 		identifier: { group: string; version: string; resource: string },
-		setResources: (items: T[]) => void
+		setResources: (items: T[]) => void,
+		labelSelector?: string
 	) {
 		while (!abortController.signal.aborted) {
 			try {
@@ -72,7 +72,9 @@
 					{
 						cluster,
 						namespace,
-						labelSelector: `app.kubernetes.io/part-of=llminferenceservice,app.kubernetes.io/name=${serviceName}`,
+						labelSelector:
+							labelSelector ??
+							`app.kubernetes.io/part-of=llminferenceservice,app.kubernetes.io/name=${serviceName}`,
 						...identifier
 					},
 					{ signal: abortController.signal }
@@ -117,49 +119,60 @@
 	let deployments = $state<AppsV1Deployment[]>([]);
 	let leaderWorkerSets = $state<LeaderworkersetXK8SIoV1LeaderWorkerSet[]>([]);
 	let replicaSets = $state<AppsV1ReplicaSet[]>([]);
-	let statefulSets = $state<AppsV1StatefulSet[]>([]);
+	let allStatefulSets = $state<AppsV1StatefulSet[]>([]);
 	let services = $state<CoreV1Service[]>([]);
 	let pods = $state<CoreV1Pod[]>([]);
 	let inferencePools = $state<InferenceNetworkingK8SIoV1InferencePool[]>([]);
-	let gateways = $state<GatewayNetworkingK8SIoV1Gateway[]>([]);
 	let httpRoutes = $state<GatewayNetworkingK8SIoV1HTTPRoute[]>([]);
+
+	// StatefulSets created by a LeaderWorkerSet only carry `leaderworkerset.sigs.k8s.io/*`
+	// labels — not the `app.kubernetes.io/*` labels the shared selector relies on — so they
+	// are matched client-side via their ownerReference to a LeaderWorkerSet of this service.
+	const statefulSets = $derived.by(() => {
+		const leaderWorkerSetUids = new Set(
+			leaderWorkerSets.map((leaderWorkerSet) => leaderWorkerSet.metadata?.uid).filter(Boolean)
+		);
+		return allStatefulSets.filter((statefulSet) =>
+			statefulSet.metadata?.ownerReferences?.some(
+				(ownerReference) =>
+					ownerReference.kind === 'LeaderWorkerSet' && leaderWorkerSetUids.has(ownerReference.uid)
+			)
+		);
+	});
 
 	onMount(() => {
 		if (!serviceName) return;
 
-		listAndWatch<AppsV1Deployment>(
+		listResources<AppsV1Deployment>(
 			{ group: 'apps', version: 'v1', resource: 'deployments' },
 			(items) => (deployments = items)
 		);
-		listAndWatch<LeaderworkersetXK8SIoV1LeaderWorkerSet>(
+		listResources<LeaderworkersetXK8SIoV1LeaderWorkerSet>(
 			{ group: 'leaderworkerset.x-k8s.io', version: 'v1', resource: 'leaderworkersets' },
 			(items) => (leaderWorkerSets = items)
 		);
-		listAndWatch<AppsV1ReplicaSet>(
+		listResources<AppsV1ReplicaSet>(
 			{ group: 'apps', version: 'v1', resource: 'replicasets' },
 			(items) => (replicaSets = items)
 		);
-		listAndWatch<AppsV1StatefulSet>(
+		listResources<AppsV1StatefulSet>(
 			{ group: 'apps', version: 'v1', resource: 'statefulsets' },
-			(items) => (statefulSets = items)
+			(items) => (allStatefulSets = items),
+			'' // no label selector — matched client-side via ownerReference, see `statefulSets`
 		);
-		listAndWatch<CoreV1Service>(
+		listResources<CoreV1Service>(
 			{ group: '', version: 'v1', resource: 'services' },
 			(items) => (services = items)
 		);
-		listAndWatch<CoreV1Pod>(
+		listResources<CoreV1Pod>(
 			{ group: '', version: 'v1', resource: 'pods' },
 			(items) => (pods = items)
 		);
-		listAndWatch<InferenceNetworkingK8SIoV1InferencePool>(
+		listResources<InferenceNetworkingK8SIoV1InferencePool>(
 			{ group: 'inference.networking.k8s.io', version: 'v1', resource: 'inferencepools' },
 			(items) => (inferencePools = items)
 		);
-		listAndWatch<GatewayNetworkingK8SIoV1Gateway>(
-			{ group: 'gateway.networking.k8s.io', version: 'v1', resource: 'gateways' },
-			(items) => (gateways = items)
-		);
-		listAndWatch<GatewayNetworkingK8SIoV1HTTPRoute>(
+		listResources<GatewayNetworkingK8SIoV1HTTPRoute>(
 			{ group: 'gateway.networking.k8s.io', version: 'v1', resource: 'httproutes' },
 			(items) => (httpRoutes = items)
 		);
@@ -419,37 +432,6 @@
 					<Empty.Title>No InferencePools Found</Empty.Title>
 					<Empty.Description>
 						No InferencePools owned by this LLMInferenceService were found.
-					</Empty.Description>
-				</Empty.Header>
-			</Empty.Root>
-		{/if}
-	</Field.Set>
-
-	<Field.Set>
-		<Item.Root class="p-0">
-			<Item.Content>
-				<Item.Title>Related Gateways</Item.Title>
-				<Item.Description>
-					{gateways.length} Gateways related to {object.kind}
-					{object.metadata?.name}
-				</Item.Description>
-			</Item.Content>
-		</Item.Root>
-		{#if gateways.length > 0}
-			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-				{#each gateways as gateway (gateway.metadata?.uid)}
-					<GatewayViewer {gateway} {cluster} {namespace} />
-				{/each}
-			</div>
-		{:else}
-			<Empty.Root class="h-full bg-muted/30">
-				<Empty.Header>
-					<Empty.Media variant="icon">
-						<Route />
-					</Empty.Media>
-					<Empty.Title>No Gateways Found</Empty.Title>
-					<Empty.Description>
-						No Gateways owned by this LLMInferenceService were found.
 					</Empty.Description>
 				</Empty.Header>
 			</Empty.Root>
