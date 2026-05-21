@@ -2,7 +2,6 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import { BotIcon } from '@lucide/svelte';
 	import Box from '@lucide/svelte/icons/box';
-	import FileSearchIcon from '@lucide/svelte/icons/file-search';
 	import Layers from '@lucide/svelte/icons/layers';
 	import Route from '@lucide/svelte/icons/route';
 	import Server from '@lucide/svelte/icons/server';
@@ -23,19 +22,22 @@
 	import { getContext, onDestroy, onMount } from 'svelte';
 
 	import { page } from '$app/state';
-	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import { Badge } from '$lib/components/ui/badge';
-	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
-	import * as Dialog from '$lib/components/ui/dialog/index.ts';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as Item from '$lib/components/ui/item';
-	import { cn } from '$lib/utils';
 
 	import DeploymentViewer from '../related-resources-viewer/deployment.svelte';
+	import GatewayViewer from '../related-resources-viewer/gateway.svelte';
+	import HorizontalPodAutoscalerViewer from '../related-resources-viewer/horizontal-pod-autoscaler.svelte';
+	import HttpRouteViewer from '../related-resources-viewer/http-route.svelte';
+	import InferencePoolViewer from '../related-resources-viewer/inference-pool.svelte';
+	import LeaderWorkerSetViewer from '../related-resources-viewer/leader-worker-set.svelte';
 	import PodViewer from '../related-resources-viewer/pod.svelte';
+	import ReplicaSetViewer from '../related-resources-viewer/replica-set.svelte';
 	import ServiceViewer from '../related-resources-viewer/service.svelte';
+	import StatefulSetViewer from '../related-resources-viewer/stateful-set.svelte';
 
 	let { object } = $props<{ object: ServingKserveIoV1Alpha1LLMInferenceService }>();
 
@@ -64,7 +66,7 @@
 	const getKey = (resource: RelatedResource) =>
 		resource?.metadata?.uid ?? resource?.metadata?.name ?? '';
 
-	async function listAndWatch<T>(
+	async function listAndWatch<T extends RelatedResource>(
 		identifier: { group: string; version: string; resource: string },
 		setResources: (items: T[]) => void,
 		updateResources: (updater: (previous: T[]) => T[]) => void
@@ -359,35 +361,7 @@
 		{#if leaderWorkerSets.length > 0}
 			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
 				{#each leaderWorkerSets as leaderWorkerSet (leaderWorkerSet.metadata?.uid)}
-					<Card.Root class="border-0 bg-muted/30 shadow-none ring-0">
-						<Card.Header>
-							<Card.Title>{leaderWorkerSet?.metadata?.name}</Card.Title>
-							<Card.Description>
-								<Badge>
-									{leaderWorkerSet?.status?.readyReplicas ?? 0}/{leaderWorkerSet?.status
-										?.replicas ??
-										leaderWorkerSet?.spec?.replicas ??
-										0} ready
-								</Badge>
-							</Card.Description>
-							<Card.Action>
-								<Describe
-									{cluster}
-									namespace={leaderWorkerSet?.metadata?.namespace ?? namespace}
-									group="leaderworkerset.x-k8s.io"
-									version="v1"
-									resource="leaderworkersets"
-									object={leaderWorkerSet}
-								>
-									{#snippet trigger()}
-										<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
-											<FileSearchIcon size={16} />
-										</Dialog.Trigger>
-									{/snippet}
-								</Describe>
-							</Card.Action>
-						</Card.Header>
-					</Card.Root>
+					<LeaderWorkerSetViewer {leaderWorkerSet} {cluster} {namespace} />
 				{/each}
 			</div>
 		{:else}
@@ -418,34 +392,7 @@
 		{#if replicaSets.length > 0}
 			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
 				{#each replicaSets as replicaSet (replicaSet.metadata?.uid)}
-					<Card.Root class="border-0 bg-muted/30 shadow-none ring-0">
-						<Card.Header>
-							<Card.Title>{replicaSet?.metadata?.name}</Card.Title>
-							<Card.Description>
-								<Badge>
-									{replicaSet?.status?.readyReplicas ?? 0}/{replicaSet?.status?.replicas ??
-										replicaSet?.spec?.replicas ??
-										0} ready
-								</Badge>
-							</Card.Description>
-							<Card.Action>
-								<Describe
-									{cluster}
-									namespace={replicaSet?.metadata?.namespace ?? namespace}
-									group="apps"
-									version="v1"
-									resource="replicasets"
-									object={replicaSet}
-								>
-									{#snippet trigger()}
-										<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
-											<FileSearchIcon size={16} />
-										</Dialog.Trigger>
-									{/snippet}
-								</Describe>
-							</Card.Action>
-						</Card.Header>
-					</Card.Root>
+					<ReplicaSetViewer {replicaSet} {cluster} {namespace} />
 				{/each}
 			</div>
 		{:else}
@@ -476,34 +423,7 @@
 		{#if statefulSets.length > 0}
 			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
 				{#each statefulSets as statefulSet (statefulSet.metadata?.uid)}
-					<Card.Root class="border-0 bg-muted/30 shadow-none ring-0">
-						<Card.Header>
-							<Card.Title>{statefulSet?.metadata?.name}</Card.Title>
-							<Card.Description>
-								<Badge>
-									{statefulSet?.status?.readyReplicas ?? 0}/{statefulSet?.status?.replicas ??
-										statefulSet?.spec?.replicas ??
-										0} ready
-								</Badge>
-							</Card.Description>
-							<Card.Action>
-								<Describe
-									{cluster}
-									namespace={statefulSet?.metadata?.namespace ?? namespace}
-									group="apps"
-									version="v1"
-									resource="statefulsets"
-									object={statefulSet}
-								>
-									{#snippet trigger()}
-										<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
-											<FileSearchIcon size={16} />
-										</Dialog.Trigger>
-									{/snippet}
-								</Describe>
-							</Card.Action>
-						</Card.Header>
-					</Card.Root>
+					<StatefulSetViewer {statefulSet} {cluster} {namespace} />
 				{/each}
 			</div>
 		{:else}
@@ -565,65 +485,7 @@
 		{#if inferencePools.length > 0}
 			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
 				{#each inferencePools as inferencePool (inferencePool.metadata?.uid)}
-					<Card.Root class="border-0 bg-muted/30 shadow-none ring-0">
-						<Card.Header>
-							<Card.Title>{inferencePool?.metadata?.name}</Card.Title>
-							<Card.Description>
-								{@const accepted = inferencePool?.status?.parents
-									?.flatMap((parent) => parent.conditions ?? [])
-									.find((condition) => condition.type === 'Accepted')}
-								{#if accepted?.status === 'True'}
-									<Badge>Accepted</Badge>
-								{:else}
-									<Badge variant="destructive">{accepted?.reason ?? 'Pending'}</Badge>
-								{/if}
-							</Card.Description>
-							<Card.Action>
-								<Describe
-									{cluster}
-									namespace={inferencePool?.metadata?.namespace ?? namespace}
-									group="inference.networking.k8s.io"
-									version="v1"
-									resource="inferencepools"
-									object={inferencePool}
-								>
-									{#snippet trigger()}
-										<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
-											<FileSearchIcon size={16} />
-										</Dialog.Trigger>
-									{/snippet}
-								</Describe>
-							</Card.Action>
-						</Card.Header>
-						<Card.Content class="flex flex-col gap-2">
-							{@const targetPorts = inferencePool?.spec?.targetPorts ?? []}
-							{#if targetPorts.length > 0}
-								<Item.Root class="p-0">
-									<Item.Content>
-										<Item.Title class="text-xs">Target Ports</Item.Title>
-										<Item.Description class="flex flex-wrap gap-1">
-											{#each targetPorts as targetPort, index (index)}
-												<Badge variant="outline" class="font-mono">{targetPort.number}</Badge>
-											{/each}
-										</Item.Description>
-									</Item.Content>
-								</Item.Root>
-							{/if}
-							{@const parents = inferencePool?.status?.parents ?? []}
-							{#if parents.length > 0}
-								<Item.Root class="p-0">
-									<Item.Content>
-										<Item.Title class="text-xs">Parents</Item.Title>
-										<Item.Description class="flex flex-wrap gap-1">
-											{#each parents as parent, index (index)}
-												<Badge variant="outline">{parent.parentRef.name}</Badge>
-											{/each}
-										</Item.Description>
-									</Item.Content>
-								</Item.Root>
-							{/if}
-						</Card.Content>
-					</Card.Root>
+					<InferencePoolViewer {inferencePool} {cluster} {namespace} />
 				{/each}
 			</div>
 		{:else}
@@ -654,47 +516,7 @@
 		{#if gateways.length > 0}
 			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
 				{#each gateways as gateway (gateway.metadata?.uid)}
-					<Card.Root class="border-0 bg-muted/30 shadow-none ring-0">
-						<Card.Header>
-							<Card.Title>{gateway?.metadata?.name}</Card.Title>
-							<Card.Description>
-								<Badge>{gateway?.spec?.gatewayClassName ?? 'Gateway'}</Badge>
-							</Card.Description>
-							<Card.Action>
-								<Describe
-									{cluster}
-									namespace={gateway?.metadata?.namespace ?? namespace}
-									group="gateway.networking.k8s.io"
-									version="v1"
-									resource="gateways"
-									object={gateway}
-								>
-									{#snippet trigger()}
-										<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
-											<FileSearchIcon size={16} />
-										</Dialog.Trigger>
-									{/snippet}
-								</Describe>
-							</Card.Action>
-						</Card.Header>
-						<Card.Content class="flex flex-col gap-2">
-							{@const listeners = gateway?.spec?.listeners ?? []}
-							{#if listeners.length > 0}
-								<Item.Root class="p-0">
-									<Item.Content>
-										<Item.Title class="text-xs">Listeners</Item.Title>
-										<Item.Description class="flex flex-wrap gap-1">
-											{#each listeners as listener, index (index)}
-												<Badge variant="outline">
-													{listener.name ?? `listener-${index + 1}`}
-												</Badge>
-											{/each}
-										</Item.Description>
-									</Item.Content>
-								</Item.Root>
-							{/if}
-						</Card.Content>
-					</Card.Root>
+					<GatewayViewer {gateway} {cluster} {namespace} />
 				{/each}
 			</div>
 		{:else}
@@ -756,65 +578,7 @@
 		{#if httpRoutes.length > 0}
 			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
 				{#each httpRoutes as httpRoute (httpRoute.metadata?.uid)}
-					<Card.Root>
-						<Card.Header>
-							<Card.Title>{httpRoute?.metadata?.name}</Card.Title>
-							<Card.Description>
-								{@const accepted = httpRoute?.status?.parents?.[0]?.conditions?.find(
-									(condition) => condition.type === 'Accepted'
-								)}
-								{#if accepted?.status === 'True'}
-									<Badge>Accepted</Badge>
-								{:else}
-									<Badge variant="destructive">{accepted?.reason ?? 'Not Accepted'}</Badge>
-								{/if}
-							</Card.Description>
-							<Card.Action>
-								<Describe
-									{cluster}
-									namespace={httpRoute?.metadata?.namespace ?? namespace}
-									group="gateway.networking.k8s.io"
-									version="v1"
-									resource="httproutes"
-									object={httpRoute}
-								>
-									{#snippet trigger()}
-										<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
-											<FileSearchIcon size={16} />
-										</Dialog.Trigger>
-									{/snippet}
-								</Describe>
-							</Card.Action>
-						</Card.Header>
-						<Card.Content class="flex flex-col gap-2">
-							{@const hostnames = httpRoute?.spec?.hostnames ?? []}
-							{#if hostnames.length > 0}
-								<Item.Root class="p-0">
-									<Item.Content>
-										<Item.Title class="text-xs">Hostnames</Item.Title>
-										<Item.Description class="flex flex-wrap gap-1">
-											{#each hostnames as hostname (hostname)}
-												<Badge variant="outline" class="font-mono">{hostname}</Badge>
-											{/each}
-										</Item.Description>
-									</Item.Content>
-								</Item.Root>
-							{/if}
-							{@const parentRefs = httpRoute?.spec?.parentRefs ?? []}
-							{#if parentRefs.length > 0}
-								<Item.Root class="p-0">
-									<Item.Content>
-										<Item.Title class="text-xs">Gateways</Item.Title>
-										<Item.Description class="flex flex-wrap gap-1">
-											{#each parentRefs as parentRef, index (index)}
-												<Badge variant="outline">{parentRef.name}</Badge>
-											{/each}
-										</Item.Description>
-									</Item.Content>
-								</Item.Root>
-							{/if}
-						</Card.Content>
-					</Card.Root>
+					<HttpRouteViewer {httpRoute} {cluster} {namespace} />
 				{/each}
 			</div>
 		{:else}
@@ -845,60 +609,7 @@
 		{#if horizontalPodAutoscalers.length > 0}
 			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
 				{#each horizontalPodAutoscalers as horizontalPodAutoscaler (horizontalPodAutoscaler.metadata?.uid)}
-					<Card.Root class="border-0 bg-muted/30 shadow-none ring-0">
-						<Card.Header>
-							<Card.Title>{horizontalPodAutoscaler?.metadata?.name}</Card.Title>
-							<Card.Description>
-								{@const condition =
-									horizontalPodAutoscaler?.status?.conditions?.find(
-										(condition) => condition.status === 'True'
-									) ?? horizontalPodAutoscaler?.status?.conditions?.[0]}
-								{#if condition?.status === 'True'}
-									<Badge>{condition?.type ?? 'Active'}</Badge>
-								{:else}
-									<Badge variant="destructive">{condition?.reason ?? 'Pending'}</Badge>
-								{/if}
-							</Card.Description>
-							<Card.Action>
-								<Describe
-									{cluster}
-									namespace={horizontalPodAutoscaler?.metadata?.namespace ?? namespace}
-									group="autoscaling"
-									version="v2"
-									resource="horizontalpodautoscalers"
-									object={horizontalPodAutoscaler}
-								>
-									{#snippet trigger()}
-										<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
-											<FileSearchIcon size={16} />
-										</Dialog.Trigger>
-									{/snippet}
-								</Describe>
-							</Card.Action>
-						</Card.Header>
-						<Card.Content class="flex flex-col gap-2">
-							{#if horizontalPodAutoscaler?.spec?.scaleTargetRef}
-								<Item.Root class="p-0">
-									<Item.Content>
-										<Item.Title class="text-xs">Scale Target</Item.Title>
-										<Item.Description>
-											{horizontalPodAutoscaler.spec.scaleTargetRef.kind}/
-											{horizontalPodAutoscaler.spec.scaleTargetRef.name}
-										</Item.Description>
-									</Item.Content>
-								</Item.Root>
-							{/if}
-							<Item.Root class="p-0">
-								<Item.Content>
-									<Item.Title class="text-xs">Replicas</Item.Title>
-									<Item.Description>
-										{horizontalPodAutoscaler?.status?.currentReplicas ?? 0} current /
-										{horizontalPodAutoscaler?.status?.desiredReplicas ?? 0} desired
-									</Item.Description>
-								</Item.Content>
-							</Item.Root>
-						</Card.Content>
-					</Card.Root>
+					<HorizontalPodAutoscalerViewer {horizontalPodAutoscaler} {cluster} {namespace} />
 				{/each}
 			</div>
 		{:else}
