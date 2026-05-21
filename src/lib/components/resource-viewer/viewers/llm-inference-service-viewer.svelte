@@ -30,7 +30,7 @@
 
 	import DeploymentViewer from '../related-resources-viewer/deployment.svelte';
 	import GatewayViewer from '../related-resources-viewer/gateway.svelte';
-	import HorizontalPodAutoscalerViewer from '../related-resources-viewer/horizontal-pod-autoscaler.svelte';
+	// import HorizontalPodAutoscalerViewer from '../related-resources-viewer/horizontal-pod-autoscaler.svelte';
 	import HttpRouteViewer from '../related-resources-viewer/http-route.svelte';
 	import InferencePoolViewer from '../related-resources-viewer/inference-pool.svelte';
 	import LeaderWorkerSetViewer from '../related-resources-viewer/leader-worker-set.svelte';
@@ -186,7 +186,7 @@
 	let inferencePools = $state<InferenceNetworkingK8SIoV1InferencePool[]>([]);
 	let gateways = $state<GatewayNetworkingK8SIoV1Gateway[]>([]);
 	let httpRoutes = $state<GatewayNetworkingK8SIoV1HTTPRoute[]>([]);
-	let horizontalPodAutoscalers = $state<AutoscalingV2HorizontalPodAutoscaler[]>([]);
+	// let horizontalPodAutoscalers = $state<AutoscalingV2HorizontalPodAutoscaler[]>([]);
 
 	onMount(() => {
 		if (!serviceName) return;
@@ -236,11 +236,11 @@
 			(items) => (httpRoutes = items),
 			(updater) => (httpRoutes = updater(httpRoutes))
 		);
-		listAndWatch<AutoscalingV2HorizontalPodAutoscaler>(
-			{ group: 'autoscaling', version: 'v2', resource: 'horizontalpodautoscalers' },
-			(items) => (horizontalPodAutoscalers = items),
-			(updater) => (horizontalPodAutoscalers = updater(horizontalPodAutoscalers))
-		);
+		// listAndWatch<AutoscalingV2HorizontalPodAutoscaler>(
+		// 	{ group: 'autoscaling', version: 'v2', resource: 'horizontalpodautoscalers' },
+		// 	(items) => (horizontalPodAutoscalers = items),
+		// 	(updater) => (horizontalPodAutoscalers = updater(horizontalPodAutoscalers))
+		// );
 	});
 
 	onDestroy(() => {
@@ -596,7 +596,7 @@
 		{/if}
 	</Field.Set>
 
-	<Field.Set>
+	<!-- <Field.Set>
 		<Item.Root class="p-0">
 			<Item.Content>
 				<Item.Title>Related HorizontalPodAutoscalers</Item.Title>
@@ -625,5 +625,5 @@
 				</Empty.Header>
 			</Empty.Root>
 		{/if}
-	</Field.Set>
+	</Field.Set> -->
 </Field.Group>
