@@ -47,6 +47,9 @@ export const load: PageServerLoad = async ({ parent, fetch, params }) => {
 	}
 
 	if (workspace) {
-		redirect(307, resolve('/(auth)/[cluster]/[workspace]/overview', { cluster, workspace }));
+		redirect(
+			307,
+			resolve('/(auth)/[cluster]/[workspace]/dashboard/overview', { cluster, workspace })
+		);
 	}
 };

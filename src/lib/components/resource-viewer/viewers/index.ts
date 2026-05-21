@@ -3,6 +3,7 @@ import type { Schema } from '@sjsf/form';
 import type { Component } from 'svelte';
 
 import DefaultViewer from './default-viewer.svelte';
+import LLMInferenceServiceViewer from './llm-inference-service-viewer.svelte';
 import WorkspaceEditor from './workspace-editor.svelte';
 import WorkspaceViewer from './workspaces-viewer.svelte';
 
@@ -25,6 +26,9 @@ type EditorType = Component<EditorProps> | null;
 function getResourceViewer(resource: string): ViewerType {
 	if (resource === 'workspaces') {
 		return WorkspaceViewer as ViewerType;
+	}
+	if (resource === 'llminferenceservices') {
+		return LLMInferenceServiceViewer as ViewerType;
 	}
 	return DefaultViewer as ViewerType;
 }

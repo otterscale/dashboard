@@ -49,6 +49,8 @@
 			lang="yaml"
 			code={stringify(row.original['chart'])}
 			class="w-full border-none"
-		/>
+		>
+			<Code.CopyButton />
+		</Code.Root>
 	</Dialog.Content>
 </Dialog.Root>

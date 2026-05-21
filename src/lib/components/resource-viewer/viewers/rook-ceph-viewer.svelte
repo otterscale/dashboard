@@ -43,7 +43,7 @@
 
 	const namespace = 'rook-ceph';
 
-	type TargetResource =
+	type RelatedResource =
 		| CephRookIoV1CephCluster
 		| CephRookIoV1CephBlockPool
 		| CephRookIoV1CephFilesystem
@@ -53,8 +53,8 @@
 	// AbortController is used to terminate all watch streams when the component is destroyed
 	const abortController = new AbortController();
 
-	const getKey = (o: TargetResource) => o?.metadata?.uid ?? o?.metadata?.name ?? '';
-	async function listAndWatch<T extends TargetResource>(
+	const getKey = (o: RelatedResource) => o?.metadata?.uid ?? o?.metadata?.name ?? '';
+	async function listAndWatch<T extends RelatedResource>(
 		identifier: { group: string; version: string; resource: string },
 		setObjects: (items: T[]) => void,
 		updateObject: (updater: (previous: T[]) => T[]) => void
@@ -147,11 +147,15 @@
 
 	function sleep(ms: number) {
 		return new Promise<void>((resolve) => {
-			const timer = setTimeout(resolve, ms);
-			abortController.signal.addEventListener('abort', () => {
+			const timer = setTimeout(() => {
+				abortController.signal.removeEventListener('abort', onAbort);
+				resolve();
+			}, ms);
+			const onAbort = () => {
 				clearTimeout(timer);
 				resolve();
-			});
+			};
+			abortController.signal.addEventListener('abort', onAbort, { once: true });
 		});
 	}
 
@@ -269,11 +273,11 @@
 	});
 </script>
 
-<Field.Group class="pb-8">
+<Field.Group>
 	<Field.Set>
 		{#if cephClusters.length > 0}
 			{#each cephClusters as cephCluster, index (index)}
-				<Card.Root class="flex h-full flex-col border-0 bg-muted/50 shadow-none">
+				<Card.Root class="flex h-full flex-col border-0 bg-muted/30 shadow-none ring-0">
 					<Card.Header>
 						{@const health = cephCluster?.status?.ceph?.health}
 						<Card.Title>
@@ -364,7 +368,7 @@
 		<!-- CephBlockPool -->
 		{#if cephBlockPools.length > 0}
 			{#each cephBlockPools as cephBlockPool, index (index)}
-				<Card.Root class="flex h-full flex-col border-0">
+				<Card.Root class="flex h-full flex-col border-0 bg-muted/30 shadow-none ring-0">
 					<Card.Header>
 						<Card.Title>
 							<Item.Root class="p-0">
@@ -445,7 +449,7 @@
 		<!-- CephFilesystem -->
 		{#if cephFilesystems.length > 0}
 			{#each cephFilesystems as cephFilesystem, index (index)}
-				<Card.Root class="flex h-full flex-col border-0">
+				<Card.Root class="flex h-full flex-col border-0 bg-muted/30 shadow-none ring-0">
 					<Card.Header>
 						<Card.Title>
 							<Item.Root class="p-0">
@@ -528,7 +532,7 @@
 		<!-- CephObjectStore -->
 		{#if cephObjectStores.length > 0}
 			{#each cephObjectStores as cephObjectStore, index (index)}
-				<Card.Root class="flex h-full flex-col border-0">
+				<Card.Root class="flex h-full flex-col border-0 bg-muted/30 shadow-none ring-0">
 					<Card.Header>
 						<Card.Title>
 							<Item.Root class="p-0">

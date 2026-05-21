@@ -22,7 +22,6 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as Item from '$lib/components/ui/item';
-	import Label from '$lib/components/ui/label/label.svelte';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { Toggle } from '$lib/components/ui/toggle/index.js';
@@ -295,7 +294,7 @@
 </script>
 
 {#if !isLoaded}
-	<Field.Group class="pb-8">
+	<Field.Group>
 		<Field.Set>
 			{#each Array(13).keys() as index (index)}
 				{#if index % 2 === 0}
@@ -323,11 +322,11 @@
 		</Field.Set>
 	</Field.Group>
 {:else}
-	<Field.Group class="pb-8">
+	<Field.Group>
 		<!-- Spec Section -->
 		<Field.Set>
 			<!-- Status Conditions -->
-			<Card.Root class="flex h-full flex-col border-0 bg-muted/50 shadow-none">
+			<Card.Root class="flex h-full flex-col border-0 bg-muted/30 shadow-none ring-0">
 				{@const conditions = object.status?.conditions ?? []}
 				{@const readyCondition = conditions.find((condition) => condition.type === 'Ready')}
 				{@const isReady = readyCondition?.status === 'True' ? true : false}
@@ -392,7 +391,7 @@
 			</Card.Root>
 
 			<!-- Resource Quota -->
-			<Card.Root class="flex h-full flex-col border-0 bg-muted/50 shadow-none">
+			<Card.Root class="flex h-full flex-col border-0 bg-muted/30 shadow-none ring-0">
 				{@const resourceQuotaHard = object.spec?.resourceQuota?.hard ?? {}}
 				<Card.Header>
 					<Card.Title>
@@ -465,7 +464,7 @@
 			</Card.Root>
 
 			<!-- Limit Range -->
-			<Card.Root class="flex h-full flex-col border-0 bg-muted/50 shadow-none">
+			<Card.Root class="flex h-full flex-col border-0 bg-muted/30 shadow-none ring-0">
 				{@const limits = object.spec?.limitRange?.limits ?? []}
 				<Card.Header>
 					<Card.Title>
@@ -532,7 +531,7 @@
 			</Card.Root>
 
 			<!-- Network Isolation -->
-			<Card.Root class="flex h-full flex-col border-0 bg-muted/50 shadow-none">
+			<Card.Root class="flex h-full flex-col border-0 bg-muted/30 shadow-none ring-0">
 				<Card.Header>
 					<Card.Title>
 						<Item.Root class="p-0">
@@ -594,7 +593,7 @@
 			</Card.Root>
 
 			<!-- Members -->
-			<Card.Root class="flex h-full flex-col border-0 bg-muted/50 shadow-none">
+			<Card.Root class="flex h-full flex-col border-0 bg-muted/30 shadow-none ring-0">
 				{@const members = object.spec?.members ?? []}
 				<Card.Header>
 					<Card.Title>
@@ -639,7 +638,15 @@
 
 		<Field.Set>
 			<!-- Related Resources -->
-			<Label class={typographyVariants({ variant: 'h4' })}>Related Resources</Label>
+			<Item.Root class="p-0">
+				<Item.Content>
+					<Item.Title>Related Resources</Item.Title>
+					<Item.Description>
+						{relatedResources.length} resources related to {object.kind}
+						{object.metadata?.name}
+					</Item.Description>
+				</Item.Content>
+			</Item.Root>
 			{#if relatedResources.length > 0}
 				<div class="grid gap-4 xl:grid-cols-3 2xl:grid-cols-4">
 					{#each relatedResources as ref (ref.kind + ref.name)}

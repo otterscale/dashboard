@@ -132,6 +132,7 @@
 					{#if selectedTab === 'overview'}
 						{#key `${selectedNamespace ?? ''}-${dashboardTimeRangeKey}`}
 							<WidgetGrid
+								{cluster}
 								{widgets}
 								{prometheusDriver}
 								namespace={selectedNamespace ?? ''}

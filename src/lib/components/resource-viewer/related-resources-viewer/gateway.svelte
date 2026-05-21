@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { FileSearchIcon } from '@lucide/svelte';
-	import type { CoreV1PersistentVolumeClaim } from '@otterscale/types';
+	import type { GatewayNetworkingK8SIoV1Gateway } from '@otterscale/types';
 
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import { Badge } from '$lib/components/ui/badge';
@@ -11,11 +11,11 @@
 	import { cn } from '$lib/utils';
 
 	let {
-		persistentVolumeClaim,
+		gateway,
 		cluster,
 		namespace
 	}: {
-		persistentVolumeClaim: CoreV1PersistentVolumeClaim;
+		gateway: GatewayNetworkingK8SIoV1Gateway;
 		cluster: string;
 		namespace: string;
 	} = $props();
@@ -23,37 +23,42 @@
 
 <Card.Root class="border-0 bg-muted/30 shadow-none ring-0">
 	<Card.Header>
-		<Card.Title>{persistentVolumeClaim?.metadata?.name}</Card.Title>
+		<Card.Title>{gateway?.metadata?.name}</Card.Title>
 		<Card.Description>
-			<Badge>{persistentVolumeClaim?.status?.phase}</Badge>
+			<Badge>{gateway?.spec?.gatewayClassName ?? 'Gateway'}</Badge>
 		</Card.Description>
 		<Card.Action>
 			<Describe
 				{cluster}
-				namespace={persistentVolumeClaim?.metadata?.namespace ?? namespace}
-				group=""
+				namespace={gateway?.metadata?.namespace ?? namespace}
+				group="gateway.networking.k8s.io"
 				version="v1"
-				resource="persistentvolumeclaims"
-				object={persistentVolumeClaim}
+				resource="gateways"
+				object={gateway}
 			>
 				{#snippet trigger()}
-					<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost' }))}>
-						<FileSearchIcon />
+					<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
+						<FileSearchIcon size={16} />
 					</Dialog.Trigger>
 				{/snippet}
 			</Describe>
 		</Card.Action>
 	</Card.Header>
 	<Card.Content class="flex flex-col gap-2">
-		{@const accessModes = persistentVolumeClaim?.status?.accessModes ?? []}
-		<p class="text-xl">{persistentVolumeClaim?.status?.capacity?.storage}</p>
-		{#each accessModes as accessMode, index (index)}
+		{@const listeners = gateway?.spec?.listeners ?? []}
+		{#if listeners.length > 0}
 			<Item.Root class="p-0">
 				<Item.Content>
-					<Item.Title>Access Mode</Item.Title>
-					<Item.Description>{accessMode}</Item.Description>
+					<Item.Title class="text-xs">Listeners</Item.Title>
+					<Item.Description class="flex flex-wrap gap-1">
+						{#each listeners as listener, index (index)}
+							<Badge variant="outline">
+								{listener.name ?? `listener-${index + 1}`}
+							</Badge>
+						{/each}
+					</Item.Description>
 				</Item.Content>
 			</Item.Root>
-		{/each}
+		{/if}
 	</Card.Content>
 </Card.Root>

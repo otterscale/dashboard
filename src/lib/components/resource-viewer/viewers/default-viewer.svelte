@@ -7,4 +7,6 @@
 	let { object }: { object: JsonObject } = $props();
 </script>
 
-<Code.Root variant="secondary" lang="yaml" class="w-full border-none" code={stringify(object)} />
+<Code.Root variant="secondary" lang="yaml" class="w-full border-none" code={stringify(object)}>
+	<Code.CopyButton />
+</Code.Root>
