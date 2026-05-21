@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
-	import type { ServingKserveIoV1Alpha1LLMInferenceService } from '@otterscale/types';
+	import type { ServingKserveIoV1Alpha2LLMInferenceService } from '@otterscale/types';
 	import type { Schema } from '@sjsf/form';
 	import type { ValidateFunction } from 'ajv';
 
@@ -33,7 +33,7 @@
 		resource: string;
 		schema: Schema;
 		validate: ValidateFunction;
-		object: ServingKserveIoV1Alpha1LLMInferenceService;
+		object: ServingKserveIoV1Alpha2LLMInferenceService;
 	} = $props();
 
 	let actionsOpen = $state(false);
