@@ -4,6 +4,8 @@
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
+	import Ajv from 'ajv';
+	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
@@ -69,6 +71,12 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
+
+	const jsonSchemaValidator = new Ajv({
+		allErrors: true,
+		strict: false
+	});
+	const validate = $derived(jsonSchemaValidator.compile(jsonSchema));
 
 	const systemFields = [
 		'clusterName',
@@ -555,6 +563,24 @@
 							if (isSubmitting) return;
 
 							isSubmitting = true;
+
+							let parsed: unknown;
+							try {
+								parsed = load(value);
+							} catch {
+								toast.error('Invalid YAML. Please check the content.');
+								isSubmitting = false;
+								return;
+							}
+
+							const isValid = validate(parsed);
+
+							if (!isValid) {
+								console.error('Validation errors:', validate.errors);
+								toast.error('Validation failed. Please check the YAML.');
+								isSubmitting = false;
+								return;
+							}
 
 							const name = object.metadata?.name;
 							const manifest = new TextEncoder().encode(value);
