@@ -36,10 +36,36 @@
 		version: string;
 		kind: string;
 		resource: string;
-		schema: any;
-		object: any;
+		schema: Schema;
+		object: ApplicationObject;
 		onOpenChangeComplete: () => void;
 	} = $props();
+
+	type ApplicationSpec = {
+		name?: string;
+		image?: string;
+		command?: string[];
+		args?: string[];
+		containerPort?: number;
+		replicas?: number;
+		serviceType?: string;
+		serviceNodePort?: number;
+		accessMode?: string;
+		storageSize?: string;
+		mountPath?: string;
+		resourcesRequestsCpu?: string;
+		resourcesRequestsMemory?: string;
+		resourcesLimitsCpu?: string;
+		resourcesLimitsMemory?: string;
+		resourcesGpu?: string;
+		resourcesGpumem?: string;
+	};
+
+	type ApplicationObject = {
+		metadata?: { name?: string; namespace?: string; [k: string]: unknown };
+		spec?: ApplicationSpec;
+		status?: { nodePort?: number; [k: string]: unknown };
+	};
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
@@ -62,27 +88,34 @@
 		'uid'
 	];
 
-	let values: any = $state({
-		apiVersion: group ? `${group}/${version}` : version,
-		kind,
-		metadata: object.metadata,
-		spec: {}
-	});
-	let specValues: any = $state({});
-	let serviceValues: any = $state({});
-	let storageValues: any = $state({});
-	let resourceFormValues: any = $state({});
+	let values = $state(getInitialValues());
+	let specValues = $state<FormValue>({});
+	let serviceValues = $state<FormValue>({});
+	let storageValues = $state<FormValue>({});
+	let resourceFormValues = $state<FormValue>({});
+
+	function getInitialValues() {
+		return {
+			apiVersion: group ? `${group}/${version}` : version,
+			kind,
+			metadata: (object.metadata ?? {}) as Record<string, unknown>,
+			spec: {} as Record<string, unknown>
+		};
+	}
 
 	$effect(() => {
-		values.spec = { ...specValues, ...serviceValues, ...storageValues, ...resourceFormValues };
+		values.spec = {
+			...(specValues as Record<string, unknown>),
+			...(serviceValues as Record<string, unknown>),
+			...(storageValues as Record<string, unknown>),
+			...(resourceFormValues as Record<string, unknown>)
+		};
 	});
 
 	let value = $derived.by(() => {
-		const filtered = lodash.cloneDeep(values);
-		if (filtered.metadata) {
-			for (const field of systemFields) {
-				delete filtered.metadata[field];
-			}
+		const filtered = lodash.cloneDeep(values) as typeof values & { status?: unknown };
+		for (const field of systemFields) {
+			delete filtered.metadata[field];
 		}
 		delete filtered.status;
 		return stringify(filtered);
@@ -99,17 +132,28 @@
 	function handlePrevious() {
 		currentStep = steps[Math.max(currentIndex - 1, 0)];
 	}
-	function reset() {
-		currentStep = firstStep;
-	}
-
 	let open = $state(false);
 	let isSubmitting = $state(false);
-	let storageEnabled = $state(
-		object.spec?.accessMode != null ||
+	let storageEnabled = $state(getStorageEnabled());
+
+	function getStorageEnabled() {
+		return (
+			object.spec?.accessMode != null ||
 			object.spec?.storageSize != null ||
 			object.spec?.mountPath != null
-	);
+		);
+	}
+
+	function initiate() {
+		values = getInitialValues();
+		specValues = {};
+		serviceValues = {};
+		storageValues = {};
+		resourceFormValues = {};
+		currentStep = firstStep;
+		isSubmitting = false;
+		storageEnabled = getStorageEnabled();
+	}
 </script>
 
 <Dialog.Root
@@ -117,7 +161,7 @@
 	onOpenChangeComplete={(isOpen) => {
 		onOpenChangeComplete?.();
 		if (!isOpen) {
-			reset();
+			initiate();
 		}
 	}}
 >
@@ -151,32 +195,32 @@
 					schema={{
 						title: 'Container',
 						type: 'object',
-						required: lodash
-							.get(jsonSchema, 'properties.spec.required', [])
-							.filter((f: string) => ['name', 'image'].includes(f)),
+						required: (
+							lodash.get(jsonSchema, 'properties.spec.required', []) as string[]
+						).filter((f) => ['name', 'image'].includes(f)),
 						properties: {
 							name: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.name'),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.name') as Schema),
 								title: 'Name'
 							},
 							image: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.image'),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.image') as Schema),
 								title: 'Image'
 							},
 							command: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.command'),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.command') as Schema),
 								title: 'Command'
 							},
 							args: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.args'),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.args') as Schema),
 								title: 'Arguments'
 							},
 							containerPort: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.containerPort'),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.containerPort') as Schema),
 								title: 'Container Port'
 							},
 							replicas: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.replicas'),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.replicas') as Schema),
 								title: 'Replicas'
 							}
 						}
@@ -237,7 +281,7 @@
 						type: 'object',
 						properties: {
 							serviceType: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.serviceType'),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.serviceType') as Schema),
 								title: 'Service Type',
 								enum: ['ClusterIP', 'NodePort', 'LoadBalancer']
 							}
@@ -259,7 +303,10 @@
 										properties: {
 											serviceType: { enum: ['NodePort'] },
 											serviceNodePort: {
-												...lodash.get(jsonSchema, 'properties.spec.properties.serviceNodePort'),
+												...(lodash.get(
+													jsonSchema,
+													'properties.spec.properties.serviceNodePort'
+												) as Schema),
 												title: 'Service Node Port'
 											}
 										}
@@ -327,16 +374,16 @@
 								type: 'object',
 								properties: {
 									accessMode: {
-										...lodash.get(jsonSchema, 'properties.spec.properties.accessMode'),
+										...(lodash.get(jsonSchema, 'properties.spec.properties.accessMode') as Schema),
 										title: 'Access Mode',
 										enum: ['ReadWriteOnce', 'ReadOnlyMany', 'ReadWriteMany']
 									},
 									storageSize: {
-										...lodash.get(jsonSchema, 'properties.spec.properties.storageSize'),
+										...(lodash.get(jsonSchema, 'properties.spec.properties.storageSize') as Schema),
 										title: 'Storage Size'
 									},
 									mountPath: {
-										...lodash.get(jsonSchema, 'properties.spec.properties.mountPath'),
+										...(lodash.get(jsonSchema, 'properties.spec.properties.mountPath') as Schema),
 										title: 'Mount Path'
 									}
 								}
@@ -402,27 +449,39 @@
 						type: 'object',
 						properties: {
 							resourcesRequestsCpu: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesRequestsCpu'),
+								...(lodash.get(
+									jsonSchema,
+									'properties.spec.properties.resourcesRequestsCpu'
+								) as Schema),
 								title: 'CPU Request'
 							},
 							resourcesRequestsMemory: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesRequestsMemory'),
+								...(lodash.get(
+									jsonSchema,
+									'properties.spec.properties.resourcesRequestsMemory'
+								) as Schema),
 								title: 'Memory Request'
 							},
 							resourcesLimitsCpu: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesLimitsCpu'),
+								...(lodash.get(
+									jsonSchema,
+									'properties.spec.properties.resourcesLimitsCpu'
+								) as Schema),
 								title: 'CPU Limit'
 							},
 							resourcesLimitsMemory: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesLimitsMemory'),
+								...(lodash.get(
+									jsonSchema,
+									'properties.spec.properties.resourcesLimitsMemory'
+								) as Schema),
 								title: 'Memory Limit'
 							},
 							resourcesGpu: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesGpu'),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.resourcesGpu') as Schema),
 								title: 'GPU'
 							},
 							resourcesGpumem: {
-								...lodash.get(jsonSchema, 'properties.spec.properties.resourcesGpumem'),
+								...(lodash.get(jsonSchema, 'properties.spec.properties.resourcesGpumem') as Schema),
 								title: 'GPU Memory'
 							}
 						}
