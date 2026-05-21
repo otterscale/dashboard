@@ -63,19 +63,13 @@
 		| GatewayNetworkingK8SIoV1HTTPRoute
 		| AutoscalingV2HorizontalPodAutoscaler;
 
-	const getKey = (resource: RelatedResource) =>
-		resource?.metadata?.uid ?? resource?.metadata?.name ?? '';
-
 	async function listAndWatch<T extends RelatedResource>(
 		identifier: { group: string; version: string; resource: string },
-		setResources: (items: T[]) => void,
-		updateResources: (updater: (previous: T[]) => T[]) => void
+		setResources: (items: T[]) => void
 	) {
 		const labelSelector = `app.kubernetes.io/part-of=llminferenceservice,app.kubernetes.io/name=${serviceName}`;
 
 		while (!abortController.signal.aborted) {
-			let resourceVersion = '';
-
 			try {
 				const response = await resourceClient.list(
 					{
@@ -88,69 +82,11 @@
 				);
 				const items = response.items.map((item) => item.object as T);
 				setResources(items);
-				resourceVersion = response.resourceVersion;
 			} catch (error) {
 				if (abortController.signal.aborted) return;
 				console.error(`Failed to list ${identifier.resource}:`, error);
 				await sleep(3000);
 				continue;
-			}
-
-			try {
-				const stream = resourceClient.watch(
-					{
-						cluster,
-						namespace,
-						labelSelector,
-						...identifier,
-						resourceVersion
-					},
-					{ signal: abortController.signal }
-				);
-
-				for await (const event of stream) {
-					if (event.type === WatchEvent_Type.BOOKMARK) {
-						if (event.resourceVersion) resourceVersion = event.resourceVersion;
-						continue;
-					}
-
-					if (event.type === WatchEvent_Type.ERROR) {
-						console.warn(`Watch error for ${identifier.resource}, relisting...`);
-						break;
-					}
-
-					const resourceObject = event.resource?.object as T | undefined;
-					if (!resourceObject) continue;
-					const key = getKey(resourceObject);
-					if (!key) continue;
-
-					if (event.resourceVersion) resourceVersion = event.resourceVersion;
-
-					switch (event.type) {
-						case WatchEvent_Type.ADDED:
-						case WatchEvent_Type.MODIFIED: {
-							updateResources((previous) => {
-								const index = previous.findIndex((resource) => getKey(resource) === key);
-								if (index >= 0) {
-									const next = previous.slice();
-									next[index] = resourceObject;
-									return next;
-								}
-								return [...previous, resourceObject];
-							});
-							break;
-						}
-						case WatchEvent_Type.DELETED: {
-							updateResources((previous) =>
-								previous.filter((resource) => getKey(resource) !== key)
-							);
-							break;
-						}
-					}
-				}
-			} catch (error) {
-				if (abortController.signal.aborted) return;
-				console.error(`Watch stream error for ${identifier.resource}:`, error);
 			}
 
 			if (!abortController.signal.aborted) {
@@ -193,53 +129,43 @@
 
 		listAndWatch<AppsV1Deployment>(
 			{ group: 'apps', version: 'v1', resource: 'deployments' },
-			(items) => (deployments = items),
-			(updater) => (deployments = updater(deployments))
+			(items) => (deployments = items)
 		);
 		listAndWatch<LeaderworkersetXK8SIoV1LeaderWorkerSet>(
 			{ group: 'leaderworkerset.x-k8s.io', version: 'v1', resource: 'leaderworkersets' },
-			(items) => (leaderWorkerSets = items),
-			(updater) => (leaderWorkerSets = updater(leaderWorkerSets))
+			(items) => (leaderWorkerSets = items)
 		);
 		listAndWatch<AppsV1ReplicaSet>(
 			{ group: 'apps', version: 'v1', resource: 'replicasets' },
-			(items) => (replicaSets = items),
-			(updater) => (replicaSets = updater(replicaSets))
+			(items) => (replicaSets = items)
 		);
 		listAndWatch<AppsV1StatefulSet>(
 			{ group: 'apps', version: 'v1', resource: 'statefulsets' },
-			(items) => (statefulSets = items),
-			(updater) => (statefulSets = updater(statefulSets))
+			(items) => (statefulSets = items)
 		);
 		listAndWatch<CoreV1Service>(
 			{ group: '', version: 'v1', resource: 'services' },
-			(items) => (services = items),
-			(updater) => (services = updater(services))
+			(items) => (services = items)
 		);
 		listAndWatch<CoreV1Pod>(
 			{ group: '', version: 'v1', resource: 'pods' },
-			(items) => (pods = items),
-			(updater) => (pods = updater(pods))
+			(items) => (pods = items)
 		);
 		listAndWatch<InferenceNetworkingK8SIoV1InferencePool>(
 			{ group: 'inference.networking.k8s.io', version: 'v1', resource: 'inferencepools' },
-			(items) => (inferencePools = items),
-			(updater) => (inferencePools = updater(inferencePools))
+			(items) => (inferencePools = items)
 		);
 		listAndWatch<GatewayNetworkingK8SIoV1Gateway>(
 			{ group: 'gateway.networking.k8s.io', version: 'v1', resource: 'gateways' },
-			(items) => (gateways = items),
-			(updater) => (gateways = updater(gateways))
+			(items) => (gateways = items)
 		);
 		listAndWatch<GatewayNetworkingK8SIoV1HTTPRoute>(
 			{ group: 'gateway.networking.k8s.io', version: 'v1', resource: 'httproutes' },
-			(items) => (httpRoutes = items),
-			(updater) => (httpRoutes = updater(httpRoutes))
+			(items) => (httpRoutes = items)
 		);
 		// listAndWatch<AutoscalingV2HorizontalPodAutoscaler>(
 		// 	{ group: 'autoscaling', version: 'v2', resource: 'horizontalpodautoscalers' },
 		// 	(items) => (horizontalPodAutoscalers = items),
-		// 	(updater) => (horizontalPodAutoscalers = updater(horizontalPodAutoscalers))
 		// );
 	});
 
