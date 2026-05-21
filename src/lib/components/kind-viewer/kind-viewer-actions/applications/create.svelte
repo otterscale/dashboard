@@ -2,8 +2,8 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
-	import { SubmitButton } from '@sjsf/form';
+	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
+	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
 	import { load } from 'js-yaml';
 	import lodash from 'lodash';
@@ -328,8 +328,13 @@
 						serviceType: 'ClusterIP'
 					} as FormValue}
 					handleSubmit={{
-						posthook: () => {
+						posthook: (form: FormState<FormValue>) => {
 							handleNext();
+
+							const formValue = getValueSnapshot(form);
+							if (lodash.get(formValue, 'serviceType') !== 'NodePort') {
+								lodash.unset(serviceValues, 'serviceNodePort');
+							}
 						}
 					}}
 					bind:values={serviceValues}

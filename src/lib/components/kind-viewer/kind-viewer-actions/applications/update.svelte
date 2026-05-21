@@ -2,8 +2,8 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import FormIcon from '@lucide/svelte/icons/form-input';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
-	import { SubmitButton } from '@sjsf/form';
+	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
+	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
@@ -334,11 +334,16 @@
 					} as UiSchemaRoot}
 					initialValue={{
 						serviceType: object.spec?.serviceType ?? 'ClusterIP',
-						serviceNodePort: object.status?.nodePort ?? 0
+						serviceNodePort: object.status?.nodePort
 					} as FormValue}
 					handleSubmit={{
-						posthook: () => {
+						posthook: (form: FormState<FormValue>) => {
 							handleNext();
+
+							const formValue = getValueSnapshot(form);
+							if (lodash.get(formValue, 'serviceType') !== 'NodePort') {
+								lodash.unset(serviceValues, 'serviceNodePort');
+							}
 						}
 					}}
 					bind:values={serviceValues}
