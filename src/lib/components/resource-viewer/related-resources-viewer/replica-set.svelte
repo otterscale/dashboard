@@ -1,17 +1,8 @@
 <script lang="ts">
-	import {
-		ChevronDownIcon,
-		FileSearchIcon,
-		RotateCcwIcon,
-		ScrollTextIcon,
-		TerminalSquareIcon
-	} from '@lucide/svelte';
-	import type { AppsV1Deployment } from '@otterscale/types';
+	import { ChevronDownIcon, FileSearchIcon } from '@lucide/svelte';
+	import type { AppsV1ReplicaSet } from '@otterscale/types';
 
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
-	import Log from '$lib/components/kind-viewer/kind-viewer-actions/default/log.svelte';
-	import Restart from '$lib/components/kind-viewer/kind-viewer-actions/default/restart.svelte';
-	import Terminal from '$lib/components/kind-viewer/kind-viewer-actions/default/terminal.svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
@@ -21,11 +12,11 @@
 	import { cn } from '$lib/utils';
 
 	let {
-		deployment,
+		replicaSet,
 		cluster,
 		namespace
 	}: {
-		deployment: AppsV1Deployment;
+		replicaSet: AppsV1ReplicaSet;
 		cluster: string;
 		namespace: string;
 	} = $props();
@@ -33,25 +24,22 @@
 
 <Card.Root class="border-0 bg-muted/30 shadow-none ring-0">
 	<Card.Header>
-		<Card.Title>{deployment?.metadata?.name}</Card.Title>
+		<Card.Title>{replicaSet?.metadata?.name}</Card.Title>
 		<Card.Description>
-			{@const availability = deployment.status?.conditions?.find(
-				(condition) => condition.type === 'Available'
-			)}
-			{#if availability?.status === 'True'}
-				<Badge>Available</Badge>
-			{:else}
-				<Badge variant="destructive">Unavailable</Badge>
-			{/if}
+			<Badge>
+				{replicaSet?.status?.readyReplicas ?? 0}/{replicaSet?.status?.replicas ??
+					replicaSet?.spec?.replicas ??
+					0} ready
+			</Badge>
 		</Card.Description>
-		<Card.Action class="flex items-center">
+		<Card.Action>
 			<Describe
 				{cluster}
-				namespace={deployment?.metadata?.namespace ?? namespace}
+				namespace={replicaSet?.metadata?.namespace ?? namespace}
 				group="apps"
 				version="v1"
-				resource="deployments"
-				object={deployment}
+				resource="replicasets"
+				object={replicaSet}
 			>
 				{#snippet trigger()}
 					<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
@@ -59,39 +47,30 @@
 					</Dialog.Trigger>
 				{/snippet}
 			</Describe>
-			<Log {cluster} object={deployment} kind="Deployment">
-				{#snippet trigger()}
-					<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
-						<ScrollTextIcon size={16} />
-					</Dialog.Trigger>
-				{/snippet}
-			</Log>
-			<Terminal {cluster} object={deployment}>
-				{#snippet trigger()}
-					<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
-						<TerminalSquareIcon size={16} />
-					</Dialog.Trigger>
-				{/snippet}
-			</Terminal>
-			<Restart
-				{cluster}
-				namespace={deployment?.metadata?.namespace ?? namespace}
-				group="apps"
-				version="v1"
-				kind="Deployment"
-				resource="deployments"
-				object={deployment}
-			>
-				{#snippet trigger()}
-					<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
-						<RotateCcwIcon size={16} />
-					</Dialog.Trigger>
-				{/snippet}
-			</Restart>
 		</Card.Action>
 	</Card.Header>
 	<Card.Content class="flex flex-col gap-2">
-		{@const conditions = deployment?.status?.conditions ?? []}
+		<div class="grid grid-cols-2 gap-2">
+			<Item.Root class="p-0">
+				<Item.Content>
+					<Item.Title class="text-xs">Ready Replicas</Item.Title>
+					<Item.Description>
+						{replicaSet?.status?.readyReplicas ?? 0}/{replicaSet?.status?.replicas ??
+							replicaSet?.spec?.replicas ??
+							0}
+					</Item.Description>
+				</Item.Content>
+			</Item.Root>
+			<Item.Root class="p-0">
+				<Item.Content>
+					<Item.Title class="text-xs">Terminating Replicas</Item.Title>
+					<Item.Description>
+						{replicaSet?.status?.terminatingReplicas ?? 0}
+					</Item.Description>
+				</Item.Content>
+			</Item.Root>
+		</div>
+		{@const conditions = replicaSet?.status?.conditions ?? []}
 		{#each conditions as condition, index (index)}
 			<Collapsible.Root class="rounded-lg transition-colors duration-200">
 				<Collapsible.Trigger class="group w-full hover:underline">

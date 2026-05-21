@@ -72,7 +72,6 @@
 			>
 				<Copy
 					{cluster}
-					{namespace}
 					{group}
 					{version}
 					{kind}

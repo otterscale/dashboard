@@ -21,7 +21,7 @@
 	} = $props();
 </script>
 
-<Card.Root>
+<Card.Root class="border-0 bg-muted/30 shadow-none ring-0">
 	<Card.Header>
 		<Card.Title>{service?.metadata?.name}</Card.Title>
 		<Card.Description>
@@ -44,49 +44,51 @@
 			</Describe>
 		</Card.Action>
 	</Card.Header>
-	<Card.Content class="flex flex-col gap-2">
+	<Card.Content class="flex flex-col gap-4">
 		{@const ports = service?.spec?.ports ?? []}
 		{#each ports as port, index (index)}
-			{#if port.name}
-				<Item.Root class="p-0">
-					<Item.Content>
-						<Item.Title>Name</Item.Title>
-						<Item.Description>{port.name}</Item.Description>
-					</Item.Content>
-				</Item.Root>
-			{/if}
-			{#if port.protocol}
-				<Item.Root class="p-0">
-					<Item.Content>
-						<Item.Title>Protocol</Item.Title>
-						<Item.Description>{port.protocol}</Item.Description>
-					</Item.Content>
-				</Item.Root>
-			{/if}
-			{#if port.nodePort}
-				<Item.Root class="p-0">
-					<Item.Content>
-						<Item.Title>Node Port</Item.Title>
-						<Item.Description>{port.nodePort}</Item.Description>
-					</Item.Content>
-				</Item.Root>
-			{/if}
-			{#if port.port}
-				<Item.Root class="p-0">
-					<Item.Content>
-						<Item.Title>Port</Item.Title>
-						<Item.Description>{port.port}</Item.Description>
-					</Item.Content>
-				</Item.Root>
-			{/if}
-			{#if port.targetPort}
-				<Item.Root class="p-0">
-					<Item.Content>
-						<Item.Title>Target Port</Item.Title>
-						<Item.Description>{port.targetPort}</Item.Description>
-					</Item.Content>
-				</Item.Root>
-			{/if}
+			<div class="grid grid-cols-3 gap-2">
+				{#if port.name}
+					<Item.Root class="p-0">
+						<Item.Content>
+							<Item.Title>Name</Item.Title>
+							<Item.Description>{port.name}</Item.Description>
+						</Item.Content>
+					</Item.Root>
+				{/if}
+				{#if port.protocol}
+					<Item.Root class="p-0">
+						<Item.Content>
+							<Item.Title>Protocol</Item.Title>
+							<Item.Description>{port.protocol}</Item.Description>
+						</Item.Content>
+					</Item.Root>
+				{/if}
+				{#if port.nodePort}
+					<Item.Root class="p-0">
+						<Item.Content>
+							<Item.Title>Node Port</Item.Title>
+							<Item.Description>{port.nodePort}</Item.Description>
+						</Item.Content>
+					</Item.Root>
+				{/if}
+				{#if port.port}
+					<Item.Root class="p-0">
+						<Item.Content>
+							<Item.Title>Port</Item.Title>
+							<Item.Description>{port.port}</Item.Description>
+						</Item.Content>
+					</Item.Root>
+				{/if}
+				{#if port.targetPort}
+					<Item.Root class="p-0">
+						<Item.Content>
+							<Item.Title>Target Port</Item.Title>
+							<Item.Description>{port.targetPort}</Item.Description>
+						</Item.Content>
+					</Item.Root>
+				{/if}
+			</div>
 		{/each}
 	</Card.Content>
 </Card.Root>
