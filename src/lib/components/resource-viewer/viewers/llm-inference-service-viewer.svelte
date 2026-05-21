@@ -35,85 +35,7 @@
 	import PodViewer from '../related-resources-viewer/pod.svelte';
 	import ServiceViewer from '../related-resources-viewer/service.svelte';
 
-	type ResourceCondition = {
-		type?: string;
-		status?: string;
-		reason?: string;
-		message?: string;
-		lastTransitionTime?: string;
-	};
-
-	type MetadataResource = {
-		apiVersion?: string;
-		kind?: string;
-		metadata?: {
-			uid?: string;
-			name?: string;
-			namespace?: string;
-			creationTimestamp?: string;
-		};
-	};
-
-	type LeaderWorkerSet = MetadataResource & {
-		spec?: {
-			replicas?: number;
-		};
-		status?: {
-			readyReplicas?: number;
-			replicas?: number;
-		};
-	};
-
-	type KedaScaledObject = MetadataResource & {
-		spec?: {
-			scaleTargetRef?: {
-				apiVersion?: string;
-				kind?: string;
-				name?: string;
-			};
-			triggers?: Array<{
-				type?: string;
-			}>;
-		};
-		status?: {
-			conditions?: ResourceCondition[];
-			scaleTargetGVKR?: {
-				group?: string;
-				version?: string;
-				kind?: string;
-				resource?: string;
-			};
-			scaleTargetKind?: string;
-			scaleTargetName?: string;
-		};
-	};
-
-	type LLMInferenceService = MetadataResource & {
-		spec?: {
-			model?: {
-				name?: string;
-				uri?: string;
-			};
-		};
-		status?: {
-			conditions?: ResourceCondition[];
-		};
-	};
-
-	type RelatedResource =
-		| AppsV1Deployment
-		| AppsV1ReplicaSet
-		| AppsV1StatefulSet
-		| AutoscalingV2HorizontalPodAutoscaler
-		| CoreV1Pod
-		| CoreV1Service
-		| GatewayNetworkingK8SIoV1Gateway
-		| GatewayNetworkingK8SIoV1HTTPRoute
-		| InferenceNetworkingK8SIoV1InferencePool
-		| LeaderWorkerSet
-		| KedaScaledObject;
-
-	let { object }: { object: LLMInferenceService } = $props();
+	let { object } = $props<{ object: any }>();
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
@@ -125,10 +47,9 @@
 	// AbortController is used to terminate all watch streams when the component is destroyed
 	const abortController = new AbortController();
 
-	const getKey = (resource: RelatedResource) =>
-		resource?.metadata?.uid ?? resource?.metadata?.name ?? '';
+	const getKey = (resource: any) => resource?.metadata?.uid ?? resource?.metadata?.name ?? '';
 
-	async function listAndWatch<T extends RelatedResource>(
+	async function listAndWatch<T>(
 		identifier: { group: string; version: string; resource: string },
 		setResources: (items: T[]) => void,
 		updateResources: (updater: (previous: T[]) => T[]) => void
@@ -231,15 +152,6 @@
 		});
 	}
 
-	function getPrimaryCondition(conditions?: ResourceCondition[]) {
-		if (!conditions?.length) return undefined;
-		return conditions.find((condition) => condition.status === 'True') ?? conditions[0];
-	}
-
-	function getKedaTargetName(resource: KedaScaledObject) {
-		return resource.spec?.scaleTargetRef?.name ?? resource.status?.scaleTargetName;
-	}
-
 	const conditions = $derived(
 		[...(object?.status?.conditions ?? [])].sort(
 			(previous, next) => Number(previous.status === 'True') - Number(next.status === 'True')
@@ -249,7 +161,7 @@
 	const isReady = $derived(readyCondition?.status === 'True');
 
 	let deployments = $state<AppsV1Deployment[]>([]);
-	let leaderWorkerSets = $state<LeaderWorkerSet[]>([]);
+	let leaderWorkerSets = $state<any[]>([]);
 	let replicaSets = $state<AppsV1ReplicaSet[]>([]);
 	let statefulSets = $state<AppsV1StatefulSet[]>([]);
 	let services = $state<CoreV1Service[]>([]);
@@ -258,7 +170,6 @@
 	let gateways = $state<GatewayNetworkingK8SIoV1Gateway[]>([]);
 	let httpRoutes = $state<GatewayNetworkingK8SIoV1HTTPRoute[]>([]);
 	let horizontalPodAutoscalers = $state<AutoscalingV2HorizontalPodAutoscaler[]>([]);
-	let kedaScaledObjects = $state<KedaScaledObject[]>([]);
 
 	onMount(() => {
 		if (!serviceName) return;
@@ -268,7 +179,7 @@
 			(items) => (deployments = items),
 			(updater) => (deployments = updater(deployments))
 		);
-		listAndWatch<LeaderWorkerSet>(
+		listAndWatch<any>(
 			{ group: 'leaderworkerset.x-k8s.io', version: 'v1', resource: 'leaderworkersets' },
 			(items) => (leaderWorkerSets = items),
 			(updater) => (leaderWorkerSets = updater(leaderWorkerSets))
@@ -312,11 +223,6 @@
 			{ group: 'autoscaling', version: 'v2', resource: 'horizontalpodautoscalers' },
 			(items) => (horizontalPodAutoscalers = items),
 			(updater) => (horizontalPodAutoscalers = updater(horizontalPodAutoscalers))
-		);
-		listAndWatch<KedaScaledObject>(
-			{ group: 'keda.sh', version: 'v1alpha1', resource: 'scaledobjects' },
-			(items) => (kedaScaledObjects = items),
-			(updater) => (kedaScaledObjects = updater(kedaScaledObjects))
 		);
 	});
 
@@ -928,9 +834,10 @@
 						<Card.Header>
 							<Card.Title>{horizontalPodAutoscaler?.metadata?.name}</Card.Title>
 							<Card.Description>
-								{@const condition = getPrimaryCondition(
-									horizontalPodAutoscaler?.status?.conditions
-								)}
+								{@const condition =
+									horizontalPodAutoscaler?.status?.conditions?.find(
+										(condition) => condition.status === 'True'
+									) ?? horizontalPodAutoscaler?.status?.conditions?.[0]}
 								{#if condition?.status === 'True'}
 									<Badge>{condition?.type ?? 'Active'}</Badge>
 								{:else}
@@ -988,92 +895,6 @@
 					<Empty.Title>No HPAs Found</Empty.Title>
 					<Empty.Description>
 						No HorizontalPodAutoscalers owned by this LLMInferenceService were found.
-					</Empty.Description>
-				</Empty.Header>
-			</Empty.Root>
-		{/if}
-	</Field.Set>
-
-	<Field.Set>
-		<Item.Root class="p-0">
-			<Item.Content>
-				<Item.Title>Related KEDA ScaledObjects</Item.Title>
-				<Item.Description>
-					{kedaScaledObjects.length} ScaledObjects related to {object.kind}
-					{object.metadata?.name}
-				</Item.Description>
-			</Item.Content>
-		</Item.Root>
-		{#if kedaScaledObjects.length > 0}
-			<div class="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
-				{#each kedaScaledObjects as kedaScaledObject (kedaScaledObject.metadata?.uid)}
-					<Card.Root class="border-0 bg-muted/30 shadow-none ring-0">
-						<Card.Header>
-							<Card.Title>{kedaScaledObject?.metadata?.name}</Card.Title>
-							<Card.Description>
-								{@const condition = getPrimaryCondition(kedaScaledObject?.status?.conditions)}
-								{#if condition?.status === 'True'}
-									<Badge>{condition?.type ?? 'Ready'}</Badge>
-								{:else}
-									<Badge variant="destructive">{condition?.reason ?? 'Pending'}</Badge>
-								{/if}
-							</Card.Description>
-							<Card.Action>
-								<Describe
-									{cluster}
-									namespace={kedaScaledObject?.metadata?.namespace ?? namespace}
-									group="keda.sh"
-									version="v1alpha1"
-									resource="scaledobjects"
-									object={kedaScaledObject}
-								>
-									{#snippet trigger()}
-										<Dialog.Trigger class={cn(buttonVariants({ variant: 'ghost', size: 'icon' }))}>
-											<FileSearchIcon size={16} />
-										</Dialog.Trigger>
-									{/snippet}
-								</Describe>
-							</Card.Action>
-						</Card.Header>
-						<Card.Content class="flex flex-col gap-2">
-							{#if getKedaTargetName(kedaScaledObject)}
-								<Item.Root class="p-0">
-									<Item.Content>
-										<Item.Title class="text-xs">Scale Target</Item.Title>
-										<Item.Description>
-											{kedaScaledObject?.spec?.scaleTargetRef?.kind ??
-												kedaScaledObject?.status?.scaleTargetKind}/
-											{getKedaTargetName(kedaScaledObject)}
-										</Item.Description>
-									</Item.Content>
-								</Item.Root>
-							{/if}
-							{@const triggers = kedaScaledObject?.spec?.triggers ?? []}
-							{#if triggers.length > 0}
-								<Item.Root class="p-0">
-									<Item.Content>
-										<Item.Title class="text-xs">Triggers</Item.Title>
-										<Item.Description class="flex flex-wrap gap-1">
-											{#each triggers as trigger, index (index)}
-												<Badge variant="outline">{trigger.type ?? `trigger-${index + 1}`}</Badge>
-											{/each}
-										</Item.Description>
-									</Item.Content>
-								</Item.Root>
-							{/if}
-						</Card.Content>
-					</Card.Root>
-				{/each}
-			</div>
-		{:else}
-			<Empty.Root class="h-full bg-muted/30">
-				<Empty.Header>
-					<Empty.Media variant="icon">
-						<Layers />
-					</Empty.Media>
-					<Empty.Title>No KEDA ScaledObjects Found</Empty.Title>
-					<Empty.Description>
-						No ScaledObjects owned by this LLMInferenceService were found.
 					</Empty.Description>
 				</Empty.Header>
 			</Empty.Root>
