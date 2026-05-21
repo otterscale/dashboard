@@ -1,6 +1,6 @@
 <script lang="ts">
 	import {
-		ChevronUpIcon,
+		ChevronDownIcon,
 		FileSearchIcon,
 		RotateCcwIcon,
 		ScrollTextIcon,
@@ -106,7 +106,7 @@
 							</Item.Description>
 						</Item.Content>
 						<Item.Actions>
-							<ChevronUpIcon
+							<ChevronDownIcon
 								size={12}
 								class="transition-transform duration-200 group-data-[state=open]:rotate-180"
 							/>

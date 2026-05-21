@@ -24,7 +24,6 @@
 
 	let {
 		cluster,
-		namespace,
 		group,
 		version,
 		kind,
@@ -35,7 +34,6 @@
 		onOpenChangeComplete
 	}: {
 		cluster: string;
-		namespace: string;
 		group: string;
 		version: string;
 		kind: string;
@@ -141,7 +139,7 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						namespace: namespace
+						namespace: page.data.namespace
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -204,7 +202,7 @@
 
 									await resourceClient.create({
 										cluster,
-										namespace,
+										namespace: page.data.namespace,
 										group,
 										version,
 										resource,

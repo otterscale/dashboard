@@ -16,7 +16,9 @@
 		CoreV1Service,
 		GatewayNetworkingK8SIoV1Gateway,
 		GatewayNetworkingK8SIoV1HTTPRoute,
-		InferenceNetworkingK8SIoV1InferencePool
+		InferenceNetworkingK8SIoV1InferencePool,
+		LeaderworkersetXK8SIoV1LeaderWorkerSet,
+		ServingKserveIoV1Alpha1LLMInferenceService
 	} from '@otterscale/types';
 	import { getContext, onDestroy, onMount } from 'svelte';
 
@@ -35,7 +37,7 @@
 	import PodViewer from '../related-resources-viewer/pod.svelte';
 	import ServiceViewer from '../related-resources-viewer/service.svelte';
 
-	let { object } = $props<{ object: any }>();
+	let { object } = $props<{ object: ServingKserveIoV1Alpha1LLMInferenceService }>();
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
@@ -47,7 +49,20 @@
 	// AbortController is used to terminate all watch streams when the component is destroyed
 	const abortController = new AbortController();
 
-	const getKey = (resource: any) => resource?.metadata?.uid ?? resource?.metadata?.name ?? '';
+	type RelatedResource =
+		| AppsV1Deployment
+		| LeaderworkersetXK8SIoV1LeaderWorkerSet
+		| AppsV1ReplicaSet
+		| AppsV1StatefulSet
+		| CoreV1Service
+		| CoreV1Pod
+		| InferenceNetworkingK8SIoV1InferencePool
+		| GatewayNetworkingK8SIoV1Gateway
+		| GatewayNetworkingK8SIoV1HTTPRoute
+		| AutoscalingV2HorizontalPodAutoscaler;
+
+	const getKey = (resource: RelatedResource) =>
+		resource?.metadata?.uid ?? resource?.metadata?.name ?? '';
 
 	async function listAndWatch<T>(
 		identifier: { group: string; version: string; resource: string },
@@ -161,7 +176,7 @@
 	const isReady = $derived(readyCondition?.status === 'True');
 
 	let deployments = $state<AppsV1Deployment[]>([]);
-	let leaderWorkerSets = $state<any[]>([]);
+	let leaderWorkerSets = $state<LeaderworkersetXK8SIoV1LeaderWorkerSet[]>([]);
 	let replicaSets = $state<AppsV1ReplicaSet[]>([]);
 	let statefulSets = $state<AppsV1StatefulSet[]>([]);
 	let services = $state<CoreV1Service[]>([]);
@@ -179,7 +194,7 @@
 			(items) => (deployments = items),
 			(updater) => (deployments = updater(deployments))
 		);
-		listAndWatch<any>(
+		listAndWatch<LeaderworkersetXK8SIoV1LeaderWorkerSet>(
 			{ group: 'leaderworkerset.x-k8s.io', version: 'v1', resource: 'leaderworkersets' },
 			(items) => (leaderWorkerSets = items),
 			(updater) => (leaderWorkerSets = updater(leaderWorkerSets))
