@@ -4,6 +4,8 @@ import type { Row } from '@tanstack/table-core';
 import { type ValidateFunction } from 'ajv';
 import type { Component } from 'svelte';
 
+import ApplicationActions from './applications/actions.svelte';
+import ApplicationCreate from './applications/create.svelte';
 import ObjectBucketClaimActions from './ceph-object-bucket-claim/actions.svelte';
 import ObjectBucketClaimCreate from './ceph-object-bucket-claim/create.svelte';
 import ClusterRoleBindingActions from './cluster-role-binding/actions.svelte';
@@ -68,6 +70,8 @@ type ActionsType = Component<{
 
 function getCreate(kind: string, namespace?: string): CreateType {
 	switch (kind) {
+		case 'Application':
+			return ApplicationCreate as CreateType;
 		case 'ClusterRoleBinding':
 			return ClusterRoleBindingCreate as CreateType;
 		case 'DataVolume':
@@ -102,6 +106,8 @@ function getCreate(kind: string, namespace?: string): CreateType {
 
 function getActions(kind: string): ActionsType {
 	switch (kind) {
+		case 'Application':
+			return ApplicationActions as ActionsType;
 		case 'ClusterRoleBinding':
 			return ClusterRoleBindingActions as ActionsType;
 		case 'CronJob':
