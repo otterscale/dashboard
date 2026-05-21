@@ -327,7 +327,9 @@
 					initialValue={{
 						name: values.metadata.name ?? null,
 						image: null,
-						containerPort: 8080
+						containerPort: 8080,
+						command: [],
+						args: []
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {

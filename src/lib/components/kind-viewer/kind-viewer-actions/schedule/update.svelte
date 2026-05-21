@@ -326,8 +326,8 @@
 					initialValue={{
 						name: object.spec?.name ?? null,
 						image: object.spec?.image ?? null,
-						command: object.spec?.command ?? undefined,
-						args: object.spec?.args ?? undefined,
+						command: object.spec?.command ?? [],
+						args: object.spec?.args ?? [],
 						cronSchedule: object.spec?.cronSchedule ?? '*/5 * * * *',
 						containerPort: object.spec?.containerPort ?? 8080
 					} as FormValue}
