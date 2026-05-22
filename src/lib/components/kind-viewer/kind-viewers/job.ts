@@ -143,7 +143,8 @@ function getJobColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'Namespace'
+			accessorKey: 'Namespace',
+			meta: { defaultHidden: true }
 		},
 		{
 			id: 'Completions',
@@ -186,27 +187,6 @@ function getJobColumnDefinitions(
 					uiSchemas: uiSchemas
 				}),
 			accessorKey: 'Duration'
-		},
-		{
-			id: 'Age',
-			header: ({ column }: { column: Column<Record<JobAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<JobAttribute, JsonValue>>;
-				row: Row<Record<JobAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas
-				}),
-			accessorKey: 'Age'
 		},
 		{
 			id: 'Containers',
@@ -311,6 +291,27 @@ function getJobColumnDefinitions(
 			meta: {
 				class: 'hidden xl:table-cell'
 			}
+		},
+		{
+			id: 'Age',
+			header: ({ column }: { column: Column<Record<JobAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<JobAttribute, JsonValue>>;
+				row: Row<Record<JobAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Age'
 		}
 	];
 }

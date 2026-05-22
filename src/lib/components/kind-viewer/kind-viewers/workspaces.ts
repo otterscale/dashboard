@@ -139,7 +139,8 @@ function getWorkspaceColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'Namespace'
+			accessorKey: 'Namespace',
+			meta: { defaultHidden: true }
 		},
 		{
 			id: 'Admin',

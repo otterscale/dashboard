@@ -110,7 +110,8 @@ function getRoleColumnDefinitions(
 					column,
 					uiSchemas
 				}),
-			accessorKey: 'Namespace'
+			accessorKey: 'Namespace',
+			meta: { defaultHidden: true }
 		},
 		simpleColumn('Rules'),
 		simpleColumn('Age')

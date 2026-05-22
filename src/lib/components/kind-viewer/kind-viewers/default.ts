@@ -121,7 +121,8 @@ function getDefaultColumnDefinitions(
 						column: column,
 						uiSchemas: uiSchemas
 					}),
-				accessorKey: 'Namespace'
+				accessorKey: 'Namespace',
+				meta: { defaultHidden: true }
 			}
 		].filter(() => apiResource!.namespaced),
 		{

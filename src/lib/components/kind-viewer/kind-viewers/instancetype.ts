@@ -145,7 +145,8 @@ function getVirtualMachineInstancetypeColumnDefinitions(
 					column,
 					uiSchemas
 				}),
-			accessorKey: 'Namespace'
+			accessorKey: 'Namespace',
+			meta: { defaultHidden: true }
 		},
 		simpleColumn('CPU'),
 		simpleColumn('Memory'),

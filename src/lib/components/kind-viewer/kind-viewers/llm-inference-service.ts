@@ -153,7 +153,8 @@ function getLLMInferenceServiceColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'Namespace'
+			accessorKey: 'Namespace',
+			meta: { defaultHidden: true }
 		},
 		{
 			id: 'Model Name',

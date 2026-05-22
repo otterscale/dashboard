@@ -120,7 +120,8 @@ function getStatefulSetColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'Namespace'
+			accessorKey: 'Namespace',
+			meta: { defaultHidden: true }
 		},
 		{
 			id: 'Ready',
@@ -142,27 +143,6 @@ function getStatefulSetColumnDefinitions(
 					uiSchemas: uiSchemas
 				}),
 			accessorKey: 'Ready'
-		},
-		{
-			id: 'Age',
-			header: ({ column }: { column: Column<Record<StatefulSetAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<StatefulSetAttribute, JsonValue>>;
-				row: Row<Record<StatefulSetAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas
-				}),
-			accessorKey: 'Age'
 		},
 		{
 			id: 'Containers',
@@ -234,6 +214,27 @@ function getStatefulSetColumnDefinitions(
 			meta: {
 				class: 'hidden xl:table-cell'
 			}
+		},
+		{
+			id: 'Age',
+			header: ({ column }: { column: Column<Record<StatefulSetAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<StatefulSetAttribute, JsonValue>>;
+				row: Row<Record<StatefulSetAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Age'
 		}
 	];
 }

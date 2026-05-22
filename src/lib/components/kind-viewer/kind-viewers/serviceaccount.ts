@@ -112,7 +112,8 @@ function getServiceAccountColumnDefinitions(
 					column,
 					uiSchemas
 				}),
-			accessorKey: 'Namespace'
+			accessorKey: 'Namespace',
+			meta: { defaultHidden: true }
 		},
 		simpleColumn('Secrets'),
 		simpleColumn('Age')

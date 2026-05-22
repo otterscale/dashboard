@@ -136,7 +136,8 @@ function getEventColumnDefinitions(
 					column,
 					uiSchemas
 				}),
-			accessorKey: 'Namespace'
+			accessorKey: 'Namespace',
+			meta: { defaultHidden: true }
 		},
 		simpleColumn('Type'),
 		simpleColumn('Reason'),
