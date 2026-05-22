@@ -42,30 +42,47 @@
 		onOpenChangeComplete: () => void;
 	} = $props();
 
-	let values = $state({ name: '' });
-
-	// Submit
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	// Flags
+	let values = $state(getInitialValues());
 	let open = $state(false);
 	let isDeleting = $state(false);
+
+	const jsonSchema = $derived({
+		type: 'object',
+		required: ['name'],
+		properties: {
+			name: {
+				title: 'Name',
+				type: 'string',
+				pattern: object?.metadata?.name
+			},
+			force: {
+				title: 'Force',
+				type: 'boolean'
+			}
+		}
+	} as Schema);
+
+	function getInitialValues() {
+		return { name: '', force: false };
+	}
+
+	function initiate() {
+		values = getInitialValues();
+		isDeleting = false;
+	}
 </script>
 
 <Dialog.Root
 	bind:open
-	onOpenChange={(isOpen) => {
-		if (!isOpen) return;
-
-		values = { name: '' };
-	}}
 	onOpenChangeComplete={(isOpen) => {
 		onOpenChangeComplete?.();
 
 		if (isOpen) return;
 
-		values = { name: '' };
+		initiate();
 	}}
 >
 	<Dialog.Trigger>
@@ -81,20 +98,9 @@
 		{/snippet}
 	</Dialog.Trigger>
 	<Dialog.Content
-		class="max-h-[95vh] min-w-[23vw] overflow-auto"
+		class="max-h-[95vh] min-w-[24vw] overflow-auto"
 		onInteractOutside={(e) => e.preventDefault()}
 	>
-		{@const jsonSchema = {
-			type: 'object',
-			required: ['name'],
-			properties: {
-				name: {
-					title: 'Name',
-					type: 'string',
-					pattern: object?.metadata?.name
-				}
-			}
-		} as Schema}
 		<Item.Root class="p-0">
 			<Item.Content class="text-left">
 				<Item.Title class="text-xl font-bold">{kind}</Item.Title>
@@ -102,17 +108,32 @@
 			</Item.Content>
 		</Item.Root>
 		<Form
-			schema={lodash.get(jsonSchema, 'properties.name') as Schema}
+			schema={jsonSchema}
 			uiSchema={{
 				'ui:options': {
-					help: `Entering the ${kind.toLowerCase()} name.`,
-					shadcn4Text: {
-						placeholder: object.metadata?.name
+					layouts: {
+						'object-properties': {
+							class: 'gap-3'
+						}
+					}
+				},
+				name: {
+					'ui:options': {
+						help: `Entering the ${kind.toLowerCase()} name.`,
+						shadcn4Text: {
+							placeholder: object.metadata?.name
+						}
+					}
+				},
+				force: {
+					'ui:options': {
+						help: 'Immediately terminate without waiting for graceful shutdown.',
+						shadcn4Checkbox: {}
 					}
 				}
 			} as UiSchemaRoot}
-			initialValue={'' as FormValue}
-			bind:values={values['name']}
+			initialValue={getInitialValues() as FormValue}
+			bind:values
 			handleSubmit={{
 				posthook: () => {
 					if (isDeleting) return;
@@ -124,6 +145,7 @@
 					if (!isValid) return;
 
 					const name = values.name as string;
+					const force = values.force as boolean;
 
 					toast.promise(
 						async () => {
@@ -133,7 +155,8 @@
 								group,
 								version,
 								resource,
-								name
+								name,
+								...(force ? { gracePeriodSeconds: 0n } : {})
 							});
 						},
 						{
