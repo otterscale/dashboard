@@ -10,6 +10,7 @@ import type {
 	ArrayOfObjectMetadata
 } from '$lib/components/dynamic-table/dynamic-table-cells/array-of-object-cell.svelte';
 import type { LinkMetadata } from '$lib/components/dynamic-table/dynamic-table-cells/link-cell.svelte';
+import type { QuantityMetadata } from '$lib/components/dynamic-table/dynamic-table-cells/quantity-cell.svelte';
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
 
@@ -34,11 +35,11 @@ function getWorkspaceDataSchemas(): Record<WorkspaceAttribute, DataSchemaType> {
 		Namespace: 'text',
 		Admin: 'text',
 		Members: 'number',
-		'CPU Request': 'number',
-		'Memory Request': 'number',
-		'CPU Limit': 'number',
-		'Memory Limit': 'number',
-		'GPU Memory Limit': 'number',
+		'CPU Request': 'quantity',
+		'Memory Request': 'quantity',
+		'CPU Limit': 'quantity',
+		'Memory Limit': 'quantity',
+		'GPU Memory Limit': 'quantity',
 		Age: 'time',
 		raw: 'object'
 	};
@@ -68,11 +69,11 @@ function getWorkspaceUISchemas(): Record<WorkspaceAttribute, UISchemaType> {
 		Namespace: 'text',
 		Admin: 'text',
 		Members: 'array-of-object',
-		'CPU Request': 'number',
-		'Memory Request': 'number',
-		'CPU Limit': 'number',
-		'Memory Limit': 'number',
-		'GPU Memory Limit': 'number',
+		'CPU Request': 'quantity',
+		'Memory Request': 'quantity',
+		'CPU Limit': 'quantity',
+		'Memory Limit': 'quantity',
+		'GPU Memory Limit': 'quantity',
 		Age: 'time',
 		raw: 'object'
 	};
@@ -202,7 +203,8 @@ function getWorkspaceColumnDefinitions(
 				renderComponent(DynamicTableCell, {
 					row: row,
 					column: column,
-					uiSchemas: uiSchemas
+					uiSchemas: uiSchemas,
+					metadata: { type: 'continuous' } as QuantityMetadata
 				}),
 			accessorKey: 'CPU Request'
 		},
@@ -223,7 +225,8 @@ function getWorkspaceColumnDefinitions(
 				renderComponent(DynamicTableCell, {
 					row: row,
 					column: column,
-					uiSchemas: uiSchemas
+					uiSchemas: uiSchemas,
+					metadata: { type: 'discrete' } as QuantityMetadata
 				}),
 			accessorKey: 'Memory Request'
 		},
@@ -244,7 +247,8 @@ function getWorkspaceColumnDefinitions(
 				renderComponent(DynamicTableCell, {
 					row: row,
 					column: column,
-					uiSchemas: uiSchemas
+					uiSchemas: uiSchemas,
+					metadata: { type: 'continuous' } as QuantityMetadata
 				}),
 			accessorKey: 'CPU Limit'
 		},
@@ -265,7 +269,8 @@ function getWorkspaceColumnDefinitions(
 				renderComponent(DynamicTableCell, {
 					row: row,
 					column: column,
-					uiSchemas: uiSchemas
+					uiSchemas: uiSchemas,
+					metadata: { type: 'discrete' } as QuantityMetadata
 				}),
 			accessorKey: 'Memory Limit'
 		},
@@ -286,7 +291,8 @@ function getWorkspaceColumnDefinitions(
 				renderComponent(DynamicTableCell, {
 					row: row,
 					column: column,
-					uiSchemas: uiSchemas
+					uiSchemas: uiSchemas,
+					metadata: { type: 'discrete' } as QuantityMetadata
 				}),
 			accessorKey: 'GPU Memory Limit'
 		},
