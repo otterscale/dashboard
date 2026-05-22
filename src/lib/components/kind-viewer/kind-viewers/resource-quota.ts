@@ -19,22 +19,22 @@ import { buildResourceDetailUrl } from './resource-url';
 type ResourceQuotaAttribute =
 	| 'Name'
 	| 'Namespace'
+	| 'CPU Request'
+	| 'Memory Request'
 	| 'CPU Limit'
 	| 'Memory Limit'
-	| 'CPU Request'
-	| 'GPU Request'
-	| 'Memory Request'
+	| 'GPU Memory Limit'
 	| 'raw';
 
 function getResourceQuotaDataSchemas(): Record<ResourceQuotaAttribute, DataSchemaType> {
 	return {
 		Name: 'text',
 		Namespace: 'text',
+		'CPU Request': 'number',
+		'Memory Request': 'number',
 		'CPU Limit': 'number',
 		'Memory Limit': 'number',
-		'CPU Request': 'number',
-		'GPU Request': 'number',
-		'Memory Request': 'number',
+		'GPU Memory Limit': 'number',
 		raw: 'object'
 	};
 }
@@ -45,6 +45,16 @@ function getResourceQuotaData(
 	return {
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.metadata?.namespace ?? null,
+		'CPU Request': getRatio(
+			object?.status?.used?.['requests.cpu'] ?? null,
+			object?.status?.hard?.['requests.cpu'] ?? null,
+			'continuous'
+		),
+		'Memory Request': getRatio(
+			object?.status?.used?.['requests.memory'] ?? null,
+			object?.status?.hard?.['requests.memory'] ?? null,
+			'discrete'
+		),
 		'CPU Limit': getRatio(
 			object?.status?.used?.['limits.cpu'] ?? null,
 			object?.status?.hard?.['limits.cpu'] ?? null,
@@ -55,19 +65,9 @@ function getResourceQuotaData(
 			object?.status?.hard?.['limits.memory'] ?? null,
 			'discrete'
 		),
-		'CPU Request': getRatio(
-			object?.status?.used?.['requests.cpu'] ?? null,
-			object?.status?.hard?.['requests.cpu'] ?? null,
-			'continuous'
-		),
-		'GPU Request': getRatio(
-			object?.status?.used?.['requests.nvidia.com/gpu'] ?? null,
-			object?.status?.hard?.['requests.nvidia.com/gpu'] ?? null,
-			'discrete'
-		),
-		'Memory Request': getRatio(
-			object?.status?.used?.['requests.memory'] ?? null,
-			object?.status?.hard?.['requests.memory'] ?? null,
+		'GPU Memory Limit': getRatio(
+			object?.status?.used?.['limits.nvidia.com/gpumem'] ?? null,
+			object?.status?.hard?.['limits.nvidia.com/gpumem'] ?? null,
 			'discrete'
 		),
 		raw: object as JsonObject
@@ -78,11 +78,11 @@ function getResourceQuotaUISchemas(): Record<ResourceQuotaAttribute, UISchemaTyp
 	return {
 		Name: 'link',
 		Namespace: 'text',
+		'CPU Request': 'ratio',
+		'Memory Request': 'ratio',
 		'CPU Limit': 'ratio',
 		'Memory Limit': 'ratio',
-		'CPU Request': 'ratio',
-		'GPU Request': 'ratio',
-		'Memory Request': 'ratio',
+		'GPU Memory Limit': 'ratio',
 		raw: 'object'
 	};
 }
@@ -144,34 +144,6 @@ function getResourceQuotaColumnDefinitions(
 			meta: { defaultHidden: true }
 		},
 		{
-			id: 'CPU Limit',
-			header: ({ column }: { column: Column<Record<ResourceQuotaAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<ResourceQuotaAttribute, JsonValue>>;
-				row: Row<Record<ResourceQuotaAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas,
-					metadata: {
-						numerator:
-							(row.original['raw'] as CoreV1ResourceQuota).status?.used?.['limits.cpu'] ?? ' - ',
-						denominator:
-							(row.original['raw'] as CoreV1ResourceQuota).status?.hard?.['limits.cpu'] ?? ' - '
-					} satisfies RatioMetadata
-				}),
-			accessorKey: 'CPU Limit',
-			size: 100
-		},
-		{
 			id: 'CPU Request',
 			header: ({ column }: { column: Column<Record<ResourceQuotaAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
@@ -197,34 +169,6 @@ function getResourceQuotaColumnDefinitions(
 					} satisfies RatioMetadata
 				}),
 			accessorKey: 'CPU Request',
-			size: 100
-		},
-		{
-			id: 'Memory Limit',
-			header: ({ column }: { column: Column<Record<ResourceQuotaAttribute, JsonValue>> }) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<ResourceQuotaAttribute, JsonValue>>;
-				row: Row<Record<ResourceQuotaAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas,
-					metadata: {
-						numerator:
-							(row.original['raw'] as CoreV1ResourceQuota).status?.used?.['limits.memory'] ?? ' - ',
-						denominator:
-							(row.original['raw'] as CoreV1ResourceQuota).status?.hard?.['limits.memory'] ?? ' - '
-					} satisfies RatioMetadata
-				}),
-			accessorKey: 'Memory Limit',
 			size: 100
 		},
 		{
@@ -258,7 +202,64 @@ function getResourceQuotaColumnDefinitions(
 			size: 100
 		},
 		{
-			id: 'GPU Request',
+			id: 'CPU Limit',
+			header: ({ column }: { column: Column<Record<ResourceQuotaAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<ResourceQuotaAttribute, JsonValue>>;
+				row: Row<Record<ResourceQuotaAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas,
+					metadata: {
+						numerator:
+							(row.original['raw'] as CoreV1ResourceQuota).status?.used?.['limits.cpu'] ?? ' - ',
+						denominator:
+							(row.original['raw'] as CoreV1ResourceQuota).status?.hard?.['limits.cpu'] ?? ' - '
+					} satisfies RatioMetadata
+				}),
+			accessorKey: 'CPU Limit',
+			size: 100
+		},
+		{
+			id: 'Memory Limit',
+			header: ({ column }: { column: Column<Record<ResourceQuotaAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<ResourceQuotaAttribute, JsonValue>>;
+				row: Row<Record<ResourceQuotaAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas,
+					metadata: {
+						numerator:
+							(row.original['raw'] as CoreV1ResourceQuota).status?.used?.['limits.memory'] ?? ' - ',
+						denominator:
+							(row.original['raw'] as CoreV1ResourceQuota).status?.hard?.['limits.memory'] ?? ' - '
+					} satisfies RatioMetadata
+				}),
+			accessorKey: 'Memory Limit',
+			size: 100
+		},
+
+		{
+			id: 'GPU Memory Limit',
 			header: ({ column }: { column: Column<Record<ResourceQuotaAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
@@ -278,15 +279,15 @@ function getResourceQuotaColumnDefinitions(
 					metadata: {
 						numerator:
 							(row.original['raw'] as CoreV1ResourceQuota).status?.used?.[
-								'requests.nvidia.com/gpu'
+								'limits.nvidia.com/gpumem'
 							] ?? ' - ',
 						denominator:
 							(row.original['raw'] as CoreV1ResourceQuota).status?.hard?.[
-								'requests.nvidia.com/gpu'
+								'limits.nvidia.com/gpumem'
 							] ?? ' - '
 					} satisfies RatioMetadata
 				}),
-			accessorKey: 'GPU Request',
+			accessorKey: 'GPU Memory Limit',
 			size: 100
 		}
 	];

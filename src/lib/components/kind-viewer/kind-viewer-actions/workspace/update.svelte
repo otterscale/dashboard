@@ -121,11 +121,8 @@
 			hard: lodash.get(object, 'spec.resourceQuota.hard', {
 				'requests.cpu': '32',
 				'requests.memory': '64Gi',
-				'requests.nvidia.com/gpu': '0',
-				'requests.nvidia.com/gpumem': '0',
 				'limits.cpu': '32',
 				'limits.memory': '64Gi',
-				'limits.nvidia.com/gpu': '0',
 				'limits.nvidia.com/gpumem': '0'
 			}) as SchemaValue
 		};
@@ -367,10 +364,8 @@
 							<Button
 								onclick={() => {
 									handlePrevious();
-								}}
+								}}>Previous</Button
 							>
-								Previous
-							</Button>
 							<SubmitButton />
 						</div>
 					{/snippet}
@@ -421,16 +416,6 @@
 													type: 'string',
 													readOnly: !editable
 												},
-												'requests.nvidia.com/gpu': {
-													title: 'GPU Device Request',
-													type: 'string',
-													readOnly: !editable
-												},
-												'requests.nvidia.com/gpumem': {
-													title: 'GPU Memory Request',
-													type: 'string',
-													readOnly: !editable
-												},
 												'limits.cpu': {
 													title: 'CPU Limit',
 													type: 'string',
@@ -438,11 +423,6 @@
 												},
 												'limits.memory': {
 													title: 'Memory Limit',
-													type: 'string',
-													readOnly: !editable
-												},
-												'limits.nvidia.com/gpu': {
-													title: 'GPU Device Limit',
 													type: 'string',
 													readOnly: !editable
 												},
@@ -499,11 +479,8 @@
 									hard: lodash.get(formValue, 'hard', {
 										'requests.cpu': '32',
 										'requests.memory': '64Gi',
-										'requests.nvidia.com/gpu': '0',
-										'requests.nvidia.com/gpumem': '0',
 										'limits.cpu': '32',
 										'limits.memory': '64Gi',
-										'limits.nvidia.com/gpu': '0',
 										'limits.nvidia.com/gpumem': '0'
 									})
 								});
@@ -532,10 +509,8 @@
 							<Button
 								onclick={() => {
 									handlePrevious();
-								}}
+								}}>Previous</Button
 							>
-								Previous
-							</Button>
 							<SubmitButton />
 						</div>
 					{/snippet}
@@ -562,10 +537,8 @@
 						<Button
 							onclick={() => {
 								handlePrevious();
-							}}
+							}}>Previous</Button
 						>
-							Previous
-						</Button>
 						<Button
 							onclick={() => {
 								if (isSubmitting) return;
