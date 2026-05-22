@@ -545,7 +545,7 @@
 								layouts: {
 									'object-properties': {
 										class:
-											'grid grid-cols-2 gap-3 [&_input]:read-only:focus-visible:ring-0 [&_input]:read-only:focus-visible:ring-offset-0 [&_input]:read-only:focus-visible:border-input [&_input]:read-only:cursor-default'
+											'grid grid-cols-2 gap-3 [&_input]:read-only:bg-muted [&_input]:read-only:opacity-50 [&_input]:read-only:cursor-not-allowed [&_input]:read-only:focus-visible:ring-0 [&_input]:read-only:focus-visible:ring-offset-0 [&_input]:read-only:focus-visible:border-input'
 									}
 								}
 							}
