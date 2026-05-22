@@ -171,7 +171,7 @@
 							<Item.Root class="w-full p-0">
 								<Item.Content class="text-start">
 									<Item.Title>{option.label}</Item.Title>
-									<Item.Description>{option.value}</Item.Description>
+									<Item.Description>{option.user.username}</Item.Description>
 								</Item.Content>
 							</Item.Root>
 						</Command.Item>
