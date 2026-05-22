@@ -119,12 +119,12 @@
 		return {
 			unlimit: !lodash.has(object, 'spec.resourceQuota.hard'),
 			hard: lodash.get(object, 'spec.resourceQuota.hard', {
-				'requests.cpu': '16',
-				'requests.memory': '32Gi',
+				'requests.cpu': '32',
+				'requests.memory': '64Gi',
 				'requests.nvidia.com/gpu': '0',
 				'requests.nvidia.com/gpumem': '0',
-				'limits.cpu': '16',
-				'limits.memory': '32Gi',
+				'limits.cpu': '32',
+				'limits.memory': '64Gi',
 				'limits.nvidia.com/gpu': '0',
 				'limits.nvidia.com/gpumem': '0'
 			}) as SchemaValue
@@ -497,12 +497,12 @@
 							} else {
 								lodash.set(values, ['spec', 'resourceQuota'], {
 									hard: lodash.get(formValue, 'hard', {
-										'requests.cpu': '16',
-										'requests.memory': '32Gi',
+										'requests.cpu': '32',
+										'requests.memory': '64Gi',
 										'requests.nvidia.com/gpu': '0',
 										'requests.nvidia.com/gpumem': '0',
-										'limits.cpu': '16',
-										'limits.memory': '32Gi',
+										'limits.cpu': '32',
+										'limits.memory': '64Gi',
 										'limits.nvidia.com/gpu': '0',
 										'limits.nvidia.com/gpumem': '0'
 									})
@@ -512,8 +512,8 @@
 										{
 											type: 'Container',
 											default: {
-												cpu: '4',
-												memory: '8Gi'
+												cpu: '1',
+												memory: '2Gi'
 											},
 											defaultRequest: {
 												cpu: '0.5',
