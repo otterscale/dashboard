@@ -17,8 +17,9 @@ type HelmReleaseAttribute =
 	| 'Repository'
 	| 'Helm Chart'
 	| 'Version'
-	| 'Status'
+	| 'Ready'
 	| 'Reason'
+	| 'Message'
 	| 'Age'
 	| 'raw';
 
@@ -29,8 +30,9 @@ function getHelmReleaseDataSchemas(): Record<HelmReleaseAttribute, DataSchemaTyp
 		Repository: 'text',
 		'Helm Chart': 'text',
 		Version: 'text',
-		Status: 'text',
+		Ready: 'text',
 		Reason: 'text',
+		Message: 'text',
 		Age: 'time',
 		raw: 'object'
 	};
@@ -48,13 +50,9 @@ function getHelmReleaseData(
 		Repository: object?.spec?.chart?.spec?.sourceRef?.name ?? null,
 		'Helm Chart': object?.status?.helmChart ?? null,
 		Version: object?.spec?.chart?.spec?.version ?? null,
-		Status:
-			readyCondition?.status === 'True'
-				? 'Ready'
-				: readyCondition?.status === 'False'
-					? readyCondition.reason
-					: '',
+		Ready: readyCondition?.status ?? 'Unknown',
 		Reason: readyCondition?.reason ?? null,
+		Message: readyCondition?.message ?? null,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
 	};
@@ -67,8 +65,9 @@ function getHelmReleaseUISchemas(): Record<HelmReleaseAttribute, UISchemaType> {
 		Repository: 'text',
 		'Helm Chart': 'text',
 		Version: 'text',
-		Status: 'text',
+		Ready: 'text',
 		Reason: 'text',
+		Message: 'text',
 		Age: 'time',
 		raw: 'object'
 	};
@@ -194,7 +193,7 @@ function getHelmReleaseColumnDefinitions(
 			accessorKey: 'Version'
 		},
 		{
-			id: 'Status',
+			id: 'Ready',
 			header: ({ column }: { column: Column<Record<HelmReleaseAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
@@ -212,7 +211,7 @@ function getHelmReleaseColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'Status'
+			accessorKey: 'Ready'
 		},
 		{
 			id: 'Reason',
@@ -234,6 +233,28 @@ function getHelmReleaseColumnDefinitions(
 					uiSchemas: uiSchemas
 				}),
 			accessorKey: 'Reason'
+		},
+		{
+			id: 'Message',
+			header: ({ column }: { column: Column<Record<HelmReleaseAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<HelmReleaseAttribute, JsonValue>>;
+				row: Row<Record<HelmReleaseAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Message',
+			size: 400
 		},
 		{
 			id: 'Age',
