@@ -1,8 +1,10 @@
 <script lang="ts" module>
-	const jsonSchemaValidator = new Ajv({
-		allErrors: true,
-		strict: true
-	});
+	const jsonSchemaValidator = ajvErrors(
+		new Ajv({
+			allErrors: true,
+			strict: true
+		})
+	);
 </script>
 
 <script lang="ts">
@@ -12,6 +14,7 @@
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
+	import ajvErrors from 'ajv-errors';
 	import lodash from 'lodash';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -56,7 +59,8 @@
 			name: {
 				title: 'Name',
 				type: 'string',
-				pattern: object?.metadata?.name
+				const: object?.metadata?.name,
+				errorMessage: `Please enter "${object?.metadata?.name ?? ''}" to confirm.`
 			},
 			force: {
 				title: 'Force',

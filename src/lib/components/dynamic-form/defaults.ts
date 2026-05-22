@@ -7,11 +7,12 @@ export { theme } from '@sjsf/shadcn4-theme';
 
 import { addFormComponents, createFormValidator } from '@sjsf/ajv8-validator';
 import type { ValidatorFactoryOptions } from '@sjsf/form';
+import ajvErrors from 'ajv-errors';
 import addFormats from 'ajv-formats';
 export const validator = <T>(options: ValidatorFactoryOptions) =>
 	createFormValidator<T>({
 		...options,
-		ajvPlugins: (ajv) => addFormComponents(addFormats(ajv))
+		ajvPlugins: (ajv) => addFormComponents(ajvErrors(addFormats(ajv)))
 	});
 
 import '@sjsf/form/fields/extra/aggregated-include';
