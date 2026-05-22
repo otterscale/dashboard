@@ -71,6 +71,7 @@
 		timer = setTimeout(async () => {
 			try {
 				const response = await fetch(`/rest/users?search=${encodeURIComponent(term)}`);
+				if (term !== searchTerm) return;
 				if (response.ok) {
 					const fetchedUsers: KeycloakUser[] = await response.json();
 					enumerations = fetchedUsers.map((user) => {
