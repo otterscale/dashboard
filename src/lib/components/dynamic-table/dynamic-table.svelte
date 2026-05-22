@@ -170,7 +170,9 @@
 	// svelte-ignore state_referenced_locally
 	const initialColumnVisibility: VisibilityState = Object.fromEntries(
 		columnDefinitions
-			.filter((col) => (col.meta as { defaultHidden?: boolean } | undefined)?.defaultHidden === true)
+			.filter(
+				(col) => (col.meta as { defaultHidden?: boolean } | undefined)?.defaultHidden === true
+			)
 			.map((col) => [col.id ?? (col as { accessorKey?: string }).accessorKey, false])
 			.filter(([id]) => id != null)
 	);
