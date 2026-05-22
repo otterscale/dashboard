@@ -84,12 +84,12 @@
 			} catch (error) {
 				if (abortController.signal.aborted) return;
 				console.error(`Failed to list ${identifier.resource}:`, error);
-				await sleep(3000);
+				await sleep(10 * 1000);
 				continue;
 			}
 
 			if (!abortController.signal.aborted) {
-				await sleep(1000);
+				await sleep(10 * 60 * 1000);
 			}
 		}
 	}
