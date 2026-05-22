@@ -17,6 +17,7 @@
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
 	import NetworkIcon from '@lucide/svelte/icons/network';
 	import PlusIcon from '@lucide/svelte/icons/plus';
+	import ShieldCheckIcon from '@lucide/svelte/icons/shield-check';
 	import UserStarIcon from '@lucide/svelte/icons/user-star';
 	import { type Link, LinkService } from '@otterscale/api/link/v1';
 	import { ResourceService } from '@otterscale/api/resource/v1';
@@ -324,6 +325,15 @@
 												cluster: activeCluster,
 												workspace: page.params.workspace
 											})
+										: ''
+								},
+								{
+									title: m.license?.() ?? 'License',
+									url: page.params.workspace
+										? (resolve as (path: string, params: Record<string, string>) => string)(
+												'/(auth)/[cluster]/[workspace]/license',
+												{ cluster: activeCluster, workspace: page.params.workspace }
+											)
 										: ''
 								}
 							]
