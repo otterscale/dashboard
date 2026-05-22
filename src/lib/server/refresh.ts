@@ -33,10 +33,19 @@ function clearSession(event: RequestEvent): void {
 }
 
 /**
- * Another request holds the refresh lock. Poll Redis until we see fresh tokens
- * or we give up.
+ * Another request — possibly on another replica — holds the refresh lock. Poll
+ * Redis until the stored refresh token rotates away from `staleRefreshToken`,
+ * which proves the in-flight refresh has committed its new token set.
+ *
+ * We key off the refresh token rather than the access-token expiry on purpose:
+ * a short access-token lifespan can make even a freshly minted token look
+ * near-expiry, which would hide a completed refresh.
  */
-async function waitForOngoingRefresh(event: RequestEvent, token: string): Promise<RefreshOutcome> {
+async function waitForOngoingRefresh(
+	event: RequestEvent,
+	token: string,
+	staleRefreshToken: string
+): Promise<RefreshOutcome> {
 	const deadline = Date.now() + WAIT_MAX_MS;
 	while (Date.now() < deadline) {
 		await sleep(WAIT_POLL_MS);
@@ -45,7 +54,7 @@ async function waitForOngoingRefresh(event: RequestEvent, token: string): Promis
 			clearSession(event);
 			return { kind: 'invalid' };
 		}
-		if (!isNearExpiry(latest.tokenSet.accessTokenExpiresAt)) {
+		if (latest.tokenSet.refreshToken !== staleRefreshToken) {
 			event.locals.session = latest;
 			return { kind: 'ok', session: latest };
 		}
@@ -84,8 +93,17 @@ async function performRefresh(event: RequestEvent, latest: Session): Promise<Ref
 /**
  * Ensures event.locals.session has a usable access token.
  * - `force: false` → only refresh when near-expiry (scheduled refresh).
- * - `force: true`  → always attempt refresh (used after an upstream 401).
- * Handles the single-use refresh-token race via Redis lock + re-read.
+ * - `force: true`  → refresh even when not near-expiry (used after an upstream 401).
+ *
+ * Keycloak refresh tokens are single-use: presenting one twice trips reuse
+ * detection and revokes the entire SSO session. Two mechanisms — both living in
+ * shared Redis, so they hold across replicas — keep concurrent requests from
+ * doing that:
+ *  1. `acquireRefreshLock` serialises refreshes per session.
+ *  2. The rotation guard below only sends a refresh token to Keycloak while
+ *     Redis still holds that exact token. If a concurrent request (or replica)
+ *     already rotated it, we adopt their result instead of replaying a spent
+ *     token.
  */
 export async function tryRefreshSession(
 	event: RequestEvent,
@@ -101,23 +119,37 @@ export async function tryRefreshSession(
 	const token = getSessionTokenCookie(event.cookies);
 	if (!token) return { kind: 'invalid' };
 
+	// The refresh token we intend to rotate away from. It must never be handed
+	// to Keycloak more than once, here or on any other replica.
+	const staleRefreshToken = session.tokenSet.refreshToken;
+
 	const lockToken = await acquireRefreshLock(session.id, LOCK_TTL_MS);
 	if (!lockToken) {
-		return waitForOngoingRefresh(event, token);
+		return waitForOngoingRefresh(event, token, staleRefreshToken);
 	}
 
 	try {
-		// Re-read after acquiring the lock: another request may have just refreshed,
-		// which would have invalidated our in-memory refresh token (single-use).
+		// Re-read under the lock: a concurrent request may have refreshed while we
+		// waited to acquire it, which would have consumed our refresh token.
 		const { session: latest } = await validateSessionToken(token);
 		if (!latest) {
 			clearSession(event);
 			return { kind: 'invalid' };
 		}
+
+		// Rotation guard: the stored refresh token already changed, so another
+		// request completed a refresh. Adopt it — replaying staleRefreshToken now
+		// would trip Keycloak's reuse detection.
+		if (latest.tokenSet.refreshToken !== staleRefreshToken) {
+			event.locals.session = latest;
+			return { kind: 'ok', session: latest };
+		}
+
 		if (!force && !isNearExpiry(latest.tokenSet.accessTokenExpiresAt)) {
 			event.locals.session = latest;
 			return { kind: 'ok', session: latest };
 		}
+
 		return performRefresh(event, latest);
 	} finally {
 		await releaseRefreshLock(session.id, lockToken);
