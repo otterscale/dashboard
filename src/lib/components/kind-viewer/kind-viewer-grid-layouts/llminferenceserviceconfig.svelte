@@ -1,25 +1,44 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
-	import BotIcon from '@lucide/svelte/icons/bot';
 	import BrainCircuitIcon from '@lucide/svelte/icons/brain-circuit';
-	import GitBranchIcon from '@lucide/svelte/icons/git-branch';
-	import LayersIcon from '@lucide/svelte/icons/layers';
-	import LinkIcon from '@lucide/svelte/icons/link';
 	import type { ServingKserveIoV1Alpha2LLMInferenceServiceConfig } from '@otterscale/types';
+	import type { Schema } from '@sjsf/form';
 	import type { Row } from '@tanstack/table-core';
+	import type { ValidateFunction } from 'ajv';
 
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
-	import Badge from '$lib/components/ui/badge/badge.svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Item from '$lib/components/ui/item';
 
+	import Actions from '../kind-viewer-actions/llm-inference-service-config/actions.svelte';
 	import type { LLMInferenceServiceConfigAttribute } from '../kind-viewer-columns/llminferenceserviceconfig';
 
 	let {
-		row
+		row,
+		cluster,
+		namespace,
+		group,
+		version,
+		kind,
+		resource,
+		schema,
+		validate
 	}: {
 		row: Row<Record<LLMInferenceServiceConfigAttribute, JsonValue>>;
+		cluster: string;
+		namespace: string;
+		group: string;
+		version: string;
+		kind: string;
+		resource: string;
+		schema: Schema;
+		validate: ValidateFunction;
 	} = $props();
+
+	const object = $derived(
+		row.original['raw'] as unknown as ServingKserveIoV1Alpha2LLMInferenceServiceConfig
+	);
+	const rowNamespace = $derived(object?.metadata?.namespace ?? namespace);
 </script>
 
 <Card.Root>
@@ -35,77 +54,40 @@
 			<Item.Content class="text-left">
 				<Item.Title class="font-bold">
 					{row.original['Name']}
-					{@const mode = row.original['Mode'] as string}
-					{#if mode}
-						<Badge variant="outline">{mode}</Badge>
-					{/if}
 				</Item.Title>
 				<Item.Description>
-					<span class="flex items-center gap-1">
-						<LayersIcon size={12} />
-						{row.original['Namespace']}
-					</span>
+					{row.original['Namespace']}
 				</Item.Description>
 			</Item.Content>
-			<Item.Actions></Item.Actions>
+			<Item.Actions>
+				<Actions
+					{cluster}
+					namespace={rowNamespace}
+					{group}
+					{version}
+					{kind}
+					{resource}
+					{schema}
+					{validate}
+					{object}
+				/>
+			</Item.Actions>
 		</Item.Root>
 	</Card.Header>
 	<Card.Content class="flex flex-1 flex-col gap-2">
-		<Item.Root class="items-start p-0">
-			<Item.Content class="text-left">
-				<Item.Title class="text-xs text-muted-foreground uppercase">Model</Item.Title>
-				<span class="flex items-center gap-1">
-					<BotIcon size={12} />
-					{row.original['Model Name']}
-				</span>
-			</Item.Content>
-		</Item.Root>
+		{@const modelName = row.original['Model Name'] as string | null}
+		{#if modelName}
+			<p>{modelName}</p>
+		{/if}
 		{@const modelUri = row.original['Model URI'] as string | null}
 		{#if modelUri}
-			<span class="flex items-start gap-1 text-xs break-all text-muted-foreground">
-				<LinkIcon size={12} />
-				{modelUri}
-			</span>
-		{:else}
-			<span class="text-xs text-muted-foreground">No model URI</span>
+			<p>{modelUri}</p>
 		{/if}
 	</Card.Content>
 	<Card.Footer class="flex flex-wrap items-center gap-2 text-xs">
-		{@const raw = row.original['raw'] as unknown as
-			| ServingKserveIoV1Alpha2LLMInferenceServiceConfig
-			| undefined}
-		{@const baseRefs = raw?.spec?.baseRefs ?? []}
-		{@const hasTemplate = Boolean(raw?.spec?.template)}
-		{@const hasPrefill = Boolean(raw?.spec?.prefill)}
-		{@const hasRouter = Boolean(raw?.spec?.router)}
-		{@const hasWorker = Boolean(raw?.spec?.worker)}
-		{#if baseRefs.length}
-			<div class="flex flex-wrap items-center gap-2">
-				{#each baseRefs.slice(0, 2) as baseRef, index (index)}
-					<Badge variant="outline">
-						<GitBranchIcon size={12} />
-						{baseRef.name}
-					</Badge>
-				{/each}
-				{#if baseRefs.length > 2}
-					<Badge variant="outline">+{baseRefs.length - 2} more</Badge>
-				{/if}
-			</div>
+		{@const mode = row.original['Mode'] as string}
+		{#if mode}
+			<p>{mode}</p>
 		{/if}
-		<div class="flex flex-wrap items-center gap-2">
-			{#if hasTemplate}
-				<Badge variant="secondary">Template</Badge>
-			{/if}
-			{#if hasPrefill}
-				<Badge variant="secondary">Prefill</Badge>
-			{/if}
-			{#if hasRouter}
-				<Badge variant="secondary">Router</Badge>
-			{/if}
-			{#if hasWorker}
-				<Badge variant="secondary">Worker</Badge>
-			{/if}
-		</div>
-		<span class="ml-auto text-muted-foreground">{row.original['Age']}</span>
 	</Card.Footer>
 </Card.Root>
