@@ -37,7 +37,7 @@
 		getDataSchemas,
 		getUISchemas
 	} from './kind-viewer-columns';
-	import { getGridLayouts, type GridLayoutType } from './kind-viewer-grid-layouts';
+	import { getGridLayout, type GridLayoutType } from './kind-viewer-grid-layouts';
 
 	let {
 		isClusterAdmin,
@@ -270,7 +270,7 @@
 
 	const Create: CreateType = $derived(getCreate(apiResource.kind, namespace));
 	const Actions: ActionsType = $derived(getActions(apiResource.kind));
-	const GridLayout: GridLayoutType = $derived(getGridLayouts(apiResource.kind));
+	const GridLayout: GridLayoutType = $derived(getGridLayout(apiResource.kind));
 </script>
 
 {#snippet gridLayout({
