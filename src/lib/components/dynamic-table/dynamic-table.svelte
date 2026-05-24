@@ -69,7 +69,7 @@
 		bulkDelete,
 		reload,
 		rowActions = createRawSnippet(() => ({ render: () => '' })),
-		gridsLayout
+		gridLayout
 	}: {
 		data: Record<string, JsonValue>[];
 		columnDefinitions: ColumnDef<Record<string, JsonValue>>[];
@@ -81,7 +81,7 @@
 		bulkDelete?: Snippet<[{ table: TanStackTabke<Record<string, JsonValue>> }]>;
 		rowActions?: Snippet<[{ row: Row<Record<string, JsonValue>> }]>;
 		reload?: Snippet;
-		gridsLayout?: Snippet<
+		gridLayout?: Snippet<
 			[
 				{
 					table: TableType<Record<string, JsonValue>>;
@@ -93,7 +93,7 @@
 
 	// gridsLayout is set once, capturing the initial value is intentional.
 	// svelte-ignore state_referenced_locally
-	const hasGridlayout = !!gridsLayout;
+	const hasGridlayout = !!gridLayout;
 	let mode = $state<'table' | 'grid'>(hasGridlayout ? 'grid' : 'table');
 
 	// columnDefinitions are set once, capturing the initial value is intentional.
@@ -394,7 +394,7 @@
 					{#snippet child({ props })}
 						<Button
 							{...props}
-							disabled={!gridsLayout}
+							disabled={!gridLayout}
 							variant={mode === 'grid' ? 'secondary' : 'outline'}
 							size="icon"
 							onclick={() => (mode = 'grid')}
@@ -572,7 +572,7 @@
 	{#if mode === 'table'}
 		{@render tableLayout()}
 	{:else if mode === 'grid'}
-		{@render gridsLayout?.({ table, handleClear })}
+		{@render gridLayout?.({ table, handleClear })}
 	{/if}
 
 	<!-- Pagination -->
