@@ -247,6 +247,7 @@ function getLLMInferenceServiceConfigColumnDefinitions(
 }
 
 export {
+	type LLMInferenceServiceConfigAttribute,
 	getLLMInferenceServiceConfigColumnDefinitions,
 	getLLMInferenceServiceConfigData,
 	getLLMInferenceServiceConfigDataSchemas,
