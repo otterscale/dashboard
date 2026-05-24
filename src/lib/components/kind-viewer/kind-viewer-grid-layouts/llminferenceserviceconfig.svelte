@@ -16,11 +16,9 @@
 	import type { LLMInferenceServiceConfigAttribute } from '../kind-viewer-columns/llminferenceserviceconfig';
 
 	let {
-		row,
-		cluster: _cluster
+		row
 	}: {
 		row: Row<Record<LLMInferenceServiceConfigAttribute, JsonValue>>;
-		cluster: string;
 	} = $props();
 </script>
 
@@ -55,7 +53,7 @@
 	<Card.Content class="flex flex-1 flex-col gap-2">
 		<Item.Root class="items-start p-0">
 			<Item.Content class="text-left">
-				<Item.Title class="text-muted-foreground text-xs uppercase">Model</Item.Title>
+				<Item.Title class="text-xs text-muted-foreground uppercase">Model</Item.Title>
 				<span class="flex items-center gap-1">
 					<BotIcon size={12} />
 					{row.original['Model Name']}
@@ -64,12 +62,12 @@
 		</Item.Root>
 		{@const modelUri = row.original['Model URI'] as string | null}
 		{#if modelUri}
-			<span class="text-muted-foreground flex items-start gap-1 break-all text-xs">
+			<span class="flex items-start gap-1 text-xs break-all text-muted-foreground">
 				<LinkIcon size={12} />
 				{modelUri}
 			</span>
 		{:else}
-			<span class="text-muted-foreground text-xs">No model URI</span>
+			<span class="text-xs text-muted-foreground">No model URI</span>
 		{/if}
 	</Card.Content>
 	<Card.Footer class="flex flex-wrap items-center gap-2 text-xs">
@@ -108,6 +106,6 @@
 				<Badge variant="secondary">Worker</Badge>
 			{/if}
 		</div>
-		<span class="text-muted-foreground ml-auto">{row.original['Age']}</span>
+		<span class="ml-auto text-muted-foreground">{row.original['Age']}</span>
 	</Card.Footer>
 </Card.Root>
