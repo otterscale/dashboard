@@ -31,7 +31,12 @@
 	import type { DataSchemaType, UISchemaType } from '../dynamic-table/utils';
 	import type { ActionsType, CreateType } from './kind-viewer-actions';
 	import { getActions, getCreate } from './kind-viewer-actions';
-	import { getColumnDefinitions, getData, getDataSchemas, getUISchemas } from './kind-viewers';
+	import {
+		getColumnDefinitions,
+		getData,
+		getDataSchemas,
+		getUISchemas
+	} from './kind-viewer-columns';
 
 	let {
 		isClusterAdmin,
