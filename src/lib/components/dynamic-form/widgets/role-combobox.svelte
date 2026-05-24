@@ -29,7 +29,7 @@
 	let { value = $bindable(), config, handlers }: ComponentProps['comboboxWidget'] = $props();
 
 	const { ...buttonHandlers } = $derived(handlers);
-	const enumerations: { label: string; value: string }[] = [{ label: 'Admin', value: 'admin' }];
+	const enumerations: { label: string; value: string }[] = [{ label: 'admin', value: 'admin' }];
 
 	let open = $state(false);
 	let triggerReference = $state<HTMLButtonElement>(null!);
