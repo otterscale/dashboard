@@ -280,11 +280,24 @@
 	table: TableType<Record<string, JsonValue>>;
 	handleClear: () => void;
 })}
-	{#if GridLayout}
+	{#if GridLayout && schema && validate}
 		{#if table.getRowModel().rows?.length}
 			<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
 				{#each table.getRowModel().rows as row (row.id)}
-					<GridLayout {row} />
+					<GridLayout
+						{row}
+						{cluster}
+						namespace={namespace
+							? (row.original.raw as Record<string, Record<string, string>>)?.metadata?.namespace ||
+								namespace
+							: (namespace ?? '')}
+						group={apiResource.group}
+						version={apiResource.version}
+						kind={apiResource.kind}
+						resource={apiResource.resource}
+						{schema}
+						{validate}
+					/>
 				{/each}
 			</div>
 		{:else}
