@@ -20,7 +20,7 @@ type GridLayoutType =
 	  }>
 	| undefined;
 
-function getGridLayouts(kind: string): GridLayoutType {
+function getGridLayout(kind: string): GridLayoutType {
 	switch (kind) {
 		case 'LLMInferenceServiceConfig':
 			return LLMInferenceServiceConfigGridLayout as GridLayoutType;
@@ -30,4 +30,4 @@ function getGridLayouts(kind: string): GridLayoutType {
 }
 
 export type { GridLayoutType };
-export { getGridLayouts };
+export { getGridLayout };
