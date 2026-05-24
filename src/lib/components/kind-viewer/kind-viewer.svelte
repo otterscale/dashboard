@@ -16,7 +16,7 @@
 		type WatchRequest
 	} from '@otterscale/api/resource/v1';
 	import type { Schema } from '@sjsf/form';
-	import type { ColumnDef } from '@tanstack/table-core';
+	import type { ColumnDef, Table as TableType } from '@tanstack/table-core';
 	import Ajv, { type ValidateFunction } from 'ajv';
 	import { getContext, onDestroy, onMount } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
@@ -273,6 +273,43 @@
 	const GridLayout: GridLayoutType = $derived(getGridLayouts(apiResource.kind));
 </script>
 
+{#snippet gridLayout({
+	table,
+	handleClear
+}: {
+	table: TableType<Record<string, JsonValue>>;
+	handleClear: () => void;
+})}
+	{#if GridLayout}
+		{#if table.getRowModel().rows?.length}
+			<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+				{#each table.getRowModel().rows as row (row.id)}
+					<GridLayout {row} />
+				{/each}
+			</div>
+		{:else}
+			<Empty.Root class="rounded-lg bg-muted">
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<Columns3Icon size={32} class="opacity-60" aria-hidden="true" />
+					</Empty.Media>
+					<Empty.Title>No Resources Found</Empty.Title>
+					<Empty.Description>
+						No resources found. Please adjust your filters or initiate a new resource to populate
+						this table.
+					</Empty.Description>
+				</Empty.Header>
+				<Empty.Content>
+					<Button onclick={handleClear}>
+						<EraserIcon size={16} class="opacity-60" />
+						Reset
+					</Button>
+				</Empty.Content>
+			</Empty.Root>
+		{/if}
+	{/if}
+{/snippet}
+
 {#if fetchError}
 	<Empty.Root>
 		<Empty.Header>
@@ -290,35 +327,12 @@
 	</Empty.Root>
 {:else if isMounted}
 	{#if columnDefinitions}
-		<DynamicTable {data} {columnDefinitions} {uiSchemas}>
-			{#snippet gridLayout({ table, handleClear })}
-				{#if table.getRowModel().rows?.length}
-					<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-						{#each table.getRowModel().rows as row (row.id)}
-							<GridLayout {row} />
-						{/each}
-					</div>
-				{:else}
-					<Empty.Root class="rounded-lg bg-muted">
-						<Empty.Header>
-							<Empty.Media variant="icon">
-								<Columns3Icon size={32} class="opacity-60" aria-hidden="true" />
-							</Empty.Media>
-							<Empty.Title>No Resources Found</Empty.Title>
-							<Empty.Description>
-								No resources found. Please adjust your filters or initiate a new resource to
-								populate this table.
-							</Empty.Description>
-						</Empty.Header>
-						<Empty.Content>
-							<Button onclick={handleClear}>
-								<EraserIcon size={16} class="opacity-60" />
-								Reset
-							</Button>
-						</Empty.Content>
-					</Empty.Root>
-				{/if}
-			{/snippet}
+		<DynamicTable
+			{data}
+			{columnDefinitions}
+			{uiSchemas}
+			gridLayout={GridLayout ? gridLayout : undefined}
+		>
 			{#snippet accessReview()}
 				{#if isClusterAdmin}
 					<Tooltip.Root>
