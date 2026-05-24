@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { JsonObject, JsonValue } from '@bufbuild/protobuf';
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { EllipsisIcon } from '@lucide/svelte';
+	import { Columns3Icon, EllipsisIcon, EraserIcon } from '@lucide/svelte';
 	import BanIcon from '@lucide/svelte/icons/ban';
 	import CableIcon from '@lucide/svelte/icons/cable';
 	import PlusIcon from '@lucide/svelte/icons/plus';
@@ -37,6 +37,7 @@
 		getDataSchemas,
 		getUISchemas
 	} from './kind-viewer-columns';
+	import { getGridLayouts, type GridLayoutType } from './kind-viewer-grid-layouts';
 
 	let {
 		isClusterAdmin,
@@ -269,6 +270,7 @@
 
 	const Create: CreateType = $derived(getCreate(apiResource.kind, namespace));
 	const Actions: ActionsType = $derived(getActions(apiResource.kind));
+	const GridLayout: GridLayoutType = $derived(getGridLayouts(apiResource.kind));
 </script>
 
 {#if fetchError}
@@ -289,6 +291,34 @@
 {:else if isMounted}
 	{#if columnDefinitions}
 		<DynamicTable {data} {columnDefinitions} {uiSchemas}>
+			{#snippet gridLayout({ table, handleClear })}
+				{#if table.getRowModel().rows?.length}
+					<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+						{#each table.getRowModel().rows as row (row.id)}
+							<GridLayout {row} />
+						{/each}
+					</div>
+				{:else}
+					<Empty.Root class="rounded-lg bg-muted">
+						<Empty.Header>
+							<Empty.Media variant="icon">
+								<Columns3Icon size={32} class="opacity-60" aria-hidden="true" />
+							</Empty.Media>
+							<Empty.Title>No Resources Found</Empty.Title>
+							<Empty.Description>
+								No resources found. Please adjust your filters or initiate a new resource to
+								populate this table.
+							</Empty.Description>
+						</Empty.Header>
+						<Empty.Content>
+							<Button onclick={handleClear}>
+								<EraserIcon size={16} class="opacity-60" />
+								Reset
+							</Button>
+						</Empty.Content>
+					</Empty.Root>
+				{/if}
+			{/snippet}
 			{#snippet accessReview()}
 				{#if isClusterAdmin}
 					<Tooltip.Root>
