@@ -24,7 +24,6 @@ import InstanceTypeActions from './instance-type/actions.svelte';
 import InstanceTypeCreate from './instance-type/create.svelte';
 import JobActions from './job/actions.svelte';
 import LLMInferenceServiceActions from './llm-inference-service/actions.svelte';
-import LLMInferenceServiceCreate from './llm-inference-service/create.svelte';
 import LLMInferenceServiceConfigActions from './llm-inference-service-config/actions.svelte';
 import ModelTemplateActions from './modeltemplate/actions.svelte';
 import NodeActions from './node/actions.svelte';
@@ -79,8 +78,6 @@ function getCreate(kind: string, namespace?: string): CreateType {
 			return DataVolumeCreate as CreateType;
 		case 'HelmRepository':
 			return HelmRepositoryCreate as CreateType;
-		case 'LLMInferenceService':
-			return LLMInferenceServiceCreate as CreateType;
 		case 'Node':
 			return DisabledCreate as CreateType;
 		case 'ObjectBucketClaim':

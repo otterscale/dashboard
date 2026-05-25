@@ -12,6 +12,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
 	import Copy from './copy.svelte';
+	import Deploy from './deploy.svelte';
 
 	let {
 		cluster,
@@ -50,6 +51,21 @@
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content align="end" class="w-full">
 		<DropdownMenu.Group>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Deploy
+					{cluster}
+					{namespace}
+					{schema}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
