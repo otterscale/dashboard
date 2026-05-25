@@ -24,6 +24,7 @@
 
 	let {
 		cluster,
+		namespace,
 		group,
 		version,
 		kind,
@@ -34,6 +35,7 @@
 		onOpenChangeComplete
 	}: {
 		cluster: string;
+		namespace: string;
 		group: string;
 		version: string;
 		kind: string;
@@ -63,7 +65,7 @@
 			kind: lodash.get(object, 'kind'),
 			metadata: {
 				name: '',
-				namespace: page.data.namespace
+				namespace
 			},
 			spec: lodash.get(object, 'spec')
 		};
@@ -139,7 +141,7 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						namespace: page.data.namespace
+						namespace
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -202,7 +204,7 @@
 
 									await resourceClient.create({
 										cluster,
-										namespace: page.data.namespace,
+										namespace,
 										group,
 										version,
 										resource,
