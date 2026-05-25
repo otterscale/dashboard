@@ -104,7 +104,7 @@ function getCreate(kind: string, namespace?: string): CreateType {
 	}
 }
 
-function getActions(kind: string): ActionsType {
+function getActions(kind: string, namespace?: string): ActionsType {
 	switch (kind) {
 		case 'Application':
 			return ApplicationActions as ActionsType;
@@ -127,6 +127,9 @@ function getActions(kind: string): ActionsType {
 		case 'LLMInferenceService':
 			return LLMInferenceServiceActions as ActionsType;
 		case 'LLMInferenceServiceConfig':
+			if (namespace === 'otterscale-system') {
+				return LLMInferenceServiceConfigActions as ActionsType;
+			}
 			return LLMInferenceServiceConfigActions as ActionsType;
 		case 'Node':
 			return NodeActions as ActionsType;

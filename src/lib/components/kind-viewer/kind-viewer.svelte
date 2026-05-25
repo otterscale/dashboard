@@ -277,10 +277,11 @@
 	}
 
 	const Create: CreateType = $derived(getCreate(apiResource.kind, namespace));
-	const Actions: ActionsType = $derived(getActions(apiResource.kind));
+	const Actions: ActionsType = $derived(getActions(apiResource.kind, namespace));
 	const GridLayout: GridLayoutType = $derived(getGridLayout(apiResource.kind));
 </script>
 
+{namespace}
 {#snippet gridLayout({
 	table,
 	handleClear
