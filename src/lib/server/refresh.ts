@@ -63,20 +63,9 @@ async function waitForOngoingRefresh(
 }
 
 async function performRefresh(event: RequestEvent, latest: Session): Promise<RefreshOutcome> {
+	let tokens: Awaited<ReturnType<typeof keycloak.refreshAccessToken>>;
 	try {
-		const tokens = await keycloak.refreshAccessToken(latest.tokenSet.refreshToken);
-		const tokenSet = {
-			idToken: tokens.idToken(),
-			accessToken: tokens.accessToken(),
-			refreshToken: tokens.refreshToken(),
-			accessTokenExpiresAt: tokens.accessTokenExpiresAt()
-		};
-
-		await updateSessionTokenSet(latest.id, tokenSet);
-
-		latest.tokenSet = tokenSet;
-		event.locals.session = latest;
-		return { kind: 'ok', session: latest };
+		tokens = await keycloak.refreshAccessToken(latest.tokenSet.refreshToken);
 	} catch (err) {
 		if (err instanceof OAuth2RequestError && err.code === 'invalid_grant') {
 			console.error('Refresh token rejected by Keycloak:', err);
@@ -84,10 +73,39 @@ async function performRefresh(event: RequestEvent, latest: Session): Promise<Ref
 			clearSession(event);
 			return { kind: 'invalid' };
 		}
-		// Transient (network / 5xx): keep the session so the next request can retry.
+		// Network/5xx: refresh token was not consumed, safe to retry next request.
 		console.error('Token refresh failed (transient):', err);
 		return { kind: 'transient' };
 	}
+
+	const tokenSet = {
+		idToken: tokens.idToken(),
+		accessToken: tokens.accessToken(),
+		refreshToken: tokens.refreshToken(),
+		accessTokenExpiresAt: tokens.accessTokenExpiresAt()
+	};
+
+	try {
+		await updateSessionTokenSet(latest.id, tokenSet);
+	} catch (err) {
+		// Keycloak has already rotated the refresh token — the old one is dead and
+		// the new one only exists in this in-memory `tokenSet`. If we returned ok
+		// without persisting, the next request would read the stale token from
+		// Redis and trip reuse detection, destroying the session. Invalidate now
+		// so the user re-logs in cleanly. (invalidateSession may also fail if
+		// Redis is down; the stale session will then self-heal on the next
+		// refresh attempt via Keycloak's invalid_grant.)
+		console.error('Failed to persist refreshed token set; invalidating session:', err);
+		await invalidateSession(latest.id).catch((delErr) => {
+			console.error('Failed to invalidate session after persist failure:', delErr);
+		});
+		clearSession(event);
+		return { kind: 'invalid' };
+	}
+
+	latest.tokenSet = tokenSet;
+	event.locals.session = latest;
+	return { kind: 'ok', session: latest };
 }
 
 /**
@@ -141,11 +159,6 @@ export async function tryRefreshSession(
 		// request completed a refresh. Adopt it — replaying staleRefreshToken now
 		// would trip Keycloak's reuse detection.
 		if (latest.tokenSet.refreshToken !== staleRefreshToken) {
-			event.locals.session = latest;
-			return { kind: 'ok', session: latest };
-		}
-
-		if (!force && !isNearExpiry(latest.tokenSet.accessTokenExpiresAt)) {
 			event.locals.session = latest;
 			return { kind: 'ok', session: latest };
 		}
