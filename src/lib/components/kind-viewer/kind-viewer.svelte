@@ -278,10 +278,9 @@
 
 	const Create: CreateType = $derived(getCreate(apiResource.kind, namespace));
 	const Actions: ActionsType = $derived(getActions(apiResource.kind, namespace));
-	const GridLayout: GridLayoutType = $derived(getGridLayout(apiResource.kind));
+	const GridLayout: GridLayoutType = $derived(getGridLayout(apiResource.kind, namespace));
 </script>
 
-{namespace}
 {#snippet gridLayout({
 	table,
 	handleClear
@@ -296,10 +295,7 @@
 					<GridLayout
 						{row}
 						{cluster}
-						namespace={namespace
-							? (row.original.raw as Record<string, Record<string, string>>)?.metadata?.namespace ||
-								namespace
-							: (namespace ?? '')}
+						namespace={namespace ?? ''}
 						group={apiResource.group}
 						version={apiResource.version}
 						kind={apiResource.kind}

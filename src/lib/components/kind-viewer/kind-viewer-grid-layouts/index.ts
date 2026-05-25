@@ -5,6 +5,7 @@ import type { ValidateFunction } from 'ajv';
 import type { Component } from 'svelte';
 
 import LLMInferenceServiceConfigGridLayout from './llminferenceserviceconfig.svelte';
+import ModelTemplateGridLayout from './modeltemplate.svelte';
 
 type GridLayoutType =
 	| Component<{
@@ -20,9 +21,12 @@ type GridLayoutType =
 	  }>
 	| undefined;
 
-function getGridLayout(kind: string): GridLayoutType {
+function getGridLayout(kind: string, namespace?: string): GridLayoutType {
 	switch (kind) {
 		case 'LLMInferenceServiceConfig':
+			if (namespace === 'otterscale-system') {
+				return ModelTemplateGridLayout as GridLayoutType;
+			}
 			return LLMInferenceServiceConfigGridLayout as GridLayoutType;
 		default:
 			return undefined;
