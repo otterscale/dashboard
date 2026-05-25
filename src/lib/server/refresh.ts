@@ -163,7 +163,7 @@ export async function tryRefreshSession(
 			return { kind: 'ok', session: latest };
 		}
 
-		return performRefresh(event, latest);
+		return await performRefresh(event, latest);
 	} finally {
 		await releaseRefreshLock(session.id, lockToken);
 	}
