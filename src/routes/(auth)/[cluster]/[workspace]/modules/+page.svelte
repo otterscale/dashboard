@@ -32,7 +32,7 @@
 	// Set breadcrumbs navigation
 	breadcrumbs.set([
 		{
-			title: m.application_hub(),
+			title: m.module(),
 			url: resolve('/(auth)/[cluster]/[workspace]/modules', {
 				cluster: page.params.cluster!,
 				workspace: page.params.workspace!
