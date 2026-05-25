@@ -41,6 +41,8 @@
 	const version = $derived(page.url.searchParams.get('version') ?? '');
 	const kind = $derived(page.url.searchParams.get('kind') ?? '');
 	const resource = $derived(page.url.searchParams.get('resource') ?? '');
+	const labelSelector = $derived(page.url.searchParams.get('labelSelector') ?? '');
+	const fieldSelector = $derived(page.url.searchParams.get('fieldSelector') ?? '');
 
 	const transport: Transport = getContext('transport');
 	const client = createClient(ResourceService, transport);
@@ -113,10 +115,17 @@
 					</Item.Content>
 				</Item.Root>
 			</div>
-			{#key resource + namespace}
+			{#key resource + namespace + labelSelector + fieldSelector}
 				{@const apiResource = apiResources.find((r) => r.resource === resource)}
 				{#if apiResource}
-					<KindViewer {isClusterAdmin} {cluster} {namespace} {apiResource} />
+					<KindViewer
+						{isClusterAdmin}
+						{cluster}
+						{namespace}
+						{apiResource}
+						{labelSelector}
+						{fieldSelector}
+					/>
 				{/if}
 			{/key}
 		</div>

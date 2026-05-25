@@ -43,12 +43,16 @@
 		isClusterAdmin,
 		cluster,
 		namespace: namespaceProp,
-		apiResource
+		apiResource,
+		labelSelector = '',
+		fieldSelector = ''
 	}: {
 		isClusterAdmin: boolean;
 		cluster: string;
 		namespace?: string;
 		apiResource: APIResource;
+		labelSelector?: string;
+		fieldSelector?: string;
 	} = $props();
 
 	let clustered = $derived(isClusterAdmin);
@@ -116,6 +120,8 @@
 						group: apiResource.group,
 						version: apiResource.version,
 						resource: apiResource.resource,
+						labelSelector,
+						fieldSelector,
 						limit: BigInt(10),
 						continue: continueToken
 					} as ListRequest,
@@ -165,6 +171,8 @@
 					group: apiResource.group,
 					version: apiResource.version,
 					resource: apiResource.resource,
+					labelSelector,
+					fieldSelector,
 					resourceVersion: resourceVersion
 				} as WatchRequest,
 				{ signal: watchAbortController.signal }
