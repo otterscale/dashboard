@@ -14,7 +14,6 @@
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
-	import { page } from '$app/state';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
