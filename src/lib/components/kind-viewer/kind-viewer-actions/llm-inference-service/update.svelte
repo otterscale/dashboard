@@ -47,7 +47,6 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	// Container for Data – initialised from the existing object
 	let values = $state(getInitialValues());
 
 	function getInitialValues() {
@@ -84,25 +83,52 @@
 		return stringify(filtered);
 	});
 
-	// ===== Faceted GPU selector =====
-	type GPUDevice = { uuid: string; type: string; node: string };
+	type GPUDevice = { type: string; node: string };
 
 	function getAllGPUDevices(nodes: NodeInfo[]): GPUDevice[] {
 		return nodes.flatMap((node) =>
 			node.devices.map((device) => ({
-				uuid: device.id,
 				type: device.type,
 				node: node.name
 			}))
 		);
 	}
 
-	function splitCsv(raw: unknown): string[] {
-		if (typeof raw !== 'string' || raw.length === 0) return [];
-		return raw
-			.split(',')
-			.map((v) => v.trim())
-			.filter(Boolean);
+	function getResourceTopology(devices: GPUDevice[]): Record<string, string[]> {
+		const container: Record<string, Set<string>> = {};
+		for (const { type, node } of devices) {
+			if (!container[type]) {
+				container[type] = new Set();
+			}
+			container[type].add(node);
+		}
+
+		const resourceTopology: Record<string, string[]> = {};
+		for (const [type, nodes] of Object.entries(container)) {
+			resourceTopology[type] = [...nodes];
+		}
+		return resourceTopology;
+	}
+
+	function getGPUSelectionSchema(resourceTopology: Record<string, string[]>): Schema {
+		const types = Object.keys(resourceTopology);
+		return {
+			type: 'object',
+			properties: {
+				type: { type: 'string', title: 'Type', enum: types }
+			},
+			required: ['type'],
+			dependencies: {
+				type: {
+					oneOf: Object.entries(resourceTopology).map(([type, nodes]) => ({
+						properties: {
+							type: { enum: [type] },
+							node: { type: 'string', title: 'Node', enum: nodes }
+						}
+					}))
+				}
+			}
+		};
 	}
 
 	// Steps Manager (2 steps: GPU selector + YAML review)
@@ -120,7 +146,6 @@
 		currentStep = firstStep;
 	}
 
-	// Flag for Dialog
 	let open = $state(false);
 	let isSubmitting = $state(false);
 </script>
@@ -163,127 +188,47 @@
 				{#await fetchAllGpuNodes(resourceClient, cluster)}
 					Loading
 				{:then allGPUNodes}
+					{@const allGPUDevices = getAllGPUDevices(allGPUNodes)}
+					{@const resourceTopology = getResourceTopology(allGPUDevices)}
+					{@const gpuSelectionSchema = getGPUSelectionSchema(resourceTopology)}
 					{@const isSingleNode =
 						lodash.has(object, 'spec.template') && !lodash.has(object, 'spec.prefill')}
 					{@const isPrefillDecode =
 						lodash.has(object, 'spec.template') && lodash.has(object, 'spec.prefill')}
-					{@const allGPUDevices = getAllGPUDevices(allGPUNodes)}
-					{@const allNodes = new Set(allGPUDevices.map((device) => device.node))}
-					{@const allTypes = new Set(allGPUDevices.map((device) => device.type))}
-					{@const allUUIDs = new Set(allGPUDevices.map((device) => device.uuid))}
 					{#if isSingleNode}
 						<Form
-							schema={{
-								title: 'GPU Selector',
-								type: 'object',
-								properties: {
-									type: {
-										title: 'Type',
-										type: 'array',
-										items: {
-											type: 'string',
-											enum: [...allTypes]
-										}
-									},
-									node: {
-										title: 'Node',
-										type: 'array',
-										items: {
-											type: 'string',
-											enum: [...allNodes]
-										}
-									},
-									uuid: {
-										title: 'UUID',
-										type: 'array',
-										items: {
-											type: 'string',
-											enum: [...allUUIDs]
-										}
-									}
-								}
-							}}
+							schema={{ title: 'GPU Selector', ...gpuSelectionSchema } as Schema}
 							uiSchema={{
 								'ui:options': {
 									translations: {
 										submit: 'Next'
 									}
-								},
-								type: {
-									'ui:options': {
-										itemTitle: () => null
-									},
-									items: {
-										'ui:components': {
-											stringField: 'enumField',
-											selectWidget: 'comboboxWidget'
-										}
-									}
-								},
-								node: {
-									'ui:options': {
-										itemTitle: () => null
-									},
-									items: {
-										'ui:components': {
-											stringField: 'enumField',
-											selectWidget: 'comboboxWidget'
-										}
-									}
-								},
-								uuid: {
-									'ui:options': {
-										itemTitle: () => null
-									},
-									items: {
-										'ui:components': {
-											stringField: 'enumField',
-											selectWidget: 'comboboxWidget'
-										}
-									}
 								}
 							} as UiSchemaRoot}
 							initialValue={{
-								type: splitCsv(
-									lodash.get(object, ['spec', 'annotations', 'nvidia.com/use-gputype'])
-								),
-								node: splitCsv(
-									lodash.get(object, ['spec', 'template', 'nodeSelector', 'kubernetes.io/hostname'])
-								),
-								uuid: splitCsv(
-									lodash.get(object, ['spec', 'annotations', 'nvidia.com/use-gpuuuid'])
-								)
+								type: lodash.get(object, ['spec', 'annotations', 'nvidia.com/use-gputype']),
+								node: lodash.get(object, [
+									'spec',
+									'template',
+									'nodeSelector',
+									'kubernetes.io/hostname'
+								])
 							} as FormValue}
 							handleSubmit={{
 								posthook: (form) => {
 									const value = getValueSnapshot(form);
-									lodash.unset(values, ['spec', 'template']);
-									lodash.unset(values, ['spec', 'annotations']);
-									lodash.unset(values, ['spec', 'prefill']);
 
-									const nodes = lodash.get(value, 'node', []) as string[];
-									if (nodes.length > 0) {
+									const type = lodash.get(value, 'type') as string | undefined;
+									if (type) {
+										lodash.set(values, ['spec', 'annotations', 'nvidia.com/use-gputype'], type);
+									}
+
+									const node = lodash.get(value, 'node') as string | undefined;
+									if (node) {
 										lodash.set(
 											values,
 											['spec', 'template', 'nodeSelector', 'kubernetes.io/hostname'],
-											nodes.join(',')
-										);
-									}
-
-									const types = lodash.get(value, 'type', []) as string[];
-									if (types.length > 0) {
-										lodash.set(
-											values,
-											['spec', 'annotations', 'nvidia.com/use-gputype'],
-											types.join(',')
-										);
-									}
-									const uuids = lodash.get(value, 'uuid', []) as string[];
-									if (uuids.length > 0) {
-										lodash.set(
-											values,
-											['spec', 'annotations', 'nvidia.com/use-gpuuuid'],
-											uuids.join(',')
+											node
 										);
 									}
 
@@ -311,217 +256,80 @@
 								title: 'GPU Selector',
 								type: 'object',
 								properties: {
-									decode: {
-										title: 'Decode',
-										type: 'object',
-										properties: {
-											type: {
-												title: 'Type',
-												type: 'array',
-												items: { type: 'string', enum: [...allTypes] }
-											},
-											node: {
-												title: 'Node',
-												type: 'array',
-												items: { type: 'string', enum: [...allNodes] }
-											},
-											uuid: {
-												title: 'UUID',
-												type: 'array',
-												items: { type: 'string', enum: [...allUUIDs] }
-											}
-										}
-									},
-									prefill: {
-										title: 'Prefill',
-										type: 'object',
-										properties: {
-											type: {
-												title: 'Type',
-												type: 'array',
-												items: { type: 'string', enum: [...allTypes] }
-											},
-											node: {
-												title: 'Node',
-												type: 'array',
-												items: { type: 'string', enum: [...allNodes] }
-											},
-											uuid: {
-												title: 'UUID',
-												type: 'array',
-												items: { type: 'string', enum: [...allUUIDs] }
-											}
-										}
-									}
+									decode: { title: 'Decode', ...gpuSelectionSchema },
+									prefill: { title: 'Prefill', ...gpuSelectionSchema }
 								}
-							}}
+							} as Schema}
 							uiSchema={{
 								'ui:options': {
 									translations: {
 										submit: 'Next'
 									}
-								},
-								prefill: {
-									type: {
-										'ui:options': {
-											itemTitle: () => null
-										},
-										items: {
-											'ui:components': {
-												stringField: 'enumField',
-												selectWidget: 'comboboxWidget'
-											}
-										}
-									},
-									node: {
-										'ui:options': {
-											itemTitle: () => null
-										},
-										items: {
-											'ui:components': {
-												stringField: 'enumField',
-												selectWidget: 'comboboxWidget'
-											}
-										}
-									},
-									uuid: {
-										'ui:options': {
-											itemTitle: () => null
-										},
-										items: {
-											'ui:components': {
-												stringField: 'enumField',
-												selectWidget: 'comboboxWidget'
-											}
-										}
-									}
-								},
-								decode: {
-									type: {
-										'ui:options': {
-											itemTitle: () => null
-										},
-										items: {
-											'ui:components': {
-												stringField: 'enumField',
-												selectWidget: 'comboboxWidget'
-											}
-										}
-									},
-									node: {
-										'ui:options': {
-											itemTitle: () => null
-										},
-										items: {
-											'ui:components': {
-												stringField: 'enumField',
-												selectWidget: 'comboboxWidget'
-											}
-										}
-									},
-									uuid: {
-										'ui:options': {
-											itemTitle: () => null
-										},
-										items: {
-											'ui:components': {
-												stringField: 'enumField',
-												selectWidget: 'comboboxWidget'
-											}
-										}
-									}
 								}
 							} as UiSchemaRoot}
 							initialValue={{
 								decode: {
-									type: splitCsv(
-										lodash.get(object, ['spec', 'annotations', 'nvidia.com/use-gputype'])
-									),
-									node: splitCsv(
-										lodash.get(object, [
-											'spec',
-											'template',
-											'nodeSelector',
-											'kubernetes.io/hostname'
-										])
-									),
-									uuid: splitCsv(
-										lodash.get(object, ['spec', 'annotations', 'nvidia.com/use-gpuuuid'])
-									)
+									type: lodash.get(object, ['spec', 'annotations', 'nvidia.com/use-gputype']),
+									node: lodash.get(object, [
+										'spec',
+										'template',
+										'nodeSelector',
+										'kubernetes.io/hostname'
+									])
 								},
 								prefill: {
-									type: splitCsv(
-										lodash.get(object, ['spec', 'prefill', 'annotations', 'nvidia.com/use-gputype'])
-									),
-									node: splitCsv(
-										lodash.get(object, [
-											'spec',
-											'prefill',
-											'template',
-											'nodeSelector',
-											'kubernetes.io/hostname'
-										])
-									),
-									uuid: splitCsv(
-										lodash.get(object, ['spec', 'prefill', 'annotations', 'nvidia.com/use-gpuuuid'])
-									)
+									type: lodash.get(object, [
+										'spec',
+										'prefill',
+										'annotations',
+										'nvidia.com/use-gputype'
+									]),
+									node: lodash.get(object, [
+										'spec',
+										'prefill',
+										'template',
+										'nodeSelector',
+										'kubernetes.io/hostname'
+									])
 								}
 							} as FormValue}
 							handleSubmit={{
 								posthook: (form) => {
-									lodash.unset(values, ['spec', 'template']);
-									lodash.unset(values, ['spec', 'annotations']);
-									lodash.unset(values, ['spec', 'prefill']);
-
 									const value = getValueSnapshot(form);
 
-									const decodeNodes = lodash.get(value, 'decode.node', []) as string[];
-									if (decodeNodes.length > 0) {
-										lodash.set(
-											values,
-											['spec', 'template', 'nodeSelector', 'kubernetes.io/hostname'],
-											decodeNodes.join(',')
-										);
-									}
-
-									const decodeTypes = lodash.get(value, 'decode.type', []) as string[];
-									if (decodeTypes.length > 0) {
+									const decodeType = lodash.get(value, 'decode.type') as string | undefined;
+									if (decodeType) {
 										lodash.set(
 											values,
 											['spec', 'annotations', 'nvidia.com/use-gputype'],
-											decodeTypes.join(',')
+											decodeType
 										);
 									}
-									const decodeUUIDs = lodash.get(value, 'decode.uuid', []) as string[];
-									if (decodeUUIDs.length > 0) {
+
+									const decodeNode = lodash.get(value, 'decode.node') as string | undefined;
+									if (decodeNode) {
 										lodash.set(
 											values,
-											['spec', 'annotations', 'nvidia.com/use-gpuuuid'],
-											decodeUUIDs.join(',')
+											['spec', 'template', 'nodeSelector', 'kubernetes.io/hostname'],
+											decodeNode
 										);
 									}
-									const prefillNodes = lodash.get(value, 'prefill.node', []) as string[];
-									if (prefillNodes.length > 0) {
-										lodash.set(
-											values,
-											['spec', 'prefill', 'template', 'nodeSelector', 'kubernetes.io/hostname'],
-											prefillNodes.join(',')
-										);
-									}
-									const prefillTypes = lodash.get(value, 'prefill.type', []) as string[];
-									if (prefillTypes.length > 0) {
+
+									const prefillType = lodash.get(value, 'prefill.type') as string | undefined;
+									if (prefillType) {
 										lodash.set(
 											values,
 											['spec', 'prefill', 'annotations', 'nvidia.com/use-gputype'],
-											prefillTypes.join(',')
+											prefillType
 										);
 									}
-									const prefillUUIDs = lodash.get(value, 'prefill.uuid', []) as string[];
-									if (prefillUUIDs.length > 0) {
+
+									const prefillNode = lodash.get(value, 'prefill.node') as string | undefined;
+									if (prefillNode) {
 										lodash.set(
 											values,
-											['spec', 'prefill', 'annotations', 'nvidia.com/use-gpuuuid'],
-											prefillUUIDs.join(',')
+											['spec', 'prefill', 'template', 'nodeSelector', 'kubernetes.io/hostname'],
+											prefillNode
 										);
 									}
 
