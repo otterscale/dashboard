@@ -123,7 +123,7 @@
 				'requests.memory': '64Gi',
 				'limits.cpu': '32',
 				'limits.memory': '64Gi',
-				'limits.nvidia.com/gpumem': '0'
+				'limits.nvidia.com/gpumem': '1'
 			}) as SchemaValue
 		};
 	}
@@ -481,7 +481,7 @@
 										'requests.memory': '64Gi',
 										'limits.cpu': '32',
 										'limits.memory': '64Gi',
-										'limits.nvidia.com/gpumem': '0'
+										'limits.nvidia.com/gpumem': '1'
 									})
 								});
 								lodash.set(values, ['spec', 'limitRange'], {
