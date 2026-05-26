@@ -2,7 +2,6 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import BanIcon from '@lucide/svelte/icons/ban';
 	import { type DiscoveryRequest, ResourceService } from '@otterscale/api/resource/v1';
-	import type { CoreV1ConfigMap } from '@otterscale/types';
 	import { getContext } from 'svelte';
 
 	import { resolve } from '$app/paths';
@@ -13,13 +12,14 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import { m } from '$lib/paraglide/messages';
 	import { breadcrumbs } from '$lib/stores';
 
 	$effect(() => {
 		// Set breadcrumbs navigation
 		breadcrumbs.set([
 			{
-				title: page.url.searchParams.get('kind') ?? 'Resource',
+				title: m.model_template(),
 				url: resolve('/(auth)/[cluster]/[workspace]', {
 					cluster: page.params.cluster!,
 					workspace: page.params.workspace!
@@ -28,21 +28,14 @@
 		]);
 	});
 
-	const endpointMap: Record<string, string> = {
-		LLMInferenceService: 'ModelGatewayEndpoint',
-		ObjectBucketClaim: 'ObjectGatewayEndpoint',
-		Service: 'ServiceEndpoint'
-	};
-
 	const isClusterAdmin = $derived(page.data.isClusterAdmin === true);
-	const cluster = $derived(page.params.cluster ?? '');
-	const namespace = $derived(page.data.namespace ?? '');
-	const group = $derived(page.url.searchParams.get('group') ?? '');
-	const version = $derived(page.url.searchParams.get('version') ?? '');
-	const kind = $derived(page.url.searchParams.get('kind') ?? '');
-	const resource = $derived(page.url.searchParams.get('resource') ?? '');
-	const labelSelector = $derived(page.url.searchParams.get('labelSelector') ?? '');
-	const fieldSelector = $derived(page.url.searchParams.get('fieldSelector') ?? '');
+	const cluster = $derived(page.params.cluster!);
+	const namespace = 'otterscale-system';
+	const group = 'serving.kserve.io';
+	const version = 'v1alpha2';
+	const kind = 'LLMInferenceServiceConfig';
+	const resource = 'llminferenceserviceconfigs';
+	const fieldSelector = 'metadata.namespace==otterscale-system';
 
 	const transport: Transport = getContext('transport');
 	const client = createClient(ResourceService, transport);
@@ -53,34 +46,6 @@
 		return response.apiResources.filter(
 			(r) => r && r.group === group && r.version === version && r.kind === kind
 		);
-	}
-
-	async function getDescription(kind: string) {
-		const endpointKey = endpointMap[kind];
-		if (!endpointKey) {
-			return `${group || 'core'}/${version}`;
-		}
-
-		const response = await client.get({
-			cluster,
-			namespace,
-			name: 'workspace-config',
-			group: '',
-			version: 'v1',
-			resource: 'configmaps'
-		});
-		const config = (response.object as CoreV1ConfigMap).data;
-
-		const endpoint = config?.[endpointKey];
-		if (!endpoint) return 'Unavailable';
-
-		const ns = namespace || '<Namespace>';
-		const suffixMap: Record<string, string> = {
-			Service: ':<NodePort>',
-			LLMInferenceService: `/${ns}/<Name>`,
-			ObjectBucketClaim: `/${ns}-<Name>`
-		};
-		return `Available at ${endpoint}${suffixMap[kind] ?? ''}`;
 	}
 </script>
 
@@ -107,25 +72,16 @@
 						<Item.Title class="text-xl font-bold">
 							{kind}
 						</Item.Title>
-						{#await getDescription(kind) then description}
-							<Item.Description class="text-base">
-								{description}
-							</Item.Description>
-						{/await}
+						<Item.Description class="text-base">
+							{`${group || 'core'}/${version}`}
+						</Item.Description>
 					</Item.Content>
 				</Item.Root>
 			</div>
-			{#key resource + namespace + labelSelector + fieldSelector}
+			{#key resource + namespace}
 				{@const apiResource = apiResources.find((r) => r.resource === resource)}
 				{#if apiResource}
-					<KindViewer
-						{isClusterAdmin}
-						{cluster}
-						{namespace}
-						{apiResource}
-						{labelSelector}
-						{fieldSelector}
-					/>
+					<KindViewer {isClusterAdmin} {cluster} {namespace} {apiResource} {fieldSelector} />
 				{/if}
 			{/key}
 		</div>
