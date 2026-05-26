@@ -531,7 +531,14 @@
 
 							isSubmitting = true;
 
-							const parsed = load(value);
+							let parsed;
+							try {
+								parsed = load(value);
+							} catch (err) {
+								toast.error('Invalid YAML syntax. Please check the editor.');
+								isSubmitting = false;
+								return;
+							}
 							const name = lodash.get(parsed, 'metadata.name');
 							const namespace = lodash.get(parsed, 'metadata.namespace', page.data.namespace);
 
