@@ -10,7 +10,7 @@
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Item from '$lib/components/ui/item';
 
-	import Actions from '../kind-viewer-actions/llm-inference-service-config/actions.svelte';
+	import Actions from '../kind-viewer-actions/modeltemplate/actions.svelte';
 	import type { LLMInferenceServiceConfigAttribute } from '../kind-viewer-columns/llminferenceserviceconfig';
 
 	let {

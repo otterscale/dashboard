@@ -43,12 +43,16 @@
 		isClusterAdmin,
 		cluster,
 		namespace: namespaceProp,
-		apiResource
+		apiResource,
+		labelSelector = '',
+		fieldSelector = ''
 	}: {
 		isClusterAdmin: boolean;
 		cluster: string;
 		namespace?: string;
 		apiResource: APIResource;
+		labelSelector?: string;
+		fieldSelector?: string;
 	} = $props();
 
 	let clustered = $derived(isClusterAdmin);
@@ -116,6 +120,8 @@
 						group: apiResource.group,
 						version: apiResource.version,
 						resource: apiResource.resource,
+						labelSelector,
+						fieldSelector,
 						limit: BigInt(10),
 						continue: continueToken
 					} as ListRequest,
@@ -165,6 +171,8 @@
 					group: apiResource.group,
 					version: apiResource.version,
 					resource: apiResource.resource,
+					labelSelector,
+					fieldSelector,
 					resourceVersion: resourceVersion
 				} as WatchRequest,
 				{ signal: watchAbortController.signal }
@@ -269,8 +277,8 @@
 	}
 
 	const Create: CreateType = $derived(getCreate(apiResource.kind, namespace));
-	const Actions: ActionsType = $derived(getActions(apiResource.kind));
-	const GridLayout: GridLayoutType = $derived(getGridLayout(apiResource.kind));
+	const Actions: ActionsType = $derived(getActions(apiResource.kind, namespace));
+	const GridLayout: GridLayoutType = $derived(getGridLayout(apiResource.kind, namespace));
 </script>
 
 {#snippet gridLayout({
@@ -287,10 +295,7 @@
 					<GridLayout
 						{row}
 						{cluster}
-						namespace={namespace
-							? (row.original.raw as Record<string, Record<string, string>>)?.metadata?.namespace ||
-								namespace
-							: (namespace ?? '')}
+						namespace={namespace ?? ''}
 						group={apiResource.group}
 						version={apiResource.version}
 						kind={apiResource.kind}
