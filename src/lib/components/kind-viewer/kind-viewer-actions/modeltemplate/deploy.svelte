@@ -534,7 +534,7 @@
 							let parsed;
 							try {
 								parsed = load(value);
-							} catch (err) {
+							} catch {
 								toast.error('Invalid YAML syntax. Please check the editor.');
 								isSubmitting = false;
 								return;
