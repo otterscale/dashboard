@@ -34,19 +34,21 @@
 		isReloading: boolean;
 	} = $props();
 
-	let prompts = $state([] as SampleValue[]);
-	let generations = $state([] as SampleValue[]);
-	const throughputs = $derived(
-		prompts.map((sample, index) => ({
+	let ninety_fives = $state([] as SampleValue[]);
+	let ninety_nines = $state([] as SampleValue[]);
+	const times_per_output_token = $derived(
+		ninety_fives.map((sample, index) => ({
 			time: sample.time,
-			prompt: sample.value,
-			generation: generations[index]?.value ?? null
+			ninety_five: !isNaN(Number(sample.value)) ? Number(sample.value) : 0,
+			ninety_nine: !isNaN(Number(ninety_nines[index]?.value))
+				? Number(ninety_nines[index]?.value)
+				: 0
 		}))
 	);
 
 	const configuration = {
-		prompt: { label: 'Prompt', color: 'var(--chart-1)' },
-		generation: { label: 'Generation', color: 'var(--chart-2)' }
+		ninety_five: { label: '95', color: 'var(--chart-1)' },
+		ninety_nine: { label: '99', color: 'var(--chart-2)' }
 	} satisfies Chart.ChartConfig;
 
 	const areaProps = {
@@ -56,33 +58,27 @@
 		motion: 'tween'
 	} as const;
 
-	async function fetchPrompts(startMs: number, endMs: number, step: number) {
-		try {
-			const inner = vllmMetricWithSelector('vllm:prompt_tokens_total', namespace, undefined);
-			const response = await prometheusDriver.rangeQuery(
-				`sum(rate(${inner}[2m]))`,
-				startMs,
-				endMs,
-				step
-			);
-			prompts = response.result[0]?.values ?? [];
-		} catch (error) {
-			console.error(`Fail to fetch latest prompt throughput in cluster ${cluster}:`, error);
-		}
-	}
-
-	async function fetchGenerations(startMs: number, endMs: number, step: number) {
-		try {
-			const inner = vllmMetricWithSelector('vllm:generation_tokens_total', namespace, undefined);
-			const response = await prometheusDriver.rangeQuery(
-				`sum(rate(${inner}[2m]))`,
-				startMs,
-				endMs,
-				step
-			);
-			generations = response.result[0]?.values ?? [];
-		} catch (error) {
-			console.error(`Fail to fetch latest generation throughput in cluster ${cluster}:`, error);
+	async function fetchTimesPerOutputToken(
+		quantile: number,
+		startMs: number,
+		endMs: number,
+		step: number
+	) {
+		const inner = vllmMetricWithSelector(
+			'vllm:request_time_per_output_token_seconds_bucket',
+			namespace,
+			undefined
+		);
+		const response = await prometheusDriver.rangeQuery(
+			`histogram_quantile(${quantile}, sum by(le) (rate(${inner}[5m])))`,
+			startMs,
+			endMs,
+			step
+		);
+		if (quantile === 0.95) {
+			ninety_fives = response.result[0]?.values ?? [];
+		} else if (quantile === 0.99) {
+			ninety_nines = response.result[0]?.values ?? [];
 		}
 	}
 
@@ -92,11 +88,11 @@
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const step = computeStep(startMs, endMs);
 			await Promise.all([
-				fetchPrompts(startMs, endMs, step),
-				fetchGenerations(startMs, endMs, step)
+				fetchTimesPerOutputToken(0.95, startMs, endMs, step),
+				fetchTimesPerOutputToken(0.99, startMs, endMs, step)
 			]);
 		} catch (error) {
-			console.error(`Fail to fetch throughputs data in cluster ${cluster}:`, error);
+			console.error(`Fail to fetch time per output token data in cluster ${cluster}:`, error);
 		}
 	}
 
@@ -127,17 +123,17 @@
 <Card.Root class="h-full">
 	<Card.Header>
 		<Card.Title class="flex items-center justify-between gap-2">
-			<span>{m.throughput()}</span>
+			<span>{m.time_per_output_token()}</span>
 			<Tooltip.Root>
 				<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
 					<InfoIcon class="size-5 text-muted-foreground" />
 				</Tooltip.Trigger>
 				<Tooltip.Content>
-					<p>{m.llm_dashboard_throughputs_tooltip()}</p>
+					<p>{m.llm_dashboard_time_per_output_token_tooltip()}</p>
 				</Tooltip.Content>
 			</Tooltip.Root>
 		</Card.Title>
-		<Card.Description>{m.llm_dashboard_throughputs_description()}</Card.Description>
+		<Card.Description>{m.llm_dashboard_time_per_output_token_description()}</Card.Description>
 	</Card.Header>
 	{#if !isLoaded}
 		<Card.Content>
@@ -145,7 +141,7 @@
 				<Loader2Icon class="size-12 animate-spin" />
 			</div>
 		</Card.Content>
-	{:else if throughputs.length === 0}
+	{:else if times_per_output_token.length === 0}
 		<Card.Content>
 			<div class="flex h-45 w-full flex-col items-center justify-center gap-2">
 				<ChartLineIcon class="size-12 animate-pulse text-muted-foreground" />
@@ -156,20 +152,20 @@
 		<Card.Content>
 			<Chart.Container config={configuration} class="h-45 w-full">
 				<AreaChart
-					data={throughputs}
+					data={times_per_output_token}
 					x="time"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}
 					series={[
 						{
-							key: 'prompt',
-							label: configuration.prompt.label,
-							color: configuration.prompt.color
+							key: 'ninety_five',
+							label: configuration.ninety_five.label,
+							color: configuration.ninety_five.color
 						},
 						{
-							key: 'generation',
-							label: configuration.generation.label,
-							color: configuration.generation.color
+							key: 'ninety_nine',
+							label: configuration.ninety_nine.label,
+							color: configuration.ninety_nine.color
 						}
 					]}
 					props={{
@@ -205,7 +201,7 @@
 									<div class="grid gap-1.5">
 										<span class="text-muted-foreground">{name}</span>
 									</div>
-									<p class="font-mono">{Number(value).toFixed(0)}/{m.per_second()}</p>
+									<p class="font-mono">{(Number(value) * 1000).toFixed(0)} {m.ms()}</p>
 								</div>
 							{/snippet}
 						</Chart.Tooltip>

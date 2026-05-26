@@ -114,7 +114,7 @@
 			<div class="flex min-h-[4.5rem] flex-col gap-0.5">
 				<span class="line-clamp-1">{m.time_per_output_token()}</span>
 				<p class="line-clamp-2 text-sm font-normal text-muted-foreground">
-					{m.llm_dashboard_tpot_tooltip()}
+					{m.llm_dashboard_time_per_output_token_tooltip()}
 				</p>
 			</div>
 		</Statistics.Title>

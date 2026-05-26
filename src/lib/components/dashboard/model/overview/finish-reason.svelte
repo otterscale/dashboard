@@ -14,7 +14,7 @@
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
-	import { computeStep, vllmMetricWithSelector } from '$lib/prometheus';
+	import { computeStep, escapePromqlStringLiteral } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -34,55 +34,45 @@
 		isReloading: boolean;
 	} = $props();
 
-	let prompts = $state([] as SampleValue[]);
-	let generations = $state([] as SampleValue[]);
-	const throughputs = $derived(
-		prompts.map((sample, index) => ({
-			time: sample.time,
-			prompt: sample.value,
-			generation: generations[index]?.value ?? null
-		}))
-	);
+	let stop = $state([] as SampleValue[]);
+	let length = $state([] as SampleValue[]);
+	let abort = $state([] as SampleValue[]);
 
 	const configuration = {
-		prompt: { label: 'Prompt', color: 'var(--chart-1)' },
-		generation: { label: 'Generation', color: 'var(--chart-2)' }
+		stop: { label: m.finish_reason_stop(), color: 'var(--chart-2)' },
+		length: { label: m.finish_reason_length(), color: 'var(--chart-1)' },
+		abort: { label: m.finish_reason_abort(), color: 'var(--destructive)' }
 	} satisfies Chart.ChartConfig;
 
 	const areaProps = {
 		curve: curveMonotoneX,
-		'fill-opacity': 0.4,
+		'fill-opacity': 0.5,
 		line: { class: 'stroke-1' },
 		motion: 'tween'
 	} as const;
 
-	async function fetchPrompts(startMs: number, endMs: number, step: number) {
-		try {
-			const inner = vllmMetricWithSelector('vllm:prompt_tokens_total', namespace, undefined);
-			const response = await prometheusDriver.rangeQuery(
-				`sum(rate(${inner}[2m]))`,
-				startMs,
-				endMs,
-				step
-			);
-			prompts = response.result[0]?.values ?? [];
-		} catch (error) {
-			console.error(`Fail to fetch latest prompt throughput in cluster ${cluster}:`, error);
-		}
+	function reasonQuery(reason: string): string {
+		// Build metric{namespace="X", finished_reason="reason"} manually since
+		// vllmMetricWithSelector only knows about namespace + llm_inference_service.
+		const ns = (namespace ?? '').trim();
+		const r = escapePromqlStringLiteral(reason);
+		const sel = ns
+			? `{namespace="${escapePromqlStringLiteral(ns)}",finished_reason="${r}"}`
+			: `{finished_reason="${r}"}`;
+		return `sum(rate(vllm:request_success_total${sel}[5m]))`;
 	}
 
-	async function fetchGenerations(startMs: number, endMs: number, step: number) {
+	async function fetchOne(reason: 'stop' | 'length' | 'abort', startMs: number, endMs: number, step: number) {
 		try {
-			const inner = vllmMetricWithSelector('vllm:generation_tokens_total', namespace, undefined);
-			const response = await prometheusDriver.rangeQuery(
-				`sum(rate(${inner}[2m]))`,
-				startMs,
-				endMs,
-				step
-			);
-			generations = response.result[0]?.values ?? [];
-		} catch (error) {
-			console.error(`Fail to fetch latest generation throughput in cluster ${cluster}:`, error);
+			const resp = await prometheusDriver.rangeQuery(reasonQuery(reason), startMs, endMs, step);
+			const values = resp.result[0]?.values ?? [];
+			if (reason === 'stop') stop = values;
+			else if (reason === 'length') length = values;
+			else abort = values;
+		} catch {
+			if (reason === 'stop') stop = [];
+			else if (reason === 'length') length = [];
+			else abort = [];
 		}
 	}
 
@@ -92,11 +82,12 @@
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const step = computeStep(startMs, endMs);
 			await Promise.all([
-				fetchPrompts(startMs, endMs, step),
-				fetchGenerations(startMs, endMs, step)
+				fetchOne('stop', startMs, endMs, step),
+				fetchOne('length', startMs, endMs, step),
+				fetchOne('abort', startMs, endMs, step)
 			]);
 		} catch (error) {
-			console.error(`Fail to fetch throughputs data in cluster ${cluster}:`, error);
+			console.error(`Fail to fetch finish reason in cluster ${cluster}:`, error);
 		}
 	}
 
@@ -104,40 +95,49 @@
 
 	let isLoaded = $state(false);
 	onMount(async () => {
-		try {
-			await fetch();
-			isLoaded = true;
-		} catch (error) {
-			console.error(`Fail to fetch data in cluster ${cluster}:`, error);
-		}
+		await fetch();
+		isLoaded = true;
 	});
-	onDestroy(() => {
-		reloadManager.stop();
-	});
+	onDestroy(() => reloadManager.stop());
 
 	$effect(() => {
-		if (isReloading) {
-			reloadManager.restart();
-		} else {
-			reloadManager.stop();
-		}
+		if (isReloading) reloadManager.restart();
+		else reloadManager.stop();
 	});
+
+	// Use stop's time axis as the canonical one; fall back to length/abort if stop is missing.
+	const data = $derived(
+		(() => {
+			const reference = stop.length > 0 ? stop : length.length > 0 ? length : abort;
+			if (reference.length === 0) return [];
+			const numAt = (arr: SampleValue[], i: number) => {
+				const v = Number(arr[i]?.value ?? 0);
+				return Number.isFinite(v) ? v : 0;
+			};
+			return reference.map((sample, i) => ({
+				time: sample.time,
+				stop: numAt(stop, i),
+				length: numAt(length, i),
+				abort: numAt(abort, i)
+			}));
+		})()
+	);
 </script>
 
 <Card.Root class="h-full">
 	<Card.Header>
 		<Card.Title class="flex items-center justify-between gap-2">
-			<span>{m.throughput()}</span>
+			<span>{m.finish_reason()}</span>
 			<Tooltip.Root>
 				<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
 					<InfoIcon class="size-5 text-muted-foreground" />
 				</Tooltip.Trigger>
 				<Tooltip.Content>
-					<p>{m.llm_dashboard_throughputs_tooltip()}</p>
+					<p>{m.llm_dashboard_finish_reason_tooltip()}</p>
 				</Tooltip.Content>
 			</Tooltip.Root>
 		</Card.Title>
-		<Card.Description>{m.llm_dashboard_throughputs_description()}</Card.Description>
+		<Card.Description>{m.llm_dashboard_finish_reason_description()}</Card.Description>
 	</Card.Header>
 	{#if !isLoaded}
 		<Card.Content>
@@ -145,7 +145,7 @@
 				<Loader2Icon class="size-12 animate-spin" />
 			</div>
 		</Card.Content>
-	{:else if throughputs.length === 0}
+	{:else if data.length === 0}
 		<Card.Content>
 			<div class="flex h-45 w-full flex-col items-center justify-center gap-2">
 				<ChartLineIcon class="size-12 animate-pulse text-muted-foreground" />
@@ -156,21 +156,19 @@
 		<Card.Content>
 			<Chart.Container config={configuration} class="h-45 w-full">
 				<AreaChart
-					data={throughputs}
+					{data}
 					x="time"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}
+					seriesLayout="stack"
 					series={[
+						{ key: 'stop', label: configuration.stop.label, color: configuration.stop.color },
 						{
-							key: 'prompt',
-							label: configuration.prompt.label,
-							color: configuration.prompt.color
+							key: 'length',
+							label: configuration.length.label,
+							color: configuration.length.color
 						},
-						{
-							key: 'generation',
-							label: configuration.generation.label,
-							color: configuration.generation.color
-						}
+						{ key: 'abort', label: configuration.abort.label, color: configuration.abort.color }
 					]}
 					props={{
 						area: areaProps,
@@ -184,15 +182,14 @@
 					{#snippet tooltip()}
 						<Chart.Tooltip
 							indicator="dot"
-							labelFormatter={(v: Date) => {
-								return v.toLocaleDateString('en-US', {
+							labelFormatter={(v: Date) =>
+								v.toLocaleDateString('en-US', {
 									year: 'numeric',
 									month: 'short',
 									day: 'numeric',
 									hour: 'numeric',
 									minute: 'numeric'
-								});
-							}}
+								})}
 						>
 							{#snippet formatter({ item, name, value })}
 								<div
@@ -202,10 +199,8 @@
 								<div
 									class="flex flex-1 shrink-0 items-center justify-between gap-2 text-xs leading-none"
 								>
-									<div class="grid gap-1.5">
-										<span class="text-muted-foreground">{name}</span>
-									</div>
-									<p class="font-mono">{Number(value).toFixed(0)}/{m.per_second()}</p>
+									<span class="text-muted-foreground">{name}</span>
+									<p class="font-mono">{Number(value).toFixed(2)}/{m.per_second()}</p>
 								</div>
 							{/snippet}
 						</Chart.Tooltip>

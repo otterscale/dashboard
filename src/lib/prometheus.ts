@@ -62,6 +62,75 @@ export function computeStep(
 	return Math.max(minStep, Math.ceil(rangeSeconds / maxPoints));
 }
 
+/** Convert (start, end) into a PromQL range literal like "1h" / "30m". */
+export function rangeLiteralFromWindow(startMs: number, endMs: number): string {
+	const secs = Math.max(60, Math.floor((endMs - startMs) / 1000));
+	if (secs % 3600 === 0) return `${secs / 3600}h`;
+	if (secs % 60 === 0) return `${secs / 60}m`;
+	return `${secs}s`;
+}
+
+/**
+ * Window-vs-window trend ratio, e.g. 0.05 = +5%.
+ * Computes `(avg(window) - avg(prev window)) / avg(prev window)` server-side
+ * via a single instant query, so it's stable against single-sample jitter.
+ */
+export async function fetchTrendPct(
+	client: PrometheusDriver,
+	inner: string,
+	range: string
+): Promise<number> {
+	const query =
+		`(avg_over_time((${inner})[${range}:]) - avg_over_time((${inner})[${range}:] offset ${range}))` +
+		` / avg_over_time((${inner})[${range}:] offset ${range})`;
+	try {
+		const response = await client.instantQuery(query);
+		const raw = response.result[0]?.value?.value;
+		const num = Number(raw);
+		return Number.isFinite(num) ? num : 0;
+	} catch {
+		return 0;
+	}
+}
+
+export type ThresholdLevel = 'green' | 'orange' | 'red';
+
+/**
+ * Classify a value into a 3-step health level.
+ * - `lower-is-better`: ≤green → green, ≤orange → orange, else red.
+ * - `higher-is-better`: ≥green → green, ≥orange → orange, else red.
+ */
+export function classifyThreshold(
+	value: number,
+	thresholds: { green: number; orange: number },
+	direction: 'lower-is-better' | 'higher-is-better' = 'lower-is-better'
+): ThresholdLevel {
+	if (direction === 'lower-is-better') {
+		if (value <= thresholds.green) return 'green';
+		if (value <= thresholds.orange) return 'orange';
+		return 'red';
+	}
+	if (value >= thresholds.green) return 'green';
+	if (value >= thresholds.orange) return 'orange';
+	return 'red';
+}
+
+/** Tailwind class fragments per threshold level. Compose at the call site. */
+export function thresholdClasses(level: ThresholdLevel): {
+	text: string;
+	border: string;
+	bg: string;
+} {
+	switch (level) {
+		case 'green':
+			return { text: 'text-chart-2', border: '', bg: '' };
+		case 'orange':
+			return { text: 'text-chart-1', border: 'border-chart-1', bg: '' };
+		case 'red':
+			return { text: 'text-destructive', border: 'border-destructive', bg: 'bg-destructive/5' };
+	}
+}
+
 export type DataPoint = Record<string, Date | number>;
 
 const CHART_COLORS = ['chart-1', 'chart-2', 'chart-3', 'chart-4', 'chart-5'];

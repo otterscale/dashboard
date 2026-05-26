@@ -1,21 +1,25 @@
 <script lang="ts">
 	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
+	import InfoIcon from '@lucide/svelte/icons/info';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { scaleUtc } from 'd3-scale';
-	import { curveStep } from 'd3-shape';
+	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
 	import { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
+	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
-	import { computeStep } from '$lib/prometheus';
+	import { computeStep, vllmMetricWithSelector } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
 		cluster,
+		namespace,
 		start,
 		end,
 		endIsNow,
@@ -23,6 +27,7 @@
 	}: {
 		prometheusDriver: PrometheusDriver;
 		cluster: string;
+		namespace: string;
 		start: Date;
 		end: Date;
 		endIsNow: boolean;
@@ -43,43 +48,31 @@
 	);
 
 	const configuration = {
-		ninety_five: { label: '95th', color: 'var(--chart-1)' },
-		ninety_nine: { label: '99th', color: 'var(--chart-2)' }
+		ninety_five: { label: '95', color: 'var(--chart-1)' },
+		ninety_nine: { label: '99', color: 'var(--chart-2)' }
 	} satisfies Chart.ChartConfig;
 
 	const areaProps = {
-		curve: curveStep,
+		curve: curveMonotoneX,
 		'fill-opacity': 0.4,
 		line: { class: 'stroke-1' },
 		motion: 'tween'
 	} as const;
 
-	async function fetchNinetyFive(startMs: number, endMs: number, step: number) {
-		try {
-			const response = await prometheusDriver.rangeQuery(
-				`histogram_quantile(0.95, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket{}[5m])))`,
-				startMs,
-				endMs,
-				step
-			);
-			ninety_five = response.result[0]?.values ?? [];
-		} catch (error) {
-			console.error(`Fail to fetch latest running requests in cluster ${cluster}:`, error);
-		}
-	}
-
-	async function fetchNinetyNine(startMs: number, endMs: number, step: number) {
-		try {
-			const response = await prometheusDriver.rangeQuery(
-				`histogram_quantile(0.99, sum by(le) (rate(vllm:e2e_request_latency_seconds_bucket{}[5m])))`,
-				startMs,
-				endMs,
-				step
-			);
-			ninety_nine = response.result[0]?.values ?? [];
-		} catch (error) {
-			console.error(`Fail to fetch latest waiting requests in cluster ${cluster}:`, error);
-		}
+	async function fetchQuantile(quantile: number, startMs: number, endMs: number, step: number) {
+		const inner = vllmMetricWithSelector(
+			'vllm:e2e_request_latency_seconds_bucket',
+			namespace,
+			undefined
+		);
+		const response = await prometheusDriver.rangeQuery(
+			`histogram_quantile(${quantile}, sum by(le) (rate(${inner}[5m])))`,
+			startMs,
+			endMs,
+			step
+		);
+		if (quantile === 0.95) ninety_five = response.result[0]?.values ?? [];
+		else if (quantile === 0.99) ninety_nine = response.result[0]?.values ?? [];
 	}
 
 	async function fetch() {
@@ -88,11 +81,11 @@
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const step = computeStep(startMs, endMs);
 			await Promise.all([
-				fetchNinetyFive(startMs, endMs, step),
-				fetchNinetyNine(startMs, endMs, step)
+				fetchQuantile(0.95, startMs, endMs, step),
+				fetchQuantile(0.99, startMs, endMs, step)
 			]);
 		} catch (error) {
-			console.error(`Fail to fetch requests data in cluster ${cluster}:`, error);
+			console.error(`Fail to fetch e2e latency in cluster ${cluster}:`, error);
 		}
 	}
 
@@ -122,27 +115,35 @@
 
 <Card.Root class="h-full">
 	<Card.Header>
-		<Card.Title>{m.requests()}</Card.Title>
-		<Card.Description>
-			{m.llm_dashboard_requests_tooltip()}
-		</Card.Description>
+		<Card.Title class="flex items-center justify-between gap-2">
+			<span>{m.e2e_latency()}</span>
+			<Tooltip.Root>
+				<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+					<InfoIcon class="size-5 text-muted-foreground" />
+				</Tooltip.Trigger>
+				<Tooltip.Content>
+					<p>{m.llm_dashboard_e2e_latency_tooltip()}</p>
+				</Tooltip.Content>
+			</Tooltip.Root>
+		</Card.Title>
+		<Card.Description>{m.llm_dashboard_e2e_latency_description()}</Card.Description>
 	</Card.Header>
 	{#if !isLoaded}
 		<Card.Content>
-			<div class="flex h-[200px] w-full items-center justify-center">
+			<div class="flex h-45 w-full items-center justify-center">
 				<Loader2Icon class="size-12 animate-spin" />
 			</div>
 		</Card.Content>
 	{:else if requestLatencies.length === 0}
 		<Card.Content>
-			<div class="flex h-[200px] w-full flex-col items-center justify-center">
-				<ChartLineIcon class="size-50 animate-pulse text-muted-foreground" />
-				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
+			<div class="flex h-45 w-full flex-col items-center justify-center gap-2">
+				<ChartLineIcon class="size-12 animate-pulse text-muted-foreground" />
+				<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
 			</div>
 		</Card.Content>
 	{:else}
 		<Card.Content>
-			<Chart.Container config={configuration} class="h-[200px] w-full">
+			<Chart.Container config={configuration} class="h-45 w-full">
 				<AreaChart
 					data={requestLatencies}
 					x="time"
@@ -170,7 +171,18 @@
 					}}
 				>
 					{#snippet tooltip()}
-						<Chart.Tooltip hideLabel>
+						<Chart.Tooltip
+							indicator="dot"
+							labelFormatter={(v: Date) => {
+								return v.toLocaleDateString('en-US', {
+									year: 'numeric',
+									month: 'short',
+									day: 'numeric',
+									hour: 'numeric',
+									minute: 'numeric'
+								});
+							}}
+						>
 							{#snippet formatter({ item, name, value })}
 								<div
 									style="--color-bg: {item.color}"

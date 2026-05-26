@@ -2,8 +2,6 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import BotIcon from '@lucide/svelte/icons/bot';
 	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
-	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
-	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { ResourceService } from '@otterscale/api/resource/v1';
@@ -19,8 +17,7 @@
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
-	import { computeStep } from '$lib/prometheus';
-	import { cn } from '$lib/utils';
+	import { computeStep, vllmMetricWithSelector } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -68,18 +65,16 @@
 	}
 
 	let availablePods = $state([] as SampleValue[]);
-	const trend = $derived(
-		availablePods.length > 1 && availablePods[availablePods.length - 2].value !== 0
-			? (availablePods[availablePods.length - 1].value -
-					availablePods[availablePods.length - 2].value) /
-					availablePods[availablePods.length - 2].value
-			: 0
-	);
+
+	function buildInner(): string {
+		return `count by(endpoint) (${vllmMetricWithSelector('vllm:cache_config_info', namespace, undefined)})`;
+	}
+
 	async function fetchAvailablePods() {
 		try {
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const response = await prometheusDriver.rangeQuery(
-				`count by(endpoint) (vllm:cache_config_info{})`,
+				buildInner(),
 				start.getTime(),
 				endMs,
 				computeStep(start.getTime(), endMs)
@@ -200,18 +195,5 @@
 				</LineChart>
 			</Chart.Container>
 		</Card.Content>
-		<Card.Footer
-			class={cn(
-				'flex flex-wrap items-center justify-end text-sm leading-none font-medium',
-				trend >= 0 ? 'text-emerald-500 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'
-			)}
-		>
-			{Math.abs(trend).toFixed(2)} %
-			{#if trend >= 0}
-				<ChevronUpIcon />
-			{:else}
-				<ChevronDownIcon />
-			{/if}
-		</Card.Footer>
 	{/if}
 </Card.Root>

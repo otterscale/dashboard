@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
+	import InfoIcon from '@lucide/svelte/icons/info';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
@@ -8,14 +9,17 @@
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
+	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
-	import { computeStep } from '$lib/prometheus';
+	import { computeStep, vllmMetricWithSelector } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
 		cluster,
+		namespace,
 		start,
 		end,
 		endIsNow,
@@ -23,6 +27,7 @@
 	}: {
 		prometheusDriver: PrometheusDriver;
 		cluster: string;
+		namespace: string;
 		start: Date;
 		end: Date;
 		endIsNow: boolean;
@@ -59,8 +64,13 @@
 		endMs: number,
 		step: number
 	) {
+		const inner = vllmMetricWithSelector(
+			'vllm:time_to_first_token_seconds_bucket',
+			namespace,
+			undefined
+		);
 		const response = await prometheusDriver.rangeQuery(
-			`histogram_quantile(${quantile}, sum by(le) (rate(vllm:time_to_first_token_seconds_bucket{}[5m])))`,
+			`histogram_quantile(${quantile}, sum by(le) (rate(${inner}[5m])))`,
 			startMs,
 			endMs,
 			step
@@ -112,27 +122,35 @@
 
 <Card.Root class="h-full">
 	<Card.Header>
-		<Card.Title>{m.time_to_first_token()}</Card.Title>
-		<Card.Description>
-			{m.llm_dashboard_time_to_first_token_tooltip()}
-		</Card.Description>
+		<Card.Title class="flex items-center justify-between gap-2">
+			<span>{m.time_to_first_token()}</span>
+			<Tooltip.Root>
+				<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+					<InfoIcon class="size-5 text-muted-foreground" />
+				</Tooltip.Trigger>
+				<Tooltip.Content>
+					<p>{m.llm_dashboard_time_to_first_token_tooltip()}</p>
+				</Tooltip.Content>
+			</Tooltip.Root>
+		</Card.Title>
+		<Card.Description>{m.llm_dashboard_time_to_first_token_description()}</Card.Description>
 	</Card.Header>
 	{#if !isLoaded}
 		<Card.Content>
-			<div class="flex h-[200px] w-full items-center justify-center">
+			<div class="flex h-45 w-full items-center justify-center">
 				<Loader2Icon class="size-12 animate-spin" />
 			</div>
 		</Card.Content>
 	{:else if times_to_first_token.length === 0}
 		<Card.Content>
-			<div class="flex h-[200px] w-full flex-col items-center justify-center">
-				<ChartLineIcon class="size-50 animate-pulse text-muted-foreground" />
-				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
+			<div class="flex h-45 w-full flex-col items-center justify-center gap-2">
+				<ChartLineIcon class="size-12 animate-pulse text-muted-foreground" />
+				<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
 			</div>
 		</Card.Content>
 	{:else}
 		<Card.Content>
-			<Chart.Container config={configuration} class="h-[200px] w-full">
+			<Chart.Container config={configuration} class="h-45 w-full">
 				<AreaChart
 					data={times_to_first_token}
 					x="time"
@@ -183,7 +201,7 @@
 									<div class="grid gap-1.5">
 										<span class="text-muted-foreground">{name}</span>
 									</div>
-									<p class="font-mono">{Number(value).toFixed(2)} {m.sec()}</p>
+									<p class="font-mono">{(Number(value) * 1000).toFixed(0)} {m.ms()}</p>
 								</div>
 							{/snippet}
 						</Chart.Tooltip>
