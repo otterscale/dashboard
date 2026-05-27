@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
+	import { BanIcon } from '@lucide/svelte';
 	import FormIcon from '@lucide/svelte/icons/form';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { ServingKserveIoV1Alpha2LLMInferenceService } from '@otterscale/types';
@@ -18,8 +19,10 @@
 	import { fetchAllGpuNodes, type NodeInfo } from '$lib/components/gpu-allocation';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
+	import Spinner from '$lib/components/ui/spinner/spinner.svelte';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
 	let {
@@ -110,14 +113,13 @@
 		return resourceTopology;
 	}
 
-	function getGPUSelectionSchema(resourceTopology: Record<string, string[]>): Schema {
+	function getWorkloadPlacementSchema(resourceTopology: Record<string, string[]>): Schema {
 		const types = Object.keys(resourceTopology);
 		return {
 			type: 'object',
 			properties: {
 				type: { type: 'string', title: 'Type', enum: types }
 			},
-			required: ['type'],
 			dependencies: {
 				type: {
 					oneOf: Object.entries(resourceTopology).map(([type, nodes]) => ({
@@ -238,25 +240,49 @@
 			</Item.Content>
 		</Item.Root>
 		<Tabs.Root value={currentStep}>
-			<!-- Step 1: GPU Selector -->
+			<!-- Step 1: Workload Placement -->
 			<Tabs.Content value={steps[0]}>
 				{#await fetchAllGpuNodes(resourceClient, cluster)}
-					Loading
+					<Empty.Root>
+						<Empty.Header>
+							<Empty.Media variant="icon">
+								<Spinner />
+							</Empty.Media>
+							<Empty.Title>Loading</Empty.Title>
+						</Empty.Header>
+					</Empty.Root>
 				{:then allGPUNodes}
 					{@const allGPUDevices = getAllGPUDevices(allGPUNodes)}
 					{@const resourceTopology = getResourceTopology(allGPUDevices)}
-					{@const gpuSelectionSchema = getGPUSelectionSchema(resourceTopology)}
+					{@const gpuWorkloadPlacementSchema = getWorkloadPlacementSchema(resourceTopology)}
 					{@const isSingleNode =
 						lodash.has(object, 'spec.template') && !lodash.has(object, 'spec.prefill')}
 					{@const isPrefillDecode =
 						lodash.has(object, 'spec.template') && lodash.has(object, 'spec.prefill')}
 					{#if isSingleNode}
 						<Form
-							schema={{ title: 'GPU Selector', ...gpuSelectionSchema } as Schema}
+							schema={{
+								title: 'Workload Placement',
+								description:
+									'Control where this workload runs by selecting target nodes and GPU types.',
+								...gpuWorkloadPlacementSchema
+							} as Schema}
 							uiSchema={{
 								'ui:options': {
 									translations: {
 										submit: 'Next'
+									}
+								},
+								type: {
+									'ui:components': {
+										stringField: 'enumField',
+										selectWidget: 'comboboxWidget'
+									}
+								},
+								node: {
+									'ui:components': {
+										stringField: 'enumField',
+										selectWidget: 'comboboxWidget'
 									}
 								}
 							} as UiSchemaRoot}
@@ -308,17 +334,45 @@
 					{:else if isPrefillDecode}
 						<Form
 							schema={{
-								title: 'GPU Selector',
+								title: 'Workload Placement',
 								type: 'object',
 								properties: {
-									decode: { title: 'Decode', ...gpuSelectionSchema },
-									prefill: { title: 'Prefill', ...gpuSelectionSchema }
+									decode: { title: 'Decode', ...gpuWorkloadPlacementSchema },
+									prefill: { title: 'Prefill', ...gpuWorkloadPlacementSchema }
 								}
 							} as Schema}
 							uiSchema={{
 								'ui:options': {
 									translations: {
 										submit: 'Next'
+									}
+								},
+								Decode: {
+									translationsype: {
+										'ui:components': {
+											stringField: 'enumField',
+											selectWidget: 'comboboxWidget'
+										}
+									},
+									node: {
+										'ui:components': {
+											stringField: 'enumField',
+											selectWidget: 'comboboxWidget'
+										}
+									}
+								},
+								Prefill: {
+									type: {
+										'ui:components': {
+											stringField: 'enumField',
+											selectWidget: 'comboboxWidget'
+										}
+									},
+									node: {
+										'ui:components': {
+											stringField: 'enumField',
+											selectWidget: 'comboboxWidget'
+										}
 									}
 								}
 							} as UiSchemaRoot}
@@ -402,6 +456,16 @@
 							{/snippet}
 						</Form>
 					{/if}
+				{:catch error}
+					<Empty.Root>
+						<Empty.Header class="**:text-destructive">
+							<Empty.Media variant="icon" class="bg-destructive/30">
+								<BanIcon />
+							</Empty.Media>
+							<Empty.Title>Failed to Load Resources.</Empty.Title>
+						</Empty.Header>
+						<Empty.Content>{(error as Error).message}</Empty.Content>
+					</Empty.Root>
 				{/await}
 			</Tabs.Content>
 
@@ -409,10 +473,15 @@
 			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
-						title: 'KV Cache',
+						title: 'KV Cache Offload',
 						type: 'object',
 						properties: {
-							enabled: { type: 'boolean', title: 'Enable KV Cache' }
+							enabled: {
+								title: 'Enable',
+								description:
+									'Offload KV cache from GPU memory to host or remote storage, freeing GPU capacity for longer contexts, higher concurrency, and better prefix cache hit rates across requests.',
+								type: 'boolean'
+							}
 						}
 					} as Schema}
 					uiSchema={{
