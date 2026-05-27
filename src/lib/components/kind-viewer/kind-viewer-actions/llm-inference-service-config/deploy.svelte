@@ -43,7 +43,7 @@
 	const targetKind = 'LLMInferenceService';
 	const targetResource = 'llminferenceservices';
 
-	const steps = Array.from({ length: 3 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 
 	type GPUDevice = { type: string; node: string };
@@ -92,6 +92,22 @@
 				}
 			}
 		};
+	}
+
+	function applyKVCacheEnvironments(templatePath: string[]) {
+		lodash.set(
+			values,
+			[...templatePath, 'containers'],
+			[
+				{
+					name: 'main',
+					env: [
+						{ name: 'LMCACHE_CONFIG_FILE', value: '/etc/lmcache/lmcache_config.yaml' },
+						{ name: 'LMCACHE_USE_EXPERIMENTAL', value: 'True' }
+					]
+				}
+			]
+		);
 	}
 
 	let values = $state(getInitialValues());
@@ -205,8 +221,51 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 2 — GPU Selector -->
+			<!-- Step 2 — Model Source -->
 			<Tabs.Content value={steps[1]}>
+				<Form
+					schema={{
+						title: 'Model Source',
+						type: 'object',
+						properties: {
+							uri: { type: 'string', title: 'URI' }
+						},
+						required: ['uri']
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={{ uri: lodash.get(object, 'spec.model.uri', '') } as FormValue}
+					handleSubmit={{
+						posthook: (form) => {
+							const value = getValueSnapshot(form);
+							const uri = lodash.get(value, 'uri') as string | undefined;
+							lodash.set(values, ['spec', 'model', 'uri'], uri);
+							handleNext();
+						}
+					}}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+
+			<!-- Step 3 — GPU Selector -->
+			<Tabs.Content value={steps[2]}>
 				{#await fetchAllGpuNodes(resourceClient, cluster)}
 					Loading
 				{:then allGPUNodes}
@@ -342,8 +401,55 @@
 				{/await}
 			</Tabs.Content>
 
-			<!-- Step 3 — YAML preview -->
-			<Tabs.Content value={steps[2]} class="min-h-[77vh]">
+			<!-- Step 4 — KV Cache -->
+			<Tabs.Content value={steps[3]}>
+				<Form
+					schema={{
+						title: 'KV Cache',
+						type: 'object',
+						properties: {
+							enabled: { type: 'boolean', title: 'Enable KV Cache' }
+						}
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={{ enabled: false } as FormValue}
+					handleSubmit={{
+						posthook: (form) => {
+							const value = getValueSnapshot(form);
+							const enabled = lodash.get(value, 'enabled') as boolean | undefined;
+							if (enabled) {
+								applyKVCacheEnvironments(['spec', 'template']);
+								if (lodash.has(object, 'spec.prefill')) {
+									applyKVCacheEnvironments(['spec', 'prefill', 'template']);
+								}
+							}
+							handleNext();
+						}
+					}}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+
+			<!-- Step 5 — YAML preview -->
+			<Tabs.Content value={steps[4]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{

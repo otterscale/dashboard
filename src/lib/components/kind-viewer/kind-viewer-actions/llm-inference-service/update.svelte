@@ -131,8 +131,43 @@
 		};
 	}
 
-	// Steps Manager (2 steps: GPU selector + YAML review)
-	const steps = Array.from({ length: 2 }, (_, index) => String(index + 1));
+	function applyKVCacheEnvironments(templatePath: string[]) {
+		lodash.set(
+			values,
+			[...templatePath, 'containers'],
+			[
+				{
+					name: 'main',
+					env: [
+						{ name: 'LMCACHE_CONFIG_FILE', value: '/etc/lmcache/lmcache_config.yaml' },
+						{ name: 'LMCACHE_USE_EXPERIMENTAL', value: 'True' }
+					]
+				}
+			]
+		);
+	}
+
+	function hasKVCacheEnvironments(templatePath: string[]): boolean {
+		const containers = lodash.get(object, [...templatePath, 'containers']) as
+			| Array<{ name?: string; env?: Array<{ name?: string }> }>
+			| undefined;
+		const main = containers?.find((container) => container.name === 'main');
+		const envNames = new Set(main?.env?.map((entry) => entry.name) ?? []);
+		return envNames.has('LMCACHE_CONFIG_FILE') && envNames.has('LMCACHE_USE_EXPERIMENTAL');
+	}
+
+	function isKVCacheEnabled(): boolean {
+		if (lodash.has(object, 'spec.prefill')) {
+			return (
+				hasKVCacheEnvironments(['spec', 'template']) &&
+				hasKVCacheEnvironments(['spec', 'prefill', 'template'])
+			);
+		}
+		return hasKVCacheEnvironments(['spec', 'template']);
+	}
+
+	// Steps Manager (3 steps: GPU selector + KV Cache + YAML review)
+	const steps = Array.from({ length: 3 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -350,8 +385,55 @@
 				{/await}
 			</Tabs.Content>
 
-			<!-- Step 2: YAML Review + Submit -->
-			<Tabs.Content value={steps[1]} class="min-h-[77vh]">
+			<!-- Step 2: KV Cache -->
+			<Tabs.Content value={steps[1]}>
+				<Form
+					schema={{
+						title: 'KV Cache',
+						type: 'object',
+						properties: {
+							enabled: { type: 'boolean', title: 'Enable KV Cache' }
+						}
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={{ enabled: isKVCacheEnabled() } as FormValue}
+					handleSubmit={{
+						posthook: (form) => {
+							const value = getValueSnapshot(form);
+							const enabled = lodash.get(value, 'enabled') as boolean | undefined;
+							if (enabled) {
+								applyKVCacheEnvironments(['spec', 'template']);
+								if (lodash.has(object, 'spec.prefill')) {
+									applyKVCacheEnvironments(['spec', 'prefill', 'template']);
+								}
+							}
+							handleNext();
+						}
+					}}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+
+			<!-- Step 3: YAML Review + Submit -->
+			<Tabs.Content value={steps[2]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{
