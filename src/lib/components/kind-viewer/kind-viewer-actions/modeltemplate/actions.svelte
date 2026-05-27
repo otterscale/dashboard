@@ -54,20 +54,6 @@
 					e.preventDefault();
 				}}
 			>
-				<Deploy
-					{cluster}
-					{schema}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
-			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
 				<View {schema} {object} />
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
@@ -77,6 +63,7 @@
 			>
 				<Describe {cluster} {namespace} {group} {version} {resource} {object} />
 			</DropdownMenu.Item>
+			<DropdownMenu.Separator />
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
@@ -90,6 +77,20 @@
 					{resource}
 					{schema}
 					{validate}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Deploy
+					{cluster}
+					{schema}
 					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;

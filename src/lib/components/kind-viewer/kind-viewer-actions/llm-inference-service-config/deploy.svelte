@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
+	import { BanIcon } from '@lucide/svelte';
 	import Rocket from '@lucide/svelte/icons/rocket';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { ServingKserveIoV1Alpha2LLMInferenceServiceConfig } from '@otterscale/types';
@@ -17,8 +18,10 @@
 	import { fetchAllGpuNodes, type NodeInfo } from '$lib/components/gpu-allocation';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
+	import Spinner from '$lib/components/ui/spinner/spinner.svelte';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
 	let {
@@ -43,19 +46,90 @@
 	const targetKind = 'LLMInferenceService';
 	const targetResource = 'llminferenceservices';
 
-	const steps = Array.from({ length: 3 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 
-	type GPUDevice = { uuid: string; type: string; node: string };
+	type GPUDevice = { type: string; node: string };
 
 	function getAllGPUDevices(nodes: NodeInfo[]): GPUDevice[] {
 		return nodes.flatMap((node) =>
 			node.devices.map((device) => ({
-				uuid: device.id,
 				type: device.type,
 				node: node.name
 			}))
 		);
+	}
+
+	function getResourceTopology(devices: GPUDevice[]): Record<string, string[]> {
+		const container: Record<string, Set<string>> = {};
+		for (const { type, node } of devices) {
+			if (!container[type]) {
+				container[type] = new Set();
+			}
+			container[type].add(node);
+		}
+
+		const resourceTopology: Record<string, string[]> = {};
+		for (const [type, nodes] of Object.entries(container)) {
+			resourceTopology[type] = [...nodes];
+		}
+		return resourceTopology;
+	}
+
+	function getWorkloadPlacementSchema(resourceTopology: Record<string, string[]>): Schema {
+		const types = Object.keys(resourceTopology);
+		return {
+			type: 'object',
+			properties: {
+				type: { type: 'string', title: 'Type', enum: types }
+			},
+			dependencies: {
+				type: {
+					oneOf: Object.entries(resourceTopology).map(([type, nodes]) => ({
+						properties: {
+							type: { enum: [type] },
+							node: { type: 'string', title: 'Node', enum: nodes }
+						}
+					}))
+				}
+			}
+		};
+	}
+
+	function applyKVCacheEnvironments(templatePath: string[]) {
+		lodash.set(
+			values,
+			[...templatePath, 'containers'],
+			[
+				{
+					name: 'main',
+					env: [
+						{ name: 'LMCACHE_CONFIG_FILE', value: '/etc/lmcache/lmcache_config.yaml' },
+						{ name: 'LMCACHE_USE_EXPERIMENTAL', value: 'True' }
+					]
+				}
+			]
+		);
+	}
+
+	function removeKVCacheEnvironments(templatePath: string[]) {
+		const containers = lodash.get(values, [...templatePath, 'containers']) as
+			| Array<{ name?: string; env?: Array<{ name?: string; value?: string }> }>
+			| undefined;
+		if (!Array.isArray(containers)) return;
+
+		const kvCacheEnvNames = new Set(['LMCACHE_CONFIG_FILE', 'LMCACHE_USE_EXPERIMENTAL']);
+
+		const cleaned = containers.map((container) => {
+			if (!Array.isArray(container.env)) return container;
+			const env = container.env.filter((entry) => !kvCacheEnvNames.has(entry.name ?? ''));
+			if (env.length === 0) {
+				return lodash.omit(container, 'env');
+			}
+			return { ...container, env };
+		});
+
+		lodash.set(values, [...templatePath, 'containers'], cleaned);
 	}
 
 	let values = $state(getInitialValues());
@@ -65,7 +139,6 @@
 
 	let value = $derived(stringify(values));
 	const currentIndex = $derived(steps.indexOf(currentStep));
-	const templateName = $derived(lodash.get(object, 'metadata.name', ''));
 
 	function getInitialValues() {
 		return {
@@ -121,7 +194,6 @@
 			<Progress value={currentIndex + 1} max={steps.length} class="mt-1 mr-6" />
 			<Item.Content class="text-left">
 				<Item.Title class="text-xl font-bold">{targetKind}</Item.Title>
-				<Item.Description>Deploy a model from template {templateName}</Item.Description>
 			</Item.Content>
 		</Item.Root>
 		<Tabs.Root value={currentStep}>
@@ -129,8 +201,15 @@
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
-						...lodash.omit(lodash.get(jsonSchema, 'properties.metadata') as Schema, 'properties'),
+						...lodash.omit(lodash.get(jsonSchema, 'properties.metadata') as Schema, [
+							'properties',
+							'required'
+						]),
 						title: 'Metadata',
+						required: [
+							...(lodash.get(jsonSchema, 'properties.metadata.required', []) as string[]),
+							'name'
+						],
 						properties: {
 							name: {
 								...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema),
@@ -169,15 +248,76 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 2 — GPU Selector -->
+			<!-- Step 2 — Model Source -->
 			<Tabs.Content value={steps[1]}>
+				<Form
+					schema={{
+						title: 'Model',
+						...(lodash.omit(lodash.get(jsonSchema, 'properties.spec.properties.model') as Schema, [
+							'properties'
+						]) as Schema),
+						properties: {
+							uri: {
+								title: 'URI',
+								description:
+									'Override the default model source to load weights from a specific location — for example, a private OCI registry, a Hugging Face repository, or an S3-compatible bucket. Leave unchanged to use the platform default.',
+								...lodash.omit(
+									lodash.get(
+										jsonSchema,
+										'properties.spec.properties.model.properties.uri'
+									) as Schema,
+									['description']
+								)
+							}
+						}
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={{ uri: lodash.get(object, 'spec.model.uri', '') } as FormValue}
+					handleSubmit={{
+						posthook: (form) => {
+							const value = getValueSnapshot(form);
+							const uri = lodash.get(value, 'uri') as string | undefined;
+							lodash.set(values, ['spec', 'model', 'uri'], uri);
+							handleNext();
+						}
+					}}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+
+			<!-- Step 3 — Workload Placement -->
+			<Tabs.Content value={steps[2]}>
 				{#await fetchAllGpuNodes(resourceClient, cluster)}
-					Loading
+					<Empty.Root>
+						<Empty.Header>
+							<Empty.Media variant="icon">
+								<Spinner />
+							</Empty.Media>
+							<Empty.Title>Loading</Empty.Title>
+						</Empty.Header>
+					</Empty.Root>
 				{:then allGPUNodes}
 					{@const allGPUDevices = getAllGPUDevices(allGPUNodes)}
-					{@const allNodes = new Set(allGPUDevices.map((device) => device.node))}
-					{@const allTypes = new Set(allGPUDevices.map((device) => device.type))}
-					{@const allUUIDs = new Set(allGPUDevices.map((device) => device.uuid))}
+					{@const resourceTopology = getResourceTopology(allGPUDevices)}
+					{@const gpuWorkloadPlacementSchema = getWorkloadPlacementSchema(resourceTopology)}
 					{@const isSingleNode =
 						lodash.has(object, 'spec.template') && !lodash.has(object, 'spec.prefill')}
 					{@const isPrefillDecode =
@@ -185,32 +325,11 @@
 					{#if isSingleNode}
 						<Form
 							schema={{
-								title: 'GPU Selector',
-								type: 'object',
-								properties: {
-									node: {
-										title: 'Node',
-										type: 'string',
-										enum: [...allNodes]
-									},
-									type: {
-										title: 'Type',
-										type: 'array',
-										items: {
-											type: 'string',
-											enum: [...allTypes]
-										}
-									},
-									uuid: {
-										title: 'UUID',
-										type: 'array',
-										items: {
-											type: 'string',
-											enum: [...allUUIDs]
-										}
-									}
-								}
-							}}
+								title: 'Workload Placement',
+								description:
+									'Control where this workload runs by selecting target nodes and GPU types.',
+								...gpuWorkloadPlacementSchema
+							} as Schema}
 							uiSchema={{
 								'ui:options': {
 									translations: {
@@ -218,30 +337,15 @@
 									}
 								},
 								type: {
-									'ui:options': {
-										itemTitle: () => null
-									},
-									items: {
-										'ui:components': {
-											stringField: 'enumField',
-											selectWidget: 'comboboxWidget'
-										}
+									'ui:components': {
+										stringField: 'enumField',
+										selectWidget: 'comboboxWidget'
 									}
 								},
 								node: {
 									'ui:components': {
-										stringField: 'enumField'
-									}
-								},
-								uuid: {
-									'ui:options': {
-										itemTitle: () => null
-									},
-									items: {
-										'ui:components': {
-											stringField: 'enumField',
-											selectWidget: 'comboboxWidget'
-										}
+										stringField: 'enumField',
+										selectWidget: 'comboboxWidget'
 									}
 								}
 							} as UiSchemaRoot}
@@ -249,33 +353,18 @@
 							handleSubmit={{
 								posthook: (form) => {
 									const value = getValueSnapshot(form);
-									lodash.unset(values, ['spec', 'template']);
-									lodash.unset(values, ['spec', 'annotations']);
-									lodash.unset(values, ['spec', 'prefill']);
 
-									const node = lodash.get(value, 'node', null) as string[];
+									const type = lodash.get(value, 'type') as string | undefined;
+									if (type) {
+										lodash.set(values, ['spec', 'annotations', 'nvidia.com/use-gputype'], type);
+									}
+
+									const node = lodash.get(value, 'node') as string | undefined;
 									if (node) {
 										lodash.set(
 											values,
 											['spec', 'template', 'nodeSelector', 'kubernetes.io/hostname'],
 											node
-										);
-									}
-
-									const types = lodash.get(value, 'type', []) as string[];
-									if (types.length > 0) {
-										lodash.set(
-											values,
-											['spec', 'annotations', 'nvidia.com/use-gputype'],
-											types.join(',')
-										);
-									}
-									const uuids = lodash.get(value, 'uuid', []) as string[];
-									if (uuids.length > 0) {
-										lodash.set(
-											values,
-											['spec', 'annotations', 'nvidia.com/use-gpuuuid'],
-											uuids.join(',')
 										);
 									}
 
@@ -299,126 +388,44 @@
 					{:else if isPrefillDecode}
 						<Form
 							schema={{
-								title: 'GPU Selector',
+								title: 'Workload Placement',
 								type: 'object',
 								properties: {
-									decode: {
-										title: 'Decode',
-										type: 'object',
-										properties: {
-											node: {
-												title: 'Node',
-												type: 'string',
-												enum: [...allNodes]
-											},
-											type: {
-												title: 'Type',
-												type: 'array',
-												items: {
-													type: 'string',
-													enum: [...allTypes]
-												}
-											},
-											uuid: {
-												title: 'UUID',
-												type: 'array',
-												items: {
-													type: 'string',
-													enum: [...allUUIDs]
-												}
-											}
-										}
-									},
-									prefill: {
-										title: 'Prefill',
-										type: 'object',
-										properties: {
-											node: {
-												title: 'Node',
-												type: 'string',
-												enum: [...allNodes]
-											},
-											type: {
-												title: 'Type',
-												type: 'array',
-												items: {
-													type: 'string',
-													enum: [...allTypes]
-												}
-											},
-											uuid: {
-												title: 'UUID',
-												type: 'array',
-												items: {
-													type: 'string',
-													enum: [...allUUIDs]
-												}
-											}
-										}
-									}
+									decode: { title: 'Decode', ...gpuWorkloadPlacementSchema },
+									prefill: { title: 'Prefill', ...gpuWorkloadPlacementSchema }
 								}
-							}}
+							} as Schema}
 							uiSchema={{
 								'ui:options': {
 									translations: {
 										submit: 'Next'
 									}
 								},
-								prefill: {
+								Decode: {
 									type: {
-										'ui:options': {
-											itemTitle: () => null
-										},
-										items: {
-											'ui:components': {
-												stringField: 'enumField',
-												selectWidget: 'comboboxWidget'
-											}
+										'ui:components': {
+											stringField: 'enumField',
+											selectWidget: 'comboboxWidget'
 										}
 									},
 									node: {
 										'ui:components': {
-											stringField: 'enumField'
-										}
-									},
-									uuid: {
-										'ui:options': {
-											itemTitle: () => null
-										},
-										items: {
-											'ui:components': {
-												stringField: 'enumField',
-												selectWidget: 'comboboxWidget'
-											}
+											stringField: 'enumField',
+											selectWidget: 'comboboxWidget'
 										}
 									}
 								},
-								decode: {
+								Prefill: {
 									type: {
-										'ui:options': {
-											itemTitle: () => null
-										},
-										items: {
-											'ui:components': {
-												stringField: 'enumField',
-												selectWidget: 'comboboxWidget'
-											}
+										'ui:components': {
+											stringField: 'enumField',
+											selectWidget: 'comboboxWidget'
 										}
 									},
 									node: {
 										'ui:components': {
-											stringField: 'enumField'
-										}
-									},
-									uuid: {
-										'ui:options': {
-											itemTitle: () => null
-										},
-										items: {
-											'ui:components': {
-												stringField: 'enumField',
-												selectWidget: 'comboboxWidget'
-											}
+											stringField: 'enumField',
+											selectWidget: 'comboboxWidget'
 										}
 									}
 								}
@@ -426,13 +433,18 @@
 							initialValue={{} as FormValue}
 							handleSubmit={{
 								posthook: (form) => {
-									lodash.unset(values, ['spec', 'template']);
-									lodash.unset(values, ['spec', 'annotations']);
-									lodash.unset(values, ['spec', 'prefill']);
-
 									const value = getValueSnapshot(form);
 
-									const decodeNode = lodash.get(value, 'decode.node', null) as string[];
+									const decodeType = lodash.get(value, 'decode.type') as string | undefined;
+									if (decodeType) {
+										lodash.set(
+											values,
+											['spec', 'annotations', 'nvidia.com/use-gputype'],
+											decodeType
+										);
+									}
+
+									const decodeNode = lodash.get(value, 'decode.node') as string | undefined;
 									if (decodeNode) {
 										lodash.set(
 											values,
@@ -441,44 +453,21 @@
 										);
 									}
 
-									const decodeTypes = lodash.get(value, 'decode.type', []) as string[];
-									if (decodeTypes.length > 0) {
+									const prefillType = lodash.get(value, 'prefill.type') as string | undefined;
+									if (prefillType) {
 										lodash.set(
 											values,
-											['spec', 'annotations', 'nvidia.com/use-gputype'],
-											decodeTypes.join(',')
+											['spec', 'prefill', 'annotations', 'nvidia.com/use-gputype'],
+											prefillType
 										);
 									}
-									const decodeUUIDs = lodash.get(value, 'decode.uuid', []) as string[];
-									if (decodeUUIDs.length > 0) {
-										lodash.set(
-											values,
-											['spec', 'annotations', 'nvidia.com/use-gpuuuid'],
-											decodeUUIDs.join(',')
-										);
-									}
-									const prefillNode = lodash.get(value, 'prefill.node', null) as string[];
+
+									const prefillNode = lodash.get(value, 'prefill.node') as string | undefined;
 									if (prefillNode) {
 										lodash.set(
 											values,
 											['spec', 'prefill', 'template', 'nodeSelector', 'kubernetes.io/hostname'],
 											prefillNode
-										);
-									}
-									const prefillTypes = lodash.get(value, 'prefill.type', []) as string[];
-									if (prefillTypes.length > 0) {
-										lodash.set(
-											values,
-											['spec', 'prefill', 'annotations', 'nvidia.com/use-gputype'],
-											prefillTypes.join(',')
-										);
-									}
-									const prefillUUIDs = lodash.get(value, 'prefill.uuid', []) as string[];
-									if (prefillUUIDs.length > 0) {
-										lodash.set(
-											values,
-											['spec', 'prefill', 'annotations', 'nvidia.com/use-gpuuuid'],
-											prefillUUIDs.join(',')
 										);
 									}
 
@@ -500,11 +489,78 @@
 							{/snippet}
 						</Form>
 					{/if}
+				{:catch error}
+					<Empty.Root>
+						<Empty.Header class="**:text-destructive">
+							<Empty.Media variant="icon" class="bg-destructive/30">
+								<BanIcon />
+							</Empty.Media>
+							<Empty.Title>Failed to Load Resources.</Empty.Title>
+						</Empty.Header>
+						<Empty.Content>{(error as Error).message}</Empty.Content>
+					</Empty.Root>
 				{/await}
 			</Tabs.Content>
 
-			<!-- Step 3 — YAML preview -->
-			<Tabs.Content value={steps[2]} class="min-h-[77vh]">
+			<!-- Step 4 — KV Cache -->
+			<Tabs.Content value={steps[3]}>
+				<Form
+					schema={{
+						title: 'KV Cache Offload',
+						type: 'object',
+						properties: {
+							enabled: {
+								title: 'Enable',
+								description:
+									'Offload KV cache from GPU memory to host or remote storage, freeing GPU capacity for longer contexts, higher concurrency, and better prefix cache hit rates across requests.',
+								type: 'boolean'
+							}
+						}
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={{ enabled: false } as FormValue}
+					handleSubmit={{
+						posthook: (form) => {
+							const value = getValueSnapshot(form);
+							const enabled = lodash.get(value, 'enabled') as boolean | undefined;
+							if (enabled) {
+								applyKVCacheEnvironments(['spec', 'template']);
+								if (lodash.has(object, 'spec.prefill')) {
+									applyKVCacheEnvironments(['spec', 'prefill', 'template']);
+								}
+							} else {
+								removeKVCacheEnvironments(['spec', 'template']);
+								if (lodash.has(object, 'spec.prefill')) {
+									removeKVCacheEnvironments(['spec', 'prefill', 'template']);
+								}
+							}
+							handleNext();
+						}
+					}}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+
+			<!-- Step 5 — YAML preview -->
+			<Tabs.Content value={steps[4]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{

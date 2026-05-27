@@ -56,21 +56,6 @@
 					e.preventDefault();
 				}}
 			>
-				<Deploy
-					{cluster}
-					{namespace}
-					{schema}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
-			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
 				<View {schema} {object} />
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
@@ -79,26 +64,6 @@
 				}}
 			>
 				<Describe {cluster} {namespace} {group} {version} {resource} {object} />
-			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<Copy
-					{cluster}
-					{namespace}
-					{group}
-					{version}
-					{kind}
-					{resource}
-					{schema}
-					{validate}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {
@@ -132,6 +97,42 @@
 					{version}
 					{kind}
 					{resource}
+					{schema}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Separator />
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Copy
+					{cluster}
+					{namespace}
+					{group}
+					{version}
+					{kind}
+					{resource}
+					{schema}
+					{validate}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Deploy
+					{cluster}
+					{namespace}
 					{schema}
 					{object}
 					onOpenChangeComplete={() => {
