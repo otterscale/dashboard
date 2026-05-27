@@ -65,31 +65,13 @@
 					}}
 				/>
 			</DropdownMenu.Item>
+			<DropdownMenu.Separator />
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
 			>
 				<View {schema} {object} />
-			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<Update
-					{cluster}
-					{namespace}
-					{group}
-					{version}
-					{kind}
-					{resource}
-					{schema}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {
@@ -112,6 +94,25 @@
 					{resource}
 					{schema}
 					{validate}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Update
+					{cluster}
+					{namespace}
+					{group}
+					{version}
+					{kind}
+					{resource}
+					{schema}
 					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
