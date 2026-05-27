@@ -147,6 +147,26 @@
 		);
 	}
 
+	function removeKVCacheEnvironments(templatePath: string[]) {
+		const containers = lodash.get(values, [...templatePath, 'containers']) as
+			| Array<{ name?: string; env?: Array<{ name?: string; value?: string }> }>
+			| undefined;
+		if (!Array.isArray(containers)) return;
+
+		const kvCacheEnvNames = new Set(['LMCACHE_CONFIG_FILE', 'LMCACHE_USE_EXPERIMENTAL']);
+
+		const cleaned = containers.map((container) => {
+			if (!Array.isArray(container.env)) return container;
+			const env = container.env.filter((entry) => !kvCacheEnvNames.has(entry.name ?? ''));
+			if (env.length === 0) {
+				return lodash.omit(container, 'env');
+			}
+			return { ...container, env };
+		});
+
+		lodash.set(values, [...templatePath, 'containers'], cleaned);
+	}
+
 	function hasKVCacheEnvironments(templatePath: string[]): boolean {
 		const containers = lodash.get(object, [...templatePath, 'containers']) as
 			| Array<{ name?: string; env?: Array<{ name?: string }> }>
@@ -411,6 +431,11 @@
 								applyKVCacheEnvironments(['spec', 'template']);
 								if (lodash.has(object, 'spec.prefill')) {
 									applyKVCacheEnvironments(['spec', 'prefill', 'template']);
+								}
+							} else {
+								removeKVCacheEnvironments(['spec', 'template']);
+								if (lodash.has(object, 'spec.prefill')) {
+									removeKVCacheEnvironments(['spec', 'prefill', 'template']);
 								}
 							}
 							handleNext();
