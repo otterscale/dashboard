@@ -62,7 +62,12 @@
 		return `sum(rate(vllm:request_success_total${sel}[5m]))`;
 	}
 
-	async function fetchOne(reason: 'stop' | 'length' | 'abort', startMs: number, endMs: number, step: number) {
+	async function fetchOne(
+		reason: 'stop' | 'length' | 'abort',
+		startMs: number,
+		endMs: number,
+		step: number
+	) {
 		try {
 			const resp = await prometheusDriver.rangeQuery(reasonQuery(reason), startMs, endMs, step);
 			const values = resp.result[0]?.values ?? [];
@@ -125,19 +130,19 @@
 </script>
 
 <Card.Root class="h-full">
-	<Card.Header>
-		<Card.Title class="flex items-center justify-between gap-2">
-			<span>{m.finish_reason()}</span>
-			<Tooltip.Root>
-				<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-					<InfoIcon class="size-5 text-muted-foreground" />
-				</Tooltip.Trigger>
-				<Tooltip.Content>
-					<p>{m.llm_dashboard_finish_reason_tooltip()}</p>
-				</Tooltip.Content>
-			</Tooltip.Root>
-		</Card.Title>
-		<Card.Description>{m.llm_dashboard_finish_reason_description()}</Card.Description>
+	<Card.Header class="flex flex-row items-center gap-2 space-y-0">
+		<div class="grid flex-1 gap-1">
+			<Card.Title>{m.finish_reason()}</Card.Title>
+			<Card.Description>{m.llm_dashboard_finish_reason_description()}</Card.Description>
+		</div>
+		<Tooltip.Root>
+			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+				<InfoIcon class="size-5 text-muted-foreground" />
+			</Tooltip.Trigger>
+			<Tooltip.Content>
+				<p>{m.llm_dashboard_finish_reason_tooltip()}</p>
+			</Tooltip.Content>
+		</Tooltip.Root>
 	</Card.Header>
 	{#if !isLoaded}
 		<Card.Content>
@@ -160,7 +165,6 @@
 					x="time"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}
-					seriesLayout="stack"
 					series={[
 						{ key: 'stop', label: configuration.stop.label, color: configuration.stop.color },
 						{
@@ -193,14 +197,14 @@
 						>
 							{#snippet formatter({ item, name, value })}
 								<div
-									style="--color-bg: {item.color}"
-									class="aspect-square h-full w-fit shrink-0 border-(--color-border) bg-(--color-bg)"
+									style="--color-bg: {item.color}; --color-border: {item.color};"
+									class="size-2.5 shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)"
 								></div>
-								<div
-									class="flex flex-1 shrink-0 items-center justify-between gap-2 text-xs leading-none"
-								>
+								<div class="flex flex-1 shrink-0 items-center justify-between leading-none">
 									<span class="text-muted-foreground">{name}</span>
-									<p class="font-mono">{Number(value).toFixed(2)}/{m.per_second()}</p>
+									<span class="font-mono font-medium text-foreground tabular-nums">
+										{Number(value).toFixed(2)}/{m.per_second()}
+									</span>
 								</div>
 							{/snippet}
 						</Chart.Tooltip>

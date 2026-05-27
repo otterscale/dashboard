@@ -150,25 +150,23 @@
 </script>
 
 <Card.Root class={cn('h-full gap-2 border', colors.border, colors.bg)}>
-	<Card.Header>
-		<Card.Title class="flex flex-wrap items-center justify-between gap-6">
-			<div class="flex items-center gap-2 truncate text-sm font-medium tracking-tight">
-				<CheckCircleIcon class="size-4.5" />
-				{mode === 'successRate' ? m.success_rate() : m.total_requests()}
-			</div>
-			<Tooltip.Root>
-				<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-					<InfoIcon class="size-5 text-muted-foreground" />
-				</Tooltip.Trigger>
-				<Tooltip.Content>
-					<p>
-						{mode === 'successRate'
-							? m.llm_dashboard_success_rate_tooltip()
-							: m.llm_dashboard_total_requests_tooltip()}
-					</p>
-				</Tooltip.Content>
-			</Tooltip.Root>
+	<Card.Header class="flex flex-row items-center gap-2 space-y-0">
+		<Card.Title class="flex flex-1 items-center gap-2 truncate text-sm font-medium tracking-tight">
+			<CheckCircleIcon class="size-4.5" />
+			{mode === 'successRate' ? m.success_rate() : m.total_requests()}
 		</Card.Title>
+		<Tooltip.Root>
+			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+				<InfoIcon class="size-5 text-muted-foreground" />
+			</Tooltip.Trigger>
+			<Tooltip.Content>
+				<p>
+					{mode === 'successRate'
+						? m.llm_dashboard_success_rate_tooltip()
+						: m.llm_dashboard_total_requests_tooltip()}
+				</p>
+			</Tooltip.Content>
+		</Tooltip.Root>
 	</Card.Header>
 	{#if !isLoaded}
 		<Card.Content>
@@ -211,23 +209,21 @@
 					}}
 				>
 					{#snippet tooltip()}
-						<Chart.Tooltip hideLabel>
+						<Chart.Tooltip hideLabel indicator="dot">
 							{#snippet formatter({ item, name, value })}
 								<div
-									style="--color-bg: {item.color}"
-									class="aspect-square h-full w-fit shrink-0 border-(--color-border) bg-(--color-bg)"
+									style="--color-bg: {item.color}; --color-border: {item.color};"
+									class="size-2.5 shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)"
 								></div>
-								<div
-									class="flex flex-1 shrink-0 items-center justify-between gap-2 text-xs leading-none"
-								>
+								<div class="flex flex-1 shrink-0 items-center justify-between leading-none">
 									<div class="grid gap-1.5">
 										<span class="text-muted-foreground">{name}</span>
 									</div>
-									<p class="font-mono">
+									<span class="font-mono font-medium tabular-nums text-foreground">
 										{mode === 'successRate'
 											? `${Number(value).toFixed(2)}%`
 											: Number(value).toFixed(2)}
-									</p>
+									</span>
 								</div>
 							{/snippet}
 						</Chart.Tooltip>

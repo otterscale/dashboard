@@ -130,16 +130,16 @@
 					<Chart.Tooltip indicator="dot">
 						{#snippet formatter({ item, name, value })}
 							<div
-								style="--color-bg: {item.color}"
-								class="aspect-square h-full w-fit shrink-0 border-(--color-border) bg-(--color-bg)"
+								style="--color-bg: {item.color}; --color-border: {item.color};"
+								class="size-2.5 shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)"
 							></div>
-							<div
-								class="flex flex-1 shrink-0 items-center justify-between gap-2 text-xs leading-none"
-							>
+							<div class="flex flex-1 shrink-0 items-center justify-between leading-none">
 								<div class="grid gap-1.5">
 									<span class="text-muted-foreground">{name}</span>
 								</div>
-								<p class="font-mono">{(Number(value) * 100).toFixed(2)} %</p>
+								<span class="font-mono font-medium tabular-nums text-foreground">
+									{(Number(value) * 100).toFixed(2)} %
+								</span>
 							</div>
 						{/snippet}
 					</Chart.Tooltip>
@@ -149,9 +149,12 @@
 	</div>
 {/snippet}
 
-{#snippet titleRow()}
-	<span>{m.vgpu()}</span>
-	<div class="flex items-center gap-1">
+{#snippet header()}
+	<Card.Header class="flex flex-row items-center gap-2 space-y-0">
+		<div class="grid flex-1 gap-1">
+			<Card.Title>{m.vgpu()}</Card.Title>
+			<Card.Description>{m.vgpu_usage_description()}</Card.Description>
+		</div>
 		<Sheet.Root>
 			<Sheet.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
 				<Maximize2Icon class="size-5 text-muted-foreground" />
@@ -172,17 +175,12 @@
 				<p>{m.llm_dashboard_vgpu_tooltip()}</p>
 			</Tooltip.Content>
 		</Tooltip.Root>
-	</div>
+	</Card.Header>
 {/snippet}
 
 {#if !isLoaded}
 	<Card.Root>
-		<Card.Header class="h-10.5">
-			<Card.Title class="flex items-center justify-between gap-2">
-				{@render titleRow()}
-			</Card.Title>
-			<Card.Description>{m.vgpu_usage_description()}</Card.Description>
-		</Card.Header>
+		{@render header()}
 		<Card.Content>
 			<div class="flex h-45 w-full items-center justify-center">
 				<Loader2Icon class="size-12 animate-spin" />
@@ -191,12 +189,7 @@
 	</Card.Root>
 {:else}
 	<Card.Root class="h-full">
-		<Card.Header>
-			<Card.Title class="flex items-center justify-between gap-2">
-				{@render titleRow()}
-			</Card.Title>
-			<Card.Description>{m.vgpu_usage_description()}</Card.Description>
-		</Card.Header>
+		{@render header()}
 		<Card.Content>
 			<ScrollArea class="h-45 w-full">
 				{@render chart(36)}

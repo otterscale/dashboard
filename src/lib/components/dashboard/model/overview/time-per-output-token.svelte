@@ -121,19 +121,19 @@
 </script>
 
 <Card.Root class="h-full">
-	<Card.Header>
-		<Card.Title class="flex items-center justify-between gap-2">
-			<span>{m.time_per_output_token()}</span>
-			<Tooltip.Root>
-				<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-					<InfoIcon class="size-5 text-muted-foreground" />
-				</Tooltip.Trigger>
-				<Tooltip.Content>
-					<p>{m.llm_dashboard_time_per_output_token_tooltip()}</p>
-				</Tooltip.Content>
-			</Tooltip.Root>
-		</Card.Title>
-		<Card.Description>{m.llm_dashboard_time_per_output_token_description()}</Card.Description>
+	<Card.Header class="flex flex-row items-center gap-2 space-y-0">
+		<div class="grid flex-1 gap-1">
+			<Card.Title>{m.time_per_output_token()}</Card.Title>
+			<Card.Description>{m.llm_dashboard_time_per_output_token_description()}</Card.Description>
+		</div>
+		<Tooltip.Root>
+			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+				<InfoIcon class="size-5 text-muted-foreground" />
+			</Tooltip.Trigger>
+			<Tooltip.Content>
+				<p>{m.llm_dashboard_time_per_output_token_tooltip()}</p>
+			</Tooltip.Content>
+		</Tooltip.Root>
 	</Card.Header>
 	{#if !isLoaded}
 		<Card.Content>
@@ -192,16 +192,17 @@
 						>
 							{#snippet formatter({ item, name, value })}
 								<div
-									style="--color-bg: {item.color}"
-									class="aspect-square h-full w-fit shrink-0 border-(--color-border) bg-(--color-bg)"
+									style="--color-bg: {item.color}; --color-border: {item.color};"
+									class="size-2.5 shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)"
 								></div>
-								<div
-									class="flex flex-1 shrink-0 items-center justify-between gap-2 text-xs leading-none"
-								>
+								<div class="flex flex-1 shrink-0 items-center justify-between leading-none">
 									<div class="grid gap-1.5">
 										<span class="text-muted-foreground">{name}</span>
 									</div>
-									<p class="font-mono">{(Number(value) * 1000).toFixed(0)} {m.ms()}</p>
+									<span class="font-mono font-medium tabular-nums text-foreground">
+										{(Number(value) * 1000).toFixed(0)}
+										{m.ms()}
+									</span>
 								</div>
 							{/snippet}
 						</Chart.Tooltip>

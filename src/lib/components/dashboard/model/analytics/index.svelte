@@ -49,7 +49,7 @@
 <div class="flex flex-col gap-6 pt-4">
 	<section class="flex flex-col gap-3">
 		<h2 class="text-lg font-semibold">{m.section_model_comparison()}</h2>
-		<div class="grid w-full items-start gap-4 lg:grid-cols-3">
+		<div class="grid w-full gap-4 lg:grid-cols-3">
 			<ATopThroughput
 				prometheusDriver={client}
 				{namespace}
