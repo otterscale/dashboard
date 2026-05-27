@@ -47,22 +47,6 @@
 	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 
-	function applyKVCacheEnvironments(templatePath: string[]) {
-		lodash.set(
-			values,
-			[...templatePath, 'containers'],
-			[
-				{
-					name: 'main',
-					env: [
-						{ name: 'LMCACHE_CONFIG_FILE', value: '/etc/lmcache/lmcache_config.yaml' },
-						{ name: 'LMCACHE_USE_EXPERIMENTAL', value: 'True' }
-					]
-				}
-			]
-		);
-	}
-
 	type GPUDevice = { type: string; node: string };
 
 	function getAllGPUDevices(nodes: NodeInfo[]): GPUDevice[] {
@@ -109,6 +93,22 @@
 				}
 			}
 		};
+	}
+
+	function applyKVCacheEnvironments(templatePath: string[]) {
+		lodash.set(
+			values,
+			[...templatePath, 'containers'],
+			[
+				{
+					name: 'main',
+					env: [
+						{ name: 'LMCACHE_CONFIG_FILE', value: '/etc/lmcache/lmcache_config.yaml' },
+						{ name: 'LMCACHE_USE_EXPERIMENTAL', value: 'True' }
+					]
+				}
+			]
+		);
 	}
 
 	let values = $state(getInitialValues());
