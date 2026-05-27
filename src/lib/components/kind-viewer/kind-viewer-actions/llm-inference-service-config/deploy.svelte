@@ -402,7 +402,7 @@
 									}
 								},
 								Decode: {
-									translationsype: {
+									type: {
 										'ui:components': {
 											stringField: 'enumField',
 											selectWidget: 'comboboxWidget'
