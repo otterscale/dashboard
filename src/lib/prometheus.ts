@@ -139,10 +139,17 @@ function getLabelKey(vec: RangeVector): string {
 	const labels = vec.metric.labels as Record<string, string>;
 	const values = Object.values(labels);
 	if (values.length === 0) return 'value';
+	// Preserve verbatim for single-label series (histogram `le` values like "1.0"
+	// need to survive — they aren't passed to layerchart's path-style accessor).
 	if (values.length === 1) return values[0];
+	// Multi-label series: pick a clean identifier or escape dots in the joined fallback
+	// so layerchart's parsePath doesn't shred IPv4 addresses into nested-property reads.
+	if (labels.pod) return labels.pod;
+	if (labels.instance) return labels.instance.replace(/\./g, '_');
 	return Object.entries(labels)
-		.map(([k, v]) => `${k}="${v}"`)
-		.join(',');
+		.map(([k, v]) => `${k}=${v}`)
+		.join(',')
+		.replace(/\./g, '_');
 }
 
 /**

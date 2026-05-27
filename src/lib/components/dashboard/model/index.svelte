@@ -60,13 +60,16 @@
 
 	onMount(async () => {
 		try {
-			prometheusDriver = new PrometheusDriver({
-				endpoint: `/proxy/${cluster}/prometheus`,
-				baseURL: '/api/v1',
-				headers: {
-					'x-proxy-target': 'api'
-				}
-			});
+			const overrideUrl = import.meta.env.VITE_PROMETHEUS_URL as string | undefined;
+			prometheusDriver = overrideUrl
+				? new PrometheusDriver({ endpoint: overrideUrl, baseURL: '/api/v1' })
+				: new PrometheusDriver({
+						endpoint: `/proxy/${cluster}/prometheus`,
+						baseURL: '/api/v1',
+						headers: {
+							'x-proxy-target': 'api'
+						}
+					});
 		} catch (error) {
 			console.error('Failed to initialize Prometheus driver:', error);
 		}

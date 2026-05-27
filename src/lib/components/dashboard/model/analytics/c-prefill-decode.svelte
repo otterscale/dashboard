@@ -5,7 +5,7 @@
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
-	import { PrometheusDriver, SampleValue } from 'prometheus-query';
+	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
@@ -14,7 +14,11 @@
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
-	import { computeStep, vllmMetricWithSelector } from '$lib/prometheus';
+	import {
+		computeStep,
+		fetchMultipleFlattenedRange,
+		vllmMetricWithSelector
+	} from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -34,26 +38,31 @@
 		isReloading: boolean;
 	} = $props();
 
-	let prompts = $state([] as SampleValue[]);
-	let generations = $state([] as SampleValue[]);
-	const throughputs = $derived(
-		prompts.map((sample, index) => ({
-			time: sample.time,
-			prompt: sample.value,
-			generation: generations[index]?.value ?? null
-		}))
-	);
+	type Row = { date: Date; prefill: number; decode: number };
 
-	function getThroughputQuery(metric: 'prompt' | 'generation'): string {
-		const metricName =
-			metric === 'prompt' ? 'vllm:prompt_tokens_total' : 'vllm:generation_tokens_total';
-		const inner = vllmMetricWithSelector(metricName, namespace, selectedModel);
-		return `sum(rate(${inner}[2m]))`;
+	let data = $state<Row[]>([]);
+	let isLoaded = $state(false);
+
+	function queries() {
+		const prefillBucket = vllmMetricWithSelector(
+			'vllm:request_prefill_time_seconds_bucket',
+			namespace,
+			selectedModel
+		);
+		const decodeBucket = vllmMetricWithSelector(
+			'vllm:request_decode_time_seconds_bucket',
+			namespace,
+			selectedModel
+		);
+		return {
+			prefill: `histogram_quantile(0.95, sum by(le) (rate(${prefillBucket}[5m])))`,
+			decode: `histogram_quantile(0.95, sum by(le) (rate(${decodeBucket}[5m])))`
+		};
 	}
 
 	const configuration = {
-		prompt: { label: 'Prompt', color: 'var(--chart-1)' },
-		generation: { label: 'Generation', color: 'var(--chart-2)' }
+		prefill: { label: m.prefill(), color: 'var(--chart-1)' },
+		decode: { label: m.decode(), color: 'var(--chart-2)' }
 	} satisfies Chart.ChartConfig;
 
 	const areaProps = {
@@ -63,44 +72,30 @@
 		motion: 'tween'
 	} as const;
 
-	async function fetchPrompts(startMs: number, endMs: number, step: number) {
-		try {
-			const response = await prometheusDriver.rangeQuery(
-				getThroughputQuery('prompt'),
-				startMs,
-				endMs,
-				step
-			);
-			prompts = response.result[0]?.values ?? [];
-		} catch {
-			prompts = [];
-		}
-	}
-
-	async function fetchGenerations(startMs: number, endMs: number, step: number) {
-		try {
-			const response = await prometheusDriver.rangeQuery(
-				getThroughputQuery('generation'),
-				startMs,
-				endMs,
-				step
-			);
-			generations = response.result[0]?.values ?? [];
-		} catch {
-			generations = [];
-		}
-	}
-
 	async function fetch() {
-		const startMs = start.getTime();
-		const endMs = endIsNow ? Date.now() : end.getTime();
-		const step = computeStep(startMs, endMs);
-		await Promise.all([fetchPrompts(startMs, endMs, step), fetchGenerations(startMs, endMs, step)]);
+		try {
+			const startMs = start.getTime();
+			const endMs = endIsNow ? Date.now() : end.getTime();
+			const step = computeStep(startMs, endMs);
+			const points = await fetchMultipleFlattenedRange(
+				prometheusDriver,
+				queries(),
+				new Date(startMs),
+				new Date(endMs),
+				step
+			);
+			data = points.map((p) => ({
+				date: p.date as Date,
+				prefill: Number.isFinite(Number(p.prefill)) ? Number(p.prefill) : 0,
+				decode: Number.isFinite(Number(p.decode)) ? Number(p.decode) : 0
+			}));
+		} catch {
+			data = [];
+		}
 	}
 
 	const reloadManager = new ReloadManager(fetch);
 
-	let isLoaded = $state(false);
 	onMount(() => {
 		fetch().then(() => (isLoaded = true));
 	});
@@ -116,10 +111,10 @@
 	<Statistics.Header class="flex flex-row items-center gap-2 space-y-0">
 		<div class="grid flex-1 gap-1">
 			<Statistics.Title class="text-base leading-normal text-foreground">
-				{m.throughput()}
+				{m.prefill_vs_decode()}
 			</Statistics.Title>
 			<p class="text-sm text-muted-foreground">
-				{m.llm_dashboard_throughputs_description()}
+				{m.llm_dashboard_prefill_decode_description()}
 			</p>
 		</div>
 		<Tooltip.Root>
@@ -127,7 +122,7 @@
 				<InfoIcon class="size-5 text-muted-foreground" />
 			</Tooltip.Trigger>
 			<Tooltip.Content>
-				<p>{m.llm_dashboard_throughputs_tooltip()}</p>
+				<p>{m.llm_dashboard_prefill_decode_tooltip()}</p>
 			</Tooltip.Content>
 		</Tooltip.Root>
 	</Statistics.Header>
@@ -136,7 +131,7 @@
 			<div class="flex h-[200px] w-full items-center justify-center">
 				<LoaderCircle class="size-12 animate-spin" />
 			</div>
-		{:else if throughputs.length === 0}
+		{:else if data.length === 0}
 			<div class="flex h-[200px] w-full flex-col items-center justify-center">
 				<ChartLine class="size-12 animate-pulse text-muted-foreground" />
 				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
@@ -144,17 +139,17 @@
 		{:else}
 			<Chart.Container config={configuration} class="h-[200px] w-full">
 				<AreaChart
-					data={throughputs}
-					x="time"
+					{data}
+					x="date"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}
 					series={[
-						{ key: 'prompt', label: configuration.prompt.label, color: configuration.prompt.color },
 						{
-							key: 'generation',
-							label: configuration.generation.label,
-							color: configuration.generation.color
-						}
+							key: 'prefill',
+							label: configuration.prefill.label,
+							color: configuration.prefill.color
+						},
+						{ key: 'decode', label: configuration.decode.label, color: configuration.decode.color }
 					]}
 					props={{
 						area: areaProps,
@@ -187,7 +182,7 @@
 										<span class="text-muted-foreground">{name}</span>
 									</div>
 									<span class="font-mono font-medium tabular-nums text-foreground">
-										{Number(value).toFixed(0)}/{m.per_second()}
+										{Number(value).toFixed(3)} {m.sec()}
 									</span>
 								</div>
 							{/snippet}

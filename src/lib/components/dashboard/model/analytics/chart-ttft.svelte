@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ChartLine from '@lucide/svelte/icons/chart-line';
+	import InfoIcon from '@lucide/svelte/icons/info';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
@@ -9,7 +10,9 @@
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Statistics from '$lib/components/custom/statistics/index';
+	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Chart from '$lib/components/ui/chart';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
 	import { computeStep, vllmMetricWithSelector } from '$lib/prometheus';
 
@@ -114,15 +117,23 @@
 </script>
 
 <Statistics.Root type="count" class="overflow-visible">
-	<Statistics.Header>
-		<Statistics.Title>
-			<div class="flex min-h-[4.5rem] flex-col gap-0.5">
-				<span class="line-clamp-1">{m.time_to_first_token()}</span>
-				<p class="line-clamp-2 text-sm font-normal text-muted-foreground">
-					{m.llm_dashboard_time_to_first_token_tooltip()}
-				</p>
-			</div>
-		</Statistics.Title>
+	<Statistics.Header class="flex flex-row items-center gap-2 space-y-0">
+		<div class="grid flex-1 gap-1">
+			<Statistics.Title class="text-base leading-normal text-foreground">
+				{m.time_to_first_token()}
+			</Statistics.Title>
+			<p class="text-sm text-muted-foreground">
+				{m.llm_dashboard_time_to_first_token_description()}
+			</p>
+		</div>
+		<Tooltip.Root>
+			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+				<InfoIcon class="size-5 text-muted-foreground" />
+			</Tooltip.Trigger>
+			<Tooltip.Content>
+				<p>{m.llm_dashboard_time_to_first_token_tooltip()}</p>
+			</Tooltip.Content>
+		</Tooltip.Root>
 	</Statistics.Header>
 	<Statistics.Content class="min-h-16">
 		{#if !isLoaded}
@@ -168,12 +179,17 @@
 						>
 							{#snippet formatter({ item, name, value })}
 								<div
-									style="--color-bg: {item.color}"
-									class="flex flex-1 shrink-0 items-center justify-between gap-2 text-xs leading-none"
-								>
-									<span class="aspect-square shrink-0 rounded-sm border bg-(--color-bg)"></span>
-									<span class="text-muted-foreground">{name}</span>
-									<p class="font-mono">{Number(value).toFixed(3)} {m.sec()}</p>
+									style="--color-bg: {item.color}; --color-border: {item.color};"
+									class="size-2.5 shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)"
+								></div>
+								<div class="flex flex-1 shrink-0 items-center justify-between leading-none">
+									<div class="grid gap-1.5">
+										<span class="text-muted-foreground">{name}</span>
+									</div>
+									<span class="font-mono font-medium text-foreground tabular-nums">
+										{(Number(value) * 1000).toFixed(0)}
+										{m.ms()}
+									</span>
 								</div>
 							{/snippet}
 						</Chart.Tooltip>
