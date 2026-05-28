@@ -156,8 +156,7 @@
 							motion: 'tween'
 						},
 						xAxis: {
-							format: (v: Date) =>
-								formatChartXAxisDate(v, rangeKey),
+							format: (v: Date) => formatChartXAxisDate(v, rangeKey),
 							ticks: getChartXAxisTicks(rangeKey)
 						},
 						yAxis: { format: () => '' }

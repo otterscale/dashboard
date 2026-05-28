@@ -10,11 +10,7 @@
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart/index.js';
-	import {
-		formatChartTimeRange,
-		formatChartXAxisDate,
-		getChartXAxisTicks
-	} from '$lib/formatter';
+	import { formatChartTimeRange, formatChartXAxisDate, getChartXAxisTicks } from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
 	import { computeStep } from '$lib/prometheus';
 
@@ -128,8 +124,7 @@
 					props={{
 						spline: { curve: curveLinear, motion: 'tween', strokeWidth: 2 },
 						xAxis: {
-							format: (v: Date) =>
-								formatChartXAxisDate(v, rangeKey),
+							format: (v: Date) => formatChartXAxisDate(v, rangeKey),
 							ticks: getChartXAxisTicks(rangeKey)
 						},
 						yAxis: { format: () => '' },
