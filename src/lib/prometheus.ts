@@ -211,6 +211,41 @@ export async function fetchMultipleFlattenedRange(
 	);
 }
 
+/**
+ * Resolve the set of Kubernetes nodes a given vLLM model's pods currently run on.
+ *
+ * Joins `kube_pod_info` against `vllm:kv_cache_usage_perc` so we only keep pods
+ * that belong to `selectedModel`, then returns the distinct `node` label values.
+ * Used to scope DCGM/GPU queries (which lack pod-level labels) to the nodes the
+ * model actually occupies.
+ */
+export async function fetchModelNodes(
+	client: PrometheusDriver,
+	namespace: string | undefined,
+	selectedModel: string
+): Promise<string[]> {
+	const ns = (namespace ?? '').trim();
+	const nsSel = ns ? `namespace="${escapePromqlStringLiteral(ns)}"` : '';
+	const podInfoSelector = nsSel ? `{${nsSel}}` : '';
+	const vllmSelector = vllmMetricWithSelector('vllm:kv_cache_usage_perc', namespace, selectedModel);
+	const query =
+		`group by(node) (` +
+		`kube_pod_info${podInfoSelector}` +
+		` * on(namespace, pod) group_left() ` +
+		`group by(namespace, pod) (${vllmSelector}))`;
+	try {
+		const response = await client.instantQuery(query);
+		const nodes = new Set<string>();
+		for (const v of response.result) {
+			const node = (v.metric.labels as Record<string, string>).node;
+			if (node) nodes.add(node);
+		}
+		return Array.from(nodes);
+	} catch {
+		return [];
+	}
+}
+
 /** Build layerchart-compatible ChartConfig from DataPoint array. */
 export function generateChartConfig(data: DataPoint[]): ChartConfig {
 	if (!data.length) return {};

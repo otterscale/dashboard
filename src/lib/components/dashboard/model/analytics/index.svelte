@@ -16,6 +16,9 @@
 	import ChartThroughput from './chart-throughput.svelte';
 	import ChartTpot from './chart-tpot.svelte';
 	import ChartTtft from './chart-ttft.svelte';
+	import DGpuMemory from './d-gpu-memory.svelte';
+	import DMemoryUsage from './d-memory-usage.svelte';
+	import DStatusSnapshot from './d-status-snapshot.svelte';
 	import PlaceholderCard from './placeholder-card.svelte';
 
 	let {
@@ -73,16 +76,21 @@
 
 	{#key modelFilter}
 		<section class="flex flex-col gap-3">
-			<h2 class="text-lg font-semibold">{m.section_model_detail()}</h2>
+			<h2 class="text-lg font-semibold">{m.section_pod_hardware()}</h2>
 			{#if !hasModelSelected}
 				<PlaceholderCard
-					title={m.section_model_detail()}
+					title={m.section_pod_hardware()}
 					message={m.select_model_to_view_details()}
 				/>
 			{:else}
-				<div class="grid w-full items-start gap-4 lg:grid-cols-2">
-					<ChartTtft
-						{cluster}
+				<div class="grid w-full items-start gap-4 lg:grid-cols-3">
+					<DStatusSnapshot
+						{namespace}
+						prometheusDriver={client}
+						selectedModel={modelFilter}
+						isReloading={isReloading ?? false}
+					/>
+					<DMemoryUsage
 						{namespace}
 						prometheusDriver={client}
 						selectedModel={modelFilter}
@@ -91,8 +99,7 @@
 						{endIsNow}
 						isReloading={isReloading ?? false}
 					/>
-					<ChartTpot
-						{cluster}
+					<DGpuMemory
 						{namespace}
 						prometheusDriver={client}
 						selectedModel={modelFilter}
@@ -101,35 +108,6 @@
 						{endIsNow}
 						isReloading={isReloading ?? false}
 					/>
-					<ChartActiveRequests
-						{namespace}
-						prometheusDriver={client}
-						selectedModel={modelFilter}
-						{start}
-						{end}
-						{endIsNow}
-						isReloading={isReloading ?? false}
-					/>
-					<ChartKvCache
-						{namespace}
-						prometheusDriver={client}
-						selectedModel={modelFilter}
-						{start}
-						{end}
-						{endIsNow}
-						isReloading={isReloading ?? false}
-					/>
-					<div class="lg:col-span-2">
-						<ChartThroughput
-							{namespace}
-							prometheusDriver={client}
-							selectedModel={modelFilter}
-							{start}
-							{end}
-							{endIsNow}
-							isReloading={isReloading ?? false}
-						/>
-					</div>
 				</div>
 			{/if}
 		</section>
@@ -181,6 +159,68 @@
 					/>
 					<div class="lg:col-span-2">
 						<CTokensPerReplica
+							{namespace}
+							prometheusDriver={client}
+							selectedModel={modelFilter}
+							{start}
+							{end}
+							{endIsNow}
+							isReloading={isReloading ?? false}
+						/>
+					</div>
+				</div>
+			{/if}
+		</section>
+
+		<section class="flex flex-col gap-3">
+			<h2 class="text-lg font-semibold">{m.section_model_detail()}</h2>
+			{#if !hasModelSelected}
+				<PlaceholderCard
+					title={m.section_model_detail()}
+					message={m.select_model_to_view_details()}
+				/>
+			{:else}
+				<div class="grid w-full items-start gap-4 lg:grid-cols-2">
+					<ChartTtft
+						{cluster}
+						{namespace}
+						prometheusDriver={client}
+						selectedModel={modelFilter}
+						{start}
+						{end}
+						{endIsNow}
+						isReloading={isReloading ?? false}
+					/>
+					<ChartTpot
+						{cluster}
+						{namespace}
+						prometheusDriver={client}
+						selectedModel={modelFilter}
+						{start}
+						{end}
+						{endIsNow}
+						isReloading={isReloading ?? false}
+					/>
+					<ChartActiveRequests
+						{namespace}
+						prometheusDriver={client}
+						selectedModel={modelFilter}
+						{start}
+						{end}
+						{endIsNow}
+						isReloading={isReloading ?? false}
+					/>
+					<ChartKvCache
+						{namespace}
+						prometheusDriver={client}
+						selectedModel={modelFilter}
+						{start}
+						{end}
+						{endIsNow}
+						isReloading={isReloading ?? false}
+					/>
+					<div class="lg:col-span-2">
+						<ChartThroughput
 							{namespace}
 							prometheusDriver={client}
 							selectedModel={modelFilter}
