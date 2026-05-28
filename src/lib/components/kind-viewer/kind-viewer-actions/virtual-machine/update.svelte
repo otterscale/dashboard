@@ -180,6 +180,7 @@
 			metadata: {
 				name: values.name,
 				namespace: values.namespace,
+				resourceVersion: object.metadata?.resourceVersion,
 				annotations: {
 					'kubevirt.io/allow-pod-bridge-network-live-migration': 'true'
 				}
@@ -825,7 +826,7 @@
 								async () => {
 									const manifest = new TextEncoder().encode(value);
 
-									await resourceClient.apply({
+									await resourceClient.update({
 										cluster,
 										name,
 										namespace: values.namespace,
@@ -833,8 +834,7 @@
 										version,
 										resource,
 										manifest,
-										fieldManager: 'otterscale-web-ui',
-										force: true
+										fieldManager: 'otterscale-web-ui'
 									});
 								},
 								{

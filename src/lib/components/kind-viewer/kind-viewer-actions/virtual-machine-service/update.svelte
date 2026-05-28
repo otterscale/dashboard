@@ -66,6 +66,7 @@
 			metadata: {
 				name: service.metadata?.name ?? vmName,
 				namespace,
+				resourceVersion: service.metadata?.resourceVersion,
 				labels: {
 					...(service.metadata?.labels ?? {}),
 					'otterscale.com/virtual-machine.name': vmName
@@ -240,7 +241,7 @@
 								async () => {
 									const manifest = new TextEncoder().encode(value);
 
-									await resourceClient.apply({
+									await resourceClient.update({
 										cluster,
 										name,
 										namespace,
@@ -248,8 +249,7 @@
 										version: 'v1',
 										resource: 'services',
 										manifest,
-										fieldManager: 'otterscale-web-ui',
-										force: true
+										fieldManager: 'otterscale-web-ui'
 									});
 								},
 								{

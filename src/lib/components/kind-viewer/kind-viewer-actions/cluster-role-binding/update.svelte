@@ -96,7 +96,10 @@
 		return {
 			apiVersion: group ? `${group}/${version}` : version,
 			kind,
-			metadata: { name: lodash.get(object, 'metadata.name') },
+			metadata: {
+				name: lodash.get(object, 'metadata.name'),
+				resourceVersion: object.metadata?.resourceVersion
+			},
 			roleRef: {
 				apiGroup: group || 'rbac.authorization.k8s.io',
 				kind: 'ClusterRole',
@@ -485,15 +488,14 @@
 									async () => {
 										const manifest = new TextEncoder().encode(value);
 
-										await resourceClient.apply({
+										await resourceClient.update({
 											cluster,
 											name,
 											group,
 											version,
 											resource,
 											manifest,
-											fieldManager: 'otterscale-web-ui',
-											force: true
+											fieldManager: 'otterscale-web-ui'
 										});
 									},
 									{
