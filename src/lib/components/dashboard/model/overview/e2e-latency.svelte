@@ -5,7 +5,7 @@
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
-	import { PrometheusDriver, SampleValue } from 'prometheus-query';
+	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
@@ -14,7 +14,12 @@
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
-	import { computeStep, vllmMetricWithSelector } from '$lib/prometheus';
+	import {
+		computeStep,
+		type DataPoint,
+		fetchCombinedFlattenedRange,
+		vllmMetricWithSelector
+	} from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -34,15 +39,20 @@
 		isReloading: boolean;
 	} = $props();
 
-	let p95 = $state([] as SampleValue[]);
-	let p99 = $state([] as SampleValue[]);
-	const requestLatencies = $derived(
-		p95.map((sample, index) => ({
-			time: sample.time,
-			p95: sample.value && !isNaN(sample.value) ? sample.value : 0,
-			p99: p99[index] && p99[index].value && !isNaN(p99[index].value) ? p99[index].value : 0
-		}))
-	);
+	let requestLatencies = $state<DataPoint[]>([]);
+
+	function latencyQueries(): Record<string, string> {
+		const inner = vllmMetricWithSelector(
+			'vllm:e2e_request_latency_seconds_bucket',
+			namespace,
+			undefined
+		);
+		const rate = `sum by(le) (rate(${inner}[5m]))`;
+		return {
+			p95: `histogram_quantile(0.95, ${rate})`,
+			p99: `histogram_quantile(0.99, ${rate})`
+		};
+	}
 
 	const configuration = {
 		p95: { label: 'P95', color: 'var(--chart-1)' },
@@ -56,32 +66,20 @@
 		motion: 'tween'
 	} as const;
 
-	async function fetchQuantile(quantile: number, startMs: number, endMs: number, step: number) {
-		const inner = vllmMetricWithSelector(
-			'vllm:e2e_request_latency_seconds_bucket',
-			namespace,
-			undefined
-		);
-		const response = await prometheusDriver.rangeQuery(
-			`histogram_quantile(${quantile}, sum by(le) (rate(${inner}[5m])))`,
-			startMs,
-			endMs,
-			step
-		);
-		if (quantile === 0.95) p95 = response.result[0]?.values ?? [];
-		else if (quantile === 0.99) p99 = response.result[0]?.values ?? [];
-	}
-
 	async function fetch() {
 		try {
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const step = computeStep(startMs, endMs);
-			await Promise.all([
-				fetchQuantile(0.95, startMs, endMs, step),
-				fetchQuantile(0.99, startMs, endMs, step)
-			]);
+			requestLatencies = await fetchCombinedFlattenedRange(
+				prometheusDriver,
+				latencyQueries(),
+				new Date(startMs),
+				new Date(endMs),
+				step
+			);
 		} catch (error) {
+			requestLatencies = [];
 			console.error(`Fail to fetch e2e latency in cluster ${cluster}:`, error);
 		}
 	}
@@ -143,7 +141,7 @@
 			<Chart.Container config={configuration} class="h-45 w-full">
 				<AreaChart
 					data={requestLatencies}
-					x="time"
+					x="date"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}
 					series={[

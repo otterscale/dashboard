@@ -5,7 +5,7 @@
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
-	import { PrometheusDriver, SampleValue } from 'prometheus-query';
+	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
@@ -14,7 +14,12 @@
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
-	import { computeStep, escapePromqlStringLiteral } from '$lib/prometheus';
+	import {
+		computeStep,
+		type DataPoint,
+		escapePromqlStringLiteral,
+		fetchCombinedFlattenedRange
+	} from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -34,9 +39,7 @@
 		isReloading: boolean;
 	} = $props();
 
-	let stop = $state([] as SampleValue[]);
-	let length = $state([] as SampleValue[]);
-	let abort = $state([] as SampleValue[]);
+	let data = $state<DataPoint[]>([]);
 
 	const configuration = {
 		stop: { label: m.finish_reason_stop(), color: 'var(--chart-2)' },
@@ -62,23 +65,12 @@
 		return `sum(rate(vllm:request_success_total${sel}[5m]))`;
 	}
 
-	async function fetchOne(
-		reason: 'stop' | 'length' | 'abort',
-		startMs: number,
-		endMs: number,
-		step: number
-	) {
-		try {
-			const resp = await prometheusDriver.rangeQuery(reasonQuery(reason), startMs, endMs, step);
-			const values = resp.result[0]?.values ?? [];
-			if (reason === 'stop') stop = values;
-			else if (reason === 'length') length = values;
-			else abort = values;
-		} catch {
-			if (reason === 'stop') stop = [];
-			else if (reason === 'length') length = [];
-			else abort = [];
-		}
+	function reasonQueries(): Record<string, string> {
+		return {
+			stop: reasonQuery('stop'),
+			length: reasonQuery('length'),
+			abort: reasonQuery('abort')
+		};
 	}
 
 	async function fetch() {
@@ -86,12 +78,15 @@
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const step = computeStep(startMs, endMs);
-			await Promise.all([
-				fetchOne('stop', startMs, endMs, step),
-				fetchOne('length', startMs, endMs, step),
-				fetchOne('abort', startMs, endMs, step)
-			]);
+			data = await fetchCombinedFlattenedRange(
+				prometheusDriver,
+				reasonQueries(),
+				new Date(startMs),
+				new Date(endMs),
+				step
+			);
 		} catch (error) {
+			data = [];
 			console.error(`Fail to fetch finish reason in cluster ${cluster}:`, error);
 		}
 	}
@@ -109,24 +104,6 @@
 		if (isReloading) reloadManager.restart();
 		else reloadManager.stop();
 	});
-
-	// Use stop's time axis as the canonical one; fall back to length/abort if stop is missing.
-	const data = $derived(
-		(() => {
-			const reference = stop.length > 0 ? stop : length.length > 0 ? length : abort;
-			if (reference.length === 0) return [];
-			const numAt = (arr: SampleValue[], i: number) => {
-				const v = Number(arr[i]?.value ?? 0);
-				return Number.isFinite(v) ? v : 0;
-			};
-			return reference.map((sample, i) => ({
-				time: sample.time,
-				stop: numAt(stop, i),
-				length: numAt(length, i),
-				abort: numAt(abort, i)
-			}));
-		})()
-	);
 </script>
 
 <Card.Root class="h-full">
@@ -162,7 +139,7 @@
 			<Chart.Container config={configuration} class="h-45 w-full">
 				<AreaChart
 					{data}
-					x="time"
+					x="date"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}
 					series={[

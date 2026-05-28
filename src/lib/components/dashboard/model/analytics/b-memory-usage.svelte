@@ -14,7 +14,12 @@
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
-	import { computeStep, type DataPoint, vllmMetricWithSelector } from '$lib/prometheus';
+	import {
+		computeStep,
+		type DataPoint,
+		escapePromqlStringLiteral,
+		vllmMetricWithSelector
+	} from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -74,7 +79,7 @@
 	function buildContainerSelector(extra = ''): string {
 		const ns = (namespace ?? '').trim();
 		const parts = ['container="main"'];
-		if (ns) parts.unshift(`namespace="${ns.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`);
+		if (ns) parts.unshift(`namespace="${escapePromqlStringLiteral(ns)}"`);
 		if (extra) parts.push(extra);
 		return `{${parts.join(',')}}`;
 	}
