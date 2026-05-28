@@ -5,7 +5,7 @@
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { scaleUtc } from 'd3-scale';
 	import { curveStepAfter } from 'd3-shape';
-	import { Area, AreaChart } from 'layerchart';
+	import { AreaChart } from 'layerchart';
 	import { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 

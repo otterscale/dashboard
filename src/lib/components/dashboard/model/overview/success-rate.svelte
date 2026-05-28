@@ -1,6 +1,6 @@
 <script lang="ts">
-	import CheckCircleIcon from '@lucide/svelte/icons/check-circle';
 	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
+	import CheckCircleIcon from '@lucide/svelte/icons/check-circle';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { scaleUtc } from 'd3-scale';
