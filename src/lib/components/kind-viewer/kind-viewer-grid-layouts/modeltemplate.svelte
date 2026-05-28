@@ -1,12 +1,13 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
-	import { BotIcon } from '@lucide/svelte';
+	import { BotIcon, EllipsisIcon } from '@lucide/svelte';
 	import type { ServingKserveIoV1Alpha2LLMInferenceServiceConfig } from '@otterscale/types';
 	import type { Schema } from '@sjsf/form';
 	import type { Row } from '@tanstack/table-core';
 	import type { ValidateFunction } from 'ajv';
 
 	import { Badge } from '$lib/components/ui/badge/index.js';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Item from '$lib/components/ui/item';
 
@@ -31,8 +32,8 @@
 		version: string;
 		kind: string;
 		resource: string;
-		schema: Schema;
-		validate: ValidateFunction;
+		schema?: Schema;
+		validate?: ValidateFunction;
 	} = $props();
 
 	const object = $derived(
@@ -56,17 +57,23 @@
 				</Item.Description>
 			</Item.Content>
 			<Item.Actions>
-				<Actions
-					{cluster}
-					namespace={rowNamespace}
-					{group}
-					{version}
-					{kind}
-					{resource}
-					{schema}
-					{validate}
-					{object}
-				/>
+				{#if schema && validate}
+					<Actions
+						{cluster}
+						namespace={rowNamespace}
+						{group}
+						{version}
+						{kind}
+						{resource}
+						{schema}
+						{validate}
+						{object}
+					/>
+				{:else}
+					<Button size="icon" variant="ghost" class="shadow-none" aria-label="Actions" disabled>
+						<EllipsisIcon size={16} aria-hidden="true" />
+					</Button>
+				{/if}
 			</Item.Actions>
 		</Item.Root>
 	</Card.Header>
