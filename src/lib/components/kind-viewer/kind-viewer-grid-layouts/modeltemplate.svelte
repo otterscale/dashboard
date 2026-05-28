@@ -7,12 +7,12 @@
 	import type { ValidateFunction } from 'ajv';
 
 	import { Badge } from '$lib/components/ui/badge/index.js';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Item from '$lib/components/ui/item';
 
 	import Actions from '../kind-viewer-actions/modeltemplate/actions.svelte';
 	import type { LLMInferenceServiceConfigAttribute } from '../kind-viewer-columns/llminferenceserviceconfig';
-	import Button from '$lib/components/ui/button/button.svelte';
 
 	let {
 		row,
