@@ -203,7 +203,7 @@
 									<div class="grid gap-1.5">
 										<span class="text-muted-foreground">{name}</span>
 									</div>
-									<span class="font-mono font-medium tabular-nums text-foreground">
+									<span class="font-mono font-medium text-foreground tabular-nums">
 										{Number(value).toFixed(0)}/{m.per_second()}
 									</span>
 								</div>

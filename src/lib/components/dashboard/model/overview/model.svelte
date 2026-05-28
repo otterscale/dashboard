@@ -183,7 +183,7 @@
 									<div class="grid gap-1.5">
 										<span class="text-muted-foreground">{name}</span>
 									</div>
-									<span class="font-mono font-medium tabular-nums text-foreground">{value}</span>
+									<span class="font-mono font-medium text-foreground tabular-nums">{value}</span>
 								</div>
 							{/snippet}
 						</Chart.Tooltip>

@@ -206,7 +206,7 @@
 								></div>
 								<div class="flex flex-1 shrink-0 items-center justify-between leading-none">
 									<span class="text-muted-foreground">{name}</span>
-									<span class="font-mono font-medium tabular-nums text-foreground">
+									<span class="font-mono font-medium text-foreground tabular-nums">
 										{Number(value).toFixed(0)}
 									</span>
 								</div>
