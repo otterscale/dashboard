@@ -39,11 +39,11 @@
 		isReloading: boolean;
 	} = $props();
 
-	let times_to_first_token = $state<DataPoint[]>([]);
+	let requestLatencies = $state<DataPoint[]>([]);
 
-	function ttftQueries(): Record<string, string> {
+	function latencyQueries(): Record<string, string> {
 		const inner = vllmMetricWithSelector(
-			'vllm:time_to_first_token_seconds_bucket',
+			'vllm:e2e_request_latency_seconds_bucket',
 			namespace,
 			undefined
 		);
@@ -71,16 +71,16 @@
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const step = computeStep(startMs, endMs);
-			times_to_first_token = await fetchCombinedFlattenedRange(
+			requestLatencies = await fetchCombinedFlattenedRange(
 				prometheusDriver,
-				ttftQueries(),
+				latencyQueries(),
 				new Date(startMs),
 				new Date(endMs),
 				step
 			);
 		} catch (error) {
-			times_to_first_token = [];
-			console.error(`Fail to fetch time to first token data in cluster ${cluster}:`, error);
+			requestLatencies = [];
+			console.error(`Fail to fetch e2e latency in cluster ${cluster}:`, error);
 		}
 	}
 
@@ -111,15 +111,15 @@
 <Card.Root class="h-full">
 	<Card.Header class="flex flex-row items-center gap-2 space-y-0">
 		<div class="grid flex-1 gap-1">
-			<Card.Title>{m.time_to_first_token()}</Card.Title>
-			<Card.Description>{m.llm_dashboard_time_to_first_token_description()}</Card.Description>
+			<Card.Title>{m.e2e_latency()}</Card.Title>
+			<Card.Description>{m.llm_dashboard_e2e_latency_description()}</Card.Description>
 		</div>
 		<Tooltip.Root>
 			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
 				<InfoIcon class="size-5 text-muted-foreground" />
 			</Tooltip.Trigger>
 			<Tooltip.Content>
-				<p>{m.llm_dashboard_time_to_first_token_tooltip()}</p>
+				<p>{m.llm_dashboard_e2e_latency_tooltip()}</p>
 			</Tooltip.Content>
 		</Tooltip.Root>
 	</Card.Header>
@@ -129,7 +129,7 @@
 				<Loader2Icon class="size-12 animate-spin" />
 			</div>
 		</Card.Content>
-	{:else if times_to_first_token.length === 0}
+	{:else if requestLatencies.length === 0}
 		<Card.Content>
 			<div class="flex h-45 w-full flex-col items-center justify-center gap-2">
 				<ChartLineIcon class="size-12 animate-pulse text-muted-foreground" />
@@ -140,7 +140,7 @@
 		<Card.Content>
 			<Chart.Container config={configuration} class="h-45 w-full">
 				<AreaChart
-					data={times_to_first_token}
+					data={requestLatencies}
 					x="date"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}
@@ -188,8 +188,12 @@
 										<span class="text-muted-foreground">{name}</span>
 									</div>
 									<span class="font-mono font-medium text-foreground tabular-nums">
-										{(Number(value) * 1000).toFixed(0)}
-										{m.ms()}
+										{#if value}
+											{Number(value).toFixed(2)}
+											{m.second()}
+										{:else}
+											NaN
+										{/if}
 									</span>
 								</div>
 							{/snippet}
