@@ -80,7 +80,6 @@
 		'initializers',
 		'managedFields',
 		'ownerReferences',
-		'resourceVersion',
 		'relationships',
 		'selfLink',
 		'state',
@@ -471,7 +470,7 @@
 
 							toast.promise(
 								async () => {
-									await resourceClient.apply({
+									await resourceClient.update({
 										cluster,
 										namespace,
 										group,
@@ -479,8 +478,7 @@
 										resource,
 										name,
 										manifest,
-										fieldManager: 'otterscale-web-ui',
-										force: true
+										fieldManager: 'otterscale-web-ui'
 									});
 								},
 								{

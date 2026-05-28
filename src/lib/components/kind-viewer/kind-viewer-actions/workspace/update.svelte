@@ -74,7 +74,6 @@
 		'initializers',
 		'managedFields',
 		'ownerReferences',
-		'resourceVersion',
 		'relationships',
 		'selfLink',
 		'state',
@@ -566,15 +565,14 @@
 									async () => {
 										const manifest = new TextEncoder().encode(value);
 
-										await resourceClient.apply({
+										await resourceClient.update({
 											cluster,
 											name,
 											group,
 											version,
 											resource,
 											manifest,
-											fieldManager: 'otterscale-web-ui',
-											force: true
+											fieldManager: 'otterscale-web-ui'
 										});
 									},
 									{
