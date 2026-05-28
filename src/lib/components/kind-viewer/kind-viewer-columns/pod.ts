@@ -171,7 +171,7 @@ function getPodDataSchemas(): Record<PodAttribute, DataSchemaType> {
 		Namespace: 'text',
 		Ready: 'text',
 		Status: 'text',
-		Restarts: 'number',
+		Restarts: 'text',
 		Age: 'time',
 		IP: 'text',
 		Node: 'text',
@@ -188,12 +188,17 @@ function getPodData(object: CoreV1Pod): Record<PodAttribute, JsonValue> {
 	const totalRestarts = containerStatuses.reduce((sum, cs) => sum + (cs.restartCount ?? 0), 0);
 	const readinessGatesCount = object?.spec?.readinessGates?.length ?? 0;
 
+	const lastRestart = totalRestarts > 0 ? getPodLastRestartTime(object) : null;
+	const restartsStr = lastRestart
+		? `${totalRestarts} (${humanDuration(Date.now() - lastRestart.getTime())} ago)`
+		: String(totalRestarts);
+
 	return {
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.metadata?.namespace ?? null,
 		Ready: `${readyContainers}/${totalContainers}`,
 		Status: getPodStatus(object),
-		Restarts: totalRestarts,
+		Restarts: restartsStr,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		IP: object?.status?.podIP ?? null,
 		Node: object?.spec?.nodeName ?? null,
@@ -324,14 +329,18 @@ function getPodColumnDefinitions(
 					column: column,
 					dataSchemas: dataSchemas
 				}),
-			cell: ({ row }: { row: Row<Record<PodAttribute, JsonValue>> }) => {
-				const restarts = row.original.Restarts as number;
-				const lastRestart =
-					restarts > 0 ? getPodLastRestartTime(row.original.raw as CoreV1Pod) : null;
-				return lastRestart
-					? `${restarts} (${humanDuration(Date.now() - lastRestart.getTime())} ago)`
-					: String(restarts);
-			},
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<PodAttribute, JsonValue>>;
+				row: Row<Record<PodAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
 			accessorKey: 'Restarts'
 		},
 		{
