@@ -17,18 +17,14 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { formatPercentage } from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
-	import { escapePromqlStringLiteral } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
-		namespace,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; namespace: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; isReloading: boolean } = $props();
 
 	function buildQuery(): string {
-		const ns = (namespace ?? '').trim();
-		const selector = ns ? `{namespace="${escapePromqlStringLiteral(ns)}"}` : '{}';
-		return `avg by (nodeid) (nodeGPUMemoryPercentage${selector})`;
+		return `avg by (nodeid) (nodeGPUMemoryPercentage{namespace="kube-system"})`;
 	}
 
 	type Row = { node: string; usage: number };
