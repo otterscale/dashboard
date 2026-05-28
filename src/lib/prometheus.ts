@@ -1,4 +1,4 @@
-import { type PrometheusDriver, RangeVector } from 'prometheus-query';
+import { InstantVector, type PrometheusDriver, RangeVector } from 'prometheus-query';
 
 import type { ChartConfig } from '$lib/components/ui/chart/index.js';
 
@@ -208,6 +208,113 @@ export async function fetchMultipleFlattenedRange(
 	}
 	return Array.from(dateMap.values()).sort(
 		(a, b) => (a.date as Date).getTime() - (b.date as Date).getTime()
+	);
+}
+
+/**
+ * Tag every series produced by `expr` with `__series__="<name>"` so it can be
+ * round-tripped through a unioned (`or`) PromQL query and split apart again.
+ * Each query must yield a unique tag because PromQL `or` is set-union by label set.
+ */
+const COMBINED_TAG = '__series__';
+function tagForCombine(name: string, expr: string): string {
+	return `label_replace((${expr}), "${COMBINED_TAG}", "${name}", "", "")`;
+}
+
+/**
+ * Run multiple named range queries as a SINGLE HTTP request — wraps each `expr`
+ * with `label_replace` to tag it, then joins everything with `or`. Returns a flat
+ * array of DataPoints keyed by the query name. Drop-in replacement for
+ * `fetchMultipleFlattenedRange` when each query collapses to scalar/few series.
+ *
+ * Note: errors propagate (one failing sub-query may break the whole combined
+ * query); callers should wrap in try/catch as they would for any other query.
+ */
+export async function fetchCombinedFlattenedRange(
+	client: PrometheusDriver,
+	queries: Record<string, string>,
+	start: Date,
+	end: Date,
+	step: number
+): Promise<DataPoint[]> {
+	const combined = Object.entries(queries)
+		.map(([name, q]) => tagForCombine(name, q))
+		.join(' or ');
+	const response = await client.rangeQuery(combined, start, end, `${step}s`);
+	const vectors = response.result as RangeVector[];
+	const dateMap = new Map<number, DataPoint>();
+	for (const vector of vectors) {
+		const name = (vector.metric.labels as Record<string, string>)[COMBINED_TAG];
+		if (!name) continue;
+		for (const sample of vector.values) {
+			const time = (sample.time as Date).getTime();
+			if (!dateMap.has(time)) dateMap.set(time, { date: sample.time as Date });
+			dateMap.get(time)![name] = Number(sample.value);
+		}
+	}
+	return Array.from(dateMap.values()).sort(
+		(a, b) => (a.date as Date).getTime() - (b.date as Date).getTime()
+	);
+}
+
+/**
+ * Run multiple named instant queries as a SINGLE HTTP request.
+ * Returns a record mapping each query name to its InstantVector list (after the
+ * `__series__` tag has been stripped, so callers see the original label sets).
+ *
+ * On error, every named slot is set to `[]` so callers can deconstruct without
+ * needing a try/catch per query — matching the lenient `instantNumber` /
+ * `instantPerPod` pattern used in the dashboard.
+ */
+export async function fetchCombinedInstant(
+	client: PrometheusDriver,
+	queries: Record<string, string>
+): Promise<Record<string, InstantVector[]>> {
+	const result: Record<string, InstantVector[]> = {};
+	for (const name of Object.keys(queries)) result[name] = [];
+	const combined = Object.entries(queries)
+		.map(([name, q]) => tagForCombine(name, q))
+		.join(' or ');
+	try {
+		const response = await client.instantQuery(combined);
+		for (const vector of response.result as InstantVector[]) {
+			const labels = vector.metric.labels as Record<string, string>;
+			const name = labels[COMBINED_TAG];
+			if (!name || !(name in result)) continue;
+			const { [COMBINED_TAG]: _omit, ...rest } = labels;
+			void _omit;
+			vector.metric.labels = rest;
+			result[name].push(vector);
+		}
+	} catch {
+		// leave all slots empty
+	}
+	return result;
+}
+
+/**
+ * Build a sub-expression that yields one synthetic row per K8s node a given vLLM
+ * model's pods occupy, with the `node` label renamed to `Hostname` so the result
+ * can be intersected against DCGM / host-level metrics via `and on(Hostname)`.
+ *
+ * Lets DCGM queries scope to the model's hosts in a SINGLE PromQL request — no
+ * preceding round-trip is needed to enumerate node names client-side.
+ */
+export function vllmModelHostnamesSelector(
+	namespace: string | undefined,
+	selectedModel: string
+): string {
+	const ns = (namespace ?? '').trim();
+	const nsSel = ns ? `namespace="${escapePromqlStringLiteral(ns)}"` : '';
+	const podInfoSelector = nsSel ? `{${nsSel}}` : '';
+	const vllmSelector = vllmMetricWithSelector('vllm:kv_cache_usage_perc', namespace, selectedModel);
+	return (
+		`group by(Hostname) (` +
+		`label_replace(` +
+		`kube_pod_info${podInfoSelector}` +
+		` * on(namespace, pod) group_left() ` +
+		`group by(namespace, pod) (${vllmSelector}),` +
+		` "Hostname", "$1", "node", "(.+)"))`
 	);
 }
 

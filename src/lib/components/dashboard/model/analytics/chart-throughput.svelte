@@ -5,7 +5,7 @@
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
-	import { PrometheusDriver, SampleValue } from 'prometheus-query';
+	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
@@ -14,7 +14,12 @@
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
-	import { computeStep, vllmMetricWithSelector } from '$lib/prometheus';
+	import {
+		computeStep,
+		type DataPoint,
+		fetchCombinedFlattenedRange,
+		vllmMetricWithSelector
+	} from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -34,21 +39,19 @@
 		isReloading: boolean;
 	} = $props();
 
-	let prompts = $state([] as SampleValue[]);
-	let generations = $state([] as SampleValue[]);
-	const throughputs = $derived(
-		prompts.map((sample, index) => ({
-			time: sample.time,
-			prompt: sample.value,
-			generation: generations[index]?.value ?? null
-		}))
-	);
+	let throughputs = $state<DataPoint[]>([]);
 
-	function getThroughputQuery(metric: 'prompt' | 'generation'): string {
-		const metricName =
-			metric === 'prompt' ? 'vllm:prompt_tokens_total' : 'vllm:generation_tokens_total';
-		const inner = vllmMetricWithSelector(metricName, namespace, selectedModel);
-		return `sum(rate(${inner}[2m]))`;
+	function throughputQueries(): Record<string, string> {
+		const prompt = vllmMetricWithSelector('vllm:prompt_tokens_total', namespace, selectedModel);
+		const generation = vllmMetricWithSelector(
+			'vllm:generation_tokens_total',
+			namespace,
+			selectedModel
+		);
+		return {
+			prompt: `sum(rate(${prompt}[2m]))`,
+			generation: `sum(rate(${generation}[2m]))`
+		};
 	}
 
 	const configuration = {
@@ -63,39 +66,21 @@
 		motion: 'tween'
 	} as const;
 
-	async function fetchPrompts(startMs: number, endMs: number, step: number) {
-		try {
-			const response = await prometheusDriver.rangeQuery(
-				getThroughputQuery('prompt'),
-				startMs,
-				endMs,
-				step
-			);
-			prompts = response.result[0]?.values ?? [];
-		} catch {
-			prompts = [];
-		}
-	}
-
-	async function fetchGenerations(startMs: number, endMs: number, step: number) {
-		try {
-			const response = await prometheusDriver.rangeQuery(
-				getThroughputQuery('generation'),
-				startMs,
-				endMs,
-				step
-			);
-			generations = response.result[0]?.values ?? [];
-		} catch {
-			generations = [];
-		}
-	}
-
 	async function fetch() {
-		const startMs = start.getTime();
-		const endMs = endIsNow ? Date.now() : end.getTime();
-		const step = computeStep(startMs, endMs);
-		await Promise.all([fetchPrompts(startMs, endMs, step), fetchGenerations(startMs, endMs, step)]);
+		try {
+			const startMs = start.getTime();
+			const endMs = endIsNow ? Date.now() : end.getTime();
+			const step = computeStep(startMs, endMs);
+			throughputs = await fetchCombinedFlattenedRange(
+				prometheusDriver,
+				throughputQueries(),
+				new Date(startMs),
+				new Date(endMs),
+				step
+			);
+		} catch {
+			throughputs = [];
+		}
 	}
 
 	const reloadManager = new ReloadManager(fetch);
@@ -145,7 +130,7 @@
 			<Chart.Container config={configuration} class="h-[200px] w-full">
 				<AreaChart
 					data={throughputs}
-					x="time"
+					x="date"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}
 					series={[
@@ -186,7 +171,7 @@
 									<div class="grid gap-1.5">
 										<span class="text-muted-foreground">{name}</span>
 									</div>
-									<span class="font-mono font-medium tabular-nums text-foreground">
+									<span class="font-mono font-medium text-foreground tabular-nums">
 										{Number(value).toFixed(0)}/{m.per_second()}
 									</span>
 								</div>

@@ -5,7 +5,7 @@
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
-	import { PrometheusDriver, SampleValue } from 'prometheus-query';
+	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
@@ -14,7 +14,12 @@
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
-	import { computeStep, vllmMetricWithSelector } from '$lib/prometheus';
+	import {
+		computeStep,
+		type DataPoint,
+		fetchCombinedFlattenedRange,
+		vllmMetricWithSelector
+	} from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -34,17 +39,20 @@
 		isReloading: boolean;
 	} = $props();
 
-	let ninety_fives = $state([] as SampleValue[]);
-	let ninety_nines = $state([] as SampleValue[]);
-	const times_per_output_token = $derived(
-		ninety_fives.map((sample, index) => ({
-			time: sample.time,
-			ninety_five: !isNaN(Number(sample.value)) ? Number(sample.value) : 0,
-			ninety_nine: !isNaN(Number(ninety_nines[index]?.value))
-				? Number(ninety_nines[index]?.value)
-				: 0
-		}))
-	);
+	let times_per_output_token = $state<DataPoint[]>([]);
+
+	function tpotQueries(): Record<string, string> {
+		const inner = vllmMetricWithSelector(
+			'vllm:request_time_per_output_token_seconds_bucket',
+			namespace,
+			undefined
+		);
+		const rate = `sum by(le) (rate(${inner}[5m]))`;
+		return {
+			ninety_five: `histogram_quantile(0.95, ${rate})`,
+			ninety_nine: `histogram_quantile(0.99, ${rate})`
+		};
+	}
 
 	const configuration = {
 		ninety_five: { label: '95', color: 'var(--chart-1)' },
@@ -58,40 +66,20 @@
 		motion: 'tween'
 	} as const;
 
-	async function fetchTimesPerOutputToken(
-		quantile: number,
-		startMs: number,
-		endMs: number,
-		step: number
-	) {
-		const inner = vllmMetricWithSelector(
-			'vllm:request_time_per_output_token_seconds_bucket',
-			namespace,
-			undefined
-		);
-		const response = await prometheusDriver.rangeQuery(
-			`histogram_quantile(${quantile}, sum by(le) (rate(${inner}[5m])))`,
-			startMs,
-			endMs,
-			step
-		);
-		if (quantile === 0.95) {
-			ninety_fives = response.result[0]?.values ?? [];
-		} else if (quantile === 0.99) {
-			ninety_nines = response.result[0]?.values ?? [];
-		}
-	}
-
 	async function fetch() {
 		try {
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const step = computeStep(startMs, endMs);
-			await Promise.all([
-				fetchTimesPerOutputToken(0.95, startMs, endMs, step),
-				fetchTimesPerOutputToken(0.99, startMs, endMs, step)
-			]);
+			times_per_output_token = await fetchCombinedFlattenedRange(
+				prometheusDriver,
+				tpotQueries(),
+				new Date(startMs),
+				new Date(endMs),
+				step
+			);
 		} catch (error) {
+			times_per_output_token = [];
 			console.error(`Fail to fetch time per output token data in cluster ${cluster}:`, error);
 		}
 	}
@@ -153,7 +141,7 @@
 			<Chart.Container config={configuration} class="h-45 w-full">
 				<AreaChart
 					data={times_per_output_token}
-					x="time"
+					x="date"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}
 					series={[
@@ -199,7 +187,7 @@
 									<div class="grid gap-1.5">
 										<span class="text-muted-foreground">{name}</span>
 									</div>
-									<span class="font-mono font-medium tabular-nums text-foreground">
+									<span class="font-mono font-medium text-foreground tabular-nums">
 										{(Number(value) * 1000).toFixed(0)}
 										{m.ms()}
 									</span>

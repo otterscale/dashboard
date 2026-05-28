@@ -5,7 +5,7 @@
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
-	import { PrometheusDriver, SampleValue } from 'prometheus-query';
+	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
@@ -14,7 +14,12 @@
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
-	import { computeStep, vllmMetricWithSelector } from '$lib/prometheus';
+	import {
+		computeStep,
+		type DataPoint,
+		fetchCombinedFlattenedRange,
+		vllmMetricWithSelector
+	} from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -36,23 +41,19 @@
 		isReloading: boolean;
 	} = $props();
 
-	let ninety_fives = $state([] as SampleValue[]);
-	let ninety_nines = $state([] as SampleValue[]);
-	const times_to_first_token = $derived(
-		ninety_fives.map((sample, index) => ({
-			time: sample.time,
-			p95: !isNaN(Number(sample.value)) ? Number(sample.value) : 0,
-			p99: !isNaN(Number(ninety_nines[index]?.value)) ? Number(ninety_nines[index]?.value) : 0
-		}))
-	);
+	let times_to_first_token = $state<DataPoint[]>([]);
 
-	function getTtftQuery(quantile: number): string {
+	function ttftQueries(): Record<string, string> {
 		const bucket = vllmMetricWithSelector(
 			'vllm:time_to_first_token_seconds_bucket',
 			namespace,
 			selectedModel
 		);
-		return `histogram_quantile(${quantile}, sum by(le) (rate(${bucket}[5m])))`;
+		const inner = `sum by(le) (rate(${bucket}[5m]))`;
+		return {
+			p95: `histogram_quantile(0.95, ${inner})`,
+			p99: `histogram_quantile(0.99, ${inner})`
+		};
 	}
 
 	const configuration = {
@@ -67,37 +68,20 @@
 		motion: 'tween'
 	} as const;
 
-	async function fetchTimesToFirstToken(
-		quantile: number,
-		startMs: number,
-		endMs: number,
-		step: number
-	) {
-		try {
-			const response = await prometheusDriver.rangeQuery(
-				getTtftQuery(quantile),
-				startMs,
-				endMs,
-				step
-			);
-			if (quantile === 0.95) ninety_fives = response.result[0]?.values ?? [];
-			else if (quantile === 0.99) ninety_nines = response.result[0]?.values ?? [];
-		} catch {
-			if (quantile === 0.95) ninety_fives = [];
-			else if (quantile === 0.99) ninety_nines = [];
-		}
-	}
-
 	async function fetch() {
 		try {
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const step = computeStep(startMs, endMs);
-			await Promise.all([
-				fetchTimesToFirstToken(0.95, startMs, endMs, step),
-				fetchTimesToFirstToken(0.99, startMs, endMs, step)
-			]);
+			times_to_first_token = await fetchCombinedFlattenedRange(
+				prometheusDriver,
+				ttftQueries(),
+				new Date(startMs),
+				new Date(endMs),
+				step
+			);
 		} catch (error) {
+			times_to_first_token = [];
 			console.error(`Fail to fetch TTFT data in cluster ${cluster}:`, error);
 		}
 	}
@@ -149,7 +133,7 @@
 			<Chart.Container config={configuration} class="h-[200px] w-full">
 				<AreaChart
 					data={times_to_first_token}
-					x="time"
+					x="date"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}
 					series={[

@@ -5,7 +5,7 @@
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
-	import { PrometheusDriver, SampleValue } from 'prometheus-query';
+	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
@@ -14,7 +14,12 @@
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
-	import { computeStep, vllmMetricWithSelector } from '$lib/prometheus';
+	import {
+		computeStep,
+		type DataPoint,
+		fetchCombinedFlattenedRange,
+		vllmMetricWithSelector
+	} from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -36,23 +41,19 @@
 		isReloading: boolean;
 	} = $props();
 
-	let ninety_fives = $state([] as SampleValue[]);
-	let ninety_nines = $state([] as SampleValue[]);
-	const tpotData = $derived(
-		ninety_fives.map((sample, index) => ({
-			time: sample.time,
-			p95: !isNaN(Number(sample.value)) ? Number(sample.value) : 0,
-			p99: !isNaN(Number(ninety_nines[index]?.value)) ? Number(ninety_nines[index]?.value) : 0
-		}))
-	);
+	let tpotData = $state<DataPoint[]>([]);
 
-	function getTpotQuery(quantile: number): string {
+	function tpotQueries(): Record<string, string> {
 		const bucket = vllmMetricWithSelector(
 			'vllm:request_time_per_output_token_seconds_bucket',
 			namespace,
 			selectedModel
 		);
-		return `histogram_quantile(${quantile}, sum by(le) (rate(${bucket}[5m])))`;
+		const inner = `sum by(le) (rate(${bucket}[5m]))`;
+		return {
+			p95: `histogram_quantile(0.95, ${inner})`,
+			p99: `histogram_quantile(0.99, ${inner})`
+		};
 	}
 
 	const configuration = {
@@ -67,32 +68,20 @@
 		motion: 'tween'
 	} as const;
 
-	async function fetchTpot(quantile: number, startMs: number, endMs: number, step: number) {
-		try {
-			const response = await prometheusDriver.rangeQuery(
-				getTpotQuery(quantile),
-				startMs,
-				endMs,
-				step
-			);
-			if (quantile === 0.95) ninety_fives = response.result[0]?.values ?? [];
-			else if (quantile === 0.99) ninety_nines = response.result[0]?.values ?? [];
-		} catch {
-			if (quantile === 0.95) ninety_fives = [];
-			else if (quantile === 0.99) ninety_nines = [];
-		}
-	}
-
 	async function fetch() {
 		try {
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const step = computeStep(startMs, endMs);
-			await Promise.all([
-				fetchTpot(0.95, startMs, endMs, step),
-				fetchTpot(0.99, startMs, endMs, step)
-			]);
+			tpotData = await fetchCombinedFlattenedRange(
+				prometheusDriver,
+				tpotQueries(),
+				new Date(startMs),
+				new Date(endMs),
+				step
+			);
 		} catch (error) {
+			tpotData = [];
 			console.error(`Fail to fetch TPOT data in cluster ${cluster}:`, error);
 		}
 	}
@@ -144,7 +133,7 @@
 			<Chart.Container config={configuration} class="h-[200px] w-full">
 				<AreaChart
 					data={tpotData}
-					x="time"
+					x="date"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}
 					series={[
@@ -181,8 +170,9 @@
 									<div class="grid gap-1.5">
 										<span class="text-muted-foreground">{name}</span>
 									</div>
-									<span class="font-mono font-medium tabular-nums text-foreground">
-										{Number(value).toFixed(3)} {m.sec()}
+									<span class="font-mono font-medium text-foreground tabular-nums">
+										{Number(value).toFixed(3)}
+										{m.sec()}
 									</span>
 								</div>
 							{/snippet}

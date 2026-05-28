@@ -12,6 +12,7 @@
 	import {
 		classifyThreshold,
 		escapePromqlStringLiteral,
+		fetchCombinedInstant,
 		fetchModelNodes,
 		type ThresholdLevel,
 		vllmMetricWithSelector
@@ -66,43 +67,30 @@
 		return node.replace(/[.+*?^$()[\]{}|\\]/g, '\\$&');
 	}
 
-	async function instantNumber(query: string): Promise<number> {
-		try {
-			const resp = await prometheusDriver.instantQuery(query);
-			const raw = resp.result[0]?.value?.value;
-			const num = Number(raw);
-			return Number.isFinite(num) ? num : 0;
-		} catch {
-			return 0;
-		}
+	function scalarFromVectors(vectors: { value?: { value: unknown } }[]): number {
+		const raw = vectors[0]?.value?.value;
+		const num = Number(raw);
+		return Number.isFinite(num) ? num : 0;
 	}
 
-	async function instantPerPod(query: string): Promise<PodEntry[]> {
-		try {
-			const resp = await prometheusDriver.instantQuery(query);
-			return resp.result
-				.map((v) => {
-					const pod = (v.metric.labels as Record<string, string>).pod ?? '(unknown)';
-					const value = Number(v.value?.value);
-					return Number.isFinite(value) ? { pod, value } : null;
-				})
-				.filter((x): x is PodEntry => x !== null)
-				.sort((a, b) => b.value - a.value);
-		} catch {
-			return [];
-		}
+	function perPodFromVectors(
+		vectors: { metric: { labels: object }; value?: { value: unknown } }[]
+	): PodEntry[] {
+		return vectors
+			.map((v) => {
+				const pod = (v.metric.labels as Record<string, string>).pod ?? '(unknown)';
+				const value = Number(v.value?.value);
+				return Number.isFinite(value) ? { pod, value } : null;
+			})
+			.filter((x): x is PodEntry => x !== null)
+			.sort((a, b) => b.value - a.value);
 	}
 
-	async function instantPods(query: string): Promise<string[]> {
-		try {
-			const resp = await prometheusDriver.instantQuery(query);
-			return resp.result
-				.map((v) => (v.metric.labels as Record<string, string>).pod)
-				.filter((p): p is string => Boolean(p))
-				.sort();
-		} catch {
-			return [];
-		}
+	function podsFromVectors(vectors: { metric: { labels: object } }[]): string[] {
+		return vectors
+			.map((v) => (v.metric.labels as Record<string, string>).pod)
+			.filter((p): p is string => Boolean(p))
+			.sort();
 	}
 
 	async function fetch() {
@@ -110,80 +98,61 @@
 		const csMem = containerSelector('resource="memory"');
 		const join = modelJoin();
 
-		const restartTotalQ = `sum(increase(kube_pod_container_status_restarts_total${cs}[24h]) ${join})`;
-		const restartPerQ = `sum by(pod) (increase(kube_pod_container_status_restarts_total${cs}[24h]) ${join}) > 0`;
-		const oomTotalQ = `sum(increase(container_oom_events_total${cs}[24h]) ${join})`;
-		const oomPerQ = `sum by(pod) (increase(container_oom_events_total${cs}[24h]) ${join}) > 0`;
-		const throttleQ =
-			`sum(rate(container_cpu_cfs_throttled_periods_total${cs}[5m]) ${join})` +
-			` / sum(rate(container_cpu_cfs_periods_total${cs}[5m]) ${join}) * 100`;
-		const allPodsQ = `group by(pod) (${vllmMetricWithSelector('vllm:kv_cache_usage_perc', namespace, selectedModel)})`;
-		const podsWithLimitQ = `group by(pod) (kube_pod_container_resource_limits${csMem} ${join})`;
+		const mainQueries = {
+			restartTotal: `sum(increase(kube_pod_container_status_restarts_total${cs}[24h]) ${join})`,
+			restartPerPod: `sum by(pod) (increase(kube_pod_container_status_restarts_total${cs}[24h]) ${join}) > 0`,
+			oomTotal: `sum(increase(container_oom_events_total${cs}[24h]) ${join})`,
+			oomPerPod: `sum by(pod) (increase(container_oom_events_total${cs}[24h]) ${join}) > 0`,
+			throttle:
+				`sum(rate(container_cpu_cfs_throttled_periods_total${cs}[5m]) ${join})` +
+				` / sum(rate(container_cpu_cfs_periods_total${cs}[5m]) ${join}) * 100`,
+			allPods: `group by(pod) (${vllmMetricWithSelector('vllm:kv_cache_usage_perc', namespace, selectedModel)})`,
+			podsWithLimit: `group by(pod) (kube_pod_container_resource_limits${csMem} ${join})`
+		};
 
 		const nodesPromise = fetchModelNodes(prometheusDriver, namespace, selectedModel);
 
-		// Kick off XID as soon as nodes resolves, in parallel with the other queries —
-		// it only needs `nodes`, not the full main batch.
+		// Kick off XID as soon as nodes resolves, in parallel with the main batch —
+		// it only needs `nodes`, not the full set of cluster-wide queries.
 		const xidPromise = nodesPromise.then(async (nodes) => {
 			if (nodes.length === 0) return { total: 0, byGpu: [] as GpuEntry[] };
 			const regex = escapePromqlStringLiteral(nodes.map(regexEscape).join('|'));
 			const selector = `{Hostname=~"${regex}"}`;
-			const xidTotalQ = `sum(increase(DCGM_FI_DEV_XID_ERRORS${selector}[24h]))`;
-			const xidPerQ = `sum by(Hostname, gpu) (increase(DCGM_FI_DEV_XID_ERRORS${selector}[24h])) > 0`;
-			try {
-				const [totalResp, perResp] = await Promise.all([
-					prometheusDriver.instantQuery(xidTotalQ),
-					prometheusDriver.instantQuery(xidPerQ)
-				]);
-				const raw = totalResp.result[0]?.value?.value;
-				const num = Number(raw);
-				const total = Number.isFinite(num) ? Math.round(num) : 0;
-				const byGpu = perResp.result
-					.map((v) => {
-						const labels = v.metric.labels as Record<string, string>;
-						const value = Number(v.value?.value);
-						if (!Number.isFinite(value)) return null;
-						return {
-							hostname: labels.Hostname ?? '(unknown)',
-							gpu: labels.gpu ?? '?',
-							value
-						};
-					})
-					.filter((x): x is GpuEntry => x !== null)
-					.sort((a, b) => b.value - a.value);
-				return { total, byGpu };
-			} catch {
-				return { total: 0, byGpu: [] as GpuEntry[] };
-			}
+			const xid = await fetchCombinedInstant(prometheusDriver, {
+				total: `sum(increase(DCGM_FI_DEV_XID_ERRORS${selector}[24h]))`,
+				perGpu: `sum by(Hostname, gpu) (increase(DCGM_FI_DEV_XID_ERRORS${selector}[24h])) > 0`
+			});
+			const total = Math.round(scalarFromVectors(xid.total));
+			const byGpu = xid.perGpu
+				.map((v) => {
+					const labels = v.metric.labels as Record<string, string>;
+					const value = Number(v.value?.value);
+					if (!Number.isFinite(value)) return null;
+					return {
+						hostname: labels.Hostname ?? '(unknown)',
+						gpu: labels.gpu ?? '?',
+						value
+					};
+				})
+				.filter((x): x is GpuEntry => x !== null)
+				.sort((a, b) => b.value - a.value);
+			return { total, byGpu };
 		});
 
-		const [
-			restartTotalV,
-			restartPerV,
-			oomTotalV,
-			oomPerV,
-			throttleV,
-			allPodsV,
-			podsWithLimitV,
-			nodes,
-			xid
-		] = await Promise.all([
-			instantNumber(restartTotalQ),
-			instantPerPod(restartPerQ),
-			instantNumber(oomTotalQ),
-			instantPerPod(oomPerQ),
-			instantNumber(throttleQ),
-			instantPods(allPodsQ),
-			instantPods(podsWithLimitQ),
+		const [main, nodes, xid] = await Promise.all([
+			fetchCombinedInstant(prometheusDriver, mainQueries),
 			nodesPromise,
 			xidPromise
 		]);
 
-		restartTotal = Math.round(restartTotalV);
-		restartByPod = restartPerV;
-		oomTotal = Math.round(oomTotalV);
-		oomByPod = oomPerV;
+		restartTotal = Math.round(scalarFromVectors(main.restartTotal));
+		restartByPod = perPodFromVectors(main.restartPerPod);
+		oomTotal = Math.round(scalarFromVectors(main.oomTotal));
+		oomByPod = perPodFromVectors(main.oomPerPod);
+		const throttleV = scalarFromVectors(main.throttle);
 		throttlePct = Number.isFinite(throttleV) ? throttleV : 0;
+		const allPodsV = podsFromVectors(main.allPods);
+		const podsWithLimitV = podsFromVectors(main.podsWithLimit);
 		totalPods = allPodsV.length;
 		podsWithLimit = podsWithLimitV.length;
 		const withLimitSet = new Set(podsWithLimitV);

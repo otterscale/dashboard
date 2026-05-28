@@ -14,12 +14,7 @@
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
-	import {
-		computeStep,
-		type DataPoint,
-		escapePromqlStringLiteral,
-		fetchModelNodes
-	} from '$lib/prometheus';
+	import { computeStep, type DataPoint, vllmModelHostnamesSelector } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -66,36 +61,18 @@
 	// svelte-ignore non_reactive_update
 	let hoveredDateMs: number | null = null;
 
-	function regexEscape(node: string): string {
-		return node.replace(/[.+*?^$()[\]{}|\\]/g, '\\$&');
-	}
-
-	function nodeRegex(nodes: string[]): string {
-		return nodes.map(regexEscape).join('|');
-	}
-
 	async function fetch() {
 		try {
-			const nodes = await fetchModelNodes(prometheusDriver, namespace, selectedModel);
-			nodeCount = nodes.length;
-			if (nodes.length === 0) {
-				data = [];
-				hosts = [];
-				hostInfo = {};
-				lookup = {};
-				return;
-			}
-			const regex = escapePromqlStringLiteral(nodeRegex(nodes));
-			const selector = `{Hostname=~"${regex}"}`;
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const step = computeStep(startMs, endMs);
 
-			const usedQuery = `sum by(Hostname) (DCGM_FI_DEV_FB_USED${selector})`;
-			// Total VRAM is constant — an instant query is enough. A range query here would
-			// re-evaluate the USED + FREE vector add at every step over the window.
-			const totalQuery = `sum by(Hostname) (DCGM_FI_DEV_FB_USED${selector} + DCGM_FI_DEV_FB_FREE${selector})`;
-			const countQuery = `count by(Hostname) (DCGM_FI_DEV_FB_USED${selector})`;
+			// Inline the node filter so Prometheus does the model→host join itself —
+			// avoids a serial `fetchModelNodes` round-trip before these queries fire.
+			const hostFilter = vllmModelHostnamesSelector(namespace, selectedModel);
+			const usedQuery = `sum by(Hostname) (DCGM_FI_DEV_FB_USED and on(Hostname) (${hostFilter}))`;
+			const totalQuery = `sum by(Hostname) ((DCGM_FI_DEV_FB_USED + DCGM_FI_DEV_FB_FREE) and on(Hostname) (${hostFilter}))`;
+			const countQuery = `count by(Hostname) (DCGM_FI_DEV_FB_USED and on(Hostname) (${hostFilter}))`;
 
 			const [usedResp, totalResp, countResp] = await Promise.all([
 				prometheusDriver.rangeQuery(usedQuery, new Date(startMs), new Date(endMs), `${step}s`),
@@ -107,6 +84,14 @@
 			for (const v of countResp.result) {
 				const host = (v.metric.labels as Record<string, string>).Hostname ?? '?';
 				gpuCountByHost[host] = Math.round(Number(v.value?.value));
+			}
+			nodeCount = Object.keys(gpuCountByHost).length;
+			if (nodeCount === 0) {
+				data = [];
+				hosts = [];
+				hostInfo = {};
+				lookup = {};
+				return;
 			}
 			const totalMiBByHost: Record<string, number> = {};
 			const latestTotalGiBByHost: Record<string, number> = {};
@@ -161,6 +146,7 @@
 			hosts = [];
 			hostInfo = {};
 			lookup = {};
+			nodeCount = 0;
 		}
 	}
 
