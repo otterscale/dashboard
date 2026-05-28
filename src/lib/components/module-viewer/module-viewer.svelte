@@ -49,7 +49,7 @@
 		</Item.Root>
 	</div>
 	<DynamicTable {data} {columnDefinitions} {uiSchemas} {reload}>
-		{#snippet gridsLayout({ table, handleClear })}
+		{#snippet gridLayout({ table, handleClear })}
 			{#if table.getRowModel().rows?.length}
 				<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
 					{#each table.getRowModel().rows as row (row.id)}

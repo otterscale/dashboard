@@ -1,0 +1,200 @@
+import { type JsonObject, type JsonValue } from '@bufbuild/protobuf';
+import type { APIResource } from '@otterscale/api/resource/v1';
+import type { Column, ColumnDef } from '@tanstack/table-core';
+import { type Row } from '@tanstack/table-core';
+
+import { DynamicTableCell, DynamicTableHeader } from '$lib/components/dynamic-table';
+import type { LinkMetadata } from '$lib/components/dynamic-table/dynamic-table-cells/link-cell.svelte';
+import type { ObjectOfKeyValueMetadata } from '$lib/components/dynamic-table/dynamic-table-cells/object-of-key-value-cell.svelte';
+import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
+import { renderComponent } from '$lib/components/ui/data-table';
+
+import { buildResourceDetailUrl } from '../utils';
+
+type DefaultAttribute =
+	| 'Name'
+	| 'Namespace'
+	| 'Labels'
+	| 'Annotations'
+	| 'Creation Timestamp'
+	| 'raw';
+
+// Determine data type
+function getDefaultDataSchemas(): Record<DefaultAttribute, DataSchemaType> {
+	return {
+		Name: 'text',
+		Namespace: 'text',
+		Labels: 'number',
+		Annotations: 'number',
+		'Creation Timestamp': 'time',
+		raw: 'object'
+	};
+}
+
+type DefaultObject = {
+	metadata?: {
+		name?: string;
+		namespace?: string;
+		labels?: Record<string, string>;
+		annotations?: Record<string, string>;
+		creationTimestamp?: string;
+	};
+} & JsonObject;
+
+function getDefaultData(
+	apiResource: APIResource,
+	object: DefaultObject
+): Record<DefaultAttribute, JsonValue> {
+	return {
+		Name: object?.metadata?.name ?? null,
+		Namespace: apiResource!.namespaced ? (object?.metadata?.namespace ?? null) : null,
+		Labels: Object.keys(object?.metadata?.labels ?? {}).length,
+		Annotations: Object.keys(object?.metadata?.annotations ?? {}).length,
+		'Creation Timestamp': object?.metadata?.creationTimestamp ?? null,
+		raw: object ?? null
+	};
+}
+
+// Determine metadata type
+function getDefaultUISchemas(): Record<DefaultAttribute, UISchemaType> {
+	return {
+		Name: 'link',
+		Namespace: 'text',
+		Labels: 'object-of-key-value',
+		Annotations: 'object-of-key-value',
+		'Creation Timestamp': 'time',
+		raw: 'object'
+	};
+}
+
+function getDefaultColumnDefinitions(
+	apiResource: APIResource,
+	uiSchemas: Record<DefaultAttribute, UISchemaType>,
+	dataSchemas: Record<DefaultAttribute, DataSchemaType>
+): ColumnDef<Record<DefaultAttribute, JsonValue>>[] {
+	return [
+		{
+			id: 'Name',
+			header: ({ column }: { column: Column<Record<DefaultAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<DefaultAttribute, JsonValue>>;
+				row: Row<Record<DefaultAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas,
+					metadata: {
+						hyperlink: buildResourceDetailUrl(
+							apiResource,
+							row.original[column.id as DefaultAttribute] as string,
+							row.original['Namespace'] as string
+						)
+					} satisfies LinkMetadata
+				}),
+			accessorKey: 'Name'
+		},
+		...[
+			{
+				id: 'Namespace',
+				header: ({ column }: { column: Column<Record<DefaultAttribute, JsonValue>> }) =>
+					renderComponent(DynamicTableHeader, {
+						column: column,
+						dataSchemas: dataSchemas
+					}),
+				cell: ({
+					column,
+					row
+				}: {
+					column: Column<Record<DefaultAttribute, JsonValue>>;
+					row: Row<Record<DefaultAttribute, JsonValue>>;
+				}) =>
+					renderComponent(DynamicTableCell, {
+						row: row,
+						column: column,
+						uiSchemas: uiSchemas
+					}),
+				accessorKey: 'Namespace',
+				meta: { defaultHidden: true }
+			}
+		].filter(() => apiResource!.namespaced),
+		{
+			id: 'Annotations',
+			header: ({ column }: { column: Column<Record<DefaultAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<DefaultAttribute, JsonValue>>;
+				row: Row<Record<DefaultAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas,
+					metadata: ((row.original.raw as { metadata?: { annotations?: Record<string, string> } })
+						?.metadata?.annotations ?? {}) satisfies ObjectOfKeyValueMetadata
+				}),
+			accessorFn: (row: Record<DefaultAttribute, JsonValue>) =>
+				row['Annotations'] ? Object.keys(row['Annotations'] as object).length : null
+		},
+		{
+			id: 'Labels',
+			header: ({ column }: { column: Column<Record<DefaultAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<DefaultAttribute, JsonValue>>;
+				row: Row<Record<DefaultAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas,
+					metadata: ((row.original.raw as { metadata?: { labels?: Record<string, string> } })
+						?.metadata?.labels ?? {}) satisfies ObjectOfKeyValueMetadata
+				}),
+			accessorFn: (row: Record<DefaultAttribute, JsonValue>) =>
+				row['Labels'] ? Object.keys(row['Labels'] as object).length : null
+		},
+		{
+			id: 'Creation Timestamp',
+			header: ({ column }: { column: Column<Record<DefaultAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<DefaultAttribute, JsonValue>>;
+				row: Row<Record<DefaultAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Creation Timestamp'
+		}
+	];
+}
+
+export { getDefaultColumnDefinitions, getDefaultData, getDefaultDataSchemas, getDefaultUISchemas };

@@ -164,9 +164,9 @@
 							});
 						},
 						{
-							loading: `Deleting ${kind.toLowerCase()} ${name}...`,
+							loading: `Requesting deletion of ${kind.toLowerCase()} ${name}...`,
 							success: () => {
-								return `Successfully deleted ${kind.toLowerCase()} ${name}`;
+								return `Deletion requested for ${kind.toLowerCase()} ${name}`;
 							},
 							error: (error) => {
 								console.error(`Failed to delete ${kind.toLowerCase()} ${name}:`, error);

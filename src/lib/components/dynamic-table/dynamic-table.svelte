@@ -69,7 +69,7 @@
 		bulkDelete,
 		reload,
 		rowActions = createRawSnippet(() => ({ render: () => '' })),
-		gridsLayout
+		gridLayout
 	}: {
 		data: Record<string, JsonValue>[];
 		columnDefinitions: ColumnDef<Record<string, JsonValue>>[];
@@ -81,7 +81,7 @@
 		bulkDelete?: Snippet<[{ table: TanStackTabke<Record<string, JsonValue>> }]>;
 		rowActions?: Snippet<[{ row: Row<Record<string, JsonValue>> }]>;
 		reload?: Snippet;
-		gridsLayout?: Snippet<
+		gridLayout?: Snippet<
 			[
 				{
 					table: TableType<Record<string, JsonValue>>;
@@ -93,7 +93,7 @@
 
 	// gridsLayout is set once, capturing the initial value is intentional.
 	// svelte-ignore state_referenced_locally
-	const hasGridlayout = !!gridsLayout;
+	const hasGridlayout = !!gridLayout;
 	let mode = $state<'table' | 'grid'>(hasGridlayout ? 'grid' : 'table');
 
 	// columnDefinitions are set once, capturing the initial value is intentional.
@@ -118,6 +118,7 @@
 				}),
 			enableHiding: false,
 			enableSorting: false,
+			enableResizing: false,
 			size: 30
 		},
 		...columnDefinitions,
@@ -394,7 +395,7 @@
 					{#snippet child({ props })}
 						<Button
 							{...props}
-							disabled={!gridsLayout}
+							disabled={!gridLayout}
 							variant={mode === 'grid' ? 'secondary' : 'outline'}
 							size="icon"
 							onclick={() => (mode = 'grid')}
@@ -572,7 +573,7 @@
 	{#if mode === 'table'}
 		{@render tableLayout()}
 	{:else if mode === 'grid'}
-		{@render gridsLayout?.({ table, handleClear })}
+		{@render gridLayout?.({ table, handleClear })}
 	{/if}
 
 	<!-- Pagination -->
@@ -690,10 +691,14 @@
 		<Table.Root class="table-fixed">
 			<Table.Header class="bg-muted">
 				{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
+					{@const totalSize = headerGroup.headers.reduce(
+						(accumulation, head) => accumulation + head.getSize(),
+						0
+					)}
 					<Table.Row class="hover:bg-transparent">
 						{#each headerGroup.headers as header (header.id)}
 							<Table.Head
-								style="width: {header.getSize()}px"
+								style={`width: ${(header.getSize() / totalSize) * 100}%`}
 								class={cn(
 									lodash.get(header.column.columnDef.meta, 'class'),
 									'relative h-11 border-t select-none [&:last-child>.cursor-col-resize]:opacity-0'
