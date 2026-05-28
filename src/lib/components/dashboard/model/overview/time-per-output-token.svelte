@@ -39,11 +39,11 @@
 		isReloading: boolean;
 	} = $props();
 
-	let times_to_first_token = $state<DataPoint[]>([]);
+	let times_per_output_token = $state<DataPoint[]>([]);
 
-	function ttftQueries(): Record<string, string> {
+	function tpotQueries(): Record<string, string> {
 		const inner = vllmMetricWithSelector(
-			'vllm:time_to_first_token_seconds_bucket',
+			'vllm:request_time_per_output_token_seconds_bucket',
 			namespace,
 			undefined
 		);
@@ -71,16 +71,16 @@
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const step = computeStep(startMs, endMs);
-			times_to_first_token = await fetchCombinedFlattenedRange(
+			times_per_output_token = await fetchCombinedFlattenedRange(
 				prometheusDriver,
-				ttftQueries(),
+				tpotQueries(),
 				new Date(startMs),
 				new Date(endMs),
 				step
 			);
 		} catch (error) {
-			times_to_first_token = [];
-			console.error(`Fail to fetch time to first token data in cluster ${cluster}:`, error);
+			times_per_output_token = [];
+			console.error(`Fail to fetch time per output token data in cluster ${cluster}:`, error);
 		}
 	}
 
@@ -111,15 +111,15 @@
 <Card.Root class="h-full">
 	<Card.Header class="flex flex-row items-center gap-2 space-y-0">
 		<div class="grid flex-1 gap-1">
-			<Card.Title>{m.time_to_first_token()}</Card.Title>
-			<Card.Description>{m.llm_dashboard_time_to_first_token_description()}</Card.Description>
+			<Card.Title>{m.time_per_output_token()}</Card.Title>
+			<Card.Description>{m.llm_dashboard_time_per_output_token_description()}</Card.Description>
 		</div>
 		<Tooltip.Root>
 			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
 				<InfoIcon class="size-5 text-muted-foreground" />
 			</Tooltip.Trigger>
 			<Tooltip.Content>
-				<p>{m.llm_dashboard_time_to_first_token_tooltip()}</p>
+				<p>{m.llm_dashboard_time_per_output_token_tooltip()}</p>
 			</Tooltip.Content>
 		</Tooltip.Root>
 	</Card.Header>
@@ -129,7 +129,7 @@
 				<Loader2Icon class="size-12 animate-spin" />
 			</div>
 		</Card.Content>
-	{:else if times_to_first_token.length === 0}
+	{:else if times_per_output_token.length === 0}
 		<Card.Content>
 			<div class="flex h-45 w-full flex-col items-center justify-center gap-2">
 				<ChartLineIcon class="size-12 animate-pulse text-muted-foreground" />
@@ -140,7 +140,7 @@
 		<Card.Content>
 			<Chart.Container config={configuration} class="h-45 w-full">
 				<AreaChart
-					data={times_to_first_token}
+					data={times_per_output_token}
 					x="date"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}

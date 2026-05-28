@@ -1,7 +1,7 @@
 <script lang="ts">
-	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
+	import ChartLine from '@lucide/svelte/icons/chart-line';
 	import InfoIcon from '@lucide/svelte/icons/info';
-	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
@@ -9,54 +9,60 @@
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
+	import * as Statistics from '$lib/components/custom/statistics/index';
 	import { buttonVariants } from '$lib/components/ui/button';
-	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
 	import {
 		computeStep,
-		type DataPoint,
-		fetchCombinedFlattenedRange,
+		fetchMultipleFlattenedRange,
 		vllmMetricWithSelector
 	} from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
-		cluster,
 		namespace,
+		selectedModel,
 		start,
 		end,
 		endIsNow,
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
-		cluster: string;
-		namespace: string;
+		namespace: string | undefined;
+		selectedModel: string;
 		start: Date;
 		end: Date;
 		endIsNow: boolean;
 		isReloading: boolean;
 	} = $props();
 
-	let times_to_first_token = $state<DataPoint[]>([]);
+	type Row = { date: Date; prefill: number; decode: number };
 
-	function ttftQueries(): Record<string, string> {
-		const inner = vllmMetricWithSelector(
-			'vllm:time_to_first_token_seconds_bucket',
+	let data = $state<Row[]>([]);
+	let isLoaded = $state(false);
+
+	function queries() {
+		const prefillBucket = vllmMetricWithSelector(
+			'vllm:request_prefill_time_seconds_bucket',
 			namespace,
-			undefined
+			selectedModel
 		);
-		const rate = `sum by(le) (rate(${inner}[5m]))`;
+		const decodeBucket = vllmMetricWithSelector(
+			'vllm:request_decode_time_seconds_bucket',
+			namespace,
+			selectedModel
+		);
 		return {
-			p95: `histogram_quantile(0.95, ${rate})`,
-			p99: `histogram_quantile(0.99, ${rate})`
+			prefill: `histogram_quantile(0.95, sum by(le) (rate(${prefillBucket}[5m])))`,
+			decode: `histogram_quantile(0.95, sum by(le) (rate(${decodeBucket}[5m])))`
 		};
 	}
 
 	const configuration = {
-		p95: { label: 'P95', color: 'var(--chart-1)' },
-		p99: { label: 'P99', color: 'var(--chart-2)' }
+		prefill: { label: m.prefill(), color: 'var(--chart-1)' },
+		decode: { label: m.decode(), color: 'var(--chart-2)' }
 	} satisfies Chart.ChartConfig;
 
 	const areaProps = {
@@ -71,90 +77,79 @@
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const step = computeStep(startMs, endMs);
-			times_to_first_token = await fetchCombinedFlattenedRange(
+			const points = await fetchMultipleFlattenedRange(
 				prometheusDriver,
-				ttftQueries(),
+				queries(),
 				new Date(startMs),
 				new Date(endMs),
 				step
 			);
-		} catch (error) {
-			times_to_first_token = [];
-			console.error(`Fail to fetch time to first token data in cluster ${cluster}:`, error);
+			data = points.map((p) => ({
+				date: p.date as Date,
+				prefill: Number.isFinite(Number(p.prefill)) ? Number(p.prefill) : 0,
+				decode: Number.isFinite(Number(p.decode)) ? Number(p.decode) : 0
+			}));
+		} catch {
+			data = [];
 		}
 	}
 
 	const reloadManager = new ReloadManager(fetch);
 
-	let isLoaded = $state(false);
-	onMount(async () => {
-		try {
-			await fetch();
-			isLoaded = true;
-		} catch (error) {
-			console.error(`Fail to fetch data in cluster ${cluster}:`, error);
-		}
+	onMount(() => {
+		fetch().then(() => (isLoaded = true));
 	});
-	onDestroy(() => {
-		reloadManager.stop();
-	});
+	onDestroy(() => reloadManager.stop());
 
 	$effect(() => {
-		if (isReloading) {
-			reloadManager.restart();
-		} else {
-			reloadManager.stop();
-		}
+		if (isReloading) reloadManager.restart();
+		else reloadManager.stop();
 	});
 </script>
 
-<Card.Root class="h-full">
-	<Card.Header class="flex flex-row items-center gap-2 space-y-0">
+<Statistics.Root type="count" class="overflow-visible">
+	<Statistics.Header class="flex flex-row items-center gap-2 space-y-0">
 		<div class="grid flex-1 gap-1">
-			<Card.Title>{m.time_to_first_token()}</Card.Title>
-			<Card.Description>{m.llm_dashboard_time_to_first_token_description()}</Card.Description>
+			<Statistics.Title class="text-base leading-normal text-foreground">
+				{m.prefill_vs_decode()}
+			</Statistics.Title>
+			<p class="text-sm text-muted-foreground">
+				{m.llm_dashboard_prefill_decode_description()}
+			</p>
 		</div>
 		<Tooltip.Root>
 			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
 				<InfoIcon class="size-5 text-muted-foreground" />
 			</Tooltip.Trigger>
 			<Tooltip.Content>
-				<p>{m.llm_dashboard_time_to_first_token_tooltip()}</p>
+				<p>{m.llm_dashboard_prefill_decode_tooltip()}</p>
 			</Tooltip.Content>
 		</Tooltip.Root>
-	</Card.Header>
-	{#if !isLoaded}
-		<Card.Content>
-			<div class="flex h-45 w-full items-center justify-center">
-				<Loader2Icon class="size-12 animate-spin" />
+	</Statistics.Header>
+	<Statistics.Content class="min-h-16">
+		{#if !isLoaded}
+			<div class="flex h-[200px] w-full items-center justify-center">
+				<LoaderCircle class="size-12 animate-spin" />
 			</div>
-		</Card.Content>
-	{:else if times_to_first_token.length === 0}
-		<Card.Content>
-			<div class="flex h-45 w-full flex-col items-center justify-center gap-2">
-				<ChartLineIcon class="size-12 animate-pulse text-muted-foreground" />
-				<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
+		{:else if data.length === 0}
+			<div class="flex h-[200px] w-full flex-col items-center justify-center">
+				<ChartLine class="size-12 animate-pulse text-muted-foreground" />
+				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
 			</div>
-		</Card.Content>
-	{:else}
-		<Card.Content>
-			<Chart.Container config={configuration} class="h-45 w-full">
+		{:else}
+			<Chart.Container config={configuration} class="h-[200px] w-full">
 				<AreaChart
-					data={times_to_first_token}
+					{data}
 					x="date"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}
 					series={[
 						{
-							key: 'p95',
-							label: configuration.p95.label,
-							color: configuration.p95.color
+							key: 'prefill',
+							label: configuration.prefill.label,
+							color: configuration.prefill.color
 						},
-						{
-							key: 'p99',
-							label: configuration.p99.label,
-							color: configuration.p99.color
-						}
+						{ key: 'decode', label: configuration.decode.label, color: configuration.decode.color }
 					]}
 					props={{
 						area: areaProps,
@@ -168,15 +163,14 @@
 					{#snippet tooltip()}
 						<Chart.Tooltip
 							indicator="dot"
-							labelFormatter={(v: Date) => {
-								return v.toLocaleDateString('en-US', {
+							labelFormatter={(v: Date) =>
+								v.toLocaleDateString('en-US', {
 									year: 'numeric',
 									month: 'short',
 									day: 'numeric',
 									hour: 'numeric',
 									minute: 'numeric'
-								});
-							}}
+								})}
 						>
 							{#snippet formatter({ item, name, value })}
 								<div
@@ -188,8 +182,8 @@
 										<span class="text-muted-foreground">{name}</span>
 									</div>
 									<span class="font-mono font-medium text-foreground tabular-nums">
-										{(Number(value) * 1000).toFixed(0)}
-										{m.ms()}
+										{Number(value).toFixed(3)}
+										{m.sec()}
 									</span>
 								</div>
 							{/snippet}
@@ -209,6 +203,6 @@
 					{/snippet}
 				</AreaChart>
 			</Chart.Container>
-		</Card.Content>
-	{/if}
-</Card.Root>
+		{/if}
+	</Statistics.Content>
+</Statistics.Root>
