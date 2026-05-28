@@ -40,14 +40,12 @@
 		try {
 			const response = await prometheusDriver.instantQuery(buildQuery());
 			const instanceVectors: InstantVector[] = response.result;
-			console.log(buildQuery());
 			memoryUsage = instanceVectors
 				.map((iv) => ({
 					node: (iv.metric.labels as { nodeid?: string }).nodeid ?? 'unknown',
 					usage: Number(iv.value.value)
 				}))
 				.sort((a, b) => b.usage - a.usage);
-			console.log(memoryUsage);
 		} catch (error) {
 			console.error('Failed to fetch VGPU memory usage:', error);
 		}
