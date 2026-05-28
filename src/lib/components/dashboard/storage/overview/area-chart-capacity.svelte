@@ -10,7 +10,12 @@
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart/index.js';
-	import { formatCapacity } from '$lib/formatter';
+	import {
+		formatCapacity,
+		formatChartTimeRange,
+		formatChartXAxisDate,
+		getChartXAxisTicks
+	} from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
 	import { computeStep, fetchMultipleFlattenedRange } from '$lib/prometheus';
 
@@ -44,6 +49,12 @@
 		const maxTotal = Math.max(...data.map((d) => d.total || 0));
 		return [0, maxTotal];
 	}
+
+	// Adaptive x-axis based on selected time range
+	const rangeHours = $derived(
+		((endIsNow ? Date.now() : end.getTime()) - start.getTime()) / 3_600_000
+	);
+	const rangeKey = $derived(formatChartTimeRange(rangeHours));
 
 	// Auto Update
 	let response = $state([] as { date: Date; used: number; total: number; available: number }[]);
@@ -146,8 +157,8 @@
 						},
 						xAxis: {
 							format: (v: Date) =>
-								`${v.getHours().toString().padStart(2, '0')}:${v.getMinutes().toString().padStart(2, '0')}`,
-							ticks: 12
+								formatChartXAxisDate(v, rangeKey),
+							ticks: getChartXAxisTicks(rangeKey)
 						},
 						yAxis: { format: () => '' }
 					}}
