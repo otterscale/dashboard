@@ -35,6 +35,26 @@
 			!lodash.get(object?.metadata?.labels, 'nvidia.com/gpu.workload.config')
 	);
 
+	function buildNodeManifest(labels: Record<string, string>) {
+		const manifest = lodash.cloneDeep(object) as CoreV1Node & {
+			apiVersion?: string;
+			kind?: string;
+			status?: unknown;
+		};
+		manifest.apiVersion = group ? `${group}/${version}` : version;
+		manifest.kind = kind;
+		manifest.metadata = {
+			...(manifest.metadata ?? {}),
+			name: object.metadata?.name,
+			labels: {
+				...(object.metadata?.labels ?? {}),
+				...labels
+			}
+		};
+		delete manifest.status;
+		return JSON.stringify(manifest);
+	}
+
 	let isSubmitting = $state(false);
 </script>
 
@@ -45,34 +65,25 @@
 
 		isSubmitting = true;
 
-		const apiVersion = `${group}/${version}`;
 		const name = object?.metadata?.name;
 
 		toast.promise(
 			async () => {
-				const value = JSON.stringify({
-					apiVersion,
-					kind,
-					metadata: {
-						name,
-						labels: {
-							'otterscale.io/gpu': 'true',
-							'nvidia.com/gpu.workload.config': ''
-						}
-					}
+				const value = buildNodeManifest({
+					'otterscale.io/gpu': 'true',
+					'nvidia.com/gpu.workload.config': ''
 				});
 
 				const manifest = new TextEncoder().encode(value);
 
-				await resourceClient.apply({
+				await resourceClient.update({
 					cluster,
 					name,
 					group,
 					version,
 					resource,
 					manifest,
-					fieldManager: 'otterscale-web-ui',
-					force: true
+					fieldManager: 'otterscale-web-ui'
 				});
 			},
 			{
@@ -100,34 +111,25 @@
 
 		isSubmitting = true;
 
-		const apiVersion = `${group}/${version}`;
 		const name = object?.metadata?.name;
 
 		toast.promise(
 			async () => {
-				const value = JSON.stringify({
-					apiVersion,
-					kind,
-					metadata: {
-						name,
-						labels: {
-							'otterscale.io/gpu': '',
-							'nvidia.com/gpu.workload.config': 'vm-passthrough'
-						}
-					}
+				const value = buildNodeManifest({
+					'otterscale.io/gpu': '',
+					'nvidia.com/gpu.workload.config': 'vm-passthrough'
 				});
 
 				const manifest = new TextEncoder().encode(value);
 
-				await resourceClient.apply({
+				await resourceClient.update({
 					cluster,
 					name,
 					group,
 					version,
 					resource,
 					manifest,
-					fieldManager: 'otterscale-web-ui',
-					force: true
+					fieldManager: 'otterscale-web-ui'
 				});
 			},
 			{
