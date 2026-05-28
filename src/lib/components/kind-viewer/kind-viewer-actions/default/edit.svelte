@@ -253,39 +253,11 @@
 			return;
 		}
 
-		let partialManifestValue = lodash.cloneDeep(currentStructuredValue);
-
-		const systemFields = [
-			'clusterName',
-			'creationTimestamp',
-			'deletionGracePeriodSeconds',
-			'deletionTimestamp',
-			'finalizers',
-			'generateName',
-			'generation',
-			'initializers',
-			'managedFields',
-			'ownerReferences',
-			'resourceVersion',
-			'relationships',
-			'selfLink',
-			'state',
-			'uid'
-		];
-
-		if (partialManifestValue.metadata) {
-			for (const field of systemFields) {
-				if (partialManifestValue.metadata[field] !== undefined) {
-					delete partialManifestValue.metadata[field];
-				}
-			}
-		}
-
-		const manifest = new TextEncoder().encode(JSON.stringify(partialManifestValue));
+		const manifest = new TextEncoder().encode(JSON.stringify(currentStructuredValue));
 		const name = lodash.get(initialStructuredValue, 'metadata.name');
 		toast.promise(
 			async () => {
-				await resourceClient.apply({
+				await resourceClient.update({
 					cluster,
 					namespace,
 					group,
@@ -293,8 +265,7 @@
 					resource,
 					name,
 					manifest,
-					fieldManager: 'otterscale-web-ui',
-					force: true
+					fieldManager: 'otterscale-web-ui'
 				});
 			},
 			{
