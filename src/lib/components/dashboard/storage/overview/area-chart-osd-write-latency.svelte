@@ -10,6 +10,7 @@
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart/index.js';
+	import { formatChartTimeRange, formatChartXAxisDate, getChartXAxisTicks } from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
 	import { computeStep } from '$lib/prometheus';
 
@@ -42,6 +43,12 @@
 	const PROMETHEUS_QUERY = () =>
 		`quantile(0.95, (rate(ceph_osd_op_w_latency_sum{}[5m]) / ` +
 		`on(ceph_daemon) rate(ceph_osd_op_w_latency_count{}[5m]) * 1000))`;
+
+	// Adaptive x-axis based on selected time range
+	const rangeHours = $derived(
+		((endIsNow ? Date.now() : end.getTime()) - start.getTime()) / 3_600_000
+	);
+	const rangeKey = $derived(formatChartTimeRange(rangeHours));
 
 	// Data fetching
 	let response = $state([] as { date: Date; latency: number }[]);
@@ -117,9 +124,8 @@
 					props={{
 						spline: { curve: curveLinear, motion: 'tween', strokeWidth: 2 },
 						xAxis: {
-							format: (v: Date) =>
-								`${v.getHours().toString().padStart(2, '0')}:${v.getMinutes().toString().padStart(2, '0')}`,
-							ticks: response.length
+							format: (v: Date) => formatChartXAxisDate(v, rangeKey),
+							ticks: getChartXAxisTicks(rangeKey)
 						},
 						yAxis: { format: () => '' },
 						highlight: { points: { r: 4 } }
