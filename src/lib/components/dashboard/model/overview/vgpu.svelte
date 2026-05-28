@@ -17,18 +17,14 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { formatPercentage } from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
-	import { escapePromqlStringLiteral } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
-		namespace,
 		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; namespace: string; isReloading: boolean } = $props();
+	}: { prometheusDriver: PrometheusDriver; isReloading: boolean } = $props();
 
 	function buildQuery(): string {
-		const ns = (namespace ?? '').trim();
-		const selector = ns ? `{namespace="${escapePromqlStringLiteral(ns)}"}` : '{}';
-		return `avg by (nodeid) (nodeGPUMemoryPercentage${selector})`;
+		return `avg by (nodeid) (nodeGPUMemoryPercentage{namespace="kube-system"})`;
 	}
 
 	type Row = { node: string; usage: number };
@@ -44,12 +40,14 @@
 		try {
 			const response = await prometheusDriver.instantQuery(buildQuery());
 			const instanceVectors: InstantVector[] = response.result;
+			console.log(buildQuery());
 			memoryUsage = instanceVectors
 				.map((iv) => ({
 					node: (iv.metric.labels as { nodeid?: string }).nodeid ?? 'unknown',
 					usage: Number(iv.value.value)
 				}))
 				.sort((a, b) => b.usage - a.usage);
+			console.log(memoryUsage);
 		} catch (error) {
 			console.error('Failed to fetch VGPU memory usage:', error);
 		}

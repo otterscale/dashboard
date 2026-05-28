@@ -125,7 +125,7 @@
 			/>
 		</div>
 		<div class="md:col-span-6">
-			<VGPU {prometheusDriver} {namespace} bind:isReloading />
+			<VGPU {prometheusDriver} bind:isReloading />
 		</div>
 	</div>
 {/key}
