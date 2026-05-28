@@ -177,7 +177,7 @@ export function formatChartXAxisDate(date: Date, range: ChartTimeRange): string 
 	if (['15m', '30m', '1h', '3h', '6h', '12h', '24h'].includes(range)) {
 		return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
 	}
-	return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+	return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
 }
 
 export function getChartXAxisTicks(range: ChartTimeRange): number {
@@ -189,7 +189,7 @@ export function getChartXAxisTicks(range: ChartTimeRange): number {
 		'6h': 6,
 		'12h': 6,
 		'24h': 6,
-		'7d': 7
+		'7d': 4
 	};
 	return map[range] ?? 6;
 }
