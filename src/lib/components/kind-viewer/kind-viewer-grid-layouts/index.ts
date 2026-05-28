@@ -15,8 +15,8 @@ type GridLayoutType =
 			version: string;
 			kind: string;
 			resource: string;
-			schema: Schema;
-			validate: ValidateFunction;
+			schema?: Schema;
+			validate?: ValidateFunction;
 	  }>
 	| undefined;
 
