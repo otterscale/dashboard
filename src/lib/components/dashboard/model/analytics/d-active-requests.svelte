@@ -1,21 +1,27 @@
 <script lang="ts">
 	import ChartLine from '@lucide/svelte/icons/chart-line';
+	import InfoIcon from '@lucide/svelte/icons/info';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
-	import { PrometheusDriver, SampleValue } from 'prometheus-query';
+	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Statistics from '$lib/components/custom/statistics/index';
+	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Chart from '$lib/components/ui/chart';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
-	import { computeStep, vllmMetricWithSelector } from '$lib/prometheus';
+	import {
+		computeStep,
+		fetchMultipleFlattenedRange,
+		vllmMetricWithSelector
+	} from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
-		cluster,
 		namespace,
 		selectedModel,
 		start,
@@ -24,7 +30,6 @@
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
-		cluster: string;
 		namespace: string | undefined;
 		selectedModel: string;
 		start: Date;
@@ -33,28 +38,21 @@
 		isReloading: boolean;
 	} = $props();
 
-	let ninety_fives = $state([] as SampleValue[]);
-	let ninety_nines = $state([] as SampleValue[]);
-	const tpotData = $derived(
-		ninety_fives.map((sample, index) => ({
-			time: sample.time,
-			p95: !isNaN(Number(sample.value)) ? Number(sample.value) : 0,
-			p99: !isNaN(Number(ninety_nines[index]?.value)) ? Number(ninety_nines[index]?.value) : 0
-		}))
-	);
+	type Row = { date: Date; running: number; waiting: number };
 
-	function getTpotQuery(quantile: number): string {
-		const bucket = vllmMetricWithSelector(
-			'vllm:request_time_per_output_token_seconds_bucket',
-			namespace,
-			selectedModel
-		);
-		return `histogram_quantile(${quantile}, sum by(le) (rate(${bucket}[5m])))`;
+	let data = $state<Row[]>([]);
+	let isLoaded = $state(false);
+
+	function queries() {
+		return {
+			running: `sum(${vllmMetricWithSelector('vllm:num_requests_running', namespace, selectedModel)})`,
+			waiting: `sum(${vllmMetricWithSelector('vllm:num_requests_waiting', namespace, selectedModel)})`
+		};
 	}
 
 	const configuration = {
-		p95: { label: 'P95', color: 'var(--chart-1)' },
-		p99: { label: 'P99', color: 'var(--chart-2)' }
+		running: { label: m.running(), color: 'var(--chart-2)' },
+		waiting: { label: m.waiting(), color: 'var(--chart-1)' }
 	} satisfies Chart.ChartConfig;
 
 	const areaProps = {
@@ -64,39 +62,30 @@
 		motion: 'tween'
 	} as const;
 
-	async function fetchTpot(quantile: number, startMs: number, endMs: number, step: number) {
-		try {
-			const response = await prometheusDriver.rangeQuery(
-				getTpotQuery(quantile),
-				startMs,
-				endMs,
-				step
-			);
-			if (quantile === 0.95) ninety_fives = response.result[0]?.values ?? [];
-			else if (quantile === 0.99) ninety_nines = response.result[0]?.values ?? [];
-		} catch {
-			if (quantile === 0.95) ninety_fives = [];
-			else if (quantile === 0.99) ninety_nines = [];
-		}
-	}
-
 	async function fetch() {
 		try {
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const step = computeStep(startMs, endMs);
-			await Promise.all([
-				fetchTpot(0.95, startMs, endMs, step),
-				fetchTpot(0.99, startMs, endMs, step)
-			]);
-		} catch (error) {
-			console.error(`Fail to fetch TPOT data in cluster ${cluster}:`, error);
+			const points = await fetchMultipleFlattenedRange(
+				prometheusDriver,
+				queries(),
+				new Date(startMs),
+				new Date(endMs),
+				step
+			);
+			data = points.map((p) => ({
+				date: p.date as Date,
+				running: Number(p.running ?? 0),
+				waiting: Number(p.waiting ?? 0)
+			}));
+		} catch {
+			data = [];
 		}
 	}
 
 	const reloadManager = new ReloadManager(fetch);
 
-	let isLoaded = $state(false);
 	onMount(() => {
 		fetch().then(() => (isLoaded = true));
 	});
@@ -106,25 +95,38 @@
 		if (isReloading) reloadManager.restart();
 		else reloadManager.stop();
 	});
+
+	const series = [
+		{ key: 'running', label: configuration.running.label, color: configuration.running.color },
+		{ key: 'waiting', label: configuration.waiting.label, color: configuration.waiting.color }
+	];
 </script>
 
 <Statistics.Root type="count" class="overflow-visible">
-	<Statistics.Header>
-		<Statistics.Title>
-			<div class="flex min-h-[4.5rem] flex-col gap-0.5">
-				<span class="line-clamp-1">{m.time_per_output_token()}</span>
-				<p class="line-clamp-2 text-sm font-normal text-muted-foreground">
-					{m.llm_dashboard_tpot_tooltip()}
-				</p>
-			</div>
-		</Statistics.Title>
+	<Statistics.Header class="flex flex-row items-center gap-2 space-y-0">
+		<div class="grid flex-1 gap-1">
+			<Statistics.Title class="text-base leading-normal text-foreground">
+				{m.active_requests()}
+			</Statistics.Title>
+			<p class="text-sm text-muted-foreground">
+				{m.llm_dashboard_active_requests_description()}
+			</p>
+		</div>
+		<Tooltip.Root>
+			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+				<InfoIcon class="size-5 text-muted-foreground" />
+			</Tooltip.Trigger>
+			<Tooltip.Content>
+				<p>{m.llm_dashboard_active_requests_tooltip()}</p>
+			</Tooltip.Content>
+		</Tooltip.Root>
 	</Statistics.Header>
 	<Statistics.Content class="min-h-16">
 		{#if !isLoaded}
 			<div class="flex h-[200px] w-full items-center justify-center">
 				<LoaderCircle class="size-12 animate-spin" />
 			</div>
-		{:else if tpotData.length === 0}
+		{:else if data.length === 0}
 			<div class="flex h-[200px] w-full flex-col items-center justify-center">
 				<ChartLine class="size-12 animate-pulse text-muted-foreground" />
 				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
@@ -132,14 +134,12 @@
 		{:else}
 			<Chart.Container config={configuration} class="h-[200px] w-full">
 				<AreaChart
-					data={tpotData}
-					x="time"
+					{data}
+					x="date"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}
-					series={[
-						{ key: 'p95', label: configuration.p95.label, color: configuration.p95.color },
-						{ key: 'p99', label: configuration.p99.label, color: configuration.p99.color }
-					]}
+					{series}
+					seriesLayout="stack"
 					props={{
 						area: areaProps,
 						xAxis: {
@@ -163,12 +163,16 @@
 						>
 							{#snippet formatter({ item, name, value })}
 								<div
-									style="--color-bg: {item.color}"
-									class="flex flex-1 shrink-0 items-center justify-between gap-2 text-xs leading-none"
-								>
-									<span class="aspect-square shrink-0 rounded-sm border bg-(--color-bg)"></span>
-									<span class="text-muted-foreground">{name}</span>
-									<p class="font-mono">{Number(value).toFixed(3)} {m.sec()}</p>
+									style="--color-bg: {item.color}; --color-border: {item.color};"
+									class="size-2.5 shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)"
+								></div>
+								<div class="flex flex-1 shrink-0 items-center justify-between leading-none">
+									<div class="grid gap-1.5">
+										<span class="text-muted-foreground">{name}</span>
+									</div>
+									<span class="font-mono font-medium text-foreground tabular-nums">
+										{Number(value).toFixed(0)}
+									</span>
 								</div>
 							{/snippet}
 						</Chart.Tooltip>
