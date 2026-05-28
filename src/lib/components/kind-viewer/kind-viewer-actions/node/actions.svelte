@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { GpuIcon } from '@lucide/svelte';
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 	import type { Schema } from '@sjsf/form';
 
@@ -7,7 +6,6 @@
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
-	import * as Item from '$lib/components/ui/item';
 
 	import GPU from './gpu.svelte';
 	import GpuAllocation from './gpu-allocation.svelte';
@@ -75,21 +73,7 @@
 			>
 				<Describe {cluster} {namespace} {group} {version} {resource} {object} />
 			</DropdownMenu.Item>
-			<DropdownMenu.Sub>
-				<DropdownMenu.SubTrigger class="w-full">
-					<Item.Root class="p-0 text-xs" size="sm">
-						<Item.Media>
-							<GpuIcon />
-						</Item.Media>
-						<Item.Content>
-							<Item.Title>GPU</Item.Title>
-						</Item.Content>
-					</Item.Root>
-				</DropdownMenu.SubTrigger>
-				<DropdownMenu.SubContent>
-					<GPU {cluster} {group} {version} {kind} {resource} {object} />
-				</DropdownMenu.SubContent>
-			</DropdownMenu.Sub>
+			<GPU {cluster} {group} {version} {kind} {resource} {object} />
 		</DropdownMenu.Group>
 	</DropdownMenu.Content>
 </DropdownMenu.Root>

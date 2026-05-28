@@ -791,7 +791,7 @@
 										{/each}
 									</DropdownMenu.RadioGroup>
 								{/if}
-								{#if data.user.roles.includes('admin')}
+								{#if !data.isRestricted && data.user.roles.includes('admin')}
 									<DropdownMenu.Separator />
 									<DropdownMenu.Item onclick={() => (importOpen = true)}>
 										<PlusIcon class="mr-2 size-4" />

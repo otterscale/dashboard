@@ -336,13 +336,15 @@
 						</DropdownMenu.Shortcut>
 					</DropdownMenu.Item>
 				{/each}
-				<DropdownMenu.Separator />
-				<DropdownMenu.Item class="gap-2 p-2" onSelect={() => (createWorkspaceOpen = true)}>
-					<div class="flex size-7 items-center justify-center rounded-md border bg-transparent">
-						<PlusIcon class="size-3.5" />
-					</div>
-					<div class="text-xs font-medium text-muted-foreground">{m.add_workspace()}</div>
-				</DropdownMenu.Item>
+				{#if !page.data.isRestricted}
+					<DropdownMenu.Separator />
+					<DropdownMenu.Item class="gap-2 p-2" onSelect={() => (createWorkspaceOpen = true)}>
+						<div class="flex size-7 items-center justify-center rounded-md border bg-transparent">
+							<PlusIcon class="size-3.5" />
+						</div>
+						<div class="text-xs font-medium text-muted-foreground">{m.add_workspace()}</div>
+					</DropdownMenu.Item>
+				{/if}
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	</Sidebar.MenuItem>
