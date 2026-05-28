@@ -99,6 +99,57 @@ function getPodStatus(object: CoreV1Pod): string {
 	return reason;
 }
 
+// Ref: https://github.com/kubernetes/kubernetes/blob/master/pkg/printers/internalversion/printers.go printPod()
+// Returns the most recent terminated date across container statuses. Limited to containerStatuses to
+// stay consistent with the totalRestarts count (which also iterates containerStatuses only).
+function getPodLastRestartTime(pod: CoreV1Pod): Date | null {
+	let latest: Date | null = null;
+	for (const cs of pod?.status?.containerStatuses ?? []) {
+		const finishedAt = cs?.lastState?.terminated?.finishedAt;
+		if (!finishedAt) continue;
+		const date = new Date(finishedAt);
+		if (Number.isNaN(date.getTime())) continue;
+		if (latest === null || date.getTime() > latest.getTime()) {
+			latest = date;
+		}
+	}
+	return latest;
+}
+
+// Ref: https://github.com/kubernetes/apimachinery/blob/master/pkg/util/duration/duration.go HumanDuration()
+function humanDuration(durationMs: number): string {
+	const seconds = Math.floor(durationMs / 1000);
+	if (seconds < -1) return '<invalid>';
+	if (seconds < 0) return '0s';
+	if (seconds < 60 * 2) return `${seconds}s`;
+
+	const minutes = Math.floor(durationMs / (60 * 1000));
+	if (minutes < 10) {
+		const s = seconds % 60;
+		return s === 0 ? `${minutes}m` : `${minutes}m${s}s`;
+	}
+	if (minutes < 60 * 3) return `${minutes}m`;
+
+	const hours = Math.floor(durationMs / (60 * 60 * 1000));
+	if (hours < 8) {
+		const m = minutes % 60;
+		return m === 0 ? `${hours}h` : `${hours}h${m}m`;
+	}
+	if (hours < 48) return `${hours}h`;
+	if (hours < 24 * 8) {
+		const days = Math.floor(hours / 24);
+		const h = hours % 24;
+		return h === 0 ? `${days}d` : `${days}d${h}h`;
+	}
+	if (hours < 24 * 365 * 2) return `${Math.floor(hours / 24)}d`;
+	if (hours < 24 * 365 * 8) {
+		const years = Math.floor(hours / 24 / 365);
+		const dy = Math.floor(hours / 24) % 365;
+		return dy === 0 ? `${years}y` : `${years}y${dy}d`;
+	}
+	return `${Math.floor(hours / 24 / 365)}y`;
+}
+
 // kubectl get pod -o wide
 // NAME   READY   STATUS   RESTARTS   AGE   IP   NODE   NOMINATED NODE   READINESS GATES
 type PodAttribute =
@@ -120,7 +171,7 @@ function getPodDataSchemas(): Record<PodAttribute, DataSchemaType> {
 		Namespace: 'text',
 		Ready: 'text',
 		Status: 'text',
-		Restarts: 'number',
+		Restarts: 'text',
 		Age: 'time',
 		IP: 'text',
 		Node: 'text',
@@ -137,12 +188,17 @@ function getPodData(object: CoreV1Pod): Record<PodAttribute, JsonValue> {
 	const totalRestarts = containerStatuses.reduce((sum, cs) => sum + (cs.restartCount ?? 0), 0);
 	const readinessGatesCount = object?.spec?.readinessGates?.length ?? 0;
 
+	const lastRestart = totalRestarts > 0 ? getPodLastRestartTime(object) : null;
+	const restartsStr = lastRestart
+		? `${totalRestarts} (${humanDuration(Date.now() - lastRestart.getTime())} ago)`
+		: String(totalRestarts);
+
 	return {
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.metadata?.namespace ?? null,
 		Ready: `${readyContainers}/${totalContainers}`,
 		Status: getPodStatus(object),
-		Restarts: totalRestarts,
+		Restarts: restartsStr,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		IP: object?.status?.podIP ?? null,
 		Node: object?.spec?.nodeName ?? null,
