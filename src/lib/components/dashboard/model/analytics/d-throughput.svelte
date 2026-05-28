@@ -1,17 +1,25 @@
 <script lang="ts">
 	import ChartLine from '@lucide/svelte/icons/chart-line';
+	import InfoIcon from '@lucide/svelte/icons/info';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
-	import { PrometheusDriver, SampleValue } from 'prometheus-query';
+	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Statistics from '$lib/components/custom/statistics/index';
+	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Chart from '$lib/components/ui/chart';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
-	import { computeStep, vllmMetricWithSelector } from '$lib/prometheus';
+	import {
+		computeStep,
+		type DataPoint,
+		fetchCombinedFlattenedRange,
+		vllmMetricWithSelector
+	} from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -31,15 +39,24 @@
 		isReloading: boolean;
 	} = $props();
 
-	let requestRates = $state([] as SampleValue[]);
+	let throughputs = $state<DataPoint[]>([]);
 
-	function getRequestsQuery(): string {
-		const inner = vllmMetricWithSelector('vllm:request_success_total', namespace, selectedModel);
-		return `sum(rate(${inner}[5m]))`;
+	function throughputQueries(): Record<string, string> {
+		const prompt = vllmMetricWithSelector('vllm:prompt_tokens_total', namespace, selectedModel);
+		const generation = vllmMetricWithSelector(
+			'vllm:generation_tokens_total',
+			namespace,
+			selectedModel
+		);
+		return {
+			prompt: `sum(rate(${prompt}[2m]))`,
+			generation: `sum(rate(${generation}[2m]))`
+		};
 	}
 
 	const configuration = {
-		requests: { label: m.requests(), color: 'var(--chart-1)' }
+		prompt: { label: 'Prompt', color: 'var(--chart-1)' },
+		generation: { label: 'Generation', color: 'var(--chart-2)' }
 	} satisfies Chart.ChartConfig;
 
 	const areaProps = {
@@ -51,16 +68,18 @@
 
 	async function fetch() {
 		try {
+			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
-			const response = await prometheusDriver.rangeQuery(
-				getRequestsQuery(),
-				start.getTime(),
-				endMs,
-				computeStep(start.getTime(), endMs)
+			const step = computeStep(startMs, endMs);
+			throughputs = await fetchCombinedFlattenedRange(
+				prometheusDriver,
+				throughputQueries(),
+				new Date(startMs),
+				new Date(endMs),
+				step
 			);
-			requestRates = response.result[0]?.values ?? [];
 		} catch {
-			requestRates = [];
+			throughputs = [];
 		}
 	}
 
@@ -79,42 +98,47 @@
 </script>
 
 <Statistics.Root type="count" class="overflow-visible">
-	<Statistics.Header>
-		<Statistics.Title>
-			<div class="flex flex-col gap-0.5">
-				{m.requests()}
-				<p class="text-sm font-normal text-muted-foreground">
-					{m.llm_dashboard_request_rate_tooltip()}
-				</p>
-			</div>
-		</Statistics.Title>
+	<Statistics.Header class="flex flex-row items-center gap-2 space-y-0">
+		<div class="grid flex-1 gap-1">
+			<Statistics.Title class="text-base leading-normal text-foreground">
+				{m.throughput()}
+			</Statistics.Title>
+			<p class="text-sm text-muted-foreground">
+				{m.llm_dashboard_throughputs_description()}
+			</p>
+		</div>
+		<Tooltip.Root>
+			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+				<InfoIcon class="size-5 text-muted-foreground" />
+			</Tooltip.Trigger>
+			<Tooltip.Content>
+				<p>{m.llm_dashboard_throughputs_tooltip()}</p>
+			</Tooltip.Content>
+		</Tooltip.Root>
 	</Statistics.Header>
 	<Statistics.Content class="min-h-16">
 		{#if !isLoaded}
 			<div class="flex h-[200px] w-full items-center justify-center">
 				<LoaderCircle class="size-12 animate-spin" />
 			</div>
-		{:else if requestRates.length === 0}
+		{:else if throughputs.length === 0}
 			<div class="flex h-[200px] w-full flex-col items-center justify-center">
 				<ChartLine class="size-12 animate-pulse text-muted-foreground" />
 				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
 			</div>
 		{:else}
-			{@const data = requestRates.map((s) => ({
-				time: s.time,
-				requests: !isNaN(Number(s.value)) ? Number(s.value) : 0
-			}))}
 			<Chart.Container config={configuration} class="h-[200px] w-full">
 				<AreaChart
-					{data}
-					x="time"
+					data={throughputs}
+					x="date"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}
 					series={[
+						{ key: 'prompt', label: configuration.prompt.label, color: configuration.prompt.color },
 						{
-							key: 'requests',
-							label: configuration.requests.label,
-							color: configuration.requests.color
+							key: 'generation',
+							label: configuration.generation.label,
+							color: configuration.generation.color
 						}
 					]}
 					props={{
@@ -140,12 +164,16 @@
 						>
 							{#snippet formatter({ item, name, value })}
 								<div
-									style="--color-bg: {item.color}"
-									class="flex flex-1 shrink-0 items-center justify-between gap-2 text-xs leading-none"
-								>
-									<span class="aspect-square shrink-0 rounded-sm border bg-(--color-bg)"></span>
-									<span class="text-muted-foreground">{name}</span>
-									<p class="font-mono">{Number(value).toFixed(2)} /s</p>
+									style="--color-bg: {item.color}; --color-border: {item.color};"
+									class="size-2.5 shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)"
+								></div>
+								<div class="flex flex-1 shrink-0 items-center justify-between leading-none">
+									<div class="grid gap-1.5">
+										<span class="text-muted-foreground">{name}</span>
+									</div>
+									<span class="font-mono font-medium text-foreground tabular-nums">
+										{Number(value).toFixed(0)}/{m.per_second()}
+									</span>
 								</div>
 							{/snippet}
 						</Chart.Tooltip>

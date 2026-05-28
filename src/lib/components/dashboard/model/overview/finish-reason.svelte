@@ -17,8 +17,8 @@
 	import {
 		computeStep,
 		type DataPoint,
-		fetchCombinedFlattenedRange,
-		vllmMetricWithSelector
+		escapePromqlStringLiteral,
+		fetchCombinedFlattenedRange
 	} from '$lib/prometheus';
 
 	let {
@@ -39,48 +39,55 @@
 		isReloading: boolean;
 	} = $props();
 
-	let times_to_first_token = $state<DataPoint[]>([]);
-
-	function ttftQueries(): Record<string, string> {
-		const inner = vllmMetricWithSelector(
-			'vllm:time_to_first_token_seconds_bucket',
-			namespace,
-			undefined
-		);
-		const rate = `sum by(le) (rate(${inner}[5m]))`;
-		return {
-			p95: `histogram_quantile(0.95, ${rate})`,
-			p99: `histogram_quantile(0.99, ${rate})`
-		};
-	}
+	let data = $state<DataPoint[]>([]);
 
 	const configuration = {
-		p95: { label: 'P95', color: 'var(--chart-1)' },
-		p99: { label: 'P99', color: 'var(--chart-2)' }
+		stop: { label: m.finish_reason_stop(), color: 'var(--chart-2)' },
+		length: { label: m.finish_reason_length(), color: 'var(--chart-1)' },
+		abort: { label: m.finish_reason_abort(), color: 'var(--destructive)' }
 	} satisfies Chart.ChartConfig;
 
 	const areaProps = {
 		curve: curveMonotoneX,
-		'fill-opacity': 0.4,
+		'fill-opacity': 0.5,
 		line: { class: 'stroke-1' },
 		motion: 'tween'
 	} as const;
+
+	function reasonQuery(reason: string): string {
+		// Build metric{namespace="X", finished_reason="reason"} manually since
+		// vllmMetricWithSelector only knows about namespace + llm_inference_service.
+		const ns = (namespace ?? '').trim();
+		const r = escapePromqlStringLiteral(reason);
+		const sel = ns
+			? `{namespace="${escapePromqlStringLiteral(ns)}",finished_reason="${r}"}`
+			: `{finished_reason="${r}"}`;
+		return `sum(rate(vllm:request_success_total${sel}[5m]))`;
+	}
+
+	function reasonQueries(): Record<string, string> {
+		return {
+			stop: reasonQuery('stop'),
+			length: reasonQuery('length'),
+			abort: reasonQuery('abort')
+		};
+	}
 
 	async function fetch() {
 		try {
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const step = computeStep(startMs, endMs);
-			times_to_first_token = await fetchCombinedFlattenedRange(
+			data = await fetchCombinedFlattenedRange(
 				prometheusDriver,
-				ttftQueries(),
+				reasonQueries(),
 				new Date(startMs),
 				new Date(endMs),
 				step
 			);
 		} catch (error) {
-			times_to_first_token = [];
-			console.error(`Fail to fetch time to first token data in cluster ${cluster}:`, error);
+			data = [];
+			console.error(`Fail to fetch finish reason in cluster ${cluster}:`, error);
 		}
 	}
 
@@ -88,38 +95,29 @@
 
 	let isLoaded = $state(false);
 	onMount(async () => {
-		try {
-			await fetch();
-			isLoaded = true;
-		} catch (error) {
-			console.error(`Fail to fetch data in cluster ${cluster}:`, error);
-		}
+		await fetch();
+		isLoaded = true;
 	});
-	onDestroy(() => {
-		reloadManager.stop();
-	});
+	onDestroy(() => reloadManager.stop());
 
 	$effect(() => {
-		if (isReloading) {
-			reloadManager.restart();
-		} else {
-			reloadManager.stop();
-		}
+		if (isReloading) reloadManager.restart();
+		else reloadManager.stop();
 	});
 </script>
 
 <Card.Root class="h-full">
 	<Card.Header class="flex flex-row items-center gap-2 space-y-0">
 		<div class="grid flex-1 gap-1">
-			<Card.Title>{m.time_to_first_token()}</Card.Title>
-			<Card.Description>{m.llm_dashboard_time_to_first_token_description()}</Card.Description>
+			<Card.Title>{m.finish_reason()}</Card.Title>
+			<Card.Description>{m.llm_dashboard_finish_reason_description()}</Card.Description>
 		</div>
 		<Tooltip.Root>
 			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
 				<InfoIcon class="size-5 text-muted-foreground" />
 			</Tooltip.Trigger>
 			<Tooltip.Content>
-				<p>{m.llm_dashboard_time_to_first_token_tooltip()}</p>
+				<p>{m.llm_dashboard_finish_reason_tooltip()}</p>
 			</Tooltip.Content>
 		</Tooltip.Root>
 	</Card.Header>
@@ -129,7 +127,7 @@
 				<Loader2Icon class="size-12 animate-spin" />
 			</div>
 		</Card.Content>
-	{:else if times_to_first_token.length === 0}
+	{:else if data.length === 0}
 		<Card.Content>
 			<div class="flex h-45 w-full flex-col items-center justify-center gap-2">
 				<ChartLineIcon class="size-12 animate-pulse text-muted-foreground" />
@@ -140,21 +138,18 @@
 		<Card.Content>
 			<Chart.Container config={configuration} class="h-45 w-full">
 				<AreaChart
-					data={times_to_first_token}
+					{data}
 					x="date"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}
 					series={[
+						{ key: 'stop', label: configuration.stop.label, color: configuration.stop.color },
 						{
-							key: 'p95',
-							label: configuration.p95.label,
-							color: configuration.p95.color
+							key: 'length',
+							label: configuration.length.label,
+							color: configuration.length.color
 						},
-						{
-							key: 'p99',
-							label: configuration.p99.label,
-							color: configuration.p99.color
-						}
+						{ key: 'abort', label: configuration.abort.label, color: configuration.abort.color }
 					]}
 					props={{
 						area: areaProps,
@@ -168,15 +163,14 @@
 					{#snippet tooltip()}
 						<Chart.Tooltip
 							indicator="dot"
-							labelFormatter={(v: Date) => {
-								return v.toLocaleDateString('en-US', {
+							labelFormatter={(v: Date) =>
+								v.toLocaleDateString('en-US', {
 									year: 'numeric',
 									month: 'short',
 									day: 'numeric',
 									hour: 'numeric',
 									minute: 'numeric'
-								});
-							}}
+								})}
 						>
 							{#snippet formatter({ item, name, value })}
 								<div
@@ -184,12 +178,9 @@
 									class="size-2.5 shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)"
 								></div>
 								<div class="flex flex-1 shrink-0 items-center justify-between leading-none">
-									<div class="grid gap-1.5">
-										<span class="text-muted-foreground">{name}</span>
-									</div>
+									<span class="text-muted-foreground">{name}</span>
 									<span class="font-mono font-medium text-foreground tabular-nums">
-										{(Number(value) * 1000).toFixed(0)}
-										{m.ms()}
+										{Number(value).toFixed(2)}/{m.per_second()}
 									</span>
 								</div>
 							{/snippet}
