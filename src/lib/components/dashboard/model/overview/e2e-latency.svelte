@@ -40,10 +40,7 @@
 		p95.map((sample, index) => ({
 			time: sample.time,
 			p95: sample.value && !isNaN(sample.value) ? sample.value : 0,
-			p99:
-				p99[index] && p99[index].value && !isNaN(p99[index].value)
-					? p99[index].value
-					: 0
+			p99: p99[index] && p99[index].value && !isNaN(p99[index].value) ? p99[index].value : 0
 		}))
 	);
 
