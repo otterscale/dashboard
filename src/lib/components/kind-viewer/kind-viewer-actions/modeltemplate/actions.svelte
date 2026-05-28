@@ -1,18 +1,16 @@
 <script lang="ts">
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
-	import type { ServingKserveIoV1Alpha2LLMInferenceService } from '@otterscale/types';
+	import type { ServingKserveIoV1Alpha2LLMInferenceServiceConfig } from '@otterscale/types';
 	import type { Schema } from '@sjsf/form';
 	import type { ValidateFunction } from 'ajv';
 
-	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
-	import Edit from '$lib/components/kind-viewer/kind-viewer-actions/default/edit.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
-	import GpuAllocation from './gpu-allocation.svelte';
-	import Update from './update.svelte';
+	import Copy from './copy.svelte';
+	import Deploy from './deploy.svelte';
 
 	let {
 		cluster,
@@ -33,7 +31,7 @@
 		resource: string;
 		schema: Schema;
 		validate: ValidateFunction;
-		object: ServingKserveIoV1Alpha2LLMInferenceService;
+		object: ServingKserveIoV1Alpha2LLMInferenceServiceConfig;
 	} = $props();
 
 	let actionsOpen = $state(false);
@@ -56,21 +54,6 @@
 					e.preventDefault();
 				}}
 			>
-				<GpuAllocation
-					{cluster}
-					{namespace}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
-			</DropdownMenu.Item>
-			<DropdownMenu.Separator />
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
 				<View {schema} {object} />
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
@@ -80,14 +63,14 @@
 			>
 				<Describe {cluster} {namespace} {group} {version} {resource} {object} />
 			</DropdownMenu.Item>
+			<DropdownMenu.Separator />
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
 			>
-				<Edit
+				<Copy
 					{cluster}
-					{namespace}
 					{group}
 					{version}
 					{kind}
@@ -105,32 +88,8 @@
 					e.preventDefault();
 				}}
 			>
-				<Update
+				<Deploy
 					{cluster}
-					{namespace}
-					{group}
-					{version}
-					{kind}
-					{resource}
-					{schema}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
-			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<Delete
-					{cluster}
-					{namespace}
-					{group}
-					{version}
-					{kind}
-					{resource}
 					{schema}
 					{object}
 					onOpenChangeComplete={() => {

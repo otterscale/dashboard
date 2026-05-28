@@ -1,13 +1,12 @@
 <script lang="ts">
-	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
+	import { Code, ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import { BanIcon } from '@lucide/svelte';
-	import FormIcon from '@lucide/svelte/icons/form';
+	import Rocket from '@lucide/svelte/icons/rocket';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type { ServingKserveIoV1Alpha2LLMInferenceService } from '@otterscale/types';
+	import type { ServingKserveIoV1Alpha2LLMInferenceServiceConfig } from '@otterscale/types';
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
-	import Ajv from 'ajv';
-	import { JSON_SCHEMA, load } from 'js-yaml';
+	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
@@ -15,6 +14,7 @@
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
+	import { page } from '$app/state';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import { fetchAllGpuNodes, type NodeInfo } from '$lib/components/gpu-allocation';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -27,64 +27,28 @@
 
 	let {
 		cluster,
-		namespace,
-		group,
-		version,
-		kind,
-		resource,
 		schema: jsonSchema,
 		object,
 		onOpenChangeComplete
 	}: {
 		cluster: string;
-		namespace: string;
-		group: string;
-		version: string;
-		kind: string;
-		resource: string;
 		schema: Schema;
-		object: ServingKserveIoV1Alpha2LLMInferenceService;
+		object: ServingKserveIoV1Alpha2LLMInferenceServiceConfig;
 		onOpenChangeComplete: () => void;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	let values = $state(getInitialValues());
+	const targetGroup = 'serving.kserve.io';
+	const targetVersion = 'v1alpha2';
+	const targetKind = 'LLMInferenceService';
+	const targetResource = 'llminferenceservices';
+	const configKind = 'LLMInferenceServiceConfig';
+	const configResource = 'llminferenceserviceconfigs';
 
-	function getInitialValues() {
-		return lodash.cloneDeep(object) as ServingKserveIoV1Alpha2LLMInferenceService & {
-			metadata?: Record<string, unknown>;
-		};
-	}
-
-	const systemFields = [
-		'clusterName',
-		'creationTimestamp',
-		'deletionGracePeriodSeconds',
-		'deletionTimestamp',
-		'finalizers',
-		'generateName',
-		'generation',
-		'initializers',
-		'managedFields',
-		'ownerReferences',
-		'resourceVersion',
-		'relationships',
-		'selfLink',
-		'state',
-		'uid'
-	];
-
-	let value = $derived.by(() => {
-		const filtered = lodash.cloneDeep(values);
-		if (filtered.metadata) {
-			for (const field of systemFields) {
-				delete filtered.metadata[field];
-			}
-		}
-		return stringify(filtered);
-	});
+	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
+	const [firstStep] = steps;
 
 	type GPUDevice = { type: string; node: string };
 
@@ -169,61 +133,56 @@
 		lodash.set(values, [...templatePath, 'containers'], cleaned);
 	}
 
-	function hasKVCacheEnvironments(templatePath: string[]): boolean {
-		const containers = lodash.get(object, [...templatePath, 'containers']) as
-			| Array<{ name?: string; env?: Array<{ name?: string }> }>
-			| undefined;
-		const main = containers?.find((container) => container.name === 'main');
-		const envNames = new Set(main?.env?.map((entry) => entry.name) ?? []);
-		return envNames.has('LMCACHE_CONFIG_FILE') && envNames.has('LMCACHE_USE_EXPERIMENTAL');
-	}
-
-	function isKVCacheEnabled(): boolean {
-		if (lodash.has(object, 'spec.prefill')) {
-			return (
-				hasKVCacheEnvironments(['spec', 'template']) &&
-				hasKVCacheEnvironments(['spec', 'prefill', 'template'])
-			);
-		}
-		return hasKVCacheEnvironments(['spec', 'template']);
-	}
-
-	// Steps Manager (3 steps: GPU selector + KV Cache + YAML review)
-	const steps = Array.from({ length: 3 }, (_, index) => String(index + 1));
-	const [firstStep] = steps;
+	let values = $state(getInitialValues());
 	let currentStep = $state(firstStep);
+	let isSubmitting = $state(false);
+	let open = $state(false);
+
+	let value = $derived(stringify(values));
 	const currentIndex = $derived(steps.indexOf(currentStep));
+
+	function getInitialValues() {
+		return {
+			apiVersion: `${targetGroup}/${targetVersion}`,
+			kind: targetKind,
+			metadata: { namespace: page.data.namespace } as FormValue,
+			spec: {
+				baseRefs: [{ name: '' }],
+				model: lodash.get(object, 'spec.model')
+			}
+		};
+	}
+	function initiate() {
+		values = getInitialValues();
+		currentStep = firstStep;
+		isSubmitting = false;
+	}
 	function handleNext() {
 		currentStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
 	}
 	function handlePrevious() {
 		currentStep = steps[Math.max(currentIndex - 1, 0)];
 	}
-	function reset() {
-		currentStep = firstStep;
-	}
-
-	let open = $state(false);
-	let isSubmitting = $state(false);
 </script>
 
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
 		onOpenChangeComplete?.();
-		if (!isOpen) {
-			reset();
-		}
+
+		if (isOpen) return;
+
+		initiate();
 	}}
 >
 	<Dialog.Trigger>
 		{#snippet child({ props })}
 			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
 				<Item.Media>
-					<FormIcon />
+					<Rocket />
 				</Item.Media>
 				<Item.Content>
-					<Item.Title>Update</Item.Title>
+					<Item.Title>Deploy</Item.Title>
 				</Item.Content>
 			</Item.Root>
 		{/snippet}
@@ -235,13 +194,123 @@
 		<Item.Root class="p-0">
 			<Progress value={currentIndex + 1} max={steps.length} class="mt-1 mr-6" />
 			<Item.Content class="text-left">
-				<Item.Title class="text-xl font-bold">{kind}</Item.Title>
-				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
+				<Item.Title class="text-xl font-bold">{targetKind}</Item.Title>
 			</Item.Content>
 		</Item.Root>
 		<Tabs.Root value={currentStep}>
-			<!-- Step 1: Workload Placement -->
+			<!-- Step 1 — Metadata -->
 			<Tabs.Content value={steps[0]}>
+				<Form
+					schema={{
+						...lodash.omit(lodash.get(jsonSchema, 'properties.metadata') as Schema, [
+							'properties',
+							'required'
+						]),
+						title: 'Metadata',
+						required: [
+							...(lodash.get(jsonSchema, 'properties.metadata.required', []) as string[]),
+							'name'
+						],
+						properties: {
+							name: {
+								...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema),
+								title: 'Name'
+							}
+						}
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={{ namespace: page.data.namespace } as FormValue}
+					handleSubmit={{
+						posthook: () => {
+							lodash.set(
+								values,
+								['spec', 'baseRefs', 0, 'name'],
+								lodash.get(values, ['metadata', 'name'], '')
+							);
+							handleNext();
+						}
+					}}
+					bind:values={values['metadata']}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+								disabled={currentIndex === 0}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+
+			<!-- Step 2 — Model Source -->
+			<Tabs.Content value={steps[1]}>
+				<Form
+					schema={{
+						title: 'Model',
+						...(lodash.omit(lodash.get(jsonSchema, 'properties.spec.properties.model') as Schema, [
+							'properties'
+						]) as Schema),
+						properties: {
+							uri: {
+								title: 'URI',
+								description:
+									'Override the default model source to load weights from a specific location — for example, a private OCI registry, a Hugging Face repository, or an S3-compatible bucket. Leave unchanged to use the platform default.',
+								...lodash.omit(
+									lodash.get(
+										jsonSchema,
+										'properties.spec.properties.model.properties.uri'
+									) as Schema,
+									['description']
+								)
+							}
+						}
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={{ uri: lodash.get(object, 'spec.model.uri', '') } as FormValue}
+					handleSubmit={{
+						posthook: (form) => {
+							const value = getValueSnapshot(form);
+							const uri = lodash.get(value, 'uri') as string | undefined;
+							lodash.set(values, ['spec', 'model', 'uri'], uri);
+							handleNext();
+						}
+					}}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}
+							>
+								Previous
+							</Button>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+
+			<!-- Step 3 — GPU Selector -->
+			<Tabs.Content value={steps[2]}>
 				{#await fetchAllGpuNodes(resourceClient, cluster)}
 					<Empty.Root>
 						<Empty.Header>
@@ -286,15 +355,7 @@
 									}
 								}
 							} as UiSchemaRoot}
-							initialValue={{
-								type: lodash.get(object, ['spec', 'annotations', 'nvidia.com/use-gputype']),
-								node: lodash.get(object, [
-									'spec',
-									'template',
-									'nodeSelector',
-									'kubernetes.io/hostname'
-								])
-							} as FormValue}
+							initialValue={{} as FormValue}
 							handleSubmit={{
 								posthook: (form) => {
 									const value = getValueSnapshot(form);
@@ -323,7 +384,6 @@
 										onclick={() => {
 											handlePrevious();
 										}}
-										disabled={currentIndex === 0}
 									>
 										Previous
 									</Button>
@@ -376,32 +436,7 @@
 									}
 								}
 							} as UiSchemaRoot}
-							initialValue={{
-								decode: {
-									type: lodash.get(object, ['spec', 'annotations', 'nvidia.com/use-gputype']),
-									node: lodash.get(object, [
-										'spec',
-										'template',
-										'nodeSelector',
-										'kubernetes.io/hostname'
-									])
-								},
-								prefill: {
-									type: lodash.get(object, [
-										'spec',
-										'prefill',
-										'annotations',
-										'nvidia.com/use-gputype'
-									]),
-									node: lodash.get(object, [
-										'spec',
-										'prefill',
-										'template',
-										'nodeSelector',
-										'kubernetes.io/hostname'
-									])
-								}
-							} as FormValue}
+							initialValue={{} as FormValue}
 							handleSubmit={{
 								posthook: (form) => {
 									const value = getValueSnapshot(form);
@@ -448,7 +483,11 @@
 						>
 							{#snippet actions()}
 								<div class="flex w-full items-center justify-between gap-3">
-									<Button onclick={() => handlePrevious()} disabled={currentIndex === 0}>
+									<Button
+										onclick={() => {
+											handlePrevious();
+										}}
+									>
 										Previous
 									</Button>
 									<SubmitButton />
@@ -469,8 +508,8 @@
 				{/await}
 			</Tabs.Content>
 
-			<!-- Step 2: KV Cache -->
-			<Tabs.Content value={steps[1]}>
+			<!-- Step 4 — KV Cache -->
+			<Tabs.Content value={steps[3]}>
 				<Form
 					schema={{
 						title: 'KV Cache Offload',
@@ -491,7 +530,7 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{ enabled: isKVCacheEnabled() } as FormValue}
+					initialValue={{ enabled: false } as FormValue}
 					handleSubmit={{
 						posthook: (form) => {
 							const value = getValueSnapshot(form);
@@ -526,8 +565,8 @@
 				</Form>
 			</Tabs.Content>
 
-			<!-- Step 3: YAML Review + Submit -->
-			<Tabs.Content value={steps[2]} class="min-h-[77vh]">
+			<!-- Step 5 — YAML preview -->
+			<Tabs.Content value={steps[4]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{
@@ -548,47 +587,68 @@
 
 							isSubmitting = true;
 
-							const jsonSchemaValidator = new Ajv({
-								allErrors: true,
-								strict: false
-							});
-							const validate = jsonSchemaValidator.compile(jsonSchema);
-
-							const isValid = validate(load(value, { schema: JSON_SCHEMA }));
-
-							if (!isValid) {
-								console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
-								toast.error('Validation failed. Please check the YAML.');
+							let parsed;
+							try {
+								parsed = load(value);
+							} catch {
+								toast.error('Invalid YAML syntax. Please check the editor.');
 								isSubmitting = false;
 								return;
 							}
-
-							const name = lodash.get(load(value, { schema: JSON_SCHEMA }), 'metadata.name');
+							const name = lodash.get(parsed, 'metadata.name');
+							const namespace = lodash.get(parsed, 'metadata.namespace', page.data.namespace);
 
 							toast.promise(
 								async () => {
+									await resourceClient
+										.get({
+											cluster,
+											namespace,
+											group: targetGroup,
+											version: targetVersion,
+											resource: configResource,
+											name
+										})
+										.catch((error) => {
+											if (error instanceof ConnectError && error.code === Code.NotFound) {
+												return resourceClient.create({
+													cluster,
+													namespace,
+													group: targetGroup,
+													version: targetVersion,
+													resource: configResource,
+													manifest: new TextEncoder().encode(
+														stringify({
+															apiVersion: `${targetGroup}/${targetVersion}`,
+															kind: configKind,
+															metadata: { name, namespace },
+															spec: lodash.get(object, 'spec')
+														})
+													)
+												});
+											}
+											throw error;
+										});
+
 									const manifest = new TextEncoder().encode(value);
 
-									await resourceClient.apply({
+									await resourceClient.create({
 										cluster,
 										namespace,
-										name,
-										group,
-										version,
-										resource,
-										manifest,
-										fieldManager: 'otterscale-web-ui',
-										force: true
+										group: targetGroup,
+										version: targetVersion,
+										resource: targetResource,
+										manifest
 									});
 								},
 								{
-									loading: `Updating ${kind} ${name}...`,
+									loading: `Deploying ${targetKind} ${name}...`,
 									success: () => {
-										return `Successfully updated ${kind} ${name}`;
+										return `Successfully deployed ${targetKind} ${name}`;
 									},
 									error: (error) => {
-										console.error(`Failed to update ${kind} ${name}:`, error);
-										return `Failed to update ${kind} ${name}: ${(error as ConnectError).message}`;
+										console.error(`Failed to deploy ${targetKind} ${name}:`, error);
+										return `Failed to deploy ${targetKind} ${name}: ${(error as ConnectError).message}`;
 									},
 									finally() {
 										isSubmitting = false;
@@ -598,7 +658,7 @@
 							);
 						}}
 					>
-						Update
+						Deploy
 					</Button>
 				</div>
 			</Tabs.Content>

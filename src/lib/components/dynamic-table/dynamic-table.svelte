@@ -118,6 +118,7 @@
 				}),
 			enableHiding: false,
 			enableSorting: false,
+			enableResizing: false,
 			size: 30
 		},
 		...columnDefinitions,
@@ -690,10 +691,14 @@
 		<Table.Root class="table-fixed">
 			<Table.Header class="bg-muted">
 				{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
+					{@const totalSize = headerGroup.headers.reduce(
+						(accumulation, head) => accumulation + head.getSize(),
+						0
+					)}
 					<Table.Row class="hover:bg-transparent">
 						{#each headerGroup.headers as header (header.id)}
 							<Table.Head
-								style="width: {header.getSize()}px"
+								style={`width: ${(header.getSize() / totalSize) * 100}%`}
 								class={cn(
 									lodash.get(header.column.columnDef.meta, 'class'),
 									'relative h-11 border-t select-none [&:last-child>.cursor-col-resize]:opacity-0'

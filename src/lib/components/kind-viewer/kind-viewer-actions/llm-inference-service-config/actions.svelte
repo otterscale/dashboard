@@ -4,7 +4,6 @@
 	import type { Schema } from '@sjsf/form';
 	import type { ValidateFunction } from 'ajv';
 
-	import { page } from '$app/state';
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import Edit from '$lib/components/kind-viewer/kind-viewer-actions/default/edit.svelte';
@@ -13,6 +12,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
 	import Copy from './copy.svelte';
+	import Deploy from './deploy.svelte';
 
 	let {
 		cluster,
@@ -70,8 +70,9 @@
 					e.preventDefault();
 				}}
 			>
-				<Copy
+				<Edit
 					{cluster}
+					{namespace}
 					{group}
 					{version}
 					{kind}
@@ -84,47 +85,61 @@
 					}}
 				/>
 			</DropdownMenu.Item>
-			{#if page.url.searchParams.get('namespace') !== 'otterscale-system'}
-				<DropdownMenu.Item
-					onSelect={(e) => {
-						e.preventDefault();
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Delete
+					{cluster}
+					{namespace}
+					{group}
+					{version}
+					{kind}
+					{resource}
+					{schema}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
 					}}
-				>
-					<Edit
-						{cluster}
-						{namespace}
-						{group}
-						{version}
-						{kind}
-						{resource}
-						{schema}
-						{validate}
-						{object}
-						onOpenChangeComplete={() => {
-							actionsOpen = false;
-						}}
-					/>
-				</DropdownMenu.Item>
-				<DropdownMenu.Item
-					onSelect={(e) => {
-						e.preventDefault();
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Separator />
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Copy
+					{cluster}
+					{namespace}
+					{group}
+					{version}
+					{kind}
+					{resource}
+					{schema}
+					{validate}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
 					}}
-				>
-					<Delete
-						{cluster}
-						{namespace}
-						{group}
-						{version}
-						{kind}
-						{resource}
-						{schema}
-						{object}
-						onOpenChangeComplete={() => {
-							actionsOpen = false;
-						}}
-					/>
-				</DropdownMenu.Item>
-			{/if}
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Deploy
+					{cluster}
+					{namespace}
+					{schema}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
 		</DropdownMenu.Group>
 	</DropdownMenu.Content>
 </DropdownMenu.Root>

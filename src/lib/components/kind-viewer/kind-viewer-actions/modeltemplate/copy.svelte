@@ -14,6 +14,7 @@
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
+	import { page } from '$app/state';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -23,7 +24,6 @@
 
 	let {
 		cluster,
-		namespace,
 		group,
 		version,
 		kind,
@@ -34,7 +34,6 @@
 		onOpenChangeComplete
 	}: {
 		cluster: string;
-		namespace: string;
 		group: string;
 		version: string;
 		kind: string;
@@ -64,7 +63,7 @@
 			kind: lodash.get(object, 'kind'),
 			metadata: {
 				name: '',
-				namespace
+				namespace: page.data.namespace
 			},
 			spec: lodash.get(object, 'spec')
 		};
@@ -140,7 +139,7 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						namespace
+						namespace: page.data.namespace
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
@@ -203,7 +202,7 @@
 
 									await resourceClient.create({
 										cluster,
-										namespace,
+										namespace: page.data.namespace,
 										group,
 										version,
 										resource,

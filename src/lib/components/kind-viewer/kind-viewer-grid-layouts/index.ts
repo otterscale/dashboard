@@ -4,7 +4,7 @@ import type { Row } from '@tanstack/table-core';
 import type { ValidateFunction } from 'ajv';
 import type { Component } from 'svelte';
 
-import LLMInferenceServiceConfigGridLayout from './llminferenceserviceconfig.svelte';
+import ModelTemplateGridLayout from './modeltemplate.svelte';
 
 type GridLayoutType =
 	| Component<{
@@ -20,14 +20,17 @@ type GridLayoutType =
 	  }>
 	| undefined;
 
-function getGridLayout(kind: string): GridLayoutType {
+function getGridLayout(kind: string, namespace?: string): GridLayoutType {
 	switch (kind) {
 		case 'LLMInferenceServiceConfig':
-			return LLMInferenceServiceConfigGridLayout as GridLayoutType;
+			if (namespace === 'otterscale-system') {
+				return ModelTemplateGridLayout as GridLayoutType;
+			}
+			return undefined;
 		default:
 			return undefined;
 	}
 }
 
-export type { GridLayoutType };
 export { getGridLayout };
+export type { GridLayoutType };
