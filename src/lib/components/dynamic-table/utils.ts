@@ -205,6 +205,7 @@ function getRelativeTime(now: number, timestamp: number) {
 	const milliseconds = Math.max(timestamp, 0);
 
 	const seconds = Math.floor((now - milliseconds) / 1000);
+	if (seconds < 5) return { value: 'Just', unit: 'now' };
 	if (seconds < 60) return { value: seconds, unit: 'second' };
 
 	const minutes = Math.floor(seconds / 60);
