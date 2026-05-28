@@ -6,19 +6,19 @@
 	import ATopKvPressure from './a-top-kv-pressure.svelte';
 	import ATopP99Latency from './a-top-p99-latency.svelte';
 	import ATopThroughput from './a-top-throughput.svelte';
+	import BGpuMemory from './b-gpu-memory.svelte';
+	import BMemoryUsage from './b-memory-usage.svelte';
+	import BStatusSnapshot from './b-status-snapshot.svelte';
 	import CGenerationSizeHeatmap from './c-generation-size-heatmap.svelte';
 	import CPrefillDecode from './c-prefill-decode.svelte';
 	import CPrefixCacheHit from './c-prefix-cache-hit.svelte';
 	import CPromptSizeHeatmap from './c-prompt-size-heatmap.svelte';
 	import CTokensPerReplica from './c-tokens-per-replica.svelte';
-	import ChartActiveRequests from './chart-active-requests.svelte';
-	import ChartKvCache from './chart-kv-cache.svelte';
-	import ChartThroughput from './chart-throughput.svelte';
-	import ChartTpot from './chart-tpot.svelte';
-	import ChartTtft from './chart-ttft.svelte';
-	import DGpuMemory from './d-gpu-memory.svelte';
-	import DMemoryUsage from './d-memory-usage.svelte';
-	import DStatusSnapshot from './d-status-snapshot.svelte';
+	import DActiveRequests from './d-active-requests.svelte';
+	import DKvCache from './d-kv-cache.svelte';
+	import DThroughput from './d-throughput.svelte';
+	import DTimePerOutputToken from './d-time-per-output-token.svelte';
+	import DTimeToFirstToken from './d-time-to-first-token.svelte';
 	import PlaceholderCard from './placeholder-card.svelte';
 
 	let {
@@ -84,13 +84,13 @@
 				/>
 			{:else}
 				<div class="grid w-full items-start gap-4 lg:grid-cols-3">
-					<DStatusSnapshot
+					<BStatusSnapshot
 						{namespace}
 						prometheusDriver={client}
 						selectedModel={modelFilter}
 						isReloading={isReloading ?? false}
 					/>
-					<DMemoryUsage
+					<BMemoryUsage
 						{namespace}
 						prometheusDriver={client}
 						selectedModel={modelFilter}
@@ -99,7 +99,7 @@
 						{endIsNow}
 						isReloading={isReloading ?? false}
 					/>
-					<DGpuMemory
+					<BGpuMemory
 						{namespace}
 						prometheusDriver={client}
 						selectedModel={modelFilter}
@@ -181,7 +181,7 @@
 				/>
 			{:else}
 				<div class="grid w-full items-start gap-4 lg:grid-cols-2">
-					<ChartTtft
+					<DTimeToFirstToken
 						{cluster}
 						{namespace}
 						prometheusDriver={client}
@@ -191,7 +191,7 @@
 						{endIsNow}
 						isReloading={isReloading ?? false}
 					/>
-					<ChartTpot
+					<DTimePerOutputToken
 						{cluster}
 						{namespace}
 						prometheusDriver={client}
@@ -201,7 +201,7 @@
 						{endIsNow}
 						isReloading={isReloading ?? false}
 					/>
-					<ChartActiveRequests
+					<DActiveRequests
 						{namespace}
 						prometheusDriver={client}
 						selectedModel={modelFilter}
@@ -210,7 +210,7 @@
 						{endIsNow}
 						isReloading={isReloading ?? false}
 					/>
-					<ChartKvCache
+					<DKvCache
 						{namespace}
 						prometheusDriver={client}
 						selectedModel={modelFilter}
@@ -220,7 +220,7 @@
 						isReloading={isReloading ?? false}
 					/>
 					<div class="lg:col-span-2">
-						<ChartThroughput
+						<DThroughput
 							{namespace}
 							prometheusDriver={client}
 							selectedModel={modelFilter}

@@ -41,7 +41,7 @@
 		isReloading: boolean;
 	} = $props();
 
-	let tpotData = $state<DataPoint[]>([]);
+	let times_per_output_token = $state<DataPoint[]>([]);
 
 	function tpotQueries(): Record<string, string> {
 		const bucket = vllmMetricWithSelector(
@@ -73,7 +73,7 @@
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const step = computeStep(startMs, endMs);
-			tpotData = await fetchCombinedFlattenedRange(
+			times_per_output_token = await fetchCombinedFlattenedRange(
 				prometheusDriver,
 				tpotQueries(),
 				new Date(startMs),
@@ -81,8 +81,8 @@
 				step
 			);
 		} catch (error) {
-			tpotData = [];
-			console.error(`Fail to fetch TPOT data in cluster ${cluster}:`, error);
+			times_per_output_token = [];
+			console.error(`Fail to fetch time per output token data in cluster ${cluster}:`, error);
 		}
 	}
 
@@ -124,7 +124,7 @@
 			<div class="flex h-[200px] w-full items-center justify-center">
 				<LoaderCircle class="size-12 animate-spin" />
 			</div>
-		{:else if tpotData.length === 0}
+		{:else if times_per_output_token.length === 0}
 			<div class="flex h-[200px] w-full flex-col items-center justify-center">
 				<ChartLine class="size-12 animate-pulse text-muted-foreground" />
 				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
@@ -132,7 +132,7 @@
 		{:else}
 			<Chart.Container config={configuration} class="h-[200px] w-full">
 				<AreaChart
-					data={tpotData}
+					data={times_per_output_token}
 					x="date"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}

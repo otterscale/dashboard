@@ -34,22 +34,22 @@
 		isReloading: boolean;
 	} = $props();
 
-	let ninety_five = $state([] as SampleValue[]);
-	let ninety_nine = $state([] as SampleValue[]);
+	let p95 = $state([] as SampleValue[]);
+	let p99 = $state([] as SampleValue[]);
 	const requestLatencies = $derived(
-		ninety_five.map((sample, index) => ({
+		p95.map((sample, index) => ({
 			time: sample.time,
-			ninety_five: sample.value && !isNaN(sample.value) ? sample.value : 0,
-			ninety_nine:
-				ninety_nine[index] && ninety_nine[index].value && !isNaN(ninety_nine[index].value)
-					? ninety_nine[index].value
+			p95: sample.value && !isNaN(sample.value) ? sample.value : 0,
+			p99:
+				p99[index] && p99[index].value && !isNaN(p99[index].value)
+					? p99[index].value
 					: 0
 		}))
 	);
 
 	const configuration = {
-		ninety_five: { label: '95', color: 'var(--chart-1)' },
-		ninety_nine: { label: '99', color: 'var(--chart-2)' }
+		p95: { label: 'P95', color: 'var(--chart-1)' },
+		p99: { label: 'P99', color: 'var(--chart-2)' }
 	} satisfies Chart.ChartConfig;
 
 	const areaProps = {
@@ -71,8 +71,8 @@
 			endMs,
 			step
 		);
-		if (quantile === 0.95) ninety_five = response.result[0]?.values ?? [];
-		else if (quantile === 0.99) ninety_nine = response.result[0]?.values ?? [];
+		if (quantile === 0.95) p95 = response.result[0]?.values ?? [];
+		else if (quantile === 0.99) p99 = response.result[0]?.values ?? [];
 	}
 
 	async function fetch() {
@@ -151,14 +151,14 @@
 					yPadding={[0, 25]}
 					series={[
 						{
-							key: 'ninety_five',
-							label: configuration.ninety_five.label,
-							color: configuration.ninety_five.color
+							key: 'p95',
+							label: configuration.p95.label,
+							color: configuration.p95.color
 						},
 						{
-							key: 'ninety_nine',
-							label: configuration.ninety_nine.label,
-							color: configuration.ninety_nine.color
+							key: 'p99',
+							label: configuration.p99.label,
+							color: configuration.p99.color
 						}
 					]}
 					props={{

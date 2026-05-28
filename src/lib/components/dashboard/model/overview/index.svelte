@@ -7,7 +7,7 @@
 	import Model from './model.svelte';
 	import QueueDepth from './queue-depth.svelte';
 	import SuccessRate from './success-rate.svelte';
-	import Throughput from './throughtput.svelte';
+	import Throughput from './throughput.svelte';
 	import TimePerOutputToken from './time-per-output-token.svelte';
 	import TimeToFirstToken from './time-to-first-token.svelte';
 	import VGPU from './vgpu.svelte';

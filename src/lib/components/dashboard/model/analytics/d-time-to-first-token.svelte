@@ -82,7 +82,7 @@
 			);
 		} catch (error) {
 			times_to_first_token = [];
-			console.error(`Fail to fetch TTFT data in cluster ${cluster}:`, error);
+			console.error(`Fail to fetch time to first token data in cluster ${cluster}:`, error);
 		}
 	}
 

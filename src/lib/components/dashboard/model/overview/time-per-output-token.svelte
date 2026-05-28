@@ -49,14 +49,14 @@
 		);
 		const rate = `sum by(le) (rate(${inner}[5m]))`;
 		return {
-			ninety_five: `histogram_quantile(0.95, ${rate})`,
-			ninety_nine: `histogram_quantile(0.99, ${rate})`
+			p95: `histogram_quantile(0.95, ${rate})`,
+			p99: `histogram_quantile(0.99, ${rate})`
 		};
 	}
 
 	const configuration = {
-		ninety_five: { label: '95', color: 'var(--chart-1)' },
-		ninety_nine: { label: '99', color: 'var(--chart-2)' }
+		p95: { label: 'P95', color: 'var(--chart-1)' },
+		p99: { label: 'P99', color: 'var(--chart-2)' }
 	} satisfies Chart.ChartConfig;
 
 	const areaProps = {
@@ -146,14 +146,14 @@
 					yPadding={[0, 25]}
 					series={[
 						{
-							key: 'ninety_five',
-							label: configuration.ninety_five.label,
-							color: configuration.ninety_five.color
+							key: 'p95',
+							label: configuration.p95.label,
+							color: configuration.p95.color
 						},
 						{
-							key: 'ninety_nine',
-							label: configuration.ninety_nine.label,
-							color: configuration.ninety_nine.color
+							key: 'p99',
+							label: configuration.p99.label,
+							color: configuration.p99.color
 						}
 					]}
 					props={{
