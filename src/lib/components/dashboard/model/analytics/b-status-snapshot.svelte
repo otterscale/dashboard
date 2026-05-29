@@ -33,7 +33,7 @@
 
 	type PodEntry = { pod: string; value: number };
 	type GpuEntry = { hostname: string; gpu: string; value: number };
-	type TerminatedInfo = { reason: string; exitcode: number | null };
+	type TerminatedInfo = { exitcode: number | null };
 
 	let restartTotal = $state(0);
 	let oomTotal = $state(0);
@@ -85,28 +85,19 @@
 			.sort((a, b) => b.value - a.value);
 	}
 
-	// Merge the per-pod last-terminated reason (a label, value 1) and exit code (the value)
-	// into one map. vLLM /dev/shm exhaustion surfaces here as reason="Error" with exit 135
-	// (SIGBUS) — distinct from OOMKilled, which is the memory-limit path.
+	// Map each pod to its last-terminated exit code (the metric value). vLLM /dev/shm
+	// exhaustion surfaces here as exit 135 (SIGBUS) — distinct from OOMKilled, which is
+	// the memory-limit path.
 	function terminatedFromVectors(
-		reasonVecs: { metric: { labels: object } }[],
 		exitVecs: { metric: { labels: object }; value?: { value: unknown } }[]
 	): Record<string, TerminatedInfo> {
 		const map: Record<string, TerminatedInfo> = {};
-		for (const v of reasonVecs) {
-			const labels = v.metric.labels as Record<string, string>;
-			const pod = labels.pod;
-			if (!pod) continue;
-			map[pod] = { reason: labels.reason ?? '', exitcode: map[pod]?.exitcode ?? null };
-		}
 		for (const v of exitVecs) {
 			const labels = v.metric.labels as Record<string, string>;
 			const pod = labels.pod;
 			if (!pod) continue;
 			const code = Number(v.value?.value);
-			const exitcode = Number.isFinite(code) ? code : null;
-			if (map[pod]) map[pod].exitcode = exitcode;
-			else map[pod] = { reason: '', exitcode };
+			map[pod] = { exitcode: Number.isFinite(code) ? code : null };
 		}
 		return map;
 	}
@@ -130,7 +121,6 @@
 			throttle:
 				`sum(rate(container_cpu_cfs_throttled_periods_total${cs}[5m]) ${join})` +
 				` / sum(rate(container_cpu_cfs_periods_total${cs}[5m]) ${join}) * 100`,
-			lastTermReason: `kube_pod_container_status_last_terminated_reason${cs} ${join}`,
 			lastTermExit: `kube_pod_container_status_last_terminated_exitcode${cs} ${join}`
 		};
 
@@ -173,7 +163,7 @@
 		restartByPod = perPodFromVectors(main.restartPerPod);
 		oomTotal = Math.round(scalarFromVectors(main.oomTotal));
 		oomByPod = perPodFromVectors(main.oomPerPod);
-		terminatedByPod = terminatedFromVectors(main.lastTermReason, main.lastTermExit);
+		terminatedByPod = terminatedFromVectors(main.lastTermExit);
 		const throttleV = scalarFromVectors(main.throttle);
 		throttlePct = Number.isFinite(throttleV) ? throttleV : 0;
 		nodeCount = nodes.length;
