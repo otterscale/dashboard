@@ -49,6 +49,7 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import * as Popover from '$lib/components/ui/popover/index.js';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { cn } from '$lib/utils.js';
 
 	const ctx = getFormContext();
@@ -86,9 +87,6 @@
 			}
 		}, 300);
 	});
-	const filteredEnumerations = $derived(
-		enumerations.filter((option) => option.label.includes(searchTerm))
-	);
 
 	const visibility: number = $derived(
 		(retrieveUiOption(ctx, config, 'TailoredUserComboboxVisibility') as number) ?? 10
@@ -141,11 +139,11 @@
 			</Button>
 		{/snippet}
 	</Popover.Trigger>
-	<Popover.Content class="w-[var(--bits-popover-anchor-width)] min-w-xs p-0">
+	<Popover.Content class="w-(--bits-popover-anchor-width) min-w-xs p-0">
 		<Command.Root shouldFilter={false}>
 			<Command.Input bind:value={searchTerm} />
 			<Command.List>
-				{#if filteredEnumerations.length === 0}
+				{#if enumerations.length === 0}
 					<Empty.Root>
 						<Empty.Header>
 							<Empty.Media>
@@ -156,7 +154,7 @@
 					</Empty.Root>
 				{/if}
 				<Command.Group>
-					{#each filteredEnumerations.slice(0, visibleOptions) as option, index (index)}
+					{#each enumerations.slice(0, visibleOptions) as option, index (index)}
 						<Command.Item
 							value={option.value}
 							onSelect={() => {
@@ -168,16 +166,25 @@
 							<Check
 								class={cn('mr-2 size-4', !(value && value === option.value) && 'text-transparent')}
 							/>
-							<Item.Root class="w-full p-0">
-								<Item.Content class="text-start">
-									<Item.Title>{option.label}</Item.Title>
-									<Item.Description>{option.user.username}</Item.Description>
-								</Item.Content>
-							</Item.Root>
+							<Tooltip.Root>
+								<Tooltip.Trigger class="w-full">
+									<Item.Root class="w-full p-0">
+										<Item.Content class="text-start">
+											<Item.Title class="line-clamp-1 text-xs">{option.value}</Item.Title>
+											<Item.Description class="line-clamp-1 text-xs">
+												{option.label}
+											</Item.Description>
+										</Item.Content>
+									</Item.Root>
+								</Tooltip.Trigger>
+								<Tooltip.Content side="right" sideOffset={32}>
+									{option.user.username}
+								</Tooltip.Content>
+							</Tooltip.Root>
 						</Command.Item>
 					{/each}
 				</Command.Group>
-				{#if filteredEnumerations.length > visibleOptions}
+				{#if enumerations.length > visibleOptions}
 					<Command.Separator />
 					<Command.Item
 						class="w-full rounded-t-none hover:bg-muted"
