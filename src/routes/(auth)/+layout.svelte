@@ -518,15 +518,6 @@
 						})
 					},
 					{
-						title: m.persistent_volume(),
-						url: resourceUrl({
-							group: '',
-							version: 'v1',
-							kind: 'PersistentVolume',
-							resource: 'persistentvolumes'
-						})
-					},
-					{
 						title: m.storage_class(),
 						url: resourceUrl({
 							group: 'storage.k8s.io',
@@ -541,15 +532,6 @@
 				title: m.namespaced(),
 				icon: BracesIcon,
 				items: [
-					{
-						title: m.namespace(),
-						url: resourceUrl({
-							group: '',
-							version: 'v1',
-							kind: 'Namespace',
-							resource: 'namespaces'
-						})
-					},
 					{
 						title: m.service_account(),
 						url: resourceUrl({
@@ -618,36 +600,55 @@
 							kind: 'Node',
 							resource: 'nodes'
 						})
-					},
-					{
-						title: m.custom_resource_definition(),
-						url: resourceUrl({
-							group: 'apiextensions.k8s.io',
-							version: 'v1',
-							kind: 'CustomResourceDefinition',
-							resource: 'customresourcedefinitions'
-						})
-					},
-					{
-						title: m.cluster_role(),
-						url: resourceUrl({
-							group: 'rbac.authorization.k8s.io',
-							version: 'v1',
-							kind: 'ClusterRole',
-							resource: 'clusterroles'
-						})
-					},
-					{
-						title: m.cluster_role_binding(),
-						url: resourceUrl({
-							group: 'rbac.authorization.k8s.io',
-							version: 'v1',
-							kind: 'ClusterRoleBinding',
-							resource: 'clusterrolebindings'
-						})
 					}
 				]
-			}
+			},
+			...(data.isClusterAdmin
+				? [
+						{
+							title: m.administration(),
+							icon: UserStarIcon,
+							items: [
+								{
+									title: m.namespace(),
+									url: resourceUrl({
+										group: '',
+										version: 'v1',
+										kind: 'Namespace',
+										resource: 'namespaces'
+									})
+								},
+								{
+									title: m.custom_resource_definition(),
+									url: resourceUrl({
+										group: 'apiextensions.k8s.io',
+										version: 'v1',
+										kind: 'CustomResourceDefinition',
+										resource: 'customresourcedefinitions'
+									})
+								},
+								{
+									title: m.cluster_role(),
+									url: resourceUrl({
+										group: 'rbac.authorization.k8s.io',
+										version: 'v1',
+										kind: 'ClusterRole',
+										resource: 'clusterroles'
+									})
+								},
+								{
+									title: m.cluster_role_binding(),
+									url: resourceUrl({
+										group: 'rbac.authorization.k8s.io',
+										version: 'v1',
+										kind: 'ClusterRoleBinding',
+										resource: 'clusterrolebindings'
+									})
+								}
+							]
+						}
+					]
+				: [])
 		]
 	});
 </script>
