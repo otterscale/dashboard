@@ -48,22 +48,6 @@
 	const resourceClient = createClient(ResourceService, transport);
 	const steps = Array.from({ length: 2 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
-	const systemFields = [
-		'clusterName',
-		'creationTimestamp',
-		'deletionGracePeriodSeconds',
-		'deletionTimestamp',
-		'finalizers',
-		'generateName',
-		'generation',
-		'initializers',
-		'managedFields',
-		'ownerReferences',
-		'relationships',
-		'selfLink',
-		'state',
-		'uid'
-	];
 
 	let values = $state(getInitialValues());
 	let currentStep = $state(firstStep);
@@ -72,11 +56,6 @@
 
 	let value = $derived.by(() => {
 		const filtered = lodash.cloneDeep(values);
-		if (filtered.metadata) {
-			for (const field of systemFields) {
-				delete filtered.metadata[field];
-			}
-		}
 		return stringify(filtered);
 	});
 	const currentIndex = $derived(steps.indexOf(currentStep));

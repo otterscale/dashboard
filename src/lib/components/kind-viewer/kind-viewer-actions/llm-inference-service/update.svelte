@@ -58,30 +58,8 @@
 		};
 	}
 
-	const systemFields = [
-		'clusterName',
-		'creationTimestamp',
-		'deletionGracePeriodSeconds',
-		'deletionTimestamp',
-		'finalizers',
-		'generateName',
-		'generation',
-		'initializers',
-		'managedFields',
-		'ownerReferences',
-		'relationships',
-		'selfLink',
-		'state',
-		'uid'
-	];
-
 	let value = $derived.by(() => {
 		const filtered = lodash.cloneDeep(values);
-		if (filtered.metadata) {
-			for (const field of systemFields) {
-				delete filtered.metadata[field];
-			}
-		}
 		return stringify(filtered);
 	});
 

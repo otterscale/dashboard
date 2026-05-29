@@ -78,23 +78,6 @@
 	});
 	const validate = $derived(jsonSchemaValidator.compile(jsonSchema));
 
-	const systemFields = [
-		'clusterName',
-		'creationTimestamp',
-		'deletionGracePeriodSeconds',
-		'deletionTimestamp',
-		'finalizers',
-		'generateName',
-		'generation',
-		'initializers',
-		'managedFields',
-		'ownerReferences',
-		'relationships',
-		'selfLink',
-		'state',
-		'uid'
-	];
-
 	let values = $state(getInitialValues());
 	let specValues = $state<FormValue>({});
 	let serviceValues = $state<FormValue>({});
@@ -121,9 +104,6 @@
 
 	let value = $derived.by(() => {
 		const filtered = lodash.cloneDeep(values) as typeof values & { status?: unknown };
-		for (const field of systemFields) {
-			delete filtered.metadata[field];
-		}
 		delete filtered.status;
 		return stringify(filtered);
 	});

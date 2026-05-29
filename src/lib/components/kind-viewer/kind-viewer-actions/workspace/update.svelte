@@ -63,23 +63,6 @@
 	const steps = Array.from({ length: formCount + 1 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 
-	const systemFields = [
-		'clusterName',
-		'creationTimestamp',
-		'deletionGracePeriodSeconds',
-		'deletionTimestamp',
-		'finalizers',
-		'generateName',
-		'generation',
-		'initializers',
-		'managedFields',
-		'ownerReferences',
-		'relationships',
-		'selfLink',
-		'state',
-		'uid'
-	];
-
 	let values = $state(getInitialValues());
 	let resourceLimitation = $state(getInitialResourceLimitation());
 	let currentStep = $state(firstStep);
@@ -88,12 +71,6 @@
 
 	let value = $derived.by(() => {
 		const filtered = lodash.cloneDeep(values);
-		if (filtered.metadata) {
-			const metadata = filtered.metadata as Record<string, unknown>;
-			for (const field of systemFields) {
-				delete metadata[field];
-			}
-		}
 		return stringify(filtered);
 	});
 	const currentIndex = $derived(steps.indexOf(currentStep));

@@ -68,23 +68,6 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	const systemFields = [
-		'clusterName',
-		'creationTimestamp',
-		'deletionGracePeriodSeconds',
-		'deletionTimestamp',
-		'finalizers',
-		'generateName',
-		'generation',
-		'initializers',
-		'managedFields',
-		'ownerReferences',
-		'relationships',
-		'selfLink',
-		'state',
-		'uid'
-	];
-
 	let values = $state(getInitialValues());
 	let settingsValues = $state<FormValue>({});
 	let specValues = $state<FormValue>({});
@@ -110,9 +93,6 @@
 	let value = $state('');
 	$effect(() => {
 		const filtered = lodash.cloneDeep(values) as typeof values & { status?: unknown };
-		for (const field of systemFields) {
-			delete filtered.metadata[field];
-		}
 		delete filtered.status;
 		value = stringify(filtered);
 	});
