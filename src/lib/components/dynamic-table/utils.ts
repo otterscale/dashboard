@@ -103,6 +103,21 @@ function formatWithDecimalSuffix(value: bigint): { value: number; unit: string }
 	};
 }
 
+/**
+ * Number of bytes represented by one unit of a binary suffix (`''`, `Ki`, `Mi`, ...).
+ * Use to convert a scalar whose base unit is not bytes (e.g. `nvidia.com/gpumem`
+ * is expressed in `Mi`) into bytes before formatting.
+ */
+const binarySuffixFactors: Record<string, bigint> = {
+	'': BigInt(1),
+	Ki: BigInt(2) ** BigInt(10),
+	Mi: BigInt(2) ** BigInt(20),
+	Gi: BigInt(2) ** BigInt(30),
+	Ti: BigInt(2) ** BigInt(40),
+	Pi: BigInt(2) ** BigInt(50),
+	Ei: BigInt(2) ** BigInt(60)
+};
+
 function formatWithBinarySuffix(value: bigint): { value: number; unit: string } {
 	const units = [
 		{ value: BigInt(2) ** BigInt(60), symbol: 'Ei' },
@@ -296,6 +311,7 @@ function getDefaultDataSchema(type: JsonValue | undefined, format?: JsonValue): 
 }
 
 export {
+	binarySuffixFactors,
 	format,
 	formatWithBinarySuffix,
 	formatWithDecimalSuffix,
