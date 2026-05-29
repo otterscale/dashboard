@@ -292,7 +292,7 @@ function getWorkspaceColumnDefinitions(
 					row: row,
 					column: column,
 					uiSchemas: uiSchemas,
-					metadata: { type: 'discrete' } as QuantityMetadata
+					metadata: { type: 'discrete', baseUnit: 'Mi' } as QuantityMetadata
 				}),
 			accessorKey: 'GPU Memory Limit'
 		},

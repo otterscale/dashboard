@@ -3,15 +3,24 @@
 
 	export type QuantityType = 'discrete' | 'continuous';
 
+	/** Binary suffixes understood as the base unit of a discrete scalar. */
+	export type BinaryBaseUnit = 'Ki' | 'Mi' | 'Gi' | 'Ti' | 'Pi' | 'Ei';
+
 	export type QuantityMetadata = {
 		type: QuantityType;
+		/**
+		 * Base unit of the raw scalar value. Defaults to bytes. Set when the source
+		 * value is already expressed in a binary unit, e.g. `nvidia.com/gpumem` is
+		 * measured in `Mi`, so a value of `2400000` means 2400000 MiB, not bytes.
+		 */
+		baseUnit?: BinaryBaseUnit;
 	};
 </script>
 
 <script lang="ts">
 	import { type Column, type Row } from '@tanstack/table-core';
 
-	import { formatWithBinarySuffix, quantityToScalar } from '../utils';
+	import { binarySuffixFactors, formatWithBinarySuffix, quantityToScalar } from '../utils';
 
 	let {
 		row,
@@ -38,7 +47,10 @@
 		{data}
 	{:else if metadata.type === 'discrete'}
 		<!-- Discrete quantity in Kubernetes: integer with optional binary prefix  -->
-		{@const { value, unit } = formatWithBinarySuffix(BigInt(quantityToScalar(data)))}
+		{@const bytes =
+			BigInt(quantityToScalar(data)) *
+			(metadata.baseUnit ? binarySuffixFactors[metadata.baseUnit] : BigInt(1))}
+		{@const { value, unit } = formatWithBinarySuffix(bytes)}
 		{`${value.toFixed(0)} ${unit}`}
 	{/if}
 {/if}
