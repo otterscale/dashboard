@@ -33,17 +33,16 @@
 
 	type PodEntry = { pod: string; value: number };
 	type GpuEntry = { hostname: string; gpu: string; value: number };
+	type TerminatedInfo = { exitcode: number | null };
 
 	let restartTotal = $state(0);
 	let oomTotal = $state(0);
 	let xidTotal = $state(0);
 	let throttlePct = $state(0);
-	let totalPods = $state(0);
-	let podsWithLimit = $state(0);
 	let restartByPod = $state<PodEntry[]>([]);
 	let oomByPod = $state<PodEntry[]>([]);
+	let terminatedByPod = $state<Record<string, TerminatedInfo>>({});
 	let xidByGpu = $state<GpuEntry[]>([]);
-	let podsMissingLimit = $state<string[]>([]);
 	let nodeCount = $state(0);
 	let isLoaded = $state(false);
 
@@ -86,16 +85,32 @@
 			.sort((a, b) => b.value - a.value);
 	}
 
-	function podsFromVectors(vectors: { metric: { labels: object } }[]): string[] {
-		return vectors
-			.map((v) => (v.metric.labels as Record<string, string>).pod)
-			.filter((p): p is string => Boolean(p))
-			.sort();
+	// Map each pod to its last-terminated exit code (the metric value). vLLM /dev/shm
+	// exhaustion surfaces here as exit 135 (SIGBUS) — distinct from OOMKilled, which is
+	// the memory-limit path.
+	function terminatedFromVectors(
+		exitVecs: { metric: { labels: object }; value?: { value: unknown } }[]
+	): Record<string, TerminatedInfo> {
+		const map: Record<string, TerminatedInfo> = {};
+		for (const v of exitVecs) {
+			const labels = v.metric.labels as Record<string, string>;
+			const pod = labels.pod;
+			if (!pod) continue;
+			const code = Number(v.value?.value);
+			map[pod] = { exitcode: Number.isFinite(code) ? code : null };
+		}
+		return map;
+	}
+
+	// 135 = 128 + SIGBUS(7): writing to a full /dev/shm tmpfs faults with SIGBUS — the clearest
+	// crash signature of shm exhaustion. 134/SIGABRT is intentionally excluded: it just means
+	// abort() was called (CUDA/NCCL/assert/heap corruption) and rarely points to shm.
+	function isShmLikely(exitcode: number | null): boolean {
+		return exitcode === 135;
 	}
 
 	async function fetch() {
 		const cs = containerSelector();
-		const csMem = containerSelector('resource="memory"');
 		const join = modelJoin();
 
 		const mainQueries = {
@@ -106,8 +121,7 @@
 			throttle:
 				`sum(rate(container_cpu_cfs_throttled_periods_total${cs}[5m]) ${join})` +
 				` / sum(rate(container_cpu_cfs_periods_total${cs}[5m]) ${join}) * 100`,
-			allPods: `group by(pod) (${vllmMetricWithSelector('vllm:kv_cache_usage_perc', namespace, selectedModel)})`,
-			podsWithLimit: `group by(pod) (kube_pod_container_resource_limits${csMem} ${join})`
+			lastTermExit: `kube_pod_container_status_last_terminated_exitcode${cs} ${join}`
 		};
 
 		const nodesPromise = fetchModelNodes(prometheusDriver, namespace, selectedModel);
@@ -149,14 +163,9 @@
 		restartByPod = perPodFromVectors(main.restartPerPod);
 		oomTotal = Math.round(scalarFromVectors(main.oomTotal));
 		oomByPod = perPodFromVectors(main.oomPerPod);
+		terminatedByPod = terminatedFromVectors(main.lastTermExit);
 		const throttleV = scalarFromVectors(main.throttle);
 		throttlePct = Number.isFinite(throttleV) ? throttleV : 0;
-		const allPodsV = podsFromVectors(main.allPods);
-		const podsWithLimitV = podsFromVectors(main.podsWithLimit);
-		totalPods = allPodsV.length;
-		podsWithLimit = podsWithLimitV.length;
-		const withLimitSet = new Set(podsWithLimitV);
-		podsMissingLimit = allPodsV.filter((p) => !withLimitSet.has(p));
 		nodeCount = nodes.length;
 		xidTotal = xid.total;
 		xidByGpu = xid.byGpu;
@@ -184,13 +193,19 @@
 	const throttleLevel = $derived<ThresholdLevel>(
 		classifyThreshold(throttlePct, { green: 5, orange: 25 })
 	);
-	const missingLimitCount = $derived(Math.max(0, totalPods - podsWithLimit));
-	const limitLevel = $derived<ThresholdLevel>(
-		totalPods === 0 ? 'green' : missingLimitCount > 0 ? 'orange' : 'green'
+	// "Last died from SIGBUS" — the closest available signal to /dev/shm exhaustion.
+	// No usage gauge exists for a memory-backed emptyDir, so we count the crash signature instead.
+	const shmCrashPods = $derived(
+		Object.entries(terminatedByPod)
+			.filter(([, t]) => isShmLikely(t.exitcode))
+			.map(([pod, t]) => ({ pod, exitcode: t.exitcode }))
+			.sort((a, b) => a.pod.localeCompare(b.pod))
 	);
+	const shmCrashCount = $derived(shmCrashPods.length);
+	const shmLevel = $derived<ThresholdLevel>(shmCrashCount > 0 ? 'red' : 'green');
 
 	const severityRank = { green: 0, orange: 1, red: 2 } as const;
-	const levels = $derived([restartLevel, oomLevel, xidLevel, throttleLevel, limitLevel] as const);
+	const levels = $derived([restartLevel, oomLevel, xidLevel, throttleLevel, shmLevel] as const);
 	const overallLevel = $derived<ThresholdLevel>(
 		levels.reduce<ThresholdLevel>(
 			(acc, lvl) => (severityRank[lvl] > severityRank[acc] ? lvl : acc),
@@ -332,33 +347,30 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-3xl font-bold', valueColorClass(limitLevel))}>
-								{#if totalPods === 0}
-									—
-								{:else if missingLimitCount > 0}
-									{missingLimitCount}
-								{:else}
-									{m.metric_limit_ok()}
-								{/if}
+							<p class={cn('text-3xl font-bold', valueColorClass(shmLevel))}>
+								{shmCrashCount}
 							</p>
 							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-								{m.metric_memory_limit()}
+								{m.metric_shm_crash()}
 							</p>
 						</div>
 					</Tooltip.Trigger>
-					<Tooltip.Content side="bottom" class="max-w-xs">
-						{#if totalPods === 0}
-							<p class="text-xs">{m.no_data_display()}</p>
-						{:else if missingLimitCount === 0}
-							<p class="text-xs">{m.llm_dashboard_memory_limit_all_set_hint()}</p>
+					<Tooltip.Content side="bottom" class="max-w-sm">
+						{#if shmCrashPods.length === 0}
+							<p class="text-xs">{m.llm_dashboard_shm_crash_hint()}</p>
 						{:else}
 							<div class="flex flex-col gap-1">
-								<p class="text-xs">{m.llm_dashboard_memory_limit_missing_hint()}</p>
 								<ul class="flex max-h-40 flex-col gap-1 overflow-y-auto text-xs">
-									{#each podsMissingLimit as pod (pod)}
-										<li class="truncate" title={pod}>{pod}</li>
+									{#each shmCrashPods as p (p.pod)}
+										<li class="flex items-center gap-3">
+											<span class="truncate" title={p.pod}>{p.pod}</span>
+											<span class="ml-auto font-mono tabular-nums">exit {p.exitcode}</span>
+										</li>
 									{/each}
 								</ul>
+								<p class="mt-1 border-t pt-2 text-[0.7rem] leading-snug">
+									{m.llm_dashboard_shm_crash_hint()}
+								</p>
 							</div>
 						{/if}
 					</Tooltip.Content>
