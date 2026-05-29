@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { createClient, type Transport } from '@connectrpc/connect';
 	import ActivityIcon from '@lucide/svelte/icons/activity';
 	import ApertureIcon from '@lucide/svelte/icons/aperture';
 	import AudioWaveformIcon from '@lucide/svelte/icons/audio-waveform';
@@ -35,17 +34,13 @@
 	import Settings2Icon from '@lucide/svelte/icons/settings-2';
 	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import ZapIcon from '@lucide/svelte/icons/zap';
-	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { type TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
-	import type { Schema } from '@sjsf/form';
-	import { type Component, getContext, onMount } from 'svelte';
+	import { type Component, onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
 	import { shortcut } from '$lib/actions/shortcut.svelte';
-	import Create from '$lib/components/kind-viewer/kind-viewer-actions/workspace/create.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
@@ -59,41 +54,23 @@
 		cluster,
 		workspaces,
 		user,
-		workspace,
-		onsuccess
+		workspace
 	}: {
 		cluster: string;
 		workspaces: TenantOtterscaleIoV1Alpha1Workspace[];
 		user: User;
 		workspace?: string;
-		onsuccess?: (workspace?: TenantOtterscaleIoV1Alpha1Workspace) => void;
 	} = $props();
-
-	const transport: Transport = getContext('transport');
-	const resourceClient = createClient(ResourceService, transport);
 
 	let activeWorkspace = $derived(
 		workspaces.length > 0 && workspace
 			? workspaces.find((w) => w.metadata?.name === workspace)
 			: undefined
 	);
-	let workspaceSchema = $state<Schema | undefined>();
-	let createWorkspaceOpen = $state(false);
 	let isMac = $state(false);
 
 	onMount(async () => {
 		isMac = navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
-		try {
-			const res = await resourceClient.schema({
-				cluster,
-				group: 'tenant.otterscale.io',
-				version: 'v1alpha1',
-				kind: 'Workspace'
-			});
-			workspaceSchema = res.schema ?? {};
-		} catch (err) {
-			console.error('Failed to fetch workspace schema:', err);
-		}
 	});
 
 	const sidebar = useSidebar();
@@ -156,14 +133,6 @@
 		toast.success(m.switch_workspace({ name: name }));
 	}
 
-	function handleWorkspaceSuccess(workspace?: TenantOtterscaleIoV1Alpha1Workspace) {
-		createWorkspaceOpen = false;
-		if (workspace?.metadata?.name) {
-			onsuccess?.(workspace);
-			goto(resolve(`/(auth)/${cluster}/${workspace.metadata.name}/dashboard/overview`));
-		}
-	}
-
 	$effect(() => {
 		if (activeWorkspace) {
 			role.set(
@@ -224,21 +193,6 @@
 		callback: () => onSelect(8)
 	}}
 />
-
-{#if workspaceSchema}
-	<Create
-		role={page.data.isClusterAdmin === true ? 'Cluster Admin' : undefined}
-		bind:open={createWorkspaceOpen}
-		showTrigger={false}
-		group="tenant.otterscale.io"
-		version="v1alpha1"
-		kind="Workspace"
-		resource="workspaces"
-		schema={workspaceSchema}
-		{cluster}
-		onsuccess={handleWorkspaceSuccess}
-	/>
-{/if}
 
 <Sidebar.Menu>
 	<Sidebar.MenuItem>
@@ -336,15 +290,6 @@
 						</DropdownMenu.Shortcut>
 					</DropdownMenu.Item>
 				{/each}
-				{#if !page.data.isRestricted}
-					<DropdownMenu.Separator />
-					<DropdownMenu.Item class="gap-2 p-2" onSelect={() => (createWorkspaceOpen = true)}>
-						<div class="flex size-7 items-center justify-center rounded-md border bg-transparent">
-							<PlusIcon class="size-3.5" />
-						</div>
-						<div class="text-xs font-medium text-muted-foreground">{m.add_workspace()}</div>
-					</DropdownMenu.Item>
-				{/if}
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	</Sidebar.MenuItem>

@@ -10,16 +10,14 @@
 
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import Plus from '@lucide/svelte/icons/plus';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, setValue, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
 	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
-	import { getContext } from 'svelte';
+	import { getContext, type Snippet } from 'svelte';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
@@ -36,7 +34,7 @@
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
-	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { bump } from '$lib/stores/pulse.svelte';
 
 	let {
 		cluster,
@@ -46,9 +44,9 @@
 		resource,
 		schema: jsonSchema,
 		role,
-		onsuccess,
+		onSuccess,
 		open = $bindable(false),
-		showTrigger = true
+		trigger
 	}: {
 		cluster: string;
 		group: string;
@@ -57,9 +55,16 @@
 		resource: string;
 		schema: Schema;
 		role?: string;
-		onsuccess?: (workspace?: TenantOtterscaleIoV1Alpha1Workspace) => void;
+		onSuccess?: (name: string) => void;
 		open?: boolean;
-		showTrigger?: boolean;
+		trigger?: Snippet<
+			[
+				{
+					get open(): boolean;
+					set open(value: boolean);
+				}
+			]
+		>;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -134,20 +139,14 @@
 		initiate();
 	}}
 >
-	{#if showTrigger}
-		<Tooltip.Root>
-			<Tooltip.Trigger>
-				<Dialog.Trigger>
-					{#snippet child({ props })}
-						<Button {...props} variant="outline" size="icon">
-							<Plus />
-						</Button>
-					{/snippet}
-				</Dialog.Trigger>
-			</Tooltip.Trigger>
-			<Tooltip.Content>Create Resource</Tooltip.Content>
-		</Tooltip.Root>
-	{/if}
+	{@render trigger?.({
+		get open() {
+			return open;
+		},
+		set open(value) {
+			open = value;
+		}
+	})}
 	<Dialog.Content
 		class="max-h-[95vh] min-w-[38vw] overflow-auto"
 		onInteractOutside={(e) => e.preventDefault()}
@@ -657,7 +656,7 @@
 									{
 										loading: `Creating ${kind} ${name}...`,
 										success: () => {
-											onsuccess?.(values as TenantOtterscaleIoV1Alpha1Workspace);
+											onSuccess?.(name!);
 											return `Successfully created ${kind} ${name}`;
 										},
 										error: (error) => {
@@ -665,6 +664,7 @@
 											return `Failed to create ${kind} ${name}: ${lodash.get(error, 'message')}`;
 										},
 										finally() {
+											bump('workspaces');
 											isSubmitting = false;
 											open = false;
 										}
