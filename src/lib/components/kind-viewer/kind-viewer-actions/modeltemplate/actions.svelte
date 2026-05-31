@@ -84,6 +84,7 @@
 				/>
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
+				class="empty:hidden"
 				onSelect={(e) => {
 					e.preventDefault();
 				}}

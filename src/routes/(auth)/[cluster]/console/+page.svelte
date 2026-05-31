@@ -7,7 +7,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import Create from '$lib/components/kind-viewer/kind-viewer-actions/workspace/create.svelte';
+	import CreateWorkspace from '$lib/components/kind-viewer/kind-viewer-actions/utils/create-workspace.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Empty from '$lib/components/ui/empty/index.ts';
 	import { useSidebar } from '$lib/components/ui/sidebar';
@@ -59,7 +59,7 @@
 			{:then response}
 				{@const schema = response.schema}
 				{#if schema}
-					<Create
+					<CreateWorkspace
 						{role}
 						{cluster}
 						{schema}
@@ -81,7 +81,7 @@
 								Create
 							</Button>
 						{/snippet}
-					</Create>
+					</CreateWorkspace>
 				{/if}
 			{/await}
 		</Empty.Content>
