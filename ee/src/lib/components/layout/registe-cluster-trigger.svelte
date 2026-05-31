@@ -4,7 +4,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import { m } from '$lib/paraglide/messages';
 
-	let { open }: { open: boolean } = $props();
+	let { open = $bindable() }: { open: boolean } = $props();
 </script>
 
 <DropdownMenu.Item onclick={() => (open = true)}>

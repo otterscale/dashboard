@@ -32,8 +32,6 @@ function isLicenseValid(license: LicenseObject | null): boolean {
 	return status.phase ? VALID_PHASES.has(status.phase) : false;
 }
 
-
-
 async function fetchLicense(
 	fetch: typeof globalThis.fetch,
 	cluster: string
