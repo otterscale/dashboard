@@ -1,4 +1,15 @@
 <script lang="ts">
+	import { createClient, type Transport } from '@connectrpc/connect';
+	import { ResourceService } from '@otterscale/api/resource/v1';
+	import { getContext } from 'svelte';
+
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import Create from '$lib/components/kind-viewer/kind-viewer-actions/workspace/create.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
+	import { useSidebar } from '$lib/components/ui/sidebar';
+	import { m } from '$lib/paraglide/messages';
+	import { cn } from '$lib/utils';
 	import ActivityIcon from '@lucide/svelte/icons/activity';
 	import ApertureIcon from '@lucide/svelte/icons/aperture';
 	import AudioWaveformIcon from '@lucide/svelte/icons/audio-waveform';
@@ -38,17 +49,13 @@
 	import { type Component, onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import { shortcut } from '$lib/actions/shortcut.svelte';
-	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
-	import { m } from '$lib/paraglide/messages';
 	import type { User } from '$lib/server/session';
 	import { role } from '$lib/stores';
-	import { cn } from '$lib/utils';
+	import { page } from '$app/state';
+	import CreateWorkspaceTrigger from './create-workspace-trigger.svelte';
 
 	let {
 		cluster,
@@ -61,6 +68,9 @@
 		user: User;
 		workspace?: string;
 	} = $props();
+
+	const transport: Transport = getContext('transport');
+	const resourceClient = createClient(ResourceService, transport);
 
 	let activeWorkspace = $derived(
 		workspaces.length > 0 && workspace
@@ -290,6 +300,29 @@
 						</DropdownMenu.Shortcut>
 					</DropdownMenu.Item>
 				{/each}
+				<DropdownMenu.Item class="gap-2 p-2">
+					{#await resourceClient.schema( { cluster: cluster, group: 'tenant.otterscale.io', version: 'v1alpha1', kind: 'Workspace' } )}
+						<Button disabled>Create</Button>
+					{:then response}
+						{@const schema = response.schema}
+						{#if schema}
+							<Create
+								role={page.data.isClusterAdmin === true ? 'Cluster Admin' : undefined}
+								{cluster}
+								{schema}
+								group="tenant.otterscale.io"
+								version="v1alpha1"
+								kind="Workspace"
+								resource="workspaces"
+								onSuccess={(name) => {
+									goto(resolve(`/(auth)/${cluster}/${name}/dashboard/overview`));
+								}}
+							>
+								<CreateWorkspaceTrigger />
+							</Create>
+						{/if}
+					{/await}
+				</DropdownMenu.Item>
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	</Sidebar.MenuItem>

@@ -9,7 +9,7 @@
 	import { Progress } from '$lib/components/ui/progress';
 	import { cn } from '$lib/utils';
 
-	import ImportClusterExternal from './import-cluster-external.svelte';
+	import ImportClusterExternal from '../../../layout/import-cluster-external.svelte';
 
 	let {
 		open = $bindable(false),

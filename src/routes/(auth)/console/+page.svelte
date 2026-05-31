@@ -4,7 +4,7 @@
 
 	import { resolve } from '$app/paths';
 	import { startTour } from '$lib/components/layout';
-	import ImportCluster from '$lib/components/layout/dialog-import-cluster.svelte';
+	import Registe from '$lib/components/kind-viewer/kind-viewer-actions/cluster/registe.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Empty from '$lib/components/ui/empty/index.ts';
 	import { useSidebar } from '$lib/components/ui/sidebar';
@@ -34,7 +34,7 @@
 	let open = $state(false);
 </script>
 
-<ImportCluster bind:open />
+<Registe bind:open />
 
 <div
 	class={cn(

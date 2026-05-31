@@ -47,6 +47,8 @@
 	import { pulse } from '$lib/stores/pulse.svelte';
 
 	import type { LayoutData } from './$types';
+	import Registe from '$lib/components/kind-viewer/kind-viewer-actions/cluster/registe.svelte';
+	import RegisteClusterTrigger from '$lib/components/layout/registe-cluster-trigger.svelte';
 
 	let {
 		data,
@@ -68,6 +70,7 @@
 
 	let sidebarOpen = $state(true);
 	let aboutOpen = $state(false);
+	let importOpen = $state(false);
 
 	async function fetchClusters(): Promise<Link[]> {
 		try {
@@ -810,6 +813,9 @@
 										{/each}
 									</DropdownMenu.RadioGroup>
 								{/if}
+								{#if data.user.roles.includes('admin')}
+									<RegisteClusterTrigger />
+								{/if}
 							</DropdownMenu.Group>
 						</DropdownMenu.Content>
 					</DropdownMenu.Root>
@@ -862,3 +868,10 @@
 		{/if}
 	{/each}
 {/snippet}
+
+<Registe
+	bind:open={importOpen}
+	onsuccess={async () => {
+		links = await fetchClusters();
+	}}
+/>
