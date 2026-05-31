@@ -14,6 +14,14 @@ import svelteConfig from './svelte.config.js';
 
 const gitignorePath = fileURLToPath(new URL('./.gitignore', import.meta.url));
 
+const eslintSvelteConfig = {
+	...svelteConfig,
+	kit: {
+		...svelteConfig.kit,
+		typescript: undefined
+	}
+};
+
 export default defineConfig(
 	includeIgnoreFile(gitignorePath),
 	js.configs.recommended,
@@ -48,7 +56,7 @@ export default defineConfig(
 				projectService: true,
 				extraFileExtensions: ['.svelte'],
 				parser: ts.parser,
-				svelteConfig
+				svelteConfig: eslintSvelteConfig
 			}
 		}
 	},

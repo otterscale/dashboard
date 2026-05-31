@@ -9,32 +9,8 @@
 </script>
 
 <script lang="ts">
-	import { createClient, type Transport } from '@connectrpc/connect';
-	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
-	import { getValueSnapshot, setValue, SubmitButton } from '@sjsf/form';
-	import Ajv from 'ajv';
-	import { load } from 'js-yaml';
-	import lodash from 'lodash';
-	import { mode as themeMode } from 'mode-watcher';
-	import { getContext, type Snippet } from 'svelte';
-	import Monaco from 'svelte-monaco';
-	import { toast } from 'svelte-sonner';
-	import { stringify } from 'yaml';
-
-	import { page } from '$app/state';
-	import Form from '$lib/components/dynamic-form/form.svelte';
-	import RoleComboboxWidget from '$lib/components/dynamic-form/widgets/role-combobox.svelte';
-	import UserComboboxWidget, {
-		getDisplayName,
-		type KeycloakUser
-	} from '$lib/components/dynamic-form/widgets/user-combobox.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
-	import * as Dialog from '$lib/components/ui/dialog';
-	import * as Item from '$lib/components/ui/item';
-	import { Progress } from '$lib/components/ui/progress/index.js';
-	import * as Tabs from '$lib/components/ui/tabs/index.js';
-	import { bump } from '$lib/stores/pulse.svelte';
+	import type { Schema } from '@sjsf/form';
+	import type { Snippet } from 'svelte';
 
 	let {
 		cluster,
@@ -48,16 +24,23 @@
 		open,
 		trigger
 	}: {
-		cluster: unknown;
-		group: unknown;
-		version: unknown;
-		kind: unknown;
-		resource: unknown;
-		schema: unknown;
-		role: unknown;
-		onSuccess: unknown;
-		open: unknown;
-		trigger: unknown;
+		cluster: string;
+		group: string;
+		version: string;
+		kind: string;
+		resource: string;
+		schema: Schema;
+		role?: string;
+		onSuccess?: (name: string) => void;
+		open?: boolean;
+		trigger?: Snippet<
+			[
+				{
+					get open(): boolean;
+					set open(value: boolean);
+				}
+			]
+		>;
 	} = $props();
 
 	// svelte-ignore state_referenced_locally
