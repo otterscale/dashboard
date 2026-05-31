@@ -35,6 +35,8 @@
 		startTour,
 		WorkspaceSwitcher
 	} from '$lib/components/layout';
+	import Registe from '$lib/components/layout/dialog-import-cluster.svelte';
+	import RegisteClusterTrigger from '$lib/components/layout/registe-cluster-trigger.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -68,6 +70,7 @@
 
 	let sidebarOpen = $state(true);
 	let aboutOpen = $state(false);
+	let importOpen = $state(false);
 
 	async function fetchClusters(): Promise<Link[]> {
 		try {
@@ -811,6 +814,9 @@
 										{/each}
 									</DropdownMenu.RadioGroup>
 								{/if}
+								{#if data.user.roles.includes('admin')}
+									<RegisteClusterTrigger bind:open={importOpen} />
+								{/if}
 							</DropdownMenu.Group>
 						</DropdownMenu.Content>
 					</DropdownMenu.Root>
@@ -863,3 +869,10 @@
 		{/if}
 	{/each}
 {/snippet}
+
+<Registe
+	bind:open={importOpen}
+	onsuccess={async () => {
+		links = await fetchClusters();
+	}}
+/>
