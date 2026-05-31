@@ -12,6 +12,8 @@
 	import type { Schema } from '@sjsf/form';
 	import type { Snippet } from 'svelte';
 
+	import DisabledCreate from '$lib/components/kind-viewer/kind-viewer-actions/utils/disabled-create.svelte';
+
 	let {
 		cluster,
 		group,
@@ -64,3 +66,5 @@
 	// svelte-ignore state_referenced_locally
 	void trigger;
 </script>
+
+<DisabledCreate />
