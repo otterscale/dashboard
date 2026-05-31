@@ -35,6 +35,8 @@
 		startTour,
 		WorkspaceSwitcher
 	} from '$lib/components/layout';
+	import Registe from '$lib/components/layout/dialog-import-cluster.svelte';
+	import RegisteClusterTrigger from '$lib/components/layout/registe-cluster-trigger.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -47,8 +49,6 @@
 	import { pulse } from '$lib/stores/pulse.svelte';
 
 	import type { LayoutData } from './$types';
-	import Registe from '$lib/components/kind-viewer/kind-viewer-actions/cluster/registe.svelte';
-	import RegisteClusterTrigger from '$lib/components/layout/registe-cluster-trigger.svelte';
 
 	let {
 		data,
@@ -815,7 +815,7 @@
 									</DropdownMenu.RadioGroup>
 								{/if}
 								{#if data.user.roles.includes('admin')}
-									<RegisteClusterTrigger />
+									<RegisteClusterTrigger bind:open={importOpen} />
 								{/if}
 							</DropdownMenu.Group>
 						</DropdownMenu.Content>

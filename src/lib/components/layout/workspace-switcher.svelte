@@ -1,15 +1,5 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { ResourceService } from '@otterscale/api/resource/v1';
-	import { getContext } from 'svelte';
-
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
-	import Create from '$lib/components/kind-viewer/kind-viewer-actions/workspace/create.svelte';
-	import Button from '$lib/components/ui/button/button.svelte';
-	import { useSidebar } from '$lib/components/ui/sidebar';
-	import { m } from '$lib/paraglide/messages';
-	import { cn } from '$lib/utils';
 	import ActivityIcon from '@lucide/svelte/icons/activity';
 	import ApertureIcon from '@lucide/svelte/icons/aperture';
 	import AudioWaveformIcon from '@lucide/svelte/icons/audio-waveform';
@@ -45,16 +35,27 @@
 	import Settings2Icon from '@lucide/svelte/icons/settings-2';
 	import ShieldIcon from '@lucide/svelte/icons/shield';
 	import ZapIcon from '@lucide/svelte/icons/zap';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { type TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
+	import type { Schema } from '@sjsf/form';
+	import { getContext } from 'svelte';
 	import { type Component, onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { shortcut } from '$lib/actions/shortcut.svelte';
+	import CreateWorkspace from '$lib/components/kind-viewer/kind-viewer-actions/utils/create-workspace.svelte';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import { useSidebar } from '$lib/components/ui/sidebar';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
+	import { m } from '$lib/paraglide/messages';
 	import type { User } from '$lib/server/session';
 	import { role } from '$lib/stores';
-	import { page } from '$app/state';
+	import { cn } from '$lib/utils';
+
 	import CreateWorkspaceTrigger from './create-workspace-trigger.svelte';
 
 	let {
@@ -77,10 +78,18 @@
 			? workspaces.find((w) => w.metadata?.name === workspace)
 			: undefined
 	);
-	let isMac = $state(false);
+	let isMac = $derived(navigator.userAgent.toUpperCase().indexOf('MAC') >= 0);
+	let createWorkspaceOpen = $state(false);
+	let workspaceSchema: Schema | undefined = $state(undefined);
 
 	onMount(async () => {
-		isMac = navigator.userAgent.toUpperCase().indexOf('MAC') >= 0;
+		const response = await resourceClient.schema({
+			cluster: cluster,
+			group: 'tenant.otterscale.io',
+			version: 'v1alpha1',
+			kind: 'Workspace'
+		});
+		workspaceSchema = response.schema as Schema;
 	});
 
 	const sidebar = useSidebar();
@@ -300,30 +309,24 @@
 						</DropdownMenu.Shortcut>
 					</DropdownMenu.Item>
 				{/each}
-				<DropdownMenu.Item class="gap-2 p-2">
-					{#await resourceClient.schema( { cluster: cluster, group: 'tenant.otterscale.io', version: 'v1alpha1', kind: 'Workspace' } )}
-						<Button disabled>Create</Button>
-					{:then response}
-						{@const schema = response.schema}
-						{#if schema}
-							<Create
-								role={page.data.isClusterAdmin === true ? 'Cluster Admin' : undefined}
-								{cluster}
-								{schema}
-								group="tenant.otterscale.io"
-								version="v1alpha1"
-								kind="Workspace"
-								resource="workspaces"
-								onSuccess={(name) => {
-									goto(resolve(`/(auth)/${cluster}/${name}/dashboard/overview`));
-								}}
-							>
-								<CreateWorkspaceTrigger />
-							</Create>
-						{/if}
-					{/await}
-				</DropdownMenu.Item>
+				<CreateWorkspaceTrigger bind:open={createWorkspaceOpen} />
 			</DropdownMenu.Content>
 		</DropdownMenu.Root>
 	</Sidebar.MenuItem>
 </Sidebar.Menu>
+
+{#if workspaceSchema}
+	<CreateWorkspace
+		role={page.data.isClusterAdmin === true ? 'Cluster Admin' : undefined}
+		{cluster}
+		schema={workspaceSchema}
+		group="tenant.otterscale.io"
+		version="v1alpha1"
+		kind="Workspace"
+		resource="workspaces"
+		bind:open={createWorkspaceOpen}
+		onSuccess={(name) => {
+			goto(resolve(`/(auth)/${cluster}/${name}/dashboard/overview`));
+		}}
+	/>
+{/if}
