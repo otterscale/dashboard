@@ -279,7 +279,7 @@
 													return {
 														subject: member.subject,
 														role: member.role,
-														username: user.name,
+														username: user.username,
 														name: getDisplayName(user),
 														serviceAccount: isServiceAccount(user.username)
 													};
