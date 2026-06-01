@@ -4,7 +4,7 @@
 		role: string;
 		name: string;
 		username: string;
-		isServiceAccount: boolean;
+		serviceAccount: string;
 	}
 </script>
 
