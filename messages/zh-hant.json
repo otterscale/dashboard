@@ -568,4 +568,5 @@
 	"license_adjust_nodes_fifo_hint": "FIFO 模式：節點依加入叢集的順序自動授權。",
 	"license_adjust_nodes_readonly": "此授權已過期或無效，無法調整節點設定。",
 	"license_adjust_nodes_last_accepted": "上次接受："
+	"llm_dashboard_gpu_memory_tooltip": ">95% Node 滿載（加卡或加 Replica）；80–95% 偏熱；<80% 表示 vLLM 過度預留 KV。包含此 Node 上所有 workload，非僅此 Model。"
 }
