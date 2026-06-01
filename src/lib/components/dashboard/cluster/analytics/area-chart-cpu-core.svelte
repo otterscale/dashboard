@@ -23,16 +23,23 @@
 	} from '$lib/prometheus';
 	import { cn } from '$lib/utils';
 
-	let { client, fqdn }: { client: PrometheusDriver; fqdn: string } = $props();
+	let {
+		client,
+		fqdn,
+		start,
+		end,
+		endIsNow
+	}: { client: PrometheusDriver; fqdn: string; start: Date; end: Date; endIsNow: boolean } =
+		$props();
 
 	// Configuration
-	const STEP_SECONDS = 60;
-	const TIME_RANGE_HOURS = 1;
 	const TOP_HIGHLIGHT_COUNT = 3;
 
-	// Time range (stable, computed once at mount)
-	const endTime = new Date();
-	const startTime = new Date(endTime.getTime() - TIME_RANGE_HOURS * 60 * 60 * 1000);
+	// Time range (derived from props)
+	const effectiveEnd = endIsNow ? new Date() : end;
+	const timeRangeHours = (effectiveEnd.getTime() - start.getTime()) / 3_600_000;
+	const chartTimeRange = formatChartTimeRange(timeRangeHours);
+	const STEP_SECONDS = 60;
 
 	// Prometheus query (fqdn is stable after mount via {#key} in parent)
 	// Use $derived to properly track fqdn as reactive dependency per Svelte 5 rules
@@ -50,7 +57,7 @@
 
 	onMount(async () => {
 		try {
-			rawData = await fetchFlattenedRange(client, query, startTime, endTime, STEP_SECONDS);
+			rawData = await fetchFlattenedRange(client, query, start, effectiveEnd, STEP_SECONDS);
 		} catch {
 			hasError = true;
 		}
@@ -139,9 +146,8 @@
 					props={{
 						area: areaProps,
 						xAxis: {
-							ticks: getChartXAxisTicks(formatChartTimeRange(TIME_RANGE_HOURS)),
-							format: (date: Date) =>
-								formatChartXAxisDate(date, formatChartTimeRange(TIME_RANGE_HOURS))
+							ticks: getChartXAxisTicks(chartTimeRange),
+							format: (date: Date) => formatChartXAxisDate(date, chartTimeRange)
 						},
 						yAxis: {
 							format: () => ''
@@ -152,7 +158,7 @@
 						<defs>
 							{#each context.series.visibleSeries as s (s.key)}
 								{@const gradientId = s.key.replace(/\s+/g, '')}
-								<linearGradient id="fill{gradientId}" x1="0" y1="0" x2="0" y2="1">
+								<linearGradient id="cpucore_fill{gradientId}" x1="0" y1="0" x2="0" y2="1">
 									<stop offset="5%" stop-color={s.color} stop-opacity={1.0} />
 									<stop offset="95%" stop-color={s.color} stop-opacity={0.4} />
 								</linearGradient>
@@ -161,7 +167,7 @@
 
 						{#each context.series.visibleSeries as s (s.key)}
 							{@const gradientId = s.key.replace(/\s+/g, '')}
-							<Area seriesKey={s.key} {...areaProps} fill="url(#fill{gradientId})" />
+							<Area seriesKey={s.key} {...areaProps} fill="url(#cpucore_fill{gradientId})" />
 						{/each}
 					{/snippet}
 
