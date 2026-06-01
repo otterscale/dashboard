@@ -5,7 +5,9 @@
 	import type { Schema } from '@sjsf/form';
 	import type { Row } from '@tanstack/table-core';
 	import type { ValidateFunction } from 'ajv';
+	import lodash from 'lodash';
 
+	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
@@ -45,8 +47,20 @@
 <Card.Root class="transition-shadow hover:shadow-md">
 	<Card.Header>
 		<Item.Root class="items-start p-0">
-			<Item.Media class="rounded-full bg-muted p-2">
-				<BotIcon />
+			<Item.Media variant="image">
+				<Avatar.Root>
+					<Avatar.Image
+						src={lodash.get(row.original.raw, [
+							'metadata',
+							'annotations',
+							'model.otterscale.io/icon'
+						])}
+						alt={row.original['Name'] as string}
+					/>
+					<Avatar.Fallback class="bg-muted">
+						<BotIcon />
+					</Avatar.Fallback>
+				</Avatar.Root>
 			</Item.Media>
 			<Item.Content class="min-w-0 text-left">
 				<Item.Title class="text-base font-semibold">
@@ -77,24 +91,18 @@
 			</Item.Actions>
 		</Item.Root>
 	</Card.Header>
-	<Card.Content class="flex flex-1 gap-3">
+	<Card.Content>
 		{@const modelName = row.original['Model Name'] as string | null}
-		{@const modelUri = row.original['Model URI'] as string | null}
+		{@const modelDescription = lodash.get(row.original.raw, [
+			'metadata',
+			'annotations',
+			'model.otterscale.io/description'
+		])}
 		{#if modelName}
 			<Item.Root class="items-start p-0">
-				<Item.Content class="min-w-0 text-left">
-					<Item.Title>Model</Item.Title>
-					<Item.Description>
-						{modelName}
-					</Item.Description>
-				</Item.Content>
-			</Item.Root>
-			<Item.Root class="items-start p-0">
-				<Item.Content class="min-w-0 text-left">
-					<Item.Title>Source</Item.Title>
-					<Item.Description>
-						{modelUri}
-					</Item.Description>
+				<Item.Content class="min-w-0 space-y-2 text-left">
+					<Item.Title>{modelName}</Item.Title>
+					<Item.Description>{modelDescription}</Item.Description>
 				</Item.Content>
 			</Item.Root>
 		{/if}
