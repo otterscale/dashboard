@@ -5,7 +5,7 @@
 	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
-	import { load } from 'js-yaml';
+	import { JSON_SCHEMA, load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
@@ -552,7 +552,7 @@
 								return;
 							}
 
-							const isValid = validate(parsed);
+							const isValid = validate(load(value, { schema: JSON_SCHEMA }));
 
 							if (!isValid) {
 								console.error('Validation errors:', validate.errors);
@@ -561,7 +561,7 @@
 								return;
 							}
 
-							const name = object.metadata?.name;
+							const name = lodash.get(load(value, { schema: JSON_SCHEMA }), 'metadata.name');
 							const manifest = new TextEncoder().encode(value);
 
 							toast.promise(

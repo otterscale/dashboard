@@ -9,7 +9,7 @@
 	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
-	import { load } from 'js-yaml';
+	import { JSON_SCHEMA, load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
@@ -489,7 +489,7 @@
 								});
 								const validate = jsonSchemaValidator.compile(jsonSchema);
 
-								const isValid = validate(load(value));
+								const isValid = validate(load(value, { schema: JSON_SCHEMA }));
 
 								if (!isValid) {
 									console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
@@ -498,7 +498,7 @@
 									return;
 								}
 
-								const name = lodash.get(load(value), 'metadata.name');
+								const name = lodash.get(load(value, { schema: JSON_SCHEMA }), 'metadata.name');
 
 								toast.promise(
 									async () => {
