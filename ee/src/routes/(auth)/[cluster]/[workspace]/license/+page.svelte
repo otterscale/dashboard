@@ -7,7 +7,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import Empty from '$lib/components/license/license-empty.svelte';
-	import Manager from '$lib/components/license/license-mamager.svelte';
+	import Manager from '$lib/components/license/license-manager.svelte';
 	import type { ClusterFingerprintObject, LicenseObject } from '$lib/components/license/types';
 	import { m } from '$lib/paraglide/messages';
 	import { breadcrumbs } from '$lib/stores';
