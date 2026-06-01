@@ -2,7 +2,6 @@
 	import PlusIcon from '@lucide/svelte/icons/plus';
 
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import { m } from '$lib/paraglide/messages';
 
 	let { open = $bindable() }: { open: boolean } = $props();
 </script>
