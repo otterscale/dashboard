@@ -25,11 +25,13 @@
 	import * as Popover from '$lib/components/ui/popover/index.js';
 	import { cn } from '$lib/utils.js';
 
+	import { roles } from './role-combobox';
+
 	const ctx = getFormContext();
 	let { value = $bindable(), config, handlers }: ComponentProps['comboboxWidget'] = $props();
 
 	const { ...buttonHandlers } = $derived(handlers);
-	const enumerations: { label: string; value: string }[] = [{ label: 'admin', value: 'admin' }];
+	const enumerations: { label: string; value: string }[] = roles;
 
 	let open = $state(false);
 	let triggerReference = $state<HTMLButtonElement>(null!);

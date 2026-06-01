@@ -1,20 +1,28 @@
+<script lang="ts" module>
+	export interface Member {
+		subject: string;
+		role: string;
+		name: string;
+		username: string;
+		isServiceAccount: boolean;
+	}
+</script>
+
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import FormIcon from '@lucide/svelte/icons/form';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
-	import type { FormState, FormValue, Schema, SchemaValue, UiSchemaRoot } from '@sjsf/form';
+	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, setValue, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
 	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
-	import type { Snippet } from 'svelte';
-	import { getContext } from 'svelte';
+	import { getContext, type Snippet } from 'svelte';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
+	import { page } from '$app/state';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import RoleComboboxWidget from '$lib/components/dynamic-form/widgets/role-combobox.svelte';
 	import UserComboboxWidget, {
@@ -26,61 +34,45 @@
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
-
-	import type { Member } from './create.svelte';
+	import { bump } from '$lib/stores/pulse.svelte';
 
 	let {
-		role,
 		cluster,
 		group,
 		version,
 		kind,
 		resource,
 		schema: jsonSchema,
-		object,
-		onOpenChangeComplete,
-		trigger,
-		onsuccess,
-		open = $bindable(false)
+		role,
+		onSuccess,
+		open = $bindable(false),
+		trigger
 	}: {
-		role?: string;
 		cluster: string;
 		group: string;
 		version: string;
 		kind: string;
 		resource: string;
 		schema: Schema;
-		object?: TenantOtterscaleIoV1Alpha1Workspace;
-		onOpenChangeComplete?: () => void;
-		trigger?: Snippet<[Record<string, unknown>]>;
-		onsuccess?: (workspace?: TenantOtterscaleIoV1Alpha1Workspace) => void;
+		role?: string;
+		onSuccess?: (name: string) => void;
 		open?: boolean;
+		trigger?: Snippet<
+			[
+				{
+					get open(): boolean;
+					set open(value: boolean);
+				}
+			]
+		>;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	const formCount = 3;
+	const formCount = 4;
 	const steps = Array.from({ length: formCount + 1 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
-
-	const systemFields = [
-		'clusterName',
-		'creationTimestamp',
-		'deletionGracePeriodSeconds',
-		'deletionTimestamp',
-		'finalizers',
-		'generateName',
-		'generation',
-		'initializers',
-		'managedFields',
-		'ownerReferences',
-		'resourceVersion',
-		'relationships',
-		'selfLink',
-		'state',
-		'uid'
-	];
 
 	let values = $state(getInitialValues());
 	let resourceLimitation = $state(getInitialResourceLimitation());
@@ -88,44 +80,34 @@
 	let isSubmitting = $state(false);
 	let membersFormReference = $state(null);
 
-	let value = $derived.by(() => {
-		const filtered = lodash.cloneDeep(values);
-		if (filtered.metadata) {
-			const metadata = filtered.metadata as Record<string, unknown>;
-			for (const field of systemFields) {
-				delete metadata[field];
-			}
-		}
-		return stringify(filtered);
-	});
+	let value = $derived(stringify(values));
 	const currentIndex = $derived(steps.indexOf(currentStep));
 
 	function getInitialValues() {
 		return {
 			apiVersion: `${group}/${version}`,
 			kind: kind,
-			metadata: lodash.get(object, 'metadata', {}) as SchemaValue,
+			metadata: {},
 			spec: {
-				members: lodash.get(object, 'spec.members', []) as SchemaValue,
-				networkIsolation: lodash.get(object, 'spec.networkIsolation', {
+				members: [
+					{
+						subject: page.data.user.sub,
+						role: 'admin',
+						name: page.data.user.name,
+						username: page.data.user.username,
+						serviceAccount: false
+					}
+				],
+				networkIsolation: {
 					enabled: false
-				}) as SchemaValue,
-				...(lodash.has(object, 'spec.resourceQuota')
-					? { resourceQuota: lodash.get(object, 'spec.resourceQuota') as SchemaValue }
-					: {})
+				}
 			}
 		};
 	}
 	function getInitialResourceLimitation() {
 		return {
-			unlimit: !lodash.has(object, 'spec.resourceQuota.hard'),
-			hard: lodash.get(object, 'spec.resourceQuota.hard', {
-				'requests.cpu': '32',
-				'requests.memory': '64Gi',
-				'limits.cpu': '32',
-				'limits.memory': '64Gi',
-				'limits.nvidia.com/gpumem': '1'
-			}) as SchemaValue
+			unlimit: false,
+			ResourceQuota: {}
 		};
 	}
 
@@ -152,28 +134,19 @@
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
-		onOpenChangeComplete?.();
-		if (!isOpen) {
-			initiate();
-		}
+		if (isOpen) return;
+
+		initiate();
 	}}
 >
-	<Dialog.Trigger>
-		{#snippet child({ props })}
-			{#if trigger}
-				{@render trigger(props)}
-			{:else}
-				<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
-					<Item.Media>
-						<FormIcon />
-					</Item.Media>
-					<Item.Content>
-						<Item.Title>Update</Item.Title>
-					</Item.Content>
-				</Item.Root>
-			{/if}
-		{/snippet}
-	</Dialog.Trigger>
+	{@render trigger?.({
+		get open() {
+			return open;
+		},
+		set open(value) {
+			open = value;
+		}
+	})}
 	<Dialog.Content
 		class="max-h-[95vh] min-w-[38vw] overflow-auto"
 		onInteractOutside={(e) => e.preventDefault()}
@@ -188,6 +161,42 @@
 		<Tabs.Root value={currentStep}>
 			<Tabs.Content value={steps[0]}>
 				<Form
+					schema={{
+						...lodash.omit(lodash.get(jsonSchema, 'properties.metadata') as Schema, 'properties'),
+						title: 'Metadata',
+						required: [...lodash.get(jsonSchema, 'properties.metadata.required', []), 'name'],
+						properties: {
+							name: {
+								...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema),
+								title: 'Name'
+							}
+						}
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={{} as FormValue}
+					handleSubmit={{
+						posthook: () => {
+							handleNext();
+						}
+					}}
+					bind:values={values['metadata']}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-end gap-3">
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+
+			<Tabs.Content value={steps[1]}>
+				<Form
 					bind:reference={membersFormReference}
 					schema={{
 						...lodash.omit(
@@ -195,7 +204,41 @@
 							'items'
 						),
 						title: 'Members',
-						items: {
+						items: [
+							{
+								...lodash.omit(
+									lodash.get(jsonSchema, 'properties.spec.properties.members.items') as Schema,
+									['properties']
+								),
+								properties: {
+									subject: {
+										...(lodash.get(
+											jsonSchema,
+											'properties.spec.properties.members.items.properties.subject'
+										) as Schema),
+										title: 'Identifier',
+										readOnly: true
+									},
+									role: {
+										...(lodash.get(
+											jsonSchema,
+											'properties.spec.properties.members.items.properties.role'
+										) as Schema),
+										title: 'Role',
+										readOnly: true
+									},
+									name: {
+										...(lodash.get(
+											jsonSchema,
+											'properties.spec.properties.members.items.properties.name'
+										) as Schema),
+										title: 'Name',
+										readOnly: true
+									}
+								}
+							}
+						],
+						additionalItems: {
 							...lodash.omit(
 								lodash.get(jsonSchema, 'properties.spec.properties.members.items') as Schema,
 								['properties']
@@ -235,6 +278,16 @@
 							}
 						},
 						items: {
+							'ui:options': {
+								layouts: {
+									'object-properties': {
+										class:
+											'grid grid-cols-2 gap-3 [&_input]:read-only:focus-visible:ring-0 [&_input]:read-only:read-only:focus-visible:ring-offset-0 [&_input]:read-only:read-only:focus-visible:border-input [&_input]:read-only:read-only:cursor-default'
+									}
+								}
+							}
+						},
+						additionalItems: {
 							'ui:options': {
 								layouts: {
 									'object-properties': {
@@ -291,7 +344,15 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={lodash.get(values, 'spec.members') as FormValue}
+					initialValue={[
+						{
+							subject: page.data.user.sub,
+							role: 'admin',
+							name: page.data.user.name,
+							username: page.data.user.username,
+							serviceAccount: false
+						}
+					] as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
@@ -300,14 +361,19 @@
 					bind:values={values['spec']['members']}
 				>
 					{#snippet actions()}
-						<div class="flex w-full items-center justify-end gap-3">
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}>Previous</Button
+							>
 							<SubmitButton />
 						</div>
 					{/snippet}
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[1]}>
+			<Tabs.Content value={steps[2]}>
 				<Form
 					schema={{
 						...lodash.omit(
@@ -352,7 +418,9 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={lodash.get(values, 'spec.networkIsolation') as FormValue}
+					initialValue={{
+						enabled: false
+					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
 							handleNext();
@@ -373,7 +441,7 @@
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[2]}>
+			<Tabs.Content value={steps[3]}>
 				{@const editable = role === 'Cluster Admin'}
 				<Form
 					schema={{
@@ -464,7 +532,16 @@
 							}
 						}
 					} as UiSchemaRoot}
-					initialValue={resourceLimitation}
+					initialValue={{
+						unlimit: false,
+						hard: {
+							'requests.cpu': '32',
+							'requests.memory': '64Gi',
+							'limits.cpu': '32',
+							'limits.memory': '64Gi',
+							'limits.nvidia.com/gpumem': '1'
+						}
+					} as FormValue}
 					handleSubmit={{
 						posthook: (form: FormState<FormValue>) => {
 							handleNext();
@@ -546,6 +623,7 @@
 
 								isSubmitting = true;
 
+								// Validator
 								const jsonSchemaValidator = new Ajv({
 									allErrors: true,
 									strict: false
@@ -561,34 +639,32 @@
 									return;
 								}
 
-								const name = lodash.get(values, 'metadata.name') as string;
+								const name = lodash.get(values, 'metadata.name');
 
 								toast.promise(
 									async () => {
 										const manifest = new TextEncoder().encode(value);
 
-										await resourceClient.apply({
+										await resourceClient.create({
 											cluster,
-											name,
 											group,
 											version,
 											resource,
-											manifest,
-											fieldManager: 'otterscale-web-ui',
-											force: true
+											manifest
 										});
 									},
 									{
-										loading: `Updating ${kind} ${name}...`,
+										loading: `Creating ${kind} ${name}...`,
 										success: () => {
-											onsuccess?.(values as TenantOtterscaleIoV1Alpha1Workspace);
-											return `Successfully updated ${kind} ${name}`;
+											onSuccess?.(name!);
+											return `Successfully created ${kind} ${name}`;
 										},
 										error: (error) => {
-											console.error(`Failed to update ${kind} ${name}:`, error);
-											return `Failed to update ${kind} ${name}: ${lodash.get(error, 'message')}`;
+											console.error(`Failed to create ${kind} ${name}:`, error);
+											return `Failed to create ${kind} ${name}: ${lodash.get(error, 'message')}`;
 										},
 										finally() {
+											bump('workspaces');
 											isSubmitting = false;
 											open = false;
 										}
@@ -596,7 +672,7 @@
 								);
 							}}
 						>
-							Update
+							Create
 						</Button>
 					</div>
 				</div>

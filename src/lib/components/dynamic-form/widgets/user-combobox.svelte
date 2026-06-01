@@ -166,7 +166,7 @@
 							<Check
 								class={cn('mr-2 size-4', !(value && value === option.value) && 'text-transparent')}
 							/>
-							<Tooltip.Root>
+							<Tooltip.Root delayDuration={300}>
 								<Tooltip.Trigger class="w-full">
 									<Item.Root class="w-full p-0">
 										<Item.Content class="text-start">
@@ -177,7 +177,10 @@
 										</Item.Content>
 									</Item.Root>
 								</Tooltip.Trigger>
-								<Tooltip.Content side="right" sideOffset={32}>
+								<Tooltip.Content
+									side="bottom"
+									class={option.label === option.user.username ? 'hidden' : 'visible'}
+								>
 									{option.user.username}
 								</Tooltip.Content>
 							</Tooltip.Root>
