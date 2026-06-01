@@ -46,7 +46,7 @@
 	const targetKind = 'LLMInferenceService';
 	const targetResource = 'llminferenceservices';
 
-	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 
 	type GPUDevice = { type: string; node: string };
@@ -94,42 +94,6 @@
 				}
 			}
 		};
-	}
-
-	function applyKVCacheEnvironments(templatePath: string[]) {
-		lodash.set(
-			values,
-			[...templatePath, 'containers'],
-			[
-				{
-					name: 'main',
-					env: [
-						{ name: 'LMCACHE_CONFIG_FILE', value: '/etc/lmcache/lmcache_config.yaml' },
-						{ name: 'LMCACHE_USE_EXPERIMENTAL', value: 'True' }
-					]
-				}
-			]
-		);
-	}
-
-	function removeKVCacheEnvironments(templatePath: string[]) {
-		const containers = lodash.get(values, [...templatePath, 'containers']) as
-			| Array<{ name?: string; env?: Array<{ name?: string; value?: string }> }>
-			| undefined;
-		if (!Array.isArray(containers)) return;
-
-		const kvCacheEnvNames = new Set(['LMCACHE_CONFIG_FILE', 'LMCACHE_USE_EXPERIMENTAL']);
-
-		const cleaned = containers.map((container) => {
-			if (!Array.isArray(container.env)) return container;
-			const env = container.env.filter((entry) => !kvCacheEnvNames.has(entry.name ?? ''));
-			if (env.length === 0) {
-				return lodash.omit(container, 'env');
-			}
-			return { ...container, env };
-		});
-
-		lodash.set(values, [...templatePath, 'containers'], cleaned);
 	}
 
 	let values = $state(getInitialValues());
@@ -502,65 +466,8 @@
 				{/await}
 			</Tabs.Content>
 
-			<!-- Step 4 — KV Cache -->
-			<Tabs.Content value={steps[3]}>
-				<Form
-					schema={{
-						title: 'KV Cache Offload',
-						type: 'object',
-						properties: {
-							enabled: {
-								title: 'Enable',
-								description:
-									'Offload KV cache from GPU memory to host or remote storage, freeing GPU capacity for longer contexts, higher concurrency, and better prefix cache hit rates across requests.',
-								type: 'boolean'
-							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{ enabled: false } as FormValue}
-					handleSubmit={{
-						posthook: (form) => {
-							const value = getValueSnapshot(form);
-							const enabled = lodash.get(value, 'enabled') as boolean | undefined;
-							if (enabled) {
-								applyKVCacheEnvironments(['spec', 'template']);
-								if (lodash.has(object, 'spec.prefill')) {
-									applyKVCacheEnvironments(['spec', 'prefill', 'template']);
-								}
-							} else {
-								removeKVCacheEnvironments(['spec', 'template']);
-								if (lodash.has(object, 'spec.prefill')) {
-									removeKVCacheEnvironments(['spec', 'prefill', 'template']);
-								}
-							}
-							handleNext();
-						}
-					}}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-
 			<!-- Step 5 — YAML preview -->
-			<Tabs.Content value={steps[4]} class="min-h-[77vh]">
+			<Tabs.Content value={steps[3]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{
