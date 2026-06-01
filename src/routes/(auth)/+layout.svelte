@@ -47,6 +47,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import { breadcrumbs } from '$lib/stores';
 	import { pulse } from '$lib/stores/pulse.svelte';
+	import { getAdditionalItems } from '$lib/utils/features';
 
 	import type { LayoutData } from './$types';
 
@@ -394,7 +395,10 @@
 												workspace: page.params.workspace
 											})
 										: ''
-								}
+								},
+								...(page.params.workspace
+									? getAdditionalItems(activeCluster, page.params.workspace!)
+									: [])
 							]
 						}
 					]
