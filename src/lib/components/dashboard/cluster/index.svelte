@@ -84,11 +84,16 @@
 						>
 							<InstancePicker {prometheusDriver} bind:selectedInstance />
 						</div>
-						<DatetimePicker
-							bind:from={pickerFrom}
-							bind:to={pickerTo}
-							bind:toIsNow={pickerToIsNow}
-						/>
+						<div
+							class={selectedTab !== 'analytics' ? 'pointer-events-none invisible select-none' : ''}
+							aria-hidden={selectedTab !== 'analytics'}
+						>
+							<DatetimePicker
+								bind:from={pickerFrom}
+								bind:to={pickerTo}
+								bind:toIsNow={pickerToIsNow}
+							/>
+						</div>
 						<Reloader bind:checked={isReloading} />
 					</div>
 				</div>
