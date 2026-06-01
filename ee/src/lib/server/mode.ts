@@ -23,6 +23,8 @@ const VALID_CONDITION_TYPES = new Set(['Valid', 'Ready']);
 const VALID_PHASES = new Set(['Active', 'Valid']);
 
 function isLicenseValid(license: LicenseObject | null): boolean {
+	if (!license) return false;
+
 	const status = license?.status;
 	if (!status) return false;
 
