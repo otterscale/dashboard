@@ -36,9 +36,9 @@
 	const TOP_HIGHLIGHT_COUNT = 3;
 
 	// Time range (derived from props)
-	const effectiveEnd = endIsNow ? new Date() : end;
-	const timeRangeHours = (effectiveEnd.getTime() - start.getTime()) / 3_600_000;
-	const chartTimeRange = formatChartTimeRange(timeRangeHours);
+	const effectiveEnd = $derived(endIsNow ? new Date() : end);
+	const timeRangeHours = $derived((effectiveEnd.getTime() - start.getTime()) / 3_600_000);
+	const chartTimeRange = $derived(formatChartTimeRange(timeRangeHours));
 	const STEP_SECONDS = 60;
 
 	// Prometheus query (fqdn is stable after mount via {#key} in parent)

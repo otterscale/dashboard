@@ -37,9 +37,9 @@
 	}: { client: PrometheusDriver; fqdn: string; start: Date; end: Date; endIsNow: boolean } =
 		$props();
 
-	const effectiveEnd = endIsNow ? new Date() : end;
-	const timeRangeHours = (effectiveEnd.getTime() - start.getTime()) / 3_600_000;
-	const chartTimeRange = formatChartTimeRange(timeRangeHours);
+	const effectiveEnd = $derived(endIsNow ? new Date() : end);
+	const timeRangeHours = $derived((effectiveEnd.getTime() - start.getTime()) / 3_600_000);
+	const chartTimeRange = $derived(formatChartTimeRange(timeRangeHours));
 	const STEP_SECONDS = 60;
 
 	let topk = $state(10);
