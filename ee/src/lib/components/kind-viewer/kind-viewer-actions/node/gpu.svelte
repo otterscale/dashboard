@@ -7,6 +7,7 @@
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
+	import { page } from '$app/state';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Item from '$lib/components/ui/item';
 
@@ -40,127 +41,129 @@
 	let isSubmitting = $state(false);
 </script>
 
-<DropdownMenu.Sub>
-	<DropdownMenu.SubTrigger class="w-full">
-		<Item.Root class="p-0 text-xs" size="sm">
-			<Item.Media>
-				<GpuIcon />
-			</Item.Media>
-			<Item.Content>
-				<Item.Title>GPU</Item.Title>
-			</Item.Content>
-		</Item.Root>
-	</DropdownMenu.SubTrigger>
-	<DropdownMenu.SubContent>
-		<DropdownMenu.Item
-			disabled={isVirtualOn}
-			onclick={() => {
-				if (isSubmitting) return;
+{#if !page.data.isRestricted}
+	<DropdownMenu.Sub>
+		<DropdownMenu.SubTrigger class="w-full">
+			<Item.Root class="p-0 text-xs" size="sm">
+				<Item.Media>
+					<GpuIcon />
+				</Item.Media>
+				<Item.Content>
+					<Item.Title>GPU</Item.Title>
+				</Item.Content>
+			</Item.Root>
+		</DropdownMenu.SubTrigger>
+		<DropdownMenu.SubContent>
+			<DropdownMenu.Item
+				disabled={isVirtualOn}
+				onclick={() => {
+					if (isSubmitting) return;
 
-				isSubmitting = true;
+					isSubmitting = true;
 
-				const apiVersion = `${group}/${version}`;
-				const name = object?.metadata?.name;
+					const apiVersion = `${group}/${version}`;
+					const name = object?.metadata?.name;
 
-				toast.promise(
-					async () => {
-						const value = JSON.stringify({
-							apiVersion,
-							kind,
-							metadata: {
-								name,
-								labels: {
-									'otterscale.io/gpu': 'true',
-									'nvidia.com/gpu.workload.config': ''
+					toast.promise(
+						async () => {
+							const value = JSON.stringify({
+								apiVersion,
+								kind,
+								metadata: {
+									name,
+									labels: {
+										'otterscale.io/gpu': 'true',
+										'nvidia.com/gpu.workload.config': ''
+									}
 								}
-							}
-						});
+							});
 
-						const manifest = new TextEncoder().encode(value);
+							const manifest = new TextEncoder().encode(value);
 
-						await resourceClient.apply({
-							cluster,
-							name,
-							group,
-							version,
-							resource,
-							manifest,
-							fieldManager: 'otterscale-web-ui',
-							force: true
-						});
-					},
-					{
-						loading: `Updating ${kind} ${name}...`,
-						success: () => {
-							return `Successfully updated ${kind} ${name}`;
-						},
-						error: (error) => {
-							console.error(`Failed to update ${kind} ${name}:`, error);
-							return `Failed to update ${kind} ${name}: ${(error as ConnectError).message}`;
-						},
-						finally() {
-							isSubmitting = false;
-						}
-					}
-				);
-			}}
-		>
-			Virtual GPU
-		</DropdownMenu.Item>
-		<DropdownMenu.Item
-			disabled={isPassthroughOn}
-			onclick={() => {
-				if (isSubmitting) return;
-
-				isSubmitting = true;
-
-				const apiVersion = `${group}/${version}`;
-				const name = object?.metadata?.name;
-
-				toast.promise(
-					async () => {
-						const value = JSON.stringify({
-							apiVersion,
-							kind,
-							metadata: {
+							await resourceClient.apply({
+								cluster,
 								name,
-								labels: {
-									'otterscale.io/gpu': '',
-									'nvidia.com/gpu.workload.config': 'vm-passthrough'
-								}
+								group,
+								version,
+								resource,
+								manifest,
+								fieldManager: 'otterscale-web-ui',
+								force: true
+							});
+						},
+						{
+							loading: `Updating ${kind} ${name}...`,
+							success: () => {
+								return `Successfully updated ${kind} ${name}`;
+							},
+							error: (error) => {
+								console.error(`Failed to update ${kind} ${name}:`, error);
+								return `Failed to update ${kind} ${name}: ${(error as ConnectError).message}`;
+							},
+							finally() {
+								isSubmitting = false;
 							}
-						});
-
-						const manifest = new TextEncoder().encode(value);
-
-						await resourceClient.apply({
-							cluster,
-							name,
-							group,
-							version,
-							resource,
-							manifest,
-							fieldManager: 'otterscale-web-ui',
-							force: true
-						});
-					},
-					{
-						loading: `Updating ${kind} ${name}...`,
-						success: () => {
-							return `Successfully updated ${kind} ${name}`;
-						},
-						error: (error) => {
-							console.error(`Failed to update ${kind} ${name}:`, error);
-							return `Failed to update ${kind} ${name}: ${(error as ConnectError).message}`;
-						},
-						finally() {
-							isSubmitting = false;
 						}
-					}
-				);
-			}}
-		>
-			VM Passthrough
-		</DropdownMenu.Item>
-	</DropdownMenu.SubContent>
-</DropdownMenu.Sub>
+					);
+				}}
+			>
+				Virtual GPU
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				disabled={isPassthroughOn}
+				onclick={() => {
+					if (isSubmitting) return;
+
+					isSubmitting = true;
+
+					const apiVersion = `${group}/${version}`;
+					const name = object?.metadata?.name;
+
+					toast.promise(
+						async () => {
+							const value = JSON.stringify({
+								apiVersion,
+								kind,
+								metadata: {
+									name,
+									labels: {
+										'otterscale.io/gpu': '',
+										'nvidia.com/gpu.workload.config': 'vm-passthrough'
+									}
+								}
+							});
+
+							const manifest = new TextEncoder().encode(value);
+
+							await resourceClient.apply({
+								cluster,
+								name,
+								group,
+								version,
+								resource,
+								manifest,
+								fieldManager: 'otterscale-web-ui',
+								force: true
+							});
+						},
+						{
+							loading: `Updating ${kind} ${name}...`,
+							success: () => {
+								return `Successfully updated ${kind} ${name}`;
+							},
+							error: (error) => {
+								console.error(`Failed to update ${kind} ${name}:`, error);
+								return `Failed to update ${kind} ${name}: ${(error as ConnectError).message}`;
+							},
+							finally() {
+								isSubmitting = false;
+							}
+						}
+					);
+				}}
+			>
+				VM Passthrough
+			</DropdownMenu.Item>
+		</DropdownMenu.SubContent>
+	</DropdownMenu.Sub>
+{/if}
