@@ -387,7 +387,18 @@
 						version={apiResource.version}
 						kind={apiResource.kind}
 						resource={apiResource.resource}
-					/>
+					>
+						{#snippet trigger(state)}
+							<Button
+								variant="outline"
+								onclick={() => {
+									state.open = !state.open;
+								}}
+							>
+								<PlusIcon />
+							</Button>
+						{/snippet}
+					</Create>
 				{:else}
 					<Button variant="outline" size="icon" disabled>
 						<PlusIcon />

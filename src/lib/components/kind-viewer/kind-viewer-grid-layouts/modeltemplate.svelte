@@ -42,17 +42,17 @@
 	const rowNamespace = $derived(object?.metadata?.namespace ?? namespace);
 </script>
 
-<Card.Root class="transition-shadow hover:shadow-md">
+<Card.Root class="bg-card">
 	<Card.Header>
 		<Item.Root class="items-start p-0">
-			<Item.Media class="rounded-full bg-muted p-2">
+			<Item.Media variant="image" class="bg-muted">
 				<BotIcon />
 			</Item.Media>
 			<Item.Content class="min-w-0 text-left">
-				<Item.Title class="text-base font-semibold">
+				<Item.Title>
 					{row.original['Name']}
 				</Item.Title>
-				<Item.Description class="flex items-center gap-1 text-xs text-muted-foreground">
+				<Item.Description>
 					{row.original['Namespace']}
 				</Item.Description>
 			</Item.Content>
@@ -99,7 +99,7 @@
 			</Item.Root>
 		{/if}
 	</Card.Content>
-	<Card.Footer class="flex flex-wrap items-center gap-2 text-xs">
+	<Card.Footer>
 		{@const mode = row.original['Mode'] as string}
 		{#if mode}
 			<Badge>

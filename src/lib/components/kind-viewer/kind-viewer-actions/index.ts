@@ -2,7 +2,7 @@ import type { JsonObject, JsonValue } from '@bufbuild/protobuf';
 import type { Schema } from '@sjsf/form';
 import type { Row } from '@tanstack/table-core';
 import { type ValidateFunction } from 'ajv';
-import type { Component } from 'svelte';
+import type { Component, Snippet } from 'svelte';
 
 import ApplicationActions from './applications/actions.svelte';
 import ApplicationCreate from './applications/create.svelte';
@@ -52,6 +52,14 @@ type CreateType = Component<{
 	resource?: string;
 	schema?: Schema;
 	validate?: ValidateFunction;
+	trigger?: Snippet<
+		[
+			{
+				get open(): boolean;
+				set open(value: boolean);
+			}
+		]
+	>;
 }> | null;
 type ActionsType = Component<{
 	role?: string;
