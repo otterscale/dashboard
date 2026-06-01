@@ -3,9 +3,9 @@ import { getTimezones } from '$lib/server/timezones';
 
 import type { LayoutServerLoad } from './$types';
 
-export const load: LayoutServerLoad = async () => {
+export const load: LayoutServerLoad = async ({ fetch, params }) => {
 	return {
 		timezones: getTimezones(),
-		isRestricted: await getIsRestricted()
+		isRestricted: await getIsRestricted(fetch, params.cluster)
 	};
 };
