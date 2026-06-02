@@ -75,6 +75,7 @@
 		currentStep = steps[Math.max(currentIndex - 1, 0)];
 	}
 </script>
+
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
@@ -152,17 +153,17 @@
 					initialValue={{
 						type: lodash.get(object, 'spec.type'),
 						url: lodash.get(object, 'spec.url'),
-						insecure: lodash.get(object, 'spec.insecure'),
+						insecure: lodash.get(object, 'spec.insecure')
 					} as FormValue}
 					handleSubmit={{
 						posthook: (form: FormState<FormValue>) => {
 							handleNext();
 
-							const formValue = getValueSnapshot(form)
+							const formValue = getValueSnapshot(form);
 
-							lodash.set(values, 'spec.type', lodash.get(formValue, 'type'))
-							lodash.set(values, 'spec.insecure', lodash.get(formValue, 'insecure'))
-							lodash.set(values, 'spec.url', lodash.get(formValue, 'url'))
+							lodash.set(values, 'spec.type', lodash.get(formValue, 'type'));
+							lodash.set(values, 'spec.insecure', lodash.get(formValue, 'insecure'));
+							lodash.set(values, 'spec.url', lodash.get(formValue, 'url'));
 						}
 					}}
 				>
