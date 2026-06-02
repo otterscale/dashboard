@@ -16,6 +16,7 @@
 	import { stringify } from 'yaml';
 
 	import Form from '$lib/components/dynamic-form/form.svelte';
+	import RoleComboboxWidget from '$lib/components/dynamic-form/widgets/role-combobox.svelte';
 	import UserComboboxWidget, {
 		getDisplayName,
 		type KeycloakUser
@@ -241,7 +242,7 @@
 							role: {
 								'ui:components': {
 									stringField: 'enumField',
-									selectWidget: 'comboboxWidget'
+									selectWidget: RoleComboboxWidget
 								}
 							},
 							subject: {
@@ -262,7 +263,7 @@
 													return {
 														subject: member.subject,
 														role: member.role,
-														username: user.name,
+														username: user.username,
 														name: getDisplayName(user),
 														serviceAccount: isServiceAccount(user.username)
 													};

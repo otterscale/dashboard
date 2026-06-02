@@ -16,7 +16,6 @@
 	import LayersIcon from '@lucide/svelte/icons/layers';
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
 	import NetworkIcon from '@lucide/svelte/icons/network';
-	import PlusIcon from '@lucide/svelte/icons/plus';
 	import UserStarIcon from '@lucide/svelte/icons/user-star';
 	import { type Link, LinkService } from '@otterscale/api/link/v1';
 	import { ResourceService } from '@otterscale/api/resource/v1';
@@ -36,7 +35,8 @@
 		startTour,
 		WorkspaceSwitcher
 	} from '$lib/components/layout';
-	import DialogImportCluster from '$lib/components/layout/dialog-import-cluster.svelte';
+	import Registe from '$lib/components/layout/dialog-import-cluster.svelte';
+	import RegisteClusterTrigger from '$lib/components/layout/registe-cluster-trigger.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -46,6 +46,8 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
 	import { breadcrumbs } from '$lib/stores';
+	import { pulse } from '$lib/stores/pulse.svelte';
+	import { getAdditionalItems } from '$lib/utils/features';
 
 	import type { LayoutData } from './$types';
 
@@ -81,17 +83,24 @@
 		}
 	}
 
-	async function fetchWorkspaces(cluster: string): Promise<TenantOtterscaleIoV1Alpha1Workspace[]> {
+	async function fetchWorkspaces(
+		cluster: string,
+		signal?: AbortSignal
+	): Promise<TenantOtterscaleIoV1Alpha1Workspace[]> {
 		try {
-			const response = await resourceClient.list({
-				cluster: cluster,
-				group: 'tenant.otterscale.io',
-				version: 'v1alpha1',
-				resource: 'workspaces',
-				labelSelector: 'user.otterscale.io/' + data.user.sub
-			});
+			const response = await resourceClient.list(
+				{
+					cluster: cluster,
+					group: 'tenant.otterscale.io',
+					version: 'v1alpha1',
+					resource: 'workspaces',
+					labelSelector: 'user.otterscale.io/' + data.user.sub
+				},
+				{ signal }
+			);
 			return response.items.map((item) => item.object as TenantOtterscaleIoV1Alpha1Workspace);
 		} catch (error) {
+			if (signal?.aborted) throw error;
 			console.error('Failed to fetch workspaces:', error);
 			return [];
 		}
@@ -120,6 +129,22 @@
 			workspaces = await fetchWorkspaces(activeCluster);
 		}
 		isMounted = true;
+	});
+	$effect(() => {
+		if (pulse.workspaces === 0) return;
+
+		if (!activeCluster) return;
+
+		const abortController = new AbortController();
+		fetchWorkspaces(activeCluster, abortController.signal)
+			.then((resources) => {
+				if (!abortController.signal.aborted) workspaces = resources;
+			})
+			.catch((err) => {
+				if (!abortController.signal.aborted) console.error(err);
+			});
+
+		return () => abortController.abort();
 	});
 
 	function resourceUrl(options: {
@@ -370,7 +395,10 @@
 												workspace: page.params.workspace
 											})
 										: ''
-								}
+								},
+								...(page.params.workspace
+									? getAdditionalItems(activeCluster, page.params.workspace!)
+									: [])
 							]
 						}
 					]
@@ -518,15 +546,6 @@
 						})
 					},
 					{
-						title: m.persistent_volume(),
-						url: resourceUrl({
-							group: '',
-							version: 'v1',
-							kind: 'PersistentVolume',
-							resource: 'persistentvolumes'
-						})
-					},
-					{
 						title: m.storage_class(),
 						url: resourceUrl({
 							group: 'storage.k8s.io',
@@ -541,15 +560,6 @@
 				title: m.namespaced(),
 				icon: BracesIcon,
 				items: [
-					{
-						title: m.namespace(),
-						url: resourceUrl({
-							group: '',
-							version: 'v1',
-							kind: 'Namespace',
-							resource: 'namespaces'
-						})
-					},
 					{
 						title: m.service_account(),
 						url: resourceUrl({
@@ -618,36 +628,55 @@
 							kind: 'Node',
 							resource: 'nodes'
 						})
-					},
-					{
-						title: m.custom_resource_definition(),
-						url: resourceUrl({
-							group: 'apiextensions.k8s.io',
-							version: 'v1',
-							kind: 'CustomResourceDefinition',
-							resource: 'customresourcedefinitions'
-						})
-					},
-					{
-						title: m.cluster_role(),
-						url: resourceUrl({
-							group: 'rbac.authorization.k8s.io',
-							version: 'v1',
-							kind: 'ClusterRole',
-							resource: 'clusterroles'
-						})
-					},
-					{
-						title: m.cluster_role_binding(),
-						url: resourceUrl({
-							group: 'rbac.authorization.k8s.io',
-							version: 'v1',
-							kind: 'ClusterRoleBinding',
-							resource: 'clusterrolebindings'
-						})
 					}
 				]
-			}
+			},
+			...(data.isClusterAdmin
+				? [
+						{
+							title: m.administration(),
+							icon: UserStarIcon,
+							items: [
+								{
+									title: m.namespace(),
+									url: resourceUrl({
+										group: '',
+										version: 'v1',
+										kind: 'Namespace',
+										resource: 'namespaces'
+									})
+								},
+								{
+									title: m.custom_resource_definition(),
+									url: resourceUrl({
+										group: 'apiextensions.k8s.io',
+										version: 'v1',
+										kind: 'CustomResourceDefinition',
+										resource: 'customresourcedefinitions'
+									})
+								},
+								{
+									title: m.cluster_role(),
+									url: resourceUrl({
+										group: 'rbac.authorization.k8s.io',
+										version: 'v1',
+										kind: 'ClusterRole',
+										resource: 'clusterroles'
+									})
+								},
+								{
+									title: m.cluster_role_binding(),
+									url: resourceUrl({
+										group: 'rbac.authorization.k8s.io',
+										version: 'v1',
+										kind: 'ClusterRoleBinding',
+										resource: 'clusterrolebindings'
+									})
+								}
+							]
+						}
+					]
+				: [])
 		]
 	});
 </script>
@@ -657,7 +686,6 @@
 </svelte:head>
 
 <DialogAbout bind:open={aboutOpen} />
-
 <Sidebar.Provider class="h-svh overflow-hidden" bind:open={sidebarOpen}>
 	<Sidebar.Root id="sidebar-guide-step" collapsible="icon" variant="inset" class="p-3">
 		{#if activeCluster && isMounted}
@@ -667,7 +695,6 @@
 					{workspaces}
 					user={data.user}
 					workspace={page.params.workspace}
-					onsuccess={async () => (workspaces = await fetchWorkspaces(activeCluster))}
 				/>
 			</Sidebar.Header>
 			<Sidebar.Content class="gap-2">
@@ -792,23 +819,13 @@
 									</DropdownMenu.RadioGroup>
 								{/if}
 								{#if data.user.roles.includes('admin')}
-									<DropdownMenu.Separator />
-									<DropdownMenu.Item onclick={() => (importOpen = true)}>
-										<PlusIcon class="mr-2 size-4" />
-										{m.add_cluster()}
-									</DropdownMenu.Item>
+									<RegisteClusterTrigger bind:open={importOpen} />
 								{/if}
 							</DropdownMenu.Group>
 						</DropdownMenu.Content>
 					</DropdownMenu.Root>
 					<Tooltip.Content>Switch Cluster</Tooltip.Content>
 				</Tooltip.Root>
-				<DialogImportCluster
-					bind:open={importOpen}
-					onsuccess={async () => {
-						links = await fetchClusters();
-					}}
-				/>
 			</div>
 		</header>
 		<main class="flex min-w-0 flex-1 flex-col overflow-auto px-2 md:px-4 lg:px-8">
@@ -856,3 +873,10 @@
 		{/if}
 	{/each}
 {/snippet}
+
+<Registe
+	bind:open={importOpen}
+	onsuccess={async () => {
+		links = await fetchClusters();
+	}}
+/>

@@ -2,8 +2,6 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import BotIcon from '@lucide/svelte/icons/bot';
 	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
-	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
-	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { ResourceService } from '@otterscale/api/resource/v1';
@@ -19,8 +17,7 @@
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
-	import { computeStep } from '$lib/prometheus';
-	import { cn } from '$lib/utils';
+	import { computeStep, vllmMetricWithSelector } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -68,18 +65,16 @@
 	}
 
 	let availablePods = $state([] as SampleValue[]);
-	const trend = $derived(
-		availablePods.length > 1 && availablePods[availablePods.length - 2].value !== 0
-			? (availablePods[availablePods.length - 1].value -
-					availablePods[availablePods.length - 2].value) /
-					availablePods[availablePods.length - 2].value
-			: 0
-	);
+
+	function buildInner(): string {
+		return `count by(endpoint) (${vllmMetricWithSelector('vllm:cache_config_info', namespace, undefined)})`;
+	}
+
 	async function fetchAvailablePods() {
 		try {
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const response = await prometheusDriver.rangeQuery(
-				`count by(endpoint) (vllm:cache_config_info{})`,
+				buildInner(),
 				start.getTime(),
 				endMs,
 				computeStep(start.getTime(), endMs)
@@ -123,21 +118,19 @@
 </script>
 
 <Card.Root class="h-full gap-2">
-	<Card.Header>
-		<Card.Title class="flex flex-wrap items-center justify-between gap-6">
-			<div class="flex items-center gap-2 truncate text-sm font-medium tracking-tight">
-				<BotIcon class="size-4.5" />
-				{m.models()}
-			</div>
-			<Tooltip.Root>
-				<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-					<InfoIcon class="size-5 text-muted-foreground" />
-				</Tooltip.Trigger>
-				<Tooltip.Content>
-					<p>{m.llm_dashboard_models_tooltip()}</p>
-				</Tooltip.Content>
-			</Tooltip.Root>
+	<Card.Header class="flex flex-row items-center gap-2 space-y-0">
+		<Card.Title class="flex flex-1 items-center gap-2 truncate text-sm font-medium tracking-tight">
+			<BotIcon class="size-4.5" />
+			{m.models()}
 		</Card.Title>
+		<Tooltip.Root>
+			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+				<InfoIcon class="size-5 text-muted-foreground" />
+			</Tooltip.Trigger>
+			<Tooltip.Content>
+				<p>{m.llm_dashboard_models_tooltip()}</p>
+			</Tooltip.Content>
+		</Tooltip.Root>
 	</Card.Header>
 	{#if !isLoaded}
 		<Card.Content>
@@ -180,19 +173,17 @@
 					}}
 				>
 					{#snippet tooltip()}
-						<Chart.Tooltip hideLabel>
+						<Chart.Tooltip hideLabel indicator="dot">
 							{#snippet formatter({ item, name, value })}
 								<div
-									style="--color-bg: {item.color}"
-									class="aspect-square h-full w-fit shrink-0 border-(--color-border) bg-(--color-bg)"
+									style="--color-bg: {item.color}; --color-border: {item.color};"
+									class="size-2.5 shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)"
 								></div>
-								<div
-									class="flex flex-1 shrink-0 items-center justify-between gap-2 text-xs leading-none"
-								>
+								<div class="flex flex-1 shrink-0 items-center justify-between leading-none">
 									<div class="grid gap-1.5">
 										<span class="text-muted-foreground">{name}</span>
 									</div>
-									<p class="font-mono">{value}</p>
+									<span class="font-mono font-medium text-foreground tabular-nums">{value}</span>
 								</div>
 							{/snippet}
 						</Chart.Tooltip>
@@ -200,18 +191,5 @@
 				</LineChart>
 			</Chart.Container>
 		</Card.Content>
-		<Card.Footer
-			class={cn(
-				'flex flex-wrap items-center justify-end text-sm leading-none font-medium',
-				trend >= 0 ? 'text-emerald-500 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'
-			)}
-		>
-			{Math.abs(trend).toFixed(2)} %
-			{#if trend >= 0}
-				<ChevronUpIcon />
-			{:else}
-				<ChevronDownIcon />
-			{/if}
-		</Card.Footer>
 	{/if}
 </Card.Root>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
+	import InfoIcon from '@lucide/svelte/icons/info';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
@@ -8,14 +9,17 @@
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
+	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
-	import { computeStep } from '$lib/prometheus';
+	import { computeStep, vllmMetricWithSelector } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
 		cluster,
+		namespace,
 		start,
 		end,
 		endIsNow,
@@ -23,6 +27,7 @@
 	}: {
 		prometheusDriver: PrometheusDriver;
 		cluster: string;
+		namespace: string;
 		start: Date;
 		end: Date;
 		endIsNow: boolean;
@@ -53,8 +58,9 @@
 
 	async function fetchPrompts(startMs: number, endMs: number, step: number) {
 		try {
+			const inner = vllmMetricWithSelector('vllm:prompt_tokens_total', namespace, undefined);
 			const response = await prometheusDriver.rangeQuery(
-				`sum(rate(vllm:prompt_tokens_total{}[2m]))`,
+				`sum(rate(${inner}[2m]))`,
 				startMs,
 				endMs,
 				step
@@ -67,8 +73,9 @@
 
 	async function fetchGenerations(startMs: number, endMs: number, step: number) {
 		try {
+			const inner = vllmMetricWithSelector('vllm:generation_tokens_total', namespace, undefined);
 			const response = await prometheusDriver.rangeQuery(
-				`sum(rate(vllm:generation_tokens_total{}[2m]))`,
+				`sum(rate(${inner}[2m]))`,
 				startMs,
 				endMs,
 				step
@@ -118,26 +125,36 @@
 </script>
 
 <Card.Root class="h-full">
-	<Card.Header>
-		<Card.Title>{m.throughput()}</Card.Title>
-		<Card.Description>{m.llm_dashboard_throughputs_tooltip()}</Card.Description>
+	<Card.Header class="flex flex-row items-center gap-2 space-y-0">
+		<div class="grid flex-1 gap-1">
+			<Card.Title>{m.throughput()}</Card.Title>
+			<Card.Description>{m.llm_dashboard_throughputs_description()}</Card.Description>
+		</div>
+		<Tooltip.Root>
+			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+				<InfoIcon class="size-5 text-muted-foreground" />
+			</Tooltip.Trigger>
+			<Tooltip.Content>
+				<p>{m.llm_dashboard_throughputs_tooltip()}</p>
+			</Tooltip.Content>
+		</Tooltip.Root>
 	</Card.Header>
 	{#if !isLoaded}
 		<Card.Content>
-			<div class="flex h-[200px] w-full items-center justify-center">
+			<div class="flex h-45 w-full items-center justify-center">
 				<Loader2Icon class="size-12 animate-spin" />
 			</div>
 		</Card.Content>
 	{:else if throughputs.length === 0}
 		<Card.Content>
-			<div class="flex h-[200px] w-full flex-col items-center justify-center">
-				<ChartLineIcon class="size-50 animate-pulse text-muted-foreground" />
-				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
+			<div class="flex h-45 w-full flex-col items-center justify-center gap-2">
+				<ChartLineIcon class="size-12 animate-pulse text-muted-foreground" />
+				<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
 			</div>
 		</Card.Content>
 	{:else}
 		<Card.Content>
-			<Chart.Container config={configuration} class="h-[200px] w-full">
+			<Chart.Container config={configuration} class="h-45 w-full">
 				<AreaChart
 					data={throughputs}
 					x="time"
@@ -179,16 +196,16 @@
 						>
 							{#snippet formatter({ item, name, value })}
 								<div
-									style="--color-bg: {item.color}"
-									class="aspect-square h-full w-fit shrink-0 border-(--color-border) bg-(--color-bg)"
+									style="--color-bg: {item.color}; --color-border: {item.color};"
+									class="size-2.5 shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)"
 								></div>
-								<div
-									class="flex flex-1 shrink-0 items-center justify-between gap-2 text-xs leading-none"
-								>
+								<div class="flex flex-1 shrink-0 items-center justify-between leading-none">
 									<div class="grid gap-1.5">
 										<span class="text-muted-foreground">{name}</span>
 									</div>
-									<p class="font-mono">{Number(value).toFixed(0)}/{m.per_second()}</p>
+									<span class="font-mono font-medium text-foreground tabular-nums">
+										{Number(value).toFixed(0)}/{m.per_second()}
+									</span>
 								</div>
 							{/snippet}
 						</Chart.Tooltip>
