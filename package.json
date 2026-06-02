@@ -78,7 +78,7 @@
 		"@connectrpc/connect-web": "^2.1.1",
 		"@dagrejs/dagre": "^3.0.0",
 		"@monaco-editor/loader": "^1.7.0",
-		"@novnc/novnc": "1.7.0-beta",
+		"@novnc/novnc": "1.7.0",
 		"@oslojs/crypto": "^1.0.1",
 		"@oslojs/encoding": "^1.1.0",
 		"@shikijs/langs": "^4.0.2",
