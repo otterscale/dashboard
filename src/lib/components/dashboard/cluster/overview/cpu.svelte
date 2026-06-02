@@ -29,7 +29,7 @@
 			`
 			100 * sum(kube_pod_container_resource_requests{resource="cpu", unit="core", container!=""})
 			/
-			sum (kube_node_status_allocatable{cluster!="", resource="cpu"})
+			sum (kube_node_status_allocatable{resource="cpu"})
 			`
 		);
 		cpuRequest = response.result[0]?.value ?? undefined;

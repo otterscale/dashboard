@@ -16,16 +16,22 @@
 
 	let {
 		client,
-		selectedInstance = $bindable()
+		selectedInstance = $bindable(),
+		start,
+		end,
+		endIsNow
 	}: {
 		client: PrometheusDriver;
 		selectedInstance: string | undefined;
+		start: Date;
+		end: Date;
+		endIsNow: boolean;
 	} = $props();
 </script>
 
 <div class="flex flex-col gap-4">
 	{#if selectedInstance}
-		{#key selectedInstance}
+		{#key `${selectedInstance}-${start.getTime()}-${endIsNow ? 'now' : end.getTime()}`}
 			<div class="grid w-full gap-3 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
 				<span class="col-span-1">
 					<UsageRateUptime {client} fqdn={selectedInstance} />
@@ -46,25 +52,25 @@
 
 			<div class="grid w-full gap-4 sm:grid-cols-1 md:grid-cols-1 lg:grid-cols-2">
 				<span class="col-span-1">
-					<CPUCoreProcessor {client} fqdn={selectedInstance} />
+					<CPUCoreProcessor {client} fqdn={selectedInstance} {start} {end} {endIsNow} />
 				</span>
 				<span class="col-span-1">
-					<CPUAverage {client} fqdn={selectedInstance} />
+					<CPUAverage {client} fqdn={selectedInstance} {start} {end} {endIsNow} />
 				</span>
 				<span class="col-span-1">
-					<BasicRAM {client} fqdn={selectedInstance} />
+					<BasicRAM {client} fqdn={selectedInstance} {start} {end} {endIsNow} />
 				</span>
 				<span class="col-span-1">
-					<BasicDisk {client} fqdn={selectedInstance} />
+					<BasicDisk {client} fqdn={selectedInstance} {start} {end} {endIsNow} />
 				</span>
 				<span class="col-span-1">
-					<DiskIOTime {client} fqdn={selectedInstance} />
+					<DiskIOTime {client} fqdn={selectedInstance} {start} {end} {endIsNow} />
 				</span>
 				<span class="col-span-1">
-					<NetworkReceived {client} fqdn={selectedInstance} />
+					<NetworkReceived {client} fqdn={selectedInstance} {start} {end} {endIsNow} />
 				</span>
 				<span class="col-span-1">
-					<NetworkTransmitted {client} fqdn={selectedInstance} />
+					<NetworkTransmitted {client} fqdn={selectedInstance} {start} {end} {endIsNow} />
 				</span>
 			</div>
 		{/key}
