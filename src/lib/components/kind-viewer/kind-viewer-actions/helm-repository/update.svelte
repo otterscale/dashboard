@@ -3,10 +3,10 @@
 	import FormIcon from '@lucide/svelte/icons/form';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
-	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
-	import { SubmitButton } from '@sjsf/form';
+	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
+	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
-	import { load } from 'js-yaml';
+	import { JSON_SCHEMA, load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
@@ -48,23 +48,6 @@
 	const resourceClient = createClient(ResourceService, transport);
 	const steps = Array.from({ length: 2 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
-	const systemFields = [
-		'clusterName',
-		'creationTimestamp',
-		'deletionGracePeriodSeconds',
-		'deletionTimestamp',
-		'finalizers',
-		'generateName',
-		'generation',
-		'initializers',
-		'managedFields',
-		'ownerReferences',
-		'resourceVersion',
-		'relationships',
-		'selfLink',
-		'state',
-		'uid'
-	];
 
 	let values = $state(getInitialValues());
 	let currentStep = $state(firstStep);
@@ -73,22 +56,12 @@
 
 	let value = $derived.by(() => {
 		const filtered = lodash.cloneDeep(values);
-		if (filtered.metadata) {
-			for (const field of systemFields) {
-				delete filtered.metadata[field];
-			}
-		}
 		return stringify(filtered);
 	});
 	const currentIndex = $derived(steps.indexOf(currentStep));
 
 	function getInitialValues() {
-		return {
-			apiVersion: `${group}/${version}`,
-			kind,
-			metadata: object.metadata,
-			spec: {}
-		};
+		return object;
 	}
 	function initiate() {
 		values = getInitialValues();
@@ -175,31 +148,24 @@
 									return label;
 								}
 							}
-						},
-						secretRef: {
-							name: {
-								'ui:options': {
-									shadcn4Text: {
-										placeholder: 'Only accept Secrets with type kubernetes.io/basic-auth',
-										class: 'placeholder:text-destructive/50'
-									}
-								}
-							}
 						}
 					} as UiSchemaRoot}
 					initialValue={{
 						type: lodash.get(object, 'spec.type'),
 						url: lodash.get(object, 'spec.url'),
-						insecure: lodash.get(object, 'spec.insecure'),
-						secretRef: lodash.get(object, 'spec.secretRef'),
-						certSecretRef: lodash.get(object, 'spec.certSecretRef')
+						insecure: lodash.get(object, 'spec.insecure')
 					} as FormValue}
 					handleSubmit={{
-						posthook: () => {
+						posthook: (form: FormState<FormValue>) => {
 							handleNext();
+
+							const formValue = getValueSnapshot(form);
+
+							lodash.set(values, 'spec.type', lodash.get(formValue, 'type'));
+							lodash.set(values, 'spec.insecure', lodash.get(formValue, 'insecure'));
+							lodash.set(values, 'spec.url', lodash.get(formValue, 'url'));
 						}
 					}}
-					bind:values={values['spec']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -244,7 +210,7 @@
 							});
 							const validate = jsonSchemaValidator.compile(jsonSchema);
 
-							const isValid = validate(load(value));
+							const isValid = validate(load(value, { schema: JSON_SCHEMA }));
 
 							if (!isValid) {
 								console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
@@ -253,13 +219,13 @@
 								return;
 							}
 
-							const name = lodash.get(load(value), 'metadata.name');
+							const name = lodash.get(load(value, { schema: JSON_SCHEMA }), 'metadata.name');
 
 							toast.promise(
 								async () => {
 									const manifest = new TextEncoder().encode(value);
 
-									await resourceClient.apply({
+									await resourceClient.update({
 										cluster,
 										namespace,
 										name,
@@ -267,8 +233,7 @@
 										version,
 										resource,
 										manifest,
-										fieldManager: 'otterscale-web-ui',
-										force: true
+										fieldManager: 'otterscale-web-ui'
 									});
 								},
 								{

@@ -58,7 +58,8 @@
 			kind,
 			metadata: {
 				name: object.metadata?.name ?? '',
-				namespace: existingNamespace
+				namespace: existingNamespace,
+				resourceVersion: object.metadata?.resourceVersion
 			},
 			spec: {
 				cpu: { guest: existingCpuGuest as number },
@@ -235,7 +236,7 @@
 								async () => {
 									const manifest = new TextEncoder().encode(value);
 
-									await resourceClient.apply({
+									await resourceClient.update({
 										cluster,
 										name,
 										namespace: existingNamespace,
@@ -243,8 +244,7 @@
 										version,
 										resource,
 										manifest,
-										fieldManager: 'otterscale-web-ui',
-										force: true
+										fieldManager: 'otterscale-web-ui'
 									});
 								},
 								{

@@ -5,7 +5,7 @@
 	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
-	import { load } from 'js-yaml';
+	import { JSON_SCHEMA, load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
@@ -78,24 +78,6 @@
 	});
 	const validate = $derived(jsonSchemaValidator.compile(jsonSchema));
 
-	const systemFields = [
-		'clusterName',
-		'creationTimestamp',
-		'deletionGracePeriodSeconds',
-		'deletionTimestamp',
-		'finalizers',
-		'generateName',
-		'generation',
-		'initializers',
-		'managedFields',
-		'ownerReferences',
-		'resourceVersion',
-		'relationships',
-		'selfLink',
-		'state',
-		'uid'
-	];
-
 	let values = $state(getInitialValues());
 	let specValues = $state<FormValue>({});
 	let serviceValues = $state<FormValue>({});
@@ -122,9 +104,6 @@
 
 	let value = $derived.by(() => {
 		const filtered = lodash.cloneDeep(values) as typeof values & { status?: unknown };
-		for (const field of systemFields) {
-			delete filtered.metadata[field];
-		}
 		delete filtered.status;
 		return stringify(filtered);
 	});
@@ -566,7 +545,7 @@
 
 							let parsed: unknown;
 							try {
-								parsed = load(value);
+								parsed = load(value, { schema: JSON_SCHEMA });
 							} catch {
 								toast.error('Invalid YAML. Please check the content.');
 								isSubmitting = false;
@@ -582,12 +561,12 @@
 								return;
 							}
 
-							const name = object.metadata?.name;
+							const name = lodash.get(parsed, 'metadata.name');
 							const manifest = new TextEncoder().encode(value);
 
 							toast.promise(
 								async () => {
-									await resourceClient.apply({
+									await resourceClient.update({
 										cluster,
 										namespace,
 										group,
@@ -595,8 +574,7 @@
 										resource,
 										name,
 										manifest,
-										fieldManager: 'otterscale-web-ui',
-										force: true
+										fieldManager: 'otterscale-web-ui'
 									});
 								},
 								{

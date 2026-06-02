@@ -6,10 +6,10 @@
 		RbacAuthorizationK8SIoV1ClusterRole,
 		RbacAuthorizationK8SIoV1ClusterRoleBinding
 	} from '@otterscale/types';
-	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
-	import { SubmitButton } from '@sjsf/form';
+	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
+	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
-	import { load } from 'js-yaml';
+	import { JSON_SCHEMA, load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
@@ -52,15 +52,22 @@
 	let values = $state(getInitialValues());
 
 	function getInitialValues() {
+		const subject = lodash.get(object, 'subjects[0]', {}) as {
+			kind?: string;
+			name?: string;
+			namespace?: string;
+		};
+		const subjectKind = subject.kind ?? 'User';
+
 		return {
 			apiVersion: group ? `${group}/${version}` : version,
 			kind,
-			roleRef: { name: '' as string },
-			subjectKind: 'User' as string,
-			subjects: '' as string,
+			roleRef: { name: (lodash.get(object, 'roleRef.name') ?? '') as string },
+			subjectKind,
+			subjects: subjectKind === 'ServiceAccount' ? '' : (subject.name ?? ''),
 			serviceAccount: {
-				name: '' as string,
-				namespace: '' as string
+				name: subject.name ?? '',
+				namespace: subject.namespace ?? ''
 			}
 		};
 	}
@@ -68,7 +75,7 @@
 	// Derived submission values (proper ClusterRoleBinding structure)
 	const submissionValues = $derived.by(() => {
 		const sk = values.subjectKind as string;
-		let subjectEntry;
+		let subjectEntry: Record<string, unknown>;
 		switch (sk) {
 			case 'Group':
 				subjectEntry = {
@@ -93,17 +100,24 @@
 				};
 				break;
 		}
-		return {
-			apiVersion: group ? `${group}/${version}` : version,
-			kind,
-			metadata: { name: lodash.get(object, 'metadata.name') },
-			roleRef: {
-				apiGroup: group || 'rbac.authorization.k8s.io',
-				kind: 'ClusterRole',
-				name: values.roleRef.name
-			},
-			subjects: [subjectEntry]
+
+		const manifest = lodash.cloneDeep(object) as RbacAuthorizationK8SIoV1ClusterRoleBinding & {
+			status?: unknown;
 		};
+		delete manifest.status;
+
+		lodash.set(manifest, 'apiVersion', group ? `${group}/${version}` : version);
+		lodash.set(manifest, 'kind', kind);
+		lodash.set(manifest, 'metadata.name', lodash.get(object, 'metadata.name'));
+		lodash.set(manifest, 'metadata.resourceVersion', object.metadata?.resourceVersion);
+		lodash.set(manifest, 'roleRef', {
+			apiGroup: group || 'rbac.authorization.k8s.io',
+			kind: 'ClusterRole',
+			name: values.roleRef.name
+		});
+		lodash.set(manifest, 'subjects', [subjectEntry]);
+
+		return manifest;
 	});
 
 	// Steps (no Name step compared to create)
@@ -118,7 +132,9 @@
 		currentStep = steps[Math.max(currentIndex - 1, 0)];
 	}
 	function reset() {
+		values = getInitialValues();
 		currentStep = firstStep;
+		isSubmitting = false;
 	}
 
 	// Fetch ClusterRoles
@@ -257,11 +273,11 @@
 					} as UiSchemaRoot}
 					initialValue={(lodash.get(object, 'roleRef.name') ?? null) as FormValue}
 					handleSubmit={{
-						posthook: () => {
+						posthook: (form: FormState<FormValue>) => {
+							lodash.set(values, ['roleRef', 'name'], getValueSnapshot(form));
 							handleNext();
 						}
 					}}
-					bind:values={values['roleRef']['name']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-end gap-3">
@@ -290,11 +306,11 @@
 					} as UiSchemaRoot}
 					initialValue={(lodash.get(object, 'subjects[0].kind') ?? 'User') as FormValue}
 					handleSubmit={{
-						posthook: () => {
+						posthook: (form: FormState<FormValue>) => {
+							values.subjectKind = getValueSnapshot(form) as string;
 							handleNext();
 						}
 					}}
-					bind:values={values['subjectKind']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -337,11 +353,11 @@
 						} as UiSchemaRoot}
 						initialValue={(lodash.get(object, 'subjects[0].name') ?? null) as FormValue}
 						handleSubmit={{
-							posthook: () => {
+							posthook: (form: FormState<FormValue>) => {
+								values.subjects = getValueSnapshot(form) as string;
 								handleNext();
 							}
 						}}
-						bind:values={values['subjects']}
 					>
 						{#snippet actions()}
 							<div class="flex w-full items-center justify-between gap-3">
@@ -371,11 +387,11 @@
 						} as UiSchemaRoot}
 						initialValue={(lodash.get(object, 'subjects[0].name') ?? null) as FormValue}
 						handleSubmit={{
-							posthook: () => {
+							posthook: (form: FormState<FormValue>) => {
+								values.subjects = getValueSnapshot(form) as string;
 								handleNext();
 							}
 						}}
-						bind:values={values['subjects']}
 					>
 						{#snippet actions()}
 							<div class="flex w-full items-center justify-between gap-3">
@@ -413,11 +429,14 @@
 							namespace: lodash.get(object, 'subjects[0].namespace') ?? null
 						} as FormValue}
 						handleSubmit={{
-							posthook: () => {
+							posthook: (form: FormState<FormValue>) => {
+								values.serviceAccount = getValueSnapshot(form) as {
+									name: string;
+									namespace: string;
+								};
 								handleNext();
 							}
 						}}
-						bind:values={values['serviceAccount']}
 					>
 						{#snippet actions()}
 							<div class="flex w-full items-center justify-between gap-3">
@@ -470,7 +489,7 @@
 								});
 								const validate = jsonSchemaValidator.compile(jsonSchema);
 
-								const isValid = validate(load(value));
+								const isValid = validate(load(value, { schema: JSON_SCHEMA }));
 
 								if (!isValid) {
 									console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
@@ -479,21 +498,20 @@
 									return;
 								}
 
-								const name = lodash.get(load(value), 'metadata.name');
+								const name = lodash.get(load(value, { schema: JSON_SCHEMA }), 'metadata.name');
 
 								toast.promise(
 									async () => {
 										const manifest = new TextEncoder().encode(value);
 
-										await resourceClient.apply({
+										await resourceClient.update({
 											cluster,
 											name,
 											group,
 											version,
 											resource,
 											manifest,
-											fieldManager: 'otterscale-web-ui',
-											force: true
+											fieldManager: 'otterscale-web-ui'
 										});
 									},
 									{

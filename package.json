@@ -27,7 +27,7 @@
 		"@inlang/paraglide-js": "^2.18.0",
 		"@internationalized/date": "^3.12.1",
 		"@lucide/svelte": "^1.16.0",
-		"@otterscale/api": "^1.1.1",
+		"@otterscale/api": "^1.1.2",
 		"@otterscale/types": "^1.1.1",
 		"@playwright/test": "^1.60.0",
 		"@sveltejs/adapter-node": "^5.5.4",
