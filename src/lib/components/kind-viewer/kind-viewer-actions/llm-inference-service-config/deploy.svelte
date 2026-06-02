@@ -78,6 +78,14 @@
 
 	function getWorkloadPlacementSchema(resourceTopology: Record<string, string[]>): Schema {
 		const types = Object.keys(resourceTopology);
+		if (types.length === 0) {
+			return {
+				type: 'object',
+				properties: {
+					type: { type: 'string', title: 'Type' }
+				}
+			};
+		}
 		return {
 			type: 'object',
 			properties: {
