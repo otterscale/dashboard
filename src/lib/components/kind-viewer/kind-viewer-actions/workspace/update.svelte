@@ -6,7 +6,7 @@
 	import type { FormState, FormValue, Schema, SchemaValue, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, setValue, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
-	import { load } from 'js-yaml';
+	import { JSON_SCHEMA, load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import type { Snippet } from 'svelte';
@@ -64,24 +64,6 @@
 	const steps = Array.from({ length: formCount + 1 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 
-	const systemFields = [
-		'clusterName',
-		'creationTimestamp',
-		'deletionGracePeriodSeconds',
-		'deletionTimestamp',
-		'finalizers',
-		'generateName',
-		'generation',
-		'initializers',
-		'managedFields',
-		'ownerReferences',
-		'resourceVersion',
-		'relationships',
-		'selfLink',
-		'state',
-		'uid'
-	];
-
 	let values = $state(getInitialValues());
 	let resourceLimitation = $state(getInitialResourceLimitation());
 	let currentStep = $state(firstStep);
@@ -89,32 +71,34 @@
 	let membersFormReference = $state(null);
 
 	let value = $derived.by(() => {
-		const filtered = lodash.cloneDeep(values);
-		if (filtered.metadata) {
-			const metadata = filtered.metadata as Record<string, unknown>;
-			for (const field of systemFields) {
-				delete metadata[field];
-			}
-		}
+		const filtered = lodash.cloneDeep(values) as typeof values & { status?: unknown };
+		delete filtered.status;
 		return stringify(filtered);
 	});
 	const currentIndex = $derived(steps.indexOf(currentStep));
 
 	function getInitialValues() {
-		return {
-			apiVersion: `${group}/${version}`,
-			kind: kind,
-			metadata: lodash.get(object, 'metadata', {}) as SchemaValue,
-			spec: {
-				members: lodash.get(object, 'spec.members', []) as SchemaValue,
-				networkIsolation: lodash.get(object, 'spec.networkIsolation', {
-					enabled: false
-				}) as SchemaValue,
-				...(lodash.has(object, 'spec.resourceQuota')
-					? { resourceQuota: lodash.get(object, 'spec.resourceQuota') as SchemaValue }
-					: {})
-			}
+		const manifest = lodash.cloneDeep(object ?? {}) as TenantOtterscaleIoV1Alpha1Workspace & {
+			apiVersion?: string;
+			kind?: string;
+			metadata?: Record<string, unknown>;
+			status?: unknown;
 		};
+		manifest.apiVersion = `${group}/${version}`;
+		manifest.kind = kind;
+		manifest.metadata = manifest.metadata ?? {};
+		manifest.spec = {
+			...(manifest.spec ?? {}),
+			members: lodash.get(
+				manifest,
+				'spec.members',
+				[]
+			) as TenantOtterscaleIoV1Alpha1Workspace['spec']['members'],
+			networkIsolation: lodash.get(manifest, 'spec.networkIsolation', {
+				enabled: false
+			}) as TenantOtterscaleIoV1Alpha1Workspace['spec']['networkIsolation']
+		} as TenantOtterscaleIoV1Alpha1Workspace['spec'];
+		return manifest;
 	}
 	function getInitialResourceLimitation() {
 		return {
@@ -293,11 +277,11 @@
 					} as UiSchemaRoot}
 					initialValue={lodash.get(values, 'spec.members') as FormValue}
 					handleSubmit={{
-						posthook: () => {
+						posthook: (form: FormState<FormValue>) => {
+							lodash.set(values, ['spec', 'members'], getValueSnapshot(form));
 							handleNext();
 						}
 					}}
-					bind:values={values['spec']['members']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-end gap-3">
@@ -354,11 +338,11 @@
 					} as UiSchemaRoot}
 					initialValue={lodash.get(values, 'spec.networkIsolation') as FormValue}
 					handleSubmit={{
-						posthook: () => {
+						posthook: (form: FormState<FormValue>) => {
+							lodash.set(values, ['spec', 'networkIsolation'], getValueSnapshot(form));
 							handleNext();
 						}
 					}}
-					bind:values={values['spec']['networkIsolation']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
@@ -485,21 +469,23 @@
 										'limits.nvidia.com/gpumem': '1'
 									})
 								});
-								lodash.set(values, ['spec', 'limitRange'], {
-									limits: [
-										{
-											type: 'Container',
-											default: {
-												cpu: '1',
-												memory: '2Gi'
-											},
-											defaultRequest: {
-												cpu: '0.5',
-												memory: '1Gi'
+								if (!lodash.has(values, ['spec', 'limitRange'])) {
+									lodash.set(values, ['spec', 'limitRange'], {
+										limits: [
+											{
+												type: 'Container',
+												default: {
+													cpu: '1',
+													memory: '2Gi'
+												},
+												defaultRequest: {
+													cpu: '0.5',
+													memory: '1Gi'
+												}
 											}
-										}
-									]
-								});
+										]
+									});
+								}
 							}
 						}
 					}}
@@ -552,7 +538,7 @@
 								});
 								const validate = jsonSchemaValidator.compile(jsonSchema);
 
-								const isValid = validate(load(value));
+								const isValid = validate(load(value, { schema: JSON_SCHEMA }));
 
 								if (!isValid) {
 									console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
@@ -567,15 +553,14 @@
 									async () => {
 										const manifest = new TextEncoder().encode(value);
 
-										await resourceClient.apply({
+										await resourceClient.update({
 											cluster,
 											name,
 											group,
 											version,
 											resource,
 											manifest,
-											fieldManager: 'otterscale-web-ui',
-											force: true
+											fieldManager: 'otterscale-web-ui'
 										});
 									},
 									{

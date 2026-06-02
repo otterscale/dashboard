@@ -58,31 +58,8 @@
 		};
 	}
 
-	const systemFields = [
-		'clusterName',
-		'creationTimestamp',
-		'deletionGracePeriodSeconds',
-		'deletionTimestamp',
-		'finalizers',
-		'generateName',
-		'generation',
-		'initializers',
-		'managedFields',
-		'ownerReferences',
-		'resourceVersion',
-		'relationships',
-		'selfLink',
-		'state',
-		'uid'
-	];
-
 	let value = $derived.by(() => {
 		const filtered = lodash.cloneDeep(values);
-		if (filtered.metadata) {
-			for (const field of systemFields) {
-				delete filtered.metadata[field];
-			}
-		}
 		return stringify(filtered);
 	});
 
@@ -569,7 +546,7 @@
 								async () => {
 									const manifest = new TextEncoder().encode(value);
 
-									await resourceClient.apply({
+									await resourceClient.update({
 										cluster,
 										namespace,
 										name,
@@ -577,8 +554,7 @@
 										version,
 										resource,
 										manifest,
-										fieldManager: 'otterscale-web-ui',
-										force: true
+										fieldManager: 'otterscale-web-ui'
 									});
 								},
 								{

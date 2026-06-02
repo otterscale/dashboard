@@ -45,12 +45,26 @@
 	let currentStep = $state(firstStep);
 	let isSubmitting = $state(false);
 
-	let value = $derived(stringify(values));
+	const submissionValues = $derived.by(() => {
+		const manifest = lodash.cloneDeep(values) as CoreV1Service & { status?: unknown };
+		const existingPorts = service.spec?.ports ?? [];
+		const existingPortsByName = new Map(existingPorts.map((port) => [port.name, port]));
+		const nextPorts = (manifest.spec?.ports ?? []).map((port, index) => ({
+			...(port.name ? (existingPortsByName.get(port.name) ?? {}) : (existingPorts[index] ?? {})),
+			...port
+		}));
+
+		delete manifest.status;
+		lodash.set(manifest, 'spec.ports', nextPorts);
+		return manifest;
+	});
+	let value = $derived(stringify(submissionValues));
 	const currentIndex = $derived(steps.indexOf(currentStep));
 
 	// Extract existing ports for Form initialValue
 	const existingPorts = $derived(
 		(service.spec?.ports ?? []).map((p) => ({
+			...lodash.cloneDeep(p),
 			name: p.name ?? '',
 			protocol: p.protocol ?? 'TCP',
 			port: p.port ?? 80,
@@ -60,18 +74,25 @@
 	);
 
 	function getInitialValues() {
+		const manifest = lodash.cloneDeep(service) as CoreV1Service & { status?: unknown };
+		delete manifest.status;
+
 		return {
+			...manifest,
 			apiVersion: 'v1',
 			kind: 'Service',
 			metadata: {
+				...(manifest.metadata ?? {}),
 				name: service.metadata?.name ?? vmName,
 				namespace,
+				resourceVersion: service.metadata?.resourceVersion,
 				labels: {
-					...(service.metadata?.labels ?? {}),
+					...(manifest.metadata?.labels ?? {}),
 					'otterscale.com/virtual-machine.name': vmName
 				}
 			},
 			spec: {
+				...(manifest.spec ?? {}),
 				type: service.spec?.type ?? 'NodePort',
 				selector: service.spec?.selector ?? {
 					'kubevirt.io/vm': vmName
@@ -240,7 +261,7 @@
 								async () => {
 									const manifest = new TextEncoder().encode(value);
 
-									await resourceClient.apply({
+									await resourceClient.update({
 										cluster,
 										name,
 										namespace,
@@ -248,8 +269,7 @@
 										version: 'v1',
 										resource: 'services',
 										manifest,
-										fieldManager: 'otterscale-web-ui',
-										force: true
+										fieldManager: 'otterscale-web-ui'
 									});
 								},
 								{
