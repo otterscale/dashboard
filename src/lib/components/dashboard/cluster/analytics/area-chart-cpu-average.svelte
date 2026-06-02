@@ -20,13 +20,19 @@
 		getSeries
 	} from '$lib/prometheus';
 
-	let { client, fqdn }: { client: PrometheusDriver; fqdn: string } = $props();
+	let {
+		client,
+		fqdn,
+		start,
+		end,
+		endIsNow
+	}: { client: PrometheusDriver; fqdn: string; start: Date; end: Date; endIsNow: boolean } =
+		$props();
 
+	const effectiveEnd = $derived(endIsNow ? new Date() : end);
+	const timeRangeHours = $derived((effectiveEnd.getTime() - start.getTime()) / 3_600_000);
+	const chartTimeRange = $derived(formatChartTimeRange(timeRangeHours));
 	const STEP_SECONDS = 60;
-	const TIME_RANGE_HOURS = 1;
-
-	const endTime = new Date();
-	const startTime = new Date(endTime.getTime() - TIME_RANGE_HOURS * 60 * 60 * 1000);
 
 	let rawData = $state<DataPoint[]>([]);
 	let isLoading = $state(true);
@@ -39,7 +45,7 @@
 			'15m': `avg(node_load15{instance=~"${fqdn}"}) / on() group_left() avg(count by (instance) (node_cpu_seconds_total{instance=~"${fqdn}", mode="idle"})) * 100`
 		};
 		try {
-			rawData = await fetchMultipleFlattenedRange(client, query, startTime, endTime, STEP_SECONDS);
+			rawData = await fetchMultipleFlattenedRange(client, query, start, effectiveEnd, STEP_SECONDS);
 		} catch {
 			hasError = true;
 		}
@@ -86,9 +92,8 @@
 					props={{
 						area: areaProps,
 						xAxis: {
-							ticks: getChartXAxisTicks(formatChartTimeRange(TIME_RANGE_HOURS)),
-							format: (date: Date) =>
-								formatChartXAxisDate(date, formatChartTimeRange(TIME_RANGE_HOURS))
+							ticks: getChartXAxisTicks(chartTimeRange),
+							format: (date: Date) => formatChartXAxisDate(date, chartTimeRange)
 						},
 						yAxis: {
 							format: () => ''
@@ -99,7 +104,7 @@
 						<defs>
 							{#each context.series.visibleSeries as series (series.key)}
 								{@const key = series.key.replace(/\s+/g, '')}
-								<linearGradient id="fill{key}" x1="0" y1="0" x2="0" y2="1">
+								<linearGradient id="cpuavg_fill{key}" x1="0" y1="0" x2="0" y2="1">
 									<stop offset="5%" stop-color={series.color} stop-opacity={1.0} />
 									<stop offset="95%" stop-color={series.color} stop-opacity={0.4} />
 								</linearGradient>
@@ -108,7 +113,7 @@
 
 						{#each context.series.visibleSeries as series (series.key)}
 							{@const key = series.key.replace(/\s+/g, '')}
-							<Area seriesKey={series.key} {...areaProps} fill="url(#fill{key})" />
+							<Area seriesKey={series.key} {...areaProps} fill="url(#cpuavg_fill{key})" />
 						{/each}
 					{/snippet}
 
