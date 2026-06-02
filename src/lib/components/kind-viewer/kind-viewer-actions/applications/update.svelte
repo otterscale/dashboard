@@ -545,14 +545,14 @@
 
 							let parsed: unknown;
 							try {
-								parsed = load(value);
+								parsed = load(value, { schema: JSON_SCHEMA });
 							} catch {
 								toast.error('Invalid YAML. Please check the content.');
 								isSubmitting = false;
 								return;
 							}
 
-							const isValid = validate(load(value, { schema: JSON_SCHEMA }));
+							const isValid = validate(parsed);
 
 							if (!isValid) {
 								console.error('Validation errors:', validate.errors);
@@ -561,7 +561,7 @@
 								return;
 							}
 
-							const name = lodash.get(load(value, { schema: JSON_SCHEMA }), 'metadata.name');
+							const name = lodash.get(parsed, 'metadata.name');
 							const manifest = new TextEncoder().encode(value);
 
 							toast.promise(

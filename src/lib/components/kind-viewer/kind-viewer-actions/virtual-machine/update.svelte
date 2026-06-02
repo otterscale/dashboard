@@ -139,17 +139,15 @@
 			});
 		}
 
-		const diskNames = new Set(disks.map((d) => d.name).filter(Boolean));
+		const hasName = (items: Record<string, unknown>[], name: string) =>
+			items.some((item) => item.name === name);
 		existingDisks.forEach((disk) => {
-			if (!disk.name || diskNames.has(disk.name) || !unmanagedVolumeNames.has(disk.name)) return;
+			if (!disk.name || hasName(disks, disk.name) || !unmanagedVolumeNames.has(disk.name)) return;
 			disks.push(lodash.cloneDeep(disk) as Record<string, unknown>);
-			diskNames.add(disk.name);
 		});
-		const volumeNames = new Set(volumes.map((v) => v.name).filter(Boolean));
 		unmanagedVolumes.forEach((volume) => {
-			if (!volume.name || volumeNames.has(volume.name)) return;
+			if (!volume.name || hasName(volumes, volume.name)) return;
 			volumes.push(lodash.cloneDeep(volume) as Record<string, unknown>);
-			volumeNames.add(volume.name);
 		});
 
 		return { disks, volumes };
