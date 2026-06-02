@@ -2,6 +2,7 @@
 	import CompassIcon from '@lucide/svelte/icons/compass';
 	import { onMount } from 'svelte';
 
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { startTour } from '$lib/components/layout';
 	import ImportCluster from '$lib/components/layout/dialog-import-cluster.svelte';
@@ -34,7 +35,12 @@
 	let open = $state(false);
 </script>
 
-<ImportCluster bind:open />
+<ImportCluster
+	bind:open
+	onsuccess={async () => {
+		goto(resolve(`/`));
+	}}
+/>
 
 <div
 	class={cn(
