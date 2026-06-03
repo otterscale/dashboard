@@ -2,6 +2,7 @@
 
 [![Build](https://github.com/otterscale/dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/otterscale/dashboard/actions)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fotterscale%2Fdashboard.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fotterscale%2Fdashboard?ref=badge_shield)
 
 Kubernetes multi-cluster management UI — SvelteKit + Connect RPC.
 
@@ -64,3 +65,6 @@ docker run -p 3000:3000 --env-file .env otterscale/dashboard
 ## License
 
 [AGPL-3.0](LICENSE)
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fotterscale%2Fdashboard.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fotterscale%2Fdashboard?ref=badge_large)
