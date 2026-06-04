@@ -61,7 +61,6 @@
 			'creationTimestamp',
 			'deletionGracePeriodSeconds',
 			'deletionTimestamp',
-			'finalizers',
 			'generation',
 			'managedFields',
 			'ownerReferences',
