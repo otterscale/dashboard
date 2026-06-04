@@ -244,8 +244,9 @@
 				<div></div>
 				<Button
 					onclick={() => {
+						const target = resolve('/(auth)/[cluster]/console', { cluster: clusterName });
 						onFinish();
-						goto(resolve('/(auth)/[cluster]/console', { cluster: clusterName }));
+						goto(target);
 					}}>{m.done()}</Button
 				>
 			{/if}
