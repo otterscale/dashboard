@@ -30,6 +30,30 @@ jobs:
       - run: pnpm prepare
       - run: pnpm check
 
+  analyze:
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@87557b9c84dde89fdd9b10e88954ac2f4248e463 # v4.36.1
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+          build-mode: none
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@87557b9c84dde89fdd9b10e88954ac2f4248e463 # v4.36.1
+        with:
+          category: /language:javascript-typescript
+          upload: always
+          wait-for-processing: true
+
   test:
     runs-on: ubuntu-24.04
     steps:
@@ -53,6 +77,46 @@ jobs:
       #     flags: sveltekit-tests
       #     token: ${{ secrets.CODECOV_TOKEN }}
       #     slug: otterscale/otterscale
+
+  dast:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: pnpm/action-setup@08c4be7e2e672a47d11bd04269e27e5f3e8529cb # v6.0.0
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      - name: Start preview server
+        run: pnpm preview --host 0.0.0.0 --port 4173 > /tmp/dashboard-preview.log 2>&1 &
+
+      - name: Wait for preview server
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173 > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/dashboard-preview.log
+          exit 1
+
+      - name: Run ZAP baseline scan
+        uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
+        with:
+          target: http://127.0.0.1:4173
+          allow_issue_writing: false
+          fail_action: true
+          artifact_name: zap_baseline_scan
 
   lint:
     runs-on: ubuntu-24.04
