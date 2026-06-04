@@ -37,7 +37,7 @@
 			<Item.Content class="text-left">
 				<Item.Title class="font-bold">
 					{row.original['Chart Name']}
-					<Badge variant="outline">{row.original['Version']}</Badge>
+					<Badge variant="outline">{row.original['LatestVersion'] as string}</Badge>
 				</Item.Title>
 				<Item.Description>
 					{@const tags: string[] = row.original['Labels'] as string[]}
@@ -102,7 +102,17 @@
 		</div>
 		<div class="ml-auto">
 			{#if row.original['Installed']}
-				<Badge>Installed</Badge>
+				{@const installedVer = row.original['installedVersion'] as string}
+				{@const latestVer = row.original['LatestVersion'] as string}
+				{@const hasUpdate = installedVer && latestVer && installedVer !== latestVer}
+				<Badge
+					variant={hasUpdate ? 'outline' : 'default'}
+					class={hasUpdate
+						? 'border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+						: ''}
+				>
+					v{installedVer || '—'}
+				</Badge>
 			{/if}
 		</div>
 	</Card.Footer>

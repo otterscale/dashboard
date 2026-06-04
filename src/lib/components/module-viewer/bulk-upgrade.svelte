@@ -1,9 +1,9 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { DownloadIcon } from '@lucide/svelte';
+	import ArrowUpCircleIcon from '@lucide/svelte/icons/arrow-up-circle';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
+	import type { HelmToolkitFluxcdIoV2HelmRelease } from '@otterscale/types';
 	import type { Table } from '@tanstack/table-core';
 	import lodash from 'lodash';
 	import { getContext } from 'svelte';
@@ -28,94 +28,82 @@
 
 	const group = 'helm.toolkit.fluxcd.io';
 	const version = 'v2';
-	const kind = 'HelmRelease';
 	const resource = 'helmreleases';
 	const namespace = 'otterscale-system';
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	// Only rows that are NOT yet installed
+	// Only rows that are already installed
 	const rows = $derived(
-		table.getFilteredSelectedRowModel().rows.filter((row) => row.original['Installed'] !== true)
+		table.getFilteredSelectedRowModel().rows.filter((row) => row.original['Installed'] === true)
 	);
 
 	let open = $state(false);
 	let isSubmitting = $state(false);
-	async function handleInstall(
-		module: ModuleType,
-		helmRepository: SourceToolkitFluxcdIoV1HelmRepository,
-		selectedModuleNames: Set<string>
-	): Promise<string> {
-		const dependencies = lodash
-			.get(module, ['annotations', 'module.otterscale.io/depends-on'], '')
-			.split(',')
-			.filter(Boolean);
-		const dependenciesOfSelectedModuleNames = dependencies.filter((name) =>
-			selectedModuleNames.has(name)
-		);
-		const dependenciesOfSelectedModules = dependenciesOfSelectedModuleNames.map((name) => ({
-			name,
-			namespace
-		}));
 
-		const manifest = {
-			apiVersion: `${group}/${version}`,
-			kind,
-			metadata: {
-				name: module.name,
-				namespace
-			},
-			spec: {
-				releaseName: module.name,
-				targetNamespace: lodash.get(module, ['annotations', 'module.otterscale.io/namespace']),
-				install: { createNamespace: true },
-				interval: '15m',
-				timeout: '1h',
-				...(dependenciesOfSelectedModules.length > 0 && {
-					dependsOn: dependenciesOfSelectedModules
-				}),
-				chart: {
-					spec: {
-						chart: module.name,
-						version: module.version,
-						sourceRef: {
-							apiVersion: helmRepository?.apiVersion,
-							kind: helmRepository?.kind,
-							name: helmRepository?.metadata?.name,
-							namespace: helmRepository?.metadata?.namespace
-						}
-					}
-				},
-				values: {}
-			}
-		};
+	async function handleUpgrade(module: ModuleType): Promise<string> {
+		const name = module.name;
 
-		await resourceClient.create({
+		// Fetch current HelmRelease to preserve existing spec
+		const getResponse = await resourceClient.get({
 			cluster,
 			namespace,
+			name,
+			group,
+			version,
+			resource
+		});
+
+		const existing = getResponse.object as HelmToolkitFluxcdIoV2HelmRelease;
+
+		const systemFields = [
+			'creationTimestamp',
+			'deletionGracePeriodSeconds',
+			'deletionTimestamp',
+			'finalizers',
+			'generation',
+			'managedFields',
+			'ownerReferences',
+			'resourceVersion',
+			'selfLink',
+			'uid'
+		];
+		const cloned = lodash.cloneDeep(existing) as Record<string, unknown>;
+		const metadata = cloned.metadata as Record<string, unknown> | undefined;
+		if (metadata) {
+			for (const field of systemFields) {
+				delete metadata[field];
+			}
+		}
+		// Update to the latest chart version
+		lodash.set(cloned, 'spec.chart.spec.version', module.version);
+
+		const manifest = new TextEncoder().encode(stringify(cloned, { schema: 'yaml-1.1' }));
+
+		await resourceClient.apply({
+			cluster,
+			namespace,
+			name,
 			group,
 			version,
 			resource,
-			manifest: new TextEncoder().encode(stringify(manifest))
+			manifest,
+			fieldManager: 'otterscale-web-ui',
+			force: true
 		});
 
-		return module.name;
+		return name;
 	}
 
-	async function handleBulkInstall() {
+	async function handleBulkUpgrade() {
 		if (isSubmitting) return;
 		isSubmitting = true;
-
-		const selectedModuleNames = new Set(
-			rows.map((row) => (row.original.chart as unknown as ModuleType).name)
-		);
 
 		const results = await Promise.allSettled(
 			rows.map((row) => {
 				const module = row.original.chart as unknown as ModuleType;
-				const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
-				return handleInstall(module, helmRepository, selectedModuleNames);
+				return handleUpgrade(module);
 			})
 		);
 
@@ -125,21 +113,19 @@
 		for (const result of results) {
 			if (result.status === 'fulfilled') {
 				successes += 1;
-				toast.success(`Successfully created ${result.value}`);
+				toast.success(`Successfully upgraded ${result.value}`);
 			} else {
 				fails += 1;
 				const message =
 					result.reason instanceof ConnectError ? result.reason.message : String(result.reason);
-				toast.error(`Failed to create: ${message}`);
+				toast.error(`Failed to upgrade: ${message}`);
 			}
 		}
 
 		if (fails === 0) {
-			toast.success(
-				`${successes} HelmRelease(s) created — FluxCD will reconcile in dependency order`
-			);
+			toast.success(`${successes} HelmRelease(s) upgraded — FluxCD will reconcile`);
 		} else {
-			toast.warning(`${successes} created, ${fails} failed`);
+			toast.warning(`${successes} upgraded, ${fails} failed`);
 		}
 
 		table.resetRowSelection();
@@ -154,20 +140,20 @@
 			<Dialog.Trigger disabled={rows.length === 0}>
 				{#snippet child({ props })}
 					<Button variant="outline" {...props}>
-						<DownloadIcon size={16} />
+						<ArrowUpCircleIcon size={16} />
 					</Button>
 				{/snippet}
 			</Dialog.Trigger>
 		</Tooltip.Trigger>
-		<Tooltip.Content>Bulk Install ({rows.length} selected)</Tooltip.Content>
+		<Tooltip.Content>Bulk Upgrade ({rows.length} selected)</Tooltip.Content>
 	</Tooltip.Root>
 	<Dialog.Content class="max-h-[80vh] overflow-auto">
 		<Dialog.Header>
 			<Item.Root class="p-0">
 				<Item.Content class="text-left">
-					<Item.Title class="text-xl font-bold">Bulk Install</Item.Title>
+					<Item.Title class="text-xl font-bold">Bulk Upgrade</Item.Title>
 					<Item.Description>
-						Install module(s) with default values into cluster {cluster}
+						Upgrade selected installed module(s) to latest version in cluster {cluster}
 					</Item.Description>
 				</Item.Content>
 			</Item.Root>
@@ -175,24 +161,25 @@
 		<div class="space-y-2">
 			{#each rows as row (row.id)}
 				{@const module = row.original.chart as unknown as ModuleType}
+				{@const installedVer = row.original['installedVersion'] as string}
 				<Item.Root class="rounded-md border p-0">
 					<Item.Content class="text-left">
 						<Item.Title class="text-sm font-medium">
 							{module.name}
 						</Item.Title>
 						<Item.Description class="text-xs">
-							v{module.version}
+							v{installedVer || '?'} → v{module.version}
 						</Item.Description>
 					</Item.Content>
 				</Item.Root>
 			{/each}
 		</div>
 		<Dialog.Footer>
-			<Button onclick={handleBulkInstall} disabled={isSubmitting} class="w-full">
+			<Button onclick={handleBulkUpgrade} disabled={isSubmitting} class="w-full">
 				{#if isSubmitting}
 					<Spinner />
 				{/if}
-				Install
+				Upgrade
 			</Button>
 		</Dialog.Footer>
 	</Dialog.Content>

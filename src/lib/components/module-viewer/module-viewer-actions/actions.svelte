@@ -8,6 +8,8 @@
 
 	import type { ModuleAttribute } from '../table-layout';
 	import Install from './install.svelte';
+	import Uninstall from './uninstall.svelte';
+	import Upgrade from './upgrade.svelte';
 	import View from './view.svelte';
 
 	let {
@@ -19,6 +21,7 @@
 	} = $props();
 
 	let actionsOpen = $state(false);
+	const isInstalled = $derived(row.original['Installed'] === true);
 </script>
 
 <DropdownMenu.Root bind:open={actionsOpen}>
@@ -39,19 +42,48 @@
 				<View {row} />
 			</DropdownMenu.Item>
 
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<Install
-					{row}
-					{cluster}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
+			{#if isInstalled}
+				<DropdownMenu.Item
+					onSelect={(e) => {
+						e.preventDefault();
 					}}
-				/>
-			</DropdownMenu.Item>
+				>
+					<Upgrade
+						{row}
+						{cluster}
+						onOpenChangeComplete={() => {
+							actionsOpen = false;
+						}}
+					/>
+				</DropdownMenu.Item>
+				<DropdownMenu.Item
+					onSelect={(e) => {
+						e.preventDefault();
+					}}
+				>
+					<Uninstall
+						{row}
+						{cluster}
+						onOpenChangeComplete={() => {
+							actionsOpen = false;
+						}}
+					/>
+				</DropdownMenu.Item>
+			{:else}
+				<DropdownMenu.Item
+					onSelect={(e) => {
+						e.preventDefault();
+					}}
+				>
+					<Install
+						{row}
+						{cluster}
+						onOpenChangeComplete={() => {
+							actionsOpen = false;
+						}}
+					/>
+				</DropdownMenu.Item>
+			{/if}
 		</DropdownMenu.Group>
 	</DropdownMenu.Content>
 </DropdownMenu.Root>

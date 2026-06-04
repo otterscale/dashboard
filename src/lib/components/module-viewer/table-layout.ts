@@ -14,7 +14,7 @@ type ModuleAttribute =
 	| 'Chart Name'
 	| 'Description'
 	| 'Digest'
-	| 'Version'
+	| 'LatestVersion'
 	| 'Type'
 	| 'Labels'
 	| 'Installed'
@@ -23,7 +23,8 @@ type ModuleAttribute =
 	| 'icon'
 	| 'helmRepository'
 	| 'chart'
-	| 'installedModules';
+	| 'installedModules'
+	| 'installedVersion';
 
 function getChartDataSchemas(): Record<ModuleAttribute, DataSchemaType> {
 	return {
@@ -31,7 +32,7 @@ function getChartDataSchemas(): Record<ModuleAttribute, DataSchemaType> {
 		'Chart Name': 'text',
 		Description: 'text',
 		Digest: 'text',
-		Version: 'text',
+		LatestVersion: 'text',
 		Type: 'text',
 		Labels: 'array',
 		Installed: 'boolean',
@@ -40,7 +41,8 @@ function getChartDataSchemas(): Record<ModuleAttribute, DataSchemaType> {
 		icon: 'text',
 		helmRepository: 'object',
 		chart: 'object',
-		installedModules: 'array'
+		installedModules: 'array',
+		installedVersion: 'text'
 	};
 }
 
@@ -50,7 +52,7 @@ function getChartUISchemas(): Record<ModuleAttribute, UISchemaType> {
 		'Chart Name': 'text',
 		Description: 'text',
 		Digest: 'text',
-		Version: 'text',
+		LatestVersion: 'text',
 		Type: 'text',
 		Labels: 'array',
 		Installed: 'boolean',
@@ -59,13 +61,15 @@ function getChartUISchemas(): Record<ModuleAttribute, UISchemaType> {
 		icon: 'text',
 		helmRepository: 'object',
 		chart: 'object',
-		installedModules: 'array'
+		installedModules: 'array',
+		installedVersion: 'text'
 	};
 }
 function getChartData(
 	module: ModuleType,
 	installedModuleNames: Set<string>,
-	helmRepository: SourceToolkitFluxcdIoV1HelmRepository
+	helmRepository: SourceToolkitFluxcdIoV1HelmRepository,
+	installedVersionMap: Map<string, string> = new Map()
 ): Record<ModuleAttribute, JsonValue> {
 	const dependsOn = module.annotations?.['module.otterscale.io/depends-on'] ?? '';
 	const prerequisite = dependsOn.split(',').filter(Boolean);
@@ -74,7 +78,7 @@ function getChartData(
 		'Chart Name': module.name ?? null,
 		Description: module.description as JsonValue,
 		Digest: module.digest ?? null,
-		Version: module.version as JsonValue,
+		LatestVersion: module.version as JsonValue,
 		Type: module.type ?? null,
 		Labels: (module.keywords ?? []) as JsonValue,
 		Installed: installedModuleNames.has(module.name ?? ''),
@@ -85,7 +89,8 @@ function getChartData(
 		icon: module.icon as JsonValue,
 		helmRepository: helmRepository as JsonValue,
 		chart: module as unknown as JsonValue,
-		installedModules: Array.from(installedModuleNames) as unknown as JsonValue
+		installedModules: Array.from(installedModuleNames) as unknown as JsonValue,
+		installedVersion: (installedVersionMap.get(module.name ?? '') ?? null) as JsonValue
 	};
 }
 
@@ -98,7 +103,7 @@ function getChartColumnDefinitions(
 		'Description',
 		'Digest',
 		'Type',
-		'Version',
+		'LatestVersion',
 		'Labels',
 		'Installed'
 	];

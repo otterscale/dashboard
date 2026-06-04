@@ -12,6 +12,7 @@
 	import * as Item from '$lib/components/ui/item';
 
 	import BulkInstall from './bulk-install.svelte';
+	import BulkUpgrade from './bulk-upgrade.svelte';
 	import Grid from './grid-layout.svelte';
 	import Actions from './module-viewer-actions/actions.svelte';
 	import {
@@ -79,6 +80,7 @@
 		{/snippet}
 		{#snippet bulkCreate({ table })}
 			<BulkInstall {table} {cluster} />
+			<BulkUpgrade {table} {cluster} />
 		{/snippet}
 		{#snippet rowActions({ row })}
 			<Actions {row} {cluster} />
