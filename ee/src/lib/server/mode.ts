@@ -19,8 +19,8 @@ interface GetResponse {
 // A license counts as valid when a Valid/Ready condition is "True", or — when no
 // such condition is present — when the phase reports an active state. Adjust
 // these names to match the license.otterscale.io/v1alpha1 CRD if they differ.
-const VALID_CONDITION_TYPES = new Set(['Valid', 'Ready']);
-const VALID_PHASES = new Set(['Active', 'Valid']);
+const VALID_CONDITION_TYPES = new Set(['LicenseValid']);
+const VALID_PHASES = new Set(['Provisional', 'Active']);
 
 function isLicenseValid(license: LicenseObject | null): boolean {
 	if (!license) return false;
