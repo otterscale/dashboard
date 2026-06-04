@@ -3,7 +3,9 @@
 [![Build](https://github.com/otterscale/dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/otterscale/dashboard/actions)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 
-Kubernetes multi-cluster management UI — SvelteKit + Connect RPC.
+**The web UI for OtterScale — manage multi-cluster Kubernetes, storage, virtual machines, and AI workloads from one place.**
+
+OtterScale Dashboard is a SvelteKit application that talks to the [OtterScale API](https://github.com/otterscale/api) over Connect RPC. It handles authentication against Keycloak, proxies requests to the gateway, and renders a unified operations console for every connected cluster.
 
 ## Architecture
 
@@ -24,43 +26,32 @@ graph LR
     end
 ```
 
-## 🚀 Quick Start
-
-```bash
-# Clone
-git clone https://github.com/otterscale/dashboard.git && cd dashboard
-
-# Configure
-cp .env.example .env   # edit .env
-
-# Dev
-pnpm install && pnpm dev
-
-# Production (Docker)
-docker build -t otterscale/dashboard .
-docker run -p 3000:3000 --env-file .env otterscale/dashboard
-```
-
-## ⚙️ Configuration
-
-| `ENV_VAR`                | Default                 | Description                        |
-| ------------------------ | ----------------------- | ---------------------------------- |
-| `PUBLIC_WEB_URL`         | `http://localhost:3000` | Public URL (required)              |
-| `PUBLIC_HARBOR_URL`      | `http://localhost:5000` | Public Harbor URL (required)       |
-| `API_URL`                | `http://localhost:8299` | OtterScale API endpoint (required) |
-| `REDIS_URL`              | —                       | Redis connection string (required) |
-| `KEYCLOAK_REALM_URL`     | —                       | Keycloak realm URL (required)      |
-| `KEYCLOAK_CLIENT_ID`     | —                       | OAuth client ID (required)         |
-| `KEYCLOAK_CLIENT_SECRET` | —                       | OAuth client secret (required)     |
-
 ## Features
 
-- **Multi-cluster K8s management** — scopes, resources, RBAC
-- **Storage orchestration** — Ceph pools, OSD, NFS, SMB, object gateway
-- **VM lifecycle** — create, manage, console via xterm.js
-- **AI/ML model serving** — LLM deployment & inference proxy
-- **Prometheus monitoring** — built-in metrics & dashboards
+- **Multi-cluster Kubernetes management** — scopes, resources, and RBAC.
+- **Storage orchestration** — Ceph pools, OSD, NFS, SMB, and object gateways.
+- **VM lifecycle** — create, manage, and access consoles via xterm.js and VNC.
+- **AI/ML model serving** — LLM deployment and an inference proxy.
+- **Monitoring** — built-in metrics and dashboards backed by Prometheus.
+
+## Tech Stack
+
+Built with SvelteKit, TypeScript, Tailwind CSS, and Vite. UI building blocks include Monaco Editor, xterm.js, NoVNC, and LayerChart, with internationalization powered by Inlang Paraglide.
+
+## Documentation
+
+Setup, configuration, and deployment guides will be published in the project documentation. See `.env.example` for the environment variables the app expects.
+
+## Ecosystem
+
+OtterScale Dashboard is the web UI for the OtterScale platform. See the [otterscale](https://github.com/otterscale/otterscale) repository for an overview of the full project and its components.
+
+## Contributing
+
+Contributions are welcome. A contribution guide (`CONTRIBUTING.md`) will follow; until then, please open an issue or a pull request to get involved.
 
 ## License
 
-[AGPL-3.0](LICENSE)
+This project is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fotterscale%2Fdashboard.svg?type=large&issueType=license)](https://app.fossa.com/projects/git%2Bgithub.com%2Fotterscale%2Fdashboard?ref=badge_large&issueType=license)
