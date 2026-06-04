@@ -15,6 +15,8 @@
 	import { getContext, onDestroy } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import * as Code from '$lib/components/custom/code';
 	import * as Avatar from '$lib/components/ui/avatar';
 	import { Button } from '$lib/components/ui/button';
@@ -240,7 +242,12 @@
 				</Button>
 			{:else if stepIndex === 3}
 				<div></div>
-				<Button onclick={onFinish}>{m.done()}</Button>
+				<Button
+					onclick={() => {
+						onFinish();
+						goto(resolve('/(auth)/[cluster]/console', { cluster: clusterName }));
+					}}>{m.done()}</Button
+				>
 			{/if}
 		</div>
 	{/if}
