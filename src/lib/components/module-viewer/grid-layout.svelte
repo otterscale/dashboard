@@ -3,7 +3,9 @@
 	import SiHelm from '@icons-pack/svelte-simple-icons/icons/SiHelm';
 	import TagIcon from '@lucide/svelte/icons/tag';
 	import TagsIcon from '@lucide/svelte/icons/tags';
+	import type { Schema } from '@sjsf/form';
 	import type { Row } from '@tanstack/table-core';
+	import type { ValidateFunction } from 'ajv';
 	import lodash from 'lodash';
 
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
@@ -16,10 +18,14 @@
 
 	let {
 		row,
-		cluster
+		cluster,
+		schema,
+		validate
 	}: {
 		row: Row<Record<ModuleAttribute, JsonValue>>;
 		cluster: string;
+		schema?: Schema;
+		validate?: ValidateFunction;
 	} = $props();
 </script>
 
@@ -66,7 +72,7 @@
 				</Item.Description>
 			</Item.Content>
 			<Item.Actions>
-				<Actions {row} {cluster} />
+				<Actions {row} {cluster} {schema} {validate} />
 			</Item.Actions>
 		</Item.Root>
 	</Card.Header>

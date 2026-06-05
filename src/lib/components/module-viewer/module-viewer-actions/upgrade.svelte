@@ -4,8 +4,10 @@
 	import ArrowUpCircleIcon from '@lucide/svelte/icons/arrow-up-circle';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { HelmToolkitFluxcdIoV2HelmRelease } from '@otterscale/types';
+	import type { Schema } from '@sjsf/form';
 	import type { Row } from '@tanstack/table-core';
-	import lodash from 'lodash';
+	import type { ValidateFunction } from 'ajv';
+	import { JSON_SCHEMA, load } from 'js-yaml';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
@@ -23,10 +25,14 @@
 	let {
 		row,
 		cluster,
+		schema,
+		validate,
 		onOpenChangeComplete
 	}: {
 		row: Row<Record<ModuleAttribute, JsonValue>>;
 		cluster: string;
+		schema?: Schema;
+		validate?: ValidateFunction;
 		onOpenChangeComplete: () => void;
 	} = $props();
 
@@ -41,9 +47,7 @@
 
 	const module = $derived(row.original['chart'] as unknown as ModuleType);
 
-	// All available versions for this module
 	const allVersions = $derived((module.versions ?? []).map((v) => v.version).filter(Boolean));
-	// Latest version is the first entry in versions[]
 	const latestVersion = $derived(allVersions[0] ?? module.version);
 
 	let selectedVersion = $state('');
@@ -56,15 +60,56 @@
 	let open = $state(false);
 	let isSubmitting = $state(false);
 
+	function buildManifestFromSchema(
+		existing: HelmToolkitFluxcdIoV2HelmRelease,
+		jsonSchema: Schema,
+		targetVersion: string
+	): string {
+		const schemaProperties =
+			(jsonSchema as { properties?: Record<string, unknown> }).properties ?? {};
+		const source = existing as unknown as Record<string, unknown>;
+		const manifest: Record<string, unknown> = {};
+
+		for (const key of Object.keys(schemaProperties)) {
+			const value = source[key];
+			if (value !== undefined) {
+				manifest[key] = value;
+			}
+		}
+
+		const metadata = (manifest.metadata ?? {}) as Record<string, unknown>;
+		const existingMetadata = (source.metadata ?? {}) as Record<string, unknown>;
+		if (existingMetadata.resourceVersion) {
+			metadata.resourceVersion = existingMetadata.resourceVersion;
+		}
+		manifest.metadata = metadata;
+
+		const spec = (manifest.spec ?? {}) as Record<string, unknown>;
+		const chart = (spec.chart ?? {}) as Record<string, unknown>;
+		const chartSpec = (chart.spec ?? {}) as Record<string, unknown>;
+
+		manifest.spec = {
+			...spec,
+			chart: {
+				...chart,
+				spec: {
+					...chartSpec,
+					version: targetVersion
+				}
+			}
+		};
+
+		return stringify(manifest, { schema: 'yaml-1.1' });
+	}
+
 	async function handleUpgrade() {
-		if (isSubmitting || !selectedVersion) return;
+		if (isSubmitting || !selectedVersion || !schema || !validate) return;
 		isSubmitting = true;
 
 		const name = module.name;
 
 		toast.promise(
 			async () => {
-				// Fetch current HelmRelease to preserve existing spec
 				const getResponse = await resourceClient.get({
 					cluster,
 					namespace,
@@ -75,40 +120,31 @@
 				});
 
 				const existing = getResponse.object as HelmToolkitFluxcdIoV2HelmRelease;
+				const yamlValue = buildManifestFromSchema(existing, schema, selectedVersion);
 
-				// Build patched manifest: preserve all fields, only update chart version
-				const systemFields = [
-					'creationTimestamp',
-					'deletionGracePeriodSeconds',
-					'deletionTimestamp',
-					'generation',
-					'managedFields',
-					'ownerReferences',
-					'resourceVersion',
-					'selfLink',
-					'uid'
-				];
-				const cloned = lodash.cloneDeep(existing) as Record<string, unknown>;
-				const metadata = cloned.metadata as Record<string, unknown> | undefined;
-				if (metadata) {
-					for (const field of systemFields) {
-						delete metadata[field];
-					}
+				let parsed: unknown;
+				try {
+					parsed = load(yamlValue, { schema: JSON_SCHEMA });
+				} catch (error) {
+					console.error('Failed to parse HelmRelease manifest:', error);
+					throw new Error('Invalid YAML. Please try again.');
 				}
-				lodash.set(cloned, 'spec.chart.spec.version', selectedVersion);
 
-				const manifest = new TextEncoder().encode(stringify(cloned, { schema: 'yaml-1.1' }));
+				const isValid = validate(parsed);
+				if (!isValid) {
+					console.error('Validation errors:', validate.errors);
+					throw new Error('Validation failed. The manifest does not match the HelmRelease schema.');
+				}
 
-				await resourceClient.apply({
+				await resourceClient.update({
 					cluster,
 					namespace,
-					name,
 					group,
 					version,
 					resource,
-					manifest,
-					fieldManager: 'otterscale-web-ui',
-					force: true
+					name,
+					manifest: new TextEncoder().encode(yamlValue),
+					fieldManager: 'otterscale-web-ui'
 				});
 			},
 			{
@@ -190,7 +226,7 @@
 			</Select.Root>
 		</div>
 
-		<Button onclick={handleUpgrade} disabled={isSubmitting || !selectedVersion}>
+		<Button onclick={handleUpgrade} disabled={isSubmitting || !selectedVersion || !validate}>
 			{#if isSubmitting}
 				<Spinner />
 			{/if}

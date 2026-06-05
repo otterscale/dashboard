@@ -1,7 +1,9 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
+	import type { Schema } from '@sjsf/form';
 	import type { Row } from '@tanstack/table-core';
+	import type { ValidateFunction } from 'ajv';
 
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
@@ -14,10 +16,14 @@
 
 	let {
 		row,
-		cluster
+		cluster,
+		schema,
+		validate
 	}: {
 		row: Row<Record<ModuleAttribute, JsonValue>>;
 		cluster: string;
+		schema?: Schema;
+		validate?: ValidateFunction;
 	} = $props();
 
 	let actionsOpen = $state(false);
@@ -51,6 +57,8 @@
 					<Upgrade
 						{row}
 						{cluster}
+						{schema}
+						{validate}
 						onOpenChangeComplete={() => {
 							actionsOpen = false;
 						}}
