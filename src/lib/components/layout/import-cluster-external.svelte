@@ -29,6 +29,7 @@
 	import * as Popover from '$lib/components/ui/popover';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { m } from '$lib/paraglide/messages';
+	import { bump } from '$lib/stores/pulse.svelte';
 	import { cn } from '$lib/utils';
 
 	let {
@@ -244,9 +245,10 @@
 				<div></div>
 				<Button
 					onclick={() => {
+						bump('links');
 						const target = resolve('/(auth)/[cluster]/console', { cluster: clusterName });
-						onFinish();
 						goto(target);
+						onFinish();
 					}}>{m.done()}</Button
 				>
 			{/if}

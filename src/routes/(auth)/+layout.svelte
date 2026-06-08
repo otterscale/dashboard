@@ -73,11 +73,12 @@
 	let aboutOpen = $state(false);
 	let importOpen = $state(false);
 
-	async function fetchClusters(): Promise<Link[]> {
+	async function fetchClusters(signal?: AbortSignal): Promise<Link[]> {
 		try {
-			const response = await linkClient.listLinks({});
+			const response = await linkClient.listLinks({}, { signal });
 			return response.links;
 		} catch (error) {
+			if (signal?.aborted) throw error;
 			console.error('Failed to fetch links:', error);
 			return [];
 		}
@@ -139,6 +140,22 @@
 		fetchWorkspaces(activeCluster, abortController.signal)
 			.then((resources) => {
 				if (!abortController.signal.aborted) workspaces = resources;
+			})
+			.catch((err) => {
+				if (!abortController.signal.aborted) console.error(err);
+			});
+
+		return () => abortController.abort();
+	});
+	$effect(() => {
+		if (pulse.links === 0) return;
+
+		if (!activeCluster) return;
+
+		const abortController = new AbortController();
+		fetchClusters(abortController.signal)
+			.then((resources) => {
+				if (!abortController.signal.aborted) links = resources;
 			})
 			.catch((err) => {
 				if (!abortController.signal.aborted) console.error(err);
