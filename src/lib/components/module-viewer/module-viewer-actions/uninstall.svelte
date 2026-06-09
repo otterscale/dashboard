@@ -1,28 +1,42 @@
+<script lang="ts" module>
+	const jsonSchemaValidator = ajvErrors(
+		new Ajv({
+			allErrors: true,
+			strict: true
+		})
+	);
+</script>
+
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
 	import { ResourceService } from '@otterscale/api/resource/v1';
+	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
+	import { SubmitButton } from '@sjsf/form';
 	import type { Row } from '@tanstack/table-core';
+	import Ajv from 'ajv';
+	import ajvErrors from 'ajv-errors';
+	import lodash from 'lodash';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
-	import { buttonVariants } from '$lib/components/ui/button';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import Form from '$lib/components/dynamic-form/form.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
-	import { Spinner } from '$lib/components/ui/spinner/index.js';
 
 	import type { ModuleAttribute } from '../table-layout';
-	import { type ModuleType } from '../types';
+	import type { ModuleType } from '../types';
 
 	let {
-		row,
 		cluster,
+		schema,
+		row,
 		onOpenChangeComplete
 	}: {
-		row: Row<Record<ModuleAttribute, JsonValue>>;
 		cluster: string;
+		schema: Schema;
+		row: Row<Record<ModuleAttribute, JsonValue>>;
 		onOpenChangeComplete: () => void;
 	} = $props();
 
@@ -32,50 +46,35 @@
 	const resource = 'helmreleases';
 	const namespace = 'otterscale-system';
 
+	const module = $derived(row.original.chart as unknown as ModuleType);
+
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	const module = $derived(row.original['chart'] as unknown as ModuleType);
-	const installedVersion = $derived((row.original['installedVersion'] as string) ?? module.version);
-
+	let values = $state(getInitialValues());
 	let open = $state(false);
-	let isSubmitting = $state(false);
-	let confirm = $state('');
-	const isConfirmed = $derived(confirm === module.name);
+	let isDeleting = $state(false);
 
-	async function handleUninstall() {
-		if (isSubmitting) return;
-		isSubmitting = true;
-
-		const name = module.name;
-
-		toast.promise(
-			async () => {
-				await resourceClient.delete({
-					cluster,
-					namespace,
-					group,
-					version,
-					resource,
-					name
-				});
-			},
-			{
-				loading: `Uninstalling ${kind} ${name}…`,
-				success: () => {
-					return `Successfully uninstalled ${kind} ${name} — FluxCD is reconciling`;
-				},
-				error: (error) => {
-					console.error(`Failed to uninstall ${kind} ${name}:`, error);
-					return `Failed to uninstall ${kind} ${name}: ${(error as ConnectError).message}`;
-				},
-				finally() {
-					isSubmitting = false;
-					open = false;
-					confirm = '';
-				}
+	const jsonSchema = $derived({
+		type: 'object',
+		required: ['name'],
+		properties: {
+			name: {
+				title: 'Name',
+				type: 'string',
+				const: module.name,
+				errorMessage: `Please enter "${module.name ?? ''}" to confirm.`
 			}
-		);
+		}
+	} as Schema);
+
+	function getInitialValues() {
+		return { name: '' };
+	}
+
+	function initiate() {
+		values = getInitialValues();
+		isDeleting = false;
 	}
 </script>
 
@@ -83,10 +82,13 @@
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
 		onOpenChangeComplete?.();
-		if (!isOpen) confirm = '';
+
+		if (isOpen) return;
+
+		initiate();
 	}}
 >
-	<Dialog.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+	<Dialog.Trigger>
 		{#snippet child({ props })}
 			<Item.Root {...props} class="w-full p-0 text-xs **:text-destructive" size="sm">
 				<Item.Media>
@@ -98,46 +100,84 @@
 			</Item.Root>
 		{/snippet}
 	</Dialog.Trigger>
-	<Dialog.Content>
-		<Dialog.Header>
-			<Item.Root class="p-0">
-				<Item.Content class="text-left">
-					<Item.Title class="text-xl font-bold">Uninstall</Item.Title>
-					<Item.Description>
-						This will remove the module from cluster {cluster}. FluxCD will uninstall the associated
-						Helm chart. Enter the module name to proceed.
-					</Item.Description>
-				</Item.Content>
-			</Item.Root>
-		</Dialog.Header>
-		<Item.Root class="rounded-md border p-0">
+	<Dialog.Content
+		class="max-h-[95vh] min-w-[24vw] overflow-auto"
+		onInteractOutside={(e) => e.preventDefault()}
+	>
+		<Item.Root class="p-0">
 			<Item.Content class="text-left">
-				<Item.Title class="text-sm font-medium">
-					{module.name}
-				</Item.Title>
-				<Item.Description class="text-xs">
-					Installed: v{installedVersion}
-				</Item.Description>
+				<Item.Title class="text-xl font-bold">{kind}</Item.Title>
+				<Item.Description>{lodash.get(schema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
+		<Form
+			schema={jsonSchema}
+			uiSchema={{
+				'ui:options': {
+					layouts: {
+						'object-properties': {
+							class: 'gap-3'
+						}
+					}
+				},
+				name: {
+					'ui:options': {
+						help: `Entering the ${kind.toLowerCase()} name.`,
+						shadcn4Text: {
+							placeholder: module.name
+						}
+					}
+				}
+			} as UiSchemaRoot}
+			initialValue={getInitialValues() as FormValue}
+			bind:values
+			handleSubmit={{
+				posthook: () => {
+					if (isDeleting) return;
+					isDeleting = true;
 
-		<div class="mt-3">
-			<label for={`confirm-module-name-${module.name}`} class="text-sm font-medium"
-				>Type module name to confirm</label
-			>
-			<input
-				id={`confirm-module-name-${module.name}`}
-				class="mt-1 w-full rounded-md border px-2 py-1"
-				bind:value={confirm}
-				placeholder={module.name}
-				aria-label="Confirm module name"
-			/>
-		</div>
-		<Button variant="destructive" onclick={handleUninstall} disabled={isSubmitting || !isConfirmed}>
-			{#if isSubmitting}
-				<Spinner />
-			{/if}
-			Uninstall
-		</Button>
+					const validate = jsonSchemaValidator.compile(jsonSchema);
+
+					const isValid = validate(values);
+					if (!isValid) return;
+
+					const name = values.name as string;
+
+					toast.promise(
+						async () => {
+							await resourceClient.delete({
+								cluster,
+								namespace,
+								group,
+								version,
+								resource,
+								name
+							});
+						},
+						{
+							loading: `Requesting deletion of ${kind.toLowerCase()} ${name}...`,
+							success: () => {
+								return `Deletion requested for ${kind.toLowerCase()} ${name}`;
+							},
+							error: (error) => {
+								console.error(`Failed to delete ${kind.toLowerCase()} ${name}:`, error);
+								return `Failed to delete ${kind.toLowerCase()} ${name}: ${(error as ConnectError).message}`;
+							},
+							finally() {
+								isDeleting = false;
+								open = false;
+							}
+						}
+					);
+				}
+			}}
+			class="**:data-[slot=dynamic-form-mode-controller]:hidden"
+		>
+			{#snippet actions()}
+				<div class="*:w-full">
+					<SubmitButton />
+				</div>
+			{/snippet}
+		</Form>
 	</Dialog.Content>
 </Dialog.Root>

@@ -22,7 +22,7 @@
 	}: {
 		row: Row<Record<ModuleAttribute, JsonValue>>;
 		cluster: string;
-		schema?: Schema;
+		schema: Schema;
 		validate?: ValidateFunction;
 	} = $props();
 
@@ -70,8 +70,9 @@
 					}}
 				>
 					<Uninstall
-						{row}
 						{cluster}
+						{schema}
+						{row}
 						onOpenChangeComplete={() => {
 							actionsOpen = false;
 						}}

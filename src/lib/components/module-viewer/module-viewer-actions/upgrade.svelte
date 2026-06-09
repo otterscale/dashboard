@@ -4,20 +4,19 @@
 	import ArrowUpCircleIcon from '@lucide/svelte/icons/arrow-up-circle';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { HelmToolkitFluxcdIoV2HelmRelease } from '@otterscale/types';
-	import type { Schema } from '@sjsf/form';
+	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
+	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import type { Row } from '@tanstack/table-core';
-	import type { ValidateFunction } from 'ajv';
+	import { type ValidateFunction } from 'ajv';
 	import { JSON_SCHEMA, load } from 'js-yaml';
+	import lodash from 'lodash';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
 
-	import { buttonVariants } from '$lib/components/ui/button';
-	import Button from '$lib/components/ui/button/button.svelte';
+	import Form from '$lib/components/dynamic-form/form.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
-	import * as Select from '$lib/components/ui/select/index.js';
-	import { Spinner } from '$lib/components/ui/spinner/index.js';
 
 	import type { ModuleAttribute } from '../table-layout';
 	import { type ModuleType } from '../types';
@@ -45,134 +44,49 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	const module = $derived(row.original['chart'] as unknown as ModuleType);
+	const module = $derived(row.original.chart as unknown as ModuleType);
+	const versions = $derived(
+		module.versions.map((moduleVersion) => moduleVersion.version).filter(Boolean)
+	);
+	const latestVersion = $derived(module.version);
 
-	const allVersions = $derived((module.versions ?? []).map((v) => v.version).filter(Boolean));
-	const latestVersion = $derived(allVersions[0] ?? module.version);
-
-	let selectedVersion = $state('');
-	$effect(() => {
-		if (latestVersion && !selectedVersion) {
-			selectedVersion = latestVersion;
-		}
-	});
-
+	let values = $state(getInitialValues());
 	let open = $state(false);
 	let isSubmitting = $state(false);
 
-	function buildManifestFromSchema(
-		existing: HelmToolkitFluxcdIoV2HelmRelease,
-		jsonSchema: Schema,
-		targetVersion: string
-	): string {
-		const schemaProperties =
-			(jsonSchema as { properties?: Record<string, unknown> }).properties ?? {};
-		const source = existing as unknown as Record<string, unknown>;
-		const manifest: Record<string, unknown> = {};
-
-		for (const key of Object.keys(schemaProperties)) {
-			const value = source[key];
-			if (value !== undefined) {
-				manifest[key] = value;
+	const jsonSchema = $derived({
+		type: 'object',
+		required: ['version'],
+		properties: {
+			version: {
+				title: 'Version',
+				type: 'string',
+				enum: versions.length > 0 ? versions : [latestVersion]
 			}
 		}
+	} as Schema);
 
-		const metadata = (manifest.metadata ?? {}) as Record<string, unknown>;
-		const existingMetadata = (source.metadata ?? {}) as Record<string, unknown>;
-		if (existingMetadata.resourceVersion) {
-			metadata.resourceVersion = existingMetadata.resourceVersion;
-		}
-		manifest.metadata = metadata;
-
-		const spec = (manifest.spec ?? {}) as Record<string, unknown>;
-		const chart = (spec.chart ?? {}) as Record<string, unknown>;
-		const chartSpec = (chart.spec ?? {}) as Record<string, unknown>;
-
-		manifest.spec = {
-			...spec,
-			chart: {
-				...chart,
-				spec: {
-					...chartSpec,
-					version: targetVersion
-				}
-			}
-		};
-
-		return stringify(manifest, { schema: 'yaml-1.1' });
+	function getInitialValues() {
+		return { version: latestVersion };
 	}
 
-	async function handleUpgrade() {
-		if (isSubmitting || !selectedVersion || !schema || !validate) return;
-		isSubmitting = true;
-
-		const name = module.name;
-
-		toast.promise(
-			async () => {
-				const getResponse = await resourceClient.get({
-					cluster,
-					namespace,
-					name,
-					group,
-					version,
-					resource
-				});
-
-				const existing = getResponse.object as HelmToolkitFluxcdIoV2HelmRelease;
-				const yamlValue = buildManifestFromSchema(existing, schema, selectedVersion);
-
-				let parsed: unknown;
-				try {
-					parsed = load(yamlValue, { schema: JSON_SCHEMA });
-				} catch (error) {
-					console.error('Failed to parse HelmRelease manifest:', error);
-					throw new Error('Invalid YAML. Please try again.');
-				}
-
-				const isValid = validate(parsed);
-				if (!isValid) {
-					console.error('Validation errors:', validate.errors);
-					throw new Error('Validation failed. The manifest does not match the HelmRelease schema.');
-				}
-
-				await resourceClient.update({
-					cluster,
-					namespace,
-					group,
-					version,
-					resource,
-					name,
-					manifest: new TextEncoder().encode(yamlValue),
-					fieldManager: 'otterscale-web-ui'
-				});
-			},
-			{
-				loading: `Upgrading ${kind} ${name} to ${selectedVersion}…`,
-				success: () => `Successfully upgraded ${kind} ${name} to ${selectedVersion}`,
-				error: (error) => {
-					console.error(`Failed to upgrade ${kind} ${name}:`, error);
-					return `Failed to upgrade ${kind} ${name}: ${(error as ConnectError).message}`;
-				},
-				finally() {
-					isSubmitting = false;
-					open = false;
-				}
-			}
-		);
+	function initiate() {
+		values = { version: latestVersion };
+		isSubmitting = false;
 	}
 </script>
 
 <Dialog.Root
 	bind:open
-	onOpenChangeComplete={() => {
+	onOpenChangeComplete={(isOpen) => {
 		onOpenChangeComplete?.();
-		if (!open) {
-			selectedVersion = latestVersion;
-		}
+
+		if (isOpen) return;
+
+		initiate();
 	}}
 >
-	<Dialog.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+	<Dialog.Trigger>
 		{#snippet child({ props })}
 			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
 				<Item.Media>
@@ -185,7 +99,7 @@
 		{/snippet}
 	</Dialog.Trigger>
 
-	<Dialog.Content>
+	<Dialog.Content class="max-h-[95vh] overflow-auto" onInteractOutside={(e) => e.preventDefault()}>
 		<Dialog.Header>
 			<Item.Root class="p-0">
 				<Item.Content class="text-left">
@@ -198,39 +112,102 @@
 			</Item.Root>
 		</Dialog.Header>
 
-		<Item.Root class="rounded-md border p-0">
-			<Item.Content class="text-left">
-				<Item.Title class="text-sm font-medium">{module.name}</Item.Title>
-				<Item.Description class="text-xs">
-					Current: v{(row.original['installedVersion'] as string) ?? module.version}
-				</Item.Description>
-			</Item.Content>
-		</Item.Root>
+		<Form
+			schema={jsonSchema}
+			uiSchema={{
+				'ui:options': {
+					layouts: {
+						'object-properties': {
+							class: 'gap-3'
+						}
+					}
+				},
+				version: {
+					'ui:options': {
+						help: 'Select a Version'
+					},
+					'ui:components': {
+						stringField: 'enumField',
+						selectWidget: 'comboboxWidget'
+					}
+				}
+			} as UiSchemaRoot}
+			initialValue={getInitialValues() as FormValue}
+			bind:values
+			handleSubmit={{
+				posthook: (form: FormState<FormValue>) => {
+					if (isSubmitting || !schema || !validate) return;
+					isSubmitting = true;
 
-		<div class="flex flex-col gap-1">
-			<label class="text-sm font-medium" for="upgrade-version-select">Target Version</label>
-			<Select.Root type="single" bind:value={selectedVersion}>
-				<Select.Trigger id="upgrade-version-select" class="w-full">
-					{selectedVersion || 'Select a version…'}
-				</Select.Trigger>
-				<Select.Content>
-					{#each allVersions as ver (ver)}
-						<Select.Item value={ver}>
-							{ver}
-							{#if ver === latestVersion}
-								<span class="ml-1 text-xs text-muted-foreground">(latest)</span>
-							{/if}
-						</Select.Item>
-					{/each}
-				</Select.Content>
-			</Select.Root>
-		</div>
+					const formValue = getValueSnapshot(form);
 
-		<Button onclick={handleUpgrade} disabled={isSubmitting || !selectedVersion || !validate}>
-			{#if isSubmitting}
-				<Spinner />
-			{/if}
-			Upgrade
-		</Button>
+					const name = module.name;
+					const targetVersion = formValue
+						? lodash.get(formValue, 'version')
+						: (latestVersion as string);
+
+					toast.promise(
+						async () => {
+							const response = await resourceClient.get({
+								cluster,
+								namespace,
+								name,
+								group,
+								version,
+								resource
+							});
+
+							const helmRelease: HelmToolkitFluxcdIoV2HelmRelease = lodash.cloneDeep(
+								response.object ?? {}
+							);
+							lodash.set(helmRelease, ['spec', 'chart', 'spec', 'version'], targetVersion);
+							const manifest = stringify(helmRelease, { schema: 'yaml-1.1' });
+
+							let isValid: boolean | undefined = undefined;
+							try {
+								isValid = validate(load(manifest, { schema: JSON_SCHEMA }));
+							} catch (error) {
+								console.error(`Failed to parse HelmRelease manifest for ${name}:`, error);
+								throw new Error(`Invalid YAML for ${name}.`);
+							}
+							if (!isValid) {
+								console.error(`Validation errors for ${name}:`, validate.errors);
+								throw new Error(`Validation failed for ${name}.`);
+							}
+
+							await resourceClient.update({
+								cluster,
+								namespace,
+								group,
+								version,
+								resource,
+								name,
+								manifest: new TextEncoder().encode(manifest),
+								fieldManager: 'otterscale-web-ui'
+							});
+						},
+						{
+							loading: `Upgrading ${kind} ${name} to ${targetVersion}…`,
+							success: () => `Successfully upgraded ${kind} ${name} to ${targetVersion}`,
+							error: (error) => {
+								console.error(`Failed to upgrade ${kind} ${name}:`, error);
+								return `Failed to upgrade ${kind} ${name}: ${(error as ConnectError).message}`;
+							},
+							finally() {
+								isSubmitting = false;
+								open = false;
+							}
+						}
+					);
+				}
+			}}
+			class="**:data-[slot=dynamic-form-mode-controller]:hidden"
+		>
+			{#snippet actions()}
+				<div class="*:w-full">
+					<SubmitButton />
+				</div>
+			{/snippet}
+		</Form>
 	</Dialog.Content>
 </Dialog.Root>

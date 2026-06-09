@@ -1,15 +1,11 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
-	import { createClient, type Transport } from '@connectrpc/connect';
 	import Columns3Icon from '@lucide/svelte/icons/columns-3';
 	import EraserIcon from '@lucide/svelte/icons/eraser';
-	import { ResourceService, type SchemaRequest } from '@otterscale/api/resource/v1';
 	import type { Schema } from '@sjsf/form';
 	import type { ColumnDef } from '@tanstack/table-core';
-	import Ajv, { type ValidateFunction } from 'ajv';
+	import type { ValidateFunction } from 'ajv';
 	import type { Snippet } from 'svelte';
-	import { getContext, onMount } from 'svelte';
-	import { toast } from 'svelte-sonner';
 
 	import { DynamicTable } from '$lib/components/dynamic-table';
 	import type { DataSchemaType, UISchemaType } from '$lib/components/dynamic-table/utils';
@@ -28,19 +24,19 @@
 		type ModuleAttribute
 	} from './table-layout.ts';
 
-	const helmReleaseGroup = 'helm.toolkit.fluxcd.io';
-	const helmReleaseVersion = 'v2';
-	const helmReleaseKind = 'HelmRelease';
-
 	let {
 		cluster,
 		namespace,
 		data,
+		schema,
+		validate,
 		reload
 	}: {
 		cluster: string;
 		namespace: string;
 		data: Record<ModuleAttribute, JsonValue>[];
+		schema: Schema;
+		validate?: ValidateFunction;
 		reload: Snippet<[]>;
 	} = $props();
 
@@ -48,41 +44,6 @@
 	const dataSchemas: Record<string, DataSchemaType> = getChartDataSchemas();
 	const columnDefinitions: ColumnDef<Record<ModuleAttribute, JsonValue>>[] =
 		getChartColumnDefinitions(uiSchemas, dataSchemas);
-
-	const transport: Transport = getContext('transport');
-	const resourceClient = createClient(ResourceService, transport);
-
-	let schema: Schema | undefined = $state(undefined);
-	let validate: ValidateFunction | undefined = $state(undefined);
-
-	const jsonSchemaValidator = new Ajv({ allErrors: true, strict: false, logger: false });
-	function getValidate(jsonSchema: Schema) {
-		return jsonSchemaValidator.compile($state.snapshot(jsonSchema));
-	}
-
-	async function fetchSchema() {
-		try {
-			const schemaResponse = await resourceClient.schema({
-				cluster,
-				group: helmReleaseGroup,
-				version: helmReleaseVersion,
-				kind: helmReleaseKind
-			} as SchemaRequest);
-
-			return schemaResponse.schema as Schema;
-		} catch (error) {
-			console.error('Failed to fetch HelmRelease schema:', error);
-			toast.error('Failed to fetch HelmRelease schema');
-			return undefined;
-		}
-	}
-
-	onMount(async () => {
-		schema = await fetchSchema();
-		if (schema) {
-			validate = getValidate(schema);
-		}
-	});
 </script>
 
 <div class="space-y-4">
@@ -124,8 +85,8 @@
 			{/if}
 		{/snippet}
 		{#snippet bulkCreate({ table })}
-			<BulkInstall {table} {cluster} />
-			<BulkUpgrade {table} {cluster} {schema} {validate} />
+			<BulkInstall {table} {cluster} {validate} />
+			<BulkUpgrade {table} {cluster} {validate} />
 		{/snippet}
 		{#snippet rowActions({ row })}
 			<Actions {row} {cluster} {schema} {validate} />

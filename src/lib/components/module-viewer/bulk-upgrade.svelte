@@ -4,10 +4,10 @@
 	import ArrowUpCircleIcon from '@lucide/svelte/icons/arrow-up-circle';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { HelmToolkitFluxcdIoV2HelmRelease } from '@otterscale/types';
-	import type { Schema } from '@sjsf/form';
 	import type { Table } from '@tanstack/table-core';
 	import type { ValidateFunction } from 'ajv';
 	import { JSON_SCHEMA, load } from 'js-yaml';
+	import lodash from 'lodash';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { stringify } from 'yaml';
@@ -23,12 +23,10 @@
 	let {
 		table,
 		cluster,
-		schema,
 		validate
 	}: {
 		table: Table<Record<string, JsonValue>>;
 		cluster: string;
-		schema?: Schema;
 		validate?: ValidateFunction;
 	} = $props();
 
@@ -40,63 +38,29 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	const rows = $derived(
-		table.getFilteredSelectedRowModel().rows.filter((row) => row.original['Installed'] === true)
+	const updatableRows = $derived(
+		table
+			.getFilteredSelectedRowModel()
+			.rows.filter(
+				(row) =>
+					row.original['Installed'] === true &&
+					row.original['Installed Version'] !== row.original['Latest Version']
+			)
 	);
 
 	let open = $state(false);
 	let isSubmitting = $state(false);
 
-	function buildManifestFromSchema(
-		existing: HelmToolkitFluxcdIoV2HelmRelease,
-		jsonSchema: Schema,
-		targetVersion: string
-	): string {
-		const schemaProperties =
-			(jsonSchema as { properties?: Record<string, unknown> }).properties ?? {};
-		const source = existing as unknown as Record<string, unknown>;
-		const manifest: Record<string, unknown> = {};
-
-		for (const key of Object.keys(schemaProperties)) {
-			const value = source[key];
-			if (value !== undefined) {
-				manifest[key] = value;
-			}
+	async function handleUpgrade(module: ModuleType, latestVersion: string): Promise<string> {
+		if (!validate) {
+			throw new Error('HelmRelease validator is not available.');
 		}
 
-		const metadata = (manifest.metadata ?? {}) as Record<string, unknown>;
-		const existingMetadata = (source.metadata ?? {}) as Record<string, unknown>;
-		if (existingMetadata.resourceVersion) {
-			metadata.resourceVersion = existingMetadata.resourceVersion;
-		}
-		manifest.metadata = metadata;
-
-		const spec = (manifest.spec ?? {}) as Record<string, unknown>;
-		const chart = (spec.chart ?? {}) as Record<string, unknown>;
-		const chartSpec = (chart.spec ?? {}) as Record<string, unknown>;
-
-		manifest.spec = {
-			...spec,
-			chart: {
-				...chart,
-				spec: {
-					...chartSpec,
-					version: targetVersion
-				}
-			}
-		};
-
-		return stringify(manifest, { schema: 'yaml-1.1' });
-	}
-
-	async function handleUpgrade(module: ModuleType): Promise<string> {
-		if (!schema || !validate) {
-			throw new Error('HelmRelease schema is not available.');
-		}
-
+		// Get module name
 		const name = module.name;
 
-		const getResponse = await resourceClient.get({
+		// Get resource
+		const response = await resourceClient.get({
 			cluster,
 			namespace,
 			name,
@@ -105,18 +69,19 @@
 			resource
 		});
 
-		const existing = getResponse.object as HelmToolkitFluxcdIoV2HelmRelease;
-		const yamlValue = buildManifestFromSchema(existing, schema, module.version);
+		// Revise version
+		const helmRelease: HelmToolkitFluxcdIoV2HelmRelease = lodash.cloneDeep(response.object ?? {});
+		lodash.set(helmRelease, ['spec', 'chart', 'spec', 'version'], latestVersion);
 
-		let parsed: unknown;
+		const manifest = stringify(helmRelease, { schema: 'yaml-1.1' });
+
+		let isValid: boolean | undefined = undefined;
 		try {
-			parsed = load(yamlValue, { schema: JSON_SCHEMA });
+			isValid = validate(load(manifest, { schema: JSON_SCHEMA }));
 		} catch (error) {
 			console.error(`Failed to parse HelmRelease manifest for ${name}:`, error);
 			throw new Error(`Invalid YAML for ${name}.`);
 		}
-
-		const isValid = validate(parsed);
 		if (!isValid) {
 			console.error(`Validation errors for ${name}:`, validate.errors);
 			throw new Error(`Validation failed for ${name}.`);
@@ -129,7 +94,7 @@
 			version,
 			resource,
 			name,
-			manifest: new TextEncoder().encode(yamlValue),
+			manifest: new TextEncoder().encode(manifest),
 			fieldManager: 'otterscale-web-ui'
 		});
 
@@ -137,13 +102,15 @@
 	}
 
 	async function handleBulkUpgrade() {
-		if (isSubmitting || !schema || !validate) return;
+		if (isSubmitting || !validate) return;
 		isSubmitting = true;
 
 		const results = await Promise.allSettled(
-			rows.map((row) => {
-				const module = row.original.chart as unknown as ModuleType;
-				return handleUpgrade(module);
+			updatableRows.map((row) => {
+				return handleUpgrade(
+					row.original.chart as unknown as ModuleType,
+					row.original['Latest Version'] as string
+				);
 			})
 		);
 
@@ -177,7 +144,7 @@
 <Dialog.Root bind:open>
 	<Tooltip.Root>
 		<Tooltip.Trigger>
-			<Dialog.Trigger disabled={rows.length === 0 || !schema || !validate}>
+			<Dialog.Trigger disabled={updatableRows.length === 0 || !validate}>
 				{#snippet child({ props })}
 					<Button variant="outline" {...props}>
 						<ArrowUpCircleIcon size={16} />
@@ -185,7 +152,7 @@
 				{/snippet}
 			</Dialog.Trigger>
 		</Tooltip.Trigger>
-		<Tooltip.Content>Bulk Upgrade ({rows.length} selected)</Tooltip.Content>
+		<Tooltip.Content>Bulk Upgrade</Tooltip.Content>
 	</Tooltip.Root>
 	<Dialog.Content class="max-h-[80vh] overflow-auto">
 		<Dialog.Header>
@@ -199,27 +166,23 @@
 			</Item.Root>
 		</Dialog.Header>
 		<div class="space-y-2">
-			{#each rows as row (row.id)}
+			{#each updatableRows as row (row.id)}
 				{@const module = row.original.chart as unknown as ModuleType}
-				{@const installedVer = row.original['installedVersion'] as string}
-				<Item.Root class="rounded-md border p-0">
+				{@const installedVersion = row.original['Installed Version'] as string}
+				<Item.Root class="p-0">
 					<Item.Content class="text-left">
 						<Item.Title class="text-sm font-medium">
 							{module.name}
 						</Item.Title>
 						<Item.Description class="text-xs">
-							v{installedVer || '?'} → v{module.version}
+							v{installedVersion} to v{module.version}
 						</Item.Description>
 					</Item.Content>
 				</Item.Root>
 			{/each}
 		</div>
 		<Dialog.Footer>
-			<Button
-				onclick={handleBulkUpgrade}
-				disabled={isSubmitting || !schema || !validate}
-				class="w-full"
-			>
+			<Button onclick={handleBulkUpgrade} disabled={isSubmitting} class="w-full">
 				{#if isSubmitting}
 					<Spinner />
 				{/if}
