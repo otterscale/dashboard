@@ -17,15 +17,14 @@
 	} from '$lib/components/dynamic-form/widgets/combobox.svelte';
 	import { m } from '$lib/paraglide/messages';
 
-	// `selectedNode` holds the node_exporter `instance` value (e.g. `host:9100`) — the form the
-	// per-node `node_*` charts filter on. The dropdown shows the friendly `nodename` as its label.
+	// `.*` is the "all namespaces" sentinel, matching the analytics filter convention.
 	let {
 		prometheusDriver,
-		selectedNode = $bindable()
-	}: { prometheusDriver: PrometheusDriver; selectedNode: string | undefined } = $props();
+		selectedNamespace = $bindable()
+	}: { prometheusDriver: PrometheusDriver; selectedNamespace: string | undefined } = $props();
 
-	type InstanceOption = { value: string; label: string };
-	const instanceOptions = writable<InstanceOption[]>([]);
+	type NamespaceOption = { value: string; label: string };
+	const namespaceOptions = writable<NamespaceOption[]>([]);
 
 	let isLoaded = $state(false);
 
@@ -52,7 +51,7 @@
 		uiSchema: {
 			'ui:options': {
 				TailoredComboboxEnumerations: async (): Promise<ComboboxEnumeration[]> =>
-					get(instanceOptions) as ComboboxEnumeration[],
+					get(namespaceOptions) as ComboboxEnumeration[],
 				TailoredComboboxVisibility: 50,
 				TailoredComboboxEmptyText: m.no_result(),
 				TailoredComboboxInput: { placeholder: '' },
@@ -64,35 +63,33 @@
 
 	onMount(async () => {
 		try {
-			const response = await prometheusDriver.instantQuery('node_uname_info');
+			const response = await prometheusDriver.instantQuery('group by (namespace) (kube_pod_info)');
 			const series = (response.result ?? []) as { metric: { labels: Record<string, string> } }[];
-			const instances: InstanceOption[] = series.map((s) => {
-				const labels = s.metric?.labels ?? {};
-				const instance = labels.instance ?? '';
-				const nodename = labels.nodename ?? instance;
-				return { value: instance, label: nodename };
-			});
-			if (instances.length > 0) {
-				instances.push({ value: '.*', label: m.all_nodes() });
+			const namespaces = [
+				...new Set(series.map((s) => s.metric?.labels?.namespace).filter(Boolean))
+			].sort((a, b) => a.localeCompare(b));
+			const options: NamespaceOption[] = namespaces.map((ns) => ({ value: ns, label: ns }));
+			if (options.length > 0) {
+				options.unshift({ value: '.*', label: m.all_namespaces() });
 			}
-			instanceOptions.set(instances);
-			// Default to the "All Nodes" sentinel so the picker shows a label instead of an
-			// empty box; Section B treats `.*` as "no node drilled in" and keeps its placeholder.
-			if (selectedNode === undefined && instances.length > 0) {
-				selectedNode = '.*';
+			namespaceOptions.set(options);
+			// Default to the "All Namespaces" sentinel so the picker shows a label instead of an
+			// empty box; Section B treats `.*` as "no namespace drilled in" and keeps its placeholder.
+			if (selectedNamespace === undefined && options.length > 0) {
+				selectedNamespace = '.*';
 			}
 		} catch {
-			instanceOptions.set([]);
-			selectedNode = undefined;
+			namespaceOptions.set([]);
+			selectedNamespace = undefined;
 		}
 		isLoaded = true;
 	});
 </script>
 
-{#if isLoaded && $instanceOptions.length > 0}
+{#if isLoaded && $namespaceOptions.length > 0}
 	<ComboboxWidget
 		type="widget"
-		bind:value={selectedNode}
+		bind:value={selectedNamespace}
 		{config}
 		handlers={{}}
 		options={[]}

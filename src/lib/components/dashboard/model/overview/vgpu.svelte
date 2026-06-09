@@ -122,8 +122,8 @@
 					<Highlight area={{ class: 'fill-muted' }} />
 				{/snippet}
 
-				{#snippet tooltip()}
-					<Chart.Tooltip indicator="dot">
+				{#snippet tooltip({ context })}
+					<Chart.Tooltip indicator="dot" label={(context.tooltip.data as Row | undefined)?.node}>
 						{#snippet formatter({ item, name, value })}
 							<div
 								style="--color-bg: {item.color}; --color-border: {item.color};"

@@ -1,29 +1,28 @@
 <script lang="ts">
-	import ChartBar from '@lucide/svelte/icons/chart-bar';
-	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
-	import { ArcChart, Text } from 'layerchart';
+	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 	import { PrometheusDriver } from 'prometheus-query';
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 
-	import * as Statistics from '$lib/components/custom/statistics/index';
-	import * as Chart from '$lib/components/ui/chart/index.js';
-	import { formatCapacity, formatPercentage } from '$lib/formatter';
+	import { ReloadManager } from '$lib/components/custom/reloader';
+	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
 
-	let { client, fqdn }: { client: PrometheusDriver; fqdn: string } = $props();
+	import KpiCard from './kpi-card.svelte';
+	import KpiRatioValue from './kpi-ratio-value.svelte';
 
-	let overallVal = $state<number | null>(null);
+	let {
+		client,
+		fqdn,
+		isReloading = $bindable()
+	}: { client: PrometheusDriver; fqdn: string; isReloading?: boolean } = $props();
+
 	let usingVal = $state<number | null>(null);
 	let totalVal = $state<number | null>(null);
-	let isLoading = $state(true);
-	let hasError = $state(false);
+	let isLoaded = $state(false);
 
-	onMount(async () => {
+	async function fetch() {
 		try {
-			const [overallRes, usingRes, totalRes] = await Promise.all([
-				client.instantQuery(
-					`sum(node_filesystem_size_bytes{fstype!="rootfs",instance=~"${fqdn}",mountpoint="/"})`
-				),
+			const [usingRes, totalRes] = await Promise.all([
 				client.instantQuery(
 					`sum(node_filesystem_size_bytes{fstype!="rootfs",instance=~"${fqdn}",mountpoint="/"}) - sum(node_filesystem_avail_bytes{fstype!="rootfs",instance=~"${fqdn}",mountpoint="/"})`
 				),
@@ -31,74 +30,43 @@
 					`sum(node_filesystem_size_bytes{fstype!="rootfs",instance=~"${fqdn}",mountpoint="/"})`
 				)
 			]);
-			overallVal = overallRes.result[0]?.value?.value ?? null;
 			usingVal = usingRes.result[0]?.value?.value ?? null;
 			totalVal = totalRes.result[0]?.value?.value ?? null;
 		} catch {
-			hasError = true;
+			usingVal = null;
+			totalVal = null;
 		}
-		isLoading = false;
+	}
+
+	const reloadManager = new ReloadManager(fetch);
+
+	$effect(() => {
+		if (isReloading) reloadManager.restart();
+		else reloadManager.stop();
+	});
+
+	onMount(async () => {
+		await fetch();
+		isLoaded = true;
+	});
+	onDestroy(() => reloadManager.stop());
+
+	const isEmpty = $derived(usingVal === null || totalVal === null || Number(totalVal) === 0);
+	const pct = $derived(Number(totalVal) > 0 ? (Number(usingVal) / Number(totalVal)) * 100 : 0);
+	const subLine = $derived.by(() => {
+		const used = formatCapacity(Number(usingVal ?? 0));
+		const total = formatCapacity(Number(totalVal ?? 0));
+		return `${used.value} ${used.unit} / ${total.value} ${total.unit}`;
 	});
 </script>
 
-<Statistics.Root type="ratio">
-	<Statistics.Header>
-		<div class="flex justify-between gap-4">
-			<Statistics.Title>{m.file_system()}</Statistics.Title>
-			{#if overallVal !== null}
-				{@const { value, unit } = formatCapacity(overallVal)}
-				<div class="flex items-center gap-1 text-xl">
-					<p class="font-bold">{value} {unit}</p>
-				</div>
-			{/if}
-		</div>
-	</Statistics.Header>
-	<Statistics.Content class="min-h-20">
-		{#if isLoading}
-			<div class="flex h-[200px] w-full items-center justify-center">
-				<LoaderCircle class="m-8 size-16 animate-spin" />
-			</div>
-		{:else if hasError || usingVal === null || totalVal === null || totalVal === 0}
-			<div class="flex h-[200px] w-full flex-col items-center justify-center">
-				<ChartBar class="size-24 animate-pulse text-muted-foreground" />
-				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
-			</div>
-		{:else}
-			{@const chartConfig = { data: { color: 'var(--chart-3)' } } satisfies Chart.ChartConfig}
-			{@const value = usingVal / totalVal}
-			{@const data = [{ value: value }]}
-			<Chart.Container config={chartConfig} class="mx-auto my-auto aspect-square h-[200px] w-full">
-				<ArcChart
-					{data}
-					innerRadius={-15}
-					cornerRadius={15}
-					range={[-120, 120]}
-					maxValue={1}
-					series={[{ key: 'data', color: chartConfig.data.color }]}
-					props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
-					tooltipContext={false}
-				>
-					{#snippet aboveMarks()}
-						{@const percentage = formatPercentage(usingVal as number, totalVal as number, 1)}
-						{@const { value: usingValue, unit: usingUnit } = formatCapacity(usingVal as number)}
-						{@const { value: totalValue, unit: totalUnit } = formatCapacity(totalVal as number)}
-						<Text
-							value={`${percentage} %`}
-							textAnchor="middle"
-							verticalAnchor="middle"
-							class="fill-foreground text-3xl! font-bold"
-							dy={-15}
-						/>
-						<Text
-							value={`${usingValue} ${usingUnit}/${totalValue} ${totalUnit}`}
-							textAnchor="middle"
-							verticalAnchor="middle"
-							class="font-base text-md! text-muted-foreground"
-							dy={15}
-						/>
-					{/snippet}
-				</ArcChart>
-			</Chart.Container>
-		{/if}
-	</Statistics.Content>
-</Statistics.Root>
+<KpiCard
+	title={m.file_system()}
+	description={m.node_detail_filesystem_description()}
+	tooltip={m.node_detail_filesystem_tooltip()}
+	icon={HardDriveIcon}
+	{isLoaded}
+	{isEmpty}
+>
+	<KpiRatioValue {pct} {subLine} />
+</KpiCard>

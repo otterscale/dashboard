@@ -1,60 +1,70 @@
 <script lang="ts">
 	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
+	import InfoIcon from '@lucide/svelte/icons/info';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { ArcChart, Text } from 'layerchart';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
+	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Chart from '$lib/components/ui/chart/index.js';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
+	import { classifyThreshold, thresholdClasses } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
 		isReloading = $bindable()
 	}: { prometheusDriver: PrometheusDriver; isReloading: boolean } = $props();
 
+	// Actual consumption (cAdvisor working set) over the same allocatable base as request/limit.
 	let memoryUsage: SampleValue | undefined = $state(undefined);
 	async function fetchMemoryUsage() {
 		const usageResponse = await prometheusDriver.instantQuery(
-			`
-			100 * (sum(node_memory_MemTotal_bytes{container!=""} - node_memory_MemAvailable_bytes{container!=""}))
-			/
-			sum(node_memory_MemTotal_bytes{container!=""})
-			`
+			`100 * sum(container_memory_working_set_bytes{container!=""}) / sum(kube_node_status_allocatable{resource="memory", unit="byte"})`
 		);
 		memoryUsage = usageResponse.result[0]?.value ?? undefined;
 	}
 
+	// Reserved memory — what the scheduler checks; at 100% no new pod can be placed.
 	let memoryRequest: SampleValue | undefined = $state(undefined);
 	async function fetchMemoryRequest() {
 		const response = await prometheusDriver.instantQuery(
-			`
-			100 * sum(kube_pod_container_resource_requests{resource="memory", unit="byte", container!=""})
-			/
-			sum(kube_node_status_allocatable{resource="memory"})
-			`
+			`100 * sum(kube_pod_container_resource_requests{resource="memory", unit="byte"}) / sum(kube_node_status_allocatable{resource="memory", unit="byte"})`
 		);
 		memoryRequest = response.result[0]?.value ?? undefined;
 	}
 
-	let allocatableMemory: SampleValue | undefined = $state(undefined);
+	// Memory limit ceiling — above 100% the cluster is over-committed (OOM/eviction risk).
+	let memoryLimit: SampleValue | undefined = $state(undefined);
+	async function fetchMemoryLimit() {
+		const response = await prometheusDriver.instantQuery(
+			`100 * sum(kube_pod_container_resource_limits{resource="memory", unit="byte"}) / sum(kube_node_status_allocatable{resource="memory", unit="byte"})`
+		);
+		memoryLimit = response.result[0]?.value ?? undefined;
+	}
+
+	let allocatableMemory: SampleValue['value'] | undefined = $state(undefined);
 	async function fetchAllocatableMemory() {
 		const response = await prometheusDriver.instantQuery(
-			`
-			sum(kube_node_status_allocatable{resource="memory"})
-			`
+			`sum(kube_node_status_allocatable{resource="memory", unit="byte"})`
 		);
 		allocatableMemory = response.result[0]?.value?.value ?? undefined;
 	}
 
 	async function fetch() {
 		try {
-			await Promise.all([fetchMemoryUsage(), fetchMemoryRequest(), fetchAllocatableMemory()]);
+			await Promise.all([
+				fetchMemoryUsage(),
+				fetchMemoryRequest(),
+				fetchMemoryLimit(),
+				fetchAllocatableMemory()
+			]);
 		} catch (error) {
-			console.error('Failed to fetch CPU usage:', error);
+			console.error('Failed to fetch memory usage:', error);
 		}
 	}
 
@@ -79,16 +89,31 @@
 
 	const chartConfig = {
 		usage: { label: 'Usage' },
-		request: { label: 'Request' }
+		request: { label: 'Request' },
+		limit: { label: 'Limit' }
 	} satisfies Chart.ChartConfig;
+
+	function pctClass(value: number | undefined): string {
+		return thresholdClasses(classifyThreshold(Number(value ?? 0), { green: 70, orange: 90 })).text;
+	}
 </script>
 
 <Card.Root class="relative h-full min-h-[140px] gap-2 overflow-hidden">
-	<Card.Header class="h-20">
-		<Card.Title>{m.memory()}</Card.Title>
-		<Card.Description class="flex">
-			{m.cluster_dashboard_memory_description()}
-		</Card.Description>
+	<Card.Header class="flex flex-row items-center gap-2 space-y-0">
+		<div class="grid min-w-0 flex-1 gap-1">
+			<Card.Title>{m.memory()}</Card.Title>
+			<Card.Description class="line-clamp-2">
+				{m.cluster_dashboard_memory_description()}
+			</Card.Description>
+		</div>
+		<Tooltip.Root>
+			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+				<InfoIcon class="size-5 text-muted-foreground" />
+			</Tooltip.Trigger>
+			<Tooltip.Content class="max-w-xs">
+				<p>{m.cluster_dashboard_memory_tooltip()}</p>
+			</Tooltip.Content>
+		</Tooltip.Root>
 	</Card.Header>
 	{#if !isLoaded}
 		<div class="flex h-9 w-full items-center justify-center">
@@ -104,12 +129,13 @@
 			<Chart.Container config={chartConfig} class="mx-auto aspect-square max-h-[250px]">
 				<ArcChart
 					value="value"
-					outerRadius={-23}
-					innerRadius={-13}
+					outerRadius={-20}
+					innerRadius={-10}
 					padding={23}
 					range={[180, -180]}
 					maxValue={100}
 					series={[
+						{ key: 'limit', data: [{ key: 'limit', ...memoryLimit }], color: 'var(--chart-3)' },
 						{
 							key: 'request',
 							data: [{ key: 'request', ...memoryRequest }],
@@ -142,20 +168,27 @@
 				</ArcChart>
 			</Chart.Container>
 			<Card.Footer class="mt-auto w-full">
-				<div class="mx-auto grid w-fit grid-cols-2 py-2">
+				<div class="mx-auto grid w-fit grid-cols-2 gap-x-6 py-2">
 					<p class="col-start-1 row-start-1">
 						<span class="mr-2 inline-block aspect-square size-3 bg-chart-1 align-middle"></span>
 						usage
 					</p>
-					<p class="col-start-2 row-start-1 ml-auto">
+					<p class="col-start-2 row-start-1 ml-auto {pctClass(memoryUsage?.value)}">
 						{Math.round(Number(memoryUsage?.value ?? 0))} %
 					</p>
 					<p class="col-start-1 row-start-2">
 						<span class="mr-2 inline-block aspect-square size-3 bg-chart-2 align-middle"></span>
 						request
 					</p>
-					<p class="col-start-2 row-start-2 ml-auto">
+					<p class="col-start-2 row-start-2 ml-auto {pctClass(memoryRequest?.value)}">
 						{Math.round(Number(memoryRequest?.value ?? 0))} %
+					</p>
+					<p class="col-start-1 row-start-3">
+						<span class="mr-2 inline-block aspect-square size-3 bg-chart-3 align-middle"></span>
+						limit
+					</p>
+					<p class="col-start-2 row-start-3 ml-auto {pctClass(memoryLimit?.value)}">
+						{Math.round(Number(memoryLimit?.value ?? 0))} %
 					</p>
 				</div>
 			</Card.Footer>
