@@ -32,8 +32,8 @@
 	const query = $derived(
 		kind === 'pods'
 			? `100 * sum(kube_pod_status_phase{phase="Running"} * on(namespace,pod) group_left(node) kube_pod_info) by (node) / sum(kube_node_status_allocatable{resource="pods"}) by (node)`
-			// `> 0` keeps the chart to nodes that actually had restarts — empty is the healthy state.
-			: `sum(increase(kube_pod_container_status_restarts_total[1h]) * on(namespace,pod) group_left(node) kube_pod_info) by (node) > 0`
+			: // `> 0` keeps the chart to nodes that actually had restarts — empty is the healthy state.
+				`sum(increase(kube_pod_container_status_restarts_total[1h]) * on(namespace,pod) group_left(node) kube_pod_info) by (node) > 0`
 	);
 
 	type Bar = {

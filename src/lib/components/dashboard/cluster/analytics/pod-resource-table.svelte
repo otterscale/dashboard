@@ -156,13 +156,11 @@
 							{row.cpu.toFixed(2)}
 						</Table.Cell>
 						<Table.Cell class="text-right font-mono whitespace-nowrap tabular-nums">
-							{memValue} {memUnit}
+							{memValue}
+							{memUnit}
 						</Table.Cell>
 						<Table.Cell
-							class={cn(
-								'text-right font-mono tabular-nums',
-								mp !== null && pctClass(mp)
-							)}
+							class={cn('text-right font-mono tabular-nums', mp !== null && pctClass(mp))}
 						>
 							{mp !== null ? `${Math.round(mp)}%` : '—'}
 						</Table.Cell>
@@ -170,10 +168,12 @@
 							{row.restarts}
 						</Table.Cell>
 						<Table.Cell class="text-right font-mono whitespace-nowrap tabular-nums">
-							{ageValue.toFixed(1)} {ageUnit}
+							{ageValue.toFixed(1)}
+							{ageUnit}
 						</Table.Cell>
 						<Table.Cell class="text-right font-mono whitespace-nowrap tabular-nums">
-							{netValue} {netUnit}
+							{netValue}
+							{netUnit}
 						</Table.Cell>
 					</Table.Row>
 				{/each}
