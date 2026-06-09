@@ -5,7 +5,7 @@
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import { m } from '$lib/paraglide/messages';
-	import { escapePromqlStringLiteral } from '$lib/prometheus';
+	import { escapePromqlStringLiteral, fetchCombinedInstant } from '$lib/prometheus';
 
 	import KpiCard from './kpi-card.svelte';
 	import KpiRatioValue from './kpi-ratio-value.svelte';
@@ -22,17 +22,16 @@
 	let allocatableVal = $state<number | null>(null);
 	let isLoaded = $state(false);
 
+	// Both scalars come back in a single `or`-unioned instant query.
 	async function fetch() {
 		const node = escapePromqlStringLiteral(nodeName ?? '');
 		try {
-			const [runningRes, allocRes] = await Promise.all([
-				client.instantQuery(
-					`sum(kube_pod_status_phase{phase="Running"} * on(namespace,pod) group_left() kube_pod_info{node="${node}"})`
-				),
-				client.instantQuery(`kube_node_status_allocatable{resource="pods",node="${node}"}`)
-			]);
-			runningVal = runningRes.result[0]?.value?.value ?? null;
-			allocatableVal = allocRes.result[0]?.value?.value ?? null;
+			const r = await fetchCombinedInstant(client, {
+				running: `sum(kube_pod_status_phase{phase="Running"} * on(namespace,pod) group_left() kube_pod_info{node="${node}"})`,
+				allocatable: `kube_node_status_allocatable{resource="pods",node="${node}"}`
+			});
+			runningVal = r.running[0]?.value?.value ?? null;
+			allocatableVal = r.allocatable[0]?.value?.value ?? null;
 		} catch {
 			runningVal = null;
 			allocatableVal = null;
@@ -56,7 +55,9 @@
 	const pct = $derived(
 		Number(allocatableVal) > 0 ? (Number(runningVal) / Number(allocatableVal)) * 100 : 0
 	);
-	const subLine = $derived(`${Math.round(Number(runningVal ?? 0))} / ${Math.round(Number(allocatableVal ?? 0))}`);
+	const subLine = $derived(
+		`${Math.round(Number(runningVal ?? 0))} / ${Math.round(Number(allocatableVal ?? 0))}`
+	);
 </script>
 
 <KpiCard

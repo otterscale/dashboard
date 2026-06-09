@@ -5,6 +5,7 @@
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import { m } from '$lib/paraglide/messages';
+	import { fetchCombinedInstant } from '$lib/prometheus';
 
 	import KpiCard from './kpi-card.svelte';
 	import KpiRatioValue from './kpi-ratio-value.svelte';
@@ -20,20 +21,17 @@
 	let totalVal = $state<number | null>(null);
 	let isLoaded = $state(false);
 
+	// All three scalars come back in a single `or`-unioned instant query.
 	async function fetch() {
 		try {
-			const [countRes, usingRes, totalRes] = await Promise.all([
-				client.instantQuery(
-					`count(count by (cpu, instance) (node_cpu_seconds_total{instance=~"${fqdn}"}))`
-				),
-				client.instantQuery(
-					`sum(irate(node_cpu_seconds_total{instance=~"${fqdn}",mode!="idle"}[6m]))`
-				),
-				client.instantQuery(`sum(irate(node_cpu_seconds_total{instance=~"${fqdn}"}[6m]))`)
-			]);
-			cpuCount = countRes.result[0]?.value?.value ?? null;
-			usingVal = usingRes.result[0]?.value?.value ?? null;
-			totalVal = totalRes.result[0]?.value?.value ?? null;
+			const r = await fetchCombinedInstant(client, {
+				count: `count(count by (cpu, instance) (node_cpu_seconds_total{instance=~"${fqdn}"}))`,
+				using: `sum(irate(node_cpu_seconds_total{instance=~"${fqdn}",mode!="idle"}[6m]))`,
+				total: `sum(irate(node_cpu_seconds_total{instance=~"${fqdn}"}[6m]))`
+			});
+			cpuCount = r.count[0]?.value?.value ?? null;
+			usingVal = r.using[0]?.value?.value ?? null;
+			totalVal = r.total[0]?.value?.value ?? null;
 		} catch {
 			cpuCount = null;
 			usingVal = null;

@@ -13,7 +13,7 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
-	import { classifyThreshold, thresholdClasses } from '$lib/prometheus';
+	import { classifyThreshold, fetchCombinedInstant, thresholdClasses } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -22,47 +22,26 @@
 
 	// Actual consumption (cAdvisor working set) over the same allocatable base as request/limit.
 	let memoryUsage: SampleValue | undefined = $state(undefined);
-	async function fetchMemoryUsage() {
-		const usageResponse = await prometheusDriver.instantQuery(
-			`100 * sum(container_memory_working_set_bytes{container!=""}) / sum(kube_node_status_allocatable{resource="memory", unit="byte"})`
-		);
-		memoryUsage = usageResponse.result[0]?.value ?? undefined;
-	}
-
 	// Reserved memory — what the scheduler checks; at 100% no new pod can be placed.
 	let memoryRequest: SampleValue | undefined = $state(undefined);
-	async function fetchMemoryRequest() {
-		const response = await prometheusDriver.instantQuery(
-			`100 * sum(kube_pod_container_resource_requests{resource="memory", unit="byte"}) / sum(kube_node_status_allocatable{resource="memory", unit="byte"})`
-		);
-		memoryRequest = response.result[0]?.value ?? undefined;
-	}
-
 	// Memory limit ceiling — above 100% the cluster is over-committed (OOM/eviction risk).
 	let memoryLimit: SampleValue | undefined = $state(undefined);
-	async function fetchMemoryLimit() {
-		const response = await prometheusDriver.instantQuery(
-			`100 * sum(kube_pod_container_resource_limits{resource="memory", unit="byte"}) / sum(kube_node_status_allocatable{resource="memory", unit="byte"})`
-		);
-		memoryLimit = response.result[0]?.value ?? undefined;
-	}
-
 	let allocatableMemory: SampleValue['value'] | undefined = $state(undefined);
-	async function fetchAllocatableMemory() {
-		const response = await prometheusDriver.instantQuery(
-			`sum(kube_node_status_allocatable{resource="memory", unit="byte"})`
-		);
-		allocatableMemory = response.result[0]?.value?.value ?? undefined;
-	}
 
+	// All four scalars come back in a single HTTP request (one `or`-unioned instant query)
+	// to keep Prometheus request fan-out low.
 	async function fetch() {
 		try {
-			await Promise.all([
-				fetchMemoryUsage(),
-				fetchMemoryRequest(),
-				fetchMemoryLimit(),
-				fetchAllocatableMemory()
-			]);
+			const r = await fetchCombinedInstant(prometheusDriver, {
+				usage: `100 * sum(container_memory_working_set_bytes{container!=""}) / sum(kube_node_status_allocatable{resource="memory", unit="byte"})`,
+				request: `100 * sum(kube_pod_container_resource_requests{resource="memory", unit="byte"}) / sum(kube_node_status_allocatable{resource="memory", unit="byte"})`,
+				limit: `100 * sum(kube_pod_container_resource_limits{resource="memory", unit="byte"}) / sum(kube_node_status_allocatable{resource="memory", unit="byte"})`,
+				allocatable: `sum(kube_node_status_allocatable{resource="memory", unit="byte"})`
+			});
+			memoryUsage = r.usage[0]?.value ?? undefined;
+			memoryRequest = r.request[0]?.value ?? undefined;
+			memoryLimit = r.limit[0]?.value ?? undefined;
+			allocatableMemory = r.allocatable[0]?.value?.value ?? undefined;
 		} catch (error) {
 			console.error('Failed to fetch memory usage:', error);
 		}

@@ -20,8 +20,8 @@
 	import {
 		computeStep,
 		type DataPoint,
+		fetchCombinedFlattenedRange,
 		fetchFlattenedRange,
-		fetchMultipleFlattenedRange,
 		generateChartConfig,
 		getSeries
 	} from '$lib/prometheus';
@@ -90,7 +90,7 @@
 			rawData =
 				typeof q === 'string'
 					? await fetchFlattenedRange(client, q, new Date(startMs), new Date(endMs), step)
-					: await fetchMultipleFlattenedRange(client, q, new Date(startMs), new Date(endMs), step);
+					: await fetchCombinedFlattenedRange(client, q, new Date(startMs), new Date(endMs), step);
 			hasError = false;
 		} catch {
 			hasError = true;
@@ -224,7 +224,7 @@
 							</span>
 							<span
 								class={cn(
-									'font-mono font-medium tabular-nums text-foreground',
+									'font-mono font-medium text-foreground tabular-nums',
 									isTop && 'font-bold text-destructive'
 								)}
 							>

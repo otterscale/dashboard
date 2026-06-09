@@ -12,6 +12,7 @@
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
+	import { fetchCombinedInstant } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -19,22 +20,17 @@
 	}: { prometheusDriver: PrometheusDriver; isReloading: boolean } = $props();
 
 	let gpuUtilization: number | undefined = $state(undefined);
-	async function fetchMemoryUsage() {
-		const usageResponse = await prometheusDriver.instantQuery(
-			`avg(Device_utilization_desc_of_container{})`
-		);
-		gpuUtilization = usageResponse.result[0]?.value?.value ?? undefined;
-	}
-
 	let units: number | undefined = $state(undefined);
-	async function fetchGraphicCardUnits() {
-		const usageResponse = await prometheusDriver.instantQuery(`count(DCGM_FI_DEV_GPU_UTIL{})`);
-		units = usageResponse.result[0]?.value?.value ?? undefined;
-	}
 
+	// Both scalars come back in a single `or`-unioned instant query.
 	async function fetch() {
 		try {
-			await Promise.all([fetchMemoryUsage(), fetchGraphicCardUnits()]);
+			const r = await fetchCombinedInstant(prometheusDriver, {
+				utilization: `avg(Device_utilization_desc_of_container{})`,
+				units: `count(DCGM_FI_DEV_GPU_UTIL{})`
+			});
+			gpuUtilization = r.utilization[0]?.value?.value ?? undefined;
+			units = r.units[0]?.value?.value ?? undefined;
 		} catch (error) {
 			console.error('Failed to fetch GPU utilization:', error);
 		}

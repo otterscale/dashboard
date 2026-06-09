@@ -6,6 +6,7 @@
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
+	import { fetchCombinedInstant } from '$lib/prometheus';
 
 	import KpiCard from './kpi-card.svelte';
 	import KpiRatioValue from './kpi-ratio-value.svelte';
@@ -20,18 +21,15 @@
 	let totalVal = $state<number | null>(null);
 	let isLoaded = $state(false);
 
+	// Both scalars come back in a single `or`-unioned instant query.
 	async function fetch() {
 		try {
-			const [usingRes, totalRes] = await Promise.all([
-				client.instantQuery(
-					`sum(node_filesystem_size_bytes{fstype!="rootfs",instance=~"${fqdn}",mountpoint="/"}) - sum(node_filesystem_avail_bytes{fstype!="rootfs",instance=~"${fqdn}",mountpoint="/"})`
-				),
-				client.instantQuery(
-					`sum(node_filesystem_size_bytes{fstype!="rootfs",instance=~"${fqdn}",mountpoint="/"})`
-				)
-			]);
-			usingVal = usingRes.result[0]?.value?.value ?? null;
-			totalVal = totalRes.result[0]?.value?.value ?? null;
+			const r = await fetchCombinedInstant(client, {
+				using: `sum(node_filesystem_size_bytes{fstype!="rootfs",instance=~"${fqdn}",mountpoint="/"}) - sum(node_filesystem_avail_bytes{fstype!="rootfs",instance=~"${fqdn}",mountpoint="/"})`,
+				total: `sum(node_filesystem_size_bytes{fstype!="rootfs",instance=~"${fqdn}",mountpoint="/"})`
+			});
+			usingVal = r.using[0]?.value?.value ?? null;
+			totalVal = r.total[0]?.value?.value ?? null;
 		} catch {
 			usingVal = null;
 			totalVal = null;

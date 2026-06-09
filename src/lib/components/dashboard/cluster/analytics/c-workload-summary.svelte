@@ -10,7 +10,7 @@
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
-	import { escapePromqlStringLiteral } from '$lib/prometheus';
+	import { escapePromqlStringLiteral, fetchCombinedInstant } from '$lib/prometheus';
 
 	import KpiCard from './kpi-card.svelte';
 
@@ -34,22 +34,21 @@
 		return ns && ns !== '.*' ? `namespace="${escapePromqlStringLiteral(ns)}"` : '';
 	});
 
+	// All four scalars come back in a single `or`-unioned instant query.
 	async function fetch() {
 		const sel = nsSel;
 		const and = sel ? `,${sel}` : '';
-		const num = (r: { result: { value?: { value: number } }[] }) =>
-			r.result[0]?.value?.value ?? null;
 		try {
-			const [run, cpu, mem, rst] = await Promise.all([
-				client.instantQuery(`sum(kube_pod_status_phase{phase="Running"${and}})`),
-				client.instantQuery(`sum(rate(container_cpu_usage_seconds_total{container!=""${and}}[2m]))`),
-				client.instantQuery(`sum(container_memory_working_set_bytes{container!=""${and}})`),
-				client.instantQuery(`sum(increase(kube_pod_container_status_restarts_total{${sel}}[1h]))`)
-			]);
-			podsRunning = num(run);
-			cpuCores = num(cpu);
-			memBytes = num(mem);
-			restarts1h = num(rst);
+			const r = await fetchCombinedInstant(client, {
+				running: `sum(kube_pod_status_phase{phase="Running"${and}})`,
+				cpu: `sum(rate(container_cpu_usage_seconds_total{container!=""${and}}[2m]))`,
+				memory: `sum(container_memory_working_set_bytes{container!=""${and}})`,
+				restarts: `sum(increase(kube_pod_container_status_restarts_total{${sel}}[1h]))`
+			});
+			podsRunning = r.running[0]?.value?.value ?? null;
+			cpuCores = r.cpu[0]?.value?.value ?? null;
+			memBytes = r.memory[0]?.value?.value ?? null;
+			restarts1h = r.restarts[0]?.value?.value ?? null;
 		} catch (error) {
 			console.error('Failed to fetch workload summary:', error);
 		}

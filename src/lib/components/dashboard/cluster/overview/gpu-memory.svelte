@@ -13,7 +13,7 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
-	import { classifyThreshold, thresholdClasses } from '$lib/prometheus';
+	import { classifyThreshold, fetchCombinedInstant, thresholdClasses } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -25,45 +25,22 @@
 	}
 
 	let memoryUsage: SampleValue | undefined = $state(undefined);
-	async function fetchMemoryUsage() {
-		const usageResponse = await prometheusDriver.instantQuery(
-			`
-			100 * 
-			sum(Device_memory_desc_of_container{})
-			/
-			sum(GPUDeviceMemoryLimit{})
-			`
-		);
-		memoryUsage = usageResponse.result[0]?.value ?? undefined;
-	}
-
 	let memoryRequest: SampleValue | undefined = $state(undefined);
-	async function fetchMemoryRequest() {
-		const response = await prometheusDriver.instantQuery(
-			`
-			100 * sum(vGPU_device_memory_limit_in_bytes{})
-			/
-			sum(GPUDeviceMemoryLimit{})
-			`
-		);
-		memoryRequest = response.result[0]?.value ?? undefined;
-	}
-
 	let allocatableMemory: SampleValue | undefined = $state(undefined);
-	async function fetchAllocatableMemory() {
-		const response = await prometheusDriver.instantQuery(
-			`
-			sum(GPUDeviceMemoryLimit{})
-			`
-		);
-		allocatableMemory = response.result[0]?.value?.value ?? undefined;
-	}
 
+	// All three scalars come back in a single `or`-unioned instant query.
 	async function fetch() {
 		try {
-			await Promise.all([fetchMemoryUsage(), fetchMemoryRequest(), fetchAllocatableMemory()]);
+			const r = await fetchCombinedInstant(prometheusDriver, {
+				usage: `100 * sum(Device_memory_desc_of_container{}) / sum(GPUDeviceMemoryLimit{})`,
+				request: `100 * sum(vGPU_device_memory_limit_in_bytes{}) / sum(GPUDeviceMemoryLimit{})`,
+				allocatable: `sum(GPUDeviceMemoryLimit{})`
+			});
+			memoryUsage = r.usage[0]?.value ?? undefined;
+			memoryRequest = r.request[0]?.value ?? undefined;
+			allocatableMemory = r.allocatable[0]?.value?.value ?? undefined;
 		} catch (error) {
-			console.error('Failed to fetch CPU usage:', error);
+			console.error('Failed to fetch GPU memory usage:', error);
 		}
 	}
 

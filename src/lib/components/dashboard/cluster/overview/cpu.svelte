@@ -12,7 +12,7 @@
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
-	import { classifyThreshold, thresholdClasses } from '$lib/prometheus';
+	import { classifyThreshold, fetchCombinedInstant, thresholdClasses } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -22,47 +22,26 @@
 	// Actual consumption (cAdvisor) over the same allocatable base as request/limit, so the
 	// three rings are directly comparable.
 	let cpuUsage: SampleValue | undefined = $state(undefined);
-	async function fetchCPUUsage() {
-		const response = await prometheusDriver.instantQuery(
-			`100 * sum(irate(container_cpu_usage_seconds_total{container!=""}[2m])) / sum(kube_node_status_allocatable{resource="cpu", unit="core"})`
-		);
-		cpuUsage = response.result[0]?.value ?? undefined;
-	}
-
 	// Reserved CPU — this is what the scheduler checks; at 100% no new pod can be placed.
 	let cpuRequest: SampleValue | undefined = $state(undefined);
-	async function fetchCPURequest() {
-		const response = await prometheusDriver.instantQuery(
-			`100 * sum(kube_pod_container_resource_requests{resource="cpu", unit="core"}) / sum(kube_node_status_allocatable{resource="cpu", unit="core"})`
-		);
-		cpuRequest = response.result[0]?.value ?? undefined;
-	}
-
 	// CPU limit ceiling — above 100% the cluster is over-committed (throttling/eviction risk).
 	let cpuLimit: SampleValue | undefined = $state(undefined);
-	async function fetchCPULimit() {
-		const response = await prometheusDriver.instantQuery(
-			`100 * sum(kube_pod_container_resource_limits{resource="cpu", unit="core"}) / sum(kube_node_status_allocatable{resource="cpu", unit="core"})`
-		);
-		cpuLimit = response.result[0]?.value ?? undefined;
-	}
-
 	let allocatableCPU: SampleValue['value'] | undefined = $state(undefined);
-	async function fetchAllocatableCPU() {
-		const response = await prometheusDriver.instantQuery(
-			`sum(kube_node_status_allocatable{resource="cpu", unit="core"})`
-		);
-		allocatableCPU = response.result[0]?.value?.value ?? undefined;
-	}
 
+	// All four scalars come back in a single HTTP request (one `or`-unioned instant query)
+	// to keep Prometheus request fan-out low.
 	async function fetch() {
 		try {
-			await Promise.all([
-				fetchCPUUsage(),
-				fetchCPURequest(),
-				fetchCPULimit(),
-				fetchAllocatableCPU()
-			]);
+			const r = await fetchCombinedInstant(prometheusDriver, {
+				usage: `100 * sum(irate(container_cpu_usage_seconds_total{container!=""}[2m])) / sum(kube_node_status_allocatable{resource="cpu", unit="core"})`,
+				request: `100 * sum(kube_pod_container_resource_requests{resource="cpu", unit="core"}) / sum(kube_node_status_allocatable{resource="cpu", unit="core"})`,
+				limit: `100 * sum(kube_pod_container_resource_limits{resource="cpu", unit="core"}) / sum(kube_node_status_allocatable{resource="cpu", unit="core"})`,
+				allocatable: `sum(kube_node_status_allocatable{resource="cpu", unit="core"})`
+			});
+			cpuUsage = r.usage[0]?.value ?? undefined;
+			cpuRequest = r.request[0]?.value ?? undefined;
+			cpuLimit = r.limit[0]?.value ?? undefined;
+			allocatableCPU = r.allocatable[0]?.value?.value ?? undefined;
 		} catch (error) {
 			console.error('Failed to fetch CPU usage:', error);
 		}
