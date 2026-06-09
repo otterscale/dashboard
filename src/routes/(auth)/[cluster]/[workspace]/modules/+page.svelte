@@ -3,11 +3,17 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import CableIcon from '@lucide/svelte/icons/cable';
 	import UnplugIcon from '@lucide/svelte/icons/unplug';
-	import { ResourceService, WatchEvent_Type } from '@otterscale/api/resource/v1';
+	import {
+		ResourceService,
+		type SchemaRequest,
+		WatchEvent_Type
+	} from '@otterscale/api/resource/v1';
 	import type {
 		HelmToolkitFluxcdIoV2HelmRelease,
 		SourceToolkitFluxcdIoV1HelmRepository
 	} from '@otterscale/types';
+	import type { Schema } from '@sjsf/form';
+	import Ajv, { type ValidateFunction } from 'ajv';
 	import lodash from 'lodash';
 	import semver from 'semver';
 	import { getContext, onDestroy, onMount } from 'svelte';
@@ -23,7 +29,12 @@
 	} from '$lib/components/artifact-viewer/utils.svelte';
 	import { ModuleViewer } from '$lib/components/module-viewer';
 	import { getChartData, type ModuleAttribute } from '$lib/components/module-viewer/table-layout';
-	import type { HarborModule, IndexModule, ModuleType } from '$lib/components/module-viewer/types';
+	import type {
+		HarborModule,
+		IndexModule,
+		InstalledModule,
+		ModuleType
+	} from '$lib/components/module-viewer/types';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
@@ -50,6 +61,10 @@
 
 	// data
 	let data: Record<ModuleAttribute, JsonValue>[] = $state([]);
+	// schema
+	let schema: Schema | undefined = $state(undefined);
+	// validate
+	let validate: ValidateFunction | undefined = $state(undefined);
 
 	// Helm Repository
 	let helmRepository = $state<SourceToolkitFluxcdIoV1HelmRepository | undefined>(undefined);
@@ -291,6 +306,30 @@
 		}
 	}
 
+	// schema
+	async function fetchSchema() {
+		try {
+			const schemaResponse = await resourceClient.schema({
+				cluster,
+				group: 'helm.toolkit.fluxcd.io',
+				version: 'v2',
+				kind: 'HelmRelease'
+			} as SchemaRequest);
+
+			return schemaResponse.schema as Schema;
+		} catch (error) {
+			console.error('Failed to fetch HelmRelease schema:', error);
+			toast.error('Failed to fetch HelmRelease schema');
+			return undefined;
+		}
+	}
+
+	// validator
+	const jsonSchemaValidator = new Ajv({ allErrors: true, strict: false, logger: false });
+	function getValidate(jsonSchema: Schema) {
+		return jsonSchemaValidator.compile($state.snapshot(jsonSchema));
+	}
+
 	function handleReload() {
 		if (!isWatching) {
 			watchReleases();
@@ -310,11 +349,16 @@
 
 		await listReleases();
 		watchReleases();
+
+		schema = await fetchSchema();
+		if (schema) {
+			validate = getValidate(schema);
+		}
 	});
 	$effect(() => {
-		const installedModules = new Set(
-			releases.map((release) => release.spec?.chart?.spec.chart).filter(Boolean)
-		) as Set<string>;
+		const installedModules: InstalledModule[] = releases
+			.map((release) => release.spec?.chart?.spec as InstalledModule)
+			.filter(Boolean);
 
 		data = modules.map((module) => getChartData(module, installedModules, helmRepository!));
 	});
@@ -329,26 +373,28 @@
 </script>
 
 {#key cluster + helmRepository?.metadata?.uid}
-	<main class="pb-8">
-		<ModuleViewer {cluster} {namespace} {data}>
-			{#snippet reload()}
-				<Tooltip.Root>
-					<Tooltip.Trigger>
-						{#snippet child({ props })}
-							<Button {...props} onclick={handleReload} variant="outline" size="icon">
-								{#if isWatching}
-									<CableIcon class="size-4" />
-								{:else}
-									<UnplugIcon class="size-4 text-destructive" />
-								{/if}
-							</Button>
-						{/snippet}
-					</Tooltip.Trigger>
-					<Tooltip.Content>
-						<p>{isWatching ? 'Watching' : 'Reconnect'}</p>
-					</Tooltip.Content>
-				</Tooltip.Root>
-			{/snippet}
-		</ModuleViewer>
-	</main>
+	{#if schema}
+		<main class="pb-8">
+			<ModuleViewer {cluster} {namespace} {data} {schema} {validate}>
+				{#snippet reload()}
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Button {...props} onclick={handleReload} variant="outline" size="icon">
+									{#if isWatching}
+										<CableIcon class="size-4" />
+									{:else}
+										<UnplugIcon class="size-4 text-destructive" />
+									{/if}
+								</Button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>
+							<p>{isWatching ? 'Watching' : 'Reconnect'}</p>
+						</Tooltip.Content>
+					</Tooltip.Root>
+				{/snippet}
+			</ModuleViewer>
+		</main>
+	{/if}
 {/key}

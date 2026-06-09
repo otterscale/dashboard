@@ -1,3 +1,8 @@
+interface InstalledModule {
+	chart: string;
+	version: string;
+}
+
 interface ModuleMetadataType {
 	apiVersion: string;
 	appVersion: string;
@@ -37,4 +42,4 @@ interface HarborModule {
 	};
 }
 
-export type { HarborModule, ModuleType as IndexModule, ModuleType };
+export type { HarborModule, ModuleType as IndexModule, InstalledModule, ModuleType };
