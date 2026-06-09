@@ -7,85 +7,94 @@ import { DynamicTableCell, DynamicTableHeader } from '$lib/components/dynamic-ta
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
 
-import type { ModuleType } from './types';
+import type { InstalledModule, ModuleType } from './types';
 
 type ModuleAttribute =
 	| 'Helm Repository'
-	| 'Chart Name'
+	| 'Name'
 	| 'Description'
 	| 'Digest'
-	| 'Version'
+	| 'Latest Version'
+	| 'Installed Version'
 	| 'Type'
 	| 'Labels'
 	| 'Installed'
-	| 'annotations'
-	| 'installable'
-	| 'icon'
 	| 'helmRepository'
 	| 'chart'
-	| 'installedModules';
+	| 'icon'
+	| 'annotations'
+	| 'installedModules'
+	| 'canUpdate';
 
 function getChartDataSchemas(): Record<ModuleAttribute, DataSchemaType> {
 	return {
 		'Helm Repository': 'text',
-		'Chart Name': 'text',
+		Name: 'text',
 		Description: 'text',
 		Digest: 'text',
-		Version: 'text',
+		'Latest Version': 'text',
+		'Installed Version': 'text',
 		Type: 'text',
 		Labels: 'array',
 		Installed: 'boolean',
 		annotations: 'object',
-		installable: 'boolean',
 		icon: 'text',
 		helmRepository: 'object',
 		chart: 'object',
-		installedModules: 'array'
+		installedModules: 'array',
+		canUpdate: 'boolean'
 	};
 }
 
 function getChartUISchemas(): Record<ModuleAttribute, UISchemaType> {
 	return {
 		'Helm Repository': 'text',
-		'Chart Name': 'text',
+		Name: 'text',
 		Description: 'text',
 		Digest: 'text',
-		Version: 'text',
+		'Latest Version': 'text',
+		'Installed Version': 'text',
 		Type: 'text',
 		Labels: 'array',
 		Installed: 'boolean',
 		annotations: 'object',
-		installable: 'boolean',
 		icon: 'text',
 		helmRepository: 'object',
 		chart: 'object',
-		installedModules: 'array'
+		installedModules: 'array',
+		canUpdate: 'boolean'
 	};
 }
 function getChartData(
 	module: ModuleType,
-	installedModuleNames: Set<string>,
+	installedModules: InstalledModule[],
 	helmRepository: SourceToolkitFluxcdIoV1HelmRepository
 ): Record<ModuleAttribute, JsonValue> {
-	const dependsOn = module.annotations?.['module.otterscale.io/depends-on'] ?? '';
-	const prerequisite = dependsOn.split(',').filter(Boolean);
+	const installedModuleNames = new Set(
+		installedModules.map((installedModule) => installedModule.chart)
+	);
+	const installedModule = installedModules.find(
+		(installedModule) => installedModule.chart === module.name
+	);
+	const installedVersion = installedModule?.version;
+	const latestVersion = module.version;
+	const canUpdate = installedVersion && latestVersion && installedVersion !== latestVersion;
 	return {
 		'Helm Repository': helmRepository.metadata?.name ?? null,
-		'Chart Name': module.name ?? null,
+		Name: module.name ?? null,
 		Description: module.description as JsonValue,
 		Digest: module.digest ?? null,
-		Version: module.version as JsonValue,
+		'Latest Version': module.version as JsonValue,
+		'Installed Version': installedVersion as JsonValue,
 		Type: module.type ?? null,
 		Labels: (module.keywords ?? []) as JsonValue,
 		Installed: installedModuleNames.has(module.name ?? ''),
-		installable: prerequisite?.every((prerequisite) =>
-			installedModuleNames.has(prerequisite)
-		) as JsonValue,
 		annotations: module?.annotations as JsonValue,
 		icon: module.icon as JsonValue,
 		helmRepository: helmRepository as JsonValue,
 		chart: module as unknown as JsonValue,
-		installedModules: Array.from(installedModuleNames) as unknown as JsonValue
+		installedModules: installedModules as unknown as JsonValue,
+		canUpdate: canUpdate as JsonValue
 	};
 }
 
@@ -94,11 +103,12 @@ function getChartColumnDefinitions(
 	dataSchemas: Record<ModuleAttribute, DataSchemaType>
 ): ColumnDef<Record<ModuleAttribute, JsonValue>>[] {
 	const columns: ModuleAttribute[] = [
-		'Chart Name',
+		'Name',
 		'Description',
 		'Digest',
 		'Type',
-		'Version',
+		'Latest Version',
+		'Installed Version',
 		'Labels',
 		'Installed'
 	];

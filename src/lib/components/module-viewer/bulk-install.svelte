@@ -5,6 +5,8 @@
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 	import type { Table } from '@tanstack/table-core';
+	import type { ValidateFunction } from 'ajv';
+	import { JSON_SCHEMA, load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
@@ -20,10 +22,12 @@
 
 	let {
 		table,
-		cluster
+		cluster,
+		validate
 	}: {
 		table: Table<Record<string, JsonValue>>;
 		cluster: string;
+		validate?: ValidateFunction;
 	} = $props();
 
 	const group = 'helm.toolkit.fluxcd.io';
@@ -35,7 +39,10 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	const rows = $derived(table.getFilteredSelectedRowModel().rows);
+	// Only rows that are NOT yet installed
+	const installableRows = $derived(
+		table.getFilteredSelectedRowModel().rows.filter((row) => row.original['Installed'] !== true)
+	);
 
 	let open = $state(false);
 	let isSubmitting = $state(false);
@@ -44,6 +51,10 @@
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository,
 		selectedModuleNames: Set<string>
 	): Promise<string> {
+		if (!validate) {
+			throw new Error('HelmRelease schema calidator is not available.');
+		}
+
 		const dependencies = lodash
 			.get(module, ['annotations', 'module.otterscale.io/depends-on'], '')
 			.split(',')
@@ -88,6 +99,20 @@
 			}
 		};
 
+		let parsed: unknown;
+		try {
+			parsed = load(stringify(manifest, { schema: 'yaml-1.1' }), { schema: JSON_SCHEMA });
+		} catch (error) {
+			console.error(`Failed to parse HelmRelease manifest for ${name}:`, error);
+			throw new Error(`Invalid YAML for ${name}.`);
+		}
+
+		const isValid = validate(parsed);
+		if (!isValid) {
+			console.error(`Validation errors for ${name}:`, validate.errors);
+			throw new Error(`Validation failed for ${name}.`);
+		}
+
 		await resourceClient.create({
 			cluster,
 			namespace,
@@ -105,11 +130,11 @@
 		isSubmitting = true;
 
 		const selectedModuleNames = new Set(
-			rows.map((row) => (row.original.chart as unknown as ModuleType).name)
+			installableRows.map((row) => (row.original.chart as unknown as ModuleType).name)
 		);
 
 		const results = await Promise.allSettled(
-			rows.map((row) => {
+			installableRows.map((row) => {
 				const module = row.original.chart as unknown as ModuleType;
 				const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
 				return handleInstall(module, helmRepository, selectedModuleNames);
@@ -148,7 +173,7 @@
 <Dialog.Root bind:open>
 	<Tooltip.Root>
 		<Tooltip.Trigger>
-			<Dialog.Trigger disabled={rows.length === 0}>
+			<Dialog.Trigger disabled={installableRows.length === 0 || !validate}>
 				{#snippet child({ props })}
 					<Button variant="outline" {...props}>
 						<DownloadIcon size={16} />
@@ -170,7 +195,7 @@
 			</Item.Root>
 		</Dialog.Header>
 		<div class="space-y-2">
-			{#each rows as row (row.id)}
+			{#each installableRows as row (row.id)}
 				{@const module = row.original.chart as unknown as ModuleType}
 				<Item.Root class="rounded-md border p-0">
 					<Item.Content class="text-left">
@@ -178,7 +203,7 @@
 							{module.name}
 						</Item.Title>
 						<Item.Description class="text-xs">
-							v{module.version}
+							{module.version}
 						</Item.Description>
 					</Item.Content>
 				</Item.Root>
