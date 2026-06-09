@@ -71,7 +71,6 @@
 				>
 					<Uninstall
 						{cluster}
-						{schema}
 						{row}
 						onOpenChangeComplete={() => {
 							actionsOpen = false;

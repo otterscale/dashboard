@@ -175,7 +175,7 @@
 							{module.name}
 						</Item.Title>
 						<Item.Description class="text-xs">
-							v{installedVersion} to v{module.version}
+							{installedVersion} to {module.version}
 						</Item.Description>
 					</Item.Content>
 				</Item.Root>

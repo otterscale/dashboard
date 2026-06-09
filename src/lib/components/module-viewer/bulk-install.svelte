@@ -203,7 +203,7 @@
 							{module.name}
 						</Item.Title>
 						<Item.Description class="text-xs">
-							v{module.version}
+							{module.version}
 						</Item.Description>
 					</Item.Content>
 				</Item.Root>

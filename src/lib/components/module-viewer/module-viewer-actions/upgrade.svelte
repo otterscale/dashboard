@@ -105,8 +105,7 @@
 				<Item.Content class="text-left">
 					<Item.Title class="text-xl font-bold">Upgrade</Item.Title>
 					<Item.Description>
-						Select a target version for <strong>{module.name}</strong> in cluster
-						<strong>{cluster}</strong>.
+						{module.description}
 					</Item.Description>
 				</Item.Content>
 			</Item.Root>

@@ -17,7 +17,6 @@
 	import type { Row } from '@tanstack/table-core';
 	import Ajv from 'ajv';
 	import ajvErrors from 'ajv-errors';
-	import lodash from 'lodash';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
@@ -30,12 +29,10 @@
 
 	let {
 		cluster,
-		schema,
 		row,
 		onOpenChangeComplete
 	}: {
 		cluster: string;
-		schema: Schema;
 		row: Row<Record<ModuleAttribute, JsonValue>>;
 		onOpenChangeComplete: () => void;
 	} = $props();
@@ -106,8 +103,10 @@
 	>
 		<Item.Root class="p-0">
 			<Item.Content class="text-left">
-				<Item.Title class="text-xl font-bold">{kind}</Item.Title>
-				<Item.Description>{lodash.get(schema, 'description')}</Item.Description>
+				<Item.Title class="text-xl font-bold">Uninstall</Item.Title>
+				<Item.Description>
+					{module.description}
+				</Item.Description>
 			</Item.Content>
 		</Item.Root>
 		<Form
