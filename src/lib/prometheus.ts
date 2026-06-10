@@ -319,6 +319,15 @@ export function vllmModelHostnamesSelector(
 }
 
 /**
+ * Label selector scoping DCGM (GPU exporter) series to one Kubernetes node. DCGM's
+ * `Hostname` label equals the K8s node name (as vllmModelHostnamesSelector also assumes).
+ * Exact match, not regex: node names can contain dots and would otherwise cross-match.
+ */
+export function dcgmNodeSelector(nodeName: string): string {
+	return `Hostname="${escapePromqlStringLiteral(nodeName)}"`;
+}
+
+/**
  * Resolve the set of Kubernetes nodes a given vLLM model's pods currently run on.
  *
  * Joins `kube_pod_info` against `vllm:kv_cache_usage_perc` so we only keep pods

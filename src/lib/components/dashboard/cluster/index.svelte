@@ -17,8 +17,8 @@
 	import { m } from '$lib/paraglide/messages';
 
 	import { Dashboard as AnalyticsDashboard } from './analytics/index';
-	import InstancePicker from './analytics/instance-picker.svelte';
-	import NamespacePicker from './analytics/namespace-picker.svelte';
+	import NamespacePicker from './analytics/namespace/namespace-picker.svelte';
+	import NodePicker from './analytics/node/node-picker.svelte';
 	import NodePressure from './overview/node-pressure.svelte';
 	import { widgets } from './overview/widgets';
 
@@ -103,7 +103,7 @@
 							</Tabs.Root>
 							{#if analyticsView === 'node'}
 								<div class="flex min-h-9 min-w-40 shrink-0 items-center justify-end">
-									<InstancePicker {prometheusDriver} bind:selectedNode />
+									<NodePicker {prometheusDriver} bind:selectedNode />
 								</div>
 							{:else}
 								<div class="flex min-h-9 min-w-40 shrink-0 items-center justify-end">

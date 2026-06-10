@@ -5,7 +5,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import { escapePromqlStringLiteral } from '$lib/prometheus';
 
-	import AreaTimeSeries from './area-time-series.svelte';
+	import AreaTimeSeries from '../area-time-series.svelte';
 
 	// Per-namespace scheduling commitment: actual Usage vs reserved Request vs Limit, over time.
 	let {

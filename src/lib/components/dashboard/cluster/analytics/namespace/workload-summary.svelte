@@ -12,7 +12,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import { escapePromqlStringLiteral, fetchCombinedInstant } from '$lib/prometheus';
 
-	import KpiCard from './kpi-card.svelte';
+	import KpiCard from '../kpi-card.svelte';
 
 	// Resource-consumption headline. Defaults to the whole cluster; when a namespace is
 	// selected the values scope to it.
