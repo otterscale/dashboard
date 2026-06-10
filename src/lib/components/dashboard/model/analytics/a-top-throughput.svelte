@@ -3,10 +3,9 @@
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
+	import { TopBarList } from '$lib/components/custom/top-bar-list';
 	import { m } from '$lib/paraglide/messages';
 	import { escapePromqlStringLiteral } from '$lib/prometheus';
-
-	import TopBarList from './top-bar-list.svelte';
 
 	let {
 		prometheusDriver,

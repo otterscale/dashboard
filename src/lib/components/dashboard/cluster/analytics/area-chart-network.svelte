@@ -6,6 +6,7 @@
 
 	import AreaTimeSeries from './area-time-series.svelte';
 
+	// Combined node network I/O: received and transmitted as overlapping areas.
 	let {
 		client,
 		fqdn,
@@ -22,24 +23,28 @@
 		isReloading?: boolean;
 	} = $props();
 
-	const DEVICE = '(/dev/)?(mmcblk.p.+|nvme.+|rbd.+|sd.+|vd.+|xvd.+|dm-.+|dasd.+)';
 	const buildQuery = () => ({
-		Read: `sum (rate(node_disk_read_bytes_total{instance=~"${fqdn}", device=~"${DEVICE}"}[5m]))`,
-		Write: `sum (rate(node_disk_written_bytes_total{instance=~"${fqdn}", device=~"${DEVICE}"}[5m]))`
+		[m.received()]: `sum(rate(node_network_receive_bytes_total{instance=~"${fqdn}", device!="lo"}[5m]))`,
+		[m.transmitted()]: `sum(rate(node_network_transmit_bytes_total{instance=~"${fqdn}", device!="lo"}[5m]))`
 	});
 	const format = (value: number) => {
 		const { value: v, unit } = formatIO(value);
 		return `${v.toLocaleString()} ${unit}`;
 	};
+	const colors = {
+		[m.received()]: 'var(--chart-2)',
+		[m.transmitted()]: 'var(--chart-1)'
+	};
 </script>
 
 <AreaTimeSeries
 	{client}
-	title={`${m.disk()} · ${m.read()}/${m.write()}`}
-	description={m.node_chart_disk_rw_description()}
-	tooltip={m.node_chart_disk_rw_tooltip()}
+	title={`${m.networking()} · I/O`}
+	description={m.node_chart_network_io_description()}
+	tooltip={m.node_chart_network_io_tooltip()}
 	{buildQuery}
 	{format}
+	{colors}
 	{start}
 	{end}
 	{endIsNow}

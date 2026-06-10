@@ -18,6 +18,8 @@
 
 	import { Dashboard as AnalyticsDashboard } from './analytics/index';
 	import InstancePicker from './analytics/instance-picker.svelte';
+	import NamespacePicker from './analytics/namespace-picker.svelte';
+	import NodePressure from './overview/node-pressure.svelte';
 	import { widgets } from './overview/widgets';
 
 	let { cluster }: { cluster: string } = $props();
@@ -25,7 +27,13 @@
 	let isReloading = $state(true);
 	let prometheusDriver = $state<PrometheusDriver | null>(null);
 	let selectedTab = $state('overview');
-	let selectedInstance = $state<string | undefined>(undefined);
+	// Analytics splits by altitude: `node` shows per-node pressure + detail (Sections A+B),
+	// `namespace` shows namespace / pod consumption (Section C). The toolbar pickers follow suit.
+	let analyticsView = $state<'node' | 'namespace'>('node');
+	// Analytics drill-down filters. `selectedNode` holds the node_exporter `instance`;
+	// `.*` is the "all" sentinel for namespace / pod / container.
+	let selectedNode = $state<string | undefined>(undefined);
+	let selectedNamespace = $state<string | undefined>(undefined);
 
 	let pickerFrom = $state<CalendarDateTime>(minutesAgoCDT(60));
 	let pickerTo = $state<CalendarDateTime>(nowCDT());
@@ -33,6 +41,12 @@
 
 	const start = $derived(pickerFrom.toDate(getLocalTimeZone()));
 	const end = $derived(pickerToIsNow ? new Date() : pickerTo.toDate(getLocalTimeZone()));
+
+	const dashboardTimeRangeKey = $derived(
+		`${pickerFrom.toDate(getLocalTimeZone()).getTime()}-${
+			pickerToIsNow ? 'now' : pickerTo.toDate(getLocalTimeZone()).getTime()
+		}-${pickerToIsNow}`
+	);
 
 	onMount(async () => {
 		try {
@@ -76,18 +90,26 @@
 					</Tabs.List>
 					<div class="flex flex-wrap items-center justify-end gap-2">
 						<div
-							class="flex min-h-9 min-w-[11rem] shrink-0 items-center justify-end sm:min-w-[12rem] {selectedTab !==
-							'analytics'
+							class="flex flex-wrap items-center justify-end gap-2 {selectedTab !== 'analytics'
 								? 'pointer-events-none invisible select-none'
 								: ''}"
 							aria-hidden={selectedTab !== 'analytics'}
 						>
-							<InstancePicker {prometheusDriver} bind:selectedInstance />
-						</div>
-						<div
-							class={selectedTab !== 'analytics' ? 'pointer-events-none invisible select-none' : ''}
-							aria-hidden={selectedTab !== 'analytics'}
-						>
+							<Tabs.Root bind:value={analyticsView}>
+								<Tabs.List>
+									<Tabs.Trigger value="node">{m.node()}</Tabs.Trigger>
+									<Tabs.Trigger value="namespace">{m.namespace()}</Tabs.Trigger>
+								</Tabs.List>
+							</Tabs.Root>
+							{#if analyticsView === 'node'}
+								<div class="flex min-h-9 min-w-40 shrink-0 items-center justify-end">
+									<InstancePicker {prometheusDriver} bind:selectedNode />
+								</div>
+							{:else}
+								<div class="flex min-h-9 min-w-40 shrink-0 items-center justify-end">
+									<NamespacePicker {prometheusDriver} bind:selectedNamespace />
+								</div>
+							{/if}
 							<DatetimePicker
 								bind:from={pickerFrom}
 								bind:to={pickerTo}
@@ -103,15 +125,23 @@
 					>
 						<WidgetGrid {cluster} {widgets} {prometheusDriver} bind:isReloading />
 					</div>
+					<div class="w-full pt-4 md:pt-6">
+						<NodePressure {prometheusDriver} bind:isReloading />
+					</div>
 				</Tabs.Content>
 				<Tabs.Content value="analytics">
-					<AnalyticsDashboard
-						client={prometheusDriver}
-						bind:selectedInstance
-						{start}
-						{end}
-						endIsNow={pickerToIsNow}
-					/>
+					{#key dashboardTimeRangeKey}
+						<AnalyticsDashboard
+							client={prometheusDriver}
+							view={analyticsView}
+							bind:selectedNode
+							bind:selectedNamespace
+							{start}
+							{end}
+							endIsNow={pickerToIsNow}
+							bind:isReloading
+						/>
+					{/key}
 				</Tabs.Content>
 			</Tabs.Root>
 		</div>

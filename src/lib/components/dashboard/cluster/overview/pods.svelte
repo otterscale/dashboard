@@ -8,7 +8,7 @@
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Card from '$lib/components/ui/card';
 	import { m } from '$lib/paraglide/messages';
-	import { escapePromqlStringLiteral } from '$lib/prometheus';
+	import { escapePromqlStringLiteral, fetchCombinedInstant } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -24,34 +24,22 @@
 	let runningPods: SampleValue | undefined = $state(undefined);
 	let pendingPods: SampleValue | undefined = $state(undefined);
 	let failedPods: SampleValue | undefined = $state(undefined);
-	async function fetchPods() {
+
+	// Allocatable + the three pod phases come back in a single `or`-unioned instant query.
+	async function fetch() {
 		const ns = (namespace ?? '').trim();
 		const nsFilter = ns ? `,namespace="${escapePromqlStringLiteral(ns)}"` : '';
-
-		const allocateResponse = await prometheusDriver.instantQuery(
-			`sum(kube_node_status_allocatable{resource="pods", container!=""})`
-		);
-		maxAllocatablePods = allocateResponse.result[0]?.value ?? undefined;
-
-		const runningResponse = await prometheusDriver.instantQuery(
-			`sum(kube_pod_status_phase{phase="Running", container!=""${nsFilter}})`
-		);
-		runningPods = runningResponse.result[0]?.value ?? undefined;
-
-		const pendingResponse = await prometheusDriver.instantQuery(
-			`sum(kube_pod_status_phase{phase="Pending", container!=""${nsFilter}})`
-		);
-		pendingPods = pendingResponse.result[0]?.value ?? undefined;
-
-		const failedResponse = await prometheusDriver.instantQuery(
-			`sum(kube_pod_status_phase{phase="Failed", container!=""${nsFilter}})`
-		);
-		failedPods = failedResponse.result[0]?.value ?? undefined;
-	}
-
-	async function fetch() {
 		try {
-			await fetchPods();
+			const r = await fetchCombinedInstant(prometheusDriver, {
+				allocatable: `sum(kube_node_status_allocatable{resource="pods", container!=""})`,
+				running: `sum(kube_pod_status_phase{phase="Running", container!=""${nsFilter}})`,
+				pending: `sum(kube_pod_status_phase{phase="Pending", container!=""${nsFilter}})`,
+				failed: `sum(kube_pod_status_phase{phase="Failed", container!=""${nsFilter}})`
+			});
+			maxAllocatablePods = r.allocatable[0]?.value ?? undefined;
+			runningPods = r.running[0]?.value ?? undefined;
+			pendingPods = r.pending[0]?.value ?? undefined;
+			failedPods = r.failed[0]?.value ?? undefined;
 		} catch (error) {
 			console.error('Failed to fetch pods:', error);
 		}
