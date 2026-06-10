@@ -3,7 +3,7 @@
 
 	import { m } from '$lib/paraglide/messages';
 
-	import AreaTimeSeries from './area-time-series.svelte';
+	import AreaTimeSeries from '../area-time-series.svelte';
 
 	let {
 		client,

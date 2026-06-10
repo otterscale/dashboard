@@ -3,7 +3,7 @@
 
 	import { dcgmNodeSelector } from '$lib/prometheus';
 
-	import HeatmapChartGpu from './heatmap-chart-gpu.svelte';
+	import HeatmapChartGpu from './gpu-heatmap.svelte';
 
 	// GPU detail for the selected node. Self-gating: probes DCGM and renders nothing on
 	// CPU-only nodes. The probe tracks `nodeName` (not just mount) because the parent

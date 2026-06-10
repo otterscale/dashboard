@@ -4,15 +4,15 @@
 
 	import { m } from '$lib/paraglide/messages';
 
-	import ANodePressure from './a-node-pressure.svelte';
-	import ANodeRanking from './a-node-ranking.svelte';
-	import BNodeDetail from './b-node-detail.svelte';
-	import CNamespaceCommitment from './c-namespace-commitment.svelte';
-	import CNamespaceRanking from './c-namespace-ranking.svelte';
-	import CPvcStorage from './c-pvc-storage.svelte';
-	import CWorkloadSummary from './c-workload-summary.svelte';
+	import NamespaceCommitment from './namespace/namespace-commitment.svelte';
+	import NamespaceRanking from './namespace/namespace-ranking.svelte';
+	import PodResourceTable from './namespace/pod-resource-table.svelte';
+	import PvcStorage from './namespace/pvc-storage.svelte';
+	import WorkloadSummary from './namespace/workload-summary.svelte';
+	import NodeDetail from './node/node-detail.svelte';
+	import NodePressure from './node/node-pressure.svelte';
+	import NodeRanking from './node/node-ranking.svelte';
 	import PlaceholderCard from './placeholder-card.svelte';
-	import PodResourceTable from './pod-resource-table.svelte';
 
 	let {
 		client,
@@ -91,7 +91,7 @@
 		<section class="flex flex-col gap-3">
 			<h2 class="text-lg font-semibold">{m.section_node_ranking()}</h2>
 			<div class="grid w-full items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-4">
-				<ANodePressure
+				<NodePressure
 					prometheusDriver={client}
 					resource="cpu"
 					title={m.node_cpu_pressure()}
@@ -100,7 +100,7 @@
 					onNodeClick={handleNodeClick}
 					isReloading={reloading}
 				/>
-				<ANodePressure
+				<NodePressure
 					prometheusDriver={client}
 					resource="memory"
 					title={m.node_memory_pressure()}
@@ -109,7 +109,7 @@
 					onNodeClick={handleNodeClick}
 					isReloading={reloading}
 				/>
-				<ANodeRanking
+				<NodeRanking
 					prometheusDriver={client}
 					kind="gpu"
 					title={m.gpu_utilization()}
@@ -118,7 +118,7 @@
 					onNodeClick={handleNodeClick}
 					isReloading={reloading}
 				/>
-				<ANodeRanking
+				<NodeRanking
 					prometheusDriver={client}
 					kind="restart"
 					title={m.node_restart_count()}
@@ -134,7 +134,7 @@
 		<section class="flex flex-col gap-3">
 			<h2 class="text-lg font-semibold">{m.section_node_detail()}</h2>
 			{#if hasNodeSelected}
-				<BNodeDetail
+				<NodeDetail
 					{client}
 					fqdn={selectedNode ?? ''}
 					nodeName={selectedNodeName}
@@ -155,7 +155,7 @@
 		<section class="flex flex-col gap-3">
 			<h2 class="text-lg font-semibold">{m.section_namespace_ranking()}</h2>
 			<div class="grid w-full items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-4">
-				<CNamespaceRanking
+				<NamespaceRanking
 					prometheusDriver={client}
 					kind="cpu"
 					title={m.namespace_cpu_usage()}
@@ -164,7 +164,7 @@
 					onNamespaceClick={handleNamespaceClick}
 					isReloading={reloading}
 				/>
-				<CNamespaceRanking
+				<NamespaceRanking
 					prometheusDriver={client}
 					kind="memory"
 					title={m.namespace_memory_usage()}
@@ -173,7 +173,7 @@
 					onNamespaceClick={handleNamespaceClick}
 					isReloading={reloading}
 				/>
-				<CNamespaceRanking
+				<NamespaceRanking
 					prometheusDriver={client}
 					kind="pods"
 					title={m.namespace_pod_count()}
@@ -182,7 +182,7 @@
 					onNamespaceClick={handleNamespaceClick}
 					isReloading={reloading}
 				/>
-				<CNamespaceRanking
+				<NamespaceRanking
 					prometheusDriver={client}
 					kind="restart"
 					title={m.namespace_restart_count()}
@@ -199,8 +199,8 @@
 			<h2 class="text-lg font-semibold">{m.section_namespace_detail()}</h2>
 			{#if hasNamespaceSelected}
 				{#key selectedNamespace}
-					<CWorkloadSummary {client} namespace={selectedNamespace} isReloading={reloading} />
-					<CNamespaceCommitment
+					<WorkloadSummary {client} namespace={selectedNamespace} isReloading={reloading} />
+					<NamespaceCommitment
 						{client}
 						namespace={selectedNamespace}
 						{start}
@@ -209,7 +209,7 @@
 						isReloading={reloading}
 					/>
 					<PodResourceTable {client} namespace={selectedNamespace} isReloading={reloading} />
-					<CPvcStorage
+					<PvcStorage
 						prometheusDriver={client}
 						namespace={selectedNamespace}
 						isReloading={reloading}
