@@ -7,7 +7,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import { escapePromqlStringLiteral, fetchCombinedInstant } from '$lib/prometheus';
 
-	import KpiCard from './kpi-card.svelte';
+	import KpiCard from '../kpi-card.svelte';
 	import KpiRatioValue from './kpi-ratio-value.svelte';
 
 	// `nodeName` is the Kubernetes node name (the `node` label on kube-state-metrics),

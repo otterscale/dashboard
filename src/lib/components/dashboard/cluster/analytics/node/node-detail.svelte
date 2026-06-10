@@ -1,16 +1,17 @@
 <script lang="ts">
 	import type { PrometheusDriver } from 'prometheus-query';
 
-	import { default as CPUCoreProcessor } from './area-chart-cpu-core.svelte';
-	import { default as DiskIOTime } from './area-chart-disk-io-time.svelte';
-	import { default as BasicDisk } from './area-chart-disk-rw.svelte';
-	import { default as NetworkIO } from './area-chart-network.svelte';
-	import { default as CPUCommitment } from './chart-node-cpu-commit.svelte';
-	import { default as MemoryCommitment } from './chart-node-mem-commit.svelte';
-	import { default as UsageRateCPU } from './usage-rate-chart-cpu.svelte';
-	import { default as UsageRatePods } from './usage-rate-chart-pods.svelte';
-	import { default as UsageRateRAM } from './usage-rate-chart-ram.svelte';
-	import { default as UsageRateRootFS } from './usage-rate-chart-root-fs.svelte';
+	import { default as CPUCommitment } from './cpu-commit-chart.svelte';
+	import { default as CPUCoreProcessor } from './cpu-core-chart.svelte';
+	import { default as DiskIOTime } from './disk-io-time-chart.svelte';
+	import { default as BasicDisk } from './disk-rw-chart.svelte';
+	import { default as NodeGpu } from './gpu-usage.svelte';
+	import { default as MemoryCommitment } from './mem-commit-chart.svelte';
+	import { default as NetworkIO } from './network-chart.svelte';
+	import { default as UsageRateCPU } from './usage-rate-cpu.svelte';
+	import { default as UsageRatePods } from './usage-rate-pods.svelte';
+	import { default as UsageRateRAM } from './usage-rate-ram.svelte';
+	import { default as UsageRateRootFS } from './usage-rate-root-fs.svelte';
 
 	// `fqdn` is the node_exporter `instance`; `nodeName` is the Kubernetes node name used by
 	// the cAdvisor / kube-state-metrics commitment + pods cards.
@@ -56,5 +57,8 @@
 			<BasicDisk {client} {fqdn} {start} {end} {endIsNow} {isReloading} />
 			<DiskIOTime {client} {fqdn} {start} {end} {endIsNow} {isReloading} />
 		</div>
+
+		<!-- GPU detail (DCGM) — renders only when the node has GPU cards -->
+		<NodeGpu {client} {nodeName} {start} {end} {endIsNow} {isReloading} />
 	</div>
 {/key}
