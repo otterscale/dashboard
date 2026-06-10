@@ -111,10 +111,10 @@
 				/>
 				<ANodeRanking
 					prometheusDriver={client}
-					kind="pods"
-					title={m.node_pod_density()}
-					description={m.node_pod_density_description()}
-					tooltip={m.node_pod_density_tooltip()}
+					kind="gpu"
+					title={m.gpu_utilization()}
+					description={m.node_gpu_utilization_description()}
+					tooltip={m.node_gpu_utilization_tooltip()}
 					onNodeClick={handleNodeClick}
 					isReloading={reloading}
 				/>

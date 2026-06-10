@@ -5,6 +5,7 @@
 	import { default as DiskIOTime } from './area-chart-disk-io-time.svelte';
 	import { default as BasicDisk } from './area-chart-disk-rw.svelte';
 	import { default as NetworkIO } from './area-chart-network.svelte';
+	import { default as NodeGpu } from './b-node-gpu.svelte';
 	import { default as CPUCommitment } from './chart-node-cpu-commit.svelte';
 	import { default as MemoryCommitment } from './chart-node-mem-commit.svelte';
 	import { default as UsageRateCPU } from './usage-rate-chart-cpu.svelte';
@@ -56,5 +57,8 @@
 			<BasicDisk {client} {fqdn} {start} {end} {endIsNow} {isReloading} />
 			<DiskIOTime {client} {fqdn} {start} {end} {endIsNow} {isReloading} />
 		</div>
+
+		<!-- GPU detail (DCGM) — renders only when the node has GPU cards -->
+		<NodeGpu {client} {nodeName} {start} {end} {endIsNow} {isReloading} />
 	</div>
 {/key}

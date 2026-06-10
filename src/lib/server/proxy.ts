@@ -20,7 +20,22 @@ const REQUEST_HEADERS_TO_REMOVE = ['cookie', 'host', 'x-proxy-target'];
 const RESPONSE_HEADERS_TO_REMOVE = ['content-encoding', 'content-length'];
 const IDEMPOTENT_RETRY_METHODS = new Set(['GET', 'HEAD']);
 
+// TODO: temporary hardcode — route all Prometheus proxy requests straight to a
+// fixed Prometheus instead of the per-cluster backend gateway. Remove to restore
+// normal `/proxy/<cluster>/prometheus` forwarding via API_URL.
+const PROMETHEUS_HARDCODE_URL = 'http://10.102.197.202:10178';
+const PROMETHEUS_PROXY_RE = /^\/proxy\/[^/]+\/prometheus(\/.*)?$/;
+
 function buildTargetUrl(event: RequestEvent): URL {
+	const prometheusMatch = event.url.pathname.match(PROMETHEUS_PROXY_RE);
+	if (prometheusMatch) {
+		const base = new URL(PROMETHEUS_HARDCODE_URL);
+		return new URL(
+			base.pathname.replace(/\/$/, '') + (prometheusMatch[1] ?? '') + event.url.search,
+			base.origin
+		);
+	}
+
 	if (!env.API_URL) throw new Error('API_URL environment variable is not set');
 	const base = new URL(env.API_URL);
 	return new URL(
