@@ -17,6 +17,7 @@
 
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import { fetchAllGpuNodes, type NodeInfo } from '$lib/components/gpu-allocation';
+	import GPUResource from '$lib/components/kind-viewer/kind-viewer-actions/utils/gpu-resources.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Empty from '$lib/components/ui/empty/index.js';
@@ -192,6 +193,10 @@
 	let isSubmitting = $state(false);
 </script>
 
+{#snippet gpuResources()}
+	<GPUResource />
+{/snippet}
+
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
@@ -256,7 +261,8 @@
 								'ui:options': {
 									translations: {
 										submit: 'Next'
-									}
+									},
+									action: gpuResources
 								},
 								type: {
 									'ui:components': {
@@ -330,7 +336,8 @@
 								'ui:options': {
 									translations: {
 										submit: 'Next'
-									}
+									},
+									action: gpuResources
 								},
 								Decode: {
 									type: {
