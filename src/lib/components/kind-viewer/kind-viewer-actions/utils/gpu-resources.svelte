@@ -23,15 +23,13 @@
 	});
 
 	onMount(async () => {
-		const fieldBufferResponse = await driver.instantQuery(
-			'(DCGM_FI_DEV_FB_FREE + DCGM_FI_DEV_FB_RESERVED + DCGM_FI_DEV_FB_USED) * (1024 * 1024)' // DCGM return in Mi
-		);
-		const vgpuLimitResponse = await driver.instantQuery(
-			'sum by (deviceuuid) (vGPU_device_memory_limit_in_bytes)'
-		);
-		const vgpuUsageResponse = await driver.instantQuery(
-			'sum by (deviceuuid) (vGPU_device_memory_usage_in_bytes)'
-		);
+		const [fieldBufferResponse, vgpuLimitResponse, vgpuUsageResponse] = await Promise.all([
+			driver.instantQuery(
+				'(DCGM_FI_DEV_FB_FREE + DCGM_FI_DEV_FB_RESERVED + DCGM_FI_DEV_FB_USED) * (1024 * 1024)' // DCGM return in Mi
+			),
+			driver.instantQuery('sum by (deviceuuid) (vGPU_device_memory_limit_in_bytes)'),
+			driver.instantQuery('sum by (deviceuuid) (vGPU_device_memory_usage_in_bytes)')
+		]);
 
 		const vgpuLimits = vgpuLimitResponse.result.map((series) => {
 			return { ...series.metric.labels, limit: series.value?.value };
@@ -40,17 +38,11 @@
 			return { ...series.metric.labels, usage: series.value?.value };
 		});
 
-		const limitsByDeviceUUID = Object.assign(
-			{},
-			...Object.entries(
-				lodash.groupBy(vgpuLimits, (vgpuLimit) => lodash.get(vgpuLimit, 'deviceuuid'))
-			).map(([key, value]) => ({ [key]: lodash.sumBy(value, 'limit') }))
+		const limitsByDeviceUUID = lodash.mapValues(lodash.groupBy(vgpuLimits, 'deviceuuid'), (group) =>
+			lodash.sumBy(group, 'limit')
 		);
-		const usagesByDeviceUUID = Object.assign(
-			{},
-			...Object.entries(
-				lodash.groupBy(vgpuUsages, (vgpuUsage) => lodash.get(vgpuUsage, 'deviceuuid'))
-			).map(([key, value]) => ({ [key]: lodash.sumBy(value, 'usage') }))
+		const usagesByDeviceUUID = lodash.mapValues(lodash.groupBy(vgpuUsages, 'deviceuuid'), (group) =>
+			lodash.sumBy(group, 'usage')
 		);
 
 		gpus = fieldBufferResponse.result.map((series) => {
@@ -63,7 +55,6 @@
 				usage: lodash.get(usagesByDeviceUUID, uuid, undefined)
 			};
 		});
-		console.log();
 		gpusByModelName = Object.entries(
 			lodash.groupBy(gpus, (gpu) => lodash.get(gpu, 'modelName'))
 		).map(([key, value]) => ({
