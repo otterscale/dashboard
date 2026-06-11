@@ -101,7 +101,6 @@
 		}
 		throw new Error('Timed out waiting for bucket credentials secret');
 	}
-
 </script>
 
 {#snippet document()}
@@ -305,8 +304,8 @@
 									return;
 								}
 
-								const name = lodash.get(parsed, 'metadata.name');
-								const bucketName = lodash.get(parsed, 'spec.bucketName');
+								const name = lodash.get(parsed, 'metadata.name') as string;
+								const bucketName = lodash.get(parsed, 'spec.bucketName') as string;
 
 								toast.promise(
 									async () => {
