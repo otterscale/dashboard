@@ -22,6 +22,7 @@
 	import { version } from '$app/environment';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import type { ChartType } from '$lib/components/artifact-viewer/types';
 	import {
 		encodeHarborURIComponent,
 		parseHarborHost,
@@ -209,8 +210,27 @@
 			return [];
 		}
 
-		const entireModules = (await response.json()) as IndexModule[] as ModuleType[];
-		return entireModules;
+		const indexModules: Record<string, ChartType[]> = await response.json();
+		return Object.values(indexModules)
+			.map((versions) => {
+				const validVersions = versions.filter((version) => {
+					const validVersion = semver.valid(version.version);
+
+					return (
+						validVersion !== null &&
+						semver.major(validVersion) === semver.major(dashboardVersion) &&
+						semver.minor(validVersion) === semver.minor(dashboardVersion)
+					);
+				});
+				const [latestValidVersion] = validVersions;
+				if (latestValidVersion) {
+					return {
+						...latestValidVersion,
+						versions: validVersions
+					};
+				}
+			})
+			.filter(Boolean) as IndexModule[] as ModuleType[];
 	}
 
 	// Releases
