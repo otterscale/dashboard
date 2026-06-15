@@ -123,7 +123,7 @@
 		return {
 			apiVersion: `${targetGroup}/${targetVersion}`,
 			kind: targetKind,
-			metadata: { namespace } as FormValue,
+			metadata: { name: modelName, namespace } as FormValue,
 			spec: {
 				baseRefs: [
 					...lodash.get(object, ['spec', 'baseRefs'], []),
