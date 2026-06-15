@@ -47,6 +47,29 @@ export function vllmModelIdentityFromLabels(labels: Record<string, string>): Vll
 }
 
 /**
+ * Collapse rows that share an `id` into one, ordered by descending merged value.
+ *
+ * The top-N queries group `by(llm_inference_service, model_name)`, so a single model `id` can
+ * appear in several rows — one managed service serving multiple `model_name`s (e.g. LoRA adapters),
+ * or two standalone models that share a `model_name` across namespaces. Rendering those as-is would
+ * crash the keyed `{#each}` (duplicate keys) and mis-state the metric, so callers merge them here
+ * with the reducer matching their query's aggregation: `(a, b) => a + b` for additive rates
+ * (throughput), `Math.max` for gauges/quantiles (KV pressure, p99 latency).
+ */
+export function mergeVllmRowsById<T extends VllmModelIdentity & { value: number }>(
+	rows: T[],
+	combine: (a: number, b: number) => number
+): T[] {
+	const byId = new Map<string, T>();
+	for (const row of rows) {
+		const prev = byId.get(row.id);
+		if (prev) prev.value = combine(prev.value, row.value);
+		else byId.set(row.id, { ...row });
+	}
+	return [...byId.values()].sort((a, b) => b.value - a.value);
+}
+
+/**
  * Label selector for vLLM dashboard metrics: namespace, or namespace + model identity.
  * `selectedModel === '.*'` means all models in the namespace (namespace filter only).
  * A managed model is matched by `llm_inference_service`; a standalone model (token built

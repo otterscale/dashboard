@@ -8,6 +8,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import {
 		escapePromqlStringLiteral,
+		mergeVllmRowsById,
 		type VllmModelIdentity,
 		vllmModelIdentityFromLabels
 	} from '$lib/prometheus';
@@ -52,10 +53,12 @@
 					const value = Number(v.value?.value);
 					return Number.isFinite(value) ? { ...identity, value } : null;
 				})
-				.filter((x): x is VllmModelIdentity & { value: number } => x !== null)
-				.sort((a, b) => b.value - a.value);
+				.filter((x): x is VllmModelIdentity & { value: number } => x !== null);
 
-			bars = parsed.map(({ label, id, badge, value }) => ({
+			// p99 can't be merged exactly across split rows; keep the worst (max) per model id.
+			const merged = mergeVllmRowsById(parsed, Math.max);
+
+			bars = merged.map(({ label, id, badge, value }) => ({
 				label,
 				id,
 				badge,

@@ -8,6 +8,7 @@
 	import {
 		classifyThreshold,
 		escapePromqlStringLiteral,
+		mergeVllmRowsById,
 		type VllmModelIdentity,
 		vllmModelIdentityFromLabels
 	} from '$lib/prometheus';
@@ -63,10 +64,12 @@
 					const value = Number(v.value?.value);
 					return Number.isFinite(value) ? { ...identity, value } : null;
 				})
-				.filter((x): x is VllmModelIdentity & { value: number } => x !== null)
-				.sort((a, b) => b.value - a.value);
+				.filter((x): x is VllmModelIdentity & { value: number } => x !== null);
 
-			bars = parsed.map(({ label, id, badge, value }) => {
+			// KV pressure is a gauge: keep the worst (max) row per model id.
+			const merged = mergeVllmRowsById(parsed, Math.max);
+
+			bars = merged.map(({ label, id, badge, value }) => {
 				const level = classifyThreshold(value, { green: 70, orange: 85 }, 'lower-is-better');
 				return {
 					label,

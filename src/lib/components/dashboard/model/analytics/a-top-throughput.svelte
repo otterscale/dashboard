@@ -7,6 +7,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import {
 		escapePromqlStringLiteral,
+		mergeVllmRowsById,
 		type VllmModelIdentity,
 		vllmModelIdentityFromLabels
 	} from '$lib/prometheus';
@@ -53,10 +54,12 @@
 					const value = Number(v.value?.value);
 					return Number.isFinite(value) ? { ...identity, value } : null;
 				})
-				.filter((x): x is VllmModelIdentity & { value: number } => x !== null)
-				.sort((a, b) => b.value - a.value);
+				.filter((x): x is VllmModelIdentity & { value: number } => x !== null);
 
-			bars = parsed.map(({ label, id, badge, value }) => ({
+			// Tokens/sec is additive: sum the rows that collapse onto the same model id.
+			const merged = mergeVllmRowsById(parsed, (a, b) => a + b);
+
+			bars = merged.map(({ label, id, badge, value }) => ({
 				label,
 				id,
 				badge,
