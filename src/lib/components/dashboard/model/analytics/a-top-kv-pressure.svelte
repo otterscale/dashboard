@@ -5,7 +5,13 @@
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import { TopBarList } from '$lib/components/custom/top-bar-list';
 	import { m } from '$lib/paraglide/messages';
-	import { classifyThreshold, escapePromqlStringLiteral } from '$lib/prometheus';
+	import {
+		classifyThreshold,
+		escapePromqlStringLiteral,
+		mergeVllmRowsById,
+		type VllmModelIdentity,
+		vllmModelIdentityFromLabels
+	} from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -25,6 +31,8 @@
 		displayValue: string;
 		barClass?: string;
 		textClass?: string;
+		id?: string;
+		badge?: string;
 	};
 
 	let bars = $state<Bar[]>([]);
@@ -33,7 +41,7 @@
 	function buildQuery(): string {
 		const ns = (namespace ?? '').trim();
 		const nsSel = ns ? `{namespace="${escapePromqlStringLiteral(ns)}"}` : '{}';
-		return `topk(10, max by(llm_inference_service) (vllm:kv_cache_usage_perc${nsSel})) * 100`;
+		return `max by(llm_inference_service, model_name) (vllm:kv_cache_usage_perc${nsSel}) * 100`;
 	}
 
 	const barClassByLevel: Record<'green' | 'orange' | 'red', string> = {
@@ -52,18 +60,21 @@
 			const response = await prometheusDriver.instantQuery(buildQuery());
 			const parsed = response.result
 				.map((v) => {
-					const labels = v.metric.labels as Record<string, string>;
-					const label = labels.llm_inference_service ?? '(unknown)';
+					const identity = vllmModelIdentityFromLabels(v.metric.labels as Record<string, string>);
 					const value = Number(v.value?.value);
-					return Number.isFinite(value) ? { label, value } : null;
+					return Number.isFinite(value) ? { ...identity, value } : null;
 				})
-				.filter((x): x is { label: string; value: number } => x !== null)
-				.sort((a, b) => b.value - a.value);
+				.filter((x): x is VllmModelIdentity & { value: number } => x !== null);
 
-			bars = parsed.map(({ label, value }) => {
+			// KV pressure is a gauge: keep the worst (max) row per model id.
+			const merged = mergeVllmRowsById(parsed, Math.max);
+
+			bars = merged.map(({ label, id, badge, value }) => {
 				const level = classifyThreshold(value, { green: 70, orange: 85 }, 'lower-is-better');
 				return {
 					label,
+					id,
+					badge,
 					value,
 					displayValue: `${value.toFixed(1)}%`,
 					barClass: barClassByLevel[level],
@@ -95,4 +106,5 @@
 	{bars}
 	{isLoaded}
 	onBarClick={onModelClick}
+	scrollable
 />

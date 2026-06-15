@@ -9,6 +9,7 @@
 		setFormContext,
 		type UiOption
 	} from '@sjsf/form';
+	import { PrometheusDriver } from 'prometheus-query';
 	import { getContext } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { get, writable } from 'svelte/store';
@@ -18,14 +19,17 @@
 		type ComboboxEnumeration
 	} from '$lib/components/dynamic-form/widgets/combobox.svelte';
 	import { m } from '$lib/paraglide/messages';
+	import { encodeStandaloneModelId, escapePromqlStringLiteral } from '$lib/prometheus';
 
 	let {
 		cluster,
 		namespace,
+		prometheusDriver,
 		selectedModel = $bindable()
 	}: {
 		cluster: string | undefined;
 		namespace: string | undefined;
+		prometheusDriver?: PrometheusDriver | null;
 		selectedModel: string | undefined;
 	} = $props();
 
@@ -43,6 +47,30 @@
 	}
 
 	let isLoaded = $state(false);
+
+	/** Discover standalone models (no `llm_inference_service` label) via Prometheus. */
+	async function fetchStandaloneModels(ns: string): Promise<ModelOption[]> {
+		if (!prometheusDriver) return [];
+		const nsSel = ns ? `namespace="${escapePromqlStringLiteral(ns)}",` : '';
+		const query = `group by(model_name) (vllm:kv_cache_usage_perc{${nsSel}llm_inference_service=""})`;
+		try {
+			const response = await prometheusDriver.instantQuery(query);
+			const names = new SvelteSet<string>();
+			for (const v of response.result) {
+				const name = (v.metric.labels as Record<string, string>).model_name;
+				if (name) names.add(name);
+			}
+			return [...names]
+				.sort((a, b) => a.localeCompare(b))
+				.map((name) => {
+					const shown = name.length > 28 ? name.slice(0, 25) + '...' : name;
+					return { value: encodeStandaloneModelId(name), label: `${shown} · ${m.standalone()}` };
+				});
+		} catch (error) {
+			console.error('Failed to list standalone models for analytics picker:', error);
+			return [];
+		}
+	}
 
 	const schema: Schema = {
 		type: 'object',
@@ -105,15 +133,18 @@
 				}
 			}
 
+			const standaloneModels = await fetchStandaloneModels(ns);
+
 			if (cancelled) return;
 
-			const models: ModelOption[] = [...modelNames]
+			const managedModels: ModelOption[] = [...modelNames]
 				.sort((a, b) => a.localeCompare(b))
 				.map((name) => ({
 					value: name,
 					label: name.length > 40 ? name.slice(0, 37) + '...' : name
 				}));
 
+			const models = [...managedModels, ...standaloneModels];
 			const options = models.length > 0 ? [{ value: '.*', label: m.all_models() }, ...models] : [];
 			modelOptions.set(options);
 			selectedModel = models.length > 0 ? options[0]!.value : '.*';

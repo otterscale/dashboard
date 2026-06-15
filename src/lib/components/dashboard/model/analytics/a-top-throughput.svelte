@@ -5,7 +5,12 @@
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import { TopBarList } from '$lib/components/custom/top-bar-list';
 	import { m } from '$lib/paraglide/messages';
-	import { escapePromqlStringLiteral } from '$lib/prometheus';
+	import {
+		escapePromqlStringLiteral,
+		mergeVllmRowsById,
+		type VllmModelIdentity,
+		vllmModelIdentityFromLabels
+	} from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -19,7 +24,7 @@
 		onModelClick?: (model: string) => void;
 	} = $props();
 
-	type Bar = { label: string; value: number; displayValue: string };
+	type Bar = { label: string; value: number; displayValue: string; id?: string; badge?: string };
 
 	let bars = $state<Bar[]>([]);
 	let isLoaded = $state(false);
@@ -28,9 +33,9 @@
 		const ns = (namespace ?? '').trim();
 		const nsSel = ns ? `{namespace="${escapePromqlStringLiteral(ns)}"}` : '{}';
 		return (
-			`topk(10, sum by(llm_inference_service) (` +
+			`sum by(llm_inference_service, model_name) (` +
 			`rate(vllm:prompt_tokens_total${nsSel}[5m])` +
-			` + rate(vllm:generation_tokens_total${nsSel}[5m])))`
+			` + rate(vllm:generation_tokens_total${nsSel}[5m]))`
 		);
 	}
 
@@ -45,16 +50,19 @@
 			const response = await prometheusDriver.instantQuery(buildQuery());
 			const parsed = response.result
 				.map((v) => {
-					const labels = v.metric.labels as Record<string, string>;
-					const label = labels.llm_inference_service ?? '(unknown)';
+					const identity = vllmModelIdentityFromLabels(v.metric.labels as Record<string, string>);
 					const value = Number(v.value?.value);
-					return Number.isFinite(value) ? { label, value } : null;
+					return Number.isFinite(value) ? { ...identity, value } : null;
 				})
-				.filter((x): x is { label: string; value: number } => x !== null)
-				.sort((a, b) => b.value - a.value);
+				.filter((x): x is VllmModelIdentity & { value: number } => x !== null);
 
-			bars = parsed.map(({ label, value }) => ({
+			// Tokens/sec is additive: sum the rows that collapse onto the same model id.
+			const merged = mergeVllmRowsById(parsed, (a, b) => a + b);
+
+			bars = merged.map(({ label, id, badge, value }) => ({
 				label,
+				id,
+				badge,
 				value,
 				displayValue: formatTokensPerSec(value)
 			}));
@@ -83,4 +91,5 @@
 	{bars}
 	{isLoaded}
 	onBarClick={onModelClick}
+	scrollable
 />

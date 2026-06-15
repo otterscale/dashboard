@@ -5,11 +5,13 @@
 	import Maximize2Icon from '@lucide/svelte/icons/maximize-2';
 
 	import * as Statistics from '$lib/components/custom/statistics/index';
+	import { Badge } from '$lib/components/ui/badge';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import * as Sheet from '$lib/components/ui/sheet';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
+	import { cn } from '$lib/utils';
 
 	type Bar = {
 		label: string;
@@ -17,6 +19,11 @@
 		displayValue: string;
 		barClass?: string;
 		textClass?: string;
+		// Click payload / list key; defaults to `label` when omitted. Lets a bar display a
+		// human-friendly name while clicking through a distinct identity token.
+		id?: string;
+		// Optional short tag shown next to the label (e.g. to mark a standalone model).
+		badge?: string;
 	};
 
 	let {
@@ -43,48 +50,40 @@
 	const maxValue = $derived(bars.reduce((m, b) => Math.max(m, b.value), 0));
 </script>
 
+{#snippet barContent(bar: Bar)}
+	{@const pct = maxValue > 0 ? Math.max(2, (bar.value / maxValue) * 100) : 0}
+	<span class="flex flex-col gap-1 overflow-hidden">
+		<span class="flex items-center gap-1.5 overflow-hidden">
+			<span class="truncate text-xs font-medium" title={bar.label}>{bar.label}</span>
+			{#if bar.badge}
+				<Badge variant="secondary" class="shrink-0">{bar.badge}</Badge>
+			{/if}
+		</span>
+		<span class="relative h-2.5 w-full overflow-hidden rounded bg-muted">
+			<span
+				class={cn('absolute inset-y-0 left-0 rounded bg-chart-1', bar.barClass)}
+				style="width: {pct}%"
+			></span>
+		</span>
+	</span>
+	<span class={cn('font-mono text-sm tabular-nums', bar.textClass)}>{bar.displayValue}</span>
+{/snippet}
+
 {#snippet list()}
 	<ul class="flex flex-col gap-2">
-		{#each bars as bar (bar.label)}
-			{@const pct = maxValue > 0 ? Math.max(2, (bar.value / maxValue) * 100) : 0}
+		{#each bars as bar (bar.id ?? bar.label)}
 			<li>
 				{#if onBarClick}
 					<button
 						type="button"
 						class="group grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded px-1 py-1 text-left hover:bg-muted/60"
-						onclick={() => onBarClick?.(bar.label)}
+						onclick={() => onBarClick?.(bar.id ?? bar.label)}
 					>
-						<span class="flex flex-col gap-1 overflow-hidden">
-							<span class="truncate text-xs font-medium" title={bar.label}>
-								{bar.label}
-							</span>
-							<span class="relative h-2.5 w-full overflow-hidden rounded bg-muted">
-								<span
-									class="absolute inset-y-0 left-0 rounded bg-chart-1 {bar.barClass ?? ''}"
-									style="width: {pct}%"
-								></span>
-							</span>
-						</span>
-						<span class="font-mono text-sm tabular-nums {bar.textClass ?? ''}">
-							{bar.displayValue}
-						</span>
+						{@render barContent(bar)}
 					</button>
 				{:else}
 					<div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-1 py-1">
-						<span class="flex flex-col gap-1 overflow-hidden">
-							<span class="truncate text-xs font-medium" title={bar.label}>
-								{bar.label}
-							</span>
-							<span class="relative h-2.5 w-full overflow-hidden rounded bg-muted">
-								<span
-									class="absolute inset-y-0 left-0 rounded bg-chart-1 {bar.barClass ?? ''}"
-									style="width: {pct}%"
-								></span>
-							</span>
-						</span>
-						<span class="font-mono text-sm tabular-nums {bar.textClass ?? ''}">
-							{bar.displayValue}
-						</span>
+						{@render barContent(bar)}
 					</div>
 				{/if}
 			</li>
