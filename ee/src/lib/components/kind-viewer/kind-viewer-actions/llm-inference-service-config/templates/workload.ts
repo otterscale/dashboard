@@ -15,6 +15,23 @@ export function getWorkloadConfiguration({
 		spec: {
 			storageInitializer: { enabled: true },
 			template: {
+				affinity: {
+					nodeAffinity: {
+						requiredDuringSchedulingIgnoredDuringExecution: {
+							nodeSelectorTerms: [
+								{
+									matchExpressions: [
+										{
+											key: 'node-role.phison.mw/gpu',
+											operator: 'In',
+											values: ['true']
+										}
+									]
+								}
+							]
+						}
+					}
+				},
 				containers: [
 					{
 						name: 'main',
