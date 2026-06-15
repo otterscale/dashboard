@@ -1,6 +1,7 @@
 import { InstantVector, type PrometheusDriver, RangeVector } from 'prometheus-query';
 
 import type { ChartConfig } from '$lib/components/ui/chart/index.js';
+import { m } from '$lib/paraglide/messages';
 
 /** Escape a value for use inside PromQL double-quoted string literals (e.g. `namespace="..."`). */
 export function escapePromqlStringLiteral(value: string): string {
@@ -8,8 +9,72 @@ export function escapePromqlStringLiteral(value: string): string {
 }
 
 /**
- * Label selector for vLLM dashboard metrics: namespace, or namespace + `llm_inference_service` for one ModelService.
- * `selectedModel === '.*'` means all ModelServices in the namespace (namespace filter only).
+ * Identity prefix for standalone models — vLLM deployed directly, without the managed
+ * serving stack. Such pods carry no `llm_inference_service` label, so they are keyed by
+ * `model_name` instead. `:` can't appear in a managed model's `llm_inference_service`
+ * value (a DNS-1123 name), so this prefix can never collide with a managed model's id.
+ */
+const STANDALONE_ID_PREFIX = 'standalone:';
+
+/** Build the selected-model token for a standalone model (matched later by `model_name`). */
+export function encodeStandaloneModelId(modelName: string): string {
+	return `${STANDALONE_ID_PREFIX}${modelName}`;
+}
+
+export type VllmModelIdentity = {
+	/** Stable token to pass as `selectedModel` (drives the detail-panel selector). */
+	id: string;
+	/** Human-friendly display name. */
+	label: string;
+	/** Tag shown next to the label; set only for standalone models. */
+	badge?: string;
+};
+
+/**
+ * Derive a model's identity from a metric's labels. Managed models are keyed by
+ * `llm_inference_service`; standalone models (deployed without it) fall back to
+ * their `model_name`, encoded so the detail panels can still scope their queries.
+ */
+export function vllmModelIdentityFromLabels(labels: Record<string, string>): VllmModelIdentity {
+	const service = labels.llm_inference_service;
+	if (service) return { id: service, label: service };
+	const modelName = labels.model_name ?? '';
+	return {
+		id: encodeStandaloneModelId(modelName),
+		label: modelName || '(unknown)',
+		badge: m.standalone()
+	};
+}
+
+/**
+ * Collapse rows that share an `id` into one, ordered by descending merged value.
+ *
+ * The top-N queries group `by(llm_inference_service, model_name)`, so a single model `id` can
+ * appear in several rows — one managed service serving multiple `model_name`s (e.g. LoRA adapters),
+ * or two standalone models that share a `model_name` across namespaces. Rendering those as-is would
+ * crash the keyed `{#each}` (duplicate keys) and mis-state the metric, so callers merge them here
+ * with the reducer matching their query's aggregation: `(a, b) => a + b` for additive rates
+ * (throughput), `Math.max` for gauges/quantiles (KV pressure, p99 latency).
+ */
+export function mergeVllmRowsById<T extends VllmModelIdentity & { value: number }>(
+	rows: T[],
+	combine: (a: number, b: number) => number
+): T[] {
+	const byId = new Map<string, T>();
+	for (const row of rows) {
+		const prev = byId.get(row.id);
+		if (prev) prev.value = combine(prev.value, row.value);
+		else byId.set(row.id, { ...row });
+	}
+	return [...byId.values()].sort((a, b) => b.value - a.value);
+}
+
+/**
+ * Label selector for vLLM dashboard metrics: namespace, or namespace + model identity.
+ * `selectedModel === '.*'` means all models in the namespace (namespace filter only).
+ * A managed model is matched by `llm_inference_service`; a standalone model (token built
+ * via {@link encodeStandaloneModelId}) is matched by an empty `llm_inference_service`
+ * plus its `model_name`, since those pods never carry that label.
  */
 function vllmMetricsLabelSelector(
 	namespace: string | undefined,
@@ -17,17 +82,17 @@ function vllmMetricsLabelSelector(
 ): string {
 	const ns = (namespace ?? '').trim();
 	const sm = selectedModel ?? '.*';
-	if (!ns) {
-		if (sm === '.*') return '';
-		const msEsc = escapePromqlStringLiteral(sm);
-		return `llm_inference_service="${msEsc}"`;
+	const parts: string[] = [];
+	if (ns) parts.push(`namespace="${escapePromqlStringLiteral(ns)}"`);
+	if (sm !== '.*') {
+		if (sm.startsWith(STANDALONE_ID_PREFIX)) {
+			const mnEsc = escapePromqlStringLiteral(sm.slice(STANDALONE_ID_PREFIX.length));
+			parts.push(`llm_inference_service=""`, `model_name="${mnEsc}"`);
+		} else {
+			parts.push(`llm_inference_service="${escapePromqlStringLiteral(sm)}"`);
+		}
 	}
-	const nsEsc = escapePromqlStringLiteral(ns);
-	if (sm === '.*') {
-		return `namespace="${nsEsc}"`;
-	}
-	const msEsc = escapePromqlStringLiteral(sm);
-	return `namespace="${nsEsc}",llm_inference_service="${msEsc}"`;
+	return parts.join(',');
 }
 
 /** Wrap a vLLM metric name with `{ ... }` selector (empty selector → `{}`). */
