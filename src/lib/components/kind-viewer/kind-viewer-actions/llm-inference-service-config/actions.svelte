@@ -153,6 +153,8 @@
 			>
 				<DeployWithLmCache
 					{cluster}
+					{namespace}
+					{schema}
 					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
