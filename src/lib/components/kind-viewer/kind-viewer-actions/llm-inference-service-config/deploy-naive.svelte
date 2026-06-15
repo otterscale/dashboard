@@ -481,7 +481,9 @@
 						class="mt-auto w-full"
 						onclick={() => {
 							if (isSubmitting) return;
+
 							isSubmitting = true;
+
 							const name = lodash.get(load(value), 'metadata.name');
 							toast.promise(
 								async () => {
