@@ -7,7 +7,7 @@
 		ServingKserveIoV1Alpha2LLMInferenceService,
 		ServingKserveIoV1Alpha2LLMInferenceServiceConfig
 	} from '@otterscale/types';
-	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
+	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
@@ -125,13 +125,8 @@
 			kind: targetKind,
 			metadata: { name: modelName, namespace } as FormValue,
 			spec: {
-				baseRefs: [
-					...lodash.get(object, ['spec', 'baseRefs'], []),
-					{ name: `${modelName}-family-epp` },
-					{ name: `${modelName}-workload-template` }
-				],
 				model: lodash.get(object, 'spec.model'),
-				...lodash.omit(lodash.get(object, ['spec']), ['model', 'baseRefs'])
+				...lodash.omit(lodash.get(object, ['spec']), ['model'])
 			}
 		};
 	}
@@ -221,10 +216,25 @@
 								}
 							}
 						} as UiSchemaRoot}
-						initialValue={{ namespace } as FormValue}
+						initialValue={{
+							name: lodash.get(values, ['metadata', 'name']),
+							namespace
+						} as FormValue}
 						handleSubmit={{
-							posthook: () => {
+							posthook: (form: FormState<FormValue>) => {
 								handleNext();
+
+								const formValue = getValueSnapshot(form);
+								const name = lodash.get(formValue, 'name');
+								lodash.set(
+									values,
+									['spec', 'baseRefs'],
+									[
+										...lodash.get(object, ['spec', 'baseRefs'], []),
+										{ name: `${name}-family-epp` },
+										{ name: `${name}-workload-template` }
+									]
+								);
 							}
 						}}
 						bind:values={values['metadata']}
