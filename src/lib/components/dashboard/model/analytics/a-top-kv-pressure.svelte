@@ -40,7 +40,7 @@
 	function buildQuery(): string {
 		const ns = (namespace ?? '').trim();
 		const nsSel = ns ? `{namespace="${escapePromqlStringLiteral(ns)}"}` : '{}';
-		return `topk(10, max by(llm_inference_service, model_name) (vllm:kv_cache_usage_perc${nsSel})) * 100`;
+		return `max by(llm_inference_service, model_name) (vllm:kv_cache_usage_perc${nsSel}) * 100`;
 	}
 
 	const barClassByLevel: Record<'green' | 'orange' | 'red', string> = {
@@ -103,4 +103,5 @@
 	{bars}
 	{isLoaded}
 	onBarClick={onModelClick}
+	scrollable
 />

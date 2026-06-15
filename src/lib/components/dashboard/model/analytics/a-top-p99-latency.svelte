@@ -33,8 +33,8 @@
 		const ns = (namespace ?? '').trim();
 		const nsSel = ns ? `{namespace="${escapePromqlStringLiteral(ns)}"}` : '{}';
 		return (
-			`topk(10, histogram_quantile(0.99, sum by(llm_inference_service, model_name, le) ` +
-			`(rate(vllm:e2e_request_latency_seconds_bucket${nsSel}[5m]))))`
+			`histogram_quantile(0.99, sum by(llm_inference_service, model_name, le) ` +
+			`(rate(vllm:e2e_request_latency_seconds_bucket${nsSel}[5m])))`
 		);
 	}
 
@@ -87,4 +87,5 @@
 	{bars}
 	{isLoaded}
 	onBarClick={onModelClick}
+	scrollable
 />

@@ -32,9 +32,9 @@
 		const ns = (namespace ?? '').trim();
 		const nsSel = ns ? `{namespace="${escapePromqlStringLiteral(ns)}"}` : '{}';
 		return (
-			`topk(10, sum by(llm_inference_service, model_name) (` +
+			`sum by(llm_inference_service, model_name) (` +
 			`rate(vllm:prompt_tokens_total${nsSel}[5m])` +
-			` + rate(vllm:generation_tokens_total${nsSel}[5m])))`
+			` + rate(vllm:generation_tokens_total${nsSel}[5m]))`
 		);
 	}
 
@@ -88,4 +88,5 @@
 	{bars}
 	{isLoaded}
 	onBarClick={onModelClick}
+	scrollable
 />
