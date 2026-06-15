@@ -24,6 +24,7 @@
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import Spinner from '$lib/components/ui/spinner/spinner.svelte';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
+
 	let {
 		cluster,
 		namespace,
