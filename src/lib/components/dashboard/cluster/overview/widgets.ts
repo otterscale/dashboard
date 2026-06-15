@@ -40,10 +40,10 @@ export const widgets = [
 		class: 'col-span-1 row-span-2',
 		component: GPUMemoryUsage
 	},
-	{
-		key: 'gpu-utilization',
-		class: 'col-span-1 row-span-2',
-		component: GPUUtilization
-	},
+	// {
+	// 	key: 'gpu-utilization',
+	// 	class: 'col-span-1 row-span-2',
+	// 	component: GPUUtilization
+	// },
 	{ key: 'vgpu', class: 'col-span-1 row-span-2', component: VGPU }
 ] satisfies WidgetDefinition[];
