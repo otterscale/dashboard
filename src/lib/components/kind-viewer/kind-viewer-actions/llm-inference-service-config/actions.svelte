@@ -12,7 +12,8 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
 	import Copy from './copy.svelte';
-	import Deploy from './deploy.svelte';
+	import DeployNaive from './deploy-naive.svelte';
+	import DeployWithLmCache from './deploy-with-lm-cache.svelte';
 
 	let {
 		cluster,
@@ -35,7 +36,6 @@
 		validate: ValidateFunction;
 		object: ServingKserveIoV1Alpha2LLMInferenceServiceConfig;
 	} = $props();
-
 	let actionsOpen = $state(false);
 </script>
 
@@ -51,6 +51,8 @@
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content align="end" class="w-full">
 		<DropdownMenu.Group>
+			<DropdownMenu.Separator />
+			<DropdownMenu.Label>Inspect</DropdownMenu.Label>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
@@ -65,12 +67,34 @@
 			>
 				<Describe {cluster} {namespace} {group} {version} {resource} {object} />
 			</DropdownMenu.Item>
+			<DropdownMenu.Separator />
+			<DropdownMenu.Label>Manage</DropdownMenu.Label>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
 			>
 				<Edit
+					{cluster}
+					{namespace}
+					{group}
+					{version}
+					{kind}
+					{resource}
+					{schema}
+					{validate}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Copy
 					{cluster}
 					{namespace}
 					{group}
@@ -105,20 +129,16 @@
 				/>
 			</DropdownMenu.Item>
 			<DropdownMenu.Separator />
+			<DropdownMenu.Label>Deploy</DropdownMenu.Label>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
 			>
-				<Copy
+				<DeployNaive
 					{cluster}
 					{namespace}
-					{group}
-					{version}
-					{kind}
-					{resource}
 					{schema}
-					{validate}
 					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
@@ -126,14 +146,13 @@
 				/>
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
+				class="empty:hidden"
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
 			>
-				<Deploy
+				<DeployWithLmCache
 					{cluster}
-					{namespace}
-					{schema}
 					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
