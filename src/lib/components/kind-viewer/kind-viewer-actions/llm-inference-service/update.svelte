@@ -405,7 +405,7 @@
 				{/await}
 			</Tabs.Content>
 
-			<!-- Step 3: YAML Review + Submit -->
+			<!-- Step 2: YAML Review + Submit -->
 			<Tabs.Content value={steps[1]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
