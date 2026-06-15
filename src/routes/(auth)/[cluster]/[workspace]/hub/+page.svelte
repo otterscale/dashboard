@@ -106,7 +106,7 @@
 					})
 				});
 				if (response.ok) {
-					const indexCharts: Record<string, ChartType[]> = await response.json();
+					const indexCharts: Record<string, ChartType[]> = (await response.json()) ?? {};
 					chartsByHelmRepository = (
 						Object.values(indexCharts)
 							.map((versions) => {

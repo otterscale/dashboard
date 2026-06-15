@@ -45,7 +45,7 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 			entries?: Record<string, ChartType[]>;
 		};
 
-		return json(document?.entries);
+		return json(document?.entries ?? {});
 	} catch (err) {
 		console.error('[helm-repository-index] Failed to fetch repository index:', err);
 		const status = (err as { status?: number })?.status ?? 500;
