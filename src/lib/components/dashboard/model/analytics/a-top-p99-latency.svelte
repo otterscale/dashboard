@@ -6,7 +6,11 @@
 	import { TopBarList } from '$lib/components/custom/top-bar-list';
 	import { formatLatency } from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
-	import { escapePromqlStringLiteral } from '$lib/prometheus';
+	import {
+		escapePromqlStringLiteral,
+		type VllmModelIdentity,
+		vllmModelIdentityFromLabels
+	} from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -20,7 +24,7 @@
 		onModelClick?: (model: string) => void;
 	} = $props();
 
-	type Bar = { label: string; value: number; displayValue: string };
+	type Bar = { label: string; value: number; displayValue: string; id?: string; badge?: string };
 
 	let bars = $state<Bar[]>([]);
 	let isLoaded = $state(false);
@@ -29,7 +33,7 @@
 		const ns = (namespace ?? '').trim();
 		const nsSel = ns ? `{namespace="${escapePromqlStringLiteral(ns)}"}` : '{}';
 		return (
-			`topk(10, histogram_quantile(0.99, sum by(llm_inference_service, le) ` +
+			`topk(10, histogram_quantile(0.99, sum by(llm_inference_service, model_name, le) ` +
 			`(rate(vllm:e2e_request_latency_seconds_bucket${nsSel}[5m]))))`
 		);
 	}
@@ -44,16 +48,17 @@
 			const response = await prometheusDriver.instantQuery(buildQuery());
 			const parsed = response.result
 				.map((v) => {
-					const labels = v.metric.labels as Record<string, string>;
-					const label = labels.llm_inference_service ?? '(unknown)';
+					const identity = vllmModelIdentityFromLabels(v.metric.labels as Record<string, string>);
 					const value = Number(v.value?.value);
-					return Number.isFinite(value) ? { label, value } : null;
+					return Number.isFinite(value) ? { ...identity, value } : null;
 				})
-				.filter((x): x is { label: string; value: number } => x !== null)
+				.filter((x): x is VllmModelIdentity & { value: number } => x !== null)
 				.sort((a, b) => b.value - a.value);
 
-			bars = parsed.map(({ label, value }) => ({
+			bars = parsed.map(({ label, id, badge, value }) => ({
 				label,
+				id,
+				badge,
 				value,
 				displayValue: formatSeconds(value)
 			}));

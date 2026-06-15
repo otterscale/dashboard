@@ -36,6 +36,7 @@
 	"model": "模型",
 	"models": "模型",
 	"all_models": "全部模型",
+	"standalone": "獨立部署",
 	"model_service": "模型",
 	"model_configuration": "組態",
 	"model_template": "模板",
