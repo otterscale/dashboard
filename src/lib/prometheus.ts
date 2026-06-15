@@ -196,6 +196,22 @@ export function thresholdClasses(level: ThresholdLevel): {
 	}
 }
 
+/**
+ * Chart CSS variable matching {@link thresholdClasses}' text color, so a KPI card's
+ * sparkline can be tinted by the same health level as its big number.
+ * Mirrors the text mapping: green → chart-2, orange → chart-1, red → destructive.
+ */
+export function thresholdChartColor(level: ThresholdLevel): string {
+	switch (level) {
+		case 'green':
+			return 'var(--chart-2)';
+		case 'orange':
+			return 'var(--chart-1)';
+		case 'red':
+			return 'var(--destructive)';
+	}
+}
+
 export type DataPoint = Record<string, Date | number>;
 
 const CHART_COLORS = ['chart-1', 'chart-2', 'chart-3', 'chart-4', 'chart-5'];

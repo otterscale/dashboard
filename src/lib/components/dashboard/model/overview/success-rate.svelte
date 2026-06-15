@@ -18,6 +18,7 @@
 	import {
 		classifyThreshold,
 		computeStep,
+		thresholdChartColor,
 		thresholdClasses,
 		vllmMetricWithSelector
 	} from '$lib/prometheus';
@@ -143,6 +144,8 @@
 			: classifyThreshold(latestValue, { green: 99.5, orange: 98 }, 'higher-is-better')
 	);
 	const colors = $derived(thresholdClasses(level));
+	// Sparkline follows the same health level as the big number.
+	const lineColor = $derived(thresholdChartColor(level));
 
 	const configuration = {
 		value: { label: 'Value', color: 'var(--chart-2)' }
@@ -199,9 +202,7 @@
 					x="time"
 					xScale={scaleUtc()}
 					axis={false}
-					series={[
-						{ key: 'value', label: configuration.value.label, color: configuration.value.color }
-					]}
+					series={[{ key: 'value', label: configuration.value.label, color: lineColor }]}
 					props={{
 						spline: { curve: curveLinear, motion: 'tween', strokeWidth: 2 },
 						xAxis: { format: (v: Date) => v.toLocaleDateString('en-US', { month: 'short' }) },
