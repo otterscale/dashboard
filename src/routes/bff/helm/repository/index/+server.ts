@@ -1,7 +1,7 @@
 import { error, json, type RequestHandler } from '@sveltejs/kit';
 import { load } from 'js-yaml';
 
-import type { IndexChartType } from '$lib/components/artifact-viewer/types';
+import type { ChartType } from '$lib/components/artifact-viewer/types';
 
 function getIndexUrl(repositoryUrl: string): URL {
 	const url = new URL(repositoryUrl);
@@ -42,18 +42,10 @@ export const POST: RequestHandler = async ({ request, locals, fetch }) => {
 		}
 
 		const document = load(await response.text()) as {
-			entries?: Record<string, IndexChartType[]>;
+			entries?: Record<string, ChartType[]>;
 		};
 
-		const entries = Object.values(document?.entries ?? {}).map((versions) => {
-			const [latestVersion] = versions;
-			return {
-				...latestVersion,
-				versions: versions
-			};
-		});
-
-		return json(entries);
+		return json(document?.entries);
 	} catch (err) {
 		console.error('[helm-repository-index] Failed to fetch repository index:', err);
 		const status = (err as { status?: number })?.status ?? 500;

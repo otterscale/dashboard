@@ -101,6 +101,7 @@ function createHelmRepositoryChartArtifact(
 export {
 	type ArtifactType as ArtifactChartType,
 	type ChartArtifact,
+	type ChartType,
 	createHelmRepositoryChartArtifact,
 	type HelmRepositoryChartArtifact,
 	type HelmRepositoryChartVersion,
