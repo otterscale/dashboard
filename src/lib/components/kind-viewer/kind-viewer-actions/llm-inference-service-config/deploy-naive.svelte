@@ -24,7 +24,6 @@
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import Spinner from '$lib/components/ui/spinner/spinner.svelte';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
-
 	let {
 		cluster,
 		namespace,
@@ -51,7 +50,6 @@
 	const [firstStep] = steps;
 
 	type GPUDevice = { type: string; node: string };
-
 	function getAllGPUDevices(nodes: NodeInfo[]): GPUDevice[] {
 		return nodes.flatMap((node) =>
 			node.devices.map((device) => ({
@@ -60,7 +58,6 @@
 			}))
 		);
 	}
-
 	function getResourceTopology(devices: GPUDevice[]): Record<string, string[]> {
 		const container: Record<string, Set<string>> = {};
 		for (const { type, node } of devices) {
@@ -69,14 +66,12 @@
 			}
 			container[type].add(node);
 		}
-
 		const resourceTopology: Record<string, string[]> = {};
 		for (const [type, nodes] of Object.entries(container)) {
 			resourceTopology[type] = [...nodes];
 		}
 		return resourceTopology;
 	}
-
 	function getWorkloadPlacementSchema(resourceTopology: Record<string, string[]>): Schema {
 		const types = Object.keys(resourceTopology);
 		if (types.length === 0) {
@@ -140,14 +135,11 @@
 {#snippet gpuResources()}
 	<GPUResource />
 {/snippet}
-
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
 		onOpenChangeComplete?.();
-
 		if (isOpen) return;
-
 		initiate();
 	}}
 >
@@ -158,7 +150,7 @@
 					<Rocket />
 				</Item.Media>
 				<Item.Content>
-					<Item.Title>Deploy</Item.Title>
+					<Item.Title>Naive</Item.Title>
 				</Item.Content>
 			</Item.Root>
 		{/snippet}
@@ -224,7 +216,6 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-
 			<!-- Step 2 — Model Source -->
 			<Tabs.Content value={steps[1]}>
 				<Form
@@ -279,7 +270,6 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-
 			<!-- Step 3 — Workload Placement -->
 			<Tabs.Content value={steps[2]}>
 				{#await fetchAllGpuNodes(resourceClient, cluster)}
@@ -331,12 +321,10 @@
 							handleSubmit={{
 								posthook: (form) => {
 									const value = getValueSnapshot(form);
-
 									const type = lodash.get(value, 'type') as string | undefined;
 									if (type) {
 										lodash.set(values, ['spec', 'annotations', 'nvidia.com/use-gputype'], type);
 									}
-
 									const node = lodash.get(value, 'node') as string | undefined;
 									if (node) {
 										lodash.set(
@@ -345,7 +333,6 @@
 											node
 										);
 									}
-
 									handleNext();
 								}
 							}}
@@ -413,7 +400,6 @@
 							handleSubmit={{
 								posthook: (form) => {
 									const value = getValueSnapshot(form);
-
 									const decodeType = lodash.get(value, 'decode.type') as string | undefined;
 									if (decodeType) {
 										lodash.set(
@@ -422,7 +408,6 @@
 											decodeType
 										);
 									}
-
 									const decodeNode = lodash.get(value, 'decode.node') as string | undefined;
 									if (decodeNode) {
 										lodash.set(
@@ -431,7 +416,6 @@
 											decodeNode
 										);
 									}
-
 									const prefillType = lodash.get(value, 'prefill.type') as string | undefined;
 									if (prefillType) {
 										lodash.set(
@@ -440,7 +424,6 @@
 											prefillType
 										);
 									}
-
 									const prefillNode = lodash.get(value, 'prefill.node') as string | undefined;
 									if (prefillNode) {
 										lodash.set(
@@ -449,7 +432,6 @@
 											prefillNode
 										);
 									}
-
 									handleNext();
 								}
 							}}
@@ -480,7 +462,6 @@
 					</Empty.Root>
 				{/await}
 			</Tabs.Content>
-
 			<!-- Step 5 — YAML preview -->
 			<Tabs.Content value={steps[3]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
@@ -500,15 +481,11 @@
 						class="mt-auto w-full"
 						onclick={() => {
 							if (isSubmitting) return;
-
 							isSubmitting = true;
-
 							const name = lodash.get(load(value), 'metadata.name');
-
 							toast.promise(
 								async () => {
 									const manifest = new TextEncoder().encode(value);
-
 									await resourceClient.create({
 										cluster,
 										namespace,
