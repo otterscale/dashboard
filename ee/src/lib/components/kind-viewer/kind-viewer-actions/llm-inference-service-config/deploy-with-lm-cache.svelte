@@ -107,17 +107,6 @@
 		};
 	}
 
-	const workloadParamters = $derived({
-		modelServiceName: lodash.get(object, 'metadata.name', '') as string,
-		namespace: namespace ?? ''
-	});
-
-	const familyEndpointPickerParamters = $derived({
-		modelServiceName: lodash.get(object, 'metadata.name', '') as string,
-		namespace: namespace ?? '',
-		modelUri: lodash.get(object, 'spec.model.uri', '') as string
-	});
-
 	function getInitialValues() {
 		const modelName = lodash.get(object, 'metadata.name', '') as string;
 		return {
@@ -217,7 +206,6 @@
 							}
 						} as UiSchemaRoot}
 						initialValue={{
-							name: lodash.get(values, ['metadata', 'name']),
 							namespace
 						} as FormValue}
 						handleSubmit={{
@@ -448,6 +436,17 @@
 														controller: false
 													}
 												: {};
+
+											const workloadParamters = $derived({
+												modelServiceName: lodash.get(modelService, 'metadata.name', '') as string,
+												namespace: namespace ?? ''
+											});
+
+											const familyEndpointPickerParamters = $derived({
+												modelServiceName: lodash.get(modelService, 'metadata.name', '') as string,
+												namespace: namespace ?? '',
+												modelUri: lodash.get(object, 'spec.model.uri', '') as string
+											});
 
 											const workloadConfig = getWorkloadConfiguration(workloadParamters);
 											const eppConfig = getFamilyEndpointPickerConfiguration(
