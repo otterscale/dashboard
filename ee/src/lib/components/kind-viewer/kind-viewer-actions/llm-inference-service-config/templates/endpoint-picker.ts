@@ -1,15 +1,15 @@
 function getModelUriProtocol(modelUri: string): string {
-	try {
-		return new URL(modelUri.trim()).protocol.replace(/:$/, ''); // 's3:' → 's3'
-	} catch {
-		return '';
-	}
+	const match = modelUri.trim().match(/^([^:]+):/);
+	return match ? match[1] : '';
 }
 
 function getEnvironments(modelUri: string) {
 	if (getModelUriProtocol(modelUri) === 's3') {
 		const uri = modelUri;
-		const bucket = new URL(modelUri.trim()).hostname;
+		const bucket = modelUri
+			.trim()
+			.replace(/^s3:\/\//i, '')
+			.split('/')[0];
 		return [
 			{ name: 'S3_MODEL_URI', value: `${uri}` },
 

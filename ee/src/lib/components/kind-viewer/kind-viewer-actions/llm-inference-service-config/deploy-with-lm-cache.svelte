@@ -315,7 +315,68 @@
 						{@const gpuWorkloadPlacementSchema = getWorkloadPlacementSchema(resourceTopology)}
 						{@const isSingleNode =
 							lodash.has(object, 'spec.template') && !lodash.has(object, 'spec.prefill')}
-						{#if isSingleNode}
+						{#if !isSingleNode}
+							<Form
+								schema={{
+									title: 'Workload Placement',
+									description:
+										'Control where this workload runs by selecting target nodes and GPU types.',
+									...gpuWorkloadPlacementSchema
+								} as Schema}
+								uiSchema={{
+									'ui:options': {
+										translations: {
+											submit: 'Next'
+										},
+										action: gpuResources
+									},
+									type: {
+										'ui:components': {
+											stringField: 'enumField',
+											selectWidget: 'comboboxWidget'
+										}
+									},
+									node: {
+										'ui:components': {
+											stringField: 'enumField',
+											selectWidget: 'comboboxWidget'
+										}
+									}
+								} as UiSchemaRoot}
+								initialValue={{} as FormValue}
+								handleSubmit={{
+									posthook: (form) => {
+										const value = getValueSnapshot(form);
+										const type = lodash.get(value, 'type') as string | undefined;
+										if (type) {
+											lodash.set(values, ['spec', 'annotations', 'nvidia.com/use-gputype'], type);
+										}
+										const node = lodash.get(value, 'node') as string | undefined;
+										if (node) {
+											lodash.set(
+												values,
+												['spec', 'template', 'nodeSelector', 'kubernetes.io/hostname'],
+												node
+											);
+										}
+										handleNext();
+									}
+								}}
+							>
+								{#snippet actions()}
+									<div class="flex w-full items-center justify-between gap-3">
+										<Button
+											onclick={() => {
+												handlePrevious();
+											}}
+										>
+											Previous
+										</Button>
+										<SubmitButton />
+									</div>
+								{/snippet}
+							</Form>
+						{:else}
 							<Form
 								schema={{
 									title: 'Workload Placement',
@@ -409,7 +470,10 @@
 								class="flex-1"
 								onclick={async () => {
 									if (isSubmitting) return;
+
 									isSubmitting = true;
+
+									const name = lodash.get(values, 'metadata.name', '');
 
 									toast.promise(
 										async () => {
@@ -437,16 +501,16 @@
 													}
 												: {};
 
-											const workloadParamters = $derived({
+											const workloadParamters = {
 												modelServiceName: lodash.get(modelService, 'metadata.name', '') as string,
 												namespace: namespace ?? ''
-											});
+											};
 
-											const familyEndpointPickerParamters = $derived({
+											const familyEndpointPickerParamters = {
 												modelServiceName: lodash.get(modelService, 'metadata.name', '') as string,
 												namespace: namespace ?? '',
 												modelUri: lodash.get(object, 'spec.model.uri', '') as string
-											});
+											};
 
 											const workloadConfig = getWorkloadConfiguration(workloadParamters);
 											const eppConfig = getFamilyEndpointPickerConfiguration(
