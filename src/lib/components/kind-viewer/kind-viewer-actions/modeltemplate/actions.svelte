@@ -10,7 +10,8 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
 	import Copy from './copy.svelte';
-	import Deploy from './deploy.svelte';
+	import DeployNaive from './deploy-naive.svelte';
+	import DeployWithLmCache from './deploy-with-lm-cache.svelte';
 
 	let {
 		cluster,
@@ -89,7 +90,22 @@
 					e.preventDefault();
 				}}
 			>
-				<Deploy
+				<DeployNaive
+					{cluster}
+					{schema}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				class="empty:hidden"
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<DeployWithLmCache
 					{cluster}
 					{schema}
 					{object}
