@@ -3,7 +3,7 @@
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import { TopBarList } from '$lib/components/custom/top-bar-list';
+	import { type TopBar, TopBarList } from '$lib/components/custom/top-bar-list';
 	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/paraglide/messages';
 	import {
@@ -28,14 +28,7 @@
 		return ns && ns !== '.*' ? `{namespace="${escapePromqlStringLiteral(ns)}"}` : '';
 	});
 
-	type Bar = {
-		label: string;
-		value: number;
-		displayValue: string;
-		barClass?: string;
-		textClass?: string;
-	};
-	let bars = $state<Bar[]>([]);
+	let bars = $state<TopBar[]>([]);
 	let isLoaded = $state(false);
 
 	function barClass(level: ThresholdLevel): string {
