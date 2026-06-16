@@ -232,16 +232,16 @@
 	</Statistics.Header>
 	<Statistics.Content class="min-h-16">
 		{#if !isLoaded}
-			<div class="flex h-[260px] w-full items-center justify-center">
+			<div class="flex h-65 w-full items-center justify-center">
 				<LoaderCircle class="size-12 animate-spin" />
 			</div>
 		{:else if data.length === 0 || pods.length === 0}
-			<div class="flex h-[260px] w-full flex-col items-center justify-center">
+			<div class="flex h-65 w-full flex-col items-center justify-center">
 				<ChartLine class="size-12 animate-pulse text-muted-foreground" />
 				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
 			</div>
 		{:else}
-			<Chart.Container config={chartConfig} class="h-[260px] w-full">
+			<Chart.Container config={chartConfig} class="h-65 w-full">
 				<AreaChart
 					{data}
 					x="date"

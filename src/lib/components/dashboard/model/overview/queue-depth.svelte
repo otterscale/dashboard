@@ -18,6 +18,7 @@
 	import {
 		classifyThreshold,
 		computeStep,
+		thresholdChartColor,
 		thresholdClasses,
 		vllmMetricWithSelector
 	} from '$lib/prometheus';
@@ -121,6 +122,9 @@
 				: classifyThreshold(latestTotal, { green: 0, orange: 10 }, 'lower-is-better')
 	);
 	const colors = $derived(thresholdClasses(level));
+	// `waiting` follows the card's health level (matches the big number); `swapped` stays
+	// destructive-red since any swap is inherently bad regardless of the overall level.
+	const waitingColor = $derived(thresholdChartColor(level));
 
 	const sparklineData = $derived(
 		waitingSeries.map((s, i) => ({
@@ -187,7 +191,7 @@
 						{
 							key: 'waiting',
 							label: configuration.waiting.label,
-							color: configuration.waiting.color
+							color: waitingColor
 						},
 						{
 							key: 'swapped',
