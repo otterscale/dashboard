@@ -3,7 +3,7 @@
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import { TopBarList } from '$lib/components/custom/top-bar-list';
+	import { type TopBar, TopBarList } from '$lib/components/custom/top-bar-list';
 	import { classifyThreshold, fetchCombinedInstant, type ThresholdLevel } from '$lib/prometheus';
 
 	// Reusable node-pressure ranking: one bar per node, sized by Request%, labelled with the
@@ -35,14 +35,7 @@
 		lim: `100 * sum(kube_pod_container_resource_limits{resource="${resource}", unit="${unit}"}) by (node) / ${alloc}`
 	});
 
-	type Bar = {
-		label: string;
-		value: number;
-		displayValue: string;
-		barClass?: string;
-		textClass?: string;
-	};
-	let bars = $state<Bar[]>([]);
+	let bars = $state<TopBar[]>([]);
 	let isLoaded = $state(false);
 
 	function barClass(level: ThresholdLevel): string {

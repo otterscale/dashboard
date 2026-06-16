@@ -13,18 +13,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import { cn } from '$lib/utils';
 
-	type Bar = {
-		label: string;
-		value: number;
-		displayValue: string;
-		barClass?: string;
-		textClass?: string;
-		// Click payload / list key; defaults to `label` when omitted. Lets a bar display a
-		// human-friendly name while clicking through a distinct identity token.
-		id?: string;
-		// Optional short tag shown next to the label (e.g. to mark a standalone model).
-		badge?: string;
-	};
+	import type { TopBar } from './types';
 
 	let {
 		title,
@@ -38,7 +27,7 @@
 		title: string;
 		description: string;
 		tooltip: string;
-		bars: Bar[];
+		bars: TopBar[];
 		isLoaded: boolean;
 		onBarClick?: (label: string) => void;
 		// When true, the list lives in a fixed-height scroll area with a maximize button — so
@@ -50,7 +39,7 @@
 	const maxValue = $derived(bars.reduce((m, b) => Math.max(m, b.value), 0));
 </script>
 
-{#snippet barContent(bar: Bar)}
+{#snippet barContent(bar: TopBar)}
 	{@const pct = maxValue > 0 ? Math.max(2, (bar.value / maxValue) * 100) : 0}
 	<span class="flex flex-col gap-1 overflow-hidden">
 		<span class="flex items-center gap-1.5 overflow-hidden">

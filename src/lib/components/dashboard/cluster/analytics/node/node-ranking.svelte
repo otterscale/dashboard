@@ -3,7 +3,7 @@
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import { TopBarList } from '$lib/components/custom/top-bar-list';
+	import { type TopBar, TopBarList } from '$lib/components/custom/top-bar-list';
 	import { classifyThreshold, type ThresholdLevel } from '$lib/prometheus';
 
 	// Single-value node rankings complementing the CPU/Memory pressure cards. `pods` and
@@ -41,14 +41,7 @@
 	});
 	const labelKey = $derived(kind === 'gpu' ? 'Hostname' : 'node');
 
-	type Bar = {
-		label: string;
-		value: number;
-		displayValue: string;
-		barClass?: string;
-		textClass?: string;
-	};
-	let bars = $state<Bar[]>([]);
+	let bars = $state<TopBar[]>([]);
 	let isLoaded = $state(false);
 
 	function displayValue(value: number): string {
@@ -87,7 +80,7 @@
 						? { label: node, value, displayValue: displayValue(value), ...classes(value) }
 						: null;
 				})
-				.filter((b): b is Bar => b !== null)
+				.filter((b): b is TopBar => b !== null)
 				.sort((a, b) => b.value - a.value);
 		} catch (error) {
 			console.error('Failed to fetch node ranking:', error);
