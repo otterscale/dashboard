@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { PrometheusDriver } from 'prometheus-query';
 
+	import CacheTiers from './cache-tiers.svelte';
 	import E2ELatency from './e2e-latency.svelte';
 	import FinishReason from './finish-reason.svelte';
 	import KvCache from './kv-cache.svelte';
@@ -10,7 +11,6 @@
 	import Throughput from './throughput.svelte';
 	import TimePerOutputToken from './time-per-output-token.svelte';
 	import TimeToFirstToken from './time-to-first-token.svelte';
-	import VGPU from './vgpu.svelte';
 
 	let {
 		prometheusDriver,
@@ -112,7 +112,7 @@
 			/>
 		</div>
 
-		<!-- Row 3: Finish Reason (6) + vGPU (6) -->
+		<!-- Row 3: Finish Reason (6) + Cache Hit by Tier (6) -->
 		<div class="md:col-span-6">
 			<FinishReason
 				{prometheusDriver}
@@ -125,7 +125,15 @@
 			/>
 		</div>
 		<div class="md:col-span-6">
-			<VGPU {prometheusDriver} bind:isReloading />
+			<CacheTiers
+				{prometheusDriver}
+				{namespace}
+				{cluster}
+				{start}
+				{end}
+				{endIsNow}
+				bind:isReloading
+			/>
 		</div>
 	</div>
 {/key}

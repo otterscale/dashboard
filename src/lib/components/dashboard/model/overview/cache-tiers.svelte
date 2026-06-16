@@ -1,7 +1,7 @@
 <script lang="ts">
-	import ChartLine from '@lucide/svelte/icons/chart-line';
+	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
 	import InfoIcon from '@lucide/svelte/icons/info';
-	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
@@ -9,8 +9,8 @@
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Statistics from '$lib/components/custom/statistics/index';
 	import { buttonVariants } from '$lib/components/ui/button';
+	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
@@ -22,16 +22,16 @@
 
 	let {
 		prometheusDriver,
+		cluster,
 		namespace,
-		selectedModel,
 		start,
 		end,
 		endIsNow,
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
-		namespace: string | undefined;
-		selectedModel: string;
+		cluster: string;
+		namespace: string;
 		start: Date;
 		end: Date;
 		endIsNow: boolean;
@@ -42,41 +42,11 @@
 
 	let data = $state<Row[]>([]);
 	// L2 LMCache / L3 Mooncake tiers only exist when KV Cache Offload is enabled (AI100).
-	// Render each series only when its metric actually returns data, so models without
+	// Render each series only when its metric actually returns data, so clusters without
 	// an offload tier show just the L1 line instead of misleading flat-0% L2/L3 lines.
 	let hasL2 = $state(false);
 	let hasL3 = $state(false);
 	let isLoaded = $state(false);
-
-	function queries(): Record<string, string> {
-		const l1Hits = vllmMetricWithSelector('vllm:prefix_cache_hits_total', namespace, selectedModel);
-		const l1Queries = vllmMetricWithSelector(
-			'vllm:prefix_cache_queries_total',
-			namespace,
-			selectedModel
-		);
-		const l2Hits = vllmMetricWithSelector('lmcache:num_hit_tokens_total', namespace, selectedModel);
-		const l2Requested = vllmMetricWithSelector(
-			'lmcache:num_requested_tokens_total',
-			namespace,
-			selectedModel
-		);
-		const l3Hits = vllmMetricWithSelector(
-			'vllm:external_prefix_cache_hits_total',
-			namespace,
-			selectedModel
-		);
-		const l3Queries = vllmMetricWithSelector(
-			'vllm:external_prefix_cache_queries_total',
-			namespace,
-			selectedModel
-		);
-		return {
-			l1: `sum(rate(${l1Hits}[5m])) / sum(rate(${l1Queries}[5m])) * 100`,
-			l2: `sum(rate(${l2Hits}[5m])) / sum(rate(${l2Requested}[5m])) * 100`,
-			l3: `sum(rate(${l3Hits}[5m])) / sum(rate(${l3Queries}[5m])) * 100`
-		};
-	}
 
 	const configuration = {
 		l1: { label: m.cache_l1_vllm(), color: 'var(--chart-2)' },
@@ -90,6 +60,37 @@
 		line: { class: 'stroke-1' },
 		motion: 'tween'
 	} as const;
+
+	function queries(): Record<string, string> {
+		// Namespace-scoped (overview has no single model selected).
+		const l1Hits = vllmMetricWithSelector('vllm:prefix_cache_hits_total', namespace, undefined);
+		const l1Queries = vllmMetricWithSelector(
+			'vllm:prefix_cache_queries_total',
+			namespace,
+			undefined
+		);
+		const l2Hits = vllmMetricWithSelector('lmcache:num_hit_tokens_total', namespace, undefined);
+		const l2Requested = vllmMetricWithSelector(
+			'lmcache:num_requested_tokens_total',
+			namespace,
+			undefined
+		);
+		const l3Hits = vllmMetricWithSelector(
+			'vllm:external_prefix_cache_hits_total',
+			namespace,
+			undefined
+		);
+		const l3Queries = vllmMetricWithSelector(
+			'vllm:external_prefix_cache_queries_total',
+			namespace,
+			undefined
+		);
+		return {
+			l1: `sum(rate(${l1Hits}[5m])) / sum(rate(${l1Queries}[5m])) * 100`,
+			l2: `sum(rate(${l2Hits}[5m])) / sum(rate(${l2Requested}[5m])) * 100`,
+			l3: `sum(rate(${l3Hits}[5m])) / sum(rate(${l3Queries}[5m])) * 100`
+		};
+	}
 
 	async function fetch() {
 		try {
@@ -110,17 +111,19 @@
 				...(hasL2 ? { l2: Number.isFinite(Number(p.l2)) ? Number(p.l2) : 0 } : {}),
 				...(hasL3 ? { l3: Number.isFinite(Number(p.l3)) ? Number(p.l3) : 0 } : {})
 			}));
-		} catch {
+		} catch (error) {
 			data = [];
 			hasL2 = false;
 			hasL3 = false;
+			console.error(`Fail to fetch cache tiers in cluster ${cluster}:`, error);
 		}
 	}
 
 	const reloadManager = new ReloadManager(fetch);
 
-	onMount(() => {
-		fetch().then(() => (isLoaded = true));
+	onMount(async () => {
+		await fetch();
+		isLoaded = true;
 	});
 	onDestroy(() => reloadManager.stop());
 
@@ -142,15 +145,11 @@
 	);
 </script>
 
-<Statistics.Root type="count" class="overflow-visible">
-	<Statistics.Header class="flex flex-row items-center gap-2 space-y-0">
+<Card.Root class="h-full">
+	<Card.Header class="flex flex-row items-center gap-2 space-y-0">
 		<div class="grid flex-1 gap-1">
-			<Statistics.Title class="text-base leading-normal text-foreground">
-				{m.cache_hit_by_tier()}
-			</Statistics.Title>
-			<p class="text-sm text-muted-foreground">
-				{m.llm_dashboard_cache_tiers_description()}
-			</p>
+			<Card.Title>{m.cache_hit_by_tier()}</Card.Title>
+			<Card.Description>{m.llm_dashboard_cache_tiers_description()}</Card.Description>
 		</div>
 		<Tooltip.Root>
 			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
@@ -160,19 +159,23 @@
 				<p>{m.llm_dashboard_cache_tiers_tooltip()}</p>
 			</Tooltip.Content>
 		</Tooltip.Root>
-	</Statistics.Header>
-	<Statistics.Content class="min-h-16">
-		{#if !isLoaded}
-			<div class="flex h-[200px] w-full items-center justify-center">
-				<LoaderCircle class="size-12 animate-spin" />
+	</Card.Header>
+	{#if !isLoaded}
+		<Card.Content>
+			<div class="flex h-45 w-full items-center justify-center">
+				<Loader2Icon class="size-12 animate-spin" />
 			</div>
-		{:else if data.length === 0}
-			<div class="flex h-[200px] w-full flex-col items-center justify-center">
-				<ChartLine class="size-12 animate-pulse text-muted-foreground" />
-				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
+		</Card.Content>
+	{:else if data.length === 0}
+		<Card.Content>
+			<div class="flex h-45 w-full flex-col items-center justify-center gap-2">
+				<ChartLineIcon class="size-12 animate-pulse text-muted-foreground" />
+				<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
 			</div>
-		{:else}
-			<Chart.Container config={configuration} class="h-[200px] w-full">
+		</Card.Content>
+	{:else}
+		<Card.Content>
+			<Chart.Container config={configuration} class="h-45 w-full">
 				<AreaChart
 					{data}
 					x="date"
@@ -206,9 +209,7 @@
 									class="size-2.5 shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)"
 								></div>
 								<div class="flex flex-1 shrink-0 items-center justify-between leading-none">
-									<div class="grid gap-1.5">
-										<span class="text-muted-foreground">{name}</span>
-									</div>
+									<span class="text-muted-foreground">{name}</span>
 									<span class="font-mono font-medium text-foreground tabular-nums">
 										{Number(value).toFixed(1)}%
 									</span>
@@ -230,6 +231,6 @@
 					{/snippet}
 				</AreaChart>
 			</Chart.Container>
-		{/if}
-	</Statistics.Content>
-</Statistics.Root>
+		</Card.Content>
+	{/if}
+</Card.Root>
