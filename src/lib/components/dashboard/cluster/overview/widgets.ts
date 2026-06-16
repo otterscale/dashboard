@@ -4,7 +4,6 @@ import Consumption from './consumption.svelte';
 import CpuUsage from './cpu.svelte';
 import Deployments from './deployments.svelte';
 import GPUMemoryUsage from './gpu-memory.svelte';
-import GPUUtilization from './gpu-utilization.svelte';
 import Health from './health.svelte';
 import Information from './information.svelte';
 import MemoryUsage from './memory.svelte';
@@ -12,6 +11,7 @@ import Nodes from './nodes.svelte';
 import Pods from './pods.svelte';
 import Uptime from './uptime.svelte';
 import VGPU from './vgpu.svelte';
+// import GPUUtilization from './gpu-utilization.svelte';
 
 export const widgets = [
 	{ key: 'health', class: 'col-span-1 row-span-1', component: Health },

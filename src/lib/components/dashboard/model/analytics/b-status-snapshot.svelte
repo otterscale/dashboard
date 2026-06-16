@@ -202,8 +202,10 @@
 	/** Extract the tag from an image ref, dropping any `@sha256:…` digest. */
 	function imageTag(image: string): string {
 		const noDigest = image.includes('@') ? image.slice(0, image.indexOf('@')) : image;
-		const colon = noDigest.lastIndexOf(':');
-		return colon >= 0 ? noDigest.slice(colon + 1) : noDigest;
+		const lastSlash = noDigest.lastIndexOf('/');
+		const lastPart = lastSlash >= 0 ? noDigest.slice(lastSlash + 1) : noDigest;
+		const colon = lastPart.lastIndexOf(':');
+		return colon >= 0 ? lastPart.slice(colon + 1) : 'latest';
 	}
 
 	function kvOffloadText(): string {
