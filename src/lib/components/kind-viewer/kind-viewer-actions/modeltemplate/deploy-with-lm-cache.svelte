@@ -1,14 +1,17 @@
 <script lang="ts">
+	import type { ServingKserveIoV1Alpha2LLMInferenceServiceConfig } from '@otterscale/types';
+	import type { Schema } from '@sjsf/form';
+
 	let {
 		cluster,
 		schema,
 		object,
 		onOpenChangeComplete
 	}: {
-		cluster: unknown;
-		schema: unknown;
-		object: unknown;
-		onOpenChangeComplete: unknown;
+		cluster: string;
+		schema: Schema;
+		object: ServingKserveIoV1Alpha2LLMInferenceServiceConfig;
+		onOpenChangeComplete: () => void;
 	} = $props();
 
 	// svelte-ignore state_referenced_locally
