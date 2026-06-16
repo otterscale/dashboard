@@ -5,6 +5,7 @@
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import { TopBarList } from '$lib/components/custom/top-bar-list';
 	import { formatCapacity } from '$lib/formatter';
+	import { m } from '$lib/paraglide/messages';
 	import { classifyThreshold, type ThresholdLevel } from '$lib/prometheus';
 
 	// Reusable "top namespaces" ranking. `kind="cpu"` ranks by live CPU cores;
@@ -18,6 +19,7 @@
 		description,
 		tooltip,
 		onNamespaceClick,
+		namespaceToWorkspace = {},
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
@@ -26,6 +28,8 @@
 		description: string;
 		tooltip: string;
 		onNamespaceClick?: (namespace: string) => void;
+		// namespace → workspace name; bars display the workspace, falling back to the namespace.
+		namespaceToWorkspace?: Record<string, string>;
 		isReloading?: boolean;
 	} = $props();
 
@@ -63,15 +67,34 @@
 		};
 	}
 
-	type Bar = {
-		label: string;
+	// Raw rows keep the namespace; the displayed label is resolved at render so bars relabel
+	// reactively if the workspace map arrives after the first fetch.
+	type RawBar = {
+		namespace: string;
 		value: number;
 		displayValue: string;
 		barClass?: string;
 		textClass?: string;
 	};
-	let bars = $state<Bar[]>([]);
+	let rawBars = $state<RawBar[]>([]);
 	let isLoaded = $state(false);
+
+	// label = workspace name (fallback: namespace); id = namespace (click payload for drill-in).
+	// Bars resolved to a workspace get a "Workspace" badge, like the standalone-model tag.
+	const bars = $derived(
+		rawBars.map((b) => {
+			const workspace = namespaceToWorkspace[b.namespace];
+			return {
+				label: workspace || b.namespace,
+				id: b.namespace,
+				badge: workspace ? m.workspace() : undefined,
+				value: b.value,
+				displayValue: b.displayValue,
+				barClass: b.barClass,
+				textClass: b.textClass
+			};
+		})
+	);
 
 	async function fetch() {
 		try {
@@ -80,15 +103,15 @@
 				metric: { labels: Record<string, string> };
 				value?: { value: unknown };
 			}[];
-			bars = series
+			rawBars = series
 				.map((s) => {
 					const namespace = s.metric?.labels?.namespace ?? '';
 					const value = Number(s.value?.value);
 					return namespace && Number.isFinite(value)
-						? { label: namespace, value, displayValue: displayValue(value), ...classes(value) }
+						? { namespace, value, displayValue: displayValue(value), ...classes(value) }
 						: null;
 				})
-				.filter((b): b is Bar => b !== null)
+				.filter((b): b is RawBar => b !== null)
 				.sort((a, b) => b.value - a.value);
 		} catch (error) {
 			console.error('Failed to fetch namespace ranking:', error);
