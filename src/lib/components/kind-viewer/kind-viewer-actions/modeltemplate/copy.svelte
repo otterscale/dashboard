@@ -139,7 +139,9 @@
 						}
 					} as UiSchemaRoot}
 					initialValue={{
-						namespace: page.data.namespace
+						namespace: page.data.namespace,
+						labels: lodash.get(object, ['metadata', 'labels'], {}),
+						annotations: lodash.get(object, ['metadata', 'annotations'], {})
 					} as FormValue}
 					handleSubmit={{
 						posthook: () => {
