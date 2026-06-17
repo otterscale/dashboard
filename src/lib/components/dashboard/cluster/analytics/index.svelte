@@ -1,7 +1,10 @@
 <script lang="ts">
+	import { createClient, type Transport } from '@connectrpc/connect';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { PrometheusDriver } from 'prometheus-query';
-	import { onMount } from 'svelte';
+	import { getContext, onMount } from 'svelte';
 
+	import { page } from '$app/state';
 	import { m } from '$lib/paraglide/messages';
 
 	import NamespaceCommitment from './namespace/namespace-commitment.svelte';
@@ -36,7 +39,39 @@
 		isReloading?: boolean;
 	} = $props();
 
+	const transport = getContext<Transport>('transport');
+	const resourceClient = createClient(ResourceService, transport);
+
 	const reloading = $derived(isReloading ?? false);
+
+	// namespace → workspace name (Workspace CRD owns one namespace via `spec.namespace`); lets the
+	// Section-A ranking bars show the owning workspace instead of the raw namespace.
+	let namespaceToWorkspace = $state<Record<string, string>>({});
+	async function fetchWorkspaceMap() {
+		try {
+			const response = await resourceClient.list({
+				cluster: page.params.cluster ?? '',
+				group: 'tenant.otterscale.io',
+				version: 'v1alpha1',
+				resource: 'workspaces',
+				namespace: ''
+			});
+			const map: Record<string, string> = {};
+			for (const item of response.items) {
+				const obj = item.object as Record<string, unknown> | undefined;
+				const meta = obj?.metadata as Record<string, unknown> | undefined;
+				const spec = obj?.spec as Record<string, unknown> | undefined;
+				const name = meta?.name;
+				const ns = spec?.namespace;
+				if (typeof name === 'string' && typeof ns === 'string' && name && ns) {
+					map[ns] = name;
+				}
+			}
+			namespaceToWorkspace = map;
+		} catch (error) {
+			console.error('Failed to list workspaces:', error);
+		}
+	}
 	// `.*` is the "all" sentinel selected by default in the pickers; treat it as "nothing
 	// drilled in" so Section B shows its placeholder until a concrete node / namespace is picked.
 	const hasNodeSelected = $derived(!!selectedNode && selectedNode !== '.*');
@@ -51,6 +86,7 @@
 	// commitment + pods cards resolve the selected instance back to its node name.
 	let instanceToNode = $state<Record<string, string>>({});
 	onMount(async () => {
+		fetchWorkspaceMap();
 		try {
 			const response = await client.instantQuery('node_uname_info');
 			const series = (response.result ?? []) as { metric: { labels: Record<string, string> } }[];
@@ -162,6 +198,7 @@
 					description={m.namespace_cpu_usage_description()}
 					tooltip={m.namespace_cpu_usage_tooltip()}
 					onNamespaceClick={handleNamespaceClick}
+					{namespaceToWorkspace}
 					isReloading={reloading}
 				/>
 				<NamespaceRanking
@@ -171,6 +208,7 @@
 					description={m.namespace_memory_usage_description()}
 					tooltip={m.namespace_memory_usage_tooltip()}
 					onNamespaceClick={handleNamespaceClick}
+					{namespaceToWorkspace}
 					isReloading={reloading}
 				/>
 				<NamespaceRanking
@@ -180,6 +218,7 @@
 					description={m.namespace_pod_count_description()}
 					tooltip={m.namespace_pod_count_tooltip()}
 					onNamespaceClick={handleNamespaceClick}
+					{namespaceToWorkspace}
 					isReloading={reloading}
 				/>
 				<NamespaceRanking
@@ -189,6 +228,7 @@
 					description={m.namespace_restart_count_description()}
 					tooltip={m.namespace_restart_count_tooltip()}
 					onNamespaceClick={handleNamespaceClick}
+					{namespaceToWorkspace}
 					isReloading={reloading}
 				/>
 			</div>
