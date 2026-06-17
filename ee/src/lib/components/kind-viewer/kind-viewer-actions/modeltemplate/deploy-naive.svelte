@@ -163,7 +163,6 @@
 				</Item.Content>
 			</Item.Root>
 			<Tabs.Root value={currentStep}>
-				<!-- Step 1 — Metadata -->
 				<Tabs.Content value={steps[0]}>
 					<Form
 						schema={{
@@ -219,7 +218,6 @@
 					</Form>
 				</Tabs.Content>
 
-				<!-- Step 2 — Model Source -->
 				<Tabs.Content value={steps[1]}>
 					<Form
 						schema={{
@@ -275,7 +273,6 @@
 					</Form>
 				</Tabs.Content>
 
-				<!-- Step 3 — GPU Selector -->
 				<Tabs.Content value={steps[2]}>
 					{#await fetchAllGpuNodes(resourceClient, cluster)}
 						<Empty.Root>
@@ -474,7 +471,6 @@
 					{/await}
 				</Tabs.Content>
 
-				<!-- Step 5 — YAML preview -->
 				<Tabs.Content value={steps[3]} class="min-h-[77vh]">
 					<div class="flex h-full flex-col gap-3">
 						<Monaco
@@ -517,6 +513,22 @@
 												version: targetVersion,
 												resource: configResource,
 												name
+											})
+											.then((response) => {
+												return resourceClient.update({
+													cluster,
+													namespace,
+													group: targetGroup,
+													version: targetVersion,
+													resource: configResource,
+													name,
+													manifest: new TextEncoder().encode(
+														stringify({
+															...lodash.omit(response.object, ['spec']),
+															spec: lodash.get(object, 'spec')
+														})
+													)
+												});
 											})
 											.catch((error) => {
 												if (error instanceof ConnectError && error.code === Code.NotFound) {
