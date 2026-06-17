@@ -11,7 +11,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
 	import Copy from './copy.svelte';
-	import DeployNaive from './deploy.svelte';
+	import Deploy from './deploy.svelte';
 
 	let {
 		cluster,
@@ -64,7 +64,7 @@
 					e.preventDefault();
 				}}
 			>
-				<DeployNaive
+				<Deploy
 					{cluster}
 					{namespace}
 					{schema}

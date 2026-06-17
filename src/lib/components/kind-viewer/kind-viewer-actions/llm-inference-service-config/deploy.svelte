@@ -218,7 +218,7 @@
 									name: lodash.get(formValue, ['name'], ''),
 									namespace,
 									labels: lodash.get(object, ['metadata', 'labels'], {}),
-									annotation: lodash.get(object, ['metadata', 'annotation'], {})
+									annotations: lodash.get(object, ['metadata', 'annotations'], {})
 								});
 
 								lodash.update(values, ['spec', 'baseRefs'], (references = []) => [
