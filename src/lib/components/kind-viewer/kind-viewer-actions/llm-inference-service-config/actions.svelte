@@ -5,15 +5,13 @@
 	import type { ValidateFunction } from 'ajv';
 
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
-	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import Edit from '$lib/components/kind-viewer/kind-viewer-actions/default/edit.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
 	import Copy from './copy.svelte';
-	import DeployNaive from './deploy-naive.svelte';
-	import DeployWithLmCache from './deploy-with-lm-cache.svelte';
+	import Deploy from './deploy.svelte';
 
 	let {
 		cluster,
@@ -59,15 +57,23 @@
 			>
 				<View {schema} {object} />
 			</DropdownMenu.Item>
+			<DropdownMenu.Separator />
+			<DropdownMenu.Label>Manage</DropdownMenu.Label>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
 			>
-				<Describe {cluster} {namespace} {group} {version} {resource} {object} />
+				<Deploy
+					{cluster}
+					{namespace}
+					{schema}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
 			</DropdownMenu.Item>
-			<DropdownMenu.Separator />
-			<DropdownMenu.Label>Manage</DropdownMenu.Label>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
@@ -120,39 +126,6 @@
 					{version}
 					{kind}
 					{resource}
-					{schema}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
-			</DropdownMenu.Item>
-			<DropdownMenu.Separator />
-			<DropdownMenu.Label>Deploy</DropdownMenu.Label>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<DeployNaive
-					{cluster}
-					{namespace}
-					{schema}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
-			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				class="empty:hidden"
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<DeployWithLmCache
-					{cluster}
-					{namespace}
 					{schema}
 					{object}
 					onOpenChangeComplete={() => {
