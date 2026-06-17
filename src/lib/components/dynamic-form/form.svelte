@@ -49,7 +49,8 @@
 		actions,
 		values = $bindable(),
 		onFormChange,
-		class: className
+		class: className,
+		disabled
 	}: {
 		reference?: FormState<FormValue> | null;
 		schema: Schema;
@@ -64,6 +65,7 @@
 		values?: FormValue;
 		onFormChange?: (snapshot: FormState<FormValue>) => void;
 		class?: string;
+		disabled?: boolean;
 	} = $props();
 
 	// Clean schema from unnecessary keywords to JSON Schema Draft-07.
@@ -163,7 +165,8 @@
 		initialValue,
 		validator,
 		onSubmit,
-		onSubmitError
+		onSubmitError,
+		disabled
 	});
 	reference = form;
 	// YAML
