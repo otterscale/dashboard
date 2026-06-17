@@ -48,8 +48,7 @@
 	let isSubmitting = $state(false);
 	async function handleInstall(
 		module: ModuleType,
-		helmRepository: SourceToolkitFluxcdIoV1HelmRepository,
-		selectedModuleNames: Set<string>
+		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
 	): Promise<string> {
 		if (!validate) {
 			throw new Error('HelmRelease schema calidator is not available.');
@@ -59,10 +58,7 @@
 			.get(module, ['annotations', 'module.otterscale.io/depends-on'], '')
 			.split(',')
 			.filter(Boolean);
-		const dependenciesOfSelectedModuleNames = dependencies.filter((name) =>
-			selectedModuleNames.has(name)
-		);
-		const dependenciesOfSelectedModules = dependenciesOfSelectedModuleNames.map((name) => ({
+		const dependenciesOfSelectedModules = dependencies.map((name) => ({
 			name,
 			namespace
 		}));
@@ -129,15 +125,11 @@
 		if (isSubmitting) return;
 		isSubmitting = true;
 
-		const selectedModuleNames = new Set(
-			installableRows.map((row) => (row.original.chart as unknown as ModuleType).name)
-		);
-
 		const results = await Promise.allSettled(
 			installableRows.map((row) => {
 				const module = row.original.chart as unknown as ModuleType;
 				const helmRepository = row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository;
-				return handleInstall(module, helmRepository, selectedModuleNames);
+				return handleInstall(module, helmRepository);
 			})
 		);
 
