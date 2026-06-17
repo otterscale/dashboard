@@ -515,6 +515,9 @@
 												name
 											})
 											.then((response) => {
+												if (!response.object) {
+													throw new Error('Resource object is missing in the response');
+												}
 												return resourceClient.update({
 													cluster,
 													namespace,
