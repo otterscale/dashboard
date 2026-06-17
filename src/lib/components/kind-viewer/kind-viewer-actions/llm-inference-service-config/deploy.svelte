@@ -82,14 +82,6 @@
 
 	function getWorkloadPlacementSchema(resourceTopology: Record<string, string[]>): Schema {
 		const types = Object.keys(resourceTopology);
-		if (types.length === 0) {
-			return {
-				type: 'object',
-				properties: {
-					type: { type: 'string', title: 'Type' }
-				}
-			};
-		}
 		return {
 			type: 'object',
 			properties: {
@@ -229,10 +221,14 @@
 									annotations: lodash.get(object, ['metadata', 'annotations'], {})
 								});
 
-								lodash.update(values, ['spec', 'baseRefs'], (references = []) => [
-									...references,
-									{ name: lodash.get(object, ['metadata', 'name'], '') }
-								]);
+								lodash.set(
+									values,
+									['spec', 'baseRefs'],
+									[
+										...lodash.get(object, ['spec', 'baseRefs'], []),
+										{ name: lodash.get(object, ['metadata', 'name'], '') }
+									]
+								);
 
 								handleNext();
 							}
