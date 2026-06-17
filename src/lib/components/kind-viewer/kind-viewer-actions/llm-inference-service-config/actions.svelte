@@ -51,7 +51,6 @@
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content align="end" class="w-full">
 		<DropdownMenu.Group>
-			<DropdownMenu.Separator />
 			<DropdownMenu.Label>Inspect</DropdownMenu.Label>
 			<DropdownMenu.Item
 				onSelect={(e) => {
