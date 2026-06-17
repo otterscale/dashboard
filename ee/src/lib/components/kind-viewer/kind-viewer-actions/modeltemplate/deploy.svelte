@@ -3,8 +3,11 @@
 	import { BanIcon } from '@lucide/svelte';
 	import Rocket from '@lucide/svelte/icons/rocket';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type { ServingKserveIoV1Alpha2LLMInferenceServiceConfig } from '@otterscale/types';
-	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
+	import type {
+		ServingKserveIoV1Alpha2LLMInferenceService,
+		ServingKserveIoV1Alpha2LLMInferenceServiceConfig
+	} from '@otterscale/types';
+	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import { load } from 'js-yaml';
 	import lodash from 'lodash';
@@ -16,7 +19,12 @@
 
 	import { page } from '$app/state';
 	import Form from '$lib/components/dynamic-form/form.svelte';
-	import { fetchAllGpuNodes, type NodeInfo } from '$lib/components/gpu-allocation';
+	import {
+		fetchAllGpuNodes as fetchComputeResourceNodes,
+		type NodeInfo
+	} from '$lib/components/gpu-allocation';
+	import { getFamilyEndpointPickerConfiguration } from '$lib/components/kind-viewer/kind-viewer-actions/llm-inference-service-config/templates/endpoint-picker.ts';
+	import { getWorkloadConfiguration } from '$lib/components/kind-viewer/kind-viewer-actions/llm-inference-service-config/templates/workload';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Empty from '$lib/components/ui/empty/index.js';
@@ -27,11 +35,13 @@
 
 	let {
 		cluster,
+		namespace,
 		schema: jsonSchema,
 		object,
 		onOpenChangeComplete
 	}: {
 		cluster: string;
+		namespace: string;
 		schema: Schema;
 		object: ServingKserveIoV1Alpha2LLMInferenceServiceConfig;
 		onOpenChangeComplete: () => void;
@@ -40,19 +50,19 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	const targetGroup = 'serving.kserve.io';
-	const targetVersion = 'v1alpha2';
-	const targetKind = 'LLMInferenceService';
-	const targetResource = 'llminferenceservices';
-	const configKind = 'LLMInferenceServiceConfig';
-	const configResource = 'llminferenceserviceconfigs';
+	const kserveGroup = 'serving.kserve.io';
+	const kserveVersion = 'v1alpha2';
+	const serviceKind = 'LLMInferenceService';
+	const serviceResource = 'llminferenceservices';
+	const configurationKind = 'LLMInferenceServiceConfig';
+	const configurationResource = 'llminferenceserviceconfigs';
 
-	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 
 	type GPUDevice = { type: string; node: string };
 
-	function getAllGPUDevices(nodes: NodeInfo[]): GPUDevice[] {
+	function getComputeResources(nodes: NodeInfo[]): GPUDevice[] {
 		return nodes.flatMap((node) =>
 			node.devices.map((device) => ({
 				type: device.type,
@@ -79,6 +89,14 @@
 
 	function getWorkloadPlacementSchema(resourceTopology: Record<string, string[]>): Schema {
 		const types = Object.keys(resourceTopology);
+		if (types.length === 0) {
+			return {
+				type: 'object',
+				properties: {
+					type: { type: 'string', title: 'Type' }
+				}
+			};
+		}
 		return {
 			type: 'object',
 			properties: {
@@ -97,9 +115,29 @@
 		};
 	}
 
+	function getWorkloadPlacementUISchema() {
+		return {
+			type: {
+				'ui:components': {
+					stringField: 'enumField',
+					selectWidget: 'comboboxWidget'
+				}
+			},
+			node: {
+				'ui:components': {
+					stringField: 'enumField',
+					selectWidget: 'comboboxWidget'
+				}
+			}
+		};
+	}
+
 	let values = $state(getInitialValues());
 	let currentStep = $state(firstStep);
 	let isSubmitting = $state(false);
+	let metadataFormReference: FormState<FormValue> | null = $state(null);
+	let modelFormReference: FormState<FormValue> | null = $state(null);
+	let keyValueCacheFormReference: FormState<FormValue> | null = $state(null);
 	let open = $state(false);
 
 	let value = $derived(stringify(values));
@@ -107,19 +145,19 @@
 
 	function getInitialValues() {
 		return {
-			apiVersion: `${targetGroup}/${targetVersion}`,
-			kind: targetKind,
-			metadata: { namespace: page.data.namespace } as FormValue,
-			spec: {
-				baseRefs: [{ name: '' }],
-				model: lodash.get(object, 'spec.model')
-			}
+			apiVersion: `${kserveGroup}/${kserveVersion}`,
+			kind: serviceKind,
+			metadata: {},
+			spec: {}
 		};
 	}
 	function initiate() {
 		values = getInitialValues();
 		currentStep = firstStep;
 		isSubmitting = false;
+		metadataFormReference = null;
+		modelFormReference = null;
+		keyValueCacheFormReference = null;
 	}
 	function handleNext() {
 		currentStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
@@ -159,12 +197,13 @@
 			<Item.Root class="p-0">
 				<Progress value={currentIndex + 1} max={steps.length} class="mt-1 mr-6" />
 				<Item.Content class="text-left">
-					<Item.Title class="text-xl font-bold">{targetKind}</Item.Title>
+					<Item.Title class="text-xl font-bold">{serviceKind}</Item.Title>
 				</Item.Content>
 			</Item.Root>
 			<Tabs.Root value={currentStep}>
 				<Tabs.Content value={steps[0]}>
 					<Form
+						bind:reference={metadataFormReference}
 						schema={{
 							...lodash.omit(lodash.get(jsonSchema, 'properties.metadata') as Schema, [
 								'properties',
@@ -189,18 +228,26 @@
 								}
 							}
 						} as UiSchemaRoot}
-						initialValue={{ namespace: page.data.namespace } as FormValue}
+						initialValue={{}}
 						handleSubmit={{
-							posthook: () => {
-								lodash.set(
-									values,
-									['spec', 'baseRefs', 0, 'name'],
-									lodash.get(values, ['metadata', 'name'], '')
-								);
+							posthook: (form: FormState<FormValue>) => {
+								const formValue = getValueSnapshot(form);
+
+								lodash.set(values, 'metadata', {
+									name: lodash.get(formValue, ['name'], ''),
+									namespace,
+									labels: lodash.get(object, ['metadata', 'labels'], {}),
+									annotations: lodash.get(object, ['metadata', 'annotations'], {})
+								});
+
+								lodash.update(values, ['spec', 'baseRefs'], (references = []) => [
+									...references,
+									{ name: lodash.get(formValue, ['name'], '') }
+								]);
+
 								handleNext();
 							}
 						}}
-						bind:values={values['metadata']}
 					>
 						{#snippet actions()}
 							<div class="flex w-full items-center justify-between gap-3">
@@ -220,6 +267,7 @@
 
 				<Tabs.Content value={steps[1]}>
 					<Form
+						bind:reference={modelFormReference}
 						schema={{
 							title: 'Model',
 							...(lodash.omit(
@@ -251,9 +299,13 @@
 						initialValue={{ uri: lodash.get(object, 'spec.model.uri', '') } as FormValue}
 						handleSubmit={{
 							posthook: (form) => {
-								const value = getValueSnapshot(form);
-								const uri = lodash.get(value, 'uri') as string | undefined;
-								lodash.set(values, ['spec', 'model', 'uri'], uri);
+								const formValue = getValueSnapshot(form);
+
+								lodash.set(values, ['spec', 'model'], {
+									...lodash.omit(lodash.get(object, ['spec', 'model'], {}), ['uri']),
+									uri: lodash.get(formValue, 'uri', '')
+								});
+
 								handleNext();
 							}
 						}}
@@ -274,7 +326,7 @@
 				</Tabs.Content>
 
 				<Tabs.Content value={steps[2]}>
-					{#await fetchAllGpuNodes(resourceClient, cluster)}
+					{#await fetchComputeResourceNodes(resourceClient, cluster)}
 						<Empty.Root>
 							<Empty.Header>
 								<Empty.Media variant="icon">
@@ -283,21 +335,23 @@
 								<Empty.Title>Loading</Empty.Title>
 							</Empty.Header>
 						</Empty.Root>
-					{:then allGPUNodes}
-						{@const allGPUDevices = getAllGPUDevices(allGPUNodes)}
-						{@const resourceTopology = getResourceTopology(allGPUDevices)}
-						{@const gpuWorkloadPlacementSchema = getWorkloadPlacementSchema(resourceTopology)}
+					{:then computeResourceNodes}
+						{@const computeResources = getComputeResources(computeResourceNodes)}
+						{@const resourceTopology = getResourceTopology(computeResources)}
+						{@const workloadPlacementSchema = getWorkloadPlacementSchema(resourceTopology)}
+						{@const workloadPlacementUISchema = getWorkloadPlacementUISchema()}
 						{@const isSingleNode =
 							lodash.has(object, 'spec.template') && !lodash.has(object, 'spec.prefill')}
 						{@const isPrefillDecode =
 							lodash.has(object, 'spec.template') && lodash.has(object, 'spec.prefill')}
+						{@const title = 'Workload Placement'}
+						{@const description = 'Workload Placement'}
 						{#if isSingleNode}
 							<Form
 								schema={{
-									title: 'Workload Placement',
-									description:
-										'Control where this workload runs by selecting target nodes and GPU types.',
-									...gpuWorkloadPlacementSchema
+									title: title,
+									description: description,
+									...workloadPlacementSchema
 								} as Schema}
 								uiSchema={{
 									'ui:options': {
@@ -305,18 +359,7 @@
 											submit: 'Next'
 										}
 									},
-									type: {
-										'ui:components': {
-											stringField: 'enumField',
-											selectWidget: 'comboboxWidget'
-										}
-									},
-									node: {
-										'ui:components': {
-											stringField: 'enumField',
-											selectWidget: 'comboboxWidget'
-										}
-									}
+									...workloadPlacementUISchema
 								} as UiSchemaRoot}
 								initialValue={{} as FormValue}
 								handleSubmit={{
@@ -357,11 +400,12 @@
 						{:else if isPrefillDecode}
 							<Form
 								schema={{
-									title: 'Workload Placement',
+									title: title,
+									description: description,
 									type: 'object',
 									properties: {
-										decode: { title: 'Decode', ...gpuWorkloadPlacementSchema },
-										prefill: { title: 'Prefill', ...gpuWorkloadPlacementSchema }
+										decode: { title: 'Decode', ...workloadPlacementSchema },
+										prefill: { title: 'Prefill', ...workloadPlacementSchema }
 									}
 								} as Schema}
 								uiSchema={{
@@ -370,33 +414,11 @@
 											submit: 'Next'
 										}
 									},
-									Decode: {
-										type: {
-											'ui:components': {
-												stringField: 'enumField',
-												selectWidget: 'comboboxWidget'
-											}
-										},
-										node: {
-											'ui:components': {
-												stringField: 'enumField',
-												selectWidget: 'comboboxWidget'
-											}
-										}
+									decode: {
+										...workloadPlacementUISchema
 									},
-									Prefill: {
-										type: {
-											'ui:components': {
-												stringField: 'enumField',
-												selectWidget: 'comboboxWidget'
-											}
-										},
-										node: {
-											'ui:components': {
-												stringField: 'enumField',
-												selectWidget: 'comboboxWidget'
-											}
-										}
+									prefill: {
+										...workloadPlacementUISchema
 									}
 								} as UiSchemaRoot}
 								initialValue={{} as FormValue}
@@ -404,7 +426,7 @@
 									posthook: (form) => {
 										const value = getValueSnapshot(form);
 
-										const decodeType = lodash.get(value, 'decode.type') as string | undefined;
+										const decodeType = lodash.get(value, ['decode', 'type']) as string | undefined;
 										if (decodeType) {
 											lodash.set(
 												values,
@@ -413,7 +435,7 @@
 											);
 										}
 
-										const decodeNode = lodash.get(value, 'decode.node') as string | undefined;
+										const decodeNode = lodash.get(value, ['decode', 'node']) as string | undefined;
 										if (decodeNode) {
 											lodash.set(
 												values,
@@ -422,7 +444,9 @@
 											);
 										}
 
-										const prefillType = lodash.get(value, 'prefill.type') as string | undefined;
+										const prefillType = lodash.get(value, ['prefill', 'type']) as
+											| string
+											| undefined;
 										if (prefillType) {
 											lodash.set(
 												values,
@@ -431,7 +455,9 @@
 											);
 										}
 
-										const prefillNode = lodash.get(value, 'prefill.node') as string | undefined;
+										const prefillNode = lodash.get(value, ['prefill', 'node']) as
+											| string
+											| undefined;
 										if (prefillNode) {
 											lodash.set(
 												values,
@@ -464,14 +490,77 @@
 								<Empty.Media variant="icon" class="bg-destructive/30">
 									<BanIcon />
 								</Empty.Media>
-								<Empty.Title>Failed to Load Resources.</Empty.Title>
+								<Empty.Title>Failed to Load Compute Resources.</Empty.Title>
 							</Empty.Header>
 							<Empty.Content>{(error as Error).message}</Empty.Content>
 						</Empty.Root>
 					{/await}
 				</Tabs.Content>
 
-				<Tabs.Content value={steps[3]} class="min-h-[77vh]">
+				<Tabs.Content value={steps[3]}>
+					{@const modelUri = lodash.get(getValueSnapshot(modelFormReference!), 'uri', '') as string}
+					{@const isMiddlewareSupported = lodash.startsWith(modelUri, 's3://')}
+					{modelUri}{isMiddlewareSupported}
+					{#key isMiddlewareSupported}
+						<Form
+							bind:reference={keyValueCacheFormReference}
+							schema={{
+								title: 'Key-Value Cache',
+								properties: {
+									offload: {
+										title: 'Offload',
+										description:
+											'Key-Value (KV) cache offloading is a technique used in large language model (LLM) serving to store and reuse the intermediate key and value tensors generated during model inference. In transformer-based models, these KV caches represent the context for each token processed, and reusing them allows the model to avoid redundant computations for repeated or similar prompts.',
+										type: 'boolean',
+										readOnly: !isMiddlewareSupported
+									}
+								}
+							} as Schema}
+							uiSchema={{
+								'ui:options': {
+									translations: {
+										submit: 'Next'
+									}
+								}
+							} as UiSchemaRoot}
+							initialValue={{ offload: false } as FormValue}
+							handleSubmit={{
+								posthook: (form: FormState<FormValue>) => {
+									const formValue = getValueSnapshot(form);
+
+									const isOffloaded = lodash.get(formValue, ['offload'], false);
+									const name = lodash.get(getValueSnapshot(metadataFormReference!), ['name'], '');
+
+									if (isOffloaded) {
+										lodash.update(values, ['spec', 'baseRefs'], (references = []) => [
+											...references,
+											{ name: `${name}-family-epp` },
+											{ name: `${name}-workload-template` }
+										]);
+									}
+
+									handleNext();
+								}
+							}}
+						>
+							{#snippet actions()}
+								<div class="flex w-full items-center justify-between gap-3">
+									<Button
+										onclick={() => {
+											handlePrevious();
+										}}
+										disabled={currentIndex === 0}
+									>
+										Previous
+									</Button>
+									<SubmitButton />
+								</div>
+							{/snippet}
+						</Form>
+					{/key}
+				</Tabs.Content>
+
+				<Tabs.Content value={steps[4]} class="min-h-[77vh]">
 					<div class="flex h-full flex-col gap-3">
 						<Monaco
 							options={{
@@ -492,16 +581,16 @@
 
 								isSubmitting = true;
 
-								let parsed;
+								let manifest;
 								try {
-									parsed = load(value);
+									manifest = load(value);
 								} catch {
 									toast.error('Invalid YAML syntax. Please check the editor.');
 									isSubmitting = false;
 									return;
 								}
-								const name = lodash.get(parsed, 'metadata.name');
-								const namespace = lodash.get(parsed, 'metadata.namespace', page.data.namespace);
+
+								const name = lodash.get(manifest, ['metadata', 'name'], '');
 
 								toast.promise(
 									async () => {
@@ -509,21 +598,21 @@
 											.get({
 												cluster,
 												namespace,
-												group: targetGroup,
-												version: targetVersion,
-												resource: configResource,
+												group: kserveGroup,
+												version: kserveVersion,
+												resource: configurationResource,
 												name
 											})
 											.then((response) => {
-												if (!response.object) {
+												if (!response.object)
 													throw new Error('Resource object is missing in the response');
-												}
+
 												return resourceClient.update({
 													cluster,
 													namespace,
-													group: targetGroup,
-													version: targetVersion,
-													resource: configResource,
+													group: kserveGroup,
+													version: kserveVersion,
+													resource: configurationResource,
 													name,
 													manifest: new TextEncoder().encode(
 														stringify({
@@ -538,41 +627,110 @@
 													return resourceClient.create({
 														cluster,
 														namespace,
-														group: targetGroup,
-														version: targetVersion,
-														resource: configResource,
+														group: kserveGroup,
+														version: kserveVersion,
+														resource: configurationResource,
 														manifest: new TextEncoder().encode(
 															stringify({
-																apiVersion: `${targetGroup}/${targetVersion}`,
-																kind: configKind,
+																apiVersion: `${kserveGroup}/${kserveVersion}`,
+																kind: configurationKind,
 																metadata: { name, namespace },
 																spec: lodash.get(object, 'spec')
 															})
 														)
 													});
 												}
+
 												throw error;
 											});
 
-										const manifest = new TextEncoder().encode(value);
+										await resourceClient
+											.create({
+												cluster,
+												namespace,
+												group: kserveGroup,
+												version: kserveVersion,
+												resource: serviceResource,
+												manifest: new TextEncoder().encode(value)
+											})
+											.then((response) => {
+												if (
+													lodash.get(
+														getValueSnapshot(keyValueCacheFormReference!),
+														['offload'],
+														false
+													)
+												) {
+													const modelService: ServingKserveIoV1Alpha2LLMInferenceService =
+														response.object ?? {};
 
-										await resourceClient.create({
-											cluster,
-											namespace,
-											group: targetGroup,
-											version: targetVersion,
-											resource: targetResource,
-											manifest
-										});
+													const ownerReference = {
+														apiVersion: `${kserveGroup}/${kserveVersion}`,
+														kind: serviceKind,
+														name: lodash.get(modelService, ['metadata', 'name'], ''),
+														uid: lodash.get(modelService, ['metadata', 'uid'], ''),
+														controller: false
+													};
+
+													const workloadConfiguration = getWorkloadConfiguration({
+														modelServiceName: lodash.get(
+															modelService,
+															['metadata', 'name'],
+															''
+														) as string,
+														namespace
+													});
+													const familyEndpointPickerConfiguration =
+														getFamilyEndpointPickerConfiguration({
+															modelServiceName: lodash.get(
+																modelService,
+																['metadata', 'name'],
+																''
+															) as string,
+															namespace,
+															modelUri: lodash.get(object, ['spec', 'model', 'uri'], '') as string
+														});
+
+													lodash.set(workloadConfiguration, 'metadata.ownerReferences', [
+														ownerReference
+													]);
+													lodash.set(
+														familyEndpointPickerConfiguration,
+														'metadata.ownerReferences',
+														[ownerReference]
+													);
+
+													return Promise.all([
+														resourceClient.create({
+															cluster,
+															namespace,
+															group: 'serving.kserve.io',
+															version: 'v1alpha2',
+															resource: 'llminferenceserviceconfigs',
+															manifest: new TextEncoder().encode(stringify(workloadConfiguration))
+														}),
+														resourceClient.create({
+															cluster,
+															namespace,
+															group: 'serving.kserve.io',
+															version: 'v1alpha2',
+															resource: 'llminferenceserviceconfigs',
+															manifest: new TextEncoder().encode(
+																stringify(familyEndpointPickerConfiguration)
+															)
+														})
+													]);
+												}
+											});
 									},
 									{
-										loading: `Deploying ${targetKind} ${name}...`,
+										loading: `Deploying ${serviceKind} ${name}...`,
 										success: () => {
-											return `Successfully deployed ${targetKind} ${name}`;
+											return `Successfully deployed ${serviceKind} ${name}`;
 										},
 										error: (error) => {
-											console.error(`Failed to deploy ${targetKind} ${name}:`, error);
-											return `Failed to deploy ${targetKind} ${name}: ${(error as ConnectError).message}`;
+											console.error(`Failed to deploy ${serviceKind} ${name}:`, error);
+											return `Failed to deploy ${serviceKind} ${name}: ${(error as ConnectError).message}`;
 										},
 										finally() {
 											isSubmitting = false;
