@@ -240,10 +240,14 @@
 									annotations: lodash.get(object, ['metadata', 'annotations'], {})
 								});
 
-								lodash.update(values, ['spec', 'baseRefs'], (references = []) => [
-									...references,
-									{ name: lodash.get(formValue, ['name'], '') }
-								]);
+								lodash.set(
+									values,
+									['spec', 'baseRefs'],
+									[
+										...lodash.get(object, ['spec', 'baseRefs'], []),
+										{ name: lodash.get(object, ['metadata', 'name'], '') }
+									]
+								);
 
 								handleNext();
 							}
@@ -499,10 +503,10 @@
 
 				<Tabs.Content value={steps[3]}>
 					{@const modelUri = lodash.get(getValueSnapshot(modelFormReference!), 'uri', '') as string}
-					{@const isMiddlewareSupported = lodash.startsWith(modelUri, 's3://')}
-					{modelUri}{isMiddlewareSupported}
-					{#key isMiddlewareSupported}
+					{@const middlewareSupported = lodash.startsWith(modelUri, 's3://')}
+					{#key modelUri}
 						<Form
+							disabled={!middlewareSupported}
 							bind:reference={keyValueCacheFormReference}
 							schema={{
 								title: 'Key-Value Cache',
@@ -511,8 +515,7 @@
 										title: 'Offload',
 										description:
 											'Key-Value (KV) cache offloading is a technique used in large language model (LLM) serving to store and reuse the intermediate key and value tensors generated during model inference. In transformer-based models, these KV caches represent the context for each token processed, and reusing them allows the model to avoid redundant computations for repeated or similar prompts.',
-										type: 'boolean',
-										readOnly: !isMiddlewareSupported
+										type: 'boolean'
 									}
 								}
 							} as Schema}
@@ -532,11 +535,25 @@
 									const name = lodash.get(getValueSnapshot(metadataFormReference!), ['name'], '');
 
 									if (isOffloaded) {
-										lodash.update(values, ['spec', 'baseRefs'], (references = []) => [
-											...references,
-											{ name: `${name}-family-epp` },
-											{ name: `${name}-workload-template` }
-										]);
+										lodash.set(
+											values,
+											['spec', 'baseRefs'],
+											[
+												...lodash.get(object, ['spec', 'baseRefs'], []),
+												{ name: lodash.get(object, ['metadata', 'name'], '') },
+												{ name: `${name}-family-epp` },
+												{ name: `${name}-workload-template` }
+											]
+										);
+									} else {
+										lodash.set(
+											values,
+											['spec', 'baseRefs'],
+											[
+												...lodash.get(object, ['spec', 'baseRefs'], []),
+												{ name: lodash.get(object, ['metadata', 'name'], '') }
+											]
+										);
 									}
 
 									handleNext();
@@ -553,7 +570,17 @@
 									>
 										Previous
 									</Button>
-									<SubmitButton />
+									{#if middlewareSupported}
+										<SubmitButton />
+									{:else}
+										<Button
+											onclick={() => {
+												handleNext();
+											}}
+										>
+											Next
+										</Button>
+									{/if}
 								</div>
 							{/snippet}
 						</Form>
