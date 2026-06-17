@@ -4,6 +4,7 @@
 	import type { Schema } from '@sjsf/form';
 	import type { ValidateFunction } from 'ajv';
 
+	import { page } from '$app/state';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
@@ -32,8 +33,12 @@
 		validate: ValidateFunction;
 		object: ServingKserveIoV1Alpha2LLMInferenceServiceConfig;
 	} = $props();
+	// svelte-ignore state_referenced_locally
+	void namespace;
 
 	let actionsOpen = $state(false);
+
+	const targetNamespace = page.data.namespace;
 </script>
 
 <DropdownMenu.Root bind:open={actionsOpen}>
@@ -66,7 +71,7 @@
 			>
 				<Deploy
 					{cluster}
-					{namespace}
+					namespace={targetNamespace}
 					{schema}
 					{object}
 					onOpenChangeComplete={() => {
@@ -81,7 +86,7 @@
 			>
 				<Copy
 					{cluster}
-					{namespace}
+					namespace={targetNamespace}
 					{group}
 					{version}
 					{kind}
