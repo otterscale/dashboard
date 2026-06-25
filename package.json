@@ -24,7 +24,7 @@
 		"@fontsource-variable/jetbrains-mono": "^5.2.8",
 		"@fontsource-variable/noto-sans-tc": "^5.2.10",
 		"@icons-pack/svelte-simple-icons": "^7.2.0",
-		"@inlang/paraglide-js": "^2.18.0",
+		"@inlang/paraglide-js": "^2.20.1",
 		"@internationalized/date": "^3.12.1",
 		"@lucide/svelte": "^1.16.0",
 		"@otterscale/api": "^1.1.2",
