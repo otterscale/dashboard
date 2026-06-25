@@ -4,7 +4,7 @@
 	import type { Schema } from '@sjsf/form';
 	import type { ValidateFunction } from 'ajv';
 
-	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
+	import { page } from '$app/state';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
@@ -33,8 +33,12 @@
 		validate: ValidateFunction;
 		object: ServingKserveIoV1Alpha2LLMInferenceServiceConfig;
 	} = $props();
+	// svelte-ignore state_referenced_locally
+	void namespace;
 
 	let actionsOpen = $state(false);
+
+	const targetNamespace = page.data.namespace;
 </script>
 
 <DropdownMenu.Root bind:open={actionsOpen}>
@@ -49,6 +53,7 @@
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content align="end" class="w-full">
 		<DropdownMenu.Group>
+			<DropdownMenu.Label>Inspect</DropdownMenu.Label>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
@@ -56,33 +61,8 @@
 			>
 				<View {schema} {object} />
 			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<Describe {cluster} {namespace} {group} {version} {resource} {object} />
-			</DropdownMenu.Item>
 			<DropdownMenu.Separator />
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<Copy
-					{cluster}
-					{group}
-					{version}
-					{kind}
-					{resource}
-					{schema}
-					{validate}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
-			</DropdownMenu.Item>
+			<DropdownMenu.Label>Manage</DropdownMenu.Label>
 			<DropdownMenu.Item
 				class="empty:hidden"
 				onSelect={(e) => {
@@ -91,7 +71,28 @@
 			>
 				<Deploy
 					{cluster}
+					namespace={targetNamespace}
 					{schema}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Copy
+					{cluster}
+					namespace={targetNamespace}
+					{group}
+					{version}
+					{kind}
+					{resource}
+					{schema}
+					{validate}
 					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;

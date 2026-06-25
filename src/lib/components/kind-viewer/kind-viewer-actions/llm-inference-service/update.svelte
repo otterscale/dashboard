@@ -17,6 +17,7 @@
 
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import { fetchAllGpuNodes, type NodeInfo } from '$lib/components/gpu-allocation';
+	import GPUResource from '$lib/components/kind-viewer/kind-viewer-actions/utils/gpu-resources.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Empty from '$lib/components/ui/empty/index.js';
@@ -118,63 +119,7 @@
 		};
 	}
 
-	function applyKVCacheEnvironments(templatePath: string[]) {
-		lodash.set(
-			values,
-			[...templatePath, 'containers'],
-			[
-				{
-					name: 'main',
-					env: [
-						{ name: 'LMCACHE_CONFIG_FILE', value: '/etc/lmcache/lmcache_config.yaml' },
-						{ name: 'LMCACHE_USE_EXPERIMENTAL', value: 'True' }
-					]
-				}
-			]
-		);
-	}
-
-	function removeKVCacheEnvironments(templatePath: string[]) {
-		const containers = lodash.get(values, [...templatePath, 'containers']) as
-			| Array<{ name?: string; env?: Array<{ name?: string; value?: string }> }>
-			| undefined;
-		if (!Array.isArray(containers)) return;
-
-		const kvCacheEnvNames = new Set(['LMCACHE_CONFIG_FILE', 'LMCACHE_USE_EXPERIMENTAL']);
-
-		const cleaned = containers.map((container) => {
-			if (!Array.isArray(container.env)) return container;
-			const env = container.env.filter((entry) => !kvCacheEnvNames.has(entry.name ?? ''));
-			if (env.length === 0) {
-				return lodash.omit(container, 'env');
-			}
-			return { ...container, env };
-		});
-
-		lodash.set(values, [...templatePath, 'containers'], cleaned);
-	}
-
-	function hasKVCacheEnvironments(templatePath: string[]): boolean {
-		const containers = lodash.get(object, [...templatePath, 'containers']) as
-			| Array<{ name?: string; env?: Array<{ name?: string }> }>
-			| undefined;
-		const main = containers?.find((container) => container.name === 'main');
-		const envNames = new Set(main?.env?.map((entry) => entry.name) ?? []);
-		return envNames.has('LMCACHE_CONFIG_FILE') && envNames.has('LMCACHE_USE_EXPERIMENTAL');
-	}
-
-	function isKVCacheEnabled(): boolean {
-		if (lodash.has(object, 'spec.prefill')) {
-			return (
-				hasKVCacheEnvironments(['spec', 'template']) &&
-				hasKVCacheEnvironments(['spec', 'prefill', 'template'])
-			);
-		}
-		return hasKVCacheEnvironments(['spec', 'template']);
-	}
-
-	// Steps Manager (3 steps: GPU selector + KV Cache + YAML review)
-	const steps = Array.from({ length: 3 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 2 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -191,6 +136,10 @@
 	let open = $state(false);
 	let isSubmitting = $state(false);
 </script>
+
+{#snippet gpuResources()}
+	<GPUResource />
+{/snippet}
 
 <Dialog.Root
 	bind:open
@@ -256,7 +205,8 @@
 								'ui:options': {
 									translations: {
 										submit: 'Next'
-									}
+									},
+									action: gpuResources
 								},
 								type: {
 									'ui:components': {
@@ -330,7 +280,8 @@
 								'ui:options': {
 									translations: {
 										submit: 'Next'
-									}
+									},
+									action: gpuResources
 								},
 								Decode: {
 									type: {
@@ -454,65 +405,8 @@
 				{/await}
 			</Tabs.Content>
 
-			<!-- Step 2: KV Cache -->
-			<Tabs.Content value={steps[1]}>
-				<Form
-					schema={{
-						title: 'KV Cache Offload',
-						type: 'object',
-						properties: {
-							enabled: {
-								title: 'Enable',
-								description:
-									'Offload KV cache from GPU memory to host or remote storage, freeing GPU capacity for longer contexts, higher concurrency, and better prefix cache hit rates across requests.',
-								type: 'boolean'
-							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{ enabled: isKVCacheEnabled() } as FormValue}
-					handleSubmit={{
-						posthook: (form) => {
-							const value = getValueSnapshot(form);
-							const enabled = lodash.get(value, 'enabled') as boolean | undefined;
-							if (enabled) {
-								applyKVCacheEnvironments(['spec', 'template']);
-								if (lodash.has(object, 'spec.prefill')) {
-									applyKVCacheEnvironments(['spec', 'prefill', 'template']);
-								}
-							} else {
-								removeKVCacheEnvironments(['spec', 'template']);
-								if (lodash.has(object, 'spec.prefill')) {
-									removeKVCacheEnvironments(['spec', 'prefill', 'template']);
-								}
-							}
-							handleNext();
-						}
-					}}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-
-			<!-- Step 3: YAML Review + Submit -->
-			<Tabs.Content value={steps[2]} class="min-h-[77vh]">
+			<!-- Step 2: YAML Review + Submit -->
+			<Tabs.Content value={steps[1]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{

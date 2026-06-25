@@ -68,8 +68,11 @@
 	// svelte-ignore non_reactive_update
 	let hoveredDateMs: number | null = null;
 
+	// Join on `container` too so the model container is picked by the vLLM metric's own
+	// `container` label (KServe names it `main`, a raw vLLM Deployment names it `vllm`, etc.).
+	// This also drops pod sidecars (istio/queue-proxy), which never emit vLLM metrics.
 	function modelFilter(): string {
-		return `* on(namespace, pod) group_left() group by(namespace, pod) (${vllmMetricWithSelector(
+		return `* on(namespace, pod, container) group_left() group by(namespace, pod, container) (${vllmMetricWithSelector(
 			'vllm:kv_cache_usage_perc',
 			namespace,
 			selectedModel
@@ -78,8 +81,8 @@
 
 	function buildContainerSelector(extra = ''): string {
 		const ns = (namespace ?? '').trim();
-		const parts = ['container="main"'];
-		if (ns) parts.unshift(`namespace="${escapePromqlStringLiteral(ns)}"`);
+		const parts: string[] = [];
+		if (ns) parts.push(`namespace="${escapePromqlStringLiteral(ns)}"`);
 		if (extra) parts.push(extra);
 		return `{${parts.join(',')}}`;
 	}
@@ -229,16 +232,16 @@
 	</Statistics.Header>
 	<Statistics.Content class="min-h-16">
 		{#if !isLoaded}
-			<div class="flex h-[260px] w-full items-center justify-center">
+			<div class="flex h-65 w-full items-center justify-center">
 				<LoaderCircle class="size-12 animate-spin" />
 			</div>
 		{:else if data.length === 0 || pods.length === 0}
-			<div class="flex h-[260px] w-full flex-col items-center justify-center">
+			<div class="flex h-65 w-full flex-col items-center justify-center">
 				<ChartLine class="size-12 animate-pulse text-muted-foreground" />
 				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
 			</div>
 		{:else}
-			<Chart.Container config={chartConfig} class="h-[260px] w-full">
+			<Chart.Container config={chartConfig} class="h-65 w-full">
 				<AreaChart
 					{data}
 					x="date"

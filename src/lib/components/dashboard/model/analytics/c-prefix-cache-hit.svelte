@@ -5,7 +5,7 @@
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
-	import { PrometheusDriver, SampleValue } from 'prometheus-query';
+	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
@@ -14,7 +14,11 @@
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
-	import { computeStep, vllmMetricWithSelector } from '$lib/prometheus';
+	import {
+		computeStep,
+		fetchMultipleFlattenedRange,
+		vllmMetricWithSelector
+	} from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -34,21 +38,50 @@
 		isReloading: boolean;
 	} = $props();
 
-	let samples = $state<SampleValue[]>([]);
+	type Row = { date: Date; l1: number; l2?: number; l3?: number };
+
+	let data = $state<Row[]>([]);
+	// L2 LMCache / L3 Mooncake tiers only exist when KV Cache Offload is enabled (AI100).
+	// Render each series only when its metric actually returns data, so models without
+	// an offload tier show just the L1 line instead of misleading flat-0% L2/L3 lines.
+	let hasL2 = $state(false);
+	let hasL3 = $state(false);
 	let isLoaded = $state(false);
 
-	function getQuery(): string {
-		const hits = vllmMetricWithSelector('vllm:prefix_cache_hits_total', namespace, selectedModel);
-		const queries = vllmMetricWithSelector(
+	function queries(): Record<string, string> {
+		const l1Hits = vllmMetricWithSelector('vllm:prefix_cache_hits_total', namespace, selectedModel);
+		const l1Queries = vllmMetricWithSelector(
 			'vllm:prefix_cache_queries_total',
 			namespace,
 			selectedModel
 		);
-		return `sum(rate(${hits}[5m])) / sum(rate(${queries}[5m])) * 100`;
+		const l2Hits = vllmMetricWithSelector('lmcache:num_hit_tokens_total', namespace, selectedModel);
+		const l2Requested = vllmMetricWithSelector(
+			'lmcache:num_requested_tokens_total',
+			namespace,
+			selectedModel
+		);
+		const l3Hits = vllmMetricWithSelector(
+			'vllm:external_prefix_cache_hits_total',
+			namespace,
+			selectedModel
+		);
+		const l3Queries = vllmMetricWithSelector(
+			'vllm:external_prefix_cache_queries_total',
+			namespace,
+			selectedModel
+		);
+		return {
+			l1: `sum(rate(${l1Hits}[5m])) / sum(rate(${l1Queries}[5m])) * 100`,
+			l2: `sum(rate(${l2Hits}[5m])) / sum(rate(${l2Requested}[5m])) * 100`,
+			l3: `sum(rate(${l3Hits}[5m])) / sum(rate(${l3Queries}[5m])) * 100`
+		};
 	}
 
 	const configuration = {
-		hit_rate: { label: m.hit_rate(), color: 'var(--chart-2)' }
+		l1: { label: m.cache_l1_vllm(), color: 'var(--chart-2)' },
+		l2: { label: m.cache_l2_lmcache(), color: 'var(--chart-1)' },
+		l3: { label: m.cache_l3_mooncake(), color: 'var(--chart-3)' }
 	} satisfies Chart.ChartConfig;
 
 	const areaProps = {
@@ -62,15 +95,25 @@
 		try {
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
-			const response = await prometheusDriver.rangeQuery(
-				getQuery(),
-				startMs,
-				endMs,
+			const points = await fetchMultipleFlattenedRange(
+				prometheusDriver,
+				queries(),
+				new Date(startMs),
+				new Date(endMs),
 				computeStep(startMs, endMs)
 			);
-			samples = response.result[0]?.values ?? [];
+			hasL2 = points.some((p) => Number.isFinite(Number(p.l2)));
+			hasL3 = points.some((p) => Number.isFinite(Number(p.l3)));
+			data = points.map((p) => ({
+				date: p.date as Date,
+				l1: Number.isFinite(Number(p.l1)) ? Number(p.l1) : 0,
+				...(hasL2 ? { l2: Number.isFinite(Number(p.l2)) ? Number(p.l2) : 0 } : {}),
+				...(hasL3 ? { l3: Number.isFinite(Number(p.l3)) ? Number(p.l3) : 0 } : {})
+			}));
 		} catch {
-			samples = [];
+			data = [];
+			hasL2 = false;
+			hasL3 = false;
 		}
 	}
 
@@ -85,24 +128,36 @@
 		if (isReloading) reloadManager.restart();
 		else reloadManager.stop();
 	});
+
+	const series = $derived(
+		[
+			{ key: 'l1', label: configuration.l1.label, color: configuration.l1.color },
+			...(hasL2
+				? [{ key: 'l2', label: configuration.l2.label, color: configuration.l2.color }]
+				: []),
+			...(hasL3
+				? [{ key: 'l3', label: configuration.l3.label, color: configuration.l3.color }]
+				: [])
+		].map((s) => ({ ...s }))
+	);
 </script>
 
 <Statistics.Root type="count" class="overflow-visible">
 	<Statistics.Header class="flex flex-row items-center gap-2 space-y-0">
 		<div class="grid flex-1 gap-1">
 			<Statistics.Title class="text-base leading-normal text-foreground">
-				{m.prefix_cache_hit_rate()}
+				{m.cache_hit_by_tier()}
 			</Statistics.Title>
 			<p class="text-sm text-muted-foreground">
-				{m.llm_dashboard_prefix_cache_description()}
+				{m.llm_dashboard_cache_tiers_description()}
 			</p>
 		</div>
 		<Tooltip.Root>
 			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
 				<InfoIcon class="size-5 text-muted-foreground" />
 			</Tooltip.Trigger>
-			<Tooltip.Content>
-				<p>{m.llm_dashboard_prefix_cache_tooltip()}</p>
+			<Tooltip.Content class="max-w-xs">
+				<p>{m.llm_dashboard_cache_tiers_tooltip()}</p>
 			</Tooltip.Content>
 		</Tooltip.Root>
 	</Statistics.Header>
@@ -111,29 +166,19 @@
 			<div class="flex h-[200px] w-full items-center justify-center">
 				<LoaderCircle class="size-12 animate-spin" />
 			</div>
-		{:else if samples.length === 0}
+		{:else if data.length === 0}
 			<div class="flex h-[200px] w-full flex-col items-center justify-center">
 				<ChartLine class="size-12 animate-pulse text-muted-foreground" />
 				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
 			</div>
 		{:else}
-			{@const data = samples.map((s) => ({
-				time: s.time,
-				hit_rate: Number.isFinite(Number(s.value)) ? Number(s.value) : 0
-			}))}
 			<Chart.Container config={configuration} class="h-[200px] w-full">
 				<AreaChart
 					{data}
-					x="time"
+					x="date"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}
-					series={[
-						{
-							key: 'hit_rate',
-							label: configuration.hit_rate.label,
-							color: configuration.hit_rate.color
-						}
-					]}
+					{series}
 					props={{
 						area: areaProps,
 						xAxis: {

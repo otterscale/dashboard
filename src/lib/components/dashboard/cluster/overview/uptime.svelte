@@ -8,6 +8,7 @@
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Card from '$lib/components/ui/card';
 	import { m } from '$lib/paraglide/messages';
+	import { fetchCombinedInstant } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -16,18 +17,16 @@
 
 	let uptime: SampleValue | undefined = $state(undefined);
 	let create_time: SampleValue | undefined = $state(undefined);
-	async function fetchUptime() {
-		const uptimeResponse = await prometheusDriver.instantQuery(`time() - min(kube_node_created{})`);
-		const createTimeResponse = await prometheusDriver.instantQuery(
-			`min(kube_node_created{}) * 1000`
-		);
-		uptime = uptimeResponse.result[0]?.value ?? undefined;
-		create_time = createTimeResponse.result[0]?.value?.value ?? undefined;
-	}
 
+	// Both scalars come back in a single `or`-unioned instant query.
 	async function fetch() {
 		try {
-			await fetchUptime();
+			const r = await fetchCombinedInstant(prometheusDriver, {
+				uptime: `time() - min(kube_node_created{})`,
+				create: `min(kube_node_created{}) * 1000`
+			});
+			uptime = r.uptime[0]?.value ?? undefined;
+			create_time = r.create[0]?.value?.value ?? undefined;
 		} catch (error) {
 			console.error('Failed to fetch uptime:', error);
 		}

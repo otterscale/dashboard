@@ -51,6 +51,7 @@
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content align="end" class="w-full">
 		<DropdownMenu.Group>
+			<DropdownMenu.Label>Inspect</DropdownMenu.Label>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
@@ -65,7 +66,6 @@
 					}}
 				/>
 			</DropdownMenu.Item>
-			<DropdownMenu.Separator />
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
@@ -80,6 +80,8 @@
 			>
 				<Describe {cluster} {namespace} {group} {version} {resource} {object} />
 			</DropdownMenu.Item>
+			<DropdownMenu.Separator />
+			<DropdownMenu.Label>Manage</DropdownMenu.Label>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();

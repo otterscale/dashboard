@@ -106,7 +106,12 @@
 								: ''}"
 							aria-hidden={selectedTab !== 'analytics'}
 						>
-							<ModelPicker {cluster} namespace={selectedNamespace} bind:selectedModel />
+							<ModelPicker
+								{cluster}
+								namespace={selectedNamespace}
+								{prometheusDriver}
+								bind:selectedModel
+							/>
 						</div>
 						<NamespacePicker
 							{cluster}

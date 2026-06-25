@@ -111,7 +111,6 @@ function getCreate(kind: string, namespace?: string): CreateType {
 }
 
 function getActions(kind: string, namespace?: string): ActionsType {
-	console.log('get from ', kind, namespace);
 	switch (kind) {
 		case 'Application':
 			return ApplicationActions as ActionsType;

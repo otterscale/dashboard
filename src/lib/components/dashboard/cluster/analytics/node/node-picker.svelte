@@ -17,10 +17,12 @@
 	} from '$lib/components/dynamic-form/widgets/combobox.svelte';
 	import { m } from '$lib/paraglide/messages';
 
+	// `selectedNode` holds the node_exporter `instance` value (e.g. `host:9100`) — the form the
+	// per-node `node_*` charts filter on. The dropdown shows the friendly `nodename` as its label.
 	let {
 		prometheusDriver,
-		selectedInstance = $bindable()
-	}: { prometheusDriver: PrometheusDriver; selectedInstance: string | undefined } = $props();
+		selectedNode = $bindable()
+	}: { prometheusDriver: PrometheusDriver; selectedNode: string | undefined } = $props();
 
 	type InstanceOption = { value: string; label: string };
 	const instanceOptions = writable<InstanceOption[]>([]);
@@ -74,10 +76,14 @@
 				instances.push({ value: '.*', label: m.all_nodes() });
 			}
 			instanceOptions.set(instances);
-			selectedInstance = instances[0]?.value;
+			// Default to the "All Nodes" sentinel so the picker shows a label instead of an
+			// empty box; Section B treats `.*` as "no node drilled in" and keeps its placeholder.
+			if (selectedNode === undefined && instances.length > 0) {
+				selectedNode = '.*';
+			}
 		} catch {
 			instanceOptions.set([]);
-			selectedInstance = undefined;
+			selectedNode = undefined;
 		}
 		isLoaded = true;
 	});
@@ -86,7 +92,7 @@
 {#if isLoaded && $instanceOptions.length > 0}
 	<ComboboxWidget
 		type="widget"
-		bind:value={selectedInstance}
+		bind:value={selectedNode}
 		{config}
 		handlers={{}}
 		options={[]}
