@@ -404,7 +404,9 @@
 						},
 						licenseInjection: {
 							'ui:options': {
-								shadcn4Checkbox: {}
+								shadcn4Checkbox: {
+									disabled: !page.data.isRestricted
+								}
 							}
 						}
 					} as UiSchemaRoot}
