@@ -6,5 +6,5 @@ export async function getIsRestricted(
 ): Promise<boolean> {
 	void fetch;
 	void cluster;
-	return false;
+	return true;
 }
