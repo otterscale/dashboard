@@ -6,7 +6,7 @@
 	import type { FormState, FormValue, Schema, SchemaValue, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, setValue, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
-	import { load } from 'js-yaml';
+	import { JSON_SCHEMA, load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import type { Snippet } from 'svelte';
@@ -16,6 +16,7 @@
 	import { stringify } from 'yaml';
 
 	import Form from '$lib/components/dynamic-form/form.svelte';
+	import RoleComboboxWidget from '$lib/components/dynamic-form/widgets/role-combobox.svelte';
 	import UserComboboxWidget, {
 		getDisplayName,
 		type KeycloakUser
@@ -63,24 +64,6 @@
 	const steps = Array.from({ length: formCount + 1 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 
-	const systemFields = [
-		'clusterName',
-		'creationTimestamp',
-		'deletionGracePeriodSeconds',
-		'deletionTimestamp',
-		'finalizers',
-		'generateName',
-		'generation',
-		'initializers',
-		'managedFields',
-		'ownerReferences',
-		'resourceVersion',
-		'relationships',
-		'selfLink',
-		'state',
-		'uid'
-	];
-
 	let values = $state(getInitialValues());
 	let resourceLimitation = $state(getInitialResourceLimitation());
 	let currentStep = $state(firstStep);
@@ -88,32 +71,34 @@
 	let membersFormReference = $state(null);
 
 	let value = $derived.by(() => {
-		const filtered = lodash.cloneDeep(values);
-		if (filtered.metadata) {
-			const metadata = filtered.metadata as Record<string, unknown>;
-			for (const field of systemFields) {
-				delete metadata[field];
-			}
-		}
+		const filtered = lodash.cloneDeep(values) as typeof values & { status?: unknown };
+		delete filtered.status;
 		return stringify(filtered);
 	});
 	const currentIndex = $derived(steps.indexOf(currentStep));
 
 	function getInitialValues() {
-		return {
-			apiVersion: `${group}/${version}`,
-			kind: kind,
-			metadata: lodash.get(object, 'metadata', {}) as SchemaValue,
-			spec: {
-				members: lodash.get(object, 'spec.members', []) as SchemaValue,
-				networkIsolation: lodash.get(object, 'spec.networkIsolation', {
-					enabled: false
-				}) as SchemaValue,
-				...(lodash.has(object, 'spec.resourceQuota')
-					? { resourceQuota: lodash.get(object, 'spec.resourceQuota') as SchemaValue }
-					: {})
-			}
+		const manifest = lodash.cloneDeep(object ?? {}) as TenantOtterscaleIoV1Alpha1Workspace & {
+			apiVersion?: string;
+			kind?: string;
+			metadata?: Record<string, unknown>;
+			status?: unknown;
 		};
+		manifest.apiVersion = `${group}/${version}`;
+		manifest.kind = kind;
+		manifest.metadata = manifest.metadata ?? {};
+		manifest.spec = {
+			...(manifest.spec ?? {}),
+			members: lodash.get(
+				manifest,
+				'spec.members',
+				[]
+			) as TenantOtterscaleIoV1Alpha1Workspace['spec']['members'],
+			networkIsolation: lodash.get(manifest, 'spec.networkIsolation', {
+				enabled: false
+			}) as TenantOtterscaleIoV1Alpha1Workspace['spec']['networkIsolation']
+		} as TenantOtterscaleIoV1Alpha1Workspace['spec'];
+		return manifest;
 	}
 	function getInitialResourceLimitation() {
 		return {
@@ -121,12 +106,9 @@
 			hard: lodash.get(object, 'spec.resourceQuota.hard', {
 				'requests.cpu': '32',
 				'requests.memory': '64Gi',
-				'requests.nvidia.com/gpu': '0',
-				'requests.nvidia.com/gpumem': '0',
 				'limits.cpu': '32',
 				'limits.memory': '64Gi',
-				'limits.nvidia.com/gpu': '0',
-				'limits.nvidia.com/gpumem': '0'
+				'limits.nvidia.com/gpumem': '1'
 			}) as SchemaValue
 		};
 	}
@@ -260,7 +242,7 @@
 							role: {
 								'ui:components': {
 									stringField: 'enumField',
-									selectWidget: 'comboboxWidget'
+									selectWidget: RoleComboboxWidget
 								}
 							},
 							subject: {
@@ -281,7 +263,7 @@
 													return {
 														subject: member.subject,
 														role: member.role,
-														username: user.name,
+														username: user.username,
 														name: getDisplayName(user),
 														serviceAccount: isServiceAccount(user.username)
 													};
@@ -295,11 +277,11 @@
 					} as UiSchemaRoot}
 					initialValue={lodash.get(values, 'spec.members') as FormValue}
 					handleSubmit={{
-						posthook: () => {
+						posthook: (form: FormState<FormValue>) => {
+							lodash.set(values, ['spec', 'members'], getValueSnapshot(form));
 							handleNext();
 						}
 					}}
-					bind:values={values['spec']['members']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-end gap-3">
@@ -356,21 +338,19 @@
 					} as UiSchemaRoot}
 					initialValue={lodash.get(values, 'spec.networkIsolation') as FormValue}
 					handleSubmit={{
-						posthook: () => {
+						posthook: (form: FormState<FormValue>) => {
+							lodash.set(values, ['spec', 'networkIsolation'], getValueSnapshot(form));
 							handleNext();
 						}
 					}}
-					bind:values={values['spec']['networkIsolation']}
 				>
 					{#snippet actions()}
 						<div class="flex w-full items-center justify-between gap-3">
 							<Button
 								onclick={() => {
 									handlePrevious();
-								}}
+								}}>Previous</Button
 							>
-								Previous
-							</Button>
 							<SubmitButton />
 						</div>
 					{/snippet}
@@ -421,16 +401,6 @@
 													type: 'string',
 													readOnly: !editable
 												},
-												'requests.nvidia.com/gpu': {
-													title: 'GPU Device Request',
-													type: 'string',
-													readOnly: !editable
-												},
-												'requests.nvidia.com/gpumem': {
-													title: 'GPU Memory Request',
-													type: 'string',
-													readOnly: !editable
-												},
 												'limits.cpu': {
 													title: 'CPU Limit',
 													type: 'string',
@@ -438,11 +408,6 @@
 												},
 												'limits.memory': {
 													title: 'Memory Limit',
-													type: 'string',
-													readOnly: !editable
-												},
-												'limits.nvidia.com/gpu': {
-													title: 'GPU Device Limit',
 													type: 'string',
 													readOnly: !editable
 												},
@@ -477,7 +442,7 @@
 								layouts: {
 									'object-properties': {
 										class:
-											'grid grid-cols-2 gap-3 [&_input]:read-only:focus-visible:ring-0 [&_input]:read-only:focus-visible:ring-offset-0 [&_input]:read-only:focus-visible:border-input [&_input]:read-only:cursor-default'
+											'grid grid-cols-2 gap-3 [&_input]:read-only:bg-muted [&_input]:read-only:opacity-50 [&_input]:read-only:cursor-not-allowed [&_input]:read-only:focus-visible:ring-0 [&_input]:read-only:focus-visible:ring-offset-0 [&_input]:read-only:focus-visible:border-input'
 									}
 								}
 							}
@@ -499,29 +464,28 @@
 									hard: lodash.get(formValue, 'hard', {
 										'requests.cpu': '32',
 										'requests.memory': '64Gi',
-										'requests.nvidia.com/gpu': '0',
-										'requests.nvidia.com/gpumem': '0',
 										'limits.cpu': '32',
 										'limits.memory': '64Gi',
-										'limits.nvidia.com/gpu': '0',
-										'limits.nvidia.com/gpumem': '0'
+										'limits.nvidia.com/gpumem': '1'
 									})
 								});
-								lodash.set(values, ['spec', 'limitRange'], {
-									limits: [
-										{
-											type: 'Container',
-											default: {
-												cpu: '1',
-												memory: '2Gi'
-											},
-											defaultRequest: {
-												cpu: '0.5',
-												memory: '1Gi'
+								if (!lodash.has(values, ['spec', 'limitRange'])) {
+									lodash.set(values, ['spec', 'limitRange'], {
+										limits: [
+											{
+												type: 'Container',
+												default: {
+													cpu: '1',
+													memory: '2Gi'
+												},
+												defaultRequest: {
+													cpu: '0.5',
+													memory: '1Gi'
+												}
 											}
-										}
-									]
-								});
+										]
+									});
+								}
 							}
 						}
 					}}
@@ -532,10 +496,8 @@
 							<Button
 								onclick={() => {
 									handlePrevious();
-								}}
+								}}>Previous</Button
 							>
-								Previous
-							</Button>
 							<SubmitButton />
 						</div>
 					{/snippet}
@@ -562,10 +524,8 @@
 						<Button
 							onclick={() => {
 								handlePrevious();
-							}}
+							}}>Previous</Button
 						>
-							Previous
-						</Button>
 						<Button
 							onclick={() => {
 								if (isSubmitting) return;
@@ -578,7 +538,7 @@
 								});
 								const validate = jsonSchemaValidator.compile(jsonSchema);
 
-								const isValid = validate(load(value));
+								const isValid = validate(load(value, { schema: JSON_SCHEMA }));
 
 								if (!isValid) {
 									console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
@@ -593,15 +553,14 @@
 									async () => {
 										const manifest = new TextEncoder().encode(value);
 
-										await resourceClient.apply({
+										await resourceClient.update({
 											cluster,
 											name,
 											group,
 											version,
 											resource,
 											manifest,
-											fieldManager: 'otterscale-web-ui',
-											force: true
+											fieldManager: 'otterscale-web-ui'
 										});
 									},
 									{

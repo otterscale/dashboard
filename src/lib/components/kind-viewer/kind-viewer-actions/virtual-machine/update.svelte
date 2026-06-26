@@ -11,7 +11,7 @@
 	import type { FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
-	import { load } from 'js-yaml';
+	import { JSON_SCHEMA, load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext } from 'svelte';
@@ -107,6 +107,13 @@
 
 	// Build disks and volumes — boot disk is preserved from existing object
 	function buildDisksAndVolumes() {
+		const existingVolumes = object.spec?.template?.spec?.volumes ?? [];
+		const existingDisks = object.spec?.template?.spec?.domain?.devices?.disks ?? [];
+		const bootVolumeName = values.bootVolume?.name ?? 'os-disk';
+		const unmanagedVolumes = existingVolumes.filter(
+			(v) => v.name !== bootVolumeName && !v.dataVolume && !v.cloudInitNoCloud
+		);
+		const unmanagedVolumeNames = new Set(unmanagedVolumes.map((v) => v.name).filter(Boolean));
 		// Start with the immutable boot disk/volume from the existing object
 		const disks: Record<string, unknown>[] = [
 			values.bootDisk
@@ -131,6 +138,17 @@
 				cloudInitNoCloud: { userData: values.cloudInit }
 			});
 		}
+
+		const hasName = (items: Record<string, unknown>[], name: string) =>
+			items.some((item) => item.name === name);
+		existingDisks.forEach((disk) => {
+			if (!disk.name || hasName(disks, disk.name) || !unmanagedVolumeNames.has(disk.name)) return;
+			disks.push(lodash.cloneDeep(disk) as Record<string, unknown>);
+		});
+		unmanagedVolumes.forEach((volume) => {
+			if (!volume.name || hasName(volumes, volume.name)) return;
+			volumes.push(lodash.cloneDeep(volume) as Record<string, unknown>);
+		});
 
 		return { disks, volumes };
 	}
@@ -167,41 +185,64 @@
 	const submissionValues = $derived.by(() => {
 		const { disks, volumes } = buildDisksAndVolumes();
 		const gpus = buildGpuDevices();
-
-		const devices = {
-			disks,
-			interfaces: [{ name: 'nic1', bridge: {} }],
-			...(gpus ? { gpus } : {})
+		const manifest = lodash.cloneDeep(object) as KubevirtIoV1VirtualMachine & {
+			status?: unknown;
 		};
+		delete manifest.status;
 
-		return {
-			apiVersion: group ? `${group}/${version}` : version,
-			kind,
-			metadata: {
-				name: values.name,
-				namespace: values.namespace,
-				annotations: {
-					'kubevirt.io/allow-pod-bridge-network-live-migration': 'true'
-				}
-			},
-			spec: {
-				runStrategy: values.spec.runStrategy,
-				instancetype: values.spec.instancetype,
-				template: {
-					metadata: {
-						labels: { 'kubevirt.io/vm': values.name }
-					},
-					spec: {
-						...(nodeSelector.node
-							? { nodeSelector: { 'kubernetes.io/hostname': nodeSelector.node } }
-							: {}),
-						domain: { devices },
-						networks: [{ name: 'nic1', pod: {} }],
-						volumes
-					}
-				}
-			}
+		lodash.set(manifest, 'apiVersion', group ? `${group}/${version}` : version);
+		lodash.set(manifest, 'kind', kind);
+		lodash.set(manifest, 'metadata.name', values.name);
+		lodash.set(manifest, 'metadata.namespace', values.namespace);
+		lodash.set(manifest, 'metadata.resourceVersion', object.metadata?.resourceVersion);
+		lodash.set(manifest, 'metadata.annotations', {
+			...(object.metadata?.annotations ?? {}),
+			'kubevirt.io/allow-pod-bridge-network-live-migration': 'true'
+		});
+
+		lodash.set(manifest, 'spec.runStrategy', values.spec.runStrategy);
+		lodash.set(manifest, 'spec.instancetype', values.spec.instancetype);
+		lodash.set(manifest, 'spec.template.metadata.labels', {
+			...((lodash.get(manifest, 'spec.template.metadata.labels') as Record<string, string>) ?? {}),
+			'kubevirt.io/vm': values.name
+		});
+
+		const nextNodeSelector = {
+			...((lodash.get(manifest, 'spec.template.spec.nodeSelector') as Record<string, string>) ?? {})
 		};
+		if (nodeSelector.node) {
+			nextNodeSelector['kubernetes.io/hostname'] = nodeSelector.node;
+		} else {
+			delete nextNodeSelector['kubernetes.io/hostname'];
+		}
+		if (Object.keys(nextNodeSelector).length) {
+			lodash.set(manifest, 'spec.template.spec.nodeSelector', nextNodeSelector);
+		} else {
+			lodash.unset(manifest, 'spec.template.spec.nodeSelector');
+		}
+
+		const devices: Record<string, unknown> = {
+			...((lodash.get(manifest, 'spec.template.spec.domain.devices') as Record<string, unknown>) ??
+				{}),
+			disks
+		};
+		if (!Array.isArray(devices.interfaces) || devices.interfaces.length === 0) {
+			devices.interfaces = [{ name: 'nic1', bridge: {} }];
+		}
+		if (gpus) {
+			devices.gpus = gpus;
+		} else {
+			delete devices.gpus;
+		}
+		lodash.set(manifest, 'spec.template.spec.domain.devices', devices);
+
+		const networks = lodash.get(manifest, 'spec.template.spec.networks');
+		if (!Array.isArray(networks) || networks.length === 0) {
+			lodash.set(manifest, 'spec.template.spec.networks', [{ name: 'nic1', pod: {} }]);
+		}
+		lodash.set(manifest, 'spec.template.spec.volumes', volumes);
+
+		return manifest;
 	});
 	let value = $derived(stringify(submissionValues));
 
@@ -810,7 +851,7 @@
 							});
 							const validate = jsonSchemaValidator.compile(jsonSchema);
 
-							const isValid = validate(load(value));
+							const isValid = validate(load(value, { schema: JSON_SCHEMA }));
 
 							if (!isValid) {
 								console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
@@ -819,13 +860,13 @@
 								return;
 							}
 
-							const name = lodash.get(load(value), 'metadata.name');
+							const name = lodash.get(load(value, { schema: JSON_SCHEMA }), 'metadata.name');
 
 							toast.promise(
 								async () => {
 									const manifest = new TextEncoder().encode(value);
 
-									await resourceClient.apply({
+									await resourceClient.update({
 										cluster,
 										name,
 										namespace: values.namespace,
@@ -833,8 +874,7 @@
 										version,
 										resource,
 										manifest,
-										fieldManager: 'otterscale-web-ui',
-										force: true
+										fieldManager: 'otterscale-web-ui'
 									});
 								},
 								{

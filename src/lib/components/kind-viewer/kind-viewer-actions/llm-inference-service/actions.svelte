@@ -51,6 +51,7 @@
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content align="end" class="w-full">
 		<DropdownMenu.Group>
+			<DropdownMenu.Label>Inspect</DropdownMenu.Label>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
@@ -77,27 +78,10 @@
 					e.preventDefault();
 				}}
 			>
-				<Update
-					{cluster}
-					{namespace}
-					{group}
-					{version}
-					{kind}
-					{resource}
-					{schema}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
-					}}
-				/>
-			</DropdownMenu.Item>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
 				<Describe {cluster} {namespace} {group} {version} {resource} {object} />
 			</DropdownMenu.Item>
+			<DropdownMenu.Separator />
+			<DropdownMenu.Label>Manage</DropdownMenu.Label>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
@@ -112,6 +96,25 @@
 					{resource}
 					{schema}
 					{validate}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
+					}}
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Update
+					{cluster}
+					{namespace}
+					{group}
+					{version}
+					{kind}
+					{resource}
+					{schema}
 					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;

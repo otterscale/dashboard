@@ -99,25 +99,21 @@
 
 		try {
 			const gpuResourceMap: Record<string, string> = {
-				nvidia_com_gpu: 'nvidia.com/gpu',
 				nvidia_com_gpumem: 'nvidia.com/gpumem'
 			};
 
 			// gpumem is a per-GPU value; total used = gpu_count × gpumem_per_gpu per container
 			const gpuMemLimitsTotalQuery = `sum((kube_pod_container_resource_limits{namespace="${namespace}",resource="nvidia_com_gpu"} * on (namespace, pod, container) kube_pod_container_resource_limits{namespace="${namespace}",resource="nvidia_com_gpumem"}) and on (namespace, pod, container) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`;
-			const gpuMemRequestsTotalQuery = `sum((kube_pod_container_resource_requests{namespace="${namespace}",resource="nvidia_com_gpu"} * on (namespace, pod, container) kube_pod_container_resource_requests{namespace="${namespace}",resource="nvidia_com_gpumem"}) and on (namespace, pod, container) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`;
 
-			const [limitsResponse, requestsResponse, gpuMemLimitsTotal, gpuMemRequestsTotal] =
-				await Promise.all([
-					prometheusDriver.instantQuery(
-						`sum by (resource) (kube_pod_container_resource_limits{namespace="${namespace}"} and on (namespace, pod) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`
-					),
-					prometheusDriver.instantQuery(
-						`sum by (resource) (kube_pod_container_resource_requests{namespace="${namespace}"} and on (namespace, pod) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`
-					),
-					prometheusDriver.instantQuery(gpuMemLimitsTotalQuery),
-					prometheusDriver.instantQuery(gpuMemRequestsTotalQuery)
-				]);
+			const [limitsResponse, requestsResponse, gpuMemLimitsTotal] = await Promise.all([
+				prometheusDriver.instantQuery(
+					`sum by (resource) (kube_pod_container_resource_limits{namespace="${namespace}"} and on (namespace, pod) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`
+				),
+				prometheusDriver.instantQuery(
+					`sum by (resource) (kube_pod_container_resource_requests{namespace="${namespace}"} and on (namespace, pod) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`
+				),
+				prometheusDriver.instantQuery(gpuMemLimitsTotalQuery)
+			]);
 
 			const usedMap: Record<string, string> = {};
 			for (const v of limitsResponse.result as InstantVector[]) {
@@ -143,8 +139,6 @@
 			for (const v of requestsResponse.result as InstantVector[]) {
 				const metricResource = (v.metric.labels as Record<string, string>).resource;
 				if (!metricResource) continue;
-				// gpumem handled separately below
-				if (metricResource === 'nvidia_com_gpumem') continue;
 				const quotaResource = gpuResourceMap[metricResource] ?? metricResource;
 				usedMap[`requests.${quotaResource}`] = formatResourceValue(
 					`requests.${quotaResource}`,
@@ -153,18 +147,6 @@
 				if (gpuResourceMap[metricResource]) {
 					usedMap[quotaResource] = formatResourceValue(quotaResource, v.value.value);
 				}
-			}
-			// gpumem requests: use gpu × gpumem total
-			const gpuMemRequestsVec = (gpuMemRequestsTotal.result as InstantVector[])[0];
-			if (gpuMemRequestsVec) {
-				usedMap['requests.nvidia.com/gpumem'] = formatResourceValue(
-					'requests.nvidia.com/gpumem',
-					gpuMemRequestsVec.value.value
-				);
-				usedMap['nvidia.com/gpumem'] = formatResourceValue(
-					'nvidia.com/gpumem',
-					gpuMemRequestsVec.value.value
-				);
 			}
 
 			resourceQuotaUsed = usedMap;
@@ -183,14 +165,11 @@
 	});
 
 	function getGridLayout(key: string) {
-		if (key === 'limits.cpu') return 'md:row-start-1 2xl:row-start-1';
-		if (key === 'limits.memory') return 'md:row-start-2 2xl:row-start-1';
-		if (key === 'nvidia.com/gpu') return 'md:row-start-3 2xl:row-start-1';
-		if (key === 'nvidia.com/gpumem') return 'md:row-start-4 2xl:row-start-1';
-
 		if (key === 'requests.cpu') return 'md:row-start-1 2xl:row-start-2';
 		if (key === 'requests.memory') return 'md:row-start-2 2xl:row-start-2';
-
+		if (key === 'limits.cpu') return 'md:row-start-1 2xl:row-start-1';
+		if (key === 'limits.memory') return 'md:row-start-2 2xl:row-start-1';
+		if (key === 'limits.nvidia.com/gpumem') return 'md:row-start-4 2xl:row-start-1';
 		return '2xl:row-start-3 md:row-start-5';
 	}
 

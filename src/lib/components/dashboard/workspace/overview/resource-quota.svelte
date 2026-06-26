@@ -37,9 +37,6 @@
 	let memHardReq = $state<number | null>(null);
 	let memUsedLim = $state<number | null>(null);
 	let memHardLim = $state<number | null>(null);
-	/** GPU / GPU memory: quotas are usually requests-only; not tied to the requests/limits toggle. */
-	let gpuUsed = $state<number | null>(null);
-	let gpuHard = $state<number | null>(null);
 	let gpuMemUsed = $state<number | null>(null);
 	let gpuMemHard = $state<number | null>(null);
 	let hasError = $state(false);
@@ -83,13 +80,6 @@
 	const KSM_POD_RES_NVIDIA_GPU = 'nvidia_com_gpu';
 	const KSM_POD_RES_NVIDIA_GPUMEM = 'nvidia_com_gpumem';
 
-	/** Sum limits for ready containers only (matches workspace viewer pod usage). */
-	function podContainerReadyLimitSum(ns: string, ksmResourceLabel: string): string {
-		const nsLit = escapePromqlStringLiteral(ns);
-		const resLit = escapePromqlStringLiteral(ksmResourceLabel);
-		return `sum(kube_pod_container_resource_limits{namespace="${nsLit}",resource="${resLit}"} and on (namespace, pod, container) kube_pod_container_status_ready{namespace="${nsLit}"} == 1)`;
-	}
-
 	/**
 	 * gpumem (nvidia.com/gpumem) is a per-GPU value, so total used memory =
 	 * sum over containers of (gpu_count × gpumem_per_gpu).
@@ -123,8 +113,6 @@
 			memReqH,
 			memLimU,
 			memLimH,
-			gpuUsedFromPods,
-			gpuHardFromRq,
 			gpuMemUsedFromPods,
 			gpuMemHardFromRq
 		] = await Promise.all([
@@ -136,8 +124,6 @@
 			queryScalar(rqSum('requests.memory', 'hard')),
 			queryScalar(rqSum('limits.memory', 'used')),
 			queryScalar(rqSum('limits.memory', 'hard')),
-			queryScalar(podContainerReadyLimitSum(namespace, KSM_POD_RES_NVIDIA_GPU)),
-			queryScalar(rqSum('limits.nvidia.com/gpu', 'hard')),
 			queryScalar(podContainerReadyGpuMemTotalSum(namespace)),
 			queryScalar(rqSum('limits.nvidia.com/gpumem', 'hard'))
 		]);
@@ -150,8 +136,6 @@
 		memHardReq = memReqH;
 		memUsedLim = memLimU;
 		memHardLim = memLimH;
-		gpuUsed = gpuUsedFromPods ?? 0;
-		gpuHard = gpuHardFromRq ?? 0;
 		gpuMemUsed = gpuMemUsedFromPods ?? 0;
 		gpuMemHard = gpuMemHardFromRq ?? 0;
 	}
@@ -159,7 +143,7 @@
 	function resetQuotaState() {
 		cpuUsedReq = cpuHardReq = cpuUsedLim = cpuHardLim = null;
 		memUsedReq = memHardReq = memUsedLim = memHardLim = null;
-		gpuUsed = gpuHard = gpuMemUsed = gpuMemHard = null;
+		gpuMemUsed = gpuMemHard = null;
 	}
 
 	async function fetch() {
@@ -374,96 +358,6 @@
 										verticalAnchor="middle"
 										class="text-md! text-muted-foreground"
 										dy={15}
-									/>
-								{/snippet}
-							</ArcChart>
-						</Chart.Container>
-					{/if}
-				</Statistics.Content>
-			</Statistics.Root>
-
-			<!-- GPU: nvidia.com/gpu -->
-			<Statistics.Root
-				type="ratio"
-				class="overflow-visible border-0 bg-transparent p-0 shadow-none"
-			>
-				<Statistics.Header>
-					<div class="flex justify-between gap-4">
-						<Statistics.Title>GPU</Statistics.Title>
-						{#if gpuHard !== null}
-							<div class="flex items-center gap-1 text-xl">
-								<p class="font-bold">{gpuHard}</p>
-							</div>
-						{/if}
-					</div>
-				</Statistics.Header>
-				<Statistics.Content class="min-h-20">
-					{#if hasError || gpuUsed === null || gpuHard === null}
-						<div class="flex h-[168px] w-full flex-col items-center justify-center">
-							<ChartBar class="size-16 animate-pulse text-muted-foreground" />
-							<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
-						</div>
-					{:else if gpuHard === 0}
-						{@const chartConfig = { data: { color: 'var(--chart-3)' } } satisfies Chart.ChartConfig}
-						{@const data = [{ value: 0 }]}
-						<Chart.Container
-							config={chartConfig}
-							class="mx-auto my-auto aspect-square h-[168px] w-full max-w-[220px]"
-						>
-							<ArcChart
-								{data}
-								innerRadius={-15}
-								cornerRadius={15}
-								range={[-120, 120]}
-								maxValue={1}
-								series={[{ key: 'data', color: chartConfig.data.color }]}
-								props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
-								tooltipContext={false}
-							>
-								{#snippet aboveMarks()}
-									<Text
-										value="0 / 0"
-										textAnchor="middle"
-										verticalAnchor="middle"
-										class="fill-foreground text-3xl! font-bold"
-										dy={0}
-									/>
-								{/snippet}
-							</ArcChart>
-						</Chart.Container>
-					{:else}
-						{@const chartConfig = { data: { color: 'var(--chart-3)' } } satisfies Chart.ChartConfig}
-						{@const ratio = gpuUsed / gpuHard}
-						{@const data = [{ value: ratio }]}
-						<Chart.Container
-							config={chartConfig}
-							class="mx-auto my-auto aspect-square h-[168px] w-full max-w-[220px]"
-						>
-							<ArcChart
-								{data}
-								innerRadius={-15}
-								cornerRadius={15}
-								range={[-120, 120]}
-								maxValue={1}
-								series={[{ key: 'data', color: chartConfig.data.color }]}
-								props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
-								tooltipContext={false}
-							>
-								{#snippet aboveMarks()}
-									{@const percentage = formatPercentage(gpuUsed!, gpuHard!, 1)}
-									<Text
-										value={`${percentage} %`}
-										textAnchor="middle"
-										verticalAnchor="middle"
-										class="fill-foreground text-3xl! font-bold"
-										dy={-12}
-									/>
-									<Text
-										value={`${gpuUsed!} / ${gpuHard!}`}
-										textAnchor="middle"
-										verticalAnchor="middle"
-										class="text-md! font-normal text-muted-foreground"
-										dy={14}
 									/>
 								{/snippet}
 							</ArcChart>

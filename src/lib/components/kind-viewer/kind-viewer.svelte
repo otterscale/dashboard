@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { JsonObject, JsonValue } from '@bufbuild/protobuf';
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { EllipsisIcon } from '@lucide/svelte';
+	import { Columns3Icon, EllipsisIcon, EraserIcon } from '@lucide/svelte';
 	import BanIcon from '@lucide/svelte/icons/ban';
 	import CableIcon from '@lucide/svelte/icons/cable';
 	import PlusIcon from '@lucide/svelte/icons/plus';
@@ -16,7 +16,7 @@
 		type WatchRequest
 	} from '@otterscale/api/resource/v1';
 	import type { Schema } from '@sjsf/form';
-	import type { ColumnDef } from '@tanstack/table-core';
+	import type { ColumnDef, Table as TableType } from '@tanstack/table-core';
 	import Ajv, { type ValidateFunction } from 'ajv';
 	import { getContext, onDestroy, onMount } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
@@ -31,18 +31,28 @@
 	import type { DataSchemaType, UISchemaType } from '../dynamic-table/utils';
 	import type { ActionsType, CreateType } from './kind-viewer-actions';
 	import { getActions, getCreate } from './kind-viewer-actions';
-	import { getColumnDefinitions, getData, getDataSchemas, getUISchemas } from './kind-viewers';
+	import {
+		getColumnDefinitions,
+		getData,
+		getDataSchemas,
+		getUISchemas
+	} from './kind-viewer-columns';
+	import { getGridLayout, type GridLayoutType } from './kind-viewer-grid-layouts';
 
 	let {
 		isClusterAdmin,
 		cluster,
 		namespace: namespaceProp,
-		apiResource
+		apiResource,
+		labelSelector = '',
+		fieldSelector = ''
 	}: {
 		isClusterAdmin: boolean;
 		cluster: string;
 		namespace?: string;
 		apiResource: APIResource;
+		labelSelector?: string;
+		fieldSelector?: string;
 	} = $props();
 
 	let clustered = $derived(isClusterAdmin);
@@ -110,6 +120,8 @@
 						group: apiResource.group,
 						version: apiResource.version,
 						resource: apiResource.resource,
+						labelSelector,
+						fieldSelector,
 						limit: BigInt(10),
 						continue: continueToken
 					} as ListRequest,
@@ -159,6 +171,8 @@
 					group: apiResource.group,
 					version: apiResource.version,
 					resource: apiResource.resource,
+					labelSelector,
+					fieldSelector,
 					resourceVersion: resourceVersion
 				} as WatchRequest,
 				{ signal: watchAbortController.signal }
@@ -263,8 +277,56 @@
 	}
 
 	const Create: CreateType = $derived(getCreate(apiResource.kind, namespace));
-	const Actions: ActionsType = $derived(getActions(apiResource.kind));
+	const Actions: ActionsType = $derived(getActions(apiResource.kind, namespace));
+	const GridLayout: GridLayoutType = $derived(getGridLayout(apiResource.kind, namespace));
 </script>
+
+{#snippet gridLayout({
+	table,
+	handleClear
+}: {
+	table: TableType<Record<string, JsonValue>>;
+	handleClear: () => void;
+})}
+	{#if GridLayout}
+		{#if table.getRowModel().rows?.length}
+			<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+				{#each table.getRowModel().rows as row (row.id)}
+					<GridLayout
+						{row}
+						{cluster}
+						namespace={namespace ?? ''}
+						group={apiResource.group}
+						version={apiResource.version}
+						kind={apiResource.kind}
+						resource={apiResource.resource}
+						{schema}
+						{validate}
+					/>
+				{/each}
+			</div>
+		{:else}
+			<Empty.Root class="rounded-lg bg-muted">
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<Columns3Icon size={32} class="opacity-60" aria-hidden="true" />
+					</Empty.Media>
+					<Empty.Title>No Resources Found</Empty.Title>
+					<Empty.Description>
+						No resources found. Please adjust your filters or initiate a new resource to populate
+						this table.
+					</Empty.Description>
+				</Empty.Header>
+				<Empty.Content>
+					<Button onclick={handleClear}>
+						<EraserIcon size={16} class="opacity-60" />
+						Reset
+					</Button>
+				</Empty.Content>
+			</Empty.Root>
+		{/if}
+	{/if}
+{/snippet}
 
 {#if fetchError}
 	<Empty.Root>
@@ -283,7 +345,12 @@
 	</Empty.Root>
 {:else if isMounted}
 	{#if columnDefinitions}
-		<DynamicTable {data} {columnDefinitions} {uiSchemas}>
+		<DynamicTable
+			{data}
+			{columnDefinitions}
+			{uiSchemas}
+			gridLayout={GridLayout ? gridLayout : undefined}
+		>
 			{#snippet accessReview()}
 				{#if isClusterAdmin}
 					<Tooltip.Root>
@@ -320,7 +387,18 @@
 						version={apiResource.version}
 						kind={apiResource.kind}
 						resource={apiResource.resource}
-					/>
+					>
+						{#snippet trigger(state)}
+							<Button
+								variant="outline"
+								onclick={() => {
+									state.open = !state.open;
+								}}
+							>
+								<PlusIcon />
+							</Button>
+						{/snippet}
+					</Create>
 				{:else}
 					<Button variant="outline" size="icon" disabled>
 						<PlusIcon />

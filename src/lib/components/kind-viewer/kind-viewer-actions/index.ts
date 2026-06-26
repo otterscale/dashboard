@@ -2,7 +2,7 @@ import type { JsonObject, JsonValue } from '@bufbuild/protobuf';
 import type { Schema } from '@sjsf/form';
 import type { Row } from '@tanstack/table-core';
 import { type ValidateFunction } from 'ajv';
-import type { Component } from 'svelte';
+import type { Component, Snippet } from 'svelte';
 
 import ApplicationActions from './applications/actions.svelte';
 import ApplicationCreate from './applications/create.svelte';
@@ -24,8 +24,8 @@ import InstanceTypeActions from './instance-type/actions.svelte';
 import InstanceTypeCreate from './instance-type/create.svelte';
 import JobActions from './job/actions.svelte';
 import LLMInferenceServiceActions from './llm-inference-service/actions.svelte';
-import LLMInferenceServiceCreate from './llm-inference-service/create.svelte';
 import LLMInferenceServiceConfigActions from './llm-inference-service-config/actions.svelte';
+import ModelTemplateActions from './modeltemplate/actions.svelte';
 import NodeActions from './node/actions.svelte';
 import PodActions from './pod/actions.svelte';
 import ResourceQuotaActions from './resource-quota/actions.svelte';
@@ -52,6 +52,14 @@ type CreateType = Component<{
 	resource?: string;
 	schema?: Schema;
 	validate?: ValidateFunction;
+	trigger?: Snippet<
+		[
+			{
+				get open(): boolean;
+				set open(value: boolean);
+			}
+		]
+	>;
 }> | null;
 type ActionsType = Component<{
 	role?: string;
@@ -78,8 +86,6 @@ function getCreate(kind: string, namespace?: string): CreateType {
 			return DataVolumeCreate as CreateType;
 		case 'HelmRepository':
 			return HelmRepositoryCreate as CreateType;
-		case 'LLMInferenceService':
-			return LLMInferenceServiceCreate as CreateType;
 		case 'Node':
 			return DisabledCreate as CreateType;
 		case 'ObjectBucketClaim':
@@ -104,7 +110,7 @@ function getCreate(kind: string, namespace?: string): CreateType {
 	}
 }
 
-function getActions(kind: string): ActionsType {
+function getActions(kind: string, namespace?: string): ActionsType {
 	switch (kind) {
 		case 'Application':
 			return ApplicationActions as ActionsType;
@@ -127,6 +133,9 @@ function getActions(kind: string): ActionsType {
 		case 'LLMInferenceService':
 			return LLMInferenceServiceActions as ActionsType;
 		case 'LLMInferenceServiceConfig':
+			if (namespace === 'otterscale-system') {
+				return ModelTemplateActions as ActionsType;
+			}
 			return LLMInferenceServiceConfigActions as ActionsType;
 		case 'Node':
 			return NodeActions as ActionsType;

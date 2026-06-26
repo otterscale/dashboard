@@ -15,6 +15,8 @@
 	import { getContext, onDestroy } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import * as Code from '$lib/components/custom/code';
 	import * as Avatar from '$lib/components/ui/avatar';
 	import { Button } from '$lib/components/ui/button';
@@ -27,6 +29,7 @@
 	import * as Popover from '$lib/components/ui/popover';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { m } from '$lib/paraglide/messages';
+	import { bump } from '$lib/stores/pulse.svelte';
 	import { cn } from '$lib/utils';
 
 	let {
@@ -240,7 +243,14 @@
 				</Button>
 			{:else if stepIndex === 3}
 				<div></div>
-				<Button onclick={onFinish}>{m.done()}</Button>
+				<Button
+					onclick={() => {
+						bump('links');
+						const target = resolve('/(auth)/[cluster]/console', { cluster: clusterName });
+						goto(target);
+						onFinish();
+					}}>{m.done()}</Button
+				>
 			{/if}
 		</div>
 	{/if}

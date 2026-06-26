@@ -1,21 +1,30 @@
 <script lang="ts">
 	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
+	import InfoIcon from '@lucide/svelte/icons/info';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
-	import { PrometheusDriver, SampleValue } from 'prometheus-query';
+	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
+	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
-	import { computeStep } from '$lib/prometheus';
+	import {
+		computeStep,
+		type DataPoint,
+		fetchCombinedFlattenedRange,
+		vllmMetricWithSelector
+	} from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
 		cluster,
+		namespace,
 		start,
 		end,
 		endIsNow,
@@ -23,27 +32,31 @@
 	}: {
 		prometheusDriver: PrometheusDriver;
 		cluster: string;
+		namespace: string;
 		start: Date;
 		end: Date;
 		endIsNow: boolean;
 		isReloading: boolean;
 	} = $props();
 
-	let ninety_fives = $state([] as SampleValue[]);
-	let ninety_nines = $state([] as SampleValue[]);
-	const times_to_first_token = $derived(
-		ninety_fives.map((sample, index) => ({
-			time: sample.time,
-			ninety_five: !isNaN(Number(sample.value)) ? Number(sample.value) : 0,
-			ninety_nine: !isNaN(Number(ninety_nines[index]?.value))
-				? Number(ninety_nines[index]?.value)
-				: 0
-		}))
-	);
+	let times_to_first_token = $state<DataPoint[]>([]);
+
+	function ttftQueries(): Record<string, string> {
+		const inner = vllmMetricWithSelector(
+			'vllm:time_to_first_token_seconds_bucket',
+			namespace,
+			undefined
+		);
+		const rate = `sum by(le) (rate(${inner}[5m]))`;
+		return {
+			p95: `histogram_quantile(0.95, ${rate})`,
+			p99: `histogram_quantile(0.99, ${rate})`
+		};
+	}
 
 	const configuration = {
-		ninety_five: { label: '95', color: 'var(--chart-1)' },
-		ninety_nine: { label: '99', color: 'var(--chart-2)' }
+		p95: { label: 'P95', color: 'var(--chart-1)' },
+		p99: { label: 'P99', color: 'var(--chart-2)' }
 	} satisfies Chart.ChartConfig;
 
 	const areaProps = {
@@ -53,35 +66,20 @@
 		motion: 'tween'
 	} as const;
 
-	async function fetchTimesToFirstToken(
-		quantile: number,
-		startMs: number,
-		endMs: number,
-		step: number
-	) {
-		const response = await prometheusDriver.rangeQuery(
-			`histogram_quantile(${quantile}, sum by(le) (rate(vllm:time_to_first_token_seconds_bucket{}[5m])))`,
-			startMs,
-			endMs,
-			step
-		);
-		if (quantile === 0.95) {
-			ninety_fives = response.result[0]?.values ?? [];
-		} else if (quantile === 0.99) {
-			ninety_nines = response.result[0]?.values ?? [];
-		}
-	}
-
 	async function fetch() {
 		try {
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const step = computeStep(startMs, endMs);
-			await Promise.all([
-				fetchTimesToFirstToken(0.95, startMs, endMs, step),
-				fetchTimesToFirstToken(0.99, startMs, endMs, step)
-			]);
+			times_to_first_token = await fetchCombinedFlattenedRange(
+				prometheusDriver,
+				ttftQueries(),
+				new Date(startMs),
+				new Date(endMs),
+				step
+			);
 		} catch (error) {
+			times_to_first_token = [];
 			console.error(`Fail to fetch time to first token data in cluster ${cluster}:`, error);
 		}
 	}
@@ -111,43 +109,51 @@
 </script>
 
 <Card.Root class="h-full">
-	<Card.Header>
-		<Card.Title>{m.time_to_first_token()}</Card.Title>
-		<Card.Description>
-			{m.llm_dashboard_time_to_first_token_tooltip()}
-		</Card.Description>
+	<Card.Header class="flex flex-row items-center gap-2 space-y-0">
+		<div class="grid flex-1 gap-1">
+			<Card.Title>{m.time_to_first_token()}</Card.Title>
+			<Card.Description>{m.llm_dashboard_time_to_first_token_description()}</Card.Description>
+		</div>
+		<Tooltip.Root>
+			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+				<InfoIcon class="size-5 text-muted-foreground" />
+			</Tooltip.Trigger>
+			<Tooltip.Content>
+				<p>{m.llm_dashboard_time_to_first_token_tooltip()}</p>
+			</Tooltip.Content>
+		</Tooltip.Root>
 	</Card.Header>
 	{#if !isLoaded}
 		<Card.Content>
-			<div class="flex h-[200px] w-full items-center justify-center">
+			<div class="flex h-45 w-full items-center justify-center">
 				<Loader2Icon class="size-12 animate-spin" />
 			</div>
 		</Card.Content>
 	{:else if times_to_first_token.length === 0}
 		<Card.Content>
-			<div class="flex h-[200px] w-full flex-col items-center justify-center">
-				<ChartLineIcon class="size-50 animate-pulse text-muted-foreground" />
-				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
+			<div class="flex h-45 w-full flex-col items-center justify-center gap-2">
+				<ChartLineIcon class="size-12 animate-pulse text-muted-foreground" />
+				<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
 			</div>
 		</Card.Content>
 	{:else}
 		<Card.Content>
-			<Chart.Container config={configuration} class="h-[200px] w-full">
+			<Chart.Container config={configuration} class="h-45 w-full">
 				<AreaChart
 					data={times_to_first_token}
-					x="time"
+					x="date"
 					xScale={scaleUtc()}
 					yPadding={[0, 25]}
 					series={[
 						{
-							key: 'ninety_five',
-							label: configuration.ninety_five.label,
-							color: configuration.ninety_five.color
+							key: 'p95',
+							label: configuration.p95.label,
+							color: configuration.p95.color
 						},
 						{
-							key: 'ninety_nine',
-							label: configuration.ninety_nine.label,
-							color: configuration.ninety_nine.color
+							key: 'p99',
+							label: configuration.p99.label,
+							color: configuration.p99.color
 						}
 					]}
 					props={{
@@ -174,16 +180,17 @@
 						>
 							{#snippet formatter({ item, name, value })}
 								<div
-									style="--color-bg: {item.color}"
-									class="aspect-square h-full w-fit shrink-0 border-(--color-border) bg-(--color-bg)"
+									style="--color-bg: {item.color}; --color-border: {item.color};"
+									class="size-2.5 shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)"
 								></div>
-								<div
-									class="flex flex-1 shrink-0 items-center justify-between gap-2 text-xs leading-none"
-								>
+								<div class="flex flex-1 shrink-0 items-center justify-between leading-none">
 									<div class="grid gap-1.5">
 										<span class="text-muted-foreground">{name}</span>
 									</div>
-									<p class="font-mono">{Number(value).toFixed(2)} {m.sec()}</p>
+									<span class="font-mono font-medium text-foreground tabular-nums">
+										{(Number(value) * 1000).toFixed(0)}
+										{m.ms()}
+									</span>
 								</div>
 							{/snippet}
 						</Chart.Tooltip>

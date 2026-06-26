@@ -16,7 +16,6 @@
 	import LayersIcon from '@lucide/svelte/icons/layers';
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
 	import NetworkIcon from '@lucide/svelte/icons/network';
-	import PlusIcon from '@lucide/svelte/icons/plus';
 	import UserStarIcon from '@lucide/svelte/icons/user-star';
 	import { type Link, LinkService } from '@otterscale/api/link/v1';
 	import { ResourceService } from '@otterscale/api/resource/v1';
@@ -36,7 +35,8 @@
 		startTour,
 		WorkspaceSwitcher
 	} from '$lib/components/layout';
-	import DialogImportCluster from '$lib/components/layout/dialog-import-cluster.svelte';
+	import Registe from '$lib/components/layout/dialog-import-cluster.svelte';
+	import RegisteClusterTrigger from '$lib/components/layout/registe-cluster-trigger.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -46,6 +46,8 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
 	import { breadcrumbs } from '$lib/stores';
+	import { pulse } from '$lib/stores/pulse.svelte';
+	import { getAdditionalItems } from '$lib/utils/features';
 
 	import type { LayoutData } from './$types';
 
@@ -71,27 +73,35 @@
 	let aboutOpen = $state(false);
 	let importOpen = $state(false);
 
-	async function fetchClusters(): Promise<Link[]> {
+	async function fetchClusters(signal?: AbortSignal): Promise<Link[]> {
 		try {
-			const response = await linkClient.listLinks({});
+			const response = await linkClient.listLinks({}, { signal });
 			return response.links;
 		} catch (error) {
+			if (signal?.aborted) throw error;
 			console.error('Failed to fetch links:', error);
 			return [];
 		}
 	}
 
-	async function fetchWorkspaces(cluster: string): Promise<TenantOtterscaleIoV1Alpha1Workspace[]> {
+	async function fetchWorkspaces(
+		cluster: string,
+		signal?: AbortSignal
+	): Promise<TenantOtterscaleIoV1Alpha1Workspace[]> {
 		try {
-			const response = await resourceClient.list({
-				cluster: cluster,
-				group: 'tenant.otterscale.io',
-				version: 'v1alpha1',
-				resource: 'workspaces',
-				labelSelector: 'user.otterscale.io/' + data.user.sub
-			});
+			const response = await resourceClient.list(
+				{
+					cluster: cluster,
+					group: 'tenant.otterscale.io',
+					version: 'v1alpha1',
+					resource: 'workspaces',
+					labelSelector: 'user.otterscale.io/' + data.user.sub
+				},
+				{ signal }
+			);
 			return response.items.map((item) => item.object as TenantOtterscaleIoV1Alpha1Workspace);
 		} catch (error) {
+			if (signal?.aborted) throw error;
 			console.error('Failed to fetch workspaces:', error);
 			return [];
 		}
@@ -121,21 +131,58 @@
 		}
 		isMounted = true;
 	});
+	$effect(() => {
+		if (pulse.workspaces === 0) return;
 
-	function resourceUrl(
-		group: string,
-		version: string,
-		kind: string,
-		resource: string,
-		namespace?: string
-	) {
+		if (!activeCluster) return;
+
+		const abortController = new AbortController();
+		fetchWorkspaces(activeCluster, abortController.signal)
+			.then((resources) => {
+				if (!abortController.signal.aborted) workspaces = resources;
+			})
+			.catch((err) => {
+				if (!abortController.signal.aborted) console.error(err);
+			});
+
+		return () => abortController.abort();
+	});
+	$effect(() => {
+		if (pulse.links === 0) return;
+
+		if (!activeCluster) return;
+
+		const abortController = new AbortController();
+		fetchClusters(abortController.signal)
+			.then((resources) => {
+				if (!abortController.signal.aborted) links = resources;
+			})
+			.catch((err) => {
+				if (!abortController.signal.aborted) console.error(err);
+			});
+
+		return () => abortController.abort();
+	});
+
+	function resourceUrl(options: {
+		group: string;
+		version: string;
+		kind: string;
+		resource: string;
+		labelSelector?: string;
+		fieldSelector?: string;
+	}) {
+		const { group, version, kind, resource, labelSelector, fieldSelector } = options;
+
 		const workspace = page.params.workspace ?? '_';
+
 		// eslint-disable-next-line svelte/prefer-svelte-reactivity
-		const params = new URLSearchParams({ group, version, kind, resource });
-		if (namespace) {
-			params.set('namespace', namespace);
-		}
-		return resolve(`/(auth)/${activeCluster}/${workspace}?${params}`);
+		const urlSearchParameters = new URLSearchParams({ group, version, kind, resource });
+
+		if (labelSelector) urlSearchParameters.set('labelSelector', labelSelector);
+		if (fieldSelector) urlSearchParameters.set('fieldSelector', fieldSelector);
+
+		return resolve(`/(auth)/${activeCluster}/${workspace}?${urlSearchParameters}`);
 	}
 
 	const navData = $derived({
@@ -199,31 +246,31 @@
 				items: [
 					{
 						title: m.model_service(),
-						url: resourceUrl(
-							'serving.kserve.io',
-							'v1alpha2',
-							'LLMInferenceService',
-							'llminferenceservices'
-						)
+						url: resourceUrl({
+							group: 'serving.kserve.io',
+							version: 'v1alpha2',
+							kind: 'LLMInferenceService',
+							resource: 'llminferenceservices'
+						})
 					},
 					{
 						title: m.model_configuration(),
-						url: resourceUrl(
-							'serving.kserve.io',
-							'v1alpha2',
-							'LLMInferenceServiceConfig',
-							'llminferenceserviceconfigs'
-						)
+						url: resourceUrl({
+							group: 'serving.kserve.io',
+							version: 'v1alpha2',
+							kind: 'LLMInferenceServiceConfig',
+							resource: 'llminferenceserviceconfigs',
+							fieldSelector: 'metadata.namespace!=kserve,metadata.namespace!=otterscale-system'
+						})
 					},
 					{
 						title: m.model_template(),
-						url: resourceUrl(
-							'serving.kserve.io',
-							'v1alpha2',
-							'LLMInferenceServiceConfig',
-							'llminferenceserviceconfigs',
-							'otterscale-system'
-						)
+						url: page.params.workspace
+							? resolve('/(auth)/[cluster]/[workspace]/model-templates', {
+									cluster: activeCluster,
+									workspace: page.params.workspace
+								})
+							: ''
 					}
 				]
 			},
@@ -243,11 +290,21 @@
 					},
 					{
 						title: m.release(),
-						url: resourceUrl('helm.toolkit.fluxcd.io', 'v2', 'HelmRelease', 'helmreleases')
+						url: resourceUrl({
+							group: 'helm.toolkit.fluxcd.io',
+							version: 'v2',
+							kind: 'HelmRelease',
+							resource: 'helmreleases'
+						})
 					},
 					{
 						title: m.repository(),
-						url: resourceUrl('source.toolkit.fluxcd.io', 'v1', 'HelmRepository', 'helmrepositories')
+						url: resourceUrl({
+							group: 'source.toolkit.fluxcd.io',
+							version: 'v1',
+							kind: 'HelmRepository',
+							resource: 'helmrepositories'
+						})
 					}
 				]
 			},
@@ -257,15 +314,30 @@
 				items: [
 					{
 						title: m.application(),
-						url: resourceUrl('kro.run', 'v1alpha1', 'Application', 'applications')
+						url: resourceUrl({
+							group: 'kro.run',
+							version: 'v1alpha1',
+							kind: 'Application',
+							resource: 'applications'
+						})
 					},
 					{
 						title: m.schedule(),
-						url: resourceUrl('kro.run', 'v1alpha1', 'Schedule', 'schedules')
+						url: resourceUrl({
+							group: 'kro.run',
+							version: 'v1alpha1',
+							kind: 'Schedule',
+							resource: 'schedules'
+						})
 					},
 					{
 						title: m.task(),
-						url: resourceUrl('kro.run', 'v1alpha1', 'Task', 'tasks')
+						url: resourceUrl({
+							group: 'kro.run',
+							version: 'v1alpha1',
+							kind: 'Task',
+							resource: 'tasks'
+						})
 					}
 				]
 			},
@@ -275,20 +347,30 @@
 				items: [
 					{
 						title: m.virtual_machine(),
-						url: resourceUrl('kubevirt.io', 'v1', 'VirtualMachine', 'virtualmachines')
+						url: resourceUrl({
+							group: 'kubevirt.io',
+							version: 'v1',
+							kind: 'VirtualMachine',
+							resource: 'virtualmachines'
+						})
 					},
 					{
 						title: m.data_volume(),
-						url: resourceUrl('cdi.kubevirt.io', 'v1beta1', 'DataVolume', 'datavolumes')
+						url: resourceUrl({
+							group: 'cdi.kubevirt.io',
+							version: 'v1beta1',
+							kind: 'DataVolume',
+							resource: 'datavolumes'
+						})
 					},
 					{
 						title: m.instance_type(),
-						url: resourceUrl(
-							'instancetype.kubevirt.io',
-							'v1beta1',
-							'VirtualMachineInstancetype',
-							'virtualmachineinstancetypes'
-						)
+						url: resourceUrl({
+							group: 'instancetype.kubevirt.io',
+							version: 'v1beta1',
+							kind: 'VirtualMachineInstancetype',
+							resource: 'virtualmachineinstancetypes'
+						})
 					}
 				]
 			},
@@ -298,12 +380,12 @@
 				items: [
 					{
 						title: m.object_storage(),
-						url: resourceUrl(
-							'objectbucket.io',
-							'v1alpha1',
-							'ObjectBucketClaim',
-							'objectbucketclaims'
-						)
+						url: resourceUrl({
+							group: 'objectbucket.io',
+							version: 'v1alpha1',
+							kind: 'ObjectBucketClaim',
+							resource: 'objectbucketclaims'
+						})
 					}
 				]
 			},
@@ -315,7 +397,12 @@
 							items: [
 								{
 									title: m.workspace(),
-									url: resourceUrl('tenant.otterscale.io', 'v1alpha1', 'Workspace', 'workspaces')
+									url: resourceUrl({
+										group: 'tenant.otterscale.io',
+										version: 'v1alpha1',
+										kind: 'Workspace',
+										resource: 'workspaces'
+									})
 								},
 								{
 									title: m.module(),
@@ -325,7 +412,10 @@
 												workspace: page.params.workspace
 											})
 										: ''
-								}
+								},
+								...(page.params.workspace
+									? getAdditionalItems(activeCluster, page.params.workspace!)
+									: [])
 							]
 						}
 					]
@@ -339,27 +429,57 @@
 				items: [
 					{
 						title: m.deployment(),
-						url: resourceUrl('apps', 'v1', 'Deployment', 'deployments')
+						url: resourceUrl({
+							group: 'apps',
+							version: 'v1',
+							kind: 'Deployment',
+							resource: 'deployments'
+						})
 					},
 					{
 						title: m.stateful_set(),
-						url: resourceUrl('apps', 'v1', 'StatefulSet', 'statefulsets')
+						url: resourceUrl({
+							group: 'apps',
+							version: 'v1',
+							kind: 'StatefulSet',
+							resource: 'statefulsets'
+						})
 					},
 					{
 						title: m.daemon_set(),
-						url: resourceUrl('apps', 'v1', 'DaemonSet', 'daemonsets')
+						url: resourceUrl({
+							group: 'apps',
+							version: 'v1',
+							kind: 'DaemonSet',
+							resource: 'daemonsets'
+						})
 					},
 					{
 						title: m.cronjob(),
-						url: resourceUrl('batch', 'v1', 'CronJob', 'cronjobs')
+						url: resourceUrl({
+							group: 'batch',
+							version: 'v1',
+							kind: 'CronJob',
+							resource: 'cronjobs'
+						})
 					},
 					{
 						title: m.job(),
-						url: resourceUrl('batch', 'v1', 'Job', 'jobs')
+						url: resourceUrl({
+							group: 'batch',
+							version: 'v1',
+							kind: 'Job',
+							resource: 'jobs'
+						})
 					},
 					{
 						title: m.pod(),
-						url: resourceUrl('', 'v1', 'Pod', 'pods')
+						url: resourceUrl({
+							group: '',
+							version: 'v1',
+							kind: 'Pod',
+							resource: 'pods'
+						})
 					}
 				]
 			},
@@ -369,11 +489,21 @@
 				items: [
 					{
 						title: m.config_map(),
-						url: resourceUrl('', 'v1', 'ConfigMap', 'configmaps')
+						url: resourceUrl({
+							group: '',
+							version: 'v1',
+							kind: 'ConfigMap',
+							resource: 'configmaps'
+						})
 					},
 					{
 						title: m.secret(),
-						url: resourceUrl('', 'v1', 'Secret', 'secrets')
+						url: resourceUrl({
+							group: '',
+							version: 'v1',
+							kind: 'Secret',
+							resource: 'secrets'
+						})
 					}
 				]
 			},
@@ -383,19 +513,39 @@
 				items: [
 					{
 						title: m.service(),
-						url: resourceUrl('', 'v1', 'Service', 'services')
+						url: resourceUrl({
+							group: '',
+							version: 'v1',
+							kind: 'Service',
+							resource: 'services'
+						})
 					},
 					{
 						title: m.http_route(),
-						url: resourceUrl('gateway.networking.k8s.io', 'v1', 'HTTPRoute', 'httproutes')
+						url: resourceUrl({
+							group: 'gateway.networking.k8s.io',
+							version: 'v1',
+							kind: 'HTTPRoute',
+							resource: 'httproutes'
+						})
 					},
 					{
 						title: m.gateway(),
-						url: resourceUrl('gateway.networking.k8s.io', 'v1', 'Gateway', 'gateways')
+						url: resourceUrl({
+							group: 'gateway.networking.k8s.io',
+							version: 'v1',
+							kind: 'Gateway',
+							resource: 'gateways'
+						})
 					},
 					{
 						title: m.network_policy(),
-						url: resourceUrl('networking.k8s.io', 'v1', 'NetworkPolicy', 'networkpolicies')
+						url: resourceUrl({
+							group: 'networking.k8s.io',
+							version: 'v1',
+							kind: 'NetworkPolicy',
+							resource: 'networkpolicies'
+						})
 					}
 				]
 			},
@@ -405,15 +555,21 @@
 				items: [
 					{
 						title: m.persistent_volume_claim(),
-						url: resourceUrl('', 'v1', 'PersistentVolumeClaim', 'persistentvolumeclaims')
-					},
-					{
-						title: m.persistent_volume(),
-						url: resourceUrl('', 'v1', 'PersistentVolume', 'persistentvolumes')
+						url: resourceUrl({
+							group: '',
+							version: 'v1',
+							kind: 'PersistentVolumeClaim',
+							resource: 'persistentvolumeclaims'
+						})
 					},
 					{
 						title: m.storage_class(),
-						url: resourceUrl('storage.k8s.io', 'v1', 'StorageClass', 'storageclasses')
+						url: resourceUrl({
+							group: 'storage.k8s.io',
+							version: 'v1',
+							kind: 'StorageClass',
+							resource: 'storageclasses'
+						})
 					}
 				]
 			},
@@ -422,32 +578,58 @@
 				icon: BracesIcon,
 				items: [
 					{
-						title: m.namespace(),
-						url: resourceUrl('', 'v1', 'Namespace', 'namespaces')
-					},
-					{
 						title: m.service_account(),
-						url: resourceUrl('', 'v1', 'ServiceAccount', 'serviceaccounts')
+						url: resourceUrl({
+							group: '',
+							version: 'v1',
+							kind: 'ServiceAccount',
+							resource: 'serviceaccounts'
+						})
 					},
 					{
 						title: m.role(),
-						url: resourceUrl('rbac.authorization.k8s.io', 'v1', 'Role', 'roles')
+						url: resourceUrl({
+							group: 'rbac.authorization.k8s.io',
+							version: 'v1',
+							kind: 'Role',
+							resource: 'roles'
+						})
 					},
 					{
 						title: m.role_binding(),
-						url: resourceUrl('rbac.authorization.k8s.io', 'v1', 'RoleBinding', 'rolebindings')
+						url: resourceUrl({
+							group: 'rbac.authorization.k8s.io',
+							version: 'v1',
+							kind: 'RoleBinding',
+							resource: 'rolebindings'
+						})
 					},
 					{
 						title: m.resource_quota(),
-						url: resourceUrl('', 'v1', 'ResourceQuota', 'resourcequotas')
+						url: resourceUrl({
+							group: '',
+							version: 'v1',
+							kind: 'ResourceQuota',
+							resource: 'resourcequotas'
+						})
 					},
 					{
 						title: m.limit_range(),
-						url: resourceUrl('', 'v1', 'LimitRange', 'limitranges')
+						url: resourceUrl({
+							group: '',
+							version: 'v1',
+							kind: 'LimitRange',
+							resource: 'limitranges'
+						})
 					},
 					{
 						title: m.event(),
-						url: resourceUrl('', 'v1', 'Event', 'events')
+						url: resourceUrl({
+							group: '',
+							version: 'v1',
+							kind: 'Event',
+							resource: 'events'
+						})
 					}
 				]
 			},
@@ -457,32 +639,61 @@
 				items: [
 					{
 						title: m.node(),
-						url: resourceUrl('', 'v1', 'Node', 'nodes')
-					},
-					{
-						title: m.custom_resource_definition(),
-						url: resourceUrl(
-							'apiextensions.k8s.io',
-							'v1',
-							'CustomResourceDefinition',
-							'customresourcedefinitions'
-						)
-					},
-					{
-						title: m.cluster_role(),
-						url: resourceUrl('rbac.authorization.k8s.io', 'v1', 'ClusterRole', 'clusterroles')
-					},
-					{
-						title: m.cluster_role_binding(),
-						url: resourceUrl(
-							'rbac.authorization.k8s.io',
-							'v1',
-							'ClusterRoleBinding',
-							'clusterrolebindings'
-						)
+						url: resourceUrl({
+							group: '',
+							version: 'v1',
+							kind: 'Node',
+							resource: 'nodes'
+						})
 					}
 				]
-			}
+			},
+			...(data.isClusterAdmin
+				? [
+						{
+							title: m.administration(),
+							icon: UserStarIcon,
+							items: [
+								{
+									title: m.namespace(),
+									url: resourceUrl({
+										group: '',
+										version: 'v1',
+										kind: 'Namespace',
+										resource: 'namespaces'
+									})
+								},
+								{
+									title: m.custom_resource_definition(),
+									url: resourceUrl({
+										group: 'apiextensions.k8s.io',
+										version: 'v1',
+										kind: 'CustomResourceDefinition',
+										resource: 'customresourcedefinitions'
+									})
+								},
+								{
+									title: m.cluster_role(),
+									url: resourceUrl({
+										group: 'rbac.authorization.k8s.io',
+										version: 'v1',
+										kind: 'ClusterRole',
+										resource: 'clusterroles'
+									})
+								},
+								{
+									title: m.cluster_role_binding(),
+									url: resourceUrl({
+										group: 'rbac.authorization.k8s.io',
+										version: 'v1',
+										kind: 'ClusterRoleBinding',
+										resource: 'clusterrolebindings'
+									})
+								}
+							]
+						}
+					]
+				: [])
 		]
 	});
 </script>
@@ -492,7 +703,6 @@
 </svelte:head>
 
 <DialogAbout bind:open={aboutOpen} />
-
 <Sidebar.Provider class="h-svh overflow-hidden" bind:open={sidebarOpen}>
 	<Sidebar.Root id="sidebar-guide-step" collapsible="icon" variant="inset" class="p-3">
 		{#if activeCluster && isMounted}
@@ -502,7 +712,6 @@
 					{workspaces}
 					user={data.user}
 					workspace={page.params.workspace}
-					onsuccess={async () => (workspaces = await fetchWorkspaces(activeCluster))}
 				/>
 			</Sidebar.Header>
 			<Sidebar.Content class="gap-2">
@@ -627,23 +836,13 @@
 									</DropdownMenu.RadioGroup>
 								{/if}
 								{#if data.user.roles.includes('admin')}
-									<DropdownMenu.Separator />
-									<DropdownMenu.Item onclick={() => (importOpen = true)}>
-										<PlusIcon class="mr-2 size-4" />
-										{m.add_cluster()}
-									</DropdownMenu.Item>
+									<RegisteClusterTrigger bind:open={importOpen} />
 								{/if}
 							</DropdownMenu.Group>
 						</DropdownMenu.Content>
 					</DropdownMenu.Root>
 					<Tooltip.Content>Switch Cluster</Tooltip.Content>
 				</Tooltip.Root>
-				<DialogImportCluster
-					bind:open={importOpen}
-					onsuccess={async () => {
-						links = await fetchClusters();
-					}}
-				/>
 			</div>
 		</header>
 		<main class="flex min-w-0 flex-1 flex-col overflow-auto px-2 md:px-4 lg:px-8">
@@ -691,3 +890,10 @@
 		{/if}
 	{/each}
 {/snippet}
+
+<Registe
+	bind:open={importOpen}
+	onsuccess={async () => {
+		links = await fetchClusters();
+	}}
+/>

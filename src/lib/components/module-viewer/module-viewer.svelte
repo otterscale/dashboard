@@ -2,7 +2,9 @@
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import Columns3Icon from '@lucide/svelte/icons/columns-3';
 	import EraserIcon from '@lucide/svelte/icons/eraser';
+	import type { Schema } from '@sjsf/form';
 	import type { ColumnDef } from '@tanstack/table-core';
+	import type { ValidateFunction } from 'ajv';
 	import type { Snippet } from 'svelte';
 
 	import { DynamicTable } from '$lib/components/dynamic-table';
@@ -12,6 +14,7 @@
 	import * as Item from '$lib/components/ui/item';
 
 	import BulkInstall from './bulk-install.svelte';
+	import BulkUpgrade from './bulk-upgrade.svelte';
 	import Grid from './grid-layout.svelte';
 	import Actions from './module-viewer-actions/actions.svelte';
 	import {
@@ -25,11 +28,15 @@
 		cluster,
 		namespace,
 		data,
+		schema,
+		validate,
 		reload
 	}: {
 		cluster: string;
 		namespace: string;
 		data: Record<ModuleAttribute, JsonValue>[];
+		schema: Schema;
+		validate?: ValidateFunction;
 		reload: Snippet<[]>;
 	} = $props();
 
@@ -49,11 +56,11 @@
 		</Item.Root>
 	</div>
 	<DynamicTable {data} {columnDefinitions} {uiSchemas} {reload}>
-		{#snippet gridsLayout({ table, handleClear })}
+		{#snippet gridLayout({ table, handleClear })}
 			{#if table.getRowModel().rows?.length}
 				<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
 					{#each table.getRowModel().rows as row (row.id)}
-						<Grid {row} {cluster} />
+						<Grid {row} {cluster} {schema} {validate} />
 					{/each}
 				</div>
 			{:else}
@@ -78,10 +85,11 @@
 			{/if}
 		{/snippet}
 		{#snippet bulkCreate({ table })}
-			<BulkInstall {table} {cluster} />
+			<BulkInstall {table} {cluster} {validate} />
+			<BulkUpgrade {table} {cluster} {validate} />
 		{/snippet}
 		{#snippet rowActions({ row })}
-			<Actions {row} {cluster} />
+			<Actions {row} {cluster} {schema} {validate} />
 		{/snippet}
 	</DynamicTable>
 </div>

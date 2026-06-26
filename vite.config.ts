@@ -6,8 +6,11 @@ import devtoolsJson from 'vite-plugin-devtools-json';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { defineConfig } from 'vitest/config';
 
+import { extraVitePlugins } from './extra-config/vite-config.ts';
+
 export default defineConfig({
 	plugins: [
+		...extraVitePlugins(),
 		tailwindcss(),
 		sveltekit(),
 		devtoolsJson(),
