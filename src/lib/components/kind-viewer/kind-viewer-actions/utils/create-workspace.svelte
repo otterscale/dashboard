@@ -405,7 +405,7 @@
 						licenseInjection: {
 							'ui:options': {
 								shadcn4Checkbox: {
-									disabled: !page.data.isRestricted
+									disabled: page.data.isRestricted
 								}
 							}
 						}
