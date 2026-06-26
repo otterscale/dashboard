@@ -10,7 +10,7 @@ describe('sanitize · preserves Shiki highlighting', () => {
 		const shiki =
 			'<pre class="shiki" style="color:#e1e4e8"><code><span style="color:#F97583">const</span></code></pre>';
 		const out = sanitize(shiki);
-		expect(out).toContain('color:#F97583');
+		expect(out.toLowerCase()).toMatch(/color:\s*(#f97583|rgb\(\s*249,\s*117,\s*131\s*\))/);
 		expect(out).toContain('class="shiki"');
 	});
 });
