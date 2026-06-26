@@ -18,6 +18,7 @@
 	} from '@sjsf/form';
 	import { tick } from 'svelte';
 
+	import { page } from '$app/state';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Command from '$lib/components/ui/command/index.js';
 	import * as Empty from '$lib/components/ui/empty/index.js';
@@ -25,13 +26,13 @@
 	import * as Popover from '$lib/components/ui/popover/index.js';
 	import { cn } from '$lib/utils.js';
 
-	import { roles } from './role-combobox';
+	import { getRoles } from './role-combobox';
 
 	const ctx = getFormContext();
 	let { value = $bindable(), config, handlers }: ComponentProps['comboboxWidget'] = $props();
 
 	const { ...buttonHandlers } = $derived(handlers);
-	const enumerations: { label: string; value: string }[] = roles;
+	const enumerations: { label: string; value: string }[] = getRoles(page.data.isRestricted);
 
 	let open = $state(false);
 	let triggerReference = $state<HTMLButtonElement>(null!);
