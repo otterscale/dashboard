@@ -70,12 +70,13 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	const formCount = 4;
+	const formCount = 5;
 	const steps = Array.from({ length: formCount + 1 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 
 	let values = $state(getInitialValues());
 	let resourceLimitation = $state(getInitialResourceLimitation());
+	let licenseInjectionDraft = $state(getInitialLicenseInjectionDraft());
 	let currentStep = $state(firstStep);
 	let isSubmitting = $state(false);
 	let membersFormReference = $state(null);
@@ -98,6 +99,7 @@
 						serviceAccount: false
 					}
 				],
+				licenseInjection: false,
 				networkIsolation: {
 					enabled: false
 				}
@@ -110,10 +112,16 @@
 			ResourceQuota: {}
 		};
 	}
+	function getInitialLicenseInjectionDraft() {
+		return {
+			licenseInjection: false
+		};
+	}
 
 	function initiate() {
 		values = getInitialValues();
 		resourceLimitation = getInitialResourceLimitation();
+		licenseInjectionDraft = getInitialLicenseInjectionDraft();
 		currentStep = firstStep;
 		isSubmitting = false;
 	}
@@ -376,6 +384,62 @@
 			<Tabs.Content value={steps[2]}>
 				<Form
 					schema={{
+						type: 'object',
+						title: 'License Injection',
+						properties: {
+							licenseInjection: {
+								...(lodash.get(
+									jsonSchema,
+									'properties.spec.properties.licenseInjection'
+								) as Schema),
+								title: 'Enable'
+							}
+						}
+					} as Schema}
+					uiSchema={{
+						'ui:options': {
+							translations: {
+								submit: 'Next'
+							}
+						},
+						licenseInjection: {
+							'ui:options': {
+								shadcn4Checkbox: {}
+							}
+						}
+					} as UiSchemaRoot}
+					initialValue={{ licenseInjection: false } as FormValue}
+					handleSubmit={{
+						posthook: (form: FormState<FormValue>) => {
+							handleNext();
+
+							const formValue = getValueSnapshot(form);
+
+							lodash.set(
+								values,
+								['spec', 'licenseInjection'],
+								lodash.get(formValue, 'licenseInjection', false)
+							);
+						}
+					}}
+					bind:values={licenseInjectionDraft}
+				>
+					{#snippet actions()}
+						<div class="flex w-full items-center justify-between gap-3">
+							<Button
+								onclick={() => {
+									handlePrevious();
+								}}>Previous</Button
+							>
+							<SubmitButton />
+						</div>
+					{/snippet}
+				</Form>
+			</Tabs.Content>
+
+			<Tabs.Content value={steps[3]}>
+				<Form
+					schema={{
 						...lodash.omit(
 							lodash.get(jsonSchema, 'properties.spec.properties.networkIsolation') as Schema,
 							['properties']
@@ -441,7 +505,7 @@
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[3]}>
+			<Tabs.Content value={steps[4]}>
 				{@const editable = role === 'Cluster Admin'}
 				<Form
 					schema={{
@@ -571,7 +635,7 @@
 												memory: '2Gi'
 											},
 											defaultRequest: {
-												cpu: '0.5',
+												cpu: '100m',
 												memory: '1Gi'
 											}
 										}
