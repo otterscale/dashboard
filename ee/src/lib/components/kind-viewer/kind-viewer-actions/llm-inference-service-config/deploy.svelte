@@ -533,6 +533,8 @@
 									const name = lodash.get(getValueSnapshot(metadataFormReference!), ['name'], '');
 
 									if (isOffloaded) {
+										lodash.set(values, ['labels', 'app.kubernetes.io/name'], name);
+										lodash.set(values, ['labels', 'app.kubernetes.io/part-of'], 'llm-d-lmcache');
 										lodash.set(
 											values,
 											['spec', 'baseRefs'],
@@ -544,6 +546,16 @@
 											]
 										);
 									} else {
+										lodash.set(
+											values,
+											['labels', 'app.kubernetes.io/name'],
+											lodash.get(object, ['labels', 'app.kubernetes.io/name'])
+										);
+										lodash.set(
+											values,
+											['labels', 'app.kubernetes.io/part-of'],
+											lodash.get(object, ['labels', 'app.kubernetes.io/part-of'])
+										);
 										lodash.set(
 											values,
 											['spec', 'baseRefs'],
@@ -680,7 +692,7 @@
 															cluster,
 															namespace,
 															group: 'serving.kserve.io',
-															version: 'v1alpha2',
+															version: 'v1alpha1',
 															resource: 'llminferenceserviceconfigs',
 															manifest: new TextEncoder().encode(stringify(workloadConfiguration))
 														}),
@@ -688,7 +700,7 @@
 															cluster,
 															namespace,
 															group: 'serving.kserve.io',
-															version: 'v1alpha2',
+															version: 'v1alpha1',
 															resource: 'llminferenceserviceconfigs',
 															manifest: new TextEncoder().encode(
 																stringify(familyEndpointPickerConfiguration)
