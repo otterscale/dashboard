@@ -1,0 +1,74 @@
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceServiceConfig
+metadata:
+  name: qwen-qwen3-5-9b
+  namespace: otterscale-system
+spec:
+  model:
+    name: Qwen/Qwen3.5-9B
+    uri: hf://Qwen/Qwen3.5-9B
+  parallelism:
+    tensor: 8
+  replicas: 1
+  router:
+    gateway: {}
+    route: {}
+    scheduler: {}
+  template:
+    containers:
+      - args:
+          - --trust-remote-code
+          - --tensor-parallel-size
+          - "8"
+          - --max-num-batched-tokens
+          - "8192"
+          - --max-num-seqs
+          - "256"
+          - --gpu-memory-utilization
+          - "0.9"
+          - --enable-auto-tool-choice
+          - --tool-call-parser
+          - qwen3_coder
+          - --reasoning-parser
+          - qwen3
+          - --speculative-config
+          - '{"method":"mtp","num_speculative_tokens":1}'
+        env:
+          - name: LIBRARY_PATH
+            value: /usr/lib/x86_64-linux-gnu:/usr/lib64
+        livenessProbe:
+          failureThreshold: 5
+          httpGet:
+            path: /health
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 60
+          periodSeconds: 60
+          timeoutSeconds: 5
+        name: main
+        resources:
+          limits:
+            cpu: "36"
+            memory: 36Gi
+            nvidia.com/gpu: "8"
+          requests:
+            cpu: "18"
+            memory: 36Gi
+            nvidia.com/gpu: "8"
+        startupProbe:
+          failureThreshold: 60
+          httpGet:
+            path: /health
+            port: 8000
+            scheme: HTTP
+          periodSeconds: 60
+          successThreshold: 1
+          timeoutSeconds: 5
+        volumeMounts:
+          - mountPath: /dev/shm
+            name: dshm
+    volumes:
+      - emptyDir:
+          medium: Memory
+          sizeLimit: 9Gi
+        name: dshm
