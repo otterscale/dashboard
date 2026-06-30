@@ -1,16 +1,20 @@
-import {extractBlockSize} from './utils.ts'
-import type { ServingKserveIoV1Alpha2LLMInferenceService } from '@otterscale/types';
+import type { ServingKserveIoV1Alpha2LLMInferenceServiceConfig } from '@otterscale/types';
+import lodash from 'lodash';
 
 export function getFamilyEndpointPickerConfiguration({
 	modelServiceName,
 	namespace,
-	object,
+	object
 }: {
 	modelServiceName: string;
 	namespace: string;
-	object: ServingKserveIoV1Alpha2LLMInferenceService;
+	object: ServingKserveIoV1Alpha2LLMInferenceServiceConfig;
 }) {
-	const blockSize = extractBlockSize(object)
+	const blockSize = lodash.get(object, [
+		'metadata',
+		'annotations',
+		'model.otterscale.io/block-size'
+	]);
 
 	return {
 		apiVersion: 'serving.kserve.io/v1alpha1',

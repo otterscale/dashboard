@@ -718,7 +718,7 @@
 															''
 														) as string,
 														namespace,
-														modelService
+														object
 													});
 													const familyEndpointPickerConfiguration =
 														getFamilyEndpointPickerConfiguration({
