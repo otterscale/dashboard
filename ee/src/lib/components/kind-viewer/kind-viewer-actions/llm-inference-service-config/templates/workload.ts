@@ -1,10 +1,17 @@
+import {extractBlockSize} from './utils.ts'
+import type { ServingKserveIoV1Alpha2LLMInferenceService } from '@otterscale/types';
+
 export function getWorkloadConfiguration({
 	modelServiceName,
-	namespace
+	namespace,
+	object,
 }: {
 	modelServiceName: string;
 	namespace: string;
+	object: ServingKserveIoV1Alpha2LLMInferenceService;
 }) {
+	const blockSize = extractBlockSize(object)
+	
 	return {
 		apiVersion: 'serving.kserve.io/v1alpha1',
 		kind: 'LLMInferenceServiceConfig',
@@ -31,7 +38,7 @@ export function getWorkloadConfiguration({
 								'set -euo pipefail',
 								'ulimit -l unlimited || true',
 								`L2_ADAPTER_JSON='{"type":"fs_native","base_path":"/data/kv-l2","num_workers":32,"read_ahead_size":4096,"use_odirect":true}'`,
-								'echo "starting lmcache server (L1=20GB lazy init=5GB, L2=fs_native+odirect, base_path=/data/kv-l2, port=5757, http=8088, hash=sha256_cbor, chunk-size=2048)"',
+								`echo "starting lmcache server (L1=20GB lazy init=5GB, L2=fs_native+odirect, base_path=/data/kv-l2, port=5757, http=8088, hash=sha256_cbor, chunk-size=${blockSize})"`,
 								'echo "L2 adapter: ${L2_ADAPTER_JSON}"',
 								'# chunk-size MUST be a multiple of vLLM block_size (2096, mamba page size at TP=4).',
 								'# The vLLM-side connector queries this value from the server over MQ and asserts',
@@ -39,7 +46,7 @@ export function getWorkloadConfiguration({
 								'exec /opt/vllm/bin/lmcache server \\',
 								'  --host 0.0.0.0 \\',
 								'  --port 5757 \\',
-								'  --chunk-size 2048 \\',
+								`  --chunk-size ${blockSize} \\`,
 								'  --hash-algorithm sha256_cbor \\',
 								'  --l1-size-gb 20 \\',
 								'  --l1-use-lazy \\',

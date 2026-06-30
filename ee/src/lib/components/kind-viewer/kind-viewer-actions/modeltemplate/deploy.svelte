@@ -717,7 +717,8 @@
 															['metadata', 'name'],
 															''
 														) as string,
-														namespace
+														namespace,
+														modelService
 													});
 													const familyEndpointPickerConfiguration =
 														getFamilyEndpointPickerConfiguration({
@@ -727,7 +728,7 @@
 																''
 															) as string,
 															namespace,
-															modelUri: lodash.get(object, ['spec', 'model', 'uri'], '') as string
+															object
 														});
 
 													lodash.set(workloadConfiguration, 'metadata.ownerReferences', [

@@ -1,10 +1,17 @@
+import {extractBlockSize} from './utils.ts'
+import type { ServingKserveIoV1Alpha2LLMInferenceService } from '@otterscale/types';
+
 export function getFamilyEndpointPickerConfiguration({
 	modelServiceName,
-	namespace
+	namespace,
+	object,
 }: {
 	modelServiceName: string;
 	namespace: string;
+	object: ServingKserveIoV1Alpha2LLMInferenceService;
 }) {
+	const blockSize = extractBlockSize(object)
+
 	return {
 		apiVersion: 'serving.kserve.io/v1alpha1',
 		kind: 'LLMInferenceServiceConfig',
@@ -174,7 +181,7 @@ export function getFamilyEndpointPickerConfiguration({
 									},
 									{
 										name: 'LLMD_TOKENPROCESSORCONFIG_BLOCKSIZETOKEN',
-										value: '2096'
+										value: blockSize
 									}
 								],
 								startupProbe: {
