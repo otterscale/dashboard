@@ -1,4 +1,4 @@
-import type { ServingKserveIoV1Alpha2LLMInferenceService } from '@otterscale/types';
+import type { ServingKserveIoV1Alpha2LLMInferenceServiceConfig } from '@otterscale/types';
 
 export function getWorkloadConfiguration({
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -10,8 +10,7 @@ export function getWorkloadConfiguration({
 }: {
 	modelServiceName: string;
 	namespace: string;
-	object: ServingKserveIoV1Alpha2LLMInferenceService;
-	
+	object: ServingKserveIoV1Alpha2LLMInferenceServiceConfig;
 }) {
 	return {};
 }
