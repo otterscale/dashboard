@@ -1,14 +1,16 @@
+import type { ServingKserveIoV1Alpha2LLMInferenceService } from '@otterscale/types';
+
 export function getFamilyEndpointPickerConfiguration({
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	modelServiceName,
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
 	namespace,
 	// eslint-disable-next-line @typescript-eslint/no-unused-vars
-	modelUri
+	object
 }: {
 	modelServiceName: string;
 	namespace: string;
-	modelUri: string;
+	object: ServingKserveIoV1Alpha2LLMInferenceService;
 }) {
 	return {};
 }
