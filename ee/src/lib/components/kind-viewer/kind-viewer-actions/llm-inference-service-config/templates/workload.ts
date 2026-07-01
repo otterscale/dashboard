@@ -1,10 +1,25 @@
+import type { ServingKserveIoV1Alpha2LLMInferenceServiceConfig } from '@otterscale/types';
+import lodash from 'lodash';
+
 export function getWorkloadConfiguration({
 	modelServiceName,
-	namespace
+	namespace,
+	object
 }: {
 	modelServiceName: string;
 	namespace: string;
+	object: ServingKserveIoV1Alpha2LLMInferenceServiceConfig;
 }) {
+	const blockSize = lodash.get(object, [
+		'metadata',
+		'annotations',
+		'model.otterscale.io/block-size'
+	]);
+
+	const chunkSize = blockSize
+		? Math.max(1, Math.floor(1024 / Number(blockSize))) * Number(blockSize)
+		: undefined;
+
 	return {
 		apiVersion: 'serving.kserve.io/v1alpha2',
 		kind: 'LLMInferenceServiceConfig',
@@ -13,70 +28,153 @@ export function getWorkloadConfiguration({
 			namespace: namespace
 		},
 		spec: {
-			storageInitializer: { enabled: true },
+			storageInitializer: {
+				enabled: true
+			},
 			template: {
-				affinity: {
-					nodeAffinity: {
-						requiredDuringSchedulingIgnoredDuringExecution: {
-							nodeSelectorTerms: [
-								{
-									matchExpressions: [
-										{
-											key: 'node-role.phison.mw/gpu',
-											operator: 'In',
-											values: ['true']
-										}
-									]
-								}
-							]
-						}
-					}
-				},
+				serviceAccountName: `${namespace}-models`,
+				runtimeClassName: 'nvidia',
+				schedulerName: 'hami-scheduler',
 				containers: [
 					{
-						name: 'main',
-						env: [
-							{ name: 'CUDA_DISABLE_CONTROL', value: 'true' },
-							{ name: 'LMCACHE_LOG_LEVEL', value: 'INFO' },
-							{ name: 'LMCACHE_CONFIG_FILE', value: '/mooncake-config/mooncake_config.yaml' },
-							{ name: 'LMCACHE_USE_EXPERIMENTAL', value: 'True' },
-							{ name: 'NCCL_CUMEM_HOST_ENABLE', value: '0' },
-							{ name: 'PYTHONHASHSEED', value: '0' },
-							{ name: 'HF_HOME', value: '/model-cache' },
-							{ name: 'VLLM_CACHE_ROOT', value: '/vllm-cache' },
-							{ name: 'PROMETHEUS_MULTIPROC_DIR', value: '/tmp/lmcache_prometheus' }
+						image: 'harbor.phison.com/ai-mw/mw:501-0007.001',
+						imagePullPolicy: 'IfNotPresent',
+						name: 'lmcache-server',
+						command: ['/bin/bash', '-lc'],
+						args: [
+							'set -euo pipefail\nulimit -l unlimited || true\nexec /usr/local/bin/start-lmcache.sh\n'
 						],
+						ports: [
+							{
+								containerPort: 5757,
+								name: 'lmcache-zmq',
+								protocol: 'TCP'
+							},
+							{
+								containerPort: 8088,
+								name: 'lmcache-http',
+								protocol: 'TCP'
+							}
+						],
+						env: [
+							{
+								name: 'POD_IP',
+								valueFrom: {
+									fieldRef: {
+										apiVersion: 'v1',
+										fieldPath: 'status.podIP'
+									}
+								}
+							},
+							{
+								name: 'PYTHONHASHSEED',
+								value: '0'
+							},
+							{
+								name: 'LMCACHE_PORT',
+								value: '5757'
+							},
+							{
+								name: 'LMCACHE_CHUNK_SIZE',
+								value: `'${chunkSize}'`
+							},
+							{
+								name: 'LMCACHE_HASH_ALGORITHM',
+								value: 'sha256_cbor'
+							},
+							{
+								name: 'LMCACHE_L1_SIZE_GB',
+								value: '20'
+							},
+							{
+								name: 'LMCACHE_EVICTION_POLICY',
+								value: 'LRU'
+							},
+							{
+								name: 'LMCACHE_L2_STORE_POLICY',
+								value: 'default'
+							},
+							{
+								name: 'LMCACHE_NUM_WORKERS',
+								value: '32'
+							},
+							{
+								name: 'LMCACHE_HTTP_PORT',
+								value: '8088'
+							},
+							{
+								name: 'LMCACHE_FS_BASE_PATH',
+								value: '/mnt/nvme0'
+							},
+							{
+								name: 'LMCACHE_FS_NUM_WORKERS',
+								value: '32'
+							},
+							{
+								name: 'LMCACHE_FS_READ_AHEAD_SIZE',
+								value: '4096'
+							},
+							{
+								name: 'LMCACHE_FS_USE_ODIRECT',
+								value: 'true'
+							},
+							{
+								name: 'LMCACHE_LOG_LEVEL',
+								value: 'INFO'
+							},
+							{
+								name: 'LIBRARY_PATH',
+								value:
+									'/usr/lib/x86_64-linux-gnu:/usr/local/cuda-13.0/compat:/usr/local/cuda/compat'
+							},
+							{
+								name: 'PROMETHEUS_MULTIPROC_DIR',
+								value: '/tmp/lmcache_prometheus'
+							}
+						],
+						resources: {
+							requests: {
+								cpu: '1',
+								memory: '8Gi'
+							},
+							limits: {
+								cpu: '4',
+								memory: '28Gi'
+							}
+						},
 						securityContext: {
-							runAsNonRoot: false,
-							capabilities: { add: ['IPC_LOCK'] }
-						},
-						livenessProbe: {
-							httpGet: { path: '/health', port: 'vllm', scheme: 'HTTP' },
-							periodSeconds: 10,
-							timeoutSeconds: 5,
-							failureThreshold: 3
-						},
-						readinessProbe: {
-							httpGet: { path: '/v1/models', port: 'vllm', scheme: 'HTTP' },
-							periodSeconds: 30,
-							timeoutSeconds: 2,
-							failureThreshold: 3
+							runAsNonRoot: false
 						},
 						startupProbe: {
-							httpGet: { path: '/v1/models', port: 'vllm', scheme: 'HTTP' },
-							initialDelaySeconds: 60,
+							tcpSocket: {
+								port: 5757
+							},
+							initialDelaySeconds: 10,
+							periodSeconds: 10,
+							timeoutSeconds: 5,
+							failureThreshold: 30
+						},
+						livenessProbe: {
+							tcpSocket: {
+								port: 5757
+							},
 							periodSeconds: 15,
 							timeoutSeconds: 5,
-							failureThreshold: 80
+							failureThreshold: 3
 						},
 						volumeMounts: [
-							{ mountPath: '/dev/shm', name: 'pod-shm' },
-							{ mountPath: '/etc/ssl/certs', name: 'tls-certs', readOnly: true },
-							{ mountPath: '/local-disk', name: 'local-disk' },
-							{ mountPath: '/model-cache', name: 'hf-cache' },
-							{ mountPath: '/mooncake-config', name: 'mooncake-config' },
-							{ mountPath: '/tmp/lmcache_prometheus', name: 'lmcache-prometheus' },
-							{ mountPath: '/vllm-cache', name: 'vllm-cache' }
+							{
+								mountPath: '/dev/shm',
+								name: 'pod-shm'
+							},
+							{
+								mountPath: '/tmp/lmcache_prometheus',
+								name: 'lmcache-prometheus'
+							},
+							{
+								mountPath: '/data/kv-l2',
+								name: 'local-disk'
+							}
 						]
 					}
 				],
@@ -84,34 +182,26 @@ export function getWorkloadConfiguration({
 				volumes: [
 					{
 						name: 'local-disk',
-						persistentVolumeClaim: { claimName: `${modelServiceName}-local-disk-pvc` }
+						persistentVolumeClaim: {
+							claimName: `${modelServiceName}-local-disk-pvc`
+						}
 					},
 					{
 						name: 'pod-shm',
-						hostPath: { path: '/dev/shm', type: 'Directory' }
-					},
-					{
-						name: 'hf-cache',
-						persistentVolumeClaim: { claimName: `${modelServiceName}-model-cache-pvc` }
+						emptyDir: {
+							medium: 'Memory',
+							sizeLimit: '25Gi'
+						}
 					},
 					{
 						name: 'lmcache-prometheus',
 						emptyDir: {}
 					},
 					{
-						name: 'mooncake-config',
-						configMap: {
-							name: `${modelServiceName}-mooncake-lmcache-config`,
-							items: [{ key: 'mooncake_config.yaml', path: 'mooncake_config.yaml' }]
-						}
-					},
-					{
 						name: 'tls-certs',
-						secret: { secretName: '{{ ChildName .ObjectMeta.Name `-kserve-self-signed-certs` }}' }
-					},
-					{
-						name: 'vllm-cache',
-						persistentVolumeClaim: { claimName: `${modelServiceName}-vllm-cache-pvc` }
+						secret: {
+							secretName: '{{ ChildName .ObjectMeta.Name `-kserve-self-signed-certs` }}'
+						}
 					}
 				]
 			}
