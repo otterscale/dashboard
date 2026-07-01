@@ -6,7 +6,6 @@
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
 	import MoonIcon from '@lucide/svelte/icons/moon';
 	import SunIcon from '@lucide/svelte/icons/sun';
-	import UserRoundIcon from '@lucide/svelte/icons/user-round';
 	import { mode, toggleMode } from 'mode-watcher';
 
 	import { goto } from '$app/navigation';
@@ -103,10 +102,6 @@
 				</DropdownMenu.Label>
 				<DropdownMenu.Separator />
 				<DropdownMenu.Group>
-					<!-- <DropdownMenu.Item onclick={() => goto(resolve('/(auth)/account'))}>
-						<UserRoundIcon />
-						{m.account()}
-					</DropdownMenu.Item> -->
 					<DropdownMenu.Item onclick={toggleNotification}>
 						<BellRingIcon />
 						{m.notifications()}
