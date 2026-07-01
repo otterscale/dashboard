@@ -1,5 +1,5 @@
 # Build stage
-FROM node:24-alpine@sha256:fe770c8cac839c862b3de8ddfd5cf90c1dc9928c312d5ff24adc44818715f035 AS builder
+FROM node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS builder
 
 ARG VERSION=unknown
 
