@@ -103,10 +103,10 @@
 				</DropdownMenu.Label>
 				<DropdownMenu.Separator />
 				<DropdownMenu.Group>
-					<DropdownMenu.Item onclick={() => goto(resolve('/(auth)/account'))}>
+					<!-- <DropdownMenu.Item onclick={() => goto(resolve('/(auth)/account'))}>
 						<UserRoundIcon />
 						{m.account()}
-					</DropdownMenu.Item>
+					</DropdownMenu.Item> -->
 					<DropdownMenu.Item onclick={toggleNotification}>
 						<BellRingIcon />
 						{m.notifications()}
