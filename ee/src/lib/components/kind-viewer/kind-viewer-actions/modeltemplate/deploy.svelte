@@ -733,7 +733,7 @@
 															cluster,
 															namespace,
 															group: 'serving.kserve.io',
-															version: 'v1alpha1',
+															version: 'v1alpha2',
 															resource: 'llminferenceserviceconfigs',
 															manifest: new TextEncoder().encode(stringify(workloadConfiguration))
 														}),
@@ -741,7 +741,7 @@
 															cluster,
 															namespace,
 															group: 'serving.kserve.io',
-															version: 'v1alpha1',
+															version: 'v1alpha2',
 															resource: 'llminferenceserviceconfigs',
 															manifest: new TextEncoder().encode(
 																stringify(familyEndpointPickerConfiguration)

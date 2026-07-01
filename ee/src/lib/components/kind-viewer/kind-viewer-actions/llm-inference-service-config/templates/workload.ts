@@ -21,7 +21,7 @@ export function getWorkloadConfiguration({
 		: undefined;
 
 	return {
-		apiVersion: 'serving.kserve.io/v1alpha1',
+		apiVersion: 'serving.kserve.io/v1alpha2',
 		kind: 'LLMInferenceServiceConfig',
 		metadata: {
 			name: `${modelServiceName}-workload-template`,
@@ -32,41 +32,17 @@ export function getWorkloadConfiguration({
 				enabled: true
 			},
 			template: {
-				serviceAccountName: `${modelServiceName}-kserve-s3-sa`,
+				serviceAccountName: `${namespace}-models`,
 				runtimeClassName: 'nvidia',
 				schedulerName: 'hami-scheduler',
 				containers: [
 					{
-						image: 'harbor.phison.com/ai-mw/mw:501-0005.006',
+						image: 'harbor.phison.com/ai-mw/mw:501-0007.001',
 						imagePullPolicy: 'IfNotPresent',
 						name: 'lmcache-server',
 						command: ['/bin/bash', '-lc'],
 						args: [
-							[
-								'set -euo pipefail',
-								'ulimit -l unlimited || true',
-								`L2_ADAPTER_JSON='{"type":"fs_native","base_path":"/data/kv-l2","num_workers":32,"read_ahead_size":4096,"use_odirect":true}'`,
-								`echo "starting lmcache server (L1=20GB lazy init=5GB, L2=fs_native+odirect, base_path=/data/kv-l2, port=5757, http=8088, hash=sha256_cbor, chunk-size=${chunkSize})"`,
-								'echo "L2 adapter: ${L2_ADAPTER_JSON}"',
-								'# chunk-size MUST be a multiple of vLLM block_size (2096, mamba page size at TP=4).',
-								'# The vLLM-side connector queries this value from the server over MQ and asserts',
-								'# tokens_per_chunk % vllm_block_size == 0 (LMCacheMPWorkerAdapter).',
-								'exec /opt/vllm/bin/lmcache server \\',
-								'  --host 0.0.0.0 \\',
-								'  --port 5757 \\',
-								`  --chunk-size ${chunkSize} \\`,
-								'  --hash-algorithm sha256_cbor \\',
-								'  --l1-size-gb 20 \\',
-								'  --l1-use-lazy \\',
-								'  --l1-init-size-gb 5 \\',
-								'  --l1-align-bytes 4096 \\',
-								'  --eviction-policy LRU \\',
-								'  --engine-type default \\',
-								'  --max-workers 32 \\',
-								'  --l2-adapter "${L2_ADAPTER_JSON}" \\',
-								'  --l2-store-policy default \\',
-								'  --http-port 8088'
-							].join('\n')
+							'set -euo pipefail\nulimit -l unlimited || true\nexec /usr/local/bin/start-lmcache.sh\n'
 						],
 						ports: [
 							{
@@ -91,16 +67,56 @@ export function getWorkloadConfiguration({
 								}
 							},
 							{
+								name: 'PYTHONHASHSEED',
+								value: '0'
+							},
+							{
 								name: 'LMCACHE_PORT',
 								value: '5757'
+							},
+							{
+								name: 'LMCACHE_CHUNK_SIZE',
+								value: chunkSize
+							},
+							{
+								name: 'LMCACHE_HASH_ALGORITHM',
+								value: 'sha256_cbor'
+							},
+							{
+								name: 'LMCACHE_L1_SIZE_GB',
+								value: '20'
+							},
+							{
+								name: 'LMCACHE_EVICTION_POLICY',
+								value: 'LRU'
+							},
+							{
+								name: 'LMCACHE_L2_STORE_POLICY',
+								value: 'default'
+							},
+							{
+								name: 'LMCACHE_NUM_WORKERS',
+								value: '32'
 							},
 							{
 								name: 'LMCACHE_HTTP_PORT',
 								value: '8088'
 							},
 							{
-								name: 'PYTHONHASHSEED',
-								value: '0'
+								name: 'LMCACHE_FS_BASE_PATH',
+								value: '/mnt/nvme0'
+							},
+							{
+								name: 'LMCACHE_FS_NUM_WORKERS',
+								value: '32'
+							},
+							{
+								name: 'LMCACHE_FS_READ_AHEAD_SIZE',
+								value: '4096'
+							},
+							{
+								name: 'LMCACHE_FS_USE_ODIRECT',
+								value: 'true'
 							},
 							{
 								name: 'LMCACHE_LOG_LEVEL',
@@ -149,7 +165,7 @@ export function getWorkloadConfiguration({
 						volumeMounts: [
 							{
 								mountPath: '/dev/shm',
-								name: 'host-dev-shm'
+								name: 'pod-shm'
 							},
 							{
 								mountPath: '/tmp/lmcache_prometheus',
@@ -171,7 +187,7 @@ export function getWorkloadConfiguration({
 						}
 					},
 					{
-						name: 'host-dev-shm',
+						name: 'pod-shm',
 						emptyDir: {
 							medium: 'Memory',
 							sizeLimit: '25Gi'

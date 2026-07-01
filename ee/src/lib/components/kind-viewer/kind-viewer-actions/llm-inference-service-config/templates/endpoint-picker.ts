@@ -17,7 +17,7 @@ export function getFamilyEndpointPickerConfiguration({
 	]);
 
 	return {
-		apiVersion: 'serving.kserve.io/v1alpha1',
+		apiVersion: 'serving.kserve.io/v1alpha2',
 		kind: 'LLMInferenceServiceConfig',
 		metadata: {
 			name: `${modelServiceName}-family-epp`,
@@ -31,38 +31,32 @@ export function getFamilyEndpointPickerConfiguration({
 				scheduler: {
 					pool: {
 						spec: {
-							extensionRef: {
+							endpointPickerRef: {
 								failureMode: 'FailOpen',
 								kind: 'Service',
-								name: '{{ ChildName .ObjectMeta.Name `-epp-service` }}'
+								name: '{{ ChildName .ObjectMeta.Name `-epp-service` }}',
+								port: {
+									number: 9002
+								}
 							},
-							selector: {},
-							targetPortNumber: 8000
+							selector: {
+								matchLabels: {
+									'app.kubernetes.io/part-of': 'llminferenceservice'
+								}
+							},
+							targetPorts: [
+								{
+									number: 8000
+								}
+							]
 						}
 					},
 					template: {
 						serviceAccountName: `${modelServiceName}-epp-sa`,
-						affinity: {
-							nodeAffinity: {
-								requiredDuringSchedulingIgnoredDuringExecution: {
-									nodeSelectorTerms: [
-										{
-											matchExpressions: [
-												{
-													key: 'node-role.phison.mw/gpu',
-													operator: 'In',
-													values: ['true']
-												}
-											]
-										}
-									]
-								}
-							}
-						},
 						containers: [
 							{
 								name: 'tokenizer',
-								image: 'harbor.phison.com/ai-mw/mw-llm-d-uds-tokenizer:501-0006.001',
+								image: 'harbor.phison.com/ai-mw/mw-llm-d-uds-tokenizer:vllm-v0.19.1-tx5.8',
 								imagePullPolicy: 'IfNotPresent',
 								env: [
 									{
