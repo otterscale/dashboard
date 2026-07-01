@@ -76,7 +76,7 @@ export function getWorkloadConfiguration({
 							},
 							{
 								name: 'LMCACHE_CHUNK_SIZE',
-								value: chunkSize
+								value: `'${chunkSize}'`
 							},
 							{
 								name: 'LMCACHE_HASH_ALGORITHM',

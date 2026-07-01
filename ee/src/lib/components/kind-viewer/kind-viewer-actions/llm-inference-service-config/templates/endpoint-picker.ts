@@ -179,7 +179,7 @@ export function getFamilyEndpointPickerConfiguration({
 									},
 									{
 										name: 'LLMD_TOKENPROCESSORCONFIG_BLOCKSIZETOKEN',
-										value: blockSize
+										value: `'${blockSize}'`
 									}
 								],
 								startupProbe: {
