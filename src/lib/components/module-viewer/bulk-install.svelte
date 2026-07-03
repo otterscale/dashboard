@@ -91,7 +91,31 @@
 						}
 					}
 				},
-				values: {}
+				values: {},
+				...(lodash.get(module, ['annotations', 'module.otterscale.io/post-renderer'])
+					? (() => {
+							const postRenderers = lodash
+								.get(module, ['annotations', 'module.otterscale.io/post-renderer'], '')
+								.split(',')
+								.map((script) => script.trim())
+								.filter(Boolean)
+								.reduce((jsonPatch, script) => {
+									const setOperant = script.indexOf('=');
+									const path = script.slice(0, setOperant);
+									const value = script.slice(setOperant + 1);
+									return lodash.set(jsonPatch, path, value);
+								}, []);
+							for (const postRenderer of lodash.get(postRenderers, 'postRenderers', [])) {
+								for (const patch of lodash.get(postRenderer, ['kustomize', 'patches'], [])) {
+									const patchOperation = lodash.get(patch, 'patch');
+									if (patchOperation && typeof patchOperation !== 'string') {
+										lodash.set(patch, 'patch', JSON.stringify(patchOperation).trimEnd());
+									}
+								}
+							}
+							return postRenderers;
+						})()
+					: {})
 			}
 		};
 
