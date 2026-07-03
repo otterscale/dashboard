@@ -3,10 +3,7 @@
 	import { BanIcon } from '@lucide/svelte';
 	import Rocket from '@lucide/svelte/icons/rocket';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type {
-		ServingKserveIoV1Alpha2LLMInferenceService,
-		ServingKserveIoV1Alpha2LLMInferenceServiceConfig
-	} from '@otterscale/types';
+	import type { ServingKserveIoV1Alpha2LLMInferenceServiceConfig } from '@otterscale/types';
 	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import { load } from 'js-yaml';
@@ -23,8 +20,6 @@
 		fetchAllGpuNodes as fetchComputeResourceNodes,
 		type NodeInfo
 	} from '$lib/components/gpu-allocation';
-	import { getFamilyEndpointPickerConfiguration } from '$lib/components/kind-viewer/kind-viewer-actions/llm-inference-service-config/templates/endpoint-picker.ts';
-	import { getWorkloadConfiguration } from '$lib/components/kind-viewer/kind-viewer-actions/llm-inference-service-config/templates/workload';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Empty from '$lib/components/ui/empty/index.js';
@@ -57,7 +52,7 @@
 	const configurationKind = 'LLMInferenceServiceConfig';
 	const configurationResource = 'llminferenceserviceconfigs';
 
-	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 
 	type GPUDevice = { type: string; node: string };
@@ -137,7 +132,6 @@
 	let isSubmitting = $state(false);
 	let metadataFormReference: FormState<FormValue> | null = $state(null);
 	let modelFormReference: FormState<FormValue> | null = $state(null);
-	let keyValueCacheFormReference: FormState<FormValue> | null = $state(null);
 	let open = $state(false);
 
 	let value = $derived(stringify(values));
@@ -157,7 +151,6 @@
 		isSubmitting = false;
 		metadataFormReference = null;
 		modelFormReference = null;
-		keyValueCacheFormReference = null;
 	}
 	function handleNext() {
 		currentStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
@@ -245,7 +238,7 @@
 									['spec', 'baseRefs'],
 									[
 										...lodash.get(object, ['spec', 'baseRefs'], []),
-										{ name: lodash.get(object, ['metadata', 'name'], '') }
+										{ name: lodash.get(formValue, ['name'], '') }
 									]
 								);
 
@@ -501,93 +494,7 @@
 					{/await}
 				</Tabs.Content>
 
-				<Tabs.Content value={steps[3]}>
-					{@const modelUri = lodash.get(getValueSnapshot(modelFormReference!), 'uri', '') as string}
-					{@const middlewareSupported = lodash.startsWith(modelUri, 's3://')}
-					{#key modelUri}
-						<Form
-							disabled={!middlewareSupported}
-							bind:reference={keyValueCacheFormReference}
-							schema={{
-								title: 'Key-Value Cache',
-								properties: {
-									offload: {
-										title: 'Offload',
-										description:
-											'Key-Value (KV) cache offloading is a technique used in large language model (LLM) serving to store and reuse the intermediate key and value tensors generated during model inference. In transformer-based models, these KV caches represent the context for each token processed, and reusing them allows the model to avoid redundant computations for repeated or similar prompts.',
-										type: 'boolean'
-									}
-								}
-							} as Schema}
-							uiSchema={{
-								'ui:options': {
-									translations: {
-										submit: 'Next'
-									}
-								}
-							} as UiSchemaRoot}
-							initialValue={{ offload: false } as FormValue}
-							handleSubmit={{
-								posthook: (form: FormState<FormValue>) => {
-									const formValue = getValueSnapshot(form);
-
-									const isOffloaded = lodash.get(formValue, ['offload'], false);
-									const name = lodash.get(getValueSnapshot(metadataFormReference!), ['name'], '');
-
-									if (isOffloaded) {
-										lodash.set(
-											values,
-											['spec', 'baseRefs'],
-											[
-												...lodash.get(object, ['spec', 'baseRefs'], []),
-												{ name: lodash.get(object, ['metadata', 'name'], '') },
-												{ name: `${name}-family-epp` },
-												{ name: `${name}-workload-template` }
-											]
-										);
-									} else {
-										lodash.set(
-											values,
-											['spec', 'baseRefs'],
-											[
-												...lodash.get(object, ['spec', 'baseRefs'], []),
-												{ name: lodash.get(object, ['metadata', 'name'], '') }
-											]
-										);
-									}
-
-									handleNext();
-								}
-							}}
-						>
-							{#snippet actions()}
-								<div class="flex w-full items-center justify-between gap-3">
-									<Button
-										onclick={() => {
-											handlePrevious();
-										}}
-										disabled={currentIndex === 0}
-									>
-										Previous
-									</Button>
-									{#if middlewareSupported}
-										<SubmitButton />
-									{:else}
-										<Button
-											onclick={() => {
-												handleNext();
-											}}
-										>
-											Next
-										</Button>
-									{/if}
-								</div>
-							{/snippet}
-						</Form>
-					{/key}
-				</Tabs.Content>
-
-				<Tabs.Content value={steps[4]} class="min-h-[77vh]">
+				<Tabs.Content value={steps[3]} class="min-h-[77vh]">
 					<div class="flex h-full flex-col gap-3">
 						<Monaco
 							options={{
@@ -671,85 +578,14 @@
 												throw error;
 											});
 
-										await resourceClient
-											.create({
-												cluster,
-												namespace,
-												group: kserveGroup,
-												version: kserveVersion,
-												resource: serviceResource,
-												manifest: new TextEncoder().encode(value)
-											})
-											.then((response) => {
-												if (
-													lodash.get(
-														getValueSnapshot(keyValueCacheFormReference!),
-														['offload'],
-														false
-													)
-												) {
-													const modelService: ServingKserveIoV1Alpha2LLMInferenceService =
-														response.object ?? {};
-
-													const ownerReference = {
-														apiVersion: `${kserveGroup}/${kserveVersion}`,
-														kind: serviceKind,
-														name: lodash.get(modelService, ['metadata', 'name'], ''),
-														uid: lodash.get(modelService, ['metadata', 'uid'], ''),
-														controller: false
-													};
-
-													const workloadConfiguration = getWorkloadConfiguration({
-														modelServiceName: lodash.get(
-															modelService,
-															['metadata', 'name'],
-															''
-														) as string,
-														namespace,
-														object
-													});
-													const familyEndpointPickerConfiguration =
-														getFamilyEndpointPickerConfiguration({
-															modelServiceName: lodash.get(
-																modelService,
-																['metadata', 'name'],
-																''
-															) as string,
-															namespace,
-															object
-														});
-
-													lodash.set(workloadConfiguration, 'metadata.ownerReferences', [
-														ownerReference
-													]);
-													lodash.set(
-														familyEndpointPickerConfiguration,
-														'metadata.ownerReferences',
-														[ownerReference]
-													);
-
-													return Promise.all([
-														resourceClient.create({
-															cluster,
-															namespace,
-															group: 'serving.kserve.io',
-															version: 'v1alpha2',
-															resource: 'llminferenceserviceconfigs',
-															manifest: new TextEncoder().encode(stringify(workloadConfiguration))
-														}),
-														resourceClient.create({
-															cluster,
-															namespace,
-															group: 'serving.kserve.io',
-															version: 'v1alpha2',
-															resource: 'llminferenceserviceconfigs',
-															manifest: new TextEncoder().encode(
-																stringify(familyEndpointPickerConfiguration)
-															)
-														})
-													]);
-												}
-											});
+										await resourceClient.create({
+											cluster,
+											namespace,
+											group: kserveGroup,
+											version: kserveVersion,
+											resource: serviceResource,
+											manifest: new TextEncoder().encode(value)
+										});
 									},
 									{
 										loading: `Deploying ${serviceKind} ${name}...`,
