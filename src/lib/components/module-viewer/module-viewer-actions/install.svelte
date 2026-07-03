@@ -98,10 +98,11 @@
 										.filter(Boolean)
 										.reduce((jsonPatch, script) => {
 											const setOperant = script.indexOf('=');
+											if (setOperant === -1) return jsonPatch;
 											const path = script.slice(0, setOperant);
 											const value = script.slice(setOperant + 1);
 											return lodash.set(jsonPatch, path, value);
-										}, []);
+										}, {});
 									for (const postRenderer of lodash.get(postRenderers, 'postRenderers', [])) {
 										for (const patch of lodash.get(postRenderer, ['kustomize', 'patches'], [])) {
 											const patchOperation = lodash.get(patch, 'patch');
