@@ -88,7 +88,7 @@
 			values: {}
 		}
 	});
-	let value = $derived(stringify(values));
+	let value = $derived(stringify(values, { schema: 'yaml-1.1' }));
 
 	const helmRepository = $derived(
 		row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository
