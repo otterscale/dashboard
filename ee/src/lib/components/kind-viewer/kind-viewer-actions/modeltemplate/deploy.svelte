@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Code, ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { BanIcon, CircleCheckIcon, CircleXIcon } from '@lucide/svelte';
+	import { BanIcon } from '@lucide/svelte';
 	import Rocket from '@lucide/svelte/icons/rocket';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { ServingKserveIoV1Alpha2LLMInferenceServiceConfig } from '@otterscale/types';
