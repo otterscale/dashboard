@@ -103,10 +103,12 @@
 	</Card.Content>
 	<Card.Footer class="flex items-center gap-2 ">
 		{@const mode = row.original['Mode'] as string}
-		{@const isMiddleWare = lodash
-			.get(row.original.raw, ['spec', 'template', 'containers'], [])
-			.map((container: { image: string }) => lodash.get(container, 'image', ''))
-			.find((image: string) => image.includes('/ai-mw/'))}
+		{@const containers = lodash.get(row.original.raw, ['spec', 'template', 'containers'])}
+		{@const isMiddleWare =
+			Array.isArray(containers) &&
+			containers
+				.map((container) => container?.image ?? '')
+				.find((image) => image.includes('/ai-mw/'))}
 		{#if mode}
 			<Badge>
 				{mode}
