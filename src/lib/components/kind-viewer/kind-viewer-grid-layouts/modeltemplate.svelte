@@ -5,11 +5,13 @@
 	import type { Schema } from '@sjsf/form';
 	import type { Row } from '@tanstack/table-core';
 	import type { ValidateFunction } from 'ajv';
+	import lodash from 'lodash';
 
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Item from '$lib/components/ui/item';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	import Actions from '../kind-viewer-actions/modeltemplate/actions.svelte';
 	import type { LLMInferenceServiceConfigAttribute } from '../kind-viewer-columns/llminferenceserviceconfig';
@@ -99,12 +101,39 @@
 			</Item.Root>
 		{/if}
 	</Card.Content>
-	<Card.Footer>
+	<Card.Footer class="flex items-center gap-2 ">
 		{@const mode = row.original['Mode'] as string}
+		{@const containers = lodash.get(row.original.raw, ['spec', 'template', 'containers'])}
+		{@const isMiddleWare =
+			Array.isArray(containers) &&
+			containers
+				.map((container) => container?.image ?? '')
+				.find((image) => image.includes('/ai-mw/'))}
 		{#if mode}
 			<Badge>
 				{mode}
 			</Badge>
+		{/if}
+		{#if isMiddleWare}
+			<Tooltip.Root>
+				<Tooltip.Trigger>
+					<Badge>KV-Cache Management</Badge>
+				</Tooltip.Trigger>
+				<Tooltip.Content>
+					Offload KV cache beyond accelerator memory (CPU/disk) to hold a larger working set for
+					multi-turn requests.
+				</Tooltip.Content>
+			</Tooltip.Root>
+		{:else}
+			<Tooltip.Root>
+				<Tooltip.Trigger>
+					<Badge>Intelligent Routing</Badge>
+				</Tooltip.Trigger>
+				<Tooltip.Content>
+					vLLM with prefix-cache + EPP load-aware routing. EPP routes by live XGBoost latency
+					predictions instead of utilization heuristics.
+				</Tooltip.Content>
+			</Tooltip.Root>
 		{/if}
 	</Card.Footer>
 </Card.Root>

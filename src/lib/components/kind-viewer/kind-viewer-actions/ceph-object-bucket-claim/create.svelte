@@ -3,7 +3,6 @@
 	import { SquareArrowOutUpRightIcon } from '@lucide/svelte';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import type { CoreV1Secret } from '@otterscale/types';
 	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, SubmitButton } from '@sjsf/form';
 	import Ajv from 'ajv';
@@ -74,32 +73,6 @@
 	}
 	function handlePrevious() {
 		currentStep = steps[Math.max(currentIndex - 1, 0)];
-	}
-
-	const SECRET_POLL_INTERVAL_MS = 1000;
-	const SECRET_POLL_MAX_ATTEMPTS = 30;
-
-	async function waitForSecret(secretName: string): Promise<CoreV1Secret> {
-		for (let attempt = 0; attempt < SECRET_POLL_MAX_ATTEMPTS; attempt++) {
-			try {
-				const response = await resourceClient.get({
-					cluster,
-					namespace,
-					name: secretName,
-					group: '',
-					version: 'v1',
-					resource: 'secrets'
-				});
-				const secret = response?.object as CoreV1Secret | undefined;
-				if (secret) {
-					return secret;
-				}
-			} catch {
-				// Secret not ready yet
-			}
-			await new Promise((resolve) => setTimeout(resolve, SECRET_POLL_INTERVAL_MS));
-		}
-		throw new Error('Timed out waiting for bucket credentials secret');
 	}
 </script>
 
@@ -305,13 +278,12 @@
 								}
 
 								const name = lodash.get(parsed, 'metadata.name') as string;
-								const bucketName = lodash.get(parsed, 'spec.bucketName') as string;
 
 								toast.promise(
 									async () => {
 										const manifest = new TextEncoder().encode(value);
 
-										const obcResponse = await resourceClient.create({
+										await resourceClient.create({
 											cluster,
 											namespace,
 											group,
@@ -319,76 +291,6 @@
 											resource,
 											manifest
 										});
-										const obcUid = lodash.get(obcResponse.object, 'metadata.uid') as string;
-										if (!obcUid) {
-											throw new Error('Failed to retrieve UID for created ObjectBucketClaim');
-										}
-										const OBCSecret = await waitForSecret(name);
-										const KserveSecretName = `${name}-kserve`;
-										const KserveSecret = {
-											apiVersion: 'v1',
-											kind: 'Secret',
-											metadata: {
-												name: KserveSecretName,
-												namespace: namespace,
-												annotations: {
-													...(OBCSecret.metadata?.annotations ?? {}),
-													'serving.kserve.io/s3-endpoint':
-														'http://rook-ceph-rgw-ceph-objectstore.rook-ceph.svc:8301',
-													'serving.kserve.io/s3-usehttps': '0',
-													'serving.kserve.io/s3-verifyssl': '0'
-												},
-												ownerReferences: [
-													{
-														apiVersion: `${group}/${version}`,
-														kind: 'ObjectBucketClaim',
-														name: name,
-														uid: obcUid,
-														blockOwnerDeletion: true
-													}
-												]
-											},
-											type: OBCSecret.type,
-											data: OBCSecret.data
-										};
-
-										const serviceAccountYaml = stringify({
-											apiVersion: 'v1',
-											kind: 'ServiceAccount',
-											metadata: {
-												name: bucketName,
-												namespace: namespace,
-												ownerReferences: [
-													{
-														apiVersion: `${group}/${version}`,
-														kind: 'ObjectBucketClaim',
-														name: name,
-														uid: obcUid,
-														blockOwnerDeletion: true
-													}
-												]
-											},
-											secrets: [{ name: KserveSecretName }]
-										});
-
-										await Promise.all([
-											resourceClient.create({
-												cluster,
-												namespace,
-												group: '',
-												version: 'v1',
-												resource: 'secrets',
-												manifest: new TextEncoder().encode(stringify(KserveSecret))
-											}),
-											resourceClient.create({
-												cluster,
-												namespace,
-												group: '',
-												version: 'v1',
-												resource: 'serviceaccounts',
-												manifest: new TextEncoder().encode(serviceAccountYaml)
-											})
-										]);
 									},
 									{
 										loading: `Creating ${kind} ${name}...`,
