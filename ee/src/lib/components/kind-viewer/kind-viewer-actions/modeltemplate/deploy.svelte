@@ -58,6 +58,9 @@
 	const [firstStep] = steps;
 
 	async function check(modelName: string) {
+		const harborHost = env.PUBLIC_HARBOR_URL;
+		if (!harborHost || !modelName) return;
+
 		try {
 			const projectPath = 'models';
 			const repositoryPath = 'modelcar-catalog';
@@ -97,10 +100,9 @@
 	}
 
 	function toModelCarReference(modelUrl: string): string {
-		const harborUrl = env.PUBLIC_HARBOR_URL;
-		if (!harborUrl) throw new Error('PUBLIC_HARBOR_URL is not set');
+		if (!modelUrl || !modelUrl.startsWith('hf://')) return modelUrl;
 
-		const registry = harborUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+		const registry = env.PUBLIC_HARBOR_URL.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
 		const modelName = parseModelName(modelUrl);
 
@@ -213,7 +215,9 @@
 </script>
 
 {#snippet checking()}
-	{@const currentUri = modelFormReference ? (lodash.get(getValueSnapshot(modelFormReference), 'uri', '') as string) : ''}
+	{@const currentUri = modelFormReference
+		? (lodash.get(getValueSnapshot(modelFormReference), 'uri', '') as string)
+		: ''}
 	{#if currentUri}
 		{#await check(parseModelName(currentUri))}
 			<Badge variant="ghost">Checking</Badge>
