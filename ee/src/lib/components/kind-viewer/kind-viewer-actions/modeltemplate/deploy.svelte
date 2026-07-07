@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Code, ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { BanIcon } from '@lucide/svelte';
+	import { BanIcon, CircleCheckIcon, CircleXIcon } from '@lucide/svelte';
 	import Rocket from '@lucide/svelte/icons/rocket';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { ServingKserveIoV1Alpha2LLMInferenceServiceConfig } from '@otterscale/types';
@@ -15,11 +15,13 @@
 	import { stringify } from 'yaml';
 
 	import { page } from '$app/state';
+	import { env } from '$env/dynamic/public';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import {
 		fetchAllGpuNodes as fetchComputeResourceNodes,
 		type NodeInfo
 	} from '$lib/components/gpu-allocation';
+	import Badge from '$lib/components/ui/badge/badge.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Empty from '$lib/components/ui/empty/index.js';
@@ -54,6 +56,56 @@
 
 	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
+
+	async function check(modelName: string) {
+		try {
+			const projectPath = 'models';
+			const repositoryPath = 'modelcar-catalog';
+			const reference = modelName;
+
+			const artifactsUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${reference}?with_label=true`;
+
+			const response = await fetch('/bff/helm/repository/harbor', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					harborHost: env.PUBLIC_HARBOR_URL,
+					apiPath: artifactsUrl
+				})
+			});
+
+			if (!response.ok) {
+				console.error('Failed to fetch model artifact:', response.statusText);
+				return;
+			}
+
+			return await response.json();
+		} catch (error) {
+			console.error('Error fetching model artifact:', error);
+		}
+	}
+
+	function parseModelName(modelUrl: string) {
+		if (!modelUrl.startsWith('hf://')) return modelUrl;
+
+		const repositoryIdentifier = modelUrl.slice('hf://'.length).replace(/@.*/, '');
+		const name = repositoryIdentifier.split('/').pop() ?? '';
+
+		return name;
+	}
+
+	function toModelCarReference(modelUrl: string): string {
+		const harborUrl = env.PUBLIC_HARBOR_URL;
+		if (!harborUrl) throw new Error('PUBLIC_HARBOR_URL is not set');
+
+		const registry = harborUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+		const modelName = parseModelName(modelUrl);
+
+		return `oci://${registry}/models/modelcar-catalog:${modelName.toLowerCase()}`;
+	}
 
 	type GPUDevice = { type: string; node: string };
 
@@ -159,6 +211,20 @@
 		currentStep = steps[Math.max(currentIndex - 1, 0)];
 	}
 </script>
+
+{#snippet checking()}
+	{#await check(parseModelName(lodash.get(object, ['spec', 'model', 'uri'], '')))}
+		<Badge variant="ghost">Checking</Badge>
+	{:then response}
+		{#if lodash.get(response, 'digest', null)}
+			<Badge>Exist</Badge>
+		{:else}
+			<Badge variant="secondary">Non-Exist</Badge>
+		{/if}
+	{:catch}
+		<Badge variant="destructive">Fail</Badge>
+	{/await}
+{/snippet}
 
 {#if !page.data.isRestricted}
 	<Dialog.Root
@@ -283,6 +349,12 @@
 										) as Schema,
 										['description']
 									)
+								},
+								internal: {
+									type: 'boolean',
+									title: 'Use internal registry',
+									description:
+										'When enabled, an hf:// source is rewritten to its OCI ModelCar reference in the platform registry. When disabled, the source URI is used as-is.'
 								}
 							}
 						} as Schema}
@@ -291,16 +363,26 @@
 								translations: {
 									submit: 'Next'
 								}
+							},
+							uri: {
+								'ui:options': {
+									action: checking
+								}
 							}
 						} as UiSchemaRoot}
-						initialValue={{ uri: lodash.get(object, 'spec.model.uri', '') } as FormValue}
+						initialValue={{
+							uri: lodash.get(object, 'spec.model.uri', ''),
+							internal: true
+						} as FormValue}
 						handleSubmit={{
 							posthook: (form) => {
 								const formValue = getValueSnapshot(form);
 
 								lodash.set(values, ['spec', 'model'], {
 									...lodash.omit(lodash.get(object, ['spec', 'model'], {}), ['uri']),
-									uri: lodash.get(formValue, 'uri', '')
+									uri: lodash.get(formValue, 'internal', true)
+										? toModelCarReference(lodash.get(formValue, 'uri', '') as string)
+										: lodash.get(formValue, 'uri', '')
 								});
 
 								handleNext();
