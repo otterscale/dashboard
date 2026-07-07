@@ -102,7 +102,9 @@
 	function toModelCarReference(modelUrl: string): string {
 		if (!modelUrl || !modelUrl.startsWith('hf://')) return modelUrl;
 
-		const registry = env.PUBLIC_HARBOR_URL.replace(/^https?:\/\//, '').replace(/\/$/, '');
+		const harborUrl = env.PUBLIC_HARBOR_URL ?? ''
+
+		const registry = harborUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
 		const modelName = parseModelName(modelUrl);
 
