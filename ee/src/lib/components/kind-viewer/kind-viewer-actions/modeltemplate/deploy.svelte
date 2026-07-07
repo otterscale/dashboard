@@ -213,17 +213,20 @@
 </script>
 
 {#snippet checking()}
-	{#await check(parseModelName(lodash.get(object, ['spec', 'model', 'uri'], '')))}
-		<Badge variant="ghost">Checking</Badge>
-	{:then response}
-		{#if lodash.get(response, 'digest', null)}
-			<Badge>Exist</Badge>
-		{:else}
-			<Badge variant="secondary">Non-Exist</Badge>
-		{/if}
-	{:catch}
-		<Badge variant="destructive">Fail</Badge>
-	{/await}
+	{@const currentUri = modelFormReference ? (lodash.get(getValueSnapshot(modelFormReference), 'uri', '') as string) : ''}
+	{#if currentUri}
+		{#await check(parseModelName(currentUri))}
+			<Badge variant="ghost">Checking</Badge>
+		{:then response}
+			{#if lodash.get(response, 'digest', null)}
+				<Badge>Exist</Badge>
+			{:else}
+				<Badge variant="secondary">Non-Exist</Badge>
+			{/if}
+		{:catch}
+			<Badge variant="destructive">Fail</Badge>
+		{/await}
+	{/if}
 {/snippet}
 
 {#if !page.data.isRestricted}
