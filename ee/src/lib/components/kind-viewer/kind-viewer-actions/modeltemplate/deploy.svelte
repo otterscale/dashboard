@@ -102,7 +102,7 @@
 	function toModelCarReference(modelUrl: string): string {
 		if (!modelUrl || !modelUrl.startsWith('hf://')) return modelUrl;
 
-		const harborUrl = env.PUBLIC_HARBOR_URL ?? ''
+		const harborUrl = env.PUBLIC_HARBOR_URL ?? '';
 
 		const registry = harborUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
