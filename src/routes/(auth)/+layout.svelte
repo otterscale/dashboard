@@ -12,7 +12,6 @@
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import GaugeIcon from '@lucide/svelte/icons/gauge';
 	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
-	import InfoIcon from '@lucide/svelte/icons/info';
 	import LayersIcon from '@lucide/svelte/icons/layers';
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
 	import NetworkIcon from '@lucide/svelte/icons/network';
@@ -28,7 +27,6 @@
 	import { page } from '$app/state';
 	import { env } from '$env/dynamic/public';
 	import {
-		DialogAbout,
 		NavMain,
 		NavSecondary,
 		NavUser,
@@ -70,7 +68,6 @@
 	let workspaces = $state<TenantOtterscaleIoV1Alpha1Workspace[]>([]);
 
 	let sidebarOpen = $state(true);
-	let aboutOpen = $state(false);
 	let importOpen = $state(false);
 
 	async function fetchClusters(signal?: AbortSignal): Promise<Link[]> {
@@ -702,7 +699,6 @@
 	<title>{current ? `${current.title} - OtterScale` : 'OtterScale'}</title>
 </svelte:head>
 
-<DialogAbout bind:open={aboutOpen} />
 <Sidebar.Provider class="h-svh overflow-hidden" bind:open={sidebarOpen}>
 	<Sidebar.Root id="sidebar-guide-step" collapsible="icon" variant="inset" class="p-3">
 		{#if activeCluster && isMounted}
@@ -714,7 +710,7 @@
 					workspace={page.params.workspace}
 				/>
 			</Sidebar.Header>
-			<Sidebar.Content class="gap-2">
+			<Sidebar.Content class="gap-0">
 				{#if page.params.workspace}
 					<NavMain
 						platformLabel={m.platform()}
@@ -765,23 +761,6 @@
 				</Breadcrumb.Root>
 			</div>
 			<div class="flex items-center gap-2 px-4">
-				<Tooltip.Root>
-					<Tooltip.Trigger>
-						{#snippet child({ props })}
-							<Button
-								{...props}
-								variant="ghost"
-								size="icon"
-								class="size-7"
-								onclick={() => (aboutOpen = true)}
-							>
-								<InfoIcon />
-								<span class="sr-only">About</span>
-							</Button>
-						{/snippet}
-					</Tooltip.Trigger>
-					<Tooltip.Content>About OtterScale</Tooltip.Content>
-				</Tooltip.Root>
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						{#snippet child({ props })}

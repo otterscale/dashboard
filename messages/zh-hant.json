@@ -510,6 +510,7 @@
 	"schedule": "排程器",
 	"previous": "上一步",
 	"submit": "送出",
+	"support": "支援",
 	"import_cluster_info_title": "叢集資訊",
 	"import_cluster_info_description": "請提供此叢集的相關資訊。",
 	"import_cluster_name_label": "叢集名稱",
