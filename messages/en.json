@@ -510,6 +510,7 @@
 	"schedule": "Schedule",
 	"previous": "Previous",
 	"submit": "Submit",
+	"support": "Support",
 	"import_cluster_info_title": "Cluster Information",
 	"import_cluster_info_description": "Provide details about this cluster.",
 	"import_cluster_name_label": "Cluster Name",
