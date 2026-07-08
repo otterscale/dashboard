@@ -1,5 +1,5 @@
 <script lang="ts">
-	import BookOpenIcon from '@lucide/svelte/icons/book-open';
+	import LifeBuoyIcon from '@lucide/svelte/icons/life-buoy';
 	import PackageIcon from '@lucide/svelte/icons/package';
 	import type { ComponentProps } from 'svelte';
 
@@ -21,21 +21,21 @@
 	<Sidebar.GroupContent>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
-				<Sidebar.MenuButton size="sm" tooltipContent={m.documentation()} class="[&>svg]:size-3.5">
+				<Sidebar.MenuButton size="sm" tooltipContent={m.support()}>
 					{#snippet child({ props })}
-						<a href="https://otterscale.io" target="_blank" {...props}>
-							<BookOpenIcon />
-							<span>{m.documentation()}</span>
-						</a>
+						<button type="button" {...props} onclick={() => (open = true)}>
+							<LifeBuoyIcon />
+							<span>{m.support()}</span>
+						</button>
 					{/snippet}
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
 			{#if harborUrl}
 				<Sidebar.MenuItem>
-					<Sidebar.MenuButton size="sm" tooltipContent={m.registry()} class="[&>svg]:size-3.5">
+					<Sidebar.MenuButton size="sm" tooltipContent={m.registry()}>
 						{#snippet child({ props })}
 							<!-- eslint-disable svelte/no-navigation-without-resolve -->
-							<a href={harborUrl} target="_blank" {...props}>
+							<a href={harborUrl} target="_blank" rel="noopener noreferrer" {...props}>
 								<PackageIcon />
 								<span>{m.registry()}</span>
 							</a>
