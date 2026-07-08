@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Code, ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { BanIcon, CopyIcon, RotateCcwIcon, UploadIcon } from '@lucide/svelte';
+	import { BanIcon, UploadIcon } from '@lucide/svelte';
 	import Rocket from '@lucide/svelte/icons/rocket';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { ServingKserveIoV1Alpha2LLMInferenceServiceConfig } from '@otterscale/types';
@@ -16,12 +16,12 @@
 
 	import { page } from '$app/state';
 	import { env } from '$env/dynamic/public';
+	import * as CodeBlock from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import {
 		fetchAllGpuNodes as fetchComputeResourceNodes,
 		type NodeInfo
 	} from '$lib/components/gpu-allocation';
-	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -79,10 +79,11 @@
 			const response = await fetch('/bff/helm/repository/harbor', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ harborHost, apiPath: artifactsUrl })
+				body: JSON.stringify({ harborHost, apiPath: artifactsUrl }),
+				signal: AbortSignal.timeout(3000)
 			});
 
-			if (response.status === 404) return false; // 不存在,不是失敗
+			if (response.status === 404) return false;
 
 			if (!response.ok) {
 				console.error('Failed to fetch model artifact:', response.statusText);
@@ -92,7 +93,7 @@
 			const model = await response.json();
 			return lodash.has(model, 'digest');
 		} catch (error) {
-			console.error('Error fetching model artifact:', error);
+			console.error('Error checking model artifact:', error);
 			return null;
 		}
 	}
@@ -130,8 +131,8 @@
 		const registry = (env.PUBLIC_HARBOR_URL ?? '').replace(/^https?:\/\//, '').replace(/\/$/, '');
 
 		return [
-			`docker pull quay.io/otterscale/modelcar-catalog:${modelName}`,
-			`docker tag quay.io/otterscale/modelcar-catalog:${modelName} ${registry}/models/modelcar-catalog:${modelName}`,
+			`docker pull quay.io/phison-hci/modelcar-catalog:${modelName}`,
+			`docker tag quay.io/phison-hci/modelcar-catalog:${modelName} ${registry}/models/modelcar-catalog:${modelName}`,
 			`docker push ${registry}/models/modelcar-catalog:${modelName}`
 		].join('\n');
 	}
@@ -232,6 +233,8 @@
 		values = getInitialValues();
 		currentStep = firstStep;
 		isSubmitting = false;
+		isModelExist = undefined;
+		checkToken++;
 		metadataFormReference = null;
 		modelFormReference = null;
 	}
@@ -243,79 +246,43 @@
 	}
 </script>
 
-{#snippet checking()}
-	{@const currentUri = modelFormReference
-		? (lodash.get(getValueSnapshot(modelFormReference), 'uri', '') as string)
-		: (lodash.get(object, 'spec.model.uri', '') as string)}
-	{#if isModelExist === undefined}
-		<ButtonGroup.Root class="flex h-fit items-center gap-1">
-			<Button size="xs" variant="outline" disabled>Checking</Button>
-			<Button size="icon-xs" variant="outline" disabled>
-				<Spinner />
-			</Button>
-		</ButtonGroup.Root>
-	{:else if isModelExist === true}
-		<ButtonGroup.Root class="flex h-fit items-center gap-1">
-			<Button size="xs">Exist</Button>
-		</ButtonGroup.Root>
-	{:else if isModelExist === false}
-		{@const uploadCommands = getUploadCommands(currentUri)}
-		<ButtonGroup.Root class="flex h-fit items-center gap-1">
-			<Button size="xs" variant="secondary">Not Exist</Button>
-			<AlertDialog.Root>
-				<AlertDialog.Trigger>
-					{#snippet child({ props })}
-						<Button {...props} size="icon-xs" variant="secondary">
-							<UploadIcon />
-						</Button>
-					{/snippet}
-				</AlertDialog.Trigger>
-				<AlertDialog.Content class="max-w-2xl">
-					<AlertDialog.Header>
-						<AlertDialog.Title>Model Not Found in Registry</AlertDialog.Title>
-						<AlertDialog.Description>
-							The model <span class="font-mono font-medium">
-								{parseModelName(currentUri).toLowerCase()}
-							</span>
-							was not found in the internal registry. Run the following commands to upload it, then re-check.
-						</AlertDialog.Description>
-					</AlertDialog.Header>
-					<pre
-						class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-xs whitespace-pre">{uploadCommands}</pre>
-					<AlertDialog.Footer>
-						<AlertDialog.Cancel>Close</AlertDialog.Cancel>
-						<AlertDialog.Action
-							onclick={() => {
-								navigator.clipboard.writeText(uploadCommands);
-								toast.success('Commands copied to clipboard');
-							}}
-						>
-							<CopyIcon />
-							Copy Commands
-						</AlertDialog.Action>
-					</AlertDialog.Footer>
-				</AlertDialog.Content>
-			</AlertDialog.Root>
-			<Button size="icon-xs" variant="secondary" onclick={() => checkModelExistence(currentUri)}>
-				<RotateCcwIcon />
-			</Button>
-		</ButtonGroup.Root>
-	{:else}
-		<ButtonGroup.Root class="flex h-fit items-center gap-1">
-			<Button size="xs" variant="outline">Fail</Button>
-			<Button size="icon-xs" variant="outline" onclick={() => checkModelExistence(currentUri)}>
-				<RotateCcwIcon />
-			</Button>
-		</ButtonGroup.Root>
-	{/if}
-{/snippet}
-
 {#if !page.data.isRestricted}
+	{@const modelUri = lodash.get(object, 'spec.model.uri', '') as string}
+	{#snippet checking()}
+		{@const modelUri = lodash.get(object, 'spec.model.uri', '') as string}
+		{@const uploadCommands = getUploadCommands(modelUri)}
+		<ButtonGroup.Root>
+			<Dialog.Root>
+				<Dialog.Trigger>
+					<Button size="icon-sm" variant="ghost"><UploadIcon /></Button>
+				</Dialog.Trigger>
+				<Dialog.Content class="min-w-[50vw]">
+					<Dialog.Header>
+						<Dialog.Title>Upload Model</Dialog.Title>
+						<Dialog.Description>
+							If the model <span class="font-mono font-medium">
+								{parseModelName(modelUri).toLowerCase()}
+							</span>
+							is not available in the internal registry, upload it with the following commands.
+						</Dialog.Description>
+					</Dialog.Header>
+					<CodeBlock.Root
+						variant="secondary"
+						lang="yaml"
+						code={uploadCommands}
+						class="w-full border-none"
+					>
+						<CodeBlock.CopyButton />
+					</CodeBlock.Root>
+				</Dialog.Content>
+			</Dialog.Root>
+		</ButtonGroup.Root>
+	{/snippet}
 	<Dialog.Root
 		bind:open
 		onOpenChange={(isOpen) => {
 			if (isOpen) {
-				checkModelExistence(lodash.get(object, 'spec.model.uri', '') as string);
+				checkModelExistence(modelUri);
 			}
 		}}
 		onOpenChangeComplete={(isOpen) => {
@@ -418,92 +385,115 @@
 				</Tabs.Content>
 
 				<Tabs.Content value={steps[1]}>
-					<Form
-						bind:reference={modelFormReference}
-						schema={{
-							title: 'Model',
-							...(lodash.omit(
-								lodash.get(jsonSchema, 'properties.spec.properties.model') as Schema,
-								['properties']
-							) as Schema),
-							properties: {
-								uri: {
-									title: 'URI',
-									description:
-										'Override the default model source to load weights from a specific location — for example, a private OCI registry, a Hugging Face repository, or an S3-compatible bucket. Leave unchanged to use the platform default.',
-									...lodash.omit(
-										lodash.get(
-											jsonSchema,
-											'properties.spec.properties.model.properties.uri'
-										) as Schema,
-										['description']
-									)
-								},
-								internal: {
-									type: 'boolean',
-									title: 'Use internal registry',
-									description:
-										'When enabled, an hf:// source is rewritten to its OCI ModelCar reference in the platform registry. When disabled, the source URI is used as-is.'
+					{#key isModelExist}
+						<Form
+							bind:reference={modelFormReference}
+							schema={{
+								title: 'Model',
+								...(lodash.omit(
+									lodash.get(jsonSchema, 'properties.spec.properties.model') as Schema,
+									['properties']
+								) as Schema),
+								properties: {
+									uri: {
+										title: 'URI',
+										...lodash.omit(
+											lodash.get(
+												jsonSchema,
+												'properties.spec.properties.model.properties.uri'
+											) as Schema,
+											['description']
+										),
+										description: 'The model source defined by the platform configuration.',
+										readOnly: true
+									},
+									internal: {
+										type: 'boolean',
+										title: 'Use internal registry',
+										description:
+											'When enabled, an hf:// source is rewritten to its OCI ModelCar reference in the platform registry. When disabled, the source URI is used as-is.'
+									}
 								}
-							}
-						} as Schema}
-						uiSchema={{
-							'ui:options': {
-								translations: {
-									submit: 'Next'
-								}
-							},
-							uri: {
+							} as Schema}
+							uiSchema={{
 								'ui:options': {
-									action: checking
+									translations: {
+										submit: 'Next'
+									}
+								},
+								uri: {
+									'ui:options': {
+										layouts: {
+											'object-property-content': {
+												class:
+													'[&_p[id$=__help]]:text-amber-600 dark:[&_p[id$=__help]]:text-amber-500'
+											}
+										},
+										action: checking,
+										help:
+											isModelExist === false
+												? 'Model not in internal registry.'
+												: isModelExist === null
+													? 'Model check failed.'
+													: undefined,
+										shadcn4Text: {
+											placeholder: 'No model source defined in the template.'
+										}
+									}
 								}
-							}
-						} as UiSchemaRoot}
-						initialValue={{
-							uri: lodash.get(object, 'spec.model.uri', ''),
-							internal: true
-						} as FormValue}
-						handleSubmit={{
-							posthook: (form) => {
-								const formValue = getValueSnapshot(form);
+							} as UiSchemaRoot}
+							initialValue={{
+								uri: modelUri,
+								internal: true
+							} as FormValue}
+							handleSubmit={{
+								posthook: (form) => {
+									const formValue = getValueSnapshot(form);
+									const useInternal = lodash.get(formValue, 'internal', true) as boolean;
 
-								lodash.set(values, ['spec', 'model'], {
-									...lodash.omit(lodash.get(object, ['spec', 'model'], {}), ['uri']),
-									uri: lodash.get(formValue, 'internal', true)
-										? toModelCarReference(lodash.get(formValue, 'uri', '') as string)
-										: lodash.get(formValue, 'uri', '')
-								});
+									lodash.set(values, ['spec', 'model'], {
+										...lodash.omit(lodash.get(object, ['spec', 'model'], {}), ['uri']),
+										uri: useInternal ? toModelCarReference(modelUri) : modelUri
+									});
 
-								if (lodash.get(formValue, 'internal', true)) {
-									lodash.set(
-										values,
-										['spec', 'template', 'containers'],
-										internalRegistryContainers
-									);
-									lodash.set(
-										values,
-										['spec', 'router', 'scheduler', 'template', 'containers'],
-										internalRegistryContainers
-									);
+									if (useInternal) {
+										lodash.set(
+											values,
+											['spec', 'template', 'containers'],
+											lodash.cloneDeep(internalRegistryContainers)
+										);
+										lodash.set(
+											values,
+											['spec', 'router', 'scheduler', 'template', 'containers'],
+											lodash.cloneDeep(internalRegistryContainers)
+										);
+									} else {
+										lodash.set(values, ['spec', 'template', 'containers'], []);
+										lodash.set(
+											values,
+											['spec', 'router', 'scheduler', 'template', 'containers'],
+											[]
+										);
+									}
+
+									handleNext();
 								}
-
-								handleNext();
-							}
-						}}
-					>
-						{#snippet actions()}
-							<div class="flex w-full items-center justify-between gap-3">
-								<Button
-									onclick={() => {
-										handlePrevious();
-									}}
-								>
-									Previous
-								</Button>
-								<SubmitButton />
-							</div>
-						{/snippet}
-					</Form>
+							}}
+						>
+							{#snippet actions()}
+								<div class="flex w-full items-center justify-between gap-3">
+									<Button
+										onclick={() => {
+											handlePrevious();
+										}}
+									>
+										Previous
+									</Button>
+									<SubmitButton />
+								</div>
+							{/snippet}
+						</Form>
+					{/key}
 				</Tabs.Content>
 
 				<Tabs.Content value={steps[2]}>
