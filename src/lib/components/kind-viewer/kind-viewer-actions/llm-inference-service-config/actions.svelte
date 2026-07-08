@@ -4,6 +4,7 @@
 	import type { Schema } from '@sjsf/form';
 	import type { ValidateFunction } from 'ajv';
 
+	import { page } from '$app/state';
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Edit from '$lib/components/kind-viewer/kind-viewer-actions/default/edit.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
@@ -34,7 +35,10 @@
 		validate: ValidateFunction;
 		object: ServingKserveIoV1Alpha2LLMInferenceServiceConfig;
 	} = $props();
+
 	let actionsOpen = $state(false);
+
+	const targetNamespace = page.data.namespace;
 </script>
 
 <DropdownMenu.Root bind:open={actionsOpen}>
@@ -66,7 +70,7 @@
 			>
 				<Deploy
 					{cluster}
-					{namespace}
+					namespace={targetNamespace}
 					{schema}
 					{object}
 					onOpenChangeComplete={() => {
@@ -101,7 +105,7 @@
 			>
 				<Copy
 					{cluster}
-					{namespace}
+					namespace={targetNamespace}
 					{group}
 					{version}
 					{kind}
