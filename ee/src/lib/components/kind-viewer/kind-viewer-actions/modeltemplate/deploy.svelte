@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Code, ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { BanIcon } from '@lucide/svelte';
+	import { BanIcon, CopyIcon, RotateCcwIcon, UploadIcon } from '@lucide/svelte';
 	import Rocket from '@lucide/svelte/icons/rocket';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { ServingKserveIoV1Alpha2LLMInferenceServiceConfig } from '@otterscale/types';
@@ -21,13 +21,14 @@
 		fetchAllGpuNodes as fetchComputeResourceNodes,
 		type NodeInfo
 	} from '$lib/components/gpu-allocation';
-	import Badge from '$lib/components/ui/badge/badge.svelte';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog/index.js';
 	import Button from '$lib/components/ui/button/button.svelte';
+	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
-	import Spinner from '$lib/components/ui/spinner/spinner.svelte';
+	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
 	let {
@@ -44,6 +45,16 @@
 		onOpenChangeComplete: () => void;
 	} = $props();
 
+	const internalRegistryContainers = [
+		{
+			name: 'main',
+			env: [
+				{ name: 'USER', value: 'nonroot' },
+				{ name: 'TORCHINDUCTOR_CACHE_DIR', value: '/tmp/torchinductor_cache' }
+			]
+		}
+	];
+
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
@@ -57,37 +68,40 @@
 	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 
-	async function check(modelName: string) {
+	async function check(modelName: string): Promise<boolean | null> {
 		const harborHost = env.PUBLIC_HARBOR_URL;
-		if (!harborHost || !modelName) return;
+		if (!harborHost || !modelName) return null;
 
 		try {
-			const projectPath = 'models';
-			const repositoryPath = 'modelcar-catalog';
-			const reference = modelName;
-
-			const artifactsUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${reference}?with_label=true`;
+			const reference = modelName.toLowerCase();
+			const artifactsUrl = `/api/v2.0/projects/models/repositories/modelcar-catalog/artifacts/${encodeURIComponent(reference)}?with_label=true`;
 
 			const response = await fetch('/bff/helm/repository/harbor', {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					harborHost: env.PUBLIC_HARBOR_URL,
-					apiPath: artifactsUrl
-				})
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ harborHost, apiPath: artifactsUrl })
 			});
+
+			if (response.status === 404) return false; // 不存在,不是失敗
 
 			if (!response.ok) {
 				console.error('Failed to fetch model artifact:', response.statusText);
-				return;
+				return null;
 			}
 
-			return await response.json();
+			const model = await response.json();
+			return lodash.has(model, 'digest');
 		} catch (error) {
 			console.error('Error fetching model artifact:', error);
+			return null;
 		}
+	}
+
+	async function checkModelExistence(uri: string) {
+		const token = ++checkToken;
+		isModelExist = undefined;
+		const result = await check(parseModelName(uri));
+		if (token === checkToken) isModelExist = result;
 	}
 
 	function parseModelName(modelUrl: string) {
@@ -109,6 +123,17 @@
 		const modelName = parseModelName(modelUrl);
 
 		return `oci://${registry}/models/modelcar-catalog:${modelName.toLowerCase()}`;
+	}
+
+	function getUploadCommands(uri: string): string {
+		const modelName = parseModelName(uri).toLowerCase();
+		const registry = (env.PUBLIC_HARBOR_URL ?? '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+		return [
+			`docker pull quay.io/otterscale/modelcar-catalog:${modelName}`,
+			`docker tag quay.io/otterscale/modelcar-catalog:${modelName} ${registry}/models/modelcar-catalog:${modelName}`,
+			`docker push ${registry}/models/modelcar-catalog:${modelName}`
+		].join('\n');
 	}
 
 	type GPUDevice = { type: string; node: string };
@@ -188,6 +213,8 @@
 	let isSubmitting = $state(false);
 	let metadataFormReference: FormState<FormValue> | null = $state(null);
 	let modelFormReference: FormState<FormValue> | null = $state(null);
+	let isModelExist: boolean | null | undefined = $state(undefined);
+	let checkToken = 0;
 	let open = $state(false);
 
 	let value = $derived(stringify(values));
@@ -219,25 +246,78 @@
 {#snippet checking()}
 	{@const currentUri = modelFormReference
 		? (lodash.get(getValueSnapshot(modelFormReference), 'uri', '') as string)
-		: ''}
-	{#if currentUri}
-		{#await check(parseModelName(currentUri))}
-			<Badge variant="ghost">Checking</Badge>
-		{:then response}
-			{#if lodash.get(response, 'digest', null)}
-				<Badge>Exist</Badge>
-			{:else}
-				<Badge variant="secondary">Non-Exist</Badge>
-			{/if}
-		{:catch}
-			<Badge variant="destructive">Fail</Badge>
-		{/await}
+		: (lodash.get(object, 'spec.model.uri', '') as string)}
+	{#if isModelExist === undefined}
+		<ButtonGroup.Root class="flex h-fit items-center gap-1">
+			<Button size="xs" variant="outline" disabled>Checking</Button>
+			<Button size="icon-xs" variant="outline" disabled>
+				<Spinner />
+			</Button>
+		</ButtonGroup.Root>
+	{:else if isModelExist === true}
+		<ButtonGroup.Root class="flex h-fit items-center gap-1">
+			<Button size="xs">Exist</Button>
+		</ButtonGroup.Root>
+	{:else if isModelExist === false}
+		{@const uploadCommands = getUploadCommands(currentUri)}
+		<ButtonGroup.Root class="flex h-fit items-center gap-1">
+			<Button size="xs" variant="secondary">Not Exist</Button>
+			<AlertDialog.Root>
+				<AlertDialog.Trigger>
+					{#snippet child({ props })}
+						<Button {...props} size="icon-xs" variant="secondary">
+							<UploadIcon />
+						</Button>
+					{/snippet}
+				</AlertDialog.Trigger>
+				<AlertDialog.Content class="max-w-2xl">
+					<AlertDialog.Header>
+						<AlertDialog.Title>Model Not Found in Registry</AlertDialog.Title>
+						<AlertDialog.Description>
+							The model <span class="font-mono font-medium">
+								{parseModelName(currentUri).toLowerCase()}
+							</span>
+							was not found in the internal registry. Run the following commands to upload it, then re-check.
+						</AlertDialog.Description>
+					</AlertDialog.Header>
+					<pre
+						class="overflow-x-auto rounded-md bg-muted p-4 font-mono text-xs whitespace-pre">{uploadCommands}</pre>
+					<AlertDialog.Footer>
+						<AlertDialog.Cancel>Close</AlertDialog.Cancel>
+						<AlertDialog.Action
+							onclick={() => {
+								navigator.clipboard.writeText(uploadCommands);
+								toast.success('Commands copied to clipboard');
+							}}
+						>
+							<CopyIcon />
+							Copy Commands
+						</AlertDialog.Action>
+					</AlertDialog.Footer>
+				</AlertDialog.Content>
+			</AlertDialog.Root>
+			<Button size="icon-xs" variant="secondary" onclick={() => checkModelExistence(currentUri)}>
+				<RotateCcwIcon />
+			</Button>
+		</ButtonGroup.Root>
+	{:else}
+		<ButtonGroup.Root class="flex h-fit items-center gap-1">
+			<Button size="xs" variant="outline">Fail</Button>
+			<Button size="icon-xs" variant="outline" onclick={() => checkModelExistence(currentUri)}>
+				<RotateCcwIcon />
+			</Button>
+		</ButtonGroup.Root>
 	{/if}
 {/snippet}
 
 {#if !page.data.isRestricted}
 	<Dialog.Root
 		bind:open
+		onOpenChange={(isOpen) => {
+			if (isOpen) {
+				checkModelExistence(lodash.get(object, 'spec.model.uri', '') as string);
+			}
+		}}
 		onOpenChangeComplete={(isOpen) => {
 			onOpenChangeComplete?.();
 
@@ -393,6 +473,19 @@
 										? toModelCarReference(lodash.get(formValue, 'uri', '') as string)
 										: lodash.get(formValue, 'uri', '')
 								});
+
+								if (lodash.get(formValue, 'internal', true)) {
+									lodash.set(
+										values,
+										['spec', 'template', 'containers'],
+										internalRegistryContainers
+									);
+									lodash.set(
+										values,
+										['spec', 'router', 'scheduler', 'template', 'containers'],
+										internalRegistryContainers
+									);
+								}
 
 								handleNext();
 							}
