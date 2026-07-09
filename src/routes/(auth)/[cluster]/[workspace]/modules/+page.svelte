@@ -36,6 +36,7 @@
 		InstalledModule,
 		ModuleType
 	} from '$lib/components/module-viewer/types';
+	import { ModulesHelmRepositoryName } from '$lib/components/module-viewer/utils';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/paraglide/messages';
@@ -79,7 +80,7 @@
 			const response = await resourceClient.get({
 				cluster,
 				namespace,
-				name: 'otterscale-charts',
+				name: ModulesHelmRepositoryName,
 				group: 'source.toolkit.fluxcd.io',
 				version: 'v1',
 				resource: 'helmrepositories'
