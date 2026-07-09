@@ -25,7 +25,7 @@ RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm build
 RUN pnpm prune --production --ignore-scripts && pnpm store prune
 
 # Runtime stage
-FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:ed5e65a1036b505c9e5abf0d0412ce0f70be1b812630bbbbaf49ce47edc7a513
+FROM gcr.io/distroless/nodejs24-debian13:nonroot@sha256:70a2c12a0d76018b54d7bd01c5e3677632eeed9f890ba318d6db55fc54cf3baa
 
 WORKDIR /app
 
