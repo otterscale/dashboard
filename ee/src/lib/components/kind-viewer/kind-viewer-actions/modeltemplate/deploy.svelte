@@ -45,16 +45,6 @@
 		onOpenChangeComplete: () => void;
 	} = $props();
 
-	const internalRegistryContainers = [
-		{
-			name: 'main',
-			env: [
-				{ name: 'USER', value: 'nonroot' },
-				{ name: 'TORCHINDUCTOR_CACHE_DIR', value: '/tmp/torchinductor_cache' }
-			]
-		}
-	];
-
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
@@ -460,12 +450,28 @@
 										lodash.set(
 											values,
 											['spec', 'template', 'containers'],
-											lodash.cloneDeep(internalRegistryContainers)
+											[
+												{
+													name: 'main',
+													env: [
+														{ name: 'USER', value: 'nonroot' },
+														{ name: 'TORCHINDUCTOR_CACHE_DIR', value: '/tmp/torchinductor_cache' }
+													]
+												}
+											]
 										);
 										lodash.set(
 											values,
 											['spec', 'router', 'scheduler', 'template', 'containers'],
-											lodash.cloneDeep(internalRegistryContainers)
+											[
+												{
+													name: 'tokenizer',
+													env: [
+														{ name: 'USER', value: 'nonroot' },
+														{ name: 'TORCHINDUCTOR_CACHE_DIR', value: '/tmp/torchinductor_cache' }
+													]
+												}
+											]
 										);
 									} else {
 										lodash.set(values, ['spec', 'template', 'containers'], []);
