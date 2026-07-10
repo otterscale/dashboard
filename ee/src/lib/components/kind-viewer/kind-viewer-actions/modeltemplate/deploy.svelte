@@ -748,7 +748,12 @@
 															stringify({
 																apiVersion: `${kserveGroup}/${kserveVersion}`,
 																kind: configurationKind,
-																metadata: { name, namespace },
+																metadata: {
+																	name,
+																	namespace,
+																	labels: lodash.get(object, ['metadata', 'labels'], {}),
+																	annotations: lodash.get(object, ['metadata', 'annotations'], {})
+																},
 																spec: lodash.get(object, 'spec')
 															})
 														)
