@@ -51,7 +51,7 @@
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
 	): Promise<string> {
 		if (!validate) {
-			throw new Error('HelmRelease schema calidator is not available.');
+			throw new Error('HelmRelease schema validator is not available.');
 		}
 
 		const dependencies = lodash
@@ -62,6 +62,10 @@
 			name,
 			namespace
 		}));
+		const remediationRetries = Number(
+			lodash.get(module, ['annotations', 'module.otterscale.io/remediation'], NaN)
+		);
+		const hasRemediation = Number.isInteger(remediationRetries);
 
 		const manifest = {
 			apiVersion: `${group}/${version}`,
@@ -73,7 +77,13 @@
 			spec: {
 				releaseName: module.name,
 				targetNamespace: lodash.get(module, ['annotations', 'module.otterscale.io/namespace']),
-				install: { createNamespace: true },
+				install: {
+					createNamespace: true,
+					...(hasRemediation && { remediation: { retries: remediationRetries } })
+				},
+				...(hasRemediation && {
+					upgrade: { remediation: { retries: remediationRetries } }
+				}),
 				interval: '15m',
 				timeout: '1h',
 				...(dependenciesOfSelectedModules.length > 0 && {
@@ -124,14 +134,14 @@
 		try {
 			parsed = load(stringify(manifest, { schema: 'yaml-1.1' }), { schema: JSON_SCHEMA });
 		} catch (error) {
-			console.error(`Failed to parse HelmRelease manifest for ${name}:`, error);
-			throw new Error(`Invalid YAML for ${name}.`);
+			console.error(`Failed to parse HelmRelease manifest for ${module.name}:`, error);
+			throw new Error(`Invalid YAML for ${module.name}.`);
 		}
 
 		const isValid = validate(parsed);
 		if (!isValid) {
-			console.error(`Validation errors for ${name}:`, validate.errors);
-			throw new Error(`Validation failed for ${name}.`);
+			console.error(`Validation errors for ${module.name}:`, validate.errors);
+			throw new Error(`Validation failed for ${module.name}.`);
 		}
 
 		await resourceClient.create({
