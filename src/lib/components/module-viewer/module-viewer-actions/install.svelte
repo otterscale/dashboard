@@ -60,6 +60,10 @@
 					name,
 					namespace
 				}));
+				const remediationRetries = Number(
+					lodash.get(module, ['annotations', 'module.otterscale.io/remediation'], NaN)
+				);
+				const hasRemediation = Number.isInteger(remediationRetries);
 
 				const manifest = {
 					apiVersion: `${group}/${version}`,
@@ -71,7 +75,13 @@
 					spec: {
 						releaseName: module.name,
 						targetNamespace: lodash.get(module, ['annotations', 'module.otterscale.io/namespace']),
-						install: { createNamespace: true },
+						install: {
+							createNamespace: true,
+							...(hasRemediation && { remediation: { retries: remediationRetries } })
+						},
+						...(hasRemediation && {
+							upgrade: { remediation: { retries: remediationRetries } }
+						}),
 						interval: '15m',
 						timeout: '1h',
 						...(dependenciesOfSelectedModule.length > 0 && {
