@@ -447,6 +447,8 @@
 									});
 
 									if (useInternal) {
+										const isGptOss = parseModelName(modelUri).toLowerCase().includes('gpt-oss');
+
 										lodash.set(
 											values,
 											['spec', 'template', 'containers'],
@@ -455,7 +457,15 @@
 													name: 'main',
 													env: [
 														{ name: 'USER', value: 'nonroot' },
-														{ name: 'TORCHINDUCTOR_CACHE_DIR', value: '/tmp/torchinductor_cache' }
+														{ name: 'TORCHINDUCTOR_CACHE_DIR', value: '/tmp/torchinductor_cache' },
+														...(isGptOss
+															? [
+																	{
+																		name: 'TIKTOKEN_ENCODINGS_BASE',
+																		value: '/mnt/models/tiktoken_encodings'
+																	}
+																]
+															: [])
 													]
 												}
 											]
@@ -468,7 +478,15 @@
 													name: 'tokenizer',
 													env: [
 														{ name: 'USER', value: 'nonroot' },
-														{ name: 'TORCHINDUCTOR_CACHE_DIR', value: '/tmp/torchinductor_cache' }
+														{ name: 'TORCHINDUCTOR_CACHE_DIR', value: '/tmp/torchinductor_cache' },
+														...(isGptOss
+															? [
+																	{
+																		name: 'TIKTOKEN_ENCODINGS_BASE',
+																		value: '/models/tiktoken_encodings'
+																	}
+																]
+															: [])
 													]
 												}
 											]
