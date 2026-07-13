@@ -1,16 +1,16 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import ArrowDownIcon from '@lucide/svelte/icons/arrow-down';
-	import DownloadIcon from '@lucide/svelte/icons/download';
-	import LoaderCircleIcon from '@lucide/svelte/icons/loader-circle';
-	import PauseIcon from '@lucide/svelte/icons/pause';
-	import PlayIcon from '@lucide/svelte/icons/play';
+	import SearchIcon from '@lucide/svelte/icons/search';
 	import { RuntimeService } from '@otterscale/api/runtime/v1';
-	import { getContext, type Snippet, tick } from 'svelte';
+	import { getContext, onDestroy, type Snippet, tick } from 'svelte';
 
-	import Button from '$lib/components/ui/button/button.svelte';
+	import { Badge } from '$lib/components/ui/badge';
+	import { Button } from '$lib/components/ui/button';
+	import * as Empty from '$lib/components/ui/empty';
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
-	import { Toggle } from '$lib/components/ui/toggle';
+	import { Spinner } from '$lib/components/ui/spinner';
+	import { cn } from '$lib/utils';
 
 	const MAX_LINES = 1000;
 
@@ -20,14 +20,14 @@
 		podName,
 		containers,
 		active = false,
-		extraControls
+		sourceControls
 	}: {
 		cluster: string;
 		namespace: string;
 		podName: string;
 		containers: string[];
 		active: boolean;
-		extraControls?: Snippet<[{ restart: () => void }]>;
+		sourceControls?: Snippet;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -38,18 +38,61 @@
 
 	let follow = $state(true);
 	let previous = $state(false);
-	let logLines = $state<string[]>([]);
+	// Reassigned wholesale on every chunk — $state.raw skips deep-proxying 1000 lines.
+	let logLines = $state.raw<string[]>([]);
+	let droppedLines = $state(0);
 	let abortController: AbortController | null = null;
 	let logContainer = $state<HTMLElement | undefined>(undefined);
 	let showScrollButton = $state(false);
-	let showAllData = $state(false);
 	let downloading = $state(false);
+	let wrap = $state(false);
+	let filter = $state('');
+	let debouncedFilter = $state('');
+	let filterTimer: ReturnType<typeof setTimeout> | undefined;
+	let copied = $state(false);
 
-	$effect(() => {
-		if (active) {
-			startStreaming();
+	onDestroy(() => clearTimeout(filterTimer));
+
+	const entries = $derived(logLines.map((text, i) => ({ text, no: droppedLines + i + 1 })));
+
+	const filteredLines = $derived.by(() => {
+		const query = debouncedFilter.trim().toLowerCase();
+		if (!query) return entries;
+		return entries.filter((entry) => entry.text.toLowerCase().includes(query));
+	});
+
+	function highlightSegments(text: string, query: string): { text: string; hit: boolean }[] {
+		const trimmed = query.trim();
+		if (!trimmed) return [{ text, hit: false }];
+		const lower = text.toLowerCase();
+		const lowerQuery = trimmed.toLowerCase();
+		const parts: { text: string; hit: boolean }[] = [];
+		let index = 0;
+		while (index < text.length) {
+			const hitIndex = lower.indexOf(lowerQuery, index);
+			if (hitIndex === -1) {
+				parts.push({ text: text.slice(index), hit: false });
+				break;
+			}
+			if (hitIndex > index) parts.push({ text: text.slice(index, hitIndex), hit: false });
+			parts.push({ text: text.slice(hitIndex, hitIndex + trimmed.length), hit: true });
+			index = hitIndex + trimmed.length;
 		}
+		return parts;
+	}
 
+	const streamParams = $derived({
+		name: podName,
+		container: effectiveContainer,
+		follow,
+		previous
+	});
+
+	// Single restart source: reading streamParams registers every stream input as a
+	// dependency, so changing pod, container, follow or previous restarts exactly once.
+	$effect(() => {
+		if (!active) return;
+		startStreaming(streamParams);
 		return () => stopStreaming();
 	});
 
@@ -85,11 +128,12 @@
 		return new Promise((resolve) => setTimeout(resolve, ms));
 	}
 
-	async function startStreaming() {
+	async function startStreaming(params: typeof streamParams) {
 		stopStreaming();
 		logLines = [];
+		droppedLines = 0;
 
-		if (!podName) {
+		if (!params.name) {
 			logLines = ['[Error] No pod name available.'];
 			return;
 		}
@@ -101,11 +145,11 @@
 				{
 					cluster,
 					namespace,
-					name: podName,
-					container: effectiveContainer,
-					follow,
-					previous,
-					...(showAllData ? {} : { tailLines: BigInt(MAX_LINES) })
+					name: params.name,
+					container: params.container,
+					follow: params.follow,
+					previous: params.previous,
+					tailLines: BigInt(MAX_LINES)
 				},
 				{ signal: abortController.signal }
 			);
@@ -116,7 +160,10 @@
 					const lines = text.split('\n').filter((l) => l.length > 0);
 
 					const newLogLines = [...logLines, ...lines];
-					logLines = showAllData ? newLogLines : newLogLines.slice(-MAX_LINES);
+					if (newLogLines.length > MAX_LINES) {
+						droppedLines += newLogLines.length - MAX_LINES;
+					}
+					logLines = newLogLines.slice(-MAX_LINES);
 
 					autoScrollToBottom();
 					await delay(10);
@@ -135,7 +182,73 @@
 		}
 	}
 
-	async function downloadLogs() {
+	export function restart() {
+		if (active) startStreaming(streamParams);
+	}
+
+	export function isEmpty() {
+		return logLines.length === 0;
+	}
+
+	export function isCopied() {
+		return copied;
+	}
+
+	export function isDownloading() {
+		return downloading;
+	}
+
+	export function canDownload() {
+		return !!podName && !downloading;
+	}
+
+	export function getFilter() {
+		return filter;
+	}
+
+	export function setFilter(value: string) {
+		filter = value;
+		clearTimeout(filterTimer);
+		// Clearing should feel instant; only debounce while narrowing.
+		if (!value.trim()) {
+			debouncedFilter = value;
+			return;
+		}
+		filterTimer = setTimeout(() => (debouncedFilter = value), 150);
+	}
+
+	export function isFollowing() {
+		return follow;
+	}
+
+	export function setFollowing(value: boolean) {
+		follow = value;
+	}
+
+	export function isPrevious() {
+		return previous;
+	}
+
+	export function setPrevious(value: boolean) {
+		previous = value;
+	}
+
+	export function isWrapped() {
+		return wrap;
+	}
+
+	export function setWrap(value: boolean) {
+		wrap = value;
+	}
+
+	export async function copyLogs() {
+		if (logLines.length === 0) return;
+		await navigator.clipboard.writeText(logLines.join('\n'));
+		copied = true;
+		setTimeout(() => (copied = false), 1500);
+	}
+
+	export async function downloadLogs() {
 		if (!podName || downloading) return;
 		downloading = true;
 
@@ -175,102 +288,80 @@
 	}
 </script>
 
-<!-- Controls -->
-<div class="flex flex-wrap items-center gap-2">
-	{#if extraControls}
-		{@render extraControls({ restart: startStreaming })}
-	{/if}
-	{#if containers.length > 1}
-		<Select
-			type="single"
-			value={effectiveContainer}
-			onValueChange={(value) => {
-				overriddenContainer = value;
-				if (active) startStreaming();
-			}}
-		>
-			<SelectTrigger class="w-48 max-w-64 min-w-0">
-				<span class="truncate">{effectiveContainer || 'Select container'}</span>
-			</SelectTrigger>
-			<SelectContent class="w-48 max-w-64">
-				{#each containers as c (c)}
-					<SelectItem value={c}>{c}</SelectItem>
-				{/each}
-			</SelectContent>
-		</Select>
-	{/if}
-	<Toggle
-		size="sm"
-		pressed={follow}
-		onPressedChange={(v) => {
-			follow = v;
-			if (active) startStreaming();
-		}}
-		aria-label="Toggle follow"
-	>
-		{#if follow}
-			<PauseIcon size={14} />
-		{:else}
-			<PlayIcon size={14} />
-		{/if}
-		<span class="text-xs">{follow ? 'Following' : 'Paused'}</span>
-	</Toggle>
-	<Toggle
-		size="sm"
-		pressed={previous}
-		onPressedChange={(v) => {
-			previous = v;
-			if (active) startStreaming();
-		}}
-		aria-label="Toggle previous container"
-	>
-		<span class="text-xs">Previous</span>
-	</Toggle>
-	<Toggle
-		size="sm"
-		pressed={showAllData}
-		onPressedChange={(v) => {
-			showAllData = v;
-			if (active) startStreaming();
-		}}
-		aria-label="Toggle all data"
-	>
-		<span class="text-xs">All</span>
-	</Toggle>
-	<div class="ml-auto flex items-center gap-2">
-		<Button size="sm" variant="outline" onclick={downloadLogs} disabled={downloading || !podName}>
-			{#if downloading}
-				<LoaderCircleIcon size={14} class="animate-spin" />
-			{:else}
-				<DownloadIcon size={14} />
-			{/if}
-			{downloading ? 'Downloading...' : 'Download'}
-		</Button>
-		<Button
-			size="sm"
-			variant="outline"
-			onclick={() => {
-				if (active) startStreaming();
-			}}
-		>
-			Refresh
-		</Button>
-	</div>
-</div>
-
 <!-- Log output -->
-<div class="relative">
+<div class="relative min-h-64 flex-1">
 	<div
 		bind:this={logContainer}
 		onscroll={handleScroll}
-		class="h-[55vh] overflow-auto rounded-md border bg-muted p-3 font-mono text-xs leading-relaxed"
+		class="absolute inset-0 overflow-auto rounded-md border bg-muted py-2 font-mono text-xs leading-relaxed"
 	>
 		{#if logLines.length === 0}
-			<span class="text-muted-foreground">Waiting for log data...</span>
+			<Empty.Root class="h-full">
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<Spinner />
+					</Empty.Media>
+					<Empty.Title>Waiting for logs</Empty.Title>
+					<Empty.Description>
+						Log data will appear here as soon as the container produces output.
+					</Empty.Description>
+				</Empty.Header>
+			</Empty.Root>
+		{:else if filteredLines.length === 0}
+			<Empty.Root class="h-full">
+				<Empty.Header>
+					<Empty.Media variant="icon">
+						<SearchIcon />
+					</Empty.Media>
+					<Empty.Title>No matching lines</Empty.Title>
+					<Empty.Description>No log lines match "{debouncedFilter}".</Empty.Description>
+				</Empty.Header>
+			</Empty.Root>
 		{:else}
-			{#each logLines as line, i (i)}
-				<div class="hover:bg-muted-foreground/10">{line}</div>
+			{#each filteredLines as entry (entry.no)}
+				<div
+					class={cn(
+						'px-3 hover:bg-muted-foreground/10',
+						wrap ? 'break-all whitespace-pre-wrap' : 'w-fit min-w-full whitespace-pre',
+						entry.text.startsWith('[Error]') && 'text-destructive'
+					)}
+				>
+					{#if debouncedFilter.trim()}
+						{#each highlightSegments(entry.text, debouncedFilter) as segment, i (i)}
+							{#if segment.hit}<mark class="rounded-sm bg-primary/25 text-inherit"
+									>{segment.text}</mark
+								>{:else}{segment.text}{/if}
+						{/each}
+					{:else}
+						{entry.text}
+					{/if}
+				</div>
 			{/each}
+		{/if}
+	</div>
+
+	<!-- Source pickers float over the log's top-right corner; clear of the scrollbar. -->
+	<div class="absolute top-2 right-5 flex flex-wrap items-center justify-end gap-2">
+		{#if sourceControls}
+			{@render sourceControls()}
+		{/if}
+		{#if containers.length > 1}
+			<Select
+				type="single"
+				value={effectiveContainer}
+				onValueChange={(value) => (overriddenContainer = value)}
+			>
+				<SelectTrigger class="h-8 w-44 bg-background/90 shadow-sm backdrop-blur-sm">
+					<span class="truncate">{effectiveContainer || 'Select container'}</span>
+				</SelectTrigger>
+				<SelectContent class="w-(--bits-select-anchor-width) min-w-0">
+					{#each containers as c (c)}
+						<SelectItem value={c}>
+							<span class="block truncate">{c}</span>
+						</SelectItem>
+					{/each}
+				</SelectContent>
+			</Select>
 		{/if}
 	</div>
 
@@ -281,9 +372,36 @@
 			}}
 			variant="outline"
 			size="icon-sm"
-			class="absolute bottom-2 left-1/2 inline-flex -translate-x-1/2 transform rounded-full shadow-md"
+			class="absolute bottom-2 left-1/2 -translate-x-1/2 rounded-full shadow-md"
+			aria-label="Scroll to bottom"
 		>
-			<ArrowDownIcon size={14} />
+			<ArrowDownIcon />
 		</Button>
 	{/if}
+</div>
+
+<!-- Status bar -->
+<div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+	<Badge variant="outline" class="gap-1.5 font-normal">
+		<span
+			class={cn(
+				'size-1.5 rounded-full',
+				follow && active ? 'animate-pulse bg-primary' : 'bg-muted-foreground'
+			)}
+		></span>
+		{follow ? 'Streaming' : 'Paused'}
+	</Badge>
+	{#if previous}
+		<Badge variant="secondary" class="font-normal">Previous container</Badge>
+	{/if}
+	<span class="ml-auto">
+		{#if debouncedFilter.trim()}
+			{filteredLines.length} of {logLines.length} lines
+		{:else}
+			{logLines.length} lines
+		{/if}
+		{#if droppedLines > 0}
+			· showing last {MAX_LINES}
+		{/if}
+	</span>
 </div>

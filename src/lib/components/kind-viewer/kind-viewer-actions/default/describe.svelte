@@ -1,15 +1,23 @@
 <script lang="ts">
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
+	import CheckIcon from '@lucide/svelte/icons/check';
+	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
+	import CopyIcon from '@lucide/svelte/icons/copy';
 	import FileJsonIcon from '@lucide/svelte/icons/file-json';
 	import FileSearchIcon from '@lucide/svelte/icons/file-search';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext, type Snippet } from 'svelte';
 
-	import Button from '$lib/components/ui/button/button.svelte';
+	import * as Alert from '$lib/components/ui/alert';
+	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
+	import * as Empty from '$lib/components/ui/empty';
 	import * as Item from '$lib/components/ui/item';
+	import { Spinner } from '$lib/components/ui/spinner';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 
+	import { ACTION_DIALOG_CONTENT_CLASS } from './constants';
 	import { formatDescribe } from './describe-formatter';
 
 	let {
@@ -74,10 +82,20 @@
 			);
 		} catch (err) {
 			console.error(`Failed to describe ${name}:`, err);
-			error = `Failed to describe ${name}: ${(err as ConnectError).message}`;
+			error = (err as ConnectError).message;
 		} finally {
 			isLoading = false;
 		}
+	}
+
+	let copied = $state(false);
+
+	async function copyContent() {
+		const text = mode === 'json' ? jsonText : describeText;
+		if (!text) return;
+		await navigator.clipboard.writeText(text);
+		copied = true;
+		setTimeout(() => (copied = false), 1500);
 	}
 
 	function handleOpenChange(isOpen: boolean) {
@@ -102,70 +120,108 @@
 			</Item.Root>
 		</Dialog.Trigger>
 	{/if}
-	<Dialog.Content class="flex h-fit max-h-[90vh] max-w-[70vw] min-w-[55vw] flex-col gap-3">
+	<Dialog.Content class={ACTION_DIALOG_CONTENT_CLASS}>
 		<Dialog.Header>
 			<div class="flex items-end justify-between gap-4">
-				<Item.Root class="p-0">
-					<Item.Content class="text-left">
-						<Item.Title class="text-lg font-bold">
-							Describe — {name}
-						</Item.Title>
-						<Item.Description>
-							{#if namespace}
-								Resource details and events in namespace <strong>{namespace}</strong>
-							{:else}
-								Resource details and events
-							{/if}
-						</Item.Description>
-					</Item.Content>
-				</Item.Root>
-
-				<div class="flex gap-1">
-					<Button
-						size="icon-sm"
-						variant="ghost"
-						disabled={mode === 'describe'}
-						onclick={() => (mode = 'describe')}
-					>
-						<FileSearchIcon />
-					</Button>
-					<Button
-						size="icon-sm"
-						variant="ghost"
-						disabled={mode === 'json'}
-						onclick={() => (mode = 'json')}
-					>
-						<FileJsonIcon />
-					</Button>
+				<div class="flex flex-col gap-1.5 text-left">
+					<Dialog.Title class="text-lg font-bold">Describe — {name}</Dialog.Title>
+					<Dialog.Description>
+						{#if namespace}
+							Resource details and events in namespace <strong>{namespace}</strong>
+						{:else}
+							Resource details and events
+						{/if}
+					</Dialog.Description>
+				</div>
+				<!-- -mr-2 lines the icon column up with the dialog's close button (right-4 vs p-6). -->
+				<div class="-mr-2 flex shrink-0 items-center gap-1">
+					<Tooltip.Root ignoreNonKeyboardFocus>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									size="icon-sm"
+									variant="ghost"
+									disabled={mode === 'describe'}
+									onclick={() => (mode = 'describe')}
+									aria-label="Describe view"
+								>
+									<FileSearchIcon />
+								</Button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>Describe view</Tooltip.Content>
+					</Tooltip.Root>
+					<Tooltip.Root ignoreNonKeyboardFocus>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									size="icon-sm"
+									variant="ghost"
+									disabled={mode === 'json'}
+									onclick={() => (mode = 'json')}
+									aria-label="JSON view"
+								>
+									<FileJsonIcon />
+								</Button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>JSON view</Tooltip.Content>
+					</Tooltip.Root>
+					<Tooltip.Root ignoreNonKeyboardFocus>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									size="icon-sm"
+									variant="ghost"
+									disabled={isLoading || !!error}
+									onclick={copyContent}
+									aria-label="Copy to clipboard"
+								>
+									{#if copied}
+										<CheckIcon />
+									{:else}
+										<CopyIcon />
+									{/if}
+								</Button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>{copied ? 'Copied!' : 'Copy to clipboard'}</Tooltip.Content>
+					</Tooltip.Root>
 				</div>
 			</div>
 		</Dialog.Header>
 
-		<div class="flex-1 overflow-auto">
+		<Tabs.Root bind:value={mode} class="flex min-h-0 flex-1 flex-col gap-3">
 			{#if isLoading}
-				<div
-					class="flex h-[60vh] items-center justify-center rounded-md border bg-muted text-xs text-muted-foreground"
-				>
-					Loading...
+				<div class="min-h-0 flex-1 rounded-md border bg-muted">
+					<Empty.Root class="h-full">
+						<Empty.Header>
+							<Empty.Media variant="icon">
+								<Spinner />
+							</Empty.Media>
+							<Empty.Title>Loading resource details</Empty.Title>
+						</Empty.Header>
+					</Empty.Root>
 				</div>
 			{:else if error}
-				<div
-					class="flex h-[60vh] items-center justify-center rounded-md border bg-muted text-xs text-destructive"
-				>
-					{error}
-				</div>
+				<Alert.Root variant="destructive">
+					<CircleAlertIcon />
+					<Alert.Title>Failed to describe {name}</Alert.Title>
+					<Alert.Description>{error}</Alert.Description>
+				</Alert.Root>
 			{:else}
-				<Tabs.Root bind:value={mode} class="flex h-full flex-col">
-					<Tabs.Content value="describe" class="mt-0 outline-none">
-						<pre
-							class="max-h-[70vh] w-full overflow-auto rounded-md border bg-muted p-4 font-mono text-[11px] leading-relaxed whitespace-pre text-foreground">{describeText}</pre>
-					</Tabs.Content>
-					<Tabs.Content value="json" class="mt-0 outline-none">
-						<pre
-							class="max-h-[70vh] w-full overflow-auto rounded-md border bg-muted p-4 font-mono text-[11px] leading-relaxed whitespace-pre text-foreground">{jsonText}</pre>
-					</Tabs.Content>
-				</Tabs.Root>
+				<Tabs.Content value="describe" class="mt-0 min-h-0 flex-1 outline-none">
+					<pre
+						class="h-full w-full overflow-auto rounded-md border bg-muted p-4 font-mono text-xs leading-relaxed whitespace-pre text-foreground">{describeText}</pre>
+				</Tabs.Content>
+				<Tabs.Content value="json" class="mt-0 min-h-0 flex-1 outline-none">
+					<pre
+						class="h-full w-full overflow-auto rounded-md border bg-muted p-4 font-mono text-xs leading-relaxed whitespace-pre text-foreground">{jsonText}</pre>
+				</Tabs.Content>
 			{/if}
-		</div>
+		</Tabs.Root>
 	</Dialog.Content>
 </Dialog.Root>

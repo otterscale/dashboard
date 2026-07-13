@@ -8,11 +8,13 @@
 	let {
 		cluster,
 		namespace,
-		name
+		name,
+		onConnectionChange
 	}: {
 		cluster: string;
 		namespace: string;
 		name: string;
+		onConnectionChange?: (connected: boolean) => void;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -42,10 +44,12 @@
 			rfb.addEventListener('connect', () => {
 				isConnected = true;
 				error = '';
+				onConnectionChange?.(true);
 			});
 
 			rfb.addEventListener('disconnect', (e) => {
 				isConnected = false;
+				onConnectionChange?.(false);
 				if (!(e as CustomEvent<{ clean: boolean }>).detail.clean) {
 					error = 'VNC connection lost';
 				}
@@ -53,6 +57,7 @@
 		} catch (err) {
 			error = `Failed to connect: ${err}`;
 			isConnected = false;
+			onConnectionChange?.(false);
 		}
 	}
 
@@ -61,6 +66,7 @@
 		rfb = null;
 		ws = null;
 		isConnected = false;
+		onConnectionChange?.(false);
 	}
 
 	onMount(() => {
