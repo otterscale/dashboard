@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { type Transport } from '@connectrpc/connect';
 	import CheckIcon from '@lucide/svelte/icons/check';
+	import ContainerIcon from '@lucide/svelte/icons/container';
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import DownloadIcon from '@lucide/svelte/icons/download';
 	import HistoryIcon from '@lucide/svelte/icons/history';
@@ -13,6 +14,7 @@
 	import XIcon from '@lucide/svelte/icons/x';
 	import { getContext, type Snippet } from 'svelte';
 
+	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as InputGroup from '$lib/components/ui/input-group';
@@ -48,11 +50,6 @@
 	let viewer = $state<ReturnType<typeof LogViewer>>();
 
 	const showsPodPicker = $derived(kind !== 'Pod' && resolver.associatedPods.length > 1);
-	const hasPickers = $derived(
-		(kind === 'CronJob' && resolver.associatedJobs.length > 0) ||
-			showsPodPicker ||
-			resolver.containers.length > 1
-	);
 
 	async function handleOpenChange(isOpen: boolean) {
 		if (!isOpen || kind === 'Pod') return;
@@ -67,10 +64,12 @@
 			value={resolver.selectedJob}
 			onValueChange={(value) => resolver.handleJobChange(value)}
 		>
-			<SelectTrigger class="h-8 w-56 bg-background/90 shadow-sm backdrop-blur-sm">
+			<SelectTrigger
+				class="h-7 w-fit max-w-56 gap-1 border-none bg-transparent px-2 text-xs font-medium text-foreground shadow-none hover:bg-accent dark:bg-transparent dark:hover:bg-accent"
+			>
 				<span class="truncate">{resolver.selectedJob || 'Select job'}</span>
 			</SelectTrigger>
-			<SelectContent class="w-(--bits-select-anchor-width) min-w-0">
+			<SelectContent align="start" class="max-w-72 min-w-(--bits-select-anchor-width)">
 				{#each resolver.associatedJobs as j (j)}
 					<SelectItem value={j}>
 						<span class="block truncate">{j}</span>
@@ -85,10 +84,12 @@
 			value={resolver.selectedPod}
 			onValueChange={(value) => (resolver.selectedPod = value)}
 		>
-			<SelectTrigger class="h-8 w-56 bg-background/90 shadow-sm backdrop-blur-sm">
+			<SelectTrigger
+				class="h-7 w-fit max-w-56 gap-1 border-none bg-transparent px-2 text-xs font-medium text-foreground shadow-none hover:bg-accent dark:bg-transparent dark:hover:bg-accent"
+			>
 				<span class="truncate">{resolver.selectedPod || 'Select pod'}</span>
 			</SelectTrigger>
-			<SelectContent class="w-(--bits-select-anchor-width) min-w-0">
+			<SelectContent align="start" class="max-w-72 min-w-(--bits-select-anchor-width)">
 				{#each resolver.associatedPods as p (p)}
 					<SelectItem value={p}>
 						<span class="block truncate">{p}</span>
@@ -97,6 +98,11 @@
 			</SelectContent>
 		</Select>
 	{/if}
+{/snippet}
+
+<!-- The toolbar's leading container label doubles as the container picker when the
+     pod has more than one container; otherwise it's a plain label. -->
+{#snippet containerPicker()}
 	{#if resolver.containers.length > 1}
 		<Select
 			type="single"
@@ -105,17 +111,39 @@
 				if (value) resolver.selectedContainer = value;
 			}}
 		>
-			<SelectTrigger class="h-8 w-44 bg-background/90 shadow-sm backdrop-blur-sm">
-				<span class="truncate">{resolver.selectedContainer || 'Select container'}</span>
+			<SelectTrigger
+				class="-ml-2 h-7 w-fit max-w-64 gap-1 border-none bg-transparent px-2 text-xs font-medium text-foreground shadow-none hover:bg-accent dark:bg-transparent dark:hover:bg-accent"
+			>
+				<span class="flex min-w-0 items-center gap-1.5">
+					<ContainerIcon class="size-3.5 shrink-0 text-muted-foreground" />
+					<span class="truncate">{resolver.selectedContainer || 'Select container'}</span>
+					{#if resolver.initContainerNames.has(resolver.selectedContainer)}
+						<Badge variant="secondary" class="h-4 shrink-0 px-1.5 py-0 text-[10px] font-normal">
+							Init
+						</Badge>
+					{/if}
+				</span>
 			</SelectTrigger>
-			<SelectContent class="w-(--bits-select-anchor-width) min-w-0">
+			<SelectContent align="start" class="max-w-72 min-w-(--bits-select-anchor-width)">
 				{#each resolver.containers as c (c)}
 					<SelectItem value={c}>
-						<span class="block truncate">{c}</span>
+						<span class="flex min-w-0 items-center gap-1.5">
+							<span class="truncate">{c}</span>
+							{#if resolver.initContainerNames.has(c)}
+								<Badge variant="secondary" class="h-4 shrink-0 px-1.5 py-0 text-[10px] font-normal">
+									Init
+								</Badge>
+							{/if}
+						</span>
 					</SelectItem>
 				{/each}
 			</SelectContent>
 		</Select>
+	{:else}
+		<span class="flex min-w-0 items-center gap-1.5 font-medium text-foreground">
+			<ContainerIcon class="size-3.5 shrink-0 text-muted-foreground" />
+			<span class="truncate">{resolver.selectedContainer}</span>
+		</span>
 	{/if}
 {/snippet}
 
@@ -295,7 +323,8 @@
 			podName={resolver.effectivePodName}
 			container={resolver.selectedContainer}
 			active={open}
-			sourceControls={hasPickers ? sourcePickers : undefined}
+			containerControl={containerPicker}
+			sourceControls={sourcePickers}
 		/>
 	</Dialog.Content>
 </Dialog.Root>

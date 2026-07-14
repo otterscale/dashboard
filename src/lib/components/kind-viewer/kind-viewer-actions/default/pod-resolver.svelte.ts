@@ -10,19 +10,30 @@ interface PodResolverOptions {
 	kind: string;
 }
 
+interface ContainerInfo {
+	name: string;
+	init: boolean;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractContainers(obj: any, kind: string): string[] {
+function extractContainers(obj: any, kind: string): ContainerInfo[] {
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	let specs: any[] | undefined;
+	let spec: any;
 	if (kind === 'Pod') {
-		specs = obj?.spec?.containers;
+		spec = obj?.spec;
 	} else if (kind === 'CronJob') {
-		specs = obj?.spec?.jobTemplate?.spec?.template?.spec?.containers;
+		spec = obj?.spec?.jobTemplate?.spec?.template?.spec;
 	} else {
-		specs = obj?.spec?.template?.spec?.containers;
+		spec = obj?.spec?.template?.spec;
 	}
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-	return specs?.map((c: any) => c.name as string) ?? [];
+	const initContainers: string[] = spec?.initContainers?.map((c: any) => c.name as string) ?? [];
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const containers: string[] = spec?.containers?.map((c: any) => c.name as string) ?? [];
+	return [
+		...initContainers.map((name) => ({ name, init: true })),
+		...containers.map((name) => ({ name, init: false }))
+	];
 }
 
 function toLabelSelector(labels: Record<string, string>): string {
@@ -38,7 +49,11 @@ export function createPodResolver(options: () => PodResolverOptions) {
 	const matchLabels: Record<string, string> = $derived(
 		options().object?.spec?.selector?.matchLabels ?? {}
 	);
-	const containers: string[] = $derived(extractContainers(options().object, options().kind));
+	const containerInfo = $derived(extractContainers(options().object, options().kind));
+	const containers: string[] = $derived(containerInfo.map((c) => c.name));
+	const initContainerNames = $derived(
+		new SvelteSet(containerInfo.filter((c) => c.init).map((c) => c.name))
+	);
 
 	let associatedJobs = $state<string[]>([]);
 	let selectedJob = $state('');
@@ -216,6 +231,9 @@ export function createPodResolver(options: () => PodResolverOptions) {
 		},
 		get containers() {
 			return containers;
+		},
+		get initContainerNames() {
+			return initContainerNames;
 		},
 		get effectivePodName() {
 			return effectivePodName;

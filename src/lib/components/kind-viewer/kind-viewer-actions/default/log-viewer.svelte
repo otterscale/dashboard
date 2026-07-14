@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import ArrowDownIcon from '@lucide/svelte/icons/arrow-down';
+	import ContainerIcon from '@lucide/svelte/icons/container';
 	import SearchIcon from '@lucide/svelte/icons/search';
 	import { RuntimeService } from '@otterscale/api/runtime/v1';
 	import { getContext, onDestroy, type Snippet, tick } from 'svelte';
@@ -20,6 +21,7 @@
 		podName,
 		container,
 		active = false,
+		containerControl,
 		sourceControls
 	}: {
 		cluster: string;
@@ -27,6 +29,7 @@
 		podName: string;
 		container: string;
 		active: boolean;
+		containerControl?: Snippet;
 		sourceControls?: Snippet;
 	} = $props();
 
@@ -286,66 +289,104 @@
 
 <!-- Log output -->
 <div class="relative min-h-64 flex-1">
-	<div
-		bind:this={logContainer}
-		onscroll={handleScroll}
-		class={cn(
-			'absolute inset-0 overflow-auto rounded-md border bg-muted pb-2 font-mono text-xs leading-relaxed',
-			// Floating pickers overlay the box's top-right; pad the content clear of them.
-			sourceControls ? 'pt-12' : 'pt-2'
-		)}
-	>
-		{#if logLines.length === 0}
-			<Empty.Root class="h-full">
-				<Empty.Header>
-					<Empty.Media variant="icon">
-						<Spinner />
-					</Empty.Media>
-					<Empty.Title>Waiting for logs</Empty.Title>
-					<Empty.Description>
-						Log data will appear here as soon as the container produces output.
-					</Empty.Description>
-				</Empty.Header>
-			</Empty.Root>
-		{:else if filteredLines.length === 0}
-			<Empty.Root class="h-full">
-				<Empty.Header>
-					<Empty.Media variant="icon">
-						<SearchIcon />
-					</Empty.Media>
-					<Empty.Title>No matching lines</Empty.Title>
-					<Empty.Description>No log lines match "{debouncedFilter}".</Empty.Description>
-				</Empty.Header>
-			</Empty.Root>
-		{:else}
-			{#each filteredLines as entry (entry.no)}
-				<div
-					class={cn(
-						'px-3 hover:bg-muted-foreground/10',
-						wrap ? 'break-all whitespace-pre-wrap' : 'w-fit min-w-full whitespace-pre',
-						entry.text.startsWith('[Error]') && 'text-destructive'
-					)}
-				>
+	<div class="absolute inset-0 flex flex-col overflow-hidden rounded-md border bg-muted">
+		<!-- In-frame toolbar: source info on the left, pickers on the right. The scroll
+		     area starts below it, so log lines never pass beneath the pickers. -->
+		<!-- Fixed h-10 keeps the toolbar the same height with or without pickers. -->
+		<div
+			class="flex h-10 shrink-0 items-center justify-between gap-4 border-b bg-background/50 px-3 text-xs text-muted-foreground"
+		>
+			<!-- Left: what's being viewed (container + job/pod pickers). -->
+			<div class="flex min-w-0 flex-wrap items-center gap-1">
+				{#if containerControl}
+					{@render containerControl()}
+				{:else}
+					<span class="flex min-w-0 items-center gap-1.5 font-medium text-foreground">
+						<ContainerIcon class="size-3.5 shrink-0 text-muted-foreground" />
+						<span class="truncate">{container}</span>
+					</span>
+				{/if}
+				{#if sourceControls}
+					{@render sourceControls()}
+				{/if}
+			</div>
+			<!-- Right: stream status. -->
+			<div class="flex shrink-0 items-center gap-2">
+				{#if previous}
+					<Badge variant="secondary" class="shrink-0 font-normal">Previous container</Badge>
+				{/if}
+				<span class="flex shrink-0 items-center gap-1.5">
+					<span
+						class={cn(
+							'size-1.5 rounded-full',
+							follow && active ? 'animate-pulse bg-primary' : 'bg-muted-foreground'
+						)}
+					></span>
+					{follow ? 'Streaming' : 'Paused'}
+				</span>
+				<span aria-hidden="true">·</span>
+				<span class="shrink-0">
 					{#if debouncedFilter.trim()}
-						{#each highlightSegments(entry.text, debouncedFilter) as segment, i (i)}
-							{#if segment.hit}<mark class="rounded-sm bg-primary/25 text-inherit"
-									>{segment.text}</mark
-								>{:else}{segment.text}{/if}
-						{/each}
+						{filteredLines.length} of {logLines.length} lines
 					{:else}
-						{entry.text}
+						{logLines.length} lines
 					{/if}
-				</div>
-			{/each}
-		{/if}
-	</div>
-
-	{#if sourceControls}
-		<!-- Source pickers float over the log's top-right corner; clear of the scrollbar. -->
-		<div class="absolute top-2 right-5 flex flex-wrap items-center justify-end gap-2">
-			{@render sourceControls()}
+					{#if droppedLines > 0}
+						· showing last {MAX_LINES}
+					{/if}
+				</span>
+			</div>
 		</div>
-	{/if}
+		<div
+			bind:this={logContainer}
+			onscroll={handleScroll}
+			class="flex-1 overflow-auto py-2 font-mono text-xs leading-relaxed"
+		>
+			{#if logLines.length === 0}
+				<Empty.Root class="h-full">
+					<Empty.Header>
+						<Empty.Media variant="icon">
+							<Spinner />
+						</Empty.Media>
+						<Empty.Title>Waiting for logs</Empty.Title>
+						<Empty.Description>
+							Log data will appear here as soon as the container produces output.
+						</Empty.Description>
+					</Empty.Header>
+				</Empty.Root>
+			{:else if filteredLines.length === 0}
+				<Empty.Root class="h-full">
+					<Empty.Header>
+						<Empty.Media variant="icon">
+							<SearchIcon />
+						</Empty.Media>
+						<Empty.Title>No matching lines</Empty.Title>
+						<Empty.Description>No log lines match "{debouncedFilter}".</Empty.Description>
+					</Empty.Header>
+				</Empty.Root>
+			{:else}
+				{#each filteredLines as entry (entry.no)}
+					<div
+						class={cn(
+							'px-3 hover:bg-muted-foreground/10',
+							wrap ? 'break-all whitespace-pre-wrap' : 'w-fit min-w-full whitespace-pre',
+							entry.text.startsWith('[Error]') && 'text-destructive'
+						)}
+					>
+						{#if debouncedFilter.trim()}
+							{#each highlightSegments(entry.text, debouncedFilter) as segment, i (i)}
+								{#if segment.hit}<mark class="rounded-sm bg-primary/25 text-inherit"
+										>{segment.text}</mark
+									>{:else}{segment.text}{/if}
+							{/each}
+						{:else}
+							{entry.text}
+						{/if}
+					</div>
+				{/each}
+			{/if}
+		</div>
+	</div>
 
 	{#if showScrollButton}
 		<Button
@@ -360,30 +401,4 @@
 			<ArrowDownIcon />
 		</Button>
 	{/if}
-</div>
-
-<!-- Status bar -->
-<div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-	<Badge variant="outline" class="gap-1.5 font-normal">
-		<span
-			class={cn(
-				'size-1.5 rounded-full',
-				follow && active ? 'animate-pulse bg-primary' : 'bg-muted-foreground'
-			)}
-		></span>
-		{follow ? 'Streaming' : 'Paused'}
-	</Badge>
-	{#if previous}
-		<Badge variant="secondary" class="font-normal">Previous container</Badge>
-	{/if}
-	<span class="ml-auto">
-		{#if debouncedFilter.trim()}
-			{filteredLines.length} of {logLines.length} lines
-		{:else}
-			{logLines.length} lines
-		{/if}
-		{#if droppedLines > 0}
-			· showing last {MAX_LINES}
-		{/if}
-	</span>
 </div>
