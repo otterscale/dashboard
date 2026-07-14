@@ -3,7 +3,6 @@
 	import type { ServingKserveIoV1Alpha2LLMInferenceServiceConfig } from '@otterscale/types';
 	import type { Schema } from '@sjsf/form';
 	import type { ValidateFunction } from 'ajv';
-	import lodash from 'lodash';
 
 	import { page } from '$app/state';
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
@@ -53,12 +52,10 @@
 		{/snippet}
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content align="end" class="w-full">
-		{@const containers = lodash.get(object, ['spec', 'template', 'containers'])}
-		{@const isMiddleWare =
+		{@const containers = object?.spec?.template?.containers}
+		{@const isMiddleware =
 			Array.isArray(containers) &&
-			containers
-				.map((container) => container?.image ?? '')
-				.find((image) => image.includes('/ai-mw/'))}
+			containers.some((container) => container?.image?.includes('/ai-mw/'))}
 		<DropdownMenu.Group>
 			<DropdownMenu.Label>Inspect</DropdownMenu.Label>
 			<DropdownMenu.Item
@@ -74,6 +71,7 @@
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
+				disabled={isMiddleware}
 			>
 				<Deploy
 					{cluster}
@@ -105,28 +103,27 @@
 					}}
 				/>
 			</DropdownMenu.Item>
-			{#if !isMiddleWare}
-				<DropdownMenu.Item
-					onSelect={(e) => {
-						e.preventDefault();
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+				disabled={isMiddleware}
+			>
+				<Copy
+					{cluster}
+					namespace={targetNamespace}
+					{group}
+					{version}
+					{kind}
+					{resource}
+					{schema}
+					{validate}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
 					}}
-				>
-					<Copy
-						{cluster}
-						namespace={targetNamespace}
-						{group}
-						{version}
-						{kind}
-						{resource}
-						{schema}
-						{validate}
-						{object}
-						onOpenChangeComplete={() => {
-							actionsOpen = false;
-						}}
-					/>
-				</DropdownMenu.Item>
-			{/if}
+				/>
+			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();

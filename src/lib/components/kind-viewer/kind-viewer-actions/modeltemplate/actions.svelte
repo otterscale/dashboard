@@ -3,7 +3,6 @@
 	import type { ServingKserveIoV1Alpha2LLMInferenceServiceConfig } from '@otterscale/types';
 	import type { Schema } from '@sjsf/form';
 	import type { ValidateFunction } from 'ajv';
-	import lodash from 'lodash';
 
 	import { page } from '$app/state';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
@@ -53,12 +52,10 @@
 		{/snippet}
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content align="end" class="w-full">
-		{@const containers = lodash.get(object, ['spec', 'template', 'containers'])}
-		{@const isMiddleWare =
+		{@const containers = object?.spec?.template?.containers}
+		{@const isMiddleware =
 			Array.isArray(containers) &&
-			containers
-				.map((container) => container?.image ?? '')
-				.find((image) => image.includes('/ai-mw/'))}
+			containers.some((container) => container?.image?.includes('/ai-mw/'))}
 		<DropdownMenu.Group>
 			<DropdownMenu.Label>Inspect</DropdownMenu.Label>
 			<DropdownMenu.Item
@@ -70,46 +67,43 @@
 			</DropdownMenu.Item>
 			<DropdownMenu.Separator />
 			<DropdownMenu.Label>Manage</DropdownMenu.Label>
-			{#if !isMiddleWare}
-				<DropdownMenu.Item
-					class="empty:hidden"
-					onSelect={(e) => {
-						e.preventDefault();
+			<DropdownMenu.Item
+				class="empty:hidden"
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<Deploy
+					{cluster}
+					namespace={targetNamespace}
+					{schema}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
 					}}
-				>
-					<Deploy
-						{cluster}
-						namespace={targetNamespace}
-						{schema}
-						{object}
-						onOpenChangeComplete={() => {
-							actionsOpen = false;
-						}}
-					/>
-				</DropdownMenu.Item>
-			{/if}
-			{#if !isMiddleWare}
-				<DropdownMenu.Item
-					onSelect={(e) => {
-						e.preventDefault();
+				/>
+			</DropdownMenu.Item>
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+				disabled={isMiddleware}
+			>
+				<Copy
+					{cluster}
+					namespace={targetNamespace}
+					{group}
+					{version}
+					{kind}
+					{resource}
+					{schema}
+					{validate}
+					{object}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
 					}}
-				>
-					<Copy
-						{cluster}
-						namespace={targetNamespace}
-						{group}
-						{version}
-						{kind}
-						{resource}
-						{schema}
-						{validate}
-						{object}
-						onOpenChangeComplete={() => {
-							actionsOpen = false;
-						}}
-					/>
-				</DropdownMenu.Item>
-			{/if}
+				/>
+			</DropdownMenu.Item>
 		</DropdownMenu.Group>
 	</DropdownMenu.Content>
 </DropdownMenu.Root>
