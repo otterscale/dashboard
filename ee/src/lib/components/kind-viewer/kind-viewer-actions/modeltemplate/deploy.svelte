@@ -234,6 +234,20 @@
 	function handlePrevious() {
 		currentStep = steps[Math.max(currentIndex - 1, 0)];
 	}
+
+	const mainContainerImage = $derived(
+		((
+			lodash.get(object, ['spec', 'template', 'containers'], []) as Array<{
+				name?: string;
+				image?: string;
+			}>
+		).find((container) => container.name === 'main')?.image ?? '') as string
+	);
+	const isMiddleware = $derived(mainContainerImage.includes('/ai-mw/'));
+	const middlewareModelServiceName = $derived(
+		(lodash.get(object, ['metadata', 'name'], '') as string).replace(/-llmis-config$/, '')
+	);
+	const middlewareModelConfigurationName = $derived(lodash.get(object, ['metadata', 'name'], ''));
 </script>
 
 {#if !page.data.isRestricted}
@@ -322,7 +336,15 @@
 							properties: {
 								name: {
 									...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema),
-									title: 'Name'
+									title: 'Name',
+									...(isMiddleware
+										? {
+												default: middlewareModelServiceName,
+												readOnly: true,
+												description:
+													'Name is aligned with the template name without suffix "-llmis-config".'
+											}
+										: {})
 								}
 							}
 						} as Schema}
@@ -333,7 +355,7 @@
 								}
 							}
 						} as UiSchemaRoot}
-						initialValue={{}}
+						initialValue={(isMiddleware ? { name: middlewareModelServiceName } : {}) as FormValue}
 						handleSubmit={{
 							posthook: (form: FormState<FormValue>) => {
 								const formValue = getValueSnapshot(form);
@@ -350,7 +372,11 @@
 									['spec', 'baseRefs'],
 									[
 										...lodash.get(object, ['spec', 'baseRefs'], []),
-										{ name: lodash.get(formValue, ['name'], '') }
+										{
+											name: isMiddleware
+												? middlewareModelConfigurationName
+												: lodash.get(formValue, ['name'], '')
+										}
 									]
 								);
 
@@ -767,7 +793,7 @@
 																apiVersion: `${kserveGroup}/${kserveVersion}`,
 																kind: configurationKind,
 																metadata: {
-																	name,
+																	name: isMiddleware ? middlewareModelConfigurationName : name,
 																	namespace,
 																	labels: lodash.get(object, ['metadata', 'labels'], {}),
 																	annotations: lodash.get(object, ['metadata', 'annotations'], {})
