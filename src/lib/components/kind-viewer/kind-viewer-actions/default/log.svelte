@@ -47,11 +47,77 @@
 	let open = $state(false);
 	let viewer = $state<ReturnType<typeof LogViewer>>();
 
+	const showsPodPicker = $derived(kind !== 'Pod' && resolver.associatedPods.length > 1);
+	const hasPickers = $derived(
+		(kind === 'CronJob' && resolver.associatedJobs.length > 0) ||
+			showsPodPicker ||
+			resolver.containers.length > 1
+	);
+
 	async function handleOpenChange(isOpen: boolean) {
 		if (!isOpen || kind === 'Pod') return;
 		await resolver.resolve();
 	}
 </script>
+
+{#snippet sourcePickers()}
+	{#if kind === 'CronJob' && resolver.associatedJobs.length > 0}
+		<Select
+			type="single"
+			value={resolver.selectedJob}
+			onValueChange={(value) => resolver.handleJobChange(value)}
+		>
+			<SelectTrigger class="h-8 w-56 bg-background/90 shadow-sm backdrop-blur-sm">
+				<span class="truncate">{resolver.selectedJob || 'Select job'}</span>
+			</SelectTrigger>
+			<SelectContent class="w-(--bits-select-anchor-width) min-w-0">
+				{#each resolver.associatedJobs as j (j)}
+					<SelectItem value={j}>
+						<span class="block truncate">{j}</span>
+					</SelectItem>
+				{/each}
+			</SelectContent>
+		</Select>
+	{/if}
+	{#if showsPodPicker}
+		<Select
+			type="single"
+			value={resolver.selectedPod}
+			onValueChange={(value) => (resolver.selectedPod = value)}
+		>
+			<SelectTrigger class="h-8 w-56 bg-background/90 shadow-sm backdrop-blur-sm">
+				<span class="truncate">{resolver.selectedPod || 'Select pod'}</span>
+			</SelectTrigger>
+			<SelectContent class="w-(--bits-select-anchor-width) min-w-0">
+				{#each resolver.associatedPods as p (p)}
+					<SelectItem value={p}>
+						<span class="block truncate">{p}</span>
+					</SelectItem>
+				{/each}
+			</SelectContent>
+		</Select>
+	{/if}
+	{#if resolver.containers.length > 1}
+		<Select
+			type="single"
+			value={resolver.selectedContainer}
+			onValueChange={(value) => {
+				if (value) resolver.selectedContainer = value;
+			}}
+		>
+			<SelectTrigger class="h-8 w-44 bg-background/90 shadow-sm backdrop-blur-sm">
+				<span class="truncate">{resolver.selectedContainer || 'Select container'}</span>
+			</SelectTrigger>
+			<SelectContent class="w-(--bits-select-anchor-width) min-w-0">
+				{#each resolver.containers as c (c)}
+					<SelectItem value={c}>
+						<span class="block truncate">{c}</span>
+					</SelectItem>
+				{/each}
+			</SelectContent>
+		</Select>
+	{/if}
+{/snippet}
 
 <Dialog.Root bind:open {onOpenChangeComplete} onOpenChange={handleOpenChange}>
 	{#if trigger}
@@ -71,11 +137,11 @@
 	<Dialog.Content class={ACTION_DIALOG_CONTENT_CLASS}>
 		<Dialog.Header>
 			<div class="flex items-end justify-between gap-4">
-				<div class="flex flex-col gap-1.5 text-left">
-					<Dialog.Title class="text-lg font-bold">
+				<div class="flex min-w-0 flex-1 flex-col gap-1.5 text-left">
+					<Dialog.Title class="truncate text-lg font-bold">
 						Pod Logs — {resolver.effectivePodName || resolver.name}
 					</Dialog.Title>
-					<Dialog.Description>
+					<Dialog.Description class="truncate">
 						Streaming logs from namespace <strong>{resolver.namespace}</strong>
 					</Dialog.Description>
 				</div>
@@ -227,47 +293,9 @@
 			{cluster}
 			namespace={resolver.namespace}
 			podName={resolver.effectivePodName}
-			containers={resolver.containers}
+			container={resolver.selectedContainer}
 			active={open}
-		>
-			{#snippet sourceControls()}
-				{#if kind === 'CronJob' && resolver.associatedJobs.length > 0}
-					<Select
-						type="single"
-						value={resolver.selectedJob}
-						onValueChange={(value) => resolver.handleJobChange(value)}
-					>
-						<SelectTrigger class="h-8 w-56 bg-background/90 shadow-sm backdrop-blur-sm">
-							<span class="truncate">{resolver.selectedJob || 'Select job'}</span>
-						</SelectTrigger>
-						<SelectContent class="w-(--bits-select-anchor-width) min-w-0">
-							{#each resolver.associatedJobs as j (j)}
-								<SelectItem value={j}>
-									<span class="block truncate">{j}</span>
-								</SelectItem>
-							{/each}
-						</SelectContent>
-					</Select>
-				{/if}
-				{#if kind !== 'Pod' && resolver.associatedPods.length > 1}
-					<Select
-						type="single"
-						value={resolver.selectedPod}
-						onValueChange={(value) => (resolver.selectedPod = value)}
-					>
-						<SelectTrigger class="h-8 w-56 bg-background/90 shadow-sm backdrop-blur-sm">
-							<span class="truncate">{resolver.selectedPod || 'Select pod'}</span>
-						</SelectTrigger>
-						<SelectContent class="w-(--bits-select-anchor-width) min-w-0">
-							{#each resolver.associatedPods as p (p)}
-								<SelectItem value={p}>
-									<span class="block truncate">{p}</span>
-								</SelectItem>
-							{/each}
-						</SelectContent>
-					</Select>
-				{/if}
-			{/snippet}
-		</LogViewer>
+			sourceControls={hasPickers ? sourcePickers : undefined}
+		/>
 	</Dialog.Content>
 </Dialog.Root>

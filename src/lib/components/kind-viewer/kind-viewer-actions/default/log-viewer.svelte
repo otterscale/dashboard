@@ -8,8 +8,8 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Empty from '$lib/components/ui/empty';
-	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
 	import { Spinner } from '$lib/components/ui/spinner';
+	import { UseClipboard } from '$lib/hooks/use-clipboard.svelte';
 	import { cn } from '$lib/utils';
 
 	const MAX_LINES = 1000;
@@ -18,23 +18,20 @@
 		cluster,
 		namespace,
 		podName,
-		containers,
+		container,
 		active = false,
 		sourceControls
 	}: {
 		cluster: string;
 		namespace: string;
 		podName: string;
-		containers: string[];
+		container: string;
 		active: boolean;
 		sourceControls?: Snippet;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
 	const client = createClient(RuntimeService, transport);
-
-	let overriddenContainer = $state<string | null>(null);
-	const effectiveContainer = $derived(overriddenContainer ?? containers[0] ?? '');
 
 	let follow = $state(true);
 	let previous = $state(false);
@@ -49,7 +46,8 @@
 	let filter = $state('');
 	let debouncedFilter = $state('');
 	let filterTimer: ReturnType<typeof setTimeout> | undefined;
-	let copied = $state(false);
+
+	const clipboard = new UseClipboard({ delay: 1000 });
 
 	onDestroy(() => clearTimeout(filterTimer));
 
@@ -83,7 +81,7 @@
 
 	const streamParams = $derived({
 		name: podName,
-		container: effectiveContainer,
+		container,
 		follow,
 		previous
 	});
@@ -191,7 +189,7 @@
 	}
 
 	export function isCopied() {
-		return copied;
+		return clipboard.copied;
 	}
 
 	export function isDownloading() {
@@ -243,9 +241,7 @@
 
 	export async function copyLogs() {
 		if (logLines.length === 0) return;
-		await navigator.clipboard.writeText(logLines.join('\n'));
-		copied = true;
-		setTimeout(() => (copied = false), 1500);
+		await clipboard.copy(logLines.join('\n'));
 	}
 
 	export async function downloadLogs() {
@@ -260,7 +256,7 @@
 					cluster,
 					namespace,
 					name: podName,
-					container: effectiveContainer,
+					container,
 					follow: false,
 					previous
 				},
@@ -277,7 +273,7 @@
 			const url = URL.createObjectURL(blob);
 			const a = document.createElement('a');
 			a.href = url;
-			a.download = `${podName}_${effectiveContainer}_${new Date().toISOString().replace(/[:.]/g, '-')}.log`;
+			a.download = `${podName}_${container}_${new Date().toISOString().replace(/[:.]/g, '-')}.log`;
 			a.click();
 			URL.revokeObjectURL(url);
 		} catch (error) {
@@ -293,7 +289,11 @@
 	<div
 		bind:this={logContainer}
 		onscroll={handleScroll}
-		class="absolute inset-0 overflow-auto rounded-md border bg-muted py-2 font-mono text-xs leading-relaxed"
+		class={cn(
+			'absolute inset-0 overflow-auto rounded-md border bg-muted pb-2 font-mono text-xs leading-relaxed',
+			// Floating pickers overlay the box's top-right; pad the content clear of them.
+			sourceControls ? 'pt-12' : 'pt-2'
+		)}
 	>
 		{#if logLines.length === 0}
 			<Empty.Root class="h-full">
@@ -340,30 +340,12 @@
 		{/if}
 	</div>
 
-	<!-- Source pickers float over the log's top-right corner; clear of the scrollbar. -->
-	<div class="absolute top-2 right-5 flex flex-wrap items-center justify-end gap-2">
-		{#if sourceControls}
+	{#if sourceControls}
+		<!-- Source pickers float over the log's top-right corner; clear of the scrollbar. -->
+		<div class="absolute top-2 right-5 flex flex-wrap items-center justify-end gap-2">
 			{@render sourceControls()}
-		{/if}
-		{#if containers.length > 1}
-			<Select
-				type="single"
-				value={effectiveContainer}
-				onValueChange={(value) => (overriddenContainer = value)}
-			>
-				<SelectTrigger class="h-8 w-44 bg-background/90 shadow-sm backdrop-blur-sm">
-					<span class="truncate">{effectiveContainer || 'Select container'}</span>
-				</SelectTrigger>
-				<SelectContent class="w-(--bits-select-anchor-width) min-w-0">
-					{#each containers as c (c)}
-						<SelectItem value={c}>
-							<span class="block truncate">{c}</span>
-						</SelectItem>
-					{/each}
-				</SelectContent>
-			</Select>
-		{/if}
-	</div>
+		</div>
+	{/if}
 
 	{#if showScrollButton}
 		<Button

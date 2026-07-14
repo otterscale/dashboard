@@ -16,6 +16,7 @@
 	import { Spinner } from '$lib/components/ui/spinner';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { UseClipboard } from '$lib/hooks/use-clipboard.svelte';
 
 	import { ACTION_DIALOG_CONTENT_CLASS } from './constants';
 	import { formatDescribe } from './describe-formatter';
@@ -88,14 +89,12 @@
 		}
 	}
 
-	let copied = $state(false);
+	const clipboard = new UseClipboard({ delay: 1000 });
 
 	async function copyContent() {
 		const text = mode === 'json' ? jsonText : describeText;
 		if (!text) return;
-		await navigator.clipboard.writeText(text);
-		copied = true;
-		setTimeout(() => (copied = false), 1500);
+		await clipboard.copy(text);
 	}
 
 	function handleOpenChange(isOpen: boolean) {
@@ -180,7 +179,7 @@
 									onclick={copyContent}
 									aria-label="Copy to clipboard"
 								>
-									{#if copied}
+									{#if clipboard.copied}
 										<CheckIcon />
 									{:else}
 										<CopyIcon />
@@ -188,7 +187,7 @@
 								</Button>
 							{/snippet}
 						</Tooltip.Trigger>
-						<Tooltip.Content>{copied ? 'Copied!' : 'Copy to clipboard'}</Tooltip.Content>
+						<Tooltip.Content>{clipboard.copied ? 'Copied!' : 'Copy to clipboard'}</Tooltip.Content>
 					</Tooltip.Root>
 				</div>
 			</div>
