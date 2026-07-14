@@ -14,6 +14,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { UseClipboard } from '$lib/hooks/use-clipboard.svelte';
 
 	import { ACTION_DIALOG_CONTENT_CLASS } from './constants';
 
@@ -38,16 +39,11 @@
 	);
 
 	let open = $state(false);
-	let copied = $state(false);
 	let mode = $state<'yaml' | 'json'>('yaml');
 
 	const content = $derived(mode === 'yaml' ? yaml : json);
 
-	async function copyContent() {
-		await navigator.clipboard.writeText(content);
-		copied = true;
-		setTimeout(() => (copied = false), 1500);
-	}
+	const clipboard = new UseClipboard({ delay: 1000 });
 
 	function downloadContent() {
 		const blob = new Blob([content], { type: 'text/plain' });
@@ -123,10 +119,10 @@
 									{...props}
 									size="icon-sm"
 									variant="ghost"
-									onclick={copyContent}
+									onclick={() => clipboard.copy(content)}
 									aria-label="Copy to clipboard"
 								>
-									{#if copied}
+									{#if clipboard.copied}
 										<CheckIcon />
 									{:else}
 										<CopyIcon />
@@ -134,7 +130,7 @@
 								</Button>
 							{/snippet}
 						</Tooltip.Trigger>
-						<Tooltip.Content>{copied ? 'Copied!' : 'Copy to clipboard'}</Tooltip.Content>
+						<Tooltip.Content>{clipboard.copied ? 'Copied!' : 'Copy to clipboard'}</Tooltip.Content>
 					</Tooltip.Root>
 					<Tooltip.Root ignoreNonKeyboardFocus>
 						<Tooltip.Trigger>
