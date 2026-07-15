@@ -45,6 +45,8 @@
 		onOpenChangeComplete: () => void;
 	} = $props();
 
+	type Patch = { path: Array<string | number>; value: unknown };
+
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
@@ -104,7 +106,7 @@
 		return name;
 	}
 
-	function toModelCarReference(modelUrl: string): string {
+	function tryModelCarReference(modelUrl: string): string {
 		if (!modelUrl || !modelUrl.startsWith('hf://')) return modelUrl;
 
 		const harborUrl = env.PUBLIC_HARBOR_URL ?? '';
@@ -197,6 +199,17 @@
 				}
 			}
 		};
+	}
+
+	function pruneEmptyAncestors(target: object, path: Array<string | number>): void {
+		for (let depth = path.length - 1; depth > 1; depth--) {
+			const ancestorPath = path.slice(0, depth);
+			if (lodash.isEmpty(lodash.get(target, ancestorPath))) {
+				lodash.unset(target, ancestorPath);
+			} else {
+				break;
+			}
+		}
 	}
 
 	let values = $state(getInitialValues());
@@ -401,7 +414,14 @@
 				</Tabs.Content>
 
 				<Tabs.Content value={steps[1]}>
-					{#key isModelExist}
+					{#if isModelExist === undefined}
+						<Empty.Root>
+							<Empty.Header>
+								<Empty.Media variant="icon"><Spinner /></Empty.Media>
+								<Empty.Title>Checking model availability</Empty.Title>
+							</Empty.Header>
+						</Empty.Root>
+					{:else}
 						<Form
 							bind:reference={modelFormReference}
 							schema={{
@@ -467,23 +487,29 @@
 									const formValue = getValueSnapshot(form);
 									const useInternal = lodash.get(formValue, 'internal', true) as boolean;
 
+									const modelSource = useInternal ? tryModelCarReference(modelUri) : modelUri;
+
+									const isOci = modelSource.startsWith('oci://');
+									const isGptOss = parseModelName(modelUri).toLowerCase().includes('gpt-oss');
+
 									lodash.set(values, ['spec', 'model'], {
 										...lodash.omit(lodash.get(object, ['spec', 'model'], {}), ['uri']),
-										uri: useInternal ? toModelCarReference(modelUri) : modelUri
+										uri: modelSource
 									});
 
-									if (useInternal) {
-										const isGptOss = parseModelName(modelUri).toLowerCase().includes('gpt-oss');
-
-										lodash.set(
-											values,
-											['spec', 'template', 'containers'],
-											[
+									const ociPatches: Patch[] = [
+										{ path: ['spec', 'template', 'securityContext'], value: { runAsUser: 1010 } },
+										{
+											path: ['spec', 'template', 'containers'],
+											value: [
 												{
 													name: 'main',
 													env: [
 														{ name: 'USER', value: 'nonroot' },
-														{ name: 'TORCHINDUCTOR_CACHE_DIR', value: '/tmp/torchinductor_cache' },
+														{
+															name: 'TORCHINDUCTOR_CACHE_DIR',
+															value: '/tmp/torchinductor_cache'
+														},
 														...(isGptOss
 															? [
 																	{
@@ -495,35 +521,29 @@
 													]
 												}
 											]
-										);
-										lodash.set(
-											values,
-											['spec', 'router', 'scheduler', 'template', 'containers'],
-											[
+										},
+										{
+											path: ['spec', 'router', 'scheduler', 'template', 'containers'],
+											value: [
 												{
 													name: 'tokenizer',
 													env: [
 														{ name: 'USER', value: 'nonroot' },
-														{ name: 'TORCHINDUCTOR_CACHE_DIR', value: '/tmp/torchinductor_cache' },
-														...(isGptOss
-															? [
-																	{
-																		name: 'TIKTOKEN_ENCODINGS_BASE',
-																		value: '/models/tiktoken_encodings'
-																	}
-																]
-															: [])
+														{ name: 'TORCHINDUCTOR_CACHE_DIR', value: '/tmp/torchinductor_cache' }
 													]
 												}
 											]
-										);
+										}
+									];
+
+									if (isOci) {
+										for (const { path, value: patchValue } of ociPatches)
+											lodash.set(values, path, patchValue);
 									} else {
-										lodash.set(values, ['spec', 'template', 'containers'], []);
-										lodash.set(
-											values,
-											['spec', 'router', 'scheduler', 'template', 'containers'],
-											[]
-										);
+										for (const { path } of ociPatches) {
+											lodash.unset(values, path);
+											pruneEmptyAncestors(values, path);
+										}
 									}
 
 									handleNext();
@@ -543,7 +563,7 @@
 								</div>
 							{/snippet}
 						</Form>
-					{/key}
+					{/if}
 				</Tabs.Content>
 
 				<Tabs.Content value={steps[2]}>
@@ -759,7 +779,7 @@
 												group: kserveGroup,
 												version: kserveVersion,
 												resource: configurationResource,
-												name
+												name: isMiddleware ? middlewareModelConfigurationName : name
 											})
 											.then((response) => {
 												if (!response.object)
@@ -771,7 +791,7 @@
 													group: kserveGroup,
 													version: kserveVersion,
 													resource: configurationResource,
-													name,
+													name: isMiddleware ? middlewareModelConfigurationName : name,
 													manifest: new TextEncoder().encode(
 														stringify({
 															...lodash.omit(response.object, ['spec']),
