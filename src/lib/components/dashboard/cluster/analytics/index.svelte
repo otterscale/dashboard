@@ -213,10 +213,10 @@
 				/>
 				<NamespaceRanking
 					prometheusDriver={client}
-					kind="pods"
-					title={m.namespace_pod_count()}
-					description={m.namespace_pod_count_description()}
-					tooltip={m.namespace_pod_count_tooltip()}
+					kind="gpu"
+					title={m.namespace_gpu_usage()}
+					description={m.namespace_gpu_usage_description()}
+					tooltip={m.namespace_gpu_usage_tooltip()}
 					onNamespaceClick={handleNamespaceClick}
 					{namespaceToWorkspace}
 					isReloading={reloading}

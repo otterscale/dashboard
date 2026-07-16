@@ -61,7 +61,7 @@
 		</div>
 	{:else}
 		<Card.Content>
-			<p class="text-3xl">{Number(consumption).toFixed(2)} Watt</p>
+			<p class="text-3xl">{(Number(consumption) / 1000).toFixed(2)} kW</p>
 		</Card.Content>
 	{/if}
 </Card.Root>
