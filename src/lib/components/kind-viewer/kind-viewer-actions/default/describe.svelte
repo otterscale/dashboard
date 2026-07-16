@@ -5,6 +5,8 @@
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import FileJsonIcon from '@lucide/svelte/icons/file-json';
 	import FileSearchIcon from '@lucide/svelte/icons/file-search';
+	import MaximizeIcon from '@lucide/svelte/icons/maximize';
+	import MinimizeIcon from '@lucide/svelte/icons/minimize';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext, type Snippet } from 'svelte';
 
@@ -18,7 +20,7 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { UseClipboard } from '$lib/hooks/use-clipboard.svelte';
 
-	import { ACTION_DIALOG_CONTENT_CLASS } from './constants';
+	import { ACTION_DIALOG_CONTENT_CLASS, ACTION_DIALOG_CONTENT_FULLSCREEN_CLASS } from './constants';
 	import { formatDescribe } from './describe-formatter';
 
 	let {
@@ -48,6 +50,7 @@
 	const name: string = $derived(object?.metadata?.name ?? '');
 
 	let open = $state(false);
+	let fullscreen = $state(false);
 	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 	let describeText = $state<string>('');
@@ -100,6 +103,8 @@
 	function handleOpenChange(isOpen: boolean) {
 		if (isOpen) {
 			fetchDescribe();
+		} else {
+			fullscreen = false;
 		}
 	}
 </script>
@@ -119,7 +124,9 @@
 			</Item.Root>
 		</Dialog.Trigger>
 	{/if}
-	<Dialog.Content class={ACTION_DIALOG_CONTENT_CLASS}>
+	<Dialog.Content
+		class={fullscreen ? ACTION_DIALOG_CONTENT_FULLSCREEN_CLASS : ACTION_DIALOG_CONTENT_CLASS}
+	>
 		<Dialog.Header>
 			<div class="flex items-end justify-between gap-4">
 				<div class="flex flex-col gap-1.5 text-left">
@@ -188,6 +195,26 @@
 							{/snippet}
 						</Tooltip.Trigger>
 						<Tooltip.Content>{clipboard.copied ? 'Copied!' : 'Copy to clipboard'}</Tooltip.Content>
+					</Tooltip.Root>
+					<Tooltip.Root ignoreNonKeyboardFocus>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									size="icon-sm"
+									variant="ghost"
+									aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+									onclick={() => (fullscreen = !fullscreen)}
+								>
+									{#if fullscreen}
+										<MinimizeIcon />
+									{:else}
+										<MaximizeIcon />
+									{/if}
+								</Button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>{fullscreen ? 'Exit fullscreen' : 'Fullscreen'}</Tooltip.Content>
 					</Tooltip.Root>
 				</div>
 			</div>

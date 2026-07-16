@@ -124,6 +124,9 @@
 		terminalState.terminal = new Terminal(TERMINAL_OPTIONS);
 		terminalState.terminal.onData(handleTerminalData);
 		terminalState.terminal.onKey(handleTerminalKey);
+		// Keep the backend PTY's window size in sync with xterm, so line-editing
+		// shells (bash/readline) wrap and position the cursor correctly.
+		terminalState.terminal.onResize(({ cols, rows }) => resizeTTY(cols, rows));
 
 		if (container) {
 			terminalState.terminal.open(container);
@@ -167,8 +170,27 @@
 		terminal.loadAddon(addons.unicode11);
 		terminal.loadAddon(addons.webLinks);
 
-		// Configure fit addon
-		handleResize = () => addons.fit.fit();
+		// Custom fit: FitAddon always reserves ~14px on the right for a scrollbar/
+		// overview ruler, but we hide the scrollbar (overflow-y: hidden), so that
+		// gutter becomes unreachable dead space. Measure the container ourselves to
+		// use the full width, falling back to FitAddon if the private cell metrics
+		// are ever unavailable.
+		handleResize = () => {
+			const term = terminalState.terminal;
+			// Skip while the container is hidden/transitioning (zero-sized): resizing
+			// to a tiny 2x1 grid here would corrupt the backend PTY's layout/scrollback.
+			if (!term || !container || container.clientWidth === 0 || container.clientHeight === 0)
+				return;
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			const cell = (term as any)._core?._renderService?.dimensions?.css?.cell;
+			if (container && cell?.width && cell?.height) {
+				const cols = Math.max(2, Math.floor(container.clientWidth / cell.width));
+				const rows = Math.max(1, Math.floor(container.clientHeight / cell.height));
+				if (cols !== term.cols || rows !== term.rows) term.resize(cols, rows);
+			} else {
+				addons.fit.fit();
+			}
+		};
 		handleResize();
 
 		// Configure unicode
@@ -193,7 +215,9 @@
 					name: podName,
 					container: containerName,
 					command: command,
-					tty: true
+					tty: true,
+					rows: terminalState.terminal?.rows || 24,
+					cols: terminalState.terminal?.cols || 80
 				} as ExecuteTTYRequest,
 				{ signal }
 			);
@@ -224,6 +248,10 @@
 	function handleTTYResponse(response: ExecuteTTYResponse): void {
 		if (!terminalState.sessionId && response.sessionId) {
 			terminalState.sessionId = response.sessionId;
+			// Re-sync size once the session id is known, covering any resize that
+			// happened between opening the stream and the first response.
+			const term = terminalState.terminal;
+			if (term) resizeTTY(term.cols, term.rows);
 		}
 
 		if (response.stdout) {
@@ -242,6 +270,16 @@
 			});
 		} catch (error) {
 			writeToTerminal(`Failed to send data: ${error}`, true);
+		}
+	}
+
+	function resizeTTY(cols: number, rows: number): void {
+		if (!terminalState.sessionId || !terminalState.isConnected) return;
+
+		try {
+			client.resizeTTY({ sessionId: terminalState.sessionId, cols, rows });
+		} catch (error) {
+			writeToTerminal(`Failed to resize terminal: ${error}`, true);
 		}
 	}
 
@@ -275,8 +313,18 @@
 		initializeTerminal().then(() => {
 			if (active) startTTYSession();
 		});
+
+		// Refit whenever the container itself resizes (e.g. toggling the dialog's
+		// fullscreen), not just on window resize.
+		let observer: ResizeObserver | undefined;
+		if (container) {
+			observer = new ResizeObserver(() => handleResize?.());
+			observer.observe(container);
+		}
+
 		return () => {
 			active = false;
+			observer?.disconnect();
 			cleanup();
 		};
 	});
