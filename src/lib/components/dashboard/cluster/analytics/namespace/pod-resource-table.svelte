@@ -39,6 +39,12 @@
 		cpu: number;
 		mem: number;
 		memLimit: number;
+		// GPU columns only render when the namespace has GPU pods (see `hasGpu`).
+		// `gpuUtil` is null (not 0) when HAMI reports nothing for the pod, so idle
+		// GPU pods still show "0%" while GPU-free pods show "—".
+		gpu: number;
+		gpuUtil: number | null;
+		gpuMem: number;
 		restarts: number;
 		ageSec: number;
 		net: number;
@@ -53,6 +59,12 @@
 			cpu: `sum by (namespace,pod)(irate(container_cpu_usage_seconds_total{${base}${cFilter}}[2m]))`,
 			mem: `sum by (namespace,pod)(container_memory_working_set_bytes{${base}${cFilter}})`,
 			memLimit: `sum by (namespace,pod)(kube_pod_container_resource_limits{${base},resource="memory",unit="byte"})`,
+			// nvidia.com/gpu limits (KSM flattens dots to underscores) — allocated GPU count.
+			gpu: `sum by (namespace,pod)(kube_pod_container_resource_limits{${base},resource="nvidia_com_gpu"})`,
+			// HAMI device-plugin monitor keys its per-container metrics by podname/podnamespace
+			// (its own pod owns the pod/namespace labels); the fetch loop falls back to podname.
+			gpuUtil: `avg by (podnamespace,podname)(Device_utilization_desc_of_container{podnamespace="${ns}"})`,
+			gpuMem: `sum by (podnamespace,podname)(Device_memory_desc_of_container{podnamespace="${ns}"})`,
 			restarts: `sum by (namespace,pod)(kube_pod_container_status_restarts_total{${base}${cFilter}})`,
 			created: `max by (namespace,pod)(kube_pod_created{${base}})`,
 			netRx: `sum by (namespace,pod)(irate(container_network_receive_bytes_total{${base}}[2m]))`,
@@ -63,17 +75,35 @@
 	let rows = $state<PodRow[]>([]);
 	let isLoaded = $state(false);
 
+	// GPU columns appear only when at least one pod in the namespace touches a GPU,
+	// keeping the table compact for the common GPU-free namespace.
+	const hasGpu = $derived(rows.some((r) => r.gpu > 0 || r.gpuMem > 0 || r.gpuUtil !== null));
+
 	async function fetch() {
 		try {
 			const result = await fetchCombinedInstant(client, queries);
 			const byPod: Record<string, PodRow> = {};
 			const ensure = (p: string): PodRow =>
-				(byPod[p] ??= { pod: p, cpu: 0, mem: 0, memLimit: 0, restarts: 0, ageSec: 0, net: 0 });
+				(byPod[p] ??= {
+					pod: p,
+					cpu: 0,
+					mem: 0,
+					memLimit: 0,
+					gpu: 0,
+					gpuUtil: null,
+					gpuMem: 0,
+					restarts: 0,
+					ageSec: 0,
+					net: 0
+				});
 			// `created` is an epoch timestamp → turn into an age; everything else accumulates.
 			const assign: Record<string, (row: PodRow, v: number) => void> = {
 				cpu: (r, v) => (r.cpu = v),
 				mem: (r, v) => (r.mem = v),
 				memLimit: (r, v) => (r.memLimit = v),
+				gpu: (r, v) => (r.gpu = v),
+				gpuUtil: (r, v) => (r.gpuUtil = v),
+				gpuMem: (r, v) => (r.gpuMem = v),
 				restarts: (r, v) => (r.restarts = v),
 				created: (r, v) => (r.ageSec = Math.max(0, Date.now() / 1000 - v)),
 				netRx: (r, v) => (r.net += v),
@@ -81,7 +111,8 @@
 			};
 			for (const [key, vectors] of Object.entries(result)) {
 				for (const v of vectors) {
-					const p = (v.metric.labels as Record<string, string>).pod;
+					const labels = v.metric.labels as Record<string, string>;
+					const p = labels.pod || labels.podname;
 					if (!p) continue;
 					const value = Number(v.value?.value);
 					if (!Number.isFinite(value)) continue;
@@ -137,6 +168,11 @@
 					<Table.Head class="text-right whitespace-nowrap">{m.cpu()}</Table.Head>
 					<Table.Head class="text-right whitespace-nowrap">{m.memory()}</Table.Head>
 					<Table.Head class="text-right whitespace-nowrap">{m.memory_limit_percent()}</Table.Head>
+					{#if hasGpu}
+						<Table.Head class="text-right whitespace-nowrap">{m.gpu()}</Table.Head>
+						<Table.Head class="text-right whitespace-nowrap">{m.gpu_utilization()}</Table.Head>
+						<Table.Head class="text-right whitespace-nowrap">{m.gpu_memory()}</Table.Head>
+					{/if}
 					<Table.Head class="text-right whitespace-nowrap">{m.restarts()}</Table.Head>
 					<Table.Head class="text-right whitespace-nowrap">{m.age()}</Table.Head>
 					<Table.Head class="text-right whitespace-nowrap">{m.network()}</Table.Head>
@@ -164,6 +200,23 @@
 						>
 							{mp !== null ? `${Math.round(mp)}%` : '—'}
 						</Table.Cell>
+						{#if hasGpu}
+							{@const { value: gpuMemValue, unit: gpuMemUnit } = formatCapacity(row.gpuMem)}
+							<Table.Cell class="text-right font-mono tabular-nums">
+								{row.gpu > 0 ? Math.round(row.gpu) : '—'}
+							</Table.Cell>
+							<Table.Cell class="text-right font-mono tabular-nums">
+								{row.gpuUtil !== null ? `${Math.round(row.gpuUtil)}%` : '—'}
+							</Table.Cell>
+							<Table.Cell class="text-right font-mono whitespace-nowrap tabular-nums">
+								{#if row.gpuMem > 0}
+									{gpuMemValue}
+									{gpuMemUnit}
+								{:else}
+									—
+								{/if}
+							</Table.Cell>
+						{/if}
 						<Table.Cell class={cn('text-right font-mono tabular-nums', restartClass(row.restarts))}>
 							{row.restarts}
 						</Table.Cell>

@@ -9,9 +9,9 @@
 	import { classifyThreshold, type ThresholdLevel } from '$lib/prometheus';
 
 	// Reusable "top namespaces" ranking. `kind="cpu"` ranks by live CPU cores;
-	// `kind="memory"` ranks by working-set bytes; `kind="pods"` ranks by running pod count;
-	// `kind="restart"` ranks by pod container restarts over the last hour (a health signal
-	// rather than a consumption one).
+	// `kind="memory"` ranks by working-set bytes; `kind="gpu"` ranks by nvidia.com/gpu
+	// limits of ready pods; `kind="restart"` ranks by pod container restarts over the
+	// last hour (a health signal rather than a consumption one).
 	let {
 		prometheusDriver,
 		kind,
@@ -23,7 +23,7 @@
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
-		kind: 'cpu' | 'memory' | 'pods' | 'restart';
+		kind: 'cpu' | 'memory' | 'gpu' | 'restart';
 		title: string;
 		description: string;
 		tooltip: string;
@@ -39,8 +39,10 @@
 				return `sum(irate(container_cpu_usage_seconds_total{container!="",container!="POD"}[2m])) by (namespace)`;
 			case 'memory':
 				return `sum(container_memory_working_set_bytes{container!="",container!="POD"}) by (namespace) > 1*1024*1024*1024`;
-			case 'pods':
-				return `sum(kube_pod_status_phase{phase="Running"}) by (namespace) > 0`;
+			// nvidia.com/gpu limits (KSM flattens dots to underscores) of ready pods only, so
+			// completed/pending pods don't inflate the count. `> 0` hides GPU-free namespaces.
+			case 'gpu':
+				return `sum(kube_pod_container_resource_limits{resource="nvidia_com_gpu"} and on (namespace, pod, container) kube_pod_container_status_ready == 1) by (namespace) > 0`;
 			// `> 0` keeps the chart to namespaces that actually restarted — in a healthy cluster
 			// this list is empty, which is the intended "nothing to see here" state.
 			case 'restart':
@@ -50,7 +52,8 @@
 
 	function displayValue(value: number): string {
 		if (kind === 'cpu') return `${value.toFixed(1)} cores`;
-		if (kind === 'pods' || kind === 'restart') return `${Math.round(value)}`;
+		if (kind === 'gpu') return `${Math.round(value)} GPU`;
+		if (kind === 'restart') return `${Math.round(value)}`;
 		const { value: v, unit } = formatCapacity(value);
 		return `${v} ${unit}`;
 	}
