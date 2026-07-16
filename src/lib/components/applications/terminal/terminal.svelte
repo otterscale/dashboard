@@ -177,7 +177,10 @@
 		// are ever unavailable.
 		handleResize = () => {
 			const term = terminalState.terminal;
-			if (!term) return;
+			// Skip while the container is hidden/transitioning (zero-sized): resizing
+			// to a tiny 2x1 grid here would corrupt the backend PTY's layout/scrollback.
+			if (!term || !container || container.clientWidth === 0 || container.clientHeight === 0)
+				return;
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const cell = (term as any)._core?._renderService?.dimensions?.css?.cell;
 			if (container && cell?.width && cell?.height) {
@@ -213,8 +216,8 @@
 					container: containerName,
 					command: command,
 					tty: true,
-					rows: terminalState.terminal?.rows ?? 0,
-					cols: terminalState.terminal?.cols ?? 0
+					rows: terminalState.terminal?.rows || 24,
+					cols: terminalState.terminal?.cols || 80
 				} as ExecuteTTYRequest,
 				{ signal }
 			);
