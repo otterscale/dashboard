@@ -1,16 +1,23 @@
 <script lang="ts">
 	import { type Transport } from '@connectrpc/connect';
 	import ContainerIcon from '@lucide/svelte/icons/container';
+	import MaximizeIcon from '@lucide/svelte/icons/maximize';
+	import MinimizeIcon from '@lucide/svelte/icons/minimize';
 	import TerminalSquareIcon from '@lucide/svelte/icons/terminal-square';
 	import { getContext, type Snippet } from 'svelte';
 
 	import { Terminal } from '$lib/components/applications/terminal';
 	import { Badge } from '$lib/components/ui/badge';
+	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 
-	import { ACTION_DIALOG_CONTENT_FIT_CLASS } from './constants';
+	import {
+		ACTION_DIALOG_CONTENT_FIT_CLASS,
+		ACTION_DIALOG_CONTENT_FULLSCREEN_CLASS
+	} from './constants';
 	import { createPodResolver } from './pod-resolver.svelte';
 
 	let {
@@ -32,6 +39,7 @@
 	const resolver = createPodResolver(() => ({ transport, cluster, object, kind }));
 
 	let open = $state(false);
+	let fullscreen = $state(false);
 	let showTerminal = $state(false);
 
 	async function handleOpenChange(isOpen: boolean) {
@@ -40,6 +48,7 @@
 			await resolver.resolve();
 		} else {
 			showTerminal = false;
+			fullscreen = false;
 		}
 	}
 </script>
@@ -59,19 +68,48 @@
 			</Item.Root>
 		</Dialog.Trigger>
 	{/if}
-	<Dialog.Content class={ACTION_DIALOG_CONTENT_FIT_CLASS}>
+	<Dialog.Content
+		class={fullscreen ? ACTION_DIALOG_CONTENT_FULLSCREEN_CLASS : ACTION_DIALOG_CONTENT_FIT_CLASS}
+	>
 		<Dialog.Header>
-			<div class="flex min-w-0 flex-col gap-1.5 text-left">
-				<Dialog.Title class="truncate text-lg font-bold">
-					Terminal — {resolver.effectivePodName || resolver.name}
-				</Dialog.Title>
-				<Dialog.Description class="truncate">
-					Interactive shell in namespace <strong>{resolver.namespace}</strong>
-				</Dialog.Description>
+			<div class="flex items-end justify-between gap-4">
+				<div class="flex min-w-0 flex-col gap-1.5 text-left">
+					<Dialog.Title class="truncate text-lg font-bold">
+						Terminal — {resolver.effectivePodName || resolver.name}
+					</Dialog.Title>
+					<Dialog.Description class="truncate">
+						Interactive shell in namespace <strong>{resolver.namespace}</strong>
+					</Dialog.Description>
+				</div>
+				<!-- -mr-2 lines the icon column up with the dialog's close button (right-4 vs p-6). -->
+				<div class="-mr-2 flex shrink-0 items-center gap-1">
+					<Tooltip.Root ignoreNonKeyboardFocus>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									size="icon-sm"
+									variant="ghost"
+									aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+									onclick={() => (fullscreen = !fullscreen)}
+								>
+									{#if fullscreen}
+										<MinimizeIcon />
+									{:else}
+										<MaximizeIcon />
+									{/if}
+								</Button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>{fullscreen ? 'Exit fullscreen' : 'Fullscreen'}</Tooltip.Content>
+					</Tooltip.Root>
+				</div>
 			</div>
 		</Dialog.Header>
 
-		<div class="flex h-[55vh] flex-col overflow-hidden rounded-md border">
+		<div
+			class="flex flex-col overflow-hidden rounded-md border {fullscreen ? 'flex-1' : 'h-[55vh]'}"
+		>
 			<!-- In-frame toolbar, same layout as the log viewer: sources on the left.
 			     Fixed h-10 keeps the height identical with or without pickers. -->
 			<div

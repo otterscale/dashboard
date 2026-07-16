@@ -11,7 +11,10 @@
 	import * as Item from '$lib/components/ui/item';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
-	import { ACTION_DIALOG_CONTENT_FIT_CLASS } from './constants';
+	import {
+		ACTION_DIALOG_CONTENT_FIT_CLASS,
+		ACTION_DIALOG_CONTENT_FULLSCREEN_CLASS
+	} from './constants';
 
 	let {
 		cluster,
@@ -60,9 +63,7 @@
 		</Item.Root>
 	</Dialog.Trigger>
 	<Dialog.Content
-		class={fullscreen
-			? 'flex h-screen max-h-screen w-screen max-w-none flex-col gap-3 rounded-none p-4 ring-0 sm:max-w-none'
-			: ACTION_DIALOG_CONTENT_FIT_CLASS}
+		class={fullscreen ? ACTION_DIALOG_CONTENT_FULLSCREEN_CLASS : ACTION_DIALOG_CONTENT_FIT_CLASS}
 	>
 		<Dialog.Header>
 			<div class="flex items-end justify-between gap-4">
