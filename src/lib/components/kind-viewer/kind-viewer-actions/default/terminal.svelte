@@ -125,7 +125,7 @@
 							}}
 						>
 							<SelectTrigger
-								class="-ml-2 h-7 w-fit max-w-64 gap-1 border-none bg-transparent px-2 text-xs font-medium text-foreground shadow-none hover:bg-accent dark:bg-transparent dark:hover:bg-accent"
+								class="-ml-2 h-7! w-fit max-w-64 gap-1 border-none bg-transparent px-2 text-xs font-medium text-foreground shadow-none hover:bg-accent dark:bg-transparent dark:hover:bg-accent"
 							>
 								<span class="flex min-w-0 items-center gap-1.5">
 									<ContainerIcon class="size-3.5 shrink-0 text-muted-foreground" />
@@ -173,7 +173,7 @@
 							}}
 						>
 							<SelectTrigger
-								class="h-7 w-fit max-w-56 gap-1 border-none bg-transparent px-2 text-xs font-medium text-foreground shadow-none hover:bg-accent dark:bg-transparent dark:hover:bg-accent"
+								class="h-7! w-fit max-w-56 gap-1 border-none bg-transparent px-2 text-xs font-medium text-foreground shadow-none hover:bg-accent dark:bg-transparent dark:hover:bg-accent"
 							>
 								<span class="truncate">{resolver.selectedJob || 'Select job'}</span>
 							</SelectTrigger>
@@ -195,7 +195,7 @@
 							}}
 						>
 							<SelectTrigger
-								class="h-7 w-fit max-w-56 gap-1 border-none bg-transparent px-2 text-xs font-medium text-foreground shadow-none hover:bg-accent dark:bg-transparent dark:hover:bg-accent"
+								class="h-7! w-fit max-w-56 gap-1 border-none bg-transparent px-2 text-xs font-medium text-foreground shadow-none hover:bg-accent dark:bg-transparent dark:hover:bg-accent"
 							>
 								<span class="truncate">{resolver.selectedPod || 'Select pod'}</span>
 							</SelectTrigger>
