@@ -5,6 +5,8 @@
 	import CopyIcon from '@lucide/svelte/icons/copy';
 	import DownloadIcon from '@lucide/svelte/icons/download';
 	import HistoryIcon from '@lucide/svelte/icons/history';
+	import MaximizeIcon from '@lucide/svelte/icons/maximize';
+	import MinimizeIcon from '@lucide/svelte/icons/minimize';
 	import PauseIcon from '@lucide/svelte/icons/pause';
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import RotateCwIcon from '@lucide/svelte/icons/rotate-cw';
@@ -24,7 +26,7 @@
 	import { Toggle } from '$lib/components/ui/toggle';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
-	import { ACTION_DIALOG_CONTENT_CLASS } from './constants';
+	import { ACTION_DIALOG_CONTENT_CLASS, ACTION_DIALOG_CONTENT_FULLSCREEN_CLASS } from './constants';
 	import LogViewer from './log-viewer.svelte';
 	import { createPodResolver } from './pod-resolver.svelte';
 
@@ -47,12 +49,17 @@
 	const resolver = createPodResolver(() => ({ transport, cluster, object, kind }));
 
 	let open = $state(false);
+	let fullscreen = $state(false);
 	let viewer = $state<ReturnType<typeof LogViewer>>();
 
 	const showsPodPicker = $derived(kind !== 'Pod' && resolver.associatedPods.length > 1);
 
 	async function handleOpenChange(isOpen: boolean) {
-		if (!isOpen || kind === 'Pod') return;
+		if (!isOpen) {
+			fullscreen = false;
+			return;
+		}
+		if (kind === 'Pod') return;
 		await resolver.resolve();
 	}
 </script>
@@ -162,7 +169,9 @@
 			</Item.Root>
 		</Dialog.Trigger>
 	{/if}
-	<Dialog.Content class={ACTION_DIALOG_CONTENT_CLASS}>
+	<Dialog.Content
+		class={fullscreen ? ACTION_DIALOG_CONTENT_FULLSCREEN_CLASS : ACTION_DIALOG_CONTENT_CLASS}
+	>
 		<Dialog.Header>
 			<div class="flex items-end justify-between gap-4">
 				<div class="flex min-w-0 flex-1 flex-col gap-1.5 text-left">
@@ -312,6 +321,26 @@
 							{/snippet}
 						</Tooltip.Trigger>
 						<Tooltip.Content>Restart the log stream</Tooltip.Content>
+					</Tooltip.Root>
+					<Tooltip.Root ignoreNonKeyboardFocus>
+						<Tooltip.Trigger>
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									size="icon-sm"
+									variant="ghost"
+									aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+									onclick={() => (fullscreen = !fullscreen)}
+								>
+									{#if fullscreen}
+										<MinimizeIcon />
+									{:else}
+										<MaximizeIcon />
+									{/if}
+								</Button>
+							{/snippet}
+						</Tooltip.Trigger>
+						<Tooltip.Content>{fullscreen ? 'Exit fullscreen' : 'Fullscreen'}</Tooltip.Content>
 					</Tooltip.Root>
 				</div>
 			</div>
