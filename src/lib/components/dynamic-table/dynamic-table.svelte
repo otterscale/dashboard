@@ -32,7 +32,7 @@
 	} from '@tanstack/table-core';
 	import { compileExpression } from 'filtrex';
 	import lodash from 'lodash';
-	import { createRawSnippet, type Snippet } from 'svelte';
+	import { createRawSnippet, type Snippet, tick } from 'svelte';
 
 	import { shortcut } from '$lib/actions/shortcut.svelte';
 	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
@@ -165,6 +165,60 @@
 		true: true,
 		false: false
 	};
+
+	// Field autocomplete: type `@` in the filter box to pick a column name.
+	// columnDefinitions are set once, capturing the initial value is intentional.
+	// svelte-ignore state_referenced_locally
+	const filterableFields = columnDefinitions
+		.map((col) => col.id ?? (col as { accessorKey?: string }).accessorKey)
+		.filter((id): id is string => typeof id === 'string' && id.length > 0);
+	let globalFilterInputElement = $state<HTMLInputElement | null>(null);
+	let showFieldMenu = $state(false);
+	let fieldMenuQuery = $state('');
+	let fieldMenuIndex = $state(0);
+	// Index of the triggering `@` within globalFilterInput; not reactive on its own.
+	let fieldMenuAt = -1;
+	const fieldSuggestions = $derived(
+		showFieldMenu
+			? filterableFields.filter((field) =>
+					field.toLowerCase().includes(fieldMenuQuery.toLowerCase())
+				)
+			: []
+	);
+
+	// Wrap a field name in single quotes when it isn't a bare filtrex identifier.
+	function toFilterIdentifier(field: string): string {
+		return /^[A-Za-z_][A-Za-z0-9_]*$/.test(field) ? field : `'${field}'`;
+	}
+	function updateFieldMenu() {
+		const element = globalFilterInputElement;
+		if (!element) return;
+		const caret = element.selectionStart ?? element.value.length;
+		const match = element.value.slice(0, caret).match(/@([\w-]*)$/);
+		if (match) {
+			fieldMenuAt = caret - match[0].length;
+			fieldMenuQuery = match[1];
+			fieldMenuIndex = 0;
+			showFieldMenu = true;
+		} else {
+			showFieldMenu = false;
+		}
+	}
+	function insertField(field: string) {
+		const element = globalFilterInputElement;
+		if (!element || fieldMenuAt < 0) return;
+		const caret = element.selectionStart ?? element.value.length;
+		const before = globalFilterInput.slice(0, fieldMenuAt);
+		const after = globalFilterInput.slice(caret);
+		const insertion = `${toFilterIdentifier(field)} `;
+		globalFilterInput = before + insertion + after;
+		showFieldMenu = false;
+		const caretAfter = before.length + insertion.length;
+		tick().then(() => {
+			element.focus();
+			element.setSelectionRange(caretAfter, caretAfter);
+		});
+	}
 
 	let rowSelection = $state<RowSelectionState>({});
 	let columnFilters = $state<ColumnFiltersState>([]);
@@ -325,6 +379,29 @@
 	}
 
 	function handleKeyDown(event: KeyboardEvent) {
+		if (showFieldMenu && fieldSuggestions.length > 0) {
+			if (event.key === 'ArrowDown') {
+				event.preventDefault();
+				fieldMenuIndex = (fieldMenuIndex + 1) % fieldSuggestions.length;
+				return;
+			}
+			if (event.key === 'ArrowUp') {
+				event.preventDefault();
+				fieldMenuIndex = (fieldMenuIndex - 1 + fieldSuggestions.length) % fieldSuggestions.length;
+				return;
+			}
+			if (event.key === 'Enter' || event.key === 'Tab') {
+				event.preventDefault();
+				insertField(fieldSuggestions[fieldMenuIndex]);
+				return;
+			}
+			if (event.key === 'Escape') {
+				event.preventDefault();
+				showFieldMenu = false;
+				return;
+			}
+		}
+
 		if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
 			event.preventDefault();
 			handleSearch();
@@ -446,11 +523,42 @@
 				</InputGroup.Addon>
 				<InputGroup.Input
 					id={GLOBAL_FILTER_IDENTIFIER}
-					placeholder="e.g.. Name ~= &quot;resourceName&quot; and Namespace == &quot;namespace&quot;"
+					placeholder="e.g.. Name ~= &quot;resourceName&quot; and Namespace == &quot;namespace&quot; (type @ for fields)"
 					bind:value={globalFilterInput}
+					bind:ref={globalFilterInputElement}
 					class="peer w-full"
 					onkeydown={handleKeyDown}
+					oninput={updateFieldMenu}
+					onclick={updateFieldMenu}
+					onblur={() => {
+						// Delay so a click on a suggestion is registered before closing.
+						setTimeout(() => (showFieldMenu = false), 150);
+					}}
 				/>
+				{#if showFieldMenu && fieldSuggestions.length > 0}
+					<div
+						class="absolute top-full left-0 z-50 mt-1 max-h-60 w-64 overflow-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
+					>
+						{#each fieldSuggestions as field, index (field)}
+							<button
+								type="button"
+								class={cn(
+									'flex w-full cursor-pointer items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none',
+									index === fieldMenuIndex
+										? 'bg-accent text-accent-foreground'
+										: 'hover:bg-accent hover:text-accent-foreground'
+								)}
+								onmousedown={(event) => {
+									event.preventDefault();
+									insertField(field);
+								}}
+								onmouseenter={() => (fieldMenuIndex = index)}
+							>
+								{field}
+							</button>
+						{/each}
+					</div>
+				{/if}
 				<InputGroup.Addon align="inline-end" class="hidden peer-focus:flex">
 					<Kbd.Group>
 						<Kbd.Root>⏎</Kbd.Root>
