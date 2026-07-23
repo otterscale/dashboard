@@ -13,6 +13,16 @@ const DEFAULT_DIMENSION = { width: 224, height: 120 };
 // Non-MIG GPU cards render shorter (memory bar only), matching h-28 in gpu-node.svelte
 const GPU_NON_MIG_HEIGHT = 112;
 
+// Minimum horizontal gap between cards repositioned by alignToGpuBarycenter.
+const ALIGN_GAP = 40;
+
+// Same-rank separation for dagre. Derived so that the GPU column pitch
+// (gpuW + NODESEP) is at least the space two adjacent pods need to sit exactly
+// centered on their GPUs (podW + ALIGN_GAP) — otherwise alignToGpuBarycenter
+// has to push neighboring single-GPU pods apart and their edges come out
+// slightly slanted instead of vertical.
+const NODESEP = NODE_DIMENSIONS.pod.width - NODE_DIMENSIONS.gpu.width + ALIGN_GAP; // 88
+
 function nodeDimensions(node: Node): { width: number; height: number } {
 	const dim = NODE_DIMENSIONS[node.type ?? ''] ?? DEFAULT_DIMENSION;
 	if (node.type === 'gpu' && !(node.data as { isMig?: boolean } | undefined)?.isMig) {
@@ -24,7 +34,7 @@ function nodeDimensions(node: Node): { width: number; height: number } {
 export function computeLayout(nodes: Node[], edges: Edge[]): { nodes: Node[]; edges: Edge[] } {
 	const g = new dagre.graphlib.Graph();
 	g.setDefaultEdgeLabel(() => ({}));
-	g.setGraph({ rankdir: 'TB', nodesep: 60, ranksep: 100, edgesep: 30 });
+	g.setGraph({ rankdir: 'TB', nodesep: NODESEP, ranksep: 100, edgesep: 30 });
 
 	for (const node of nodes) {
 		const dim = nodeDimensions(node);
@@ -86,9 +96,6 @@ function orderGpusByIndex(nodes: Node[]): void {
 		});
 	}
 }
-
-// Minimum horizontal gap between cards repositioned by alignToGpuBarycenter.
-const ALIGN_GAP = 40;
 
 // With GPU order pinned by index, dagre's x positions for the neighboring ranks no
 // longer line up with the GPU columns. Move nodes of the given type to their ideal
