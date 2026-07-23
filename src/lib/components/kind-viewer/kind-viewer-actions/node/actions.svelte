@@ -9,6 +9,7 @@
 
 	import GPU from './gpu.svelte';
 	import GpuAllocation from './gpu-allocation.svelte';
+	import MIG from './mig.svelte';
 
 	let {
 		cluster,
@@ -74,6 +75,7 @@
 				<Describe {cluster} {namespace} {group} {version} {resource} {object} />
 			</DropdownMenu.Item>
 			<GPU {cluster} {group} {version} {kind} {resource} {object} />
+			<MIG {cluster} {group} {version} {kind} {resource} {object} />
 		</DropdownMenu.Group>
 	</DropdownMenu.Content>
 </DropdownMenu.Root>
