@@ -100,12 +100,13 @@ import {
 	getHTTPRouteDataSchemas,
 	getHTTPRouteUISchemas
 } from './httproute.js';
-import {
-	getVirtualMachineInstancetypeColumnDefinitions,
-	getVirtualMachineInstancetypeData,
-	getVirtualMachineInstancetypeDataSchemas,
-	getVirtualMachineInstancetypeUISchemas
-} from './instancetype.js';
+// Namespaced InstanceType is disabled — most users use ClusterInstanceType directly.
+// import {
+// 	getVirtualMachineInstancetypeColumnDefinitions,
+// 	getVirtualMachineInstancetypeData,
+// 	getVirtualMachineInstancetypeDataSchemas,
+// 	getVirtualMachineInstancetypeUISchemas
+// } from './instancetype.js';
 import { getJobColumnDefinitions, getJobData, getJobDataSchemas, getJobUISchemas } from './job.js';
 import {
 	getLimitRangeColumnDefinitions,
@@ -293,8 +294,8 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 			return getVirtualMachineDataSchemas();
 		case 'DataVolume':
 			return getDataVolumeDataSchemas();
-		case 'VirtualMachineInstancetype':
-			return getVirtualMachineInstancetypeDataSchemas();
+		// case 'VirtualMachineInstancetype':
+		// 	return getVirtualMachineInstancetypeDataSchemas();
 		case 'ObjectBucketClaim':
 			return getObjectBucketClaimDataSchemas();
 		case 'Application':
@@ -379,8 +380,8 @@ function getData(apiResource: APIResource, object: JsonObject): Record<string, J
 			return getVirtualMachineData(resource);
 		case 'DataVolume':
 			return getDataVolumeData(resource);
-		case 'VirtualMachineInstancetype':
-			return getVirtualMachineInstancetypeData(resource);
+		// case 'VirtualMachineInstancetype':
+		// 	return getVirtualMachineInstancetypeData(resource);
 		case 'ObjectBucketClaim':
 			return getObjectBucketClaimData(resource);
 		case 'Application':
@@ -462,8 +463,8 @@ function getUISchemas(kind: string): Record<string, UISchemaType> {
 			return getVirtualMachineUISchemas();
 		case 'DataVolume':
 			return getDataVolumeUISchemas();
-		case 'VirtualMachineInstancetype':
-			return getVirtualMachineInstancetypeUISchemas();
+		// case 'VirtualMachineInstancetype':
+		// 	return getVirtualMachineInstancetypeUISchemas();
 		case 'ObjectBucketClaim':
 			return getObjectBucketClaimUISchemas();
 		case 'Application':
@@ -550,8 +551,8 @@ function getColumnDefinitions(
 			return getVirtualMachineColumnDefinitions(apiResource, uiSchemas, dataSchemas, cluster);
 		case 'DataVolume':
 			return getDataVolumeColumnDefinitions(apiResource, uiSchemas, dataSchemas);
-		case 'VirtualMachineInstancetype':
-			return getVirtualMachineInstancetypeColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		// case 'VirtualMachineInstancetype':
+		// 	return getVirtualMachineInstancetypeColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'ObjectBucketClaim':
 			return getObjectBucketClaimColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'Application':
