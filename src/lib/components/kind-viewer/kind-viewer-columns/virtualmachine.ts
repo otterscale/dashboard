@@ -49,8 +49,10 @@ function getVirtualMachineData(
 	object: KubevirtIoV1VirtualMachine
 ): Record<VirtualMachineAttribute, JsonValue> {
 	const instancetype = object?.spec?.instancetype;
+	// Namespaced InstanceType is disabled — fall back to the cluster-scoped kind.
+	// ? `${instancetype.kind ?? 'VirtualMachineInstancetype'}/${instancetype.name}`
 	const instanceTypeDisplay = instancetype
-		? `${instancetype.kind ?? 'VirtualMachineInstancetype'}/${instancetype.name}`
+		? `${instancetype.kind ?? 'VirtualMachineClusterInstancetype'}/${instancetype.name}`
 		: null;
 
 	return {

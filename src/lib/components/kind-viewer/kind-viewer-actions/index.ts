@@ -20,8 +20,9 @@ import DeploymentActions from './deployment/actions.svelte';
 import HelmReleaseActions from './helm-release/actions.svelte';
 import HelmRepositoryActions from './helm-repository/actions.svelte';
 import HelmRepositoryCreate from './helm-repository/create.svelte';
-import InstanceTypeActions from './instance-type/actions.svelte';
-import InstanceTypeCreate from './instance-type/create.svelte';
+// Namespaced InstanceType is disabled — most users use ClusterInstanceType directly.
+// import InstanceTypeActions from './instance-type/actions.svelte';
+// import InstanceTypeCreate from './instance-type/create.svelte';
 import JobActions from './job/actions.svelte';
 import LLMInferenceServiceActions from './llm-inference-service/actions.svelte';
 import LLMInferenceServiceConfigActions from './llm-inference-service-config/actions.svelte';
@@ -96,8 +97,8 @@ function getCreate(kind: string, namespace?: string): CreateType {
 			return TaskCreate as CreateType;
 		case 'VirtualMachine':
 			return VirtualMachineCreate as CreateType;
-		case 'VirtualMachineInstancetype':
-			return InstanceTypeCreate as CreateType;
+		// case 'VirtualMachineInstancetype':
+		// 	return InstanceTypeCreate as CreateType;
 		case 'Workspace':
 			return WorkspaceCreate as CreateType;
 		case 'LLMInferenceServiceConfig':
@@ -153,8 +154,8 @@ function getActions(kind: string, namespace?: string): ActionsType {
 			return TaskActions as ActionsType;
 		case 'VirtualMachine':
 			return VirtualMachineActions as ActionsType;
-		case 'VirtualMachineInstancetype':
-			return InstanceTypeActions as ActionsType;
+		// case 'VirtualMachineInstancetype':
+		// 	return InstanceTypeActions as ActionsType;
 		case 'Workspace':
 			return WorkspaceActions as ActionsType;
 		default:

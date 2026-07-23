@@ -359,16 +359,17 @@
 							kind: 'DataVolume',
 							resource: 'datavolumes'
 						})
-					},
-					{
-						title: m.instance_type(),
-						url: resourceUrl({
-							group: 'instancetype.kubevirt.io',
-							version: 'v1beta1',
-							kind: 'VirtualMachineInstancetype',
-							resource: 'virtualmachineinstancetypes'
-						})
 					}
+					// Namespaced InstanceType is disabled — most users use ClusterInstanceType directly.
+					// {
+					// 	title: m.instance_type(),
+					// 	url: resourceUrl({
+					// 		group: 'instancetype.kubevirt.io',
+					// 		version: 'v1beta1',
+					// 		kind: 'VirtualMachineInstancetype',
+					// 		resource: 'virtualmachineinstancetypes'
+					// 	})
+					// }
 				]
 			},
 			{

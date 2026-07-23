@@ -79,7 +79,9 @@
 			spec: {
 				runStrategy: (object.spec?.runStrategy ?? 'Halted') as string,
 				instancetype: {
-					kind: (object.spec?.instancetype?.kind ?? 'VirtualMachineInstancetype') as string,
+					// Namespaced InstanceType is disabled — most users use ClusterInstanceType directly.
+					// kind: (object.spec?.instancetype?.kind ?? 'VirtualMachineInstancetype') as string,
+					kind: (object.spec?.instancetype?.kind ?? 'VirtualMachineClusterInstancetype') as string,
 					name: (object.spec?.instancetype?.name ?? null) as string | null
 				}
 			},
@@ -247,7 +249,9 @@
 	let value = $derived(stringify(submissionValues));
 
 	// Steps Manager
-	const steps = Array.from({ length: 7 }, (_, index) => String(index + 1));
+	// 7 steps when the Instance Type Kind step is enabled.
+	// const steps = Array.from({ length: 7 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 6 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -378,7 +382,7 @@
 		try {
 			let gpuResourcesList: string[];
 
-			// If a node is selected in step 4, fetch GPU resources only for that node
+			// If a node is selected in step 3, fetch GPU resources only for that node
 			if (nodeSelector.node) {
 				gpuResourcesList = await fetchGpuResourcesForNode(nodeSelector.node);
 			} else {
@@ -498,7 +502,9 @@
 			</Item.Content>
 		</Item.Root>
 		<Tabs.Root value={currentStep} class="*:data-[slot=tabs-content]:min-h-[50vh]">
-			<!-- Step 1: Instance Type Kind -->
+			<!-- Step (removed): Instance Type Kind — namespaced InstanceType is disabled.
+				Re-enable by restoring this block, bumping `steps` back to 7, shifting later step indices,
+				and adding the Previous button back to the Instance Type step below.
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
@@ -533,8 +539,9 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 2: Instance Type -->
-			<Tabs.Content value={steps[1]}>
+			-->
+			<!-- Step 1: Instance Type -->
+			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
 						...(lodash.get(jsonSchema, 'properties.spec.properties.instancetype.properties.name', {
@@ -569,21 +576,14 @@
 					bind:values={values['spec']['instancetype']['name']}
 				>
 					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}
-							>
-								Previous
-							</Button>
+						<div class="flex w-full items-center justify-end gap-3">
 							<SubmitButton />
 						</div>
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 3: Additional Disks -->
-			<Tabs.Content value={steps[2]}>
+			<!-- Step 2: Additional Disks -->
+			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
 						type: 'array',
@@ -639,8 +639,8 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 4: Node Selector -->
-			<Tabs.Content value={steps[3]}>
+			<!-- Step 3: Node Selector -->
+			<Tabs.Content value={steps[2]}>
 				<Form
 					schema={{
 						type: 'object',
@@ -697,8 +697,8 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 5: GPU Passthrough -->
-			<Tabs.Content value={steps[4]}>
+			<!-- Step 4: GPU Passthrough -->
+			<Tabs.Content value={steps[3]}>
 				<Form
 					schema={{
 						type: 'object',
@@ -783,8 +783,8 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 6: Cloud-Init -->
-			<Tabs.Content value={steps[5]}>
+			<!-- Step 5: Cloud-Init -->
+			<Tabs.Content value={steps[4]}>
 				<Form
 					schema={{
 						type: 'string',
@@ -823,8 +823,8 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 7: Review & Edit -->
-			<Tabs.Content value={steps[6]}>
+			<!-- Step 6: Review & Edit -->
+			<Tabs.Content value={steps[5]}>
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{
