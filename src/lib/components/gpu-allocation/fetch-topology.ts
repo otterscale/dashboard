@@ -5,6 +5,9 @@ import {
 	ANNOTATION_DEVICES_ALLOCATED,
 	ANNOTATION_NODE_REGISTER,
 	getPodNodeName,
+	getPodStatus,
+	isPodMigMode,
+	isPodTerminated,
 	parseNodeGpuDevices,
 	parsePodGpuAllocations
 } from './hami';
@@ -50,6 +53,11 @@ export async function fetchLLMInferenceServiceTopology(
 	// 2. Parse pod allocations and collect unique node names
 	const nodeNames = new Set<string>();
 	const pods: PodInfo[] = [];
+	// Service pods still holding their GPU allocations. Terminated pods
+	// (Succeeded/Failed) keep the allocation annotation but HAMi has already
+	// released their devices, so they render in the diagram (with status) but
+	// must not count toward GPU usage or MIG slices.
+	const activeServicePods: PodInfo[] = [];
 
 	for (const pod of rawPods) {
 		const annotations = getAnnotations(pod);
@@ -58,14 +66,17 @@ export async function fetchLLMInferenceServiceTopology(
 		const allocations = parsePodGpuAllocations(annotations[ANNOTATION_DEVICES_ALLOCATED]);
 		if (nodeName && allocations.length > 0) nodeNames.add(nodeName);
 
-		pods.push({
+		const podInfo: PodInfo = {
 			name: (pod as Record<string, any>)?.metadata?.name ?? '', // eslint-disable-line @typescript-eslint/no-explicit-any
 			namespace: (pod as Record<string, any>)?.metadata?.namespace ?? '', // eslint-disable-line @typescript-eslint/no-explicit-any
 			nodeName,
 			allocations,
-			status: (pod as Record<string, any>)?.status?.phase ?? 'Unknown', // eslint-disable-line @typescript-eslint/no-explicit-any
-			role: labels[LABEL_ROLE]
-		});
+			status: getPodStatus(pod),
+			role: labels[LABEL_ROLE],
+			isMig: isPodMigMode(pod)
+		};
+		pods.push(podInfo);
+		if (!isPodTerminated(pod)) activeServicePods.push(podInfo);
 	}
 
 	// 3. Fetch nodes in parallel (fresh GET to ensure full annotations)
@@ -107,8 +118,55 @@ export async function fetchLLMInferenceServiceTopology(
 		}
 	}
 
-	// 5. Cross-reference: find which pods use which GPUs
-	crossReferencePodGpus(pods, gpus);
+	// 5. List every GPU pod on the involved nodes (all namespaces), so GPU/node
+	// usage reflects all workloads — not just this service's pods. The diagram
+	// still only renders this service's pods; other pods only contribute usage.
+	const nodePodLists = await Promise.all(
+		[...nodeNames].map(async (name) => {
+			try {
+				const res = await client.list({
+					cluster,
+					group: '',
+					version: 'v1',
+					resource: 'pods',
+					namespace: '',
+					fieldSelector: `spec.nodeName=${name}`
+				});
+				return res.items.map((item) => item.object);
+			} catch {
+				console.warn(`Failed to list pods on node ${name}`);
+				return [];
+			}
+		})
+	);
+
+	// Start from this service's active pods so their allocations survive a failed
+	// node listing, then add the other running GPU pods (dedup by namespace/name).
+	const seen = new Set(pods.map((p) => `${p.namespace}/${p.name}`));
+	const allocationPods: PodInfo[] = [...activeServicePods];
+	for (const pod of nodePodLists.flat()) {
+		const podAnnotations = getAnnotations(pod);
+		if (!podAnnotations[ANNOTATION_DEVICES_ALLOCATED]) continue;
+		if (isPodTerminated(pod)) continue;
+
+		const meta = (pod as Record<string, any>)?.metadata; // eslint-disable-line @typescript-eslint/no-explicit-any
+		const key = `${meta?.namespace ?? ''}/${meta?.name ?? ''}`;
+		if (seen.has(key)) continue;
+		seen.add(key);
+
+		allocationPods.push({
+			name: meta?.name ?? '',
+			namespace: meta?.namespace ?? '',
+			nodeName: getPodNodeName(pod),
+			allocations: parsePodGpuAllocations(podAnnotations[ANNOTATION_DEVICES_ALLOCATED]),
+			status: getPodStatus(pod),
+			role: getLabels(pod)[LABEL_ROLE],
+			isMig: isPodMigMode(pod)
+		});
+	}
+
+	// 6. Cross-reference: find which pods use which GPUs
+	crossReferencePodGpus(allocationPods, gpus);
 
 	return {
 		llmInferenceService: { name: serviceName, namespace },
@@ -163,12 +221,15 @@ export async function fetchNodeTopology(
 		fieldSelector: `spec.nodeName=${nodeName}`
 	});
 
-	// 3. Filter to pods with GPU allocations
+	// 3. Filter to pods still holding GPU allocations. Terminated pods keep the
+	// annotation but no longer occupy devices, so they are excluded entirely
+	// from the node view.
 	const pods: PodInfo[] = [];
 	for (const item of podResponse.items) {
 		const pod = item.object;
 		const podAnnotations = getAnnotations(pod);
 		if (!podAnnotations[ANNOTATION_DEVICES_ALLOCATED]) continue;
+		if (isPodTerminated(pod)) continue;
 
 		const labels = getLabels(pod);
 		pods.push({
@@ -176,8 +237,9 @@ export async function fetchNodeTopology(
 			namespace: (pod as Record<string, any>)?.metadata?.namespace ?? '', // eslint-disable-line @typescript-eslint/no-explicit-any
 			nodeName,
 			allocations: parsePodGpuAllocations(podAnnotations[ANNOTATION_DEVICES_ALLOCATED]),
-			status: (pod as Record<string, any>)?.status?.phase ?? 'Unknown', // eslint-disable-line @typescript-eslint/no-explicit-any
-			role: labels[LABEL_ROLE]
+			status: getPodStatus(pod),
+			role: labels[LABEL_ROLE],
+			isMig: isPodMigMode(pod)
 		});
 	}
 
