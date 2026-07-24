@@ -181,13 +181,10 @@
 		return Number.isInteger(n) ? String(n) : n.toFixed(2);
 	}
 
-	/** `nvidia.com/gpumem` values are in MB; display converts to GB (1024 MB = 1 GB). */
-	function formatGpuMemGb(nMb: number): { value: string; unit: string } {
-		const gb = nMb / 1024;
-		return {
-			value: gb.toLocaleString('en-US', { maximumFractionDigits: 2, minimumFractionDigits: 0 }),
-			unit: 'GB'
-		};
+	/** `nvidia.com/gpumem` values are reported in MiB; convert to bytes so `formatCapacity` can
+	 *  pick the best-fit unit (KB/MB/GB/TB), same as the CPU/RAM cards. */
+	function formatGpuMem(nMb: number): { value: number; unit: string } {
+		return formatCapacity(nMb * 1024 * 1024);
 	}
 </script>
 
@@ -375,7 +372,7 @@
 					<div class="flex justify-between gap-4">
 						<Statistics.Title>GPU Memory</Statistics.Title>
 						{#if gpuMemHard !== null}
-							{@const { value, unit } = formatGpuMemGb(gpuMemHard)}
+							{@const { value, unit } = formatGpuMem(gpuMemHard)}
 							<div class="flex items-center gap-1 text-xl">
 								<p class="font-bold">{value} {unit}</p>
 							</div>
@@ -436,8 +433,8 @@
 							>
 								{#snippet aboveMarks()}
 									{@const percentage = formatPercentage(gpuMemUsed!, gpuMemHard!, 1)}
-									{@const { value: usingValue, unit: usingUnit } = formatGpuMemGb(gpuMemUsed!)}
-									{@const { value: totalValue, unit: totalUnit } = formatGpuMemGb(gpuMemHard!)}
+									{@const { value: usingValue, unit: usingUnit } = formatGpuMem(gpuMemUsed!)}
+									{@const { value: totalValue, unit: totalUnit } = formatGpuMem(gpuMemHard!)}
 									<Text
 										value={`${percentage} %`}
 										textAnchor="middle"
