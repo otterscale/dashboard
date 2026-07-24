@@ -15,7 +15,7 @@ overrides:
   cookie@<0.7.0: 0.7.0
   minimatch@<10.2.3: 10.2.3
   brace-expansion@<5.0.6: 5.0.6
-  marked@<14.1.0: ^14.1.0
+  marked: ^18.0.7
 
 importers:
 
@@ -2364,9 +2364,9 @@ packages:
   markdown-table@3.0.4:
     resolution: {integrity: sha512-wiYz4+JrLyb/DqW2hkFJxP7Vd7JuTDm77fvbM8VfEQdmSMqcImWeeRbHwZjBjIFki/VaMK2BhFi7oUUZeM5bqw==}
 
-  marked@14.1.4:
-    resolution: {integrity: sha512-vkVZ8ONmUdPnjCKc5uTRvmkRbx4EAi2OkTOXmfTDhZz3OFqMNBM1oTTWwTr4HY4uAEojhzPf+Fy8F1DWa3Sndg==}
-    engines: {node: '>= 18'}
+  marked@18.0.7:
+    resolution: {integrity: sha512-iDVQ5ldaiKXn6b2JroX5kgRfmwgqolW7NpaEzTl1k/2Zh1njIEN9yniyLV/mOvWwtsE8OGgkjsCYvijuPk1dtA==}
+    engines: {node: '>= 20'}
     hasBin: true
 
   math-intrinsics@1.1.0:
@@ -5244,7 +5244,7 @@ snapshots:
 
   markdown-table@3.0.4: {}
 
-  marked@14.1.4: {}
+  marked@18.0.7: {}
 
   math-intrinsics@1.1.0: {}
 
@@ -5594,7 +5594,7 @@ snapshots:
   monaco-editor@0.55.1:
     dependencies:
       dompurify: 3.4.11
-      marked: 14.1.4
+      marked: 18.0.7
 
   monaco-themes@0.4.8:
     dependencies:
