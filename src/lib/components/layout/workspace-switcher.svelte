@@ -259,7 +259,7 @@
 										)?.role}
 									</span>
 								{:else}
-									<span class="truncate font-medium"> OtterScale </span>
+									<span class="truncate font-medium"> {m.site_title()} </span>
 									<span class="flex items-center gap-2 truncate text-xs text-muted-foreground">
 										{m.no_workspace_selected()}
 									</span>
