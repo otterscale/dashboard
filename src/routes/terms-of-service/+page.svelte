@@ -3,7 +3,7 @@
 </script>
 
 <svelte:head>
-	<title>{m.terms_of_service()} | OtterScale</title>
+	<title>{m.terms_of_service()} | {m.site_title()}</title>
 </svelte:head>
 
 terms-of-service

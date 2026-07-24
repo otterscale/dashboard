@@ -67,8 +67,8 @@ const createStores = (): AppStores => ({
 		{
 			id: '1',
 			from: 'system@otterscale.com',
-			title: 'Welcome to OtterScale',
-			content: 'Your account has been successfully created.',
+			title: m.notification_welcome_title({ site: m.site_title() }),
+			content: m.notification_welcome_content(),
 			read: false,
 			archived: false,
 			deleted: false,

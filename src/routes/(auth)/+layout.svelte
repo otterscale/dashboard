@@ -697,7 +697,7 @@
 </script>
 
 <svelte:head>
-	<title>{current ? `${current.title} - OtterScale` : 'OtterScale'}</title>
+	<title>{current ? `${current.title} - ${m.site_title()}` : m.site_title()}</title>
 </svelte:head>
 
 <Sidebar.Provider class="h-svh overflow-hidden" bind:open={sidebarOpen}>
