@@ -12,7 +12,7 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { breadcrumbs } from '$lib/stores';
 
 	$effect(() => {

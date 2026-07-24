@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { PrometheusDriver } from 'prometheus-query';
 
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	import ATopKvPressure from './a-top-kv-pressure.svelte';
 	import ATopP99Latency from './a-top-p99-latency.svelte';

@@ -5,7 +5,7 @@
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import { type TopBar, TopBarList } from '$lib/components/custom/top-bar-list';
 	import { formatCapacity } from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import {
 		classifyThreshold,
 		escapePromqlStringLiteral,

@@ -12,7 +12,7 @@
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { formatCapacity } from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { classifyThreshold, fetchCombinedInstant, thresholdClasses } from '$lib/prometheus';
 
 	let {

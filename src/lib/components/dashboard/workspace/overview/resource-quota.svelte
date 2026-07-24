@@ -13,7 +13,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import { formatCapacity, formatPercentage } from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { escapePromqlStringLiteral } from '$lib/prometheus';
 
 	let {

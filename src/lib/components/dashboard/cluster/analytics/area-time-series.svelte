@@ -16,7 +16,7 @@
 	import Input from '$lib/components/ui/input/input.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { formatChartTimeRange, formatChartXAxisDate, getChartXAxisTicks } from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import {
 		computeStep,
 		type DataPoint,

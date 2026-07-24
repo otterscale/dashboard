@@ -2,7 +2,7 @@ import { type Writable, writable } from 'svelte/store';
 
 import { browser } from '$app/environment';
 import { resolve } from '$app/paths';
-import { m } from '$lib/paraglide/messages';
+import { m } from '$lib/messages';
 import type { Path } from '$lib/path';
 
 // Create a writable store that persists to localStorage

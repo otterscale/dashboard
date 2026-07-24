@@ -16,7 +16,7 @@
 		formatChartXAxisDate,
 		getChartXAxisTicks
 	} from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { computeStep, fetchMultipleFlattenedRange } from '$lib/prometheus';
 
 	// Props

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { PrometheusDriver } from 'prometheus-query';
 
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	import CTokenSizeDistribution from './c-token-size-distribution.svelte';
 

@@ -6,7 +6,7 @@
 
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	import { fetchLLMInferenceServiceTopology, fetchNodeTopology } from './fetch-topology';
 	import GpuAllocationDiagram from './gpu-allocation-diagram.svelte';
