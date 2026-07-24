@@ -15,7 +15,7 @@
 	import ComboboxWidget, {
 		type ComboboxEnumeration
 	} from '$lib/components/dynamic-form/widgets/combobox.svelte';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	// `.*` is the "all namespaces" sentinel, matching the analytics filter convention.
 	let {

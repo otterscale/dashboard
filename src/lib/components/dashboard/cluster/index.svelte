@@ -14,7 +14,7 @@
 	import { WidgetGrid } from '$lib/components/custom/widget-grid';
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	import { Dashboard as AnalyticsDashboard } from './analytics/index';
 	import NamespacePicker from './analytics/namespace/namespace-picker.svelte';

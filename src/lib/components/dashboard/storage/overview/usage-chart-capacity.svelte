@@ -9,7 +9,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import { formatCapacity } from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	// Props
 	let { client, isReloading = $bindable() }: { client: PrometheusDriver; isReloading: boolean } =

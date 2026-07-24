@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { Construction } from '$lib/components/construction';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { breadcrumbs } from '$lib/stores';
 
 	// Set breadcrumbs navigation

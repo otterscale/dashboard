@@ -5,7 +5,7 @@
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import { TopBarList } from '$lib/components/custom/top-bar-list';
 	import { formatCapacity } from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { classifyThreshold, type ThresholdLevel } from '$lib/prometheus';
 
 	// Reusable "top namespaces" ranking. `kind="cpu"` ranks by live CPU cores;

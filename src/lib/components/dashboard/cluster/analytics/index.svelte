@@ -5,7 +5,7 @@
 	import { getContext, onMount } from 'svelte';
 
 	import { page } from '$app/state';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	import NamespaceCommitment from './namespace/namespace-commitment.svelte';
 	import NamespaceRanking from './namespace/namespace-ranking.svelte';

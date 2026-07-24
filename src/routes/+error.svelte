@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	const errorMessages: Record<number, string> = {
 		400: m.error_message_400(),

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PrometheusDriver } from 'prometheus-query';
 
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { escapePromqlStringLiteral } from '$lib/prometheus';
 
 	import AreaTimeSeries from '../area-time-series.svelte';

@@ -15,7 +15,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { getLocale, type Locale, setLocale } from '$lib/paraglide/runtime';
 	import type { User } from '$lib/server/session';
 

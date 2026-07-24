@@ -9,7 +9,7 @@
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import { formatCapacity } from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { escapePromqlStringLiteral, fetchCombinedInstant } from '$lib/prometheus';
 
 	import KpiCard from '../kpi-card.svelte';

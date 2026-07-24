@@ -28,7 +28,7 @@
 	} from '$lib/components/artifact-viewer/utils.svelte.ts';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { breadcrumbs } from '$lib/stores';
 
 	// Set breadcrumbs navigation
