@@ -21,7 +21,7 @@
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { formatChartTimeRange, formatChartXAxisDate } from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import {
 		computeStep,
 		type DataPoint,

@@ -8,7 +8,7 @@
 	import * as Statistics from '$lib/components/custom/statistics/index';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import {
 		classifyThreshold,
 		escapePromqlStringLiteral,

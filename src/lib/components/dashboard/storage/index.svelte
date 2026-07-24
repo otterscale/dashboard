@@ -17,7 +17,7 @@
 	import * as Item from '$lib/components/ui/item';
 	import * as Sheet from '$lib/components/ui/sheet';
 	import * as Tabs from '$lib/components/ui/tabs';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	let { cluster }: { cluster: string } = $props();
 

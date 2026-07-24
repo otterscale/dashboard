@@ -14,7 +14,7 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { siteConfig } from '$lib/config/site';
 	import { formatTimeAgo } from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { type Notification, notifications } from '$lib/stores';
 
 	let { open = $bindable(false) }: { open: boolean } = $props();

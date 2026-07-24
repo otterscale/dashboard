@@ -8,7 +8,7 @@
 	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	// Shared shell for the Node Detail KPI cards. Mirrors the flat overview cards
 	// (decorative background icon + three-tier header + loader/empty/content branches).

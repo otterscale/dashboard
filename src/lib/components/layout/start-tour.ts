@@ -2,7 +2,7 @@ import './tour.css';
 
 import { driver } from 'driver.js';
 
-import { m } from '$lib/paraglide/messages';
+import { m } from '$lib/messages';
 
 export function startTour() {
 	const driverObj = driver({

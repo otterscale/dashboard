@@ -10,7 +10,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import { formatBigNumber } from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { getLocale } from '$lib/paraglide/runtime';
 	import { computeStep, fetchMultipleFlattenedRange } from '$lib/prometheus';
 

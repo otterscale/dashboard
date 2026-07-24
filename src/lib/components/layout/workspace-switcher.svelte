@@ -51,7 +51,7 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import { useSidebar } from '$lib/components/ui/sidebar';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import type { User } from '$lib/server/session';
 	import { role } from '$lib/stores';
 	import { cn } from '$lib/utils';

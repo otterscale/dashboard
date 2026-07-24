@@ -2,7 +2,7 @@
 	import WandSparklesIcon from '@lucide/svelte/icons/wand-sparkles';
 
 	import { useSidebar } from '$lib/components/ui/sidebar';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { cn } from '$lib/utils';
 
 	const sidebar = useSidebar();
