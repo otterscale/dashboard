@@ -15,6 +15,7 @@ overrides:
   cookie@<0.7.0: 0.7.0
   minimatch@<10.2.3: 10.2.3
   brace-expansion@<5.0.6: 5.0.6
+  marked: ^18.0.7
 
 importers:
 
@@ -129,8 +130,8 @@ importers:
         specifier: ^3.18.0
         version: 3.18.0
       js-yaml:
-        specifier: ^4.2.0
-        version: 4.2.0
+        specifier: ^4.3.0
+        version: 4.3.0
       json-schema-faker:
         specifier: ^0.6.2
         version: 0.6.2
@@ -2194,8 +2195,8 @@ packages:
   js-sha256@0.11.1:
     resolution: {integrity: sha512-o6WSo/LUvY2uC4j7mO50a2ms7E/EAdbP0swigLV+nzHKTTaYnaLIWJ02VdXrsJX0vGedDESQnLsOekr94ryfjg==}
 
-  js-yaml@4.2.0:
-    resolution: {integrity: sha512-ePWsvanv0DWuDRsW8dnt+R4jQ31SCRCQ7hhNcPXZPsoBZiemuZNYGf7adZdqX2D86j6rvKp3RpCxVTSb8WQlOw==}
+  js-yaml@4.3.0:
+    resolution: {integrity: sha512-1td788aAnnZ5qs7V2QIRl1owjtYpbKt749Y3xauqQgwIIGF/xXWz1wMTEBx5O3LK3lXLVuqXPdPxj2BoFHaW9Q==}
     hasBin: true
 
   jsdom@29.1.1:
@@ -2363,9 +2364,9 @@ packages:
   markdown-table@3.0.4:
     resolution: {integrity: sha512-wiYz4+JrLyb/DqW2hkFJxP7Vd7JuTDm77fvbM8VfEQdmSMqcImWeeRbHwZjBjIFki/VaMK2BhFi7oUUZeM5bqw==}
 
-  marked@14.0.0:
-    resolution: {integrity: sha512-uIj4+faQ+MgHgwUW1l2PsPglZLOLOT1uErt06dAPtx2kjteLAkbsd/0FiYg/MGS+i7ZKLb7w2WClxHkzOOuryQ==}
-    engines: {node: '>= 18'}
+  marked@18.0.7:
+    resolution: {integrity: sha512-iDVQ5ldaiKXn6b2JroX5kgRfmwgqolW7NpaEzTl1k/2Zh1njIEN9yniyLV/mOvWwtsE8OGgkjsCYvijuPk1dtA==}
+    engines: {node: '>= 20'}
     hasBin: true
 
   math-intrinsics@1.1.0:
@@ -5071,7 +5072,7 @@ snapshots:
 
   js-sha256@0.11.1: {}
 
-  js-yaml@4.2.0:
+  js-yaml@4.3.0:
     dependencies:
       argparse: 2.0.1
 
@@ -5243,7 +5244,7 @@ snapshots:
 
   markdown-table@3.0.4: {}
 
-  marked@14.0.0: {}
+  marked@18.0.7: {}
 
   math-intrinsics@1.1.0: {}
 
@@ -5593,7 +5594,7 @@ snapshots:
   monaco-editor@0.55.1:
     dependencies:
       dompurify: 3.4.11
-      marked: 14.0.0
+      marked: 18.0.7
 
   monaco-themes@0.4.8:
     dependencies:
