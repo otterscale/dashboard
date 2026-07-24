@@ -22,7 +22,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Progress } from '$lib/components/ui/progress';
 	import * as Table from '$lib/components/ui/table';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	let {
 		license,

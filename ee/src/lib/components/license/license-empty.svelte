@@ -10,7 +10,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Empty from '$lib/components/ui/empty';
 	import { Label } from '$lib/components/ui/label';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	let {
 		onUpload,

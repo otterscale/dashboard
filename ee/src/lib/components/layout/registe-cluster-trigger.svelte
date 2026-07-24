@@ -3,7 +3,7 @@
 
 	import { page } from '$app/state';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	let { open = $bindable() }: { open: boolean } = $props();
 </script>

@@ -6,7 +6,7 @@
 	import type { ClusterFingerprintObject } from '$lib/components/license/types';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	let {
 		open = $bindable(false),

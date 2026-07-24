@@ -1,5 +1,5 @@
 import { resolve } from '$app/paths';
-import { m } from '$lib/paraglide/messages';
+import { m } from '$lib/messages';
 
 type NavItem = { title: string; url: string };
 
