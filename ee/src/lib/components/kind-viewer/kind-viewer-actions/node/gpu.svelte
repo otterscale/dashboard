@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
+	import { createClient, type Transport } from '@connectrpc/connect';
 	import { GpuIcon } from '@lucide/svelte';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { CoreV1Node } from '@otterscale/types';
@@ -39,6 +39,27 @@
 	);
 
 	let isSubmitting = $state(false);
+
+	function getErrorMessage(error: unknown): string {
+		if (typeof error === 'object' && error !== null && 'message' in error) {
+			return String((error as { message?: unknown }).message ?? error);
+		}
+
+		return String(error);
+	}
+
+	function buildUpdateErrorMessage(
+		kindName: string,
+		name: string | undefined,
+		error: unknown
+	): string {
+		console.error(`Failed to update ${kindName} ${name}:`, error);
+		return `Failed to update ${kindName} ${name}: ${getErrorMessage(error)}`;
+	}
+
+	function createUpdateErrorHandler(kindName: string, name: string | undefined) {
+		return (error: unknown) => buildUpdateErrorMessage(kindName, name, error);
+	}
 </script>
 
 {#if !page.data.isRestricted}
@@ -96,10 +117,7 @@
 							success: () => {
 								return `Successfully updated ${kind} ${name}`;
 							},
-							error: (error) => {
-								console.error(`Failed to update ${kind} ${name}:`, error);
-								return `Failed to update ${kind} ${name}: ${(error as ConnectError).message}`;
-							},
+							error: createUpdateErrorHandler(kind, name),
 							finally() {
 								isSubmitting = false;
 							}
@@ -151,10 +169,7 @@
 							success: () => {
 								return `Successfully updated ${kind} ${name}`;
 							},
-							error: (error) => {
-								console.error(`Failed to update ${kind} ${name}:`, error);
-								return `Failed to update ${kind} ${name}: ${(error as ConnectError).message}`;
-							},
+							error: createUpdateErrorHandler(kind, name),
 							finally() {
 								isSubmitting = false;
 							}

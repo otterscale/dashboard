@@ -57,6 +57,57 @@
 	const configurationKind = 'LLMInferenceServiceConfig';
 	const configurationResource = 'llminferenceserviceconfigs';
 
+	const migConfigMapName = 'otterscale-hami-device-plugin';
+	const migConfigMapNamespace = 'kube-system';
+	const migConfigJsonKey = 'config.json';
+
+	// Fetch the set of node names that currently have MIG enabled, based on the
+	// hami device-plugin ConfigMap (nodeconfig entries with operatingmode "mig").
+	async function fetchMigEnabledNodeNames(): Promise<Set<string>> {
+		try {
+			const response = await resourceClient.get({
+				cluster,
+				namespace: migConfigMapNamespace,
+				name: migConfigMapName,
+				group: '',
+				version: 'v1',
+				resource: 'configmaps'
+			});
+
+			const configMap = response.object as { data?: Record<string, string> } | undefined;
+			const configText = configMap?.data?.[migConfigJsonKey];
+			if (!configText) return new Set();
+
+			const parsed = JSON.parse(configText) as { nodeconfig?: unknown };
+			if (!Array.isArray(parsed.nodeconfig)) return new Set();
+
+			const names = parsed.nodeconfig
+				.filter(
+					(item): item is { name: string; operatingmode: string } =>
+						typeof item === 'object' &&
+						item !== null &&
+						typeof (item as { name?: unknown }).name === 'string' &&
+						typeof (item as { operatingmode?: unknown }).operatingmode === 'string' &&
+						(item as { operatingmode: string }).operatingmode.toLowerCase() === 'mig'
+				)
+				.map((item) => item.name);
+
+			return new Set(names);
+		} catch (error) {
+			console.error('Failed to load MIG-enabled nodes:', error);
+			return new Set();
+		}
+	}
+
+	async function loadWorkloadPlacementData() {
+		const [computeResourceNodes, migEnabledNodeNames] = await Promise.all([
+			fetchComputeResourceNodes(resourceClient, cluster),
+			fetchMigEnabledNodeNames()
+		]);
+
+		return { computeResourceNodes, migEnabledNodeNames };
+	}
+
 	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 
@@ -156,29 +207,98 @@
 		return resourceTopology;
 	}
 
-	function getWorkloadPlacementSchema(resourceTopology: Record<string, string[]>): Schema {
-		const types = Object.keys(resourceTopology);
-		if (types.length === 0) {
+	function getWorkloadPlacementSchema(
+		resourceTopology: Record<string, string[]>,
+		migResourceTopology: Record<string, string[]>
+	): Schema {
+		const migProperty: Record<string, Schema> = {
+			mig: {
+				type: 'boolean',
+				title: 'Enable MIG',
+				description:
+					'Multi-Instance GPU (MIG) allows a single GPU to be partitioned into multiple isolated instances.'
+			}
+		};
+
+		if (Object.keys(resourceTopology).length === 0) {
 			return {
 				type: 'object',
 				properties: {
+					...migProperty,
 					type: { type: 'string', title: 'Type' }
 				}
 			};
 		}
-		return {
-			type: 'object',
-			properties: {
-				type: { type: 'string', title: 'Type', enum: types }
-			},
-			dependencies: {
+
+		// Build the "type -> node" dependency for a given topology so that the
+		// node list is scoped to the selected GPU type.
+		const buildTypeDependency = (topology: Record<string, string[]>) => {
+			const entries = Object.entries(topology);
+			if (entries.length === 0) return {};
+
+			return {
 				type: {
-					oneOf: Object.entries(resourceTopology).map(([type, nodes]) => ({
+					oneOf: entries.map(([type, nodes]) => ({
 						properties: {
 							type: { enum: [type] },
 							node: { type: 'string', title: 'Node', enum: nodes }
 						}
 					}))
+				}
+			};
+		};
+
+		// Build a single MIG branch. When the topology is empty (e.g. MIG enabled
+		// but no MIG-capable nodes), avoid emitting an empty `enum`/`oneOf`, which
+		// is rejected by JSON Schema validation.
+		const buildMigBranch = (migValue: boolean, topology: Record<string, string[]>) => {
+			const types = Object.keys(topology);
+			const typeDependency = buildTypeDependency(topology);
+
+			// Empty topology means no selectable type/node. The `node` field simply
+			// disappears (it only exists via the type->node dependency), so surface
+			// an empty-state message on the `type` field to explain why placement is
+			// unavailable rather than leaving a confusing free-text input.
+			const emptyType =
+				migValue && types.length === 0
+					? {
+							type: 'string',
+							title: 'Type',
+							readOnly: true,
+							description:
+								'No MIG-capable nodes are available in this cluster. Disable MIG to select a GPU type and node.'
+						}
+					: { type: 'string', title: 'Type' };
+
+			const branch: Record<string, unknown> = {
+				properties: {
+					mig: { enum: [migValue] },
+					type: types.length > 0 ? { enum: types } : emptyType
+				}
+			};
+
+			if (Object.keys(typeDependency).length > 0) {
+				branch.dependencies = typeDependency;
+			}
+
+			return branch;
+		};
+
+		// MIG drives everything: toggling it re-renders both the type list and,
+		// in turn, the node list. When MIG is enabled, only GPU types and nodes
+		// that currently have MIG enabled are offered.
+		return {
+			type: 'object',
+			properties: {
+				...migProperty,
+				type: { type: 'string', title: 'Type' }
+			},
+			dependencies: {
+				mig: {
+					oneOf: [
+						buildMigBranch(false, resourceTopology),
+						buildMigBranch(true, migResourceTopology)
+					]
 				}
 			}
 		};
@@ -217,6 +337,7 @@
 	let isSubmitting = $state(false);
 	let metadataFormReference: FormState<FormValue> | null = $state(null);
 	let modelFormReference: FormState<FormValue> | null = $state(null);
+	let workloadPlacementFormReference: FormState<FormValue> | null = $state(null);
 	let isModelExist: boolean | null | undefined = $state(undefined);
 	let checkToken = 0;
 	let open = $state(false);
@@ -246,6 +367,17 @@
 	}
 	function handlePrevious() {
 		currentStep = steps[Math.max(currentIndex - 1, 0)];
+	}
+
+	// Helper: apply MIG annotation to a target path within `values`
+	function applyMigAnnotation(formValue: FormValue, annotationPath: string[]) {
+		const isMig = lodash.get(formValue, 'mig', false) as boolean;
+		if (isMig) {
+			lodash.set(values, annotationPath, 'mig');
+		} else {
+			// Remove the annotation if previously set
+			lodash.unset(values, annotationPath);
+		}
 	}
 
 	const mainContainerImage = $derived(
@@ -567,7 +699,7 @@
 				</Tabs.Content>
 
 				<Tabs.Content value={steps[2]}>
-					{#await fetchComputeResourceNodes(resourceClient, cluster)}
+					{#await loadWorkloadPlacementData()}
 						<Empty.Root>
 							<Empty.Header>
 								<Empty.Media variant="icon">
@@ -576,11 +708,18 @@
 								<Empty.Title>Loading</Empty.Title>
 							</Empty.Header>
 						</Empty.Root>
-					{:then computeResourceNodes}
+					{:then { computeResourceNodes, migEnabledNodeNames }}
 						{@const computeResources = getComputeResources(computeResourceNodes)}
 						{@const resourceTopology = getResourceTopology(computeResources)}
-						{@const workloadPlacementSchema = getWorkloadPlacementSchema(resourceTopology)}
+						{@const migResourceTopology = getResourceTopology(
+							computeResources.filter((device) => migEnabledNodeNames.has(device.node))
+						)}
+						{@const workloadPlacementSchema = getWorkloadPlacementSchema(
+							resourceTopology,
+							migResourceTopology
+						)}
 						{@const workloadPlacementUISchema = getWorkloadPlacementUISchema()}
+						{@const migUnavailable = Object.keys(migResourceTopology).length === 0}
 						{@const isSingleNode =
 							lodash.has(object, 'spec.template') && !lodash.has(object, 'spec.prefill')}
 						{@const isPrefillDecode =
@@ -589,6 +728,7 @@
 						{@const description = 'Workload Placement'}
 						{#if isSingleNode}
 							<Form
+								bind:reference={workloadPlacementFormReference}
 								schema={{
 									title: title,
 									description: description,
@@ -602,7 +742,7 @@
 									},
 									...workloadPlacementUISchema
 								} as UiSchemaRoot}
-								initialValue={{} as FormValue}
+								initialValue={{ mig: false } as FormValue}
 								handleSubmit={{
 									posthook: (form) => {
 										const value = getValueSnapshot(form);
@@ -621,11 +761,23 @@
 											);
 										}
 
+										// Apply MIG annotation for single-node workload
+										applyMigAnnotation(value, ['spec', 'annotations', 'nvidia.com/vgpu-mode']);
+
 										handleNext();
 									}
 								}}
 							>
 								{#snippet actions()}
+									{@const placementValue = (
+										workloadPlacementFormReference
+											? getValueSnapshot(workloadPlacementFormReference)
+											: {}
+									) as FormValue}
+									{@const migSelected =
+										lodash.get(placementValue, 'mig', false) === true ||
+										lodash.get(placementValue, ['decode', 'mig'], false) === true ||
+										lodash.get(placementValue, ['prefill', 'mig'], false) === true}
 									<div class="flex w-full items-center justify-between gap-3">
 										<Button
 											onclick={() => {
@@ -634,12 +786,22 @@
 										>
 											Previous
 										</Button>
-										<SubmitButton />
+										{#if migUnavailable && migSelected}
+											<Button
+												disabled
+												title="No MIG-capable nodes are available. Disable MIG to continue."
+											>
+												Next
+											</Button>
+										{:else}
+											<SubmitButton />
+										{/if}
 									</div>
 								{/snippet}
 							</Form>
 						{:else if isPrefillDecode}
 							<Form
+								bind:reference={workloadPlacementFormReference}
 								schema={{
 									title: title,
 									description: description,
@@ -662,7 +824,7 @@
 										...workloadPlacementUISchema
 									}
 								} as UiSchemaRoot}
-								initialValue={{} as FormValue}
+								initialValue={{ decode: { mig: false }, prefill: { mig: false } } as FormValue}
 								handleSubmit={{
 									posthook: (form) => {
 										const value = getValueSnapshot(form);
@@ -684,6 +846,13 @@
 												decodeNode
 											);
 										}
+
+										// Apply MIG annotation for decode workload
+										applyMigAnnotation(lodash.get(value, 'decode', {}) as FormValue, [
+											'spec',
+											'annotations',
+											'nvidia.com/vgpu-mode'
+										]);
 
 										const prefillType = lodash.get(value, ['prefill', 'type']) as
 											| string
@@ -707,11 +876,28 @@
 											);
 										}
 
+										// Apply MIG annotation for prefill workload
+										applyMigAnnotation(lodash.get(value, 'prefill', {}) as FormValue, [
+											'spec',
+											'prefill',
+											'annotations',
+											'nvidia.com/vgpu-mode'
+										]);
+
 										handleNext();
 									}
 								}}
 							>
 								{#snippet actions()}
+									{@const placementValue = (
+										workloadPlacementFormReference
+											? getValueSnapshot(workloadPlacementFormReference)
+											: {}
+									) as FormValue}
+									{@const migSelected =
+										lodash.get(placementValue, 'mig', false) === true ||
+										lodash.get(placementValue, ['decode', 'mig'], false) === true ||
+										lodash.get(placementValue, ['prefill', 'mig'], false) === true}
 									<div class="flex w-full items-center justify-between gap-3">
 										<Button
 											onclick={() => {
@@ -720,7 +906,16 @@
 										>
 											Previous
 										</Button>
-										<SubmitButton />
+										{#if migUnavailable && migSelected}
+											<Button
+												disabled
+												title="No MIG-capable nodes are available. Disable MIG to continue."
+											>
+												Next
+											</Button>
+										{:else}
+											<SubmitButton />
+										{/if}
 									</div>
 								{/snippet}
 							</Form>
