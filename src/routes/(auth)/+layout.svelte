@@ -42,7 +42,7 @@
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { breadcrumbs } from '$lib/stores';
 	import { pulse } from '$lib/stores/pulse.svelte';
 	import { getAdditionalItems } from '$lib/utils/features';
@@ -697,7 +697,7 @@
 </script>
 
 <svelte:head>
-	<title>{current ? `${current.title} - OtterScale` : 'OtterScale'}</title>
+	<title>{current ? `${current.title} - ${m.site_title()}` : m.site_title()}</title>
 </svelte:head>
 
 <Sidebar.Provider class="h-svh overflow-hidden" bind:open={sidebarOpen}>

@@ -18,7 +18,7 @@
 	import ComboboxWidget, {
 		type ComboboxEnumeration
 	} from '$lib/components/dynamic-form/widgets/combobox.svelte';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { encodeStandaloneModelId, escapePromqlStringLiteral } from '$lib/prometheus';
 
 	let {

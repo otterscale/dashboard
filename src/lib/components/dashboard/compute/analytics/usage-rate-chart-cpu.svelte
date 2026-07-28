@@ -8,7 +8,7 @@
 	import * as Statistics from '$lib/components/custom/statistics/index';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import { formatPercentage } from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	let { client, vmName }: { client: PrometheusDriver; vmName: string } = $props();
 

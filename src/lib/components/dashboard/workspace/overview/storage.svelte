@@ -11,7 +11,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import { Progress } from '$lib/components/ui/progress';
 	import { formatCapacity } from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { escapePromqlStringLiteral } from '$lib/prometheus';
 	import { cn } from '$lib/utils';
 

@@ -4,7 +4,7 @@
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { fetchCombinedInstant } from '$lib/prometheus';
 
 	import KpiCard from '../kpi-card.svelte';

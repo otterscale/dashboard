@@ -14,7 +14,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import {
 		classifyThreshold,
 		computeStep,

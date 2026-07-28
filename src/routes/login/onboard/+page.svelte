@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { env } from '$env/dynamic/public';
-	import { m } from '$lib/paraglide/messages.js';
+	import { m } from '$lib/messages';
 
 	const harborUrl = env.PUBLIC_HARBOR_URL;
 	const harborLoginUrl = harborUrl ? `${harborUrl}/c/oidc/login` : null;

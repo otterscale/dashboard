@@ -74,7 +74,7 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	let {
 		cluster,

@@ -6,7 +6,7 @@
 
 	import * as Statistics from '$lib/components/custom/statistics/index';
 	import { formatDuration } from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	let { client, vmName }: { client: PrometheusDriver; vmName: string } = $props();
 

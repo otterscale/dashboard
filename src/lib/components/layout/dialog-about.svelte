@@ -9,7 +9,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	let { open = $bindable(false) }: { open: boolean } = $props();
 </script>
