@@ -9,6 +9,7 @@
 	import { default as PieOSDType } from './pie-chart-osd-type.svelte';
 	import { default as TextClusterHealth } from './text-chart-cluster-health.svelte';
 	import { default as TextOSDs } from './text-chart-osds.svelte';
+	import { default as TextOvercommit } from './text-chart-overcommit.svelte';
 	import { default as TextQuorum } from './text-chart-quorum.svelte';
 	import { default as TextTimeTillFull } from './text-chart-time-till-full.svelte';
 	import { default as UsageCapacity } from './usage-chart-capacity.svelte';
@@ -49,6 +50,9 @@
 	</div>
 	<div class="col-span-2">
 		<TextOSDs {client} bind:isReloading />
+	</div>
+	<div class="col-span-2">
+		<TextOvercommit {client} bind:isReloading />
 	</div>
 	<div class="col-span-4 row-span-2">
 		<BarOSDThroughtput {client} {start} {end} {endIsNow} bind:isReloading />
