@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 
-import { applyDeltaToYamlText, computeValuesDelta } from './helm-values';
+import { applyDeltaToYamlText, computeValuesDelta, normalizeYamlText } from './helm-values';
 
 describe('computeValuesDelta', () => {
 	const defaults = {
@@ -103,5 +103,40 @@ describe('applyDeltaToYamlText', () => {
 		const delta = { replicas: 3, image: { tag: '1.25' }, extraEnv: { FOO: 'bar' } };
 		const merged = applyDeltaToYamlText(yamlText, delta);
 		expect(computeValuesDelta(parse(yamlText), parse(merged))).toEqual(delta);
+	});
+
+	it('does not fold long scalars onto continuation lines', () => {
+		const longUrl =
+			'http://otterscale-prometheus-kube-prometheus.monitoring.svc.cluster.local:9090';
+		const merged = applyDeltaToYamlText(yamlText, { prometheus: { url: longUrl } });
+		expect(merged).toContain(`url: ${longUrl}\n`);
+		expect(merged).not.toContain('\\\n');
+	});
+});
+
+describe('normalizeYamlText', () => {
+	// Trailing comments padded for alignment, plus a scalar past the default
+	// 80-column fold width — both get reflowed by the printer.
+	const yamlText = [
+		'backend:',
+		'  imageTag: ""            # empty falls back to Chart.appVersion',
+		'prometheus:',
+		'  url: "http://otterscale-prometheus-kube-prometheus.monitoring.svc.cluster.local:9090"',
+		''
+	].join('\n');
+
+	it('matches the printed form of an unmodified merge, so the diff stays clean', () => {
+		expect(normalizeYamlText(yamlText)).toBe(applyDeltaToYamlText(yamlText, {}));
+	});
+
+	it('is idempotent', () => {
+		const once = normalizeYamlText(yamlText);
+		expect(normalizeYamlText(once)).toBe(once);
+	});
+
+	it('preserves values and comments', () => {
+		const normalized = normalizeYamlText(yamlText);
+		expect(parse(normalized)).toEqual(parse(yamlText));
+		expect(normalized).toContain('# empty falls back to Chart.appVersion');
 	});
 });
