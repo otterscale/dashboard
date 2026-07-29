@@ -16,6 +16,7 @@
 	import { JSON_SCHEMA, load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
+	import semver from 'semver';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { parse, stringify } from 'yaml';
@@ -35,7 +36,11 @@
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { Toggle } from '$lib/components/ui/toggle';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { applyDeltaToYamlText, computeValuesDelta } from '$lib/utils/helm-values';
+	import {
+		applyDeltaToYamlText,
+		computeValuesDelta,
+		normalizeYamlText
+	} from '$lib/utils/helm-values';
 
 	let {
 		cluster,
@@ -79,10 +84,7 @@
 	let mergedText = $state('');
 	let sideBySide = $state(true);
 	let hideUnchanged = $state(false);
-	let formValues = $state<FormValue>({});
-	let versions = $state<string[]>([]);
-	let isLoadingVersions = $state(false);
-	let versionsError = $state('');
+	let versionsPromise = $state<Promise<string[]> | undefined>(undefined);
 	let documentsPromise = $state<Promise<{ defaultsText: string }> | undefined>(undefined);
 
 	async function fetchVersions(): Promise<string[]> {
@@ -121,16 +123,18 @@
 				throw new Error(`Failed to list versions from Harbor: ${artifactsResponse.statusText}`);
 			}
 			const artifacts: ArtifactChartType[] = await artifactsResponse.json();
-			const taggedArtifacts = artifacts.filter((artifact) => artifact.tags);
+			const taggedArtifacts = artifacts.filter((artifact) => artifact.tags?.length);
+			// Helm OCI convention: the tag name is the chart version. Fall back to it
+			// when Harbor did not parse chart metadata into extra_attrs.
+			const versionOf = (artifact: ArtifactChartType) =>
+				(lodash.get(artifact.extra_attrs, 'version') as unknown as string) ||
+				artifact.tags[0]?.name;
 			harborDigestByVersion = Object.fromEntries(
-				taggedArtifacts.map((artifact) => [
-					lodash.get(artifact.extra_attrs, 'version') as unknown as string,
-					artifact.digest
-				])
+				taggedArtifacts
+					.filter((artifact) => Boolean(versionOf(artifact)))
+					.map((artifact) => [versionOf(artifact), artifact.digest])
 			);
-			fetchedVersions = taggedArtifacts
-				.map((artifact) => lodash.get(artifact.extra_attrs, 'version') as unknown as string)
-				.filter(Boolean);
+			fetchedVersions = taggedArtifacts.map(versionOf).filter(Boolean);
 		} else {
 			const indexResponse = await fetch('/bff/helm/repository/index', {
 				method: 'POST',
@@ -151,20 +155,14 @@
 		if (fetchedVersions.length === 0) {
 			throw new Error(`No versions found for chart ${chartName}.`);
 		}
-		return fetchedVersions;
-	}
-
-	async function loadVersions() {
-		isLoadingVersions = true;
-		versionsError = '';
-		try {
-			versions = await fetchVersions();
-			formValues = { version: versions[0] };
-		} catch (error) {
-			versionsError = error instanceof Error ? error.message : String(error);
-		} finally {
-			isLoadingVersions = false;
-		}
+		// Harbor lists artifacts by push time, not by version; a re-pushed old chart
+		// would otherwise show up first and become the default selection. Helm
+		// requires SemVer 2 chart versions, but a raw OCI tag may not be one —
+		// those sort last instead of making rcompare throw.
+		return fetchedVersions.sort((a, b) => {
+			if (semver.valid(a) && semver.valid(b)) return semver.rcompare(a, b);
+			return semver.valid(a) ? -1 : semver.valid(b) ? 1 : 0;
+		});
 	}
 
 	// Harbor registries may be plain HTTP (spec.insecure); showChart always dials
@@ -218,9 +216,26 @@
 			});
 			defaultsText = new TextDecoder().decode(response.values);
 		}
+		// Both diff panes have to come out of the same YAML printer, otherwise
+		// round-trip formatting alone reads as an override.
+		const normalizedDefaults = normalizeYamlText(defaultsText);
 		const delta = (lodash.get(object, ['spec', 'values']) ?? {}) as Record<string, unknown>;
-		mergedText = applyDeltaToYamlText(defaultsText, delta);
-		return { defaultsText };
+		mergedText = applyDeltaToYamlText(normalizedDefaults, delta);
+		return { defaultsText: normalizedDefaults };
+	}
+
+	function selectVersion(form: FormState<FormValue>, fallback: string) {
+		const formValue = getValueSnapshot(form);
+		const selected = (formValue ? lodash.get(formValue, 'version') : fallback) as string;
+		if (!selected) return;
+
+		// Keep the user's in-editor edits when they step back and forward
+		// without changing the target version.
+		if (selected !== targetVersion || !documentsPromise) {
+			targetVersion = selected;
+			documentsPromise = getUpgradeDocuments();
+		}
+		currentStep = '2';
 	}
 
 	function handleUpgrade(defaultsText: string) {
@@ -298,9 +313,7 @@
 		currentStep = '1';
 		targetVersion = '';
 		mergedText = '';
-		formValues = {};
-		versions = [];
-		versionsError = '';
+		versionsPromise = undefined;
 		documentsPromise = undefined;
 		fromHarbor = false;
 		harborDigestByVersion = {};
@@ -314,11 +327,76 @@
 	);
 </script>
 
+{#snippet loadFailure(title: string, description: string)}
+	<Empty.Root class="rounded-lg bg-muted">
+		<Empty.Header>
+			<Empty.Media variant="icon">
+				<FileIcon size={32} class="opacity-60" aria-hidden="true" />
+			</Empty.Media>
+			<Empty.Title>{title}</Empty.Title>
+			<Empty.Description>{description}</Empty.Description>
+		</Empty.Header>
+	</Empty.Root>
+{/snippet}
+
+<!-- createForm captures schema, initialValue and disabled once at mount
+     (form.svelte), so the pending and resolved states each need their own
+     instance — same markup, so render both from here. -->
+{#snippet versionForm(options: string[], isLoading: boolean)}
+	<Form
+		schema={{
+			type: 'object',
+			required: ['version'],
+			properties: {
+				version: {
+					title: 'Version',
+					type: 'string',
+					enum: options
+				}
+			}
+		} as Schema}
+		uiSchema={{
+			'ui:options': {
+				layouts: {
+					'object-properties': {
+						class: 'gap-3'
+					}
+				},
+				translations: {
+					submit: 'Next'
+				}
+			},
+			version: {
+				'ui:options': {
+					help: 'Select a Version'
+				},
+				'ui:components': {
+					stringField: 'enumField'
+				}
+			}
+		} as UiSchemaRoot}
+		initialValue={{ version: targetVersion || options[0] } as FormValue}
+		disabled={isLoading}
+		handleSubmit={{ posthook: (form) => selectVersion(form, options[0]) }}
+		class="**:data-[slot=dynamic-form-mode-controller]:hidden"
+	>
+		{#snippet actions()}
+			<div class="*:w-full">
+				{#if isLoading}
+					<Button disabled>Next</Button>
+				{:else}
+					<SubmitButton />
+				{/if}
+			</div>
+		{/snippet}
+	</Form>
+{/snippet}
+
 <Dialog.Root
 	bind:open
 	onOpenChange={(isOpen) => {
 		if (isOpen) {
-			loadVersions();
+			versionsPromise = fetchVersions();
 		}
 	}}
 	onOpenChangeComplete={(isOpen) => {
@@ -353,88 +431,14 @@
 		</Item.Root>
 
 		{#if currentStep === '1'}
-			{#if versionsError}
-				<Empty.Root class="rounded-lg bg-muted">
-					<Empty.Header>
-						<Empty.Media variant="icon">
-							<FileIcon size={32} class="opacity-60" aria-hidden="true" />
-						</Empty.Media>
-						<Empty.Title>Failed to load chart versions</Empty.Title>
-						<Empty.Description>
-							{versionsError}
-						</Empty.Description>
-					</Empty.Header>
-				</Empty.Root>
-			{:else}
-				<!-- One persistent form for the loading and loaded states: while the
-				     version list loads, the combobox shows the current version and the
-				     submit stays disabled — no remount, no flash. -->
-				<Form
-					schema={{
-						type: 'object',
-						required: ['version'],
-						properties: {
-							version: {
-								title: 'Version',
-								type: 'string',
-								enum: versions.length > 0 ? versions : [currentVersion]
-							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							layouts: {
-								'object-properties': {
-									class: 'gap-3'
-								}
-							},
-							translations: {
-								submit: 'Next'
-							}
-						},
-						version: {
-							'ui:options': {
-								help: 'Select a Version'
-							},
-							'ui:components': {
-								stringField: 'enumField',
-								selectWidget: 'comboboxWidget'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{ version: currentVersion } as FormValue}
-					bind:values={formValues}
-					handleSubmit={{
-						posthook: (form: FormState<FormValue>) => {
-							if (isLoadingVersions || versions.length === 0) return;
-
-							const formValue = getValueSnapshot(form);
-							const selected = formValue
-								? (lodash.get(formValue, 'version') as string)
-								: versions[0];
-							if (!selected) return;
-
-							// Keep the user's in-editor edits when they step back and
-							// forward without changing the target version.
-							if (selected !== targetVersion || !documentsPromise) {
-								targetVersion = selected;
-								documentsPromise = getUpgradeDocuments();
-							}
-							currentStep = '2';
-						}
-					}}
-					class="**:data-[slot=dynamic-form-mode-controller]:hidden"
-				>
-					{#snippet actions()}
-						<div class="*:w-full">
-							{#if isLoadingVersions}
-								<Button disabled>Next</Button>
-							{:else}
-								<SubmitButton />
-							{/if}
-						</div>
-					{/snippet}
-				</Form>
+			{#if versionsPromise}
+				{#await versionsPromise}
+					{@render versionForm(['Loading…'], true)}
+				{:then versions}
+					{@render versionForm(versions, false)}
+				{:catch error}
+					{@render loadFailure('Failed to load chart versions', error.message)}
+				{/await}
 			{/if}
 		{:else if documentsPromise}
 			{#await documentsPromise}
@@ -522,17 +526,7 @@
 					</Button>
 				</div>
 			{:catch error}
-				<Empty.Root class="rounded-lg bg-muted">
-					<Empty.Header>
-						<Empty.Media variant="icon">
-							<FileIcon size={32} class="opacity-60" aria-hidden="true" />
-						</Empty.Media>
-						<Empty.Title>Failed to load chart values</Empty.Title>
-						<Empty.Description>
-							{error.message}
-						</Empty.Description>
-					</Empty.Header>
-				</Empty.Root>
+				{@render loadFailure('Failed to load chart values', error.message)}
 				<div class="flex w-full items-center justify-start">
 					<Button
 						onclick={() => {
