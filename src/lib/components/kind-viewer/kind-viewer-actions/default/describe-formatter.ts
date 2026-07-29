@@ -959,17 +959,18 @@ function buildEventsTable(events: any[]): string {
  * otherwise uses the generic tree renderer.
  */
 export function formatDescribe(resource: any, events?: any[]): string {
-	const kind = resource?.kind;
-	if (kind === 'Pod') {
-		return formatPodDescribe(resource, events ?? []);
+	const obj = resource ?? {};
+	if (obj.kind === 'Pod') {
+		return formatPodDescribe(obj, events ?? []);
 	}
-	return formatGenericDescribe(resource, events ?? []);
+	return formatGenericDescribe(obj, events ?? []);
 }
 
 /**
  * Pod-specific formatter — matches `kubectl describe pod` field order.
  */
-export function formatPodDescribe(pod: any, events?: any[]): string {
+export function formatPodDescribe(resource: any, events?: any[]): string {
+	const pod = resource ?? {};
 	const status = pod.status ?? {};
 	const spec = pod.spec ?? {};
 
