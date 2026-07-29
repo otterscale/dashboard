@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export function decodeTokenPayload(token: any): any {
 	// svelte-ignore state_referenced_locally
 	void token;
