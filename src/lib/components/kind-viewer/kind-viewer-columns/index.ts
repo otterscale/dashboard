@@ -109,6 +109,12 @@ import {
 // } from './instancetype.js';
 import { getJobColumnDefinitions, getJobData, getJobDataSchemas, getJobUISchemas } from './job.js';
 import {
+	getLicenseColumnDefinitions,
+	getLicenseData,
+	getLicenseDataSchemas,
+	getLicenseUISchemas
+} from './license.js';
+import {
 	getLimitRangeColumnDefinitions,
 	getLimitRangeData,
 	getLimitRangeDataSchemas,
@@ -308,6 +314,8 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 			return getLLMInferenceServiceDataSchemas();
 		case 'LLMInferenceServiceConfig':
 			return getLLMInferenceServiceConfigDataSchemas();
+		case 'License':
+			return getLicenseDataSchemas();
 		default:
 			return getDefaultDataSchemas();
 	}
@@ -394,6 +402,8 @@ function getData(apiResource: APIResource, object: JsonObject): Record<string, J
 			return getLLMInferenceServiceData(resource);
 		case 'LLMInferenceServiceConfig':
 			return getLLMInferenceServiceConfigData(resource);
+		case 'License':
+			return getLicenseData(resource);
 		default:
 			return getDefaultData(apiResource, resource);
 	}
@@ -477,6 +487,8 @@ function getUISchemas(kind: string): Record<string, UISchemaType> {
 			return getLLMInferenceServiceUISchemas();
 		case 'LLMInferenceServiceConfig':
 			return getLLMInferenceServiceConfigUISchemas();
+		case 'License':
+			return getLicenseUISchemas();
 		default:
 			return getDefaultUISchemas();
 	}
@@ -565,6 +577,8 @@ function getColumnDefinitions(
 			return getLLMInferenceServiceColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'LLMInferenceServiceConfig':
 			return getLLMInferenceServiceConfigColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'License':
+			return getLicenseColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		default:
 			return getDefaultColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 	}
