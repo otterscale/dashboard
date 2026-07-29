@@ -1,7 +1,7 @@
 import { InstantVector, type PrometheusDriver, RangeVector } from 'prometheus-query';
 
 import type { ChartConfig } from '$lib/components/ui/chart/index.js';
-import { m } from '$lib/paraglide/messages';
+import { m } from '$lib/messages';
 
 /** Escape a value for use inside PromQL double-quoted string literals (e.g. `namespace="..."`). */
 export function escapePromqlStringLiteral(value: string): string {

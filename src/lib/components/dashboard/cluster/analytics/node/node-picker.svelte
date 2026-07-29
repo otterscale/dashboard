@@ -15,7 +15,7 @@
 	import ComboboxWidget, {
 		type ComboboxEnumeration
 	} from '$lib/components/dynamic-form/widgets/combobox.svelte';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	// `selectedNode` holds the node_exporter `instance` value (e.g. `host:9100`) — the form the
 	// per-node `node_*` charts filter on. The dropdown shows the friendly `nodename` as its label.

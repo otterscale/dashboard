@@ -14,7 +14,7 @@
 	import * as Table from '$lib/components/ui/table/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { formatCapacity, formatDuration, formatIO } from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import {
 		classifyThreshold,
 		escapePromqlStringLiteral,

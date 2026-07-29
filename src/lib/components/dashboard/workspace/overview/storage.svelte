@@ -4,6 +4,7 @@
 	import Database from '@lucide/svelte/icons/database';
 	import HardDrive from '@lucide/svelte/icons/hard-drive';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
@@ -11,7 +12,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import { Progress } from '$lib/components/ui/progress';
 	import { formatCapacity } from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { escapePromqlStringLiteral } from '$lib/prometheus';
 	import { cn } from '$lib/utils';
 
@@ -26,6 +27,8 @@
 	} = $props();
 
 	let requestedBytes: SampleValue | undefined = $state(undefined);
+	let usedBytes: SampleValue | undefined = $state(undefined);
+	let clusterTotalBytes: SampleValue | undefined = $state(undefined);
 	let totalCount: SampleValue | undefined = $state(undefined);
 	let boundCount: SampleValue | undefined = $state(undefined);
 	let pendingCount: SampleValue | undefined = $state(undefined);
@@ -39,11 +42,16 @@
 	async function fetchStorage() {
 		const ns = escapePromqlStringLiteral(namespace);
 		const evalAt = new Date();
-		const [reqRes, totalRes, boundRes, pendingRes] = await Promise.all([
+		const [reqRes, usedRes, clusterTotalRes, totalRes, boundRes, pendingRes] = await Promise.all([
 			prometheusDriver.instantQuery(
 				`sum(kube_persistentvolumeclaim_resource_requests_storage_bytes{namespace="${ns}"}) or vector(0)`,
 				evalAt
 			),
+			prometheusDriver.instantQuery(
+				`sum(kubelet_volume_stats_used_bytes{namespace="${ns}"}) or vector(0)`,
+				evalAt
+			),
+			prometheusDriver.instantQuery(`sum(ceph_cluster_total_bytes) or vector(0)`, evalAt),
 			prometheusDriver.instantQuery(
 				`count(kube_persistentvolumeclaim_info{namespace="${ns}"}) or vector(0)`,
 				evalAt
@@ -58,6 +66,8 @@
 			)
 		]);
 		requestedBytes = reqRes.result[0]?.value;
+		usedBytes = usedRes.result[0]?.value;
+		clusterTotalBytes = clusterTotalRes.result[0]?.value;
 		totalCount = totalRes.result[0]?.value;
 		boundCount = boundRes.result[0]?.value;
 		pendingCount = pendingRes.result[0]?.value;
@@ -91,7 +101,14 @@
 		reloadManager.stop();
 	});
 
-	const capacity = $derived(formatCapacity(scalar(requestedBytes) ?? 0));
+	const provisioned = $derived(formatCapacity(scalar(requestedBytes) ?? 0));
+	const used = $derived(formatCapacity(scalar(usedBytes) ?? 0));
+	const clusterTotal = $derived(scalar(clusterTotalBytes) ?? 0);
+	const clusterCapacity = $derived(formatCapacity(clusterTotal));
+	// Thin provisioning lets PVC requests exceed the physical pool; flag that case.
+	const overProvisioned = $derived(
+		clusterTotal > 0 && (scalar(requestedBytes) ?? 0) > clusterTotal
+	);
 	const total = $derived(scalar(totalCount) ?? 0);
 	const bound = $derived(scalar(boundCount) ?? 0);
 	const pending = $derived(scalar(pendingCount) ?? 0);
@@ -122,23 +139,55 @@
 	{:else}
 		<Card.Content class="relative space-y-4 px-4 pt-0 pb-5 sm:px-5">
 			<div
-				class="flex items-start justify-between gap-3 rounded-xl border border-border/70 bg-muted/20 px-4 py-3.5 ring-1 ring-border/30"
+				class={cn(
+					'space-y-2 rounded-xl border px-4 py-3.5 ring-1',
+					overProvisioned
+						? 'border-amber-500/30 bg-amber-500/5 ring-amber-500/20'
+						: 'border-border/70 bg-muted/20 ring-border/30'
+				)}
 			>
-				<div class="min-w-0 space-y-1">
-					<p class="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-						{m.workspace_pvc_requested()}
-					</p>
-					<p class="text-3xl font-semibold tracking-tight text-foreground tabular-nums">
-						{capacity.value}
-						<span class="text-lg font-medium text-muted-foreground">{capacity.unit}</span>
-					</p>
+				<div class="flex items-start justify-between gap-3">
+					<div class="grid min-w-0 grow grid-cols-2 gap-3">
+						<div class="min-w-0 space-y-1">
+							<p class="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+								{m.workspace_pvc_provisioned()}
+							</p>
+							<p
+								class={cn(
+									'text-3xl font-semibold tracking-tight tabular-nums',
+									overProvisioned ? 'text-amber-700 dark:text-amber-400' : 'text-foreground'
+								)}
+							>
+								{provisioned.value}
+								<span class="text-lg font-medium text-muted-foreground">{provisioned.unit}</span>
+							</p>
+						</div>
+						<div class="min-w-0 space-y-1">
+							<p class="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
+								{m.workspace_pvc_used()}
+							</p>
+							<p class="text-3xl font-semibold tracking-tight text-foreground tabular-nums">
+								{used.value}
+								<span class="text-lg font-medium text-muted-foreground">{used.unit}</span>
+							</p>
+							<p class="text-[11px] text-muted-foreground">{m.workspace_pvc_used_hint()}</p>
+						</div>
+					</div>
+					<span
+						class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-chart-3/15 text-chart-3"
+						aria-hidden="true"
+					>
+						<Database class="size-5" />
+					</span>
 				</div>
-				<span
-					class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-chart-3/15 text-chart-3"
-					aria-hidden="true"
-				>
-					<Database class="size-5" />
-				</span>
+				{#if overProvisioned}
+					<p class="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400">
+						<TriangleAlert class="size-3.5 shrink-0" aria-hidden="true" />
+						{m.workspace_pvc_exceeds_cluster({
+							capacity: `${clusterCapacity.value} ${clusterCapacity.unit}`
+						})}
+					</p>
+				{/if}
 			</div>
 
 			<div class="space-y-3">

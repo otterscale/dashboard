@@ -28,7 +28,7 @@
 	import * as Item from '$lib/components/ui/item';
 	import * as Popover from '$lib/components/ui/popover';
 	import { Spinner } from '$lib/components/ui/spinner';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { bump } from '$lib/stores/pulse.svelte';
 	import { cn } from '$lib/utils';
 

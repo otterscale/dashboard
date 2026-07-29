@@ -19,7 +19,7 @@
 	import * as Sheet from '$lib/components/ui/sheet';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { classifyThreshold, fetchCombinedInstant, thresholdClasses } from '$lib/prometheus';
 	import { cn } from '$lib/utils';
 
