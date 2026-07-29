@@ -3,6 +3,7 @@ import type { Schema } from '@sjsf/form';
 import type { Component } from 'svelte';
 
 import DefaultViewer from './default-viewer.svelte';
+import LicenseViewer from './license-viewer.svelte';
 import LLMInferenceServiceViewer from './llm-inference-service-viewer.svelte';
 import WorkspaceEditor from './workspace-editor.svelte';
 import WorkspaceViewer from './workspaces-viewer.svelte';
@@ -29,6 +30,9 @@ function getResourceViewer(resource: string): ViewerType {
 	}
 	if (resource === 'llminferenceservices') {
 		return LLMInferenceServiceViewer as ViewerType;
+	}
+	if (resource === 'licenses') {
+		return LicenseViewer as ViewerType;
 	}
 	return DefaultViewer as ViewerType;
 }
