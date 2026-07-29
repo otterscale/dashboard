@@ -1,4 +1,4 @@
-const LICENSE_NAME = 'otterscale-license';
+const LICENSE_NAME = 'license-hci';
 
 interface LicenseCondition {
 	type?: string;
@@ -16,10 +16,6 @@ interface GetResponse {
 	object?: LicenseObject;
 }
 
-// A license counts as valid when a Valid/Ready condition is "True", or — when no
-// such condition is present — when the phase reports an active state. Adjust
-// these names to match the license.otterscale.io/v1alpha1 CRD if they differ.
-const VALID_CONDITION_TYPES = new Set(['LicenseValid']);
 const VALID_PHASES = new Set(['Provisional', 'Active']);
 
 function isLicenseValid(license: LicenseObject | null): boolean {
@@ -28,9 +24,6 @@ function isLicenseValid(license: LicenseObject | null): boolean {
 	const status = license?.status;
 	if (!status) return false;
 
-	const condition = status.conditions?.find((c) => c.type && VALID_CONDITION_TYPES.has(c.type));
-	if (condition) return condition.status === 'True';
-
 	return status.phase ? VALID_PHASES.has(status.phase) : false;
 }
 
@@ -38,7 +31,7 @@ async function fetchLicense(
 	fetch: typeof globalThis.fetch,
 	cluster: string
 ): Promise<LicenseObject | null> {
-	const res = await fetch('/otterscale.resource.v1.ResourceService/Get', {
+	const response = await fetch('/otterscale.resource.v1.ResourceService/Get', {
 		method: 'POST',
 		headers: {
 			'x-proxy-target': 'api',
@@ -53,20 +46,15 @@ async function fetchLicense(
 		})
 	});
 
-	// Connect maps a missing resource to HTTP 404 / code "not_found".
-	if (res.status === 404) return null;
-	if (!res.ok) {
-		throw new Error(`Failed to fetch license: ${res.status} ${res.statusText}`);
+	if (response.status === 404) return null;
+	if (!response.ok) {
+		throw new Error(`Failed to fetch license: ${response.status} ${response.statusText}`);
 	}
 
-	const { object } = (await res.json()) as GetResponse;
+	const { object } = (await response.json()) as GetResponse;
 	return object ?? null;
 }
 
-/**
- * Restricted mode is driven by the cluster's license: a missing or invalid
- * license restricts the deployment, a valid one unlocks it.
- */
 export async function getIsRestricted(
 	fetch: typeof globalThis.fetch,
 	cluster: string | undefined
@@ -79,7 +67,6 @@ export async function getIsRestricted(
 		const license = await fetchLicense(fetch, cluster);
 		return !isLicenseValid(license);
 	} catch (e) {
-		// Fail open: a transient API error shouldn't lock users out of the app.
 		console.error('Failed to determine license mode:', e);
 		return false;
 	}

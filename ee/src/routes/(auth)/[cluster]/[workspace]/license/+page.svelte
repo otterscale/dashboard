@@ -1,210 +1,110 @@
 <script lang="ts">
-	import { Code, ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { ResourceService } from '@otterscale/api/resource/v1';
+	import { createClient, type Transport } from '@connectrpc/connect';
+	import BanIcon from '@lucide/svelte/icons/ban';
+	import { type DiscoveryRequest, ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext } from 'svelte';
-	import { toast } from 'svelte-sonner';
 
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import Empty from '$lib/components/license/license-empty.svelte';
-	import Manager from '$lib/components/license/license-manager.svelte';
-	import type { ClusterFingerprintObject, LicenseObject } from '$lib/components/license/types';
+	import KindViewer from '$lib/components/kind-viewer/kind-viewer.svelte';
+	import * as Alert from '$lib/components/ui/alert/index.js';
+	import Button from '$lib/components/ui/button/button.svelte';
+	import * as Empty from '$lib/components/ui/empty/index.js';
+	import * as Item from '$lib/components/ui/item';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
 	import { breadcrumbs } from '$lib/stores';
 
-	const LICENSE_NAME = 'otterscale-license';
-	const CLUSTER_FINGERPRINT_NAME = 'default';
+	$effect(() => {
+		breadcrumbs.set([
+			{
+				title: m.license(),
+				url: resolve('/(auth)/[cluster]/[workspace]/license', {
+					cluster: page.params.cluster!,
+					workspace: page.params.workspace!
+				})
+			}
+		]);
+	});
 
-	breadcrumbs.set([
-		{
-			title: m.license(),
-			url: resolve('/(auth)/[cluster]/[workspace]/license', {
-				cluster: page.params.cluster!,
-				workspace: page.params.workspace!
-			})
-		}
-	]);
-
-	const cluster = $derived(page.params.cluster ?? '');
-	const workspace = $derived(page.params.workspace ?? '');
-
-	let license = $state<LicenseObject | null>(null);
-	let fingerprint = $state<ClusterFingerprintObject | null>(null);
-	let licenseChecked = $state(false);
+	const isClusterAdmin = $derived(page.data.isClusterAdmin === true);
+	const cluster = $derived(page.params.cluster!);
+	const group = 'license.otterscale.io';
+	const version = 'v1alpha1';
+	const kind = 'License';
+	const resource = 'licenses';
 
 	const transport: Transport = getContext('transport');
-	const resourceClient = createClient(ResourceService, transport);
+	const client = createClient(ResourceService, transport);
 
-	async function refresh() {
-		try {
-			try {
-				const res = await resourceClient.get({
-					cluster,
-					group: 'license.otterscale.io',
-					version: 'v1alpha1',
-					resource: 'licenses',
-					name: LICENSE_NAME
-				});
-				license = (res.object as LicenseObject) ?? null;
-				licenseChecked = true;
-			} catch (e) {
-				if (e instanceof ConnectError && e.code === Code.NotFound) {
-					license = null;
-					licenseChecked = true;
-				} else {
-					throw e;
-				}
-			}
+	async function fetchAPIResources(cluster: string, group: string, version: string, kind: string) {
+		const response = await client.discovery({ cluster } as DiscoveryRequest);
 
-			try {
-				const cfRes = await resourceClient.get({
-					cluster,
-					group: 'license.otterscale.io',
-					version: 'v1alpha1',
-					resource: 'clusterfingerprints',
-					name: CLUSTER_FINGERPRINT_NAME
-				});
-				fingerprint = (cfRes.object as ClusterFingerprintObject) ?? null;
-			} catch (e) {
-				if (e instanceof ConnectError && e.code === Code.NotFound) {
-					fingerprint = null;
-				} else {
-					throw e;
-				}
-			}
-		} catch (error) {
-			console.error('Failed to refresh license:', error);
-			toast.error(m.license_load_error());
-		}
+		return response.apiResources.filter(
+			(r) => r && r.group === group && r.version === version && r.kind === kind
+		);
 	}
-
-	async function uploadLicense(token: string) {
-		const manifest = JSON.stringify({
-			apiVersion: 'license.otterscale.io/v1alpha1',
-			kind: 'License',
-			metadata: { name: LICENSE_NAME },
-			spec: { token }
-		});
-
-		await resourceClient.create({
-			cluster,
-			group: 'license.otterscale.io',
-			version: 'v1alpha1',
-			resource: 'licenses',
-			manifest: new TextEncoder().encode(manifest)
-		});
-
-		await refresh();
-	}
-
-	async function replaceLicense(token: string) {
-		const manifest = JSON.stringify({
-			apiVersion: 'license.otterscale.io/v1alpha1',
-			kind: 'License',
-			metadata: { name: LICENSE_NAME },
-			spec: { token }
-		});
-
-		await resourceClient.apply({
-			cluster,
-			name: LICENSE_NAME,
-			group: 'license.otterscale.io',
-			version: 'v1alpha1',
-			resource: 'licenses',
-			manifest: new TextEncoder().encode(manifest),
-			fieldManager: 'otterscale-web-ui',
-			force: true
-		});
-
-		await refresh();
-	}
-
-	async function fetchClusterFingerprintSilent(): Promise<ClusterFingerprintObject | null> {
-		try {
-			const cfRes = await resourceClient.get({
-				cluster,
-				group: 'license.otterscale.io',
-				version: 'v1alpha1',
-				resource: 'clusterfingerprints',
-				name: CLUSTER_FINGERPRINT_NAME
-			});
-			return (cfRes.object as ClusterFingerprintObject) ?? null;
-		} catch (e) {
-			if (e instanceof ConnectError && e.code === Code.NotFound) {
-				return null;
-			}
-			throw e;
-		}
-	}
-
-	async function triggerExport() {
-		try {
-			await resourceClient.delete({
-				cluster,
-				group: 'license.otterscale.io',
-				version: 'v1alpha1',
-				resource: 'clusterfingerprints',
-				name: CLUSTER_FINGERPRINT_NAME,
-				namespace: ''
-			});
-		} catch (e) {
-			if (!(e instanceof ConnectError && e.code === Code.NotFound)) {
-				throw e;
-			}
-		}
-
-		const manifest = JSON.stringify({
-			apiVersion: 'license.otterscale.io/v1alpha1',
-			kind: 'ClusterFingerprint',
-			metadata: { name: CLUSTER_FINGERPRINT_NAME },
-			spec: { exportRequest: true }
-		});
-
-		await resourceClient.create({
-			cluster,
-			group: 'license.otterscale.io',
-			version: 'v1alpha1',
-			resource: 'clusterfingerprints',
-			manifest: new TextEncoder().encode(manifest)
-		});
-
-		fingerprint = null;
-
-		const maxAttempts = 20;
-		for (let i = 0; i < maxAttempts; i++) {
-			await new Promise<void>((resolve) => setTimeout(resolve, 2000));
-			try {
-				const cf = await fetchClusterFingerprintSilent();
-				fingerprint = cf;
-				if (cf?.status?.lreqB64) break;
-			} catch {
-				// ignore individual poll errors
-			}
-		}
-	}
-
-	$effect(() => {
-		void cluster;
-		void workspace;
-		license = null;
-		fingerprint = null;
-		licenseChecked = false;
-		refresh();
-	});
 </script>
 
-{#if !licenseChecked}
-	<div class="flex h-full items-center justify-center p-12">
-		<p class="text-sm text-muted-foreground">{m.license_loading()}</p>
-	</div>
-{:else if !license}
-	<Empty {fingerprint} onUpload={uploadLicense} onTriggerExport={triggerExport} />
-{:else}
-	<Manager
-		{license}
-		{fingerprint}
-		onRefresh={refresh}
-		onReplace={replaceLicense}
-		onTriggerExport={triggerExport}
-	/>
-{/if}
+{#key cluster + group + version + kind}
+	{#await fetchAPIResources(cluster, group, version, kind)}
+		<div class="flex flex-col gap-4 pt-1">
+			<Skeleton class="h-6 w-32" />
+			<Skeleton class="h-4 w-64" />
+			<Skeleton class="h-8 w-full" />
+			<Skeleton class="h-144 w-full" />
+			<div class="flex items-center justify-between">
+				<Skeleton class="h-8 w-36" />
+				<div class="flex items-center gap-4">
+					<Skeleton class="h-8 w-24" />
+					<Skeleton class="h-8 w-48" />
+				</div>
+			</div>
+		</div>
+	{:then apiResources}
+		<div class="space-y-4">
+			<div class="flex items-end justify-between gap-4">
+				<Item.Root class="p-0">
+					<Item.Content class="text-left">
+						<Item.Title class="text-xl font-bold">
+							{m.license_title()}
+						</Item.Title>
+						<Item.Description class="text-base">
+							{m.license_description()}
+						</Item.Description>
+					</Item.Content>
+				</Item.Root>
+			</div>
+			{#key resource}
+				{@const apiResource = apiResources.find((r) => r.resource === resource)}
+				{#if apiResource}
+					<KindViewer {isClusterAdmin} {cluster} {apiResource} />
+				{/if}
+			{/key}
+		</div>
+	{:catch error}
+		<Empty.Root>
+			<Empty.Header>
+				<Empty.Media class="rounded-full bg-muted p-4">
+					<BanIcon class="size-8" />
+				</Empty.Media>
+				<Empty.Title class="text-2xl font-bold">Failed to load data</Empty.Title>
+				<Empty.Description>
+					An error occurred while fetching data. Please check your connection or try again later.
+				</Empty.Description>
+			</Empty.Header>
+			<Empty.Content>
+				<Alert.Root variant="destructive" class="border-none bg-destructive/5">
+					<Alert.Title class="font-bold">{error?.name}</Alert.Title>
+					<Alert.Description class="text-start">
+						{error?.rawMessage}
+					</Alert.Description>
+				</Alert.Root>
+				<div class="flex gap-4">
+					<Button variant="outline" onclick={() => history.back()}>Go Back</Button>
+					<Button href="/">Go Home</Button>
+				</div>
+			</Empty.Content>
+		</Empty.Root>
+	{/await}
+{/key}

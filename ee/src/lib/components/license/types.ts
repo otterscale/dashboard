@@ -22,6 +22,8 @@ export interface GpuQuotaStatus {
 
 export interface LicenseStatus {
 	phase?: string;
+	softwareID?: string;
+	isPlatform?: boolean;
 	clusterFingerprintOK?: boolean;
 	maxNodes?: number;
 	authorizedNodeCount?: number;
