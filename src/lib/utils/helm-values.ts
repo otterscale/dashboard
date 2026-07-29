@@ -1,5 +1,11 @@
 import { isMap, parseDocument } from 'yaml';
 
+// The printer reflows anything it emits: long scalars fold onto continuation
+// lines and the padding some charts use to align trailing comments collapses to
+// a single space. Disable folding, and print both sides of a diff through these
+// same options so only real value changes show up.
+const TO_STRING_OPTIONS = { lineWidth: 0 } as const;
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
 	return (
 		typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Date)
@@ -73,7 +79,17 @@ function applyDeltaToYamlText(yamlText: string, delta: Record<string, unknown>):
 	for (const [key, child] of Object.entries(delta)) {
 		apply([key], child);
 	}
-	return document.toString();
+	return document.toString(TO_STRING_OPTIONS);
 }
 
-export { applyDeltaToYamlText, computeValuesDelta };
+/**
+ * Round-trips a values.yaml through the same printer `applyDeltaToYamlText`
+ * uses. Diffing raw chart defaults against printed merged values would flag
+ * comment spacing and folded long lines as changes; normalizing both sides
+ * leaves only the real overrides highlighted.
+ */
+function normalizeYamlText(yamlText: string): string {
+	return parseDocument(yamlText).toString(TO_STRING_OPTIONS);
+}
+
+export { applyDeltaToYamlText, computeValuesDelta, normalizeYamlText };
