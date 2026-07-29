@@ -16,6 +16,7 @@
 	import { JSON_SCHEMA, load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
+	import semver from 'semver';
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
 	import { parse, stringify } from 'yaml';
@@ -154,25 +155,14 @@
 		if (fetchedVersions.length === 0) {
 			throw new Error(`No versions found for chart ${chartName}.`);
 		}
-		return fetchedVersions.sort(compareVersionsDescending);
-	}
-
-	// Harbor lists artifacts by push time, not by version; a re-pushed old chart
-	// would otherwise show up first and become the default selection.
-	function compareVersionsDescending(a: string, b: string): number {
-		const aParts = a.replace(/^v/, '').split(/[.+-]/);
-		const bParts = b.replace(/^v/, '').split(/[.+-]/);
-		const length = Math.max(aParts.length, bParts.length);
-		for (let i = 0; i < length; i++) {
-			const aPart = aParts[i] ?? '';
-			const bPart = bParts[i] ?? '';
-			if (aPart === bPart) continue;
-			const aNumber = Number(aPart);
-			const bNumber = Number(bPart);
-			if (!Number.isNaN(aNumber) && !Number.isNaN(bNumber)) return bNumber - aNumber;
-			return bPart.localeCompare(aPart);
-		}
-		return 0;
+		// Harbor lists artifacts by push time, not by version; a re-pushed old chart
+		// would otherwise show up first and become the default selection. Helm
+		// requires SemVer 2 chart versions, but a raw OCI tag may not be one —
+		// those sort last instead of making rcompare throw.
+		return fetchedVersions.sort((a, b) => {
+			if (semver.valid(a) && semver.valid(b)) return semver.rcompare(a, b);
+			return semver.valid(a) ? -1 : semver.valid(b) ? 1 : 0;
+		});
 	}
 
 	// Harbor registries may be plain HTTP (spec.insecure); showChart always dials
