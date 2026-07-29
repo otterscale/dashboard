@@ -24,6 +24,7 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
+	import { computeValuesDelta } from '$lib/utils/helm-values';
 
 	import type { ChartAttribute } from '../table-layout';
 	import { type IndexChartType } from '../types';
@@ -332,8 +333,13 @@
 								handleNext();
 								try {
 									const structuredValues = load(lodash.get(values, 'spec.values') as string);
+									const defaultValues = load(documents.values);
 
-									lodash.set(values, 'spec.values', structuredValues);
+									lodash.set(
+										values,
+										'spec.values',
+										computeValuesDelta(defaultValues, structuredValues)
+									);
 								} catch (error) {
 									console.error('Failed to load values:', error);
 									toast.error('Failed to load values');
