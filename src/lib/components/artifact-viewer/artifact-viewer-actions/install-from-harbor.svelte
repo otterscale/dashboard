@@ -23,6 +23,7 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
+	import { computeValuesDelta } from '$lib/utils/helm-values';
 
 	import type { ChartAttribute } from '../table-layout';
 	import { type ArtifactChartType } from '../types';
@@ -400,7 +401,13 @@
 								const raw = lodash.get(values, 'spec.values');
 								if (typeof raw !== 'string') return;
 								try {
-									lodash.set(values, 'spec.values', parse(raw) ?? {});
+									const defaultValues = parse(String(documents.values));
+
+									lodash.set(
+										values,
+										'spec.values',
+										computeValuesDelta(defaultValues, parse(raw) ?? {})
+									);
 								} catch (error) {
 									console.error('Failed to load values:', error);
 									toast.error('Failed to load values');
