@@ -28,10 +28,10 @@
 		"@internationalized/date": "^3.12.2",
 		"@lucide/svelte": "^1.21.0",
 		"@otterscale/api": "^1.2.1",
-		"@otterscale/types": "^1.1.1",
+		"@otterscale/types": "^1.1.2",
 		"@playwright/test": "^1.61.1",
 		"@sveltejs/adapter-node": "^5.5.7",
-		"@sveltejs/kit": "^2.68.0",
+		"@sveltejs/kit": "^2.70.1",
 		"@sveltejs/vite-plugin-svelte": "^6.2.4",
 		"@tailwindcss/vite": "^4.3.1",
 		"@tanstack/table-core": "^8.21.3",
@@ -42,7 +42,7 @@
 		"@types/node": "^24.12.4",
 		"@types/pluralize": "^0.0.33",
 		"@types/semver": "^7.7.1",
-		"@vitest/browser-playwright": "^4.1.9",
+		"@vitest/browser-playwright": "^4.1.10",
 		"bits-ui": "^2.18.1",
 		"clsx": "^2.1.1",
 		"eslint": "^10.5.0",
@@ -70,7 +70,7 @@
 		"vite": "^7.3.3",
 		"vite-plugin-devtools-json": "^1.0.0",
 		"vite-plugin-static-copy": "^3.4.0",
-		"vitest": "^4.1.9"
+		"vitest": "^4.1.10"
 	},
 	"dependencies": {
 		"@bufbuild/protobuf": "^2.12.1",
@@ -127,17 +127,18 @@
 	},
 	"pnpm": {
 		"overrides": {
-			"axios@<1.16.0": "1.16.0",
+			"axios@<1.18.0": "1.18.0",
 			"form-data@<4.0.6": "4.0.6",
-			"fast-uri@<3.1.2": "3.1.2",
+			"fast-uri@<3.1.4": "3.1.4",
 			"vite@<7.3.5": "7.3.5",
 			"undici@<7.28.0": "7.28.0",
-			"dompurify@<3.4.11": "3.4.11",
+			"dompurify@<3.4.12": "3.4.12",
 			"esbuild@<0.28.1": "0.28.1",
 			"cookie@<0.7.0": "0.7.0",
 			"minimatch@<10.2.3": "10.2.3",
-			"brace-expansion@<5.0.6": "5.0.6",
-			"marked": "^18.0.7"
+			"brace-expansion@<5.0.8": "5.0.8",
+			"marked": "^18.0.7",
+			"postcss@<8.5.18": "8.5.18"
 		},
 		"onlyBuiltDependencies": [
 			"esbuild",
