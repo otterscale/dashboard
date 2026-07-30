@@ -60,7 +60,7 @@
 		}
 	}
 
-	// A workload (from the vGPU usage series' `podnamespace`/`podname`) sharing a GPU.
+	// A workload (from the vGPU usage series' pod labels) sharing a GPU.
 	type GpuConsumer = { namespace: string; pod: string; usage?: number };
 
 	// One physical GPU: `total` from DCGM, `usage`/`limit` from the vGPU exporter (undefined
@@ -113,9 +113,9 @@
 	const GPU_QUERIES = {
 		// Physical frame buffer per GPU → bytes (DCGM reports MiB). Labelled Hostname/UUID/modelName/device.
 		total: '(DCGM_FI_DEV_FB_FREE + DCGM_FI_DEV_FB_RESERVED + DCGM_FI_DEV_FB_USED) * (1024 * 1024)',
-		limit: 'sum by (deviceuuid) (vGPU_device_memory_limit_in_bytes)',
-		// Unaggregated so each series keeps `podnamespace`/`podname`; per-device sum is done in JS.
-		usage: 'vGPU_device_memory_usage_in_bytes'
+		limit: 'sum by (device_uuid) (hami_vgpu_memory_limit_bytes)',
+		// Unaggregated so each series keeps its owning pod's labels; per-device sum is done in JS.
+		usage: 'hami_vgpu_memory_used_bytes'
 	};
 
 	let rows = $state<NodeRow[]>([]);
@@ -161,7 +161,7 @@
 			const numberByDeviceUuid = (vectors: typeof limitResponse.result): Record<string, number> => {
 				const out: Record<string, number> = {};
 				for (const series of vectors) {
-					const uuid = (series.metric.labels as Record<string, string>).deviceuuid;
+					const uuid = (series.metric.labels as Record<string, string>).device_uuid;
 					const value = Number(series.value?.value);
 					if (uuid && Number.isFinite(value)) out[uuid] = value;
 				}
@@ -174,13 +174,15 @@
 			const consumersByUuid: Record<string, Record<string, GpuConsumer>> = {};
 			for (const series of usageResponse.result) {
 				const labels = series.metric.labels as Record<string, string>;
-				const uuid = labels.deviceuuid;
+				const uuid = labels.device_uuid;
 				if (!uuid) continue;
 				const value = Number(series.value?.value);
 				const usage = Number.isFinite(value) ? value : undefined;
 				if (usage !== undefined) usageByUuid[uuid] = (usageByUuid[uuid] ?? 0) + usage;
-				const namespace = labels.podnamespace ?? '';
-				const pod = labels.podname ?? '';
+				// The exporter's own `namespace`/`pod` labels win the scrape, so HAMi's workload
+				// labels arrive prefixed; fall back to the bare names for scrapes without honor_labels.
+				const namespace = labels.exported_namespace ?? labels.namespace ?? '';
+				const pod = labels.exported_pod ?? labels.pod ?? '';
 				if (!namespace && !pod) continue;
 				const byKey = (consumersByUuid[uuid] ??= {});
 				const key = `${namespace}/${pod}`;

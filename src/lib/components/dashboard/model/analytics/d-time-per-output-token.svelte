@@ -2,6 +2,7 @@
 	import ChartLine from '@lucide/svelte/icons/chart-line';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+	import MoonIcon from '@lucide/svelte/icons/moon';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
@@ -15,9 +16,11 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/messages';
 	import {
+		type ActivityState,
 		computeStep,
 		type DataPoint,
 		fetchCombinedFlattenedRange,
+		probeActivity,
 		vllmMetricWithSelector
 	} from '$lib/prometheus';
 
@@ -42,6 +45,7 @@
 	} = $props();
 
 	let times_per_output_token = $state<DataPoint[]>([]);
+	let activity = $state<ActivityState>('absent');
 
 	function tpotQueries(): Record<string, string> {
 		const bucket = vllmMetricWithSelector(
@@ -50,9 +54,17 @@
 			selectedModel
 		);
 		const inner = `sum by(le) (rate(${bucket}[5m]))`;
+		// `traffic` rides along in the same combined query at no extra request. It tells an
+		// idle model (series present, flat 0) apart from one that was never scraped (no series).
+		const requests = vllmMetricWithSelector(
+			'vllm:request_time_per_output_token_seconds_count',
+			namespace,
+			selectedModel
+		);
 		return {
 			p95: `histogram_quantile(0.95, ${inner})`,
-			p99: `histogram_quantile(0.99, ${inner})`
+			p99: `histogram_quantile(0.99, ${inner})`,
+			traffic: `sum(rate(${requests}[5m]))`
 		};
 	}
 
@@ -73,15 +85,20 @@
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const step = computeStep(startMs, endMs);
-			times_per_output_token = await fetchCombinedFlattenedRange(
+			const points = await fetchCombinedFlattenedRange(
 				prometheusDriver,
 				tpotQueries(),
 				new Date(startMs),
 				new Date(endMs),
 				step
 			);
+			activity = probeActivity(points, 'traffic');
+			// A flat `traffic: 0` is a finite value, so it would keep points alive and defeat the
+			// `length === 0` empty check below. Only quantile-bearing points are plottable.
+			times_per_output_token = points.filter((p) => p.p95 !== undefined || p.p99 !== undefined);
 		} catch (error) {
 			times_per_output_token = [];
+			activity = 'absent';
 			console.error(`Fail to fetch time per output token data in cluster ${cluster}:`, error);
 		}
 	}
@@ -125,9 +142,15 @@
 				<LoaderCircle class="size-12 animate-spin" />
 			</div>
 		{:else if times_per_output_token.length === 0}
-			<div class="flex h-[200px] w-full flex-col items-center justify-center">
-				<ChartLine class="size-12 animate-pulse text-muted-foreground" />
-				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
+			<div class="flex h-[200px] w-full flex-col items-center justify-center gap-1">
+				{#if activity === 'idle'}
+					<MoonIcon class="size-12 text-muted-foreground" />
+					<p class="text-base text-muted-foreground">{m.no_traffic_display()}</p>
+					<p class="text-xs text-muted-foreground">{m.no_traffic_hint()}</p>
+				{:else}
+					<ChartLine class="size-12 animate-pulse text-muted-foreground" />
+					<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
+				{/if}
 			</div>
 		{:else}
 			<Chart.Container config={configuration} class="h-[200px] w-full">

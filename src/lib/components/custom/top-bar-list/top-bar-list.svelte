@@ -3,6 +3,7 @@
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import Maximize2Icon from '@lucide/svelte/icons/maximize-2';
+	import MoonIcon from '@lucide/svelte/icons/moon';
 
 	import * as Statistics from '$lib/components/custom/statistics/index';
 	import { Badge } from '$lib/components/ui/badge';
@@ -11,6 +12,7 @@
 	import * as Sheet from '$lib/components/ui/sheet';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/messages';
+	import type { ActivityState } from '$lib/prometheus';
 	import { cn } from '$lib/utils';
 
 	import type { TopBar } from './types';
@@ -22,7 +24,8 @@
 		bars,
 		isLoaded,
 		onBarClick,
-		scrollable
+		scrollable,
+		activity
 	}: {
 		title: string;
 		description: string;
@@ -30,6 +33,9 @@
 		bars: TopBar[];
 		isLoaded: boolean;
 		onBarClick?: (label: string) => void;
+		// Optional: when the caller can tell "the workload is idle" apart from "nothing is
+		// deployed", pass it so the empty state says which. Omit for the generic message.
+		activity?: ActivityState;
 		// When true, the list lives in a fixed-height scroll area with a maximize button — so
 		// cards sharing a row stay the same height regardless of how many bars each has.
 		// Leave false to let the list grow with its content.
@@ -120,9 +126,15 @@
 				<LoaderCircle class="size-12 animate-spin" />
 			</div>
 		{:else if bars.length === 0}
-			<div class="flex h-65 w-full flex-col items-center justify-center">
-				<ChartLine class="size-12 animate-pulse text-muted-foreground" />
-				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
+			<div class="flex h-65 w-full flex-col items-center justify-center gap-1">
+				{#if activity === 'idle'}
+					<MoonIcon class="size-12 text-muted-foreground" />
+					<p class="text-base text-muted-foreground">{m.no_traffic_display()}</p>
+					<p class="text-xs text-muted-foreground">{m.no_traffic_hint()}</p>
+				{:else}
+					<ChartLine class="size-12 animate-pulse text-muted-foreground" />
+					<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
+				{/if}
 			</div>
 		{:else if scrollable}
 			<ScrollArea class="h-65 w-full">

@@ -214,6 +214,32 @@ export function thresholdChartColor(level: ThresholdLevel): string {
 
 export type DataPoint = Record<string, Date | number>;
 
+/**
+ * Why a panel has nothing to draw. `absent` means the metric family produced no series
+ * at all (nothing deployed, or not being scraped); `idle` means the series exist but the
+ * workload saw no requests in the window. Collapsing both into "no data" hides a working
+ * deployment behind the same message as a broken one.
+ */
+export type ActivityState = 'absent' | 'idle' | 'active';
+
+/**
+ * Classify a panel from a probe series — typically `sum(rate(<histogram>_count[5m]))`,
+ * which yields no series when the metric is absent and a flat 0 when nothing is served.
+ * Ride the probe along in the same combined query so it costs no extra request, then keep
+ * it out of the chart data: a constant 0 is a valid data point and would defeat the
+ * caller's `length === 0` empty check.
+ */
+export function probeActivity(points: DataPoint[], key: string): ActivityState {
+	let present = false;
+	for (const point of points) {
+		const value = Number(point[key]);
+		if (!Number.isFinite(value)) continue;
+		present = true;
+		if (value > 0) return 'active';
+	}
+	return present ? 'idle' : 'absent';
+}
+
 const CHART_COLORS = ['chart-1', 'chart-2', 'chart-3', 'chart-4', 'chart-5'];
 
 function getLabelKey(vec: RangeVector): string {
@@ -234,6 +260,24 @@ function getLabelKey(vec: RangeVector): string {
 }
 
 /**
+ * Record one sample under `key` in the flattened per-timestamp map, dropping values that
+ * are not finite. `histogram_quantile` over an idle histogram returns NaN (0/0 during
+ * interpolation), and NaN is not plottable — keeping it renders an empty chart whose
+ * tooltips read "NaN". Dropping it lets callers fall back to their own empty state.
+ */
+function putSample(
+	dateMap: Map<number, DataPoint>,
+	key: string,
+	sample: RangeVector['values'][number]
+) {
+	const value = Number(sample.value);
+	if (!Number.isFinite(value)) return;
+	const time = (sample.time as Date).getTime();
+	if (!dateMap.has(time)) dateMap.set(time, { date: sample.time as Date });
+	dateMap.get(time)![key] = value;
+}
+
+/**
  * Run a single range query that may return multiple labelled series (e.g. `sum by (cpu) ...`).
  * Returns a flat array of DataPoints keyed by label value, sorted by time.
  */
@@ -249,11 +293,7 @@ export async function fetchFlattenedRange(
 	const dateMap = new Map<number, DataPoint>();
 	for (const vector of vectors) {
 		const key = getLabelKey(vector);
-		for (const sample of vector.values) {
-			const time = (sample.time as Date).getTime();
-			if (!dateMap.has(time)) dateMap.set(time, { date: sample.time as Date });
-			dateMap.get(time)![key] = Number(sample.value);
-		}
+		for (const sample of vector.values) putSample(dateMap, key, sample);
 	}
 	return Array.from(dateMap.values()).sort(
 		(a, b) => (a.date as Date).getTime() - (b.date as Date).getTime()
@@ -280,11 +320,7 @@ export async function fetchMultipleFlattenedRange(
 	const dateMap = new Map<number, DataPoint>();
 	for (const { name, vectors } of results) {
 		for (const vector of vectors) {
-			for (const sample of vector.values) {
-				const time = (sample.time as Date).getTime();
-				if (!dateMap.has(time)) dateMap.set(time, { date: sample.time as Date });
-				dateMap.get(time)![name] = Number(sample.value);
-			}
+			for (const sample of vector.values) putSample(dateMap, name, sample);
 		}
 	}
 	return Array.from(dateMap.values()).sort(
@@ -327,11 +363,7 @@ export async function fetchCombinedFlattenedRange(
 	for (const vector of vectors) {
 		const name = (vector.metric.labels as Record<string, string>)[COMBINED_TAG];
 		if (!name) continue;
-		for (const sample of vector.values) {
-			const time = (sample.time as Date).getTime();
-			if (!dateMap.has(time)) dateMap.set(time, { date: sample.time as Date });
-			dateMap.get(time)![name] = Number(sample.value);
-		}
+		for (const sample of vector.values) putSample(dateMap, name, sample);
 	}
 	return Array.from(dateMap.values()).sort(
 		(a, b) => (a.date as Date).getTime() - (b.date as Date).getTime()

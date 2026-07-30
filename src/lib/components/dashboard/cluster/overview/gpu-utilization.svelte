@@ -22,11 +22,14 @@
 	let gpuUtilization: number | undefined = $state(undefined);
 	let units: number | undefined = $state(undefined);
 
-	// Both scalars come back in a single `or`-unioned instant query.
+	// Both scalars come back in a single `or`-unioned instant query. Both read DCGM, which
+	// reports per physical card — matching this card's "average across all GPU cards" framing
+	// and keeping the percentage consistent with the card count shown in the middle. HAMi's
+	// `hami_container_device_utilization_ratio` is per-container, so it double-counts a shared GPU.
 	async function fetch() {
 		try {
 			const r = await fetchCombinedInstant(prometheusDriver, {
-				utilization: `avg(Device_utilization_desc_of_container{})`,
+				utilization: `avg(DCGM_FI_DEV_GPU_UTIL{})`,
 				units: `count(DCGM_FI_DEV_GPU_UTIL{})`
 			});
 			gpuUtilization = r.utilization[0]?.value?.value ?? undefined;
@@ -111,8 +114,11 @@
 					tooltipContext={false}
 				>
 					{#snippet aboveMarks()}
+						<!-- The card gates on `utilization` alone, so the card count from the other
+						     sub-query may still be missing — String(undefined) would print "undefined". -->
+						{@const hasUnits = Number.isFinite(Number(units))}
 						<Text
-							value={String(units)}
+							value={hasUnits ? String(units) : '—'}
 							textAnchor="middle"
 							verticalAnchor="middle"
 							class="fill-foreground text-3xl! font-bold"
