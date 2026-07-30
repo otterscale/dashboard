@@ -2,6 +2,7 @@
 	import ChartLine from '@lucide/svelte/icons/chart-line';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+	import MoonIcon from '@lucide/svelte/icons/moon';
 	import { scaleBand, scaleLinear } from 'd3-scale';
 	import { Axis, Cell, Chart as LayerChart, Svg, Tooltip as LayerTooltip } from 'layerchart';
 	import { PrometheusDriver } from 'prometheus-query';
@@ -15,6 +16,7 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/messages';
 	import {
+		type ActivityState,
 		computeStep,
 		type DataPoint,
 		fetchFlattenedRange,
@@ -164,6 +166,14 @@
 	const yDomain = $derived(sortedBuckets.map((b) => b.label));
 	const hasData = $derived(cells.some((c) => c.value > 0));
 
+	// No probe query needed — the bucket series are their own signal. Series present but every
+	// cell zero means the model is up and served nothing; no series at all means nothing is
+	// deployed or scraped. Collapsing both into "no data" hides a healthy model behind the
+	// same message as a broken one.
+	const activity = $derived<ActivityState>(
+		rawData.length === 0 || sortedBuckets.length === 0 ? 'absent' : hasData ? 'active' : 'idle'
+	);
+
 	const cellLookup = $derived.by(() => {
 		const map = new SvelteMap<string, HeatCell>();
 		for (const c of cells) map.set(`${c.dateKey}|${c.bucketLabel}`, c);
@@ -213,9 +223,15 @@
 				<LoaderCircle class="size-12 animate-spin" />
 			</div>
 		{:else if !hasData || sortedBuckets.length === 0}
-			<div class="flex h-[200px] w-full flex-col items-center justify-center">
-				<ChartLine class="size-12 animate-pulse text-muted-foreground" />
-				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
+			<div class="flex h-[200px] w-full flex-col items-center justify-center gap-1">
+				{#if activity === 'idle'}
+					<MoonIcon class="size-12 text-muted-foreground" />
+					<p class="text-base text-muted-foreground">{m.no_traffic_display()}</p>
+					<p class="text-xs text-muted-foreground">{m.no_traffic_hint()}</p>
+				{:else}
+					<ChartLine class="size-12 animate-pulse text-muted-foreground" />
+					<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
+				{/if}
 			</div>
 		{:else}
 			<Chart.Container config={chartConfig} class="h-[200px] w-full">

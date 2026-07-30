@@ -2,6 +2,7 @@
 	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import MoonIcon from '@lucide/svelte/icons/moon';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
@@ -15,9 +16,11 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/messages';
 	import {
+		type ActivityState,
 		computeStep,
 		type DataPoint,
 		fetchCombinedFlattenedRange,
+		probeActivity,
 		vllmMetricWithSelector
 	} from '$lib/prometheus';
 
@@ -40,6 +43,7 @@
 	} = $props();
 
 	let requestLatencies = $state<DataPoint[]>([]);
+	let activity = $state<ActivityState>('absent');
 
 	function latencyQueries(): Record<string, string> {
 		const inner = vllmMetricWithSelector(
@@ -48,9 +52,17 @@
 			undefined
 		);
 		const rate = `sum by(le) (rate(${inner}[5m]))`;
+		// `traffic` rides along in the same combined query at no extra request. It tells an
+		// idle model (series present, flat 0) apart from one that was never scraped (no series).
+		const requests = vllmMetricWithSelector(
+			'vllm:e2e_request_latency_seconds_count',
+			namespace,
+			undefined
+		);
 		return {
 			p95: `histogram_quantile(0.95, ${rate})`,
-			p99: `histogram_quantile(0.99, ${rate})`
+			p99: `histogram_quantile(0.99, ${rate})`,
+			traffic: `sum(rate(${requests}[5m]))`
 		};
 	}
 
@@ -71,15 +83,20 @@
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const step = computeStep(startMs, endMs);
-			requestLatencies = await fetchCombinedFlattenedRange(
+			const points = await fetchCombinedFlattenedRange(
 				prometheusDriver,
 				latencyQueries(),
 				new Date(startMs),
 				new Date(endMs),
 				step
 			);
+			activity = probeActivity(points, 'traffic');
+			// A flat `traffic: 0` is a finite value, so it would keep points alive and defeat the
+			// `length === 0` empty check below. Only quantile-bearing points are plottable.
+			requestLatencies = points.filter((p) => p.p95 !== undefined || p.p99 !== undefined);
 		} catch (error) {
 			requestLatencies = [];
+			activity = 'absent';
 			console.error(`Fail to fetch e2e latency in cluster ${cluster}:`, error);
 		}
 	}
@@ -132,8 +149,14 @@
 	{:else if requestLatencies.length === 0}
 		<Card.Content>
 			<div class="flex h-45 w-full flex-col items-center justify-center gap-2">
-				<ChartLineIcon class="size-12 animate-pulse text-muted-foreground" />
-				<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
+				{#if activity === 'idle'}
+					<MoonIcon class="size-12 text-muted-foreground" />
+					<p class="text-sm text-muted-foreground">{m.no_traffic_display()}</p>
+					<p class="text-xs text-muted-foreground">{m.no_traffic_hint()}</p>
+				{:else}
+					<ChartLineIcon class="size-12 animate-pulse text-muted-foreground" />
+					<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
+				{/if}
 			</div>
 		</Card.Content>
 	{:else}
@@ -188,11 +211,11 @@
 										<span class="text-muted-foreground">{name}</span>
 									</div>
 									<span class="font-mono font-medium text-foreground tabular-nums">
-										{#if value}
+										{#if Number.isFinite(Number(value))}
 											{Number(value).toFixed(2)}
 											{m.second()}
 										{:else}
-											NaN
+											&mdash;
 										{/if}
 									</span>
 								</div>

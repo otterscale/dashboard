@@ -376,6 +376,8 @@
 	"wait": "等待",
 	"delay": "延遲",
 	"no_data_display": "尚無資料可顯示",
+	"no_traffic_display": "此區間內沒有請求",
+	"no_traffic_hint": "模型運行中,但沒有收到流量。",
 	"no_data_available": "目前無可用資料",
 	"no_result": "無結果",
 	"ram": "記憶體",

@@ -32,9 +32,9 @@
 	async function fetch() {
 		try {
 			const r = await fetchCombinedInstant(prometheusDriver, {
-				usage: `100 * sum(Device_memory_desc_of_container{}) / sum(GPUDeviceMemoryLimit{})`,
-				request: `100 * sum(vGPU_device_memory_limit_in_bytes{}) / sum(GPUDeviceMemoryLimit{})`,
-				allocatable: `sum(GPUDeviceMemoryLimit{})`
+				usage: `100 * sum(hami_container_device_memory_bytes{}) / sum(hami_gpu_memory_limit_bytes{})`,
+				request: `100 * sum(hami_vgpu_memory_limit_bytes{}) / sum(hami_gpu_memory_limit_bytes{})`,
+				allocatable: `sum(hami_gpu_memory_limit_bytes{})`
 			});
 			memoryUsage = r.usage[0]?.value ?? undefined;
 			memoryRequest = r.request[0]?.value ?? undefined;
@@ -120,15 +120,19 @@
 					tooltipContext={false}
 				>
 					{#snippet aboveMarks()}
-						{@const { value, unit } = formatCapacity(Number(allocatableMemory))}
+						{@const total = Number(allocatableMemory)}
+						{@const hasTotal = Number.isFinite(total)}
+						<!-- The card renders as soon as `usage` resolves, so the capacity from the other
+						     sub-query may still be missing. formatCapacity(NaN) would print "NaN KB". -->
+						{@const { value, unit } = formatCapacity(hasTotal ? total : 0)}
 						<Text
-							{value}
+							value={hasTotal ? value : '—'}
 							textAnchor="middle"
 							verticalAnchor="middle"
 							class="fill-foreground text-3xl! font-bold"
 						/>
 						<Text
-							value={unit}
+							value={hasTotal ? unit : ''}
 							textAnchor="middle"
 							verticalAnchor="middle"
 							class="fill-foreground text-xl! font-bold"

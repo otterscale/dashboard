@@ -2,6 +2,7 @@
 	import ChartLine from '@lucide/svelte/icons/chart-line';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+	import MoonIcon from '@lucide/svelte/icons/moon';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
@@ -15,8 +16,10 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/messages';
 	import {
+		type ActivityState,
 		computeStep,
 		fetchMultipleFlattenedRange,
+		probeActivity,
 		vllmMetricWithSelector
 	} from '$lib/prometheus';
 
@@ -42,6 +45,7 @@
 
 	let data = $state<Row[]>([]);
 	let isLoaded = $state(false);
+	let activity = $state<ActivityState>('absent');
 
 	function queries() {
 		const prefillBucket = vllmMetricWithSelector(
@@ -54,9 +58,18 @@
 			namespace,
 			selectedModel
 		);
+		// Unlike the combined helpers, this one issues a request per query, so `traffic` costs an
+		// extra round trip. It earns it: without a probe, an idle model and one that was never
+		// scraped both collapse to the same empty chart.
+		const requests = vllmMetricWithSelector(
+			'vllm:request_prefill_time_seconds_count',
+			namespace,
+			selectedModel
+		);
 		return {
 			prefill: `histogram_quantile(0.95, sum by(le) (rate(${prefillBucket}[5m])))`,
-			decode: `histogram_quantile(0.95, sum by(le) (rate(${decodeBucket}[5m])))`
+			decode: `histogram_quantile(0.95, sum by(le) (rate(${decodeBucket}[5m])))`,
+			traffic: `sum(rate(${requests}[5m]))`
 		};
 	}
 
@@ -84,13 +97,19 @@
 				new Date(endMs),
 				step
 			);
-			data = points.map((p) => ({
-				date: p.date as Date,
-				prefill: Number.isFinite(Number(p.prefill)) ? Number(p.prefill) : 0,
-				decode: Number.isFinite(Number(p.decode)) ? Number(p.decode) : 0
-			}));
+			activity = probeActivity(points, 'traffic');
+			// A flat `traffic: 0` is a finite value, so it would keep points alive and defeat the
+			// `length === 0` empty check below — leaving a zero line that reads as measured zero.
+			data = points
+				.filter((p) => p.prefill !== undefined || p.decode !== undefined)
+				.map((p) => ({
+					date: p.date as Date,
+					prefill: Number.isFinite(Number(p.prefill)) ? Number(p.prefill) : 0,
+					decode: Number.isFinite(Number(p.decode)) ? Number(p.decode) : 0
+				}));
 		} catch {
 			data = [];
+			activity = 'absent';
 		}
 	}
 
@@ -132,9 +151,15 @@
 				<LoaderCircle class="size-12 animate-spin" />
 			</div>
 		{:else if data.length === 0}
-			<div class="flex h-[200px] w-full flex-col items-center justify-center">
-				<ChartLine class="size-12 animate-pulse text-muted-foreground" />
-				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
+			<div class="flex h-[200px] w-full flex-col items-center justify-center gap-1">
+				{#if activity === 'idle'}
+					<MoonIcon class="size-12 text-muted-foreground" />
+					<p class="text-base text-muted-foreground">{m.no_traffic_display()}</p>
+					<p class="text-xs text-muted-foreground">{m.no_traffic_hint()}</p>
+				{:else}
+					<ChartLine class="size-12 animate-pulse text-muted-foreground" />
+					<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
+				{/if}
 			</div>
 		{:else}
 			<Chart.Container config={configuration} class="h-[200px] w-full">
