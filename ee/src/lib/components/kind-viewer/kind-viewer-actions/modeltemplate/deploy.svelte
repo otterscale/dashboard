@@ -18,6 +18,7 @@
 	import { env } from '$env/dynamic/public';
 	import * as CodeBlock from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
+	import { formatWithBinarySuffix, quantityToScalar } from '$lib/components/dynamic-table/utils';
 	import {
 		fetchAllGpuNodes as fetchComputeResourceNodes,
 		type NodeInfo
@@ -57,58 +58,7 @@
 	const configurationKind = 'LLMInferenceServiceConfig';
 	const configurationResource = 'llminferenceserviceconfigs';
 
-	const migConfigMapName = 'otterscale-hami-device-plugin';
-	const migConfigMapNamespace = 'kube-system';
-	const migConfigJsonKey = 'config.json';
-
-	// Fetch the set of node names that currently have MIG enabled, based on the
-	// hami device-plugin ConfigMap (nodeconfig entries with operatingmode "mig").
-	async function fetchMigEnabledNodeNames(): Promise<Set<string>> {
-		try {
-			const response = await resourceClient.get({
-				cluster,
-				namespace: migConfigMapNamespace,
-				name: migConfigMapName,
-				group: '',
-				version: 'v1',
-				resource: 'configmaps'
-			});
-
-			const configMap = response.object as { data?: Record<string, string> } | undefined;
-			const configText = configMap?.data?.[migConfigJsonKey];
-			if (!configText) return new Set();
-
-			const parsed = JSON.parse(configText) as { nodeconfig?: unknown };
-			if (!Array.isArray(parsed.nodeconfig)) return new Set();
-
-			const names = parsed.nodeconfig
-				.filter(
-					(item): item is { name: string; operatingmode: string } =>
-						typeof item === 'object' &&
-						item !== null &&
-						typeof (item as { name?: unknown }).name === 'string' &&
-						typeof (item as { operatingmode?: unknown }).operatingmode === 'string' &&
-						(item as { operatingmode: string }).operatingmode.toLowerCase() === 'mig'
-				)
-				.map((item) => item.name);
-
-			return new Set(names);
-		} catch (error) {
-			console.error('Failed to load MIG-enabled nodes:', error);
-			return new Set();
-		}
-	}
-
-	async function loadWorkloadPlacementData() {
-		const [computeResourceNodes, migEnabledNodeNames] = await Promise.all([
-			fetchComputeResourceNodes(resourceClient, cluster),
-			fetchMigEnabledNodeNames()
-		]);
-
-		return { computeResourceNodes, migEnabledNodeNames };
-	}
-
-	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 5 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 
 	async function check(modelName: string): Promise<boolean | null> {
@@ -143,6 +93,10 @@
 
 	async function checkModelExistence(uri: string) {
 		const token = ++checkToken;
+		if (!uri.startsWith('hf://')) {
+			isModelExist = null;
+			return;
+		}
 		isModelExist = undefined;
 		const result = await check(parseModelName(uri));
 		if (token === checkToken) isModelExist = result;
@@ -167,6 +121,77 @@
 		const modelName = parseModelName(modelUrl);
 
 		return `oci://${registry}/models/modelcar-catalog:${modelName.toLowerCase()}`;
+	}
+
+	function getModelSchema(modelUri: string): Schema {
+		const modelBaseSchema = lodash.omit(
+			lodash.get(jsonSchema, 'properties.spec.properties.model') as Schema,
+			['properties', 'required', 'additionalProperties']
+		) as Schema;
+		const uriSchema = {
+			title: 'URI',
+			...lodash.omit(
+				lodash.get(jsonSchema, 'properties.spec.properties.model.properties.uri') as Schema,
+				['description']
+			),
+			readOnly: true
+		};
+
+		if (!modelUri.startsWith('hf://')) {
+			return {
+				title: 'Model',
+				...modelBaseSchema,
+				properties: {
+					uri: {
+						...uriSchema,
+						default: modelUri,
+						description: 'The model source defined by the platform configuration.'
+					}
+				}
+			} as Schema;
+		}
+
+		return {
+			title: 'Model',
+			...modelBaseSchema,
+			properties: {
+				internal: {
+					type: 'boolean',
+					title: 'Use internal registry',
+					default: true,
+					description:
+						'When enabled, an hf:// source is rewritten to its OCI ModelCar reference in the platform registry. When disabled, the source URI is used as-is.'
+				}
+			},
+			allOf: [
+				{
+					if: { properties: { internal: { const: true } }, required: ['internal'] },
+					then: {
+						properties: {
+							internalUri: {
+								...uriSchema,
+								default: tryModelCarReference(modelUri),
+								description: 'The OCI ModelCar reference in the platform registry.'
+							}
+						},
+						required: ['internalUri']
+					}
+				},
+				{
+					if: { properties: { internal: { const: false } }, required: ['internal'] },
+					then: {
+						properties: {
+							uri: {
+								...uriSchema,
+								default: modelUri,
+								description: 'The model source defined by the platform configuration.'
+							}
+						},
+						required: ['uri']
+					}
+				}
+			]
+		} as Schema;
 	}
 
 	function getUploadCommands(uri: string): string {
@@ -207,98 +232,29 @@
 		return resourceTopology;
 	}
 
-	function getWorkloadPlacementSchema(
-		resourceTopology: Record<string, string[]>,
-		migResourceTopology: Record<string, string[]>
-	): Schema {
-		const migProperty: Record<string, Schema> = {
-			mig: {
-				type: 'boolean',
-				title: 'Enable MIG',
-				description:
-					'Multi-Instance GPU (MIG) allows a single GPU to be partitioned into multiple isolated instances.'
-			}
-		};
-
-		if (Object.keys(resourceTopology).length === 0) {
+	function getWorkloadPlacementSchema(resourceTopology: Record<string, string[]>): Schema {
+		const types = Object.keys(resourceTopology);
+		if (types.length === 0) {
 			return {
 				type: 'object',
 				properties: {
-					...migProperty,
 					type: { type: 'string', title: 'Type' }
 				}
 			};
 		}
-
-		// Build the "type -> node" dependency for a given topology so that the
-		// node list is scoped to the selected GPU type.
-		const buildTypeDependency = (topology: Record<string, string[]>) => {
-			const entries = Object.entries(topology);
-			if (entries.length === 0) return {};
-
-			return {
+		return {
+			type: 'object',
+			properties: {
+				type: { type: 'string', title: 'Type', enum: types }
+			},
+			dependencies: {
 				type: {
-					oneOf: entries.map(([type, nodes]) => ({
+					oneOf: Object.entries(resourceTopology).map(([type, nodes]) => ({
 						properties: {
 							type: { enum: [type] },
 							node: { type: 'string', title: 'Node', enum: nodes }
 						}
 					}))
-				}
-			};
-		};
-
-		// Build a single MIG branch. When the topology is empty (e.g. MIG enabled
-		// but no MIG-capable nodes), avoid emitting an empty `enum`/`oneOf`, which
-		// is rejected by JSON Schema validation.
-		const buildMigBranch = (migValue: boolean, topology: Record<string, string[]>) => {
-			const types = Object.keys(topology);
-			const typeDependency = buildTypeDependency(topology);
-
-			// Empty topology means no selectable type/node. The `node` field simply
-			// disappears (it only exists via the type->node dependency), so surface
-			// an empty-state message on the `type` field to explain why placement is
-			// unavailable rather than leaving a confusing free-text input.
-			const emptyType =
-				migValue && types.length === 0
-					? {
-							type: 'string',
-							title: 'Type',
-							readOnly: true,
-							description:
-								'No MIG-capable nodes are available in this cluster. Disable MIG to select a GPU type and node.'
-						}
-					: { type: 'string', title: 'Type' };
-
-			const branch: Record<string, unknown> = {
-				properties: {
-					mig: { enum: [migValue] },
-					type: types.length > 0 ? { enum: types } : emptyType
-				}
-			};
-
-			if (Object.keys(typeDependency).length > 0) {
-				branch.dependencies = typeDependency;
-			}
-
-			return branch;
-		};
-
-		// MIG drives everything: toggling it re-renders both the type list and,
-		// in turn, the node list. When MIG is enabled, only GPU types and nodes
-		// that currently have MIG enabled are offered.
-		return {
-			type: 'object',
-			properties: {
-				...migProperty,
-				type: { type: 'string', title: 'Type' }
-			},
-			dependencies: {
-				mig: {
-					oneOf: [
-						buildMigBranch(false, resourceTopology),
-						buildMigBranch(true, migResourceTopology)
-					]
 				}
 			}
 		};
@@ -321,6 +277,66 @@
 		};
 	}
 
+	const kvCacheOffloadingPath = ['spec', 'kvCacheOffloading'];
+	const quantityPattern = '^[0-9]+(\\.[0-9]+)?(Ki|Mi|Gi|Ti|Pi|Ei|k|M|G|T|P|E)?$';
+
+	function getKvCacheOffloadingSchema(): Schema {
+		return {
+			title: 'KV Cache Offloading',
+			type: 'object',
+			properties: {
+				enabled: {
+					type: 'boolean',
+					title: 'Enable KV cache offloading',
+					default: false,
+					description:
+						'When enabled, KV cache blocks evicted from GPU memory are offloaded to a CPU buffer and optional secondary storage tiers.'
+				}
+			},
+			allOf: [
+				{
+					if: { properties: { enabled: { const: true } }, required: ['enabled'] },
+					then: {
+						properties: {
+							cpu: {
+								type: 'string',
+								title: 'CPU Buffer Size',
+								default: '10Gi',
+								pattern: quantityPattern,
+								description: 'Size of the CPU memory buffer, e.g. 10Gi.'
+							},
+							secondary: {
+								type: 'array',
+								title: 'Secondary Tiers',
+								description:
+									'Additional file-system offload tiers backed by PVCs, tried in order after the CPU buffer.',
+								items: {
+									type: 'object',
+									properties: {
+										storageClassName: {
+											type: 'string',
+											title: 'Storage Class',
+											default: 'aidaptiv-cache'
+										},
+										storage: {
+											type: 'string',
+											title: 'Storage Size',
+											default: '100Gi',
+											pattern: quantityPattern
+										}
+									},
+									required: ['storageClassName', 'storage']
+								},
+								default: [{ storageClassName: 'aidaptiv-cache', storage: '100Gi' }]
+							}
+						},
+						required: ['cpu']
+					}
+				}
+			]
+		} as Schema;
+	}
+
 	function pruneEmptyAncestors(target: object, path: Array<string | number>): void {
 		for (let depth = path.length - 1; depth > 1; depth--) {
 			const ancestorPath = path.slice(0, depth);
@@ -332,12 +348,102 @@
 		}
 	}
 
+	const mainContainersPath = ['spec', 'template', 'containers'];
+	const templateVolumesPath = ['spec', 'template', 'volumes'];
+
+	function ensureEntryByName(target: object, path: Array<string | number>, name: string): number {
+		const index = lodash.findIndex(lodash.get(target, path), { name });
+		if (index >= 0) return index;
+		const appendIndex = lodash.size(lodash.get(target, path));
+		lodash.set(target, [...path, appendIndex], { name });
+		return appendIndex;
+	}
+
+	function toIntegerScalar(scalar: number | bigint): bigint {
+		return typeof scalar === 'bigint' ? scalar : BigInt(Math.round(scalar));
+	}
+
+	function formatBytesQuantity(bytes: bigint): string {
+		const { value, unit } = formatWithBinarySuffix(bytes);
+		return `${value}${unit}`;
+	}
+
+	// Snapshot of the container/volume subtrees before the KV cache offloading
+	// bump, so re-submitting the step stays idempotent and disabling reverts.
+	let kvCacheOffloadingPristine: { containers: unknown; volumes: unknown } | null = null;
+
+	function snapshotKvCacheOffloadingTargets() {
+		if (kvCacheOffloadingPristine) return;
+		kvCacheOffloadingPristine = lodash.cloneDeep({
+			containers: lodash.get(values, mainContainersPath),
+			volumes: lodash.get(values, templateVolumesPath)
+		});
+	}
+
+	function restoreKvCacheOffloadingTargets() {
+		if (!kvCacheOffloadingPristine) return;
+		const snapshots: Array<[Array<string | number>, unknown]> = [
+			[mainContainersPath, kvCacheOffloadingPristine.containers],
+			[templateVolumesPath, kvCacheOffloadingPristine.volumes]
+		];
+		for (const [path, snapshot] of snapshots) {
+			if (snapshot === undefined) {
+				lodash.unset(values, path);
+				pruneEmptyAncestors(values, path);
+			} else {
+				lodash.set(values, path, lodash.cloneDeep(snapshot));
+			}
+		}
+		kvCacheOffloadingPristine = null;
+	}
+
+	function applyKvCacheOffloadingResources(cpuQuantity: string) {
+		const cpuBufferBytes = toIntegerScalar(quantityToScalar(cpuQuantity));
+		const additionalCores = 4;
+
+		const container = {
+			list: mainContainersPath,
+			valuesIndex: ensureEntryByName(values, mainContainersPath, 'main'),
+			objectIndex: lodash.findIndex(lodash.get(object, mainContainersPath), { name: 'main' })
+		};
+		const volume = {
+			list: templateVolumesPath,
+			valuesIndex: ensureEntryByName(values, templateVolumesPath, 'dshm'),
+			objectIndex: lodash.findIndex(lodash.get(object, templateVolumesPath), { name: 'dshm' })
+		};
+
+		const targets = [
+			{ ...container, tail: ['resources', 'limits', 'memory'], unit: 'bytes' },
+			{ ...container, tail: ['resources', 'requests', 'memory'], unit: 'bytes' },
+			{ ...volume, tail: ['emptyDir', 'sizeLimit'], unit: 'bytes' },
+			{ ...container, tail: ['resources', 'limits', 'cpu'], unit: 'cores' },
+			{ ...container, tail: ['resources', 'requests', 'cpu'], unit: 'cores' }
+		];
+
+		for (const target of targets) {
+			const valuesPath = [...target.list, target.valuesIndex, ...target.tail];
+			const current =
+				lodash.get(values, valuesPath) ??
+				(target.objectIndex >= 0
+					? lodash.get(object, [...target.list, target.objectIndex, ...target.tail])
+					: undefined);
+
+			if (target.unit === 'bytes') {
+				const currentBytes =
+					current === undefined ? BigInt(0) : toIntegerScalar(quantityToScalar(String(current)));
+				lodash.set(values, valuesPath, formatBytesQuantity(currentBytes + cpuBufferBytes));
+			} else {
+				const currentCores = current === undefined ? 0 : Number(quantityToScalar(String(current)));
+				lodash.set(values, valuesPath, String(currentCores + additionalCores));
+			}
+		}
+	}
+
 	let values = $state(getInitialValues());
 	let currentStep = $state(firstStep);
 	let isSubmitting = $state(false);
 	let metadataFormReference: FormState<FormValue> | null = $state(null);
 	let modelFormReference: FormState<FormValue> | null = $state(null);
-	let workloadPlacementFormReference: FormState<FormValue> | null = $state(null);
 	let isModelExist: boolean | null | undefined = $state(undefined);
 	let checkToken = 0;
 	let open = $state(false);
@@ -355,6 +461,7 @@
 	}
 	function initiate() {
 		values = getInitialValues();
+		kvCacheOffloadingPristine = null;
 		currentStep = firstStep;
 		isSubmitting = false;
 		isModelExist = undefined;
@@ -367,17 +474,6 @@
 	}
 	function handlePrevious() {
 		currentStep = steps[Math.max(currentIndex - 1, 0)];
-	}
-
-	// Helper: apply MIG annotation to a target path within `values`
-	function applyMigAnnotation(formValue: FormValue, annotationPath: string[]) {
-		const isMig = lodash.get(formValue, 'mig', false) as boolean;
-		if (isMig) {
-			lodash.set(values, annotationPath, 'mig');
-		} else {
-			// Remove the annotation if previously set
-			lodash.unset(values, annotationPath);
-		}
 	}
 
 	const mainContainerImage = $derived(
@@ -556,40 +652,14 @@
 					{:else}
 						<Form
 							bind:reference={modelFormReference}
-							schema={{
-								title: 'Model',
-								...(lodash.omit(
-									lodash.get(jsonSchema, 'properties.spec.properties.model') as Schema,
-									['properties']
-								) as Schema),
-								properties: {
-									uri: {
-										title: 'URI',
-										...lodash.omit(
-											lodash.get(
-												jsonSchema,
-												'properties.spec.properties.model.properties.uri'
-											) as Schema,
-											['description']
-										),
-										description: 'The model source defined by the platform configuration.',
-										readOnly: true
-									},
-									internal: {
-										type: 'boolean',
-										title: 'Use internal registry',
-										description:
-											'When enabled, an hf:// source is rewritten to its OCI ModelCar reference in the platform registry. When disabled, the source URI is used as-is.'
-									}
-								}
-							} as Schema}
+							schema={getModelSchema(modelUri)}
 							uiSchema={{
 								'ui:options': {
 									translations: {
 										submit: 'Next'
 									}
 								},
-								uri: {
+								internalUri: {
 									'ui:options': {
 										layouts: {
 											'object-property-content': {
@@ -608,16 +678,24 @@
 											placeholder: 'No model source defined in the template.'
 										}
 									}
+								},
+								uri: {
+									'ui:options': {
+										shadcn4Text: {
+											placeholder: 'No model source defined in the template.'
+										}
+									}
 								}
 							} as UiSchemaRoot}
-							initialValue={{
-								uri: modelUri,
-								internal: true
-							} as FormValue}
+							initialValue={(modelUri.startsWith('hf://')
+								? { internal: true }
+								: { uri: modelUri }) as FormValue}
 							handleSubmit={{
 								posthook: (form) => {
 									const formValue = getValueSnapshot(form);
-									const useInternal = lodash.get(formValue, 'internal', true) as boolean;
+									const useInternal =
+										modelUri.startsWith('hf://') &&
+										(lodash.get(formValue, 'internal', true) as boolean);
 
 									const modelSource = useInternal ? tryModelCarReference(modelUri) : modelUri;
 
@@ -630,7 +708,6 @@
 									});
 
 									const ociPatches: Patch[] = [
-										{ path: ['spec', 'template', 'securityContext'], value: { runAsUser: 1010 } },
 										{
 											path: ['spec', 'template', 'containers'],
 											value: [
@@ -699,7 +776,7 @@
 				</Tabs.Content>
 
 				<Tabs.Content value={steps[2]}>
-					{#await loadWorkloadPlacementData()}
+					{#await fetchComputeResourceNodes(resourceClient, cluster)}
 						<Empty.Root>
 							<Empty.Header>
 								<Empty.Media variant="icon">
@@ -708,18 +785,11 @@
 								<Empty.Title>Loading</Empty.Title>
 							</Empty.Header>
 						</Empty.Root>
-					{:then { computeResourceNodes, migEnabledNodeNames }}
+					{:then computeResourceNodes}
 						{@const computeResources = getComputeResources(computeResourceNodes)}
 						{@const resourceTopology = getResourceTopology(computeResources)}
-						{@const migResourceTopology = getResourceTopology(
-							computeResources.filter((device) => migEnabledNodeNames.has(device.node))
-						)}
-						{@const workloadPlacementSchema = getWorkloadPlacementSchema(
-							resourceTopology,
-							migResourceTopology
-						)}
+						{@const workloadPlacementSchema = getWorkloadPlacementSchema(resourceTopology)}
 						{@const workloadPlacementUISchema = getWorkloadPlacementUISchema()}
-						{@const migUnavailable = Object.keys(migResourceTopology).length === 0}
 						{@const isSingleNode =
 							lodash.has(object, 'spec.template') && !lodash.has(object, 'spec.prefill')}
 						{@const isPrefillDecode =
@@ -728,7 +798,6 @@
 						{@const description = 'Workload Placement'}
 						{#if isSingleNode}
 							<Form
-								bind:reference={workloadPlacementFormReference}
 								schema={{
 									title: title,
 									description: description,
@@ -742,7 +811,7 @@
 									},
 									...workloadPlacementUISchema
 								} as UiSchemaRoot}
-								initialValue={{ mig: false } as FormValue}
+								initialValue={{} as FormValue}
 								handleSubmit={{
 									posthook: (form) => {
 										const value = getValueSnapshot(form);
@@ -761,23 +830,11 @@
 											);
 										}
 
-										// Apply MIG annotation for single-node workload
-										applyMigAnnotation(value, ['spec', 'annotations', 'nvidia.com/vgpu-mode']);
-
 										handleNext();
 									}
 								}}
 							>
 								{#snippet actions()}
-									{@const placementValue = (
-										workloadPlacementFormReference
-											? getValueSnapshot(workloadPlacementFormReference)
-											: {}
-									) as FormValue}
-									{@const migSelected =
-										lodash.get(placementValue, 'mig', false) === true ||
-										lodash.get(placementValue, ['decode', 'mig'], false) === true ||
-										lodash.get(placementValue, ['prefill', 'mig'], false) === true}
 									<div class="flex w-full items-center justify-between gap-3">
 										<Button
 											onclick={() => {
@@ -786,22 +843,12 @@
 										>
 											Previous
 										</Button>
-										{#if migUnavailable && migSelected}
-											<Button
-												disabled
-												title="No MIG-capable nodes are available. Disable MIG to continue."
-											>
-												Next
-											</Button>
-										{:else}
-											<SubmitButton />
-										{/if}
+										<SubmitButton />
 									</div>
 								{/snippet}
 							</Form>
 						{:else if isPrefillDecode}
 							<Form
-								bind:reference={workloadPlacementFormReference}
 								schema={{
 									title: title,
 									description: description,
@@ -824,7 +871,7 @@
 										...workloadPlacementUISchema
 									}
 								} as UiSchemaRoot}
-								initialValue={{ decode: { mig: false }, prefill: { mig: false } } as FormValue}
+								initialValue={{} as FormValue}
 								handleSubmit={{
 									posthook: (form) => {
 										const value = getValueSnapshot(form);
@@ -846,13 +893,6 @@
 												decodeNode
 											);
 										}
-
-										// Apply MIG annotation for decode workload
-										applyMigAnnotation(lodash.get(value, 'decode', {}) as FormValue, [
-											'spec',
-											'annotations',
-											'nvidia.com/vgpu-mode'
-										]);
 
 										const prefillType = lodash.get(value, ['prefill', 'type']) as
 											| string
@@ -876,28 +916,11 @@
 											);
 										}
 
-										// Apply MIG annotation for prefill workload
-										applyMigAnnotation(lodash.get(value, 'prefill', {}) as FormValue, [
-											'spec',
-											'prefill',
-											'annotations',
-											'nvidia.com/vgpu-mode'
-										]);
-
 										handleNext();
 									}
 								}}
 							>
 								{#snippet actions()}
-									{@const placementValue = (
-										workloadPlacementFormReference
-											? getValueSnapshot(workloadPlacementFormReference)
-											: {}
-									) as FormValue}
-									{@const migSelected =
-										lodash.get(placementValue, 'mig', false) === true ||
-										lodash.get(placementValue, ['decode', 'mig'], false) === true ||
-										lodash.get(placementValue, ['prefill', 'mig'], false) === true}
 									<div class="flex w-full items-center justify-between gap-3">
 										<Button
 											onclick={() => {
@@ -906,16 +929,7 @@
 										>
 											Previous
 										</Button>
-										{#if migUnavailable && migSelected}
-											<Button
-												disabled
-												title="No MIG-capable nodes are available. Disable MIG to continue."
-											>
-												Next
-											</Button>
-										{:else}
-											<SubmitButton />
-										{/if}
+										<SubmitButton />
 									</div>
 								{/snippet}
 							</Form>
@@ -933,7 +947,78 @@
 					{/await}
 				</Tabs.Content>
 
-				<Tabs.Content value={steps[3]} class="min-h-[77vh]">
+				<Tabs.Content value={steps[3]}>
+					<Form
+						schema={getKvCacheOffloadingSchema()}
+						uiSchema={{
+							'ui:options': {
+								translations: {
+									submit: 'Next'
+								}
+							}
+						} as UiSchemaRoot}
+						initialValue={{ enabled: false } as FormValue}
+						handleSubmit={{
+							posthook: (form) => {
+								const formValue = getValueSnapshot(form);
+								const enabled = lodash.get(formValue, 'enabled', false) as boolean;
+
+								restoreKvCacheOffloadingTargets();
+
+								if (enabled) {
+									const cpu = lodash.get(formValue, 'cpu', '10Gi') as string;
+									const secondary = lodash.get(formValue, 'secondary', []) as Array<{
+										storageClassName: string;
+										storage: string;
+									}>;
+
+									lodash.set(values, kvCacheOffloadingPath, {
+										cpu,
+										evictionPolicy: 'arc',
+										...(secondary.length > 0
+											? {
+													secondary: secondary.map((tier) => ({
+														fileSystem: {
+															pvc: {
+																spec: {
+																	accessModes: ['ReadWriteOnce'],
+																	resources: { requests: { storage: tier.storage } },
+																	storageClassName: tier.storageClassName
+																}
+															}
+														}
+													}))
+												}
+											: {})
+									});
+
+									snapshotKvCacheOffloadingTargets();
+									applyKvCacheOffloadingResources(cpu);
+								} else {
+									lodash.unset(values, kvCacheOffloadingPath);
+									pruneEmptyAncestors(values, kvCacheOffloadingPath);
+								}
+
+								handleNext();
+							}
+						}}
+					>
+						{#snippet actions()}
+							<div class="flex w-full items-center justify-between gap-3">
+								<Button
+									onclick={() => {
+										handlePrevious();
+									}}
+								>
+									Previous
+								</Button>
+								<SubmitButton />
+							</div>
+						{/snippet}
+					</Form>
+				</Tabs.Content>
+
+				<Tabs.Content value={steps[4]} class="min-h-[77vh]">
 					<div class="flex h-full flex-col gap-3">
 						<Monaco
 							options={{
