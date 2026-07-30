@@ -38,11 +38,13 @@
 			return { ...series.metric.labels, usage: series.value?.value };
 		});
 
-		const limitsByDeviceUUID = lodash.mapValues(lodash.groupBy(vgpuLimits, 'device_uuid'), (group) =>
-			lodash.sumBy(group, 'limit')
+		const limitsByDeviceUUID = lodash.mapValues(
+			lodash.groupBy(vgpuLimits, 'device_uuid'),
+			(group) => lodash.sumBy(group, 'limit')
 		);
-		const usagesByDeviceUUID = lodash.mapValues(lodash.groupBy(vgpuUsages, 'device_uuid'), (group) =>
-			lodash.sumBy(group, 'usage')
+		const usagesByDeviceUUID = lodash.mapValues(
+			lodash.groupBy(vgpuUsages, 'device_uuid'),
+			(group) => lodash.sumBy(group, 'usage')
 		);
 
 		gpus = fieldBufferResponse.result.map((series) => {
