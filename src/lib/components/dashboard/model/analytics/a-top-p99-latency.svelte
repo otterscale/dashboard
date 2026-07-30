@@ -7,7 +7,9 @@
 	import { formatLatency } from '$lib/formatter';
 	import { m } from '$lib/messages';
 	import {
+		type ActivityState,
 		escapePromqlStringLiteral,
+		fetchCombinedInstant,
 		mergeVllmRowsById,
 		type VllmModelIdentity,
 		vllmModelIdentityFromLabels
@@ -27,14 +29,20 @@
 
 	let bars = $state<TopBar[]>([]);
 	let isLoaded = $state(false);
+	let activity = $state<ActivityState>('absent');
 
-	function buildQuery(): string {
+	function buildQueries(): Record<string, string> {
 		const ns = (namespace ?? '').trim();
 		const nsSel = ns ? `{namespace="${escapePromqlStringLiteral(ns)}"}` : '{}';
-		return (
-			`histogram_quantile(0.99, sum by(llm_inference_service, model_name, le) ` +
-			`(rate(vllm:e2e_request_latency_seconds_bucket${nsSel}[5m])))`
-		);
+		return {
+			p99:
+				`histogram_quantile(0.99, sum by(llm_inference_service, model_name, le) ` +
+				`(rate(vllm:e2e_request_latency_seconds_bucket${nsSel}[5m])))`,
+			// Rides along in the same combined query at no extra request: an idle model yields a
+			// flat 0 here, while one that was never scraped yields no series at all. Without it,
+			// every p99 is NaN and gets filtered out, leaving both cases indistinguishable.
+			traffic: `sum(rate(vllm:e2e_request_latency_seconds_count${nsSel}[5m]))`
+		};
 	}
 
 	function formatSeconds(value: number): string {
@@ -44,8 +52,10 @@
 
 	async function fetch() {
 		try {
-			const response = await prometheusDriver.instantQuery(buildQuery());
-			const parsed = response.result
+			const r = await fetchCombinedInstant(prometheusDriver, buildQueries());
+			const probe = Number(r.traffic[0]?.value?.value);
+			activity = !Number.isFinite(probe) ? 'absent' : probe > 0 ? 'active' : 'idle';
+			const parsed = r.p99
 				.map((v) => {
 					const identity = vllmModelIdentityFromLabels(v.metric.labels as Record<string, string>);
 					const value = Number(v.value?.value);
@@ -65,6 +75,7 @@
 			}));
 		} catch {
 			bars = [];
+			activity = 'absent';
 		}
 	}
 
@@ -87,6 +98,7 @@
 	tooltip={m.llm_dashboard_top_p99_latency_tooltip()}
 	{bars}
 	{isLoaded}
+	{activity}
 	onBarClick={onModelClick}
 	scrollable
 />

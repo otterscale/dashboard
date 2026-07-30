@@ -2,6 +2,7 @@
 	import ChartLine from '@lucide/svelte/icons/chart-line';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+	import MoonIcon from '@lucide/svelte/icons/moon';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
@@ -15,8 +16,10 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/messages';
 	import {
+		type ActivityState,
 		computeStep,
 		fetchMultipleFlattenedRange,
+		probeActivity,
 		vllmMetricWithSelector
 	} from '$lib/prometheus';
 
@@ -47,6 +50,7 @@
 	let hasL2 = $state(false);
 	let hasL3 = $state(false);
 	let isLoaded = $state(false);
+	let activity = $state<ActivityState>('absent');
 
 	function queries(): Record<string, string> {
 		const l1Hits = vllmMetricWithSelector('vllm:prefix_cache_hits_total', namespace, selectedModel);
@@ -74,7 +78,11 @@
 		return {
 			l1: `sum(rate(${l1Hits}[5m])) / sum(rate(${l1Queries}[5m])) * 100`,
 			l2: `sum(rate(${l2Hits}[5m])) / sum(rate(${l2Requested}[5m])) * 100`,
-			l3: `sum(rate(${l3Hits}[5m])) / sum(rate(${l3Queries}[5m])) * 100`
+			l3: `sum(rate(${l3Hits}[5m])) / sum(rate(${l3Queries}[5m])) * 100`,
+			// Every tier is a hit/query ratio, so an idle model divides 0 by 0 and yields NaN for
+			// all three. The L1 denominator alone survives that: flat 0 when nothing is served,
+			// no series at all when vLLM is not scraped.
+			traffic: `sum(rate(${l1Queries}[5m]))`
 		};
 	}
 
@@ -95,12 +103,18 @@
 		try {
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
-			const points = await fetchMultipleFlattenedRange(
+			const raw = await fetchMultipleFlattenedRange(
 				prometheusDriver,
 				queries(),
 				new Date(startMs),
 				new Date(endMs),
 				computeStep(startMs, endMs)
+			);
+			activity = probeActivity(raw, 'traffic');
+			// A flat `traffic: 0` is finite and would keep points alive, defeating the
+			// `length === 0` empty check and drawing a 0% line that reads as a measured miss rate.
+			const points = raw.filter(
+				(p) => p.l1 !== undefined || p.l2 !== undefined || p.l3 !== undefined
 			);
 			hasL2 = points.some((p) => Number.isFinite(Number(p.l2)));
 			hasL3 = points.some((p) => Number.isFinite(Number(p.l3)));
@@ -112,6 +126,7 @@
 			}));
 		} catch {
 			data = [];
+			activity = 'absent';
 			hasL2 = false;
 			hasL3 = false;
 		}
@@ -167,9 +182,15 @@
 				<LoaderCircle class="size-12 animate-spin" />
 			</div>
 		{:else if data.length === 0}
-			<div class="flex h-[200px] w-full flex-col items-center justify-center">
-				<ChartLine class="size-12 animate-pulse text-muted-foreground" />
-				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
+			<div class="flex h-[200px] w-full flex-col items-center justify-center gap-1">
+				{#if activity === 'idle'}
+					<MoonIcon class="size-12 text-muted-foreground" />
+					<p class="text-base text-muted-foreground">{m.no_traffic_display()}</p>
+					<p class="text-xs text-muted-foreground">{m.no_traffic_hint()}</p>
+				{:else}
+					<ChartLine class="size-12 animate-pulse text-muted-foreground" />
+					<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
+				{/if}
 			</div>
 		{:else}
 			<Chart.Container config={configuration} class="h-[200px] w-full">

@@ -2,6 +2,7 @@
 	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import MoonIcon from '@lucide/svelte/icons/moon';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
@@ -15,8 +16,10 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/messages';
 	import {
+		type ActivityState,
 		computeStep,
 		fetchMultipleFlattenedRange,
+		probeActivity,
 		vllmMetricWithSelector
 	} from '$lib/prometheus';
 
@@ -47,6 +50,7 @@
 	let hasL2 = $state(false);
 	let hasL3 = $state(false);
 	let isLoaded = $state(false);
+	let activity = $state<ActivityState>('absent');
 
 	const configuration = {
 		l1: { label: m.cache_l1_vllm(), color: 'var(--chart-2)' },
@@ -88,7 +92,11 @@
 		return {
 			l1: `sum(rate(${l1Hits}[5m])) / sum(rate(${l1Queries}[5m])) * 100`,
 			l2: `sum(rate(${l2Hits}[5m])) / sum(rate(${l2Requested}[5m])) * 100`,
-			l3: `sum(rate(${l3Hits}[5m])) / sum(rate(${l3Queries}[5m])) * 100`
+			l3: `sum(rate(${l3Hits}[5m])) / sum(rate(${l3Queries}[5m])) * 100`,
+			// Every tier is a hit/query ratio, so an idle model divides 0 by 0 and yields NaN for
+			// all three. The L1 denominator alone survives that: flat 0 when nothing is served,
+			// no series at all when vLLM is not scraped.
+			traffic: `sum(rate(${l1Queries}[5m]))`
 		};
 	}
 
@@ -96,12 +104,18 @@
 		try {
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
-			const points = await fetchMultipleFlattenedRange(
+			const raw = await fetchMultipleFlattenedRange(
 				prometheusDriver,
 				queries(),
 				new Date(startMs),
 				new Date(endMs),
 				computeStep(startMs, endMs)
+			);
+			activity = probeActivity(raw, 'traffic');
+			// A flat `traffic: 0` is finite and would keep points alive, defeating the
+			// `length === 0` empty check and drawing a 0% line that reads as a measured miss rate.
+			const points = raw.filter(
+				(p) => p.l1 !== undefined || p.l2 !== undefined || p.l3 !== undefined
 			);
 			hasL2 = points.some((p) => Number.isFinite(Number(p.l2)));
 			hasL3 = points.some((p) => Number.isFinite(Number(p.l3)));
@@ -113,6 +127,7 @@
 			}));
 		} catch (error) {
 			data = [];
+			activity = 'absent';
 			hasL2 = false;
 			hasL3 = false;
 			console.error(`Fail to fetch cache tiers in cluster ${cluster}:`, error);
@@ -168,9 +183,15 @@
 		</Card.Content>
 	{:else if data.length === 0}
 		<Card.Content>
-			<div class="flex h-45 w-full flex-col items-center justify-center gap-2">
-				<ChartLineIcon class="size-12 animate-pulse text-muted-foreground" />
-				<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
+			<div class="flex h-45 w-full flex-col items-center justify-center gap-1">
+				{#if activity === 'idle'}
+					<MoonIcon class="size-12 text-muted-foreground" />
+					<p class="text-sm text-muted-foreground">{m.no_traffic_display()}</p>
+					<p class="text-xs text-muted-foreground">{m.no_traffic_hint()}</p>
+				{:else}
+					<ChartLineIcon class="size-12 animate-pulse text-muted-foreground" />
+					<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
+				{/if}
 			</div>
 		</Card.Content>
 	{:else}
