@@ -1,5 +1,4 @@
 import { type JsonObject, type JsonValue } from '@bufbuild/protobuf';
-import { getLocalTimeZone } from '@internationalized/date';
 import type { APIResource } from '@otterscale/api/resource/v1';
 import type { Column, ColumnDef } from '@tanstack/table-core';
 import { type Row } from '@tanstack/table-core';
