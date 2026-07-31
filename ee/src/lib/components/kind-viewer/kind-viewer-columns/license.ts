@@ -1,4 +1,5 @@
 import { type JsonObject, type JsonValue } from '@bufbuild/protobuf';
+import { getLocalTimeZone } from '@internationalized/date';
 import type { APIResource } from '@otterscale/api/resource/v1';
 import type { Column, ColumnDef } from '@tanstack/table-core';
 import { type Row } from '@tanstack/table-core';
@@ -9,6 +10,7 @@ import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-
 import { buildResourceDetailUrl } from '$lib/components/kind-viewer/utils';
 import { decodeTokenPayload, getLicenseExpiry } from '$lib/components/license/token';
 import { renderComponent } from '$lib/components/ui/data-table';
+import { getLocale } from '$lib/paraglide/runtime';
 
 // Minimal shape of license.otterscale.io/v1alpha1 License; the authoritative
 // definition lives in license-operator api/v1alpha1/license_types.go.
@@ -64,7 +66,7 @@ function getLicenseData(object: LicenseResource): Record<LicenseAttribute, JsonV
 		Software: status.softwareID ?? null,
 		Platform: status.isPlatform ?? false,
 		Phase: status.phase ?? null,
-		Expiry: expiry ? expiry.toISOString() : null,
+		Expiry: expiry ? expiry.toLocaleDateString(getLocale()) : null,
 		Alerts: alerts.length > 0 ? alerts.join(', ') : null,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
@@ -77,7 +79,7 @@ function getLicenseUISchemas(): Record<LicenseAttribute, UISchemaType> {
 		Software: 'text',
 		Platform: 'boolean',
 		Phase: 'text',
-		Expiry: 'time',
+		Expiry: 'text',
 		Alerts: 'text',
 		Age: 'time',
 		raw: 'object'
