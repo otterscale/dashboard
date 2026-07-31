@@ -41,6 +41,26 @@ function getHelmReleaseDataSchemas(): Record<HelmReleaseAttribute, DataSchemaTyp
 function getHelmReleaseData(
 	object: HelmToolkitFluxcdIoV2HelmRelease
 ): Record<HelmReleaseAttribute, JsonValue> {
+	if (object.apiVersion === 'kro.run/v1alpha1') {
+		const readyCondition = (
+			object?.status?.helmReleaseConditions as [
+				{ status: string; reason: string; message: string; type: string }
+			]
+		)?.find((helmReleaseCondition) => helmReleaseCondition.type === 'Ready');
+		return {
+			Name: object?.metadata?.name ?? null,
+			Namespace: object?.metadata?.namespace ?? null,
+			Repository: object?.spec?.chart?.spec?.sourceRef?.name ?? null,
+			'Helm Chart': object?.spec?.chart?.spec?.chart ?? null,
+			Version: object?.spec?.chart?.spec?.version ?? null,
+			Ready: readyCondition?.status ?? 'Unknown',
+			Reason: readyCondition?.reason ?? null,
+			Message: readyCondition?.message ?? null,
+			Age: object?.metadata?.creationTimestamp ?? null,
+			raw: (object as JsonObject) ?? null
+		};
+	}
+	// FluxCD Release
 	const readyCondition = object?.status?.conditions?.find(
 		(condition) => condition.type === 'Ready'
 	);
@@ -48,7 +68,7 @@ function getHelmReleaseData(
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.metadata?.namespace ?? null,
 		Repository: object?.spec?.chart?.spec?.sourceRef?.name ?? null,
-		'Helm Chart': object?.status?.helmChart ?? null,
+		'Helm Chart': object?.spec?.chart?.spec?.chart ?? null,
 		Version: object?.spec?.chart?.spec?.version ?? null,
 		Ready: readyCondition?.status ?? 'Unknown',
 		Reason: readyCondition?.reason ?? null,
