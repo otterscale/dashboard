@@ -1,20 +1,19 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import { DownloadIcon, FileIcon } from '@lucide/svelte';
+	import DownloadIcon from '@lucide/svelte/icons/download';
+	import FileIcon from '@lucide/svelte/icons/file';
 	import { ResourceService, type SchemaRequest } from '@otterscale/api/resource/v1';
-	import { RuntimeService } from '@otterscale/api/runtime/v1';
 	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 	import { type FormValue, type Schema, SubmitButton, type UiSchemaRoot } from '@sjsf/form';
 	import type { Row } from '@tanstack/table-core';
 	import Ajv from 'ajv';
-	import { load } from 'js-yaml';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext, onMount } from 'svelte';
 	import Monaco from 'svelte-monaco';
 	import { toast } from 'svelte-sonner';
-	import { stringify } from 'yaml';
+	import { parse, stringify } from 'yaml';
 
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import EditorWidget from '$lib/components/dynamic-form/widgets/editor.svelte';
@@ -27,7 +26,8 @@
 	import { computeValuesDelta } from '$lib/utils/helm-values';
 
 	import type { ChartAttribute } from '../table-layout';
-	import { type IndexChartType } from '../types';
+	import { type ArtifactChartType } from '../types';
+	import { encodeHarborURIComponent, parseHarborHost } from '../utils.svelte';
 
 	let {
 		row,
@@ -41,14 +41,13 @@
 		onOpenChangeComplete: () => void;
 	} = $props();
 
-	const group = 'kro.run';
-	const version = 'v1alpha1';
+	const group = 'helm.toolkit.fluxcd.io';
+	const version = 'v2';
 	const kind = 'HelmRelease';
 	const resource = 'helmreleases';
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-	const runtimeClient = createClient(RuntimeService, transport);
 
 	let jsonSchema: Schema | undefined = $state(undefined);
 
@@ -95,16 +94,49 @@
 		row.original.helmRepository as SourceToolkitFluxcdIoV1HelmRepository
 	);
 
-	let charts: IndexChartType[] = $derived(
-		lodash.get(row.original.chart, 'versions', {}) as IndexChartType[]
-	);
+	let charts: ArtifactChartType[] = $state([]);
+	async function fetchCharts() {
+		const chart = row.original.chart as unknown as ArtifactChartType;
 
-	let selectedChart: IndexChartType = $derived(charts[0] || ({} as IndexChartType));
+		const [project, ...latestChartNameParts] = chart.repository_name.split('/');
+		const repository = latestChartNameParts.join('/');
+		const harborHost = parseHarborHost(helmRepository);
+
+		try {
+			const projectPath = encodeHarborURIComponent(project);
+			const repositoryPath = encodeHarborURIComponent(repository);
+			const artifactsUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts?with_label=true`;
+
+			const response = await fetch('/bff/helm/repository/harbor', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					harborHost,
+					apiPath: artifactsUrl
+				})
+			});
+			if (!response.ok) {
+				console.error('Failed to fetch repository artifacts:', response.statusText);
+				return;
+			}
+			charts = await response.json();
+		} catch (error) {
+			console.error('Error fetching repository artifacts:', error);
+		}
+	}
+
+	let selectedChart: ArtifactChartType = $derived(charts[0] || ({} as ArtifactChartType));
 	function getVersions() {
-		return charts.map((chart) => chart.version);
+		return charts
+			.filter((chart) => chart.tags)
+			.map((chart) => lodash.get(chart.extra_attrs, 'version') as unknown as string);
 	}
 	function getSelectedChart(version: string) {
-		return charts.find((chart) => chart.version === version) ?? charts[0];
+		return (
+			charts.find((chart) => lodash.get(chart.extra_attrs, 'version') === version) ?? charts[0]
+		);
 	}
 	$effect(() => {
 		const version = lodash.get(values, 'spec.chart.spec.version') as unknown as string;
@@ -113,14 +145,49 @@
 		}
 	});
 
-	async function getDocuments() {
-		const response = await runtimeClient.showChart({
-			repoUrl: helmRepository.spec?.url ?? '',
-			chartName: selectedChart.name ?? '',
-			version: selectedChart.version ?? ''
+	async function getDocument(reference: string, addition: string) {
+		const artifacChart = row.original.chart as unknown as ArtifactChartType;
+
+		const [project, ...latestChartNameParts] = artifacChart.repository_name.split('/');
+		const repository = latestChartNameParts.join('/');
+		const harborHost = parseHarborHost(helmRepository);
+
+		const projectPath = encodeHarborURIComponent(project);
+		const repositoryPath = encodeHarborURIComponent(repository);
+		const referencePath = encodeHarborURIComponent(reference);
+		const additionPath = encodeHarborURIComponent(addition);
+
+		const additionUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts/${referencePath}/additions/${additionPath}`;
+
+		const response = await fetch('/bff/helm/repository/harbor', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({
+				harborHost,
+				apiPath: additionUrl
+			})
 		});
-		const decoder = new TextDecoder();
-		return { values: decoder.decode(response.values), readme: decoder.decode(response.readme) };
+		if (!response.ok) {
+			console.error('Failed to fetch Harbor addition:', response.statusText);
+			throw new Error('Failed to fetch Harbor addition');
+		}
+
+		const contentType = response.headers.get('content-type') ?? '';
+		if (contentType.includes('application/json')) {
+			return response.json();
+		}
+		return response.text();
+	}
+
+	async function getDocuments(digest: string) {
+		const [values, readme] = await Promise.all([
+			getDocument(digest, 'values.yaml'),
+			getDocument(digest, 'readme.md')
+		]);
+
+		return { values: values, readme: readme };
 	}
 
 	// Steps Manager
@@ -143,11 +210,11 @@
 	let isSubmitting = $state(false);
 
 	onMount(async () => {
-		await fetchSchema();
+		await Promise.all([fetchSchema(), fetchCharts()]);
 	});
 
-	const chartName = $derived(selectedChart.name);
-	const defaultVersion = $derived(selectedChart.version);
+	const chartName = $derived(lodash.get(selectedChart.extra_attrs, 'name') as string);
+	const defaultVersion = $derived(lodash.get(selectedChart.extra_attrs, 'version') as string);
 </script>
 
 <Dialog.Root
@@ -303,7 +370,7 @@
 					type: 'string',
 					title: 'Values'
 				} as Schema}
-				{#await getDocuments()}
+				{#await getDocuments(selectedChart.digest)}
 					<Form {schema} initialValue={null} values={null}>
 						{#snippet actions()}
 							<div class="flex w-full items-center justify-between gap-3">
@@ -331,14 +398,15 @@
 						handleSubmit={{
 							posthook: () => {
 								handleNext();
+								const raw = lodash.get(values, 'spec.values');
+								if (typeof raw !== 'string') return;
 								try {
-									const structuredValues = load(lodash.get(values, 'spec.values') as string);
-									const defaultValues = load(documents.values);
+									const defaultValues = parse(String(documents.values));
 
 									lodash.set(
 										values,
 										'spec.values',
-										computeValuesDelta(defaultValues, structuredValues)
+										computeValuesDelta(defaultValues, parse(raw) ?? {})
 									);
 								} catch (error) {
 									console.error('Failed to load values:', error);
@@ -398,7 +466,17 @@
 							if (isSubmitting) return;
 							isSubmitting = true;
 
-							const isValid = validate(load(value));
+							let parsed: unknown;
+							try {
+								parsed = parse(value);
+							} catch (error) {
+								console.error('Failed to parse YAML:', error);
+								toast.error('Invalid YAML. Please check the syntax.');
+								isSubmitting = false;
+								return;
+							}
+
+							const isValid = validate(parsed);
 
 							if (!isValid) {
 								console.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
@@ -407,7 +485,7 @@
 								return;
 							}
 
-							const name = lodash.get(load(value), 'metadata.name');
+							const name = lodash.get(parsed, 'metadata.name');
 
 							toast.promise(
 								async () => {

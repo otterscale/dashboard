@@ -288,8 +288,8 @@
 					{
 						title: m.release(),
 						url: resourceUrl({
-							group: 'helm.toolkit.fluxcd.io',
-							version: 'v2',
+							group: 'kro.run',
+							version: 'v1alpha1',
 							kind: 'HelmRelease',
 							resource: 'helmreleases'
 						})
@@ -360,16 +360,6 @@
 							resource: 'datavolumes'
 						})
 					}
-					// Namespaced InstanceType is disabled — most users use ClusterInstanceType directly.
-					// {
-					// 	title: m.instance_type(),
-					// 	url: resourceUrl({
-					// 		group: 'instancetype.kubevirt.io',
-					// 		version: 'v1beta1',
-					// 		kind: 'VirtualMachineInstancetype',
-					// 		resource: 'virtualmachineinstancetypes'
-					// 	})
-					// }
 				]
 			},
 			{
@@ -410,6 +400,25 @@
 												workspace: page.params.workspace
 											})
 										: ''
+								},
+								{
+									title: m.operator(),
+									url: page.params.workspace
+										? resolve('/(auth)/[cluster]/[workspace]/operator', {
+												cluster: activeCluster,
+												workspace: page.params.workspace
+											})
+										: ''
+								},
+								{
+									title: m.helm_release(),
+									url: resourceUrl({
+										group: 'helm.toolkit.fluxcd.io',
+										version: 'v2',
+										kind: 'HelmRelease',
+										resource: 'helmreleases',
+										labelSelector: 'app.kubernetes.io/managed-by!=kro'
+									})
 								},
 								...(page.params.workspace
 									? getAdditionalItems(activeCluster, page.params.workspace!)
