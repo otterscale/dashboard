@@ -41,8 +41,8 @@
 		onOpenChangeComplete: () => void;
 	} = $props();
 
-	const group = 'helm.toolkit.fluxcd.io';
-	const version = 'v2';
+	const group = 'kro.run';
+	const version = 'v1alpha1';
 	const kind = 'HelmRelease';
 	const resource = 'helmreleases';
 
