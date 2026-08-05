@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Select as SelectPrimitive } from 'bits-ui';
-	import { cn, type WithoutChild } from '$lib/utils.js';
 	import CheckIcon from '@lucide/svelte/icons/check';
+	import { cn, type WithoutChild } from '$lib/utils.js';
 
 	let {
 		ref = $bindable(null),
@@ -29,10 +29,12 @@
 				<CheckIcon class="cn-select-item-indicator-icon" />
 			{/if}
 		</span>
-		{#if childrenProp}
-			{@render childrenProp({ selected, highlighted })}
-		{:else}
-			{label || value}
-		{/if}
+		<span class="flex flex-1 shrink-0 gap-2 whitespace-nowrap">
+			{#if childrenProp}
+				{@render childrenProp({ selected, highlighted })}
+			{:else}
+				{label || value}
+			{/if}
+		</span>
 	{/snippet}
 </SelectPrimitive.Item>
