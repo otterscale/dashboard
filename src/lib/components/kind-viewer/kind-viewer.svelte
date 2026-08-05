@@ -29,6 +29,7 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	import type { DataSchemaType, UISchemaType } from '../dynamic-table/utils';
+	import BulkDelete from './bulk-delete.svelte';
 	import type { ActionsType, CreateType } from './kind-viewer-actions';
 	import { getActions, getCreate } from './kind-viewer-actions';
 	import {
@@ -404,6 +405,9 @@
 						<PlusIcon />
 					</Button>
 				{/if}
+			{/snippet}
+			{#snippet bulkDelete({ table })}
+				<BulkDelete {table} {cluster} {namespace} {apiResource} />
 			{/snippet}
 			{#snippet reload()}
 				<Tooltip.Root>
