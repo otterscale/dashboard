@@ -324,6 +324,10 @@
 		}
 	}
 
+	function isTerminating(row: Row<Record<string, JsonValue>>): boolean {
+		return lodash.get(row.original, 'raw.metadata.deletionTimestamp') != null;
+	}
+
 	function handleKeyDown(event: KeyboardEvent) {
 		if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
 			event.preventDefault();
@@ -759,7 +763,10 @@
 			<Table.Body>
 				{#if table.getRowModel().rows?.length}
 					{#each table.getRowModel().rows as row (row.id)}
-						<Table.Row data-state={row.getIsSelected() && 'selected'}>
+						<Table.Row
+							data-state={row.getIsSelected() && 'selected'}
+							class={cn(isTerminating(row) && 'opacity-50 grayscale')}
+						>
 							{#each row.getVisibleCells() as cell (cell.id)}
 								<Table.Cell
 									class={cn(
