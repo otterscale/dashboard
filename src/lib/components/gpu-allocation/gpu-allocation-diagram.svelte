@@ -93,7 +93,8 @@
 						gpuCount: pod.allocations.length,
 						role: pod.role ?? '',
 						usedMem: pod.allocations.reduce((sum, a) => sum + a.usedMem, 0),
-						isMig: pod.isMig
+						isMig: pod.isMig,
+						pvcs: pod.pvcs
 					}
 				});
 
@@ -196,7 +197,8 @@
 						gpuCount: pod.allocations.length,
 						role: pod.role ?? '',
 						usedMem: pod.allocations.reduce((sum, a) => sum + a.usedMem, 0),
-						isMig: pod.isMig
+						isMig: pod.isMig,
+						pvcs: pod.pvcs
 					}
 				});
 
@@ -351,6 +353,12 @@
 							>MIG</span
 						>
 						<span>MIG partition</span>
+					</div>
+					<div class="flex items-center gap-2">
+						<span class="rounded-sm bg-chart-5/10 px-1 text-[9px] font-medium text-chart-5"
+							>KV→SSD</span
+						>
+						<span>KV cache offload to SSD</span>
 					</div>
 					<div class="mt-1 flex items-center gap-2 border-t border-border pt-1.5">
 						<span class="h-0.5 w-4 rounded-full bg-primary"></span>

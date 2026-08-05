@@ -11,7 +11,7 @@ import {
 	parseNodeGpuDevices,
 	parsePodGpuAllocations
 } from './hami';
-import type { GpuInfo, NodeInfo, PodInfo, TopologyData } from './types';
+import type { GpuInfo, NodeInfo, PodInfo, PodPvc, TopologyData } from './types';
 
 type ResourceClient = Client<typeof ResourceService>;
 
@@ -30,6 +30,88 @@ function getAnnotations(obj: any): Record<string, string> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getLabels(obj: any): Record<string, string> {
 	return obj?.metadata?.labels ?? {};
+}
+
+// KV-cache offload volumes injected by kserve's LLMInferenceService controller
+// (attachKVCacheSecondaryTiers): one `kv-cache-secondary-<i>` volume per
+// secondary tier in the spec.
+const KV_CACHE_VOLUME_NAME = /^kv-cache-secondary-\d+$/;
+
+/**
+ * PVCs backing a pod's SSD KV-cache offload tiers. Only `kv-cache-secondary-*`
+ * volumes count — other PVC mounts (e.g. kserve's model-store) are not offload
+ * storage. A tier is either a generic ephemeral volume (the PVC is created as
+ * `<pod>-<volume>`, size from the claim template) or a direct PVC reference
+ * (size resolved later). emptyDir tiers have no PVC and are skipped.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getPodKvCachePvcs(pod: any): PodPvc[] {
+	const podName: string = pod?.metadata?.name ?? '';
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const volumes: any[] = pod?.spec?.volumes ?? [];
+	const pvcs: PodPvc[] = [];
+	for (const volume of volumes) {
+		if (!KV_CACHE_VOLUME_NAME.test(String(volume?.name ?? ''))) continue;
+
+		const claimName = volume?.persistentVolumeClaim?.claimName;
+		if (typeof claimName === 'string' && claimName.length > 0) {
+			pvcs.push({ name: claimName, size: '' });
+			continue;
+		}
+
+		const template = volume?.ephemeral?.volumeClaimTemplate;
+		if (template) {
+			pvcs.push({
+				name: `${podName}-${volume.name}`,
+				size: String(template?.spec?.resources?.requests?.storage ?? '')
+			});
+		}
+	}
+	return pvcs;
+}
+
+/**
+ * Fill in each pod PVC's size by listing PersistentVolumeClaims in the
+ * involved namespaces. Prefers the bound capacity over the requested size.
+ */
+async function attachPvcSizes(
+	client: ResourceClient,
+	cluster: string,
+	pods: PodInfo[]
+): Promise<void> {
+	const namespaces = new Set(pods.filter((p) => p.pvcs.length > 0).map((p) => p.namespace));
+	if (namespaces.size === 0) return;
+
+	const sizeByKey = new Map<string, string>();
+	await Promise.all(
+		[...namespaces].map(async (namespace) => {
+			try {
+				const res = await client.list({
+					cluster,
+					group: '',
+					version: 'v1',
+					resource: 'persistentvolumeclaims',
+					namespace
+				});
+				for (const item of res.items) {
+					const obj = item.object as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+					const size =
+						obj?.status?.capacity?.storage ?? obj?.spec?.resources?.requests?.storage ?? '';
+					sizeByKey.set(`${namespace}/${obj?.metadata?.name ?? ''}`, String(size));
+				}
+			} catch {
+				console.warn(`Failed to list PVCs in namespace ${namespace}`);
+			}
+		})
+	);
+
+	for (const pod of pods) {
+		for (const pvc of pod.pvcs) {
+			// Keep the claim-template size when the PVC lookup finds nothing
+			// (e.g. an ephemeral PVC not yet created, or the listing failed).
+			pvc.size = sizeByKey.get(`${pod.namespace}/${pvc.name}`) || pvc.size;
+		}
+	}
 }
 
 export async function fetchLLMInferenceServiceTopology(
@@ -73,7 +155,8 @@ export async function fetchLLMInferenceServiceTopology(
 			allocations,
 			status: getPodStatus(pod),
 			role: labels[LABEL_ROLE],
-			isMig: isPodMigMode(pod)
+			isMig: isPodMigMode(pod),
+			pvcs: getPodKvCachePvcs(pod)
 		};
 		pods.push(podInfo);
 		if (!isPodTerminated(pod)) activeServicePods.push(podInfo);
@@ -161,12 +244,16 @@ export async function fetchLLMInferenceServiceTopology(
 			allocations: parsePodGpuAllocations(podAnnotations[ANNOTATION_DEVICES_ALLOCATED]),
 			status: getPodStatus(pod),
 			role: getLabels(pod)[LABEL_ROLE],
-			isMig: isPodMigMode(pod)
+			isMig: isPodMigMode(pod),
+			pvcs: getPodKvCachePvcs(pod)
 		});
 	}
 
 	// 6. Cross-reference: find which pods use which GPUs
 	crossReferencePodGpus(allocationPods, gpus);
+
+	// 7. Resolve PVC sizes for the pods rendered in the diagram
+	await attachPvcSizes(client, cluster, pods);
 
 	return {
 		llmInferenceService: { name: serviceName, namespace },
@@ -239,12 +326,16 @@ export async function fetchNodeTopology(
 			allocations: parsePodGpuAllocations(podAnnotations[ANNOTATION_DEVICES_ALLOCATED]),
 			status: getPodStatus(pod),
 			role: labels[LABEL_ROLE],
-			isMig: isPodMigMode(pod)
+			isMig: isPodMigMode(pod),
+			pvcs: getPodKvCachePvcs(pod)
 		});
 	}
 
 	// 4. Cross-reference
 	crossReferencePodGpus(pods, gpus);
+
+	// 5. Resolve PVC sizes for the pods rendered in the diagram
+	await attachPvcSizes(client, cluster, pods);
 
 	return { pods, gpus, nodes };
 }

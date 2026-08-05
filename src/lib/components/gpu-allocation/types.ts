@@ -25,6 +25,12 @@ export interface GpuAllocation {
 	usedMem: number; // MiB
 }
 
+/** A PVC backing an SSD KV-cache offload tier of a pod. */
+export interface PodPvc {
+	name: string; // actual PVC name (for ephemeral volumes: `<pod>-<volume>`)
+	size: string; // k8s quantity, e.g. "50Gi"; bound capacity, or the claim template request as fallback
+}
+
 export interface PodInfo {
 	name: string;
 	namespace: string;
@@ -33,6 +39,7 @@ export interface PodInfo {
 	status: string;
 	role?: string; // llm-d.ai/role: decode | prefill | both
 	isMig: boolean; // nvidia.com/vgpu-mode: mig
+	pvcs: PodPvc[];
 }
 
 export interface GpuInfo {
