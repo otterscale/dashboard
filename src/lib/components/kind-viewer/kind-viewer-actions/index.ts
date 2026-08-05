@@ -20,10 +20,8 @@ import DeploymentActions from './deployment/actions.svelte';
 import HelmReleaseActions from './helm-release/actions.svelte';
 import HelmRepositoryActions from './helm-repository/actions.svelte';
 import HelmRepositoryCreate from './helm-repository/create.svelte';
-// Namespaced InstanceType is disabled — most users use ClusterInstanceType directly.
-// import InstanceTypeActions from './instance-type/actions.svelte';
-// import InstanceTypeCreate from './instance-type/create.svelte';
 import JobActions from './job/actions.svelte';
+import LicenseActions from './license/actions.svelte';
 import LicenseCreate from './license/create.svelte';
 import LLMInferenceServiceActions from './llm-inference-service/actions.svelte';
 import LLMInferenceServiceConfigActions from './llm-inference-service-config/actions.svelte';
@@ -134,6 +132,8 @@ function getActions(kind: string, namespace?: string): ActionsType {
 			return HelmRepositoryActions as ActionsType;
 		case 'Job':
 			return JobActions as ActionsType;
+		case 'License':
+			return LicenseActions as ActionsType;
 		case 'LLMInferenceService':
 			return LLMInferenceServiceActions as ActionsType;
 		case 'LLMInferenceServiceConfig':
