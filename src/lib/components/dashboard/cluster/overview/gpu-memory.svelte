@@ -95,7 +95,7 @@
 		<div class="flex h-9 w-full items-center justify-center">
 			<Loader2Icon class="size-10 animate-spin" />
 		</div>
-	<!-- Gate on capacity, not usage: it exists whenever HAMi does, so an idle cluster renders 0%. -->
+		<!-- Gate on capacity, not usage: it exists whenever HAMi does, so an idle cluster renders 0%. -->
 	{:else if allocatableMemory === undefined || allocatableMemory === null}
 		<div class="flex h-full w-full flex-col items-center justify-center">
 			<ChartColumnIcon class="size-6 animate-pulse text-muted-foreground" />
