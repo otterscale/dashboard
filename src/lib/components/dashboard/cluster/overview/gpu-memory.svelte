@@ -28,12 +28,17 @@
 	let memoryRequest: SampleValue | undefined = $state(undefined);
 	let allocatableMemory: SampleValue | undefined = $state(undefined);
 
-	// All three scalars come back in a single `or`-unioned instant query.
+	// All three scalars come back in a single `or`-unioned instant query, all per physical card.
+	// HAMi's per-container series are unusable here: HAMi-core only emits them while a vGPU
+	// container runs, and `sum(empty) / sum(x)` is empty, which blanked the card on an idle
+	// cluster. `or vector(0)` keeps a missing numerator at 0% instead of emptying it again.
 	async function fetch() {
 		try {
 			const r = await fetchCombinedInstant(prometheusDriver, {
-				usage: `100 * sum(hami_container_device_memory_bytes{}) / sum(hami_gpu_memory_limit_bytes{})`,
-				request: `100 * sum(hami_vgpu_memory_limit_bytes{}) / sum(hami_gpu_memory_limit_bytes{})`,
+				// Device plugin host gauge: memory resident on the card.
+				usage: `100 * (sum(hami_host_gpu_memory_used_bytes{}) or vector(0)) / sum(hami_gpu_memory_limit_bytes{})`,
+				// Scheduler gauge: memory handed out to pods.
+				request: `100 * (sum(hami_gpu_memory_allocated_bytes{}) or vector(0)) / sum(hami_gpu_memory_limit_bytes{})`,
 				allocatable: `sum(hami_gpu_memory_limit_bytes{})`
 			});
 			memoryUsage = r.usage[0]?.value ?? undefined;
@@ -90,7 +95,8 @@
 		<div class="flex h-9 w-full items-center justify-center">
 			<Loader2Icon class="size-10 animate-spin" />
 		</div>
-	{:else if memoryUsage === undefined || memoryUsage === null}
+		<!-- Gate on capacity, not usage: it exists whenever HAMi does, so an idle cluster renders 0%. -->
+	{:else if allocatableMemory === undefined || allocatableMemory === null}
 		<div class="flex h-full w-full flex-col items-center justify-center">
 			<ChartColumnIcon class="size-6 animate-pulse text-muted-foreground" />
 			<p class="p-0 text-xs text-muted-foreground">{m.no_data_display()}</p>
@@ -121,9 +127,8 @@
 				>
 					{#snippet aboveMarks()}
 						{@const total = Number(allocatableMemory)}
+						<!-- A non-numeric sample would reach formatCapacity() and print "NaN KB". -->
 						{@const hasTotal = Number.isFinite(total)}
-						<!-- The card renders as soon as `usage` resolves, so the capacity from the other
-						     sub-query may still be missing. formatCapacity(NaN) would print "NaN KB". -->
 						{@const { value, unit } = formatCapacity(hasTotal ? total : 0)}
 						<Text
 							value={hasTotal ? value : '—'}
