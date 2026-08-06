@@ -60,11 +60,11 @@
 		}
 	}
 
-	// A workload (from the vGPU usage series' pod labels) sharing a GPU.
-	type GpuConsumer = { namespace: string; pod: string; usage?: number };
+	// A workload (from the vGPU allocation series' pod labels) holding part of a GPU.
+	type GpuConsumer = { namespace: string; pod: string; allocated?: number };
 
-	// One physical GPU: `total` from DCGM, `usage`/`limit` from the vGPU exporter (undefined
-	// without the vGPU stack), joined by device UUID.
+	// One physical GPU: `total` from DCGM, `usage`/`limit` from HAMi (undefined without the vGPU
+	// stack), joined by device UUID.
 	type GpuDevice = {
 		uuid: string;
 		modelName: string;
@@ -72,7 +72,7 @@
 		usage?: number;
 		limit?: number;
 		total?: number;
-		// Workloads (namespace/pod) attributed to this device via the vGPU usage series.
+		// Workloads (namespace/pod) attributed to this device via the vGPU allocation series.
 		consumers: GpuConsumer[];
 	};
 
@@ -110,12 +110,17 @@
 	// Numeric percentage fields filled from the combined pressure query (keyed by query name).
 	type PressureKey = 'cpuUse' | 'cpuReq' | 'cpuLim' | 'memUse' | 'memReq' | 'memLim';
 
+	// All HAMi series here are per card, keyed by `device_uuid`. The per-container ones are unusable:
+	// HAMi-core only emits them while a vGPU container runs, which blanked both GPU columns.
 	const GPU_QUERIES = {
 		// Physical frame buffer per GPU → bytes (DCGM reports MiB). Labelled Hostname/UUID/modelName/device.
 		total: '(DCGM_FI_DEV_FB_FREE + DCGM_FI_DEV_FB_RESERVED + DCGM_FI_DEV_FB_USED) * (1024 * 1024)',
-		limit: 'sum by (device_uuid) (hami_vgpu_memory_limit_bytes)',
-		// Unaggregated so each series keeps its owning pod's labels; per-device sum is done in JS.
-		usage: 'hami_vgpu_memory_used_bytes'
+		// Scheduler gauge: memory handed out to pods.
+		limit: 'sum by (device_uuid) (hami_gpu_memory_allocated_bytes)',
+		// Device plugin host gauge — same definition as the GPU Memory card, so the panels agree.
+		usage: 'sum by (device_uuid) (hami_host_gpu_memory_used_bytes)',
+		// Unaggregated so each series keeps its owning pod's labels; folded into consumers in JS.
+		consumers: 'hami_vgpu_memory_allocated_bytes'
 	};
 
 	let rows = $state<NodeRow[]>([]);
@@ -152,10 +157,11 @@
 	// Fetch GPU devices, grouped by node name (DCGM's `Hostname` label == the K8s node name).
 	async function fetchGpusByNode(): Promise<Record<string, GpuDevice[]>> {
 		try {
-			const [totalResponse, limitResponse, usageResponse] = await Promise.all([
+			const [totalResponse, limitResponse, usageResponse, consumerResponse] = await Promise.all([
 				prometheusDriver.instantQuery(GPU_QUERIES.total),
 				prometheusDriver.instantQuery(GPU_QUERIES.limit),
-				prometheusDriver.instantQuery(GPU_QUERIES.usage)
+				prometheusDriver.instantQuery(GPU_QUERIES.usage),
+				prometheusDriver.instantQuery(GPU_QUERIES.consumers)
 			]);
 
 			const numberByDeviceUuid = (vectors: typeof limitResponse.result): Record<string, number> => {
@@ -168,17 +174,16 @@
 				return out;
 			};
 			const limitByUuid = numberByDeviceUuid(limitResponse.result);
+			const usageByUuid = numberByDeviceUuid(usageResponse.result);
 
-			// Fold raw usage into a per-device total + deduped consumers (same ns/pod summed).
-			const usageByUuid: Record<string, number> = {};
+			// Fold the per-pod allocation series into deduped consumers (same ns/pod summed).
 			const consumersByUuid: Record<string, Record<string, GpuConsumer>> = {};
-			for (const series of usageResponse.result) {
+			for (const series of consumerResponse.result) {
 				const labels = series.metric.labels as Record<string, string>;
 				const uuid = labels.device_uuid;
 				if (!uuid) continue;
 				const value = Number(series.value?.value);
-				const usage = Number.isFinite(value) ? value : undefined;
-				if (usage !== undefined) usageByUuid[uuid] = (usageByUuid[uuid] ?? 0) + usage;
+				const allocated = Number.isFinite(value) ? value : undefined;
 				// The exporter's own `namespace`/`pod` labels win the scrape, so HAMi's workload
 				// labels arrive prefixed; fall back to the bare names for scrapes without honor_labels.
 				const namespace = labels.exported_namespace ?? labels.namespace ?? '';
@@ -188,9 +193,9 @@
 				const key = `${namespace}/${pod}`;
 				const existing = byKey[key];
 				if (existing) {
-					if (usage !== undefined) existing.usage = (existing.usage ?? 0) + usage;
+					if (allocated !== undefined) existing.allocated = (existing.allocated ?? 0) + allocated;
 				} else {
-					byKey[key] = { namespace, pod, usage };
+					byKey[key] = { namespace, pod, allocated };
 				}
 			}
 
