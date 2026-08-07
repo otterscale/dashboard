@@ -9,7 +9,7 @@
 	import TerminalIcon from '@lucide/svelte/icons/terminal';
 	import UserIcon from '@lucide/svelte/icons/user';
 	import XIcon from '@lucide/svelte/icons/x';
-	import { type Link, LinkService } from '@otterscale/api/link/v1';
+	import { type Link, LinkService, type RancherProject } from '@otterscale/api/link/v1';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { AppsV1Deployment } from '@otterscale/types';
 	import { getContext, onDestroy } from 'svelte';
@@ -22,24 +22,28 @@
 	import { Button } from '$lib/components/ui/button';
 	import * as Collapsible from '$lib/components/ui/collapsible';
 	import * as Command from '$lib/components/ui/command';
+	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Empty from '$lib/components/ui/empty';
 	import * as Field from '$lib/components/ui/field';
 	import { Input } from '$lib/components/ui/input';
 	import * as Item from '$lib/components/ui/item';
 	import * as Popover from '$lib/components/ui/popover';
+	import { Progress } from '$lib/components/ui/progress';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { m } from '$lib/messages';
 	import { bump } from '$lib/stores/pulse.svelte';
 	import { cn } from '$lib/utils';
+	import {
+		createRancherProjectLoader,
+		rancherProjectSecondaryText
+	} from '$lib/utils/rancher-project';
 
 	let {
-		stepIndex = $bindable(1),
-		onBack,
-		onFinish
+		open = $bindable(false),
+		onsuccess
 	}: {
-		stepIndex: number;
-		onBack: () => void;
-		onFinish: () => void;
+		open: boolean;
+		onsuccess?: () => void;
 	} = $props();
 
 	const POLL_INTERVAL = 3000;
@@ -55,7 +59,11 @@
 	const transport: Transport = getContext('transport');
 	const linkClient = createClient(LinkService, transport);
 	const resourceClient = createClient(ResourceService, transport);
+	const loadRancherProjects = createRancherProjectLoader(() =>
+		linkClient.listRancherProjects({}).then((response) => response.projects)
+	);
 
+	let stepIndex = $state(1);
 	let clusterName = $state('');
 	let installUrl = $state('');
 	let manifestYaml = $state('');
@@ -63,6 +71,11 @@
 	let isCreating = $state(false);
 	let errorMessage = $state('');
 	let isYamlOpen = $state(false);
+	let rancherProjectID = $state('');
+	let rancherProjects = $state<RancherProject[]>([]);
+	let rancherProjectOpen = $state(false);
+	let rancherProjectLoading = $state(false);
+	let rancherProjectError = $state('');
 
 	let selectedUsers = $state<KeycloakUser[]>([]);
 	let userSearchOpen = $state(false);
@@ -74,9 +87,17 @@
 
 	let isPolling = false;
 	let abortController: AbortController | null = null;
+	let lifecycle = 0;
+	let wasOpen = open;
 
 	onDestroy(() => {
 		abortController?.abort();
+		if (userDebounceTimer) clearTimeout(userDebounceTimer);
+	});
+
+	$effect(() => {
+		if (wasOpen && !open) reset();
+		wasOpen = open;
 	});
 
 	const installCommand = $derived(
@@ -84,6 +105,64 @@
 	);
 
 	const canGoNext = $derived(stepIndex === 1 ? clusterName.trim().length > 0 : false);
+
+	function reset() {
+		lifecycle += 1;
+		abortController?.abort();
+		abortController = null;
+		isPolling = false;
+		if (userDebounceTimer) clearTimeout(userDebounceTimer);
+		userDebounceTimer = null;
+
+		stepIndex = 1;
+		clusterName = '';
+		installUrl = '';
+		manifestYaml = '';
+		clusterStatus = 'pending';
+		isCreating = false;
+		errorMessage = '';
+		isYamlOpen = false;
+		rancherProjectID = '';
+		rancherProjects = [];
+		rancherProjectOpen = false;
+		rancherProjectLoading = false;
+		rancherProjectError = '';
+		selectedUsers = [];
+		userSearchOpen = false;
+		userSearchQuery = '';
+		userSearchResults = [];
+		userSearchLoading = false;
+		userSearchInitialized = false;
+	}
+
+	async function fetchRancherProjects() {
+		if (rancherProjectLoading) return;
+		const requestLifecycle = lifecycle;
+		rancherProjectLoading = true;
+		rancherProjectError = '';
+
+		try {
+			const projects = await loadRancherProjects();
+			if (requestLifecycle !== lifecycle) return;
+			rancherProjects = projects;
+			if (!projects.some((project) => project.id === rancherProjectID)) {
+				rancherProjectID = '';
+			}
+		} catch (error) {
+			if (requestLifecycle !== lifecycle) return;
+			rancherProjects = [];
+			rancherProjectError =
+				error instanceof ConnectError || error instanceof Error
+					? error.message
+					: m.import_cluster_rancher_project_error();
+		} finally {
+			if (requestLifecycle === lifecycle) rancherProjectLoading = false;
+		}
+	}
+
+	function handleRancherProjectOpenChange(isOpen: boolean) {
+		if (isOpen) fetchRancherProjects();
+	}
 
 	function displayName(u: KeycloakUser): string {
 		const full = `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim();
@@ -139,7 +218,8 @@
 		try {
 			const response = await linkClient.getAgentManifest({
 				cluster: clusterName,
-				extraUsers: selectedUsers.map((u) => u.id).filter((id) => id)
+				extraUsers: selectedUsers.map((u) => u.id).filter((id) => id),
+				rancherProjectId: rancherProjectID
 			});
 
 			installUrl = response.url;
@@ -215,46 +295,54 @@
 			}
 		}
 
-		isPolling = false;
+		if (abortController?.signal === signal) isPolling = false;
+	}
+
+	function handleFinish() {
+		bump('links');
+		const target = resolve('/(auth)/[cluster]/console', { cluster: clusterName });
+		goto(target);
+		open = false;
+		onsuccess?.();
 	}
 </script>
 
-<div class="flex h-full min-h-0 flex-1 flex-col gap-6">
-	{#if stepIndex === 1}
-		{@render stepClusterInfo()}
-	{:else if stepIndex === 2}
-		{@render stepDeployAgent()}
-	{:else if stepIndex === 3}
-		{@render stepVerifyBinding()}
-	{/if}
+<Dialog.Root bind:open>
+	<Dialog.Content class="flex max-h-[95vh] min-w-[38vw] flex-col overflow-hidden">
+		<Dialog.Title class="sr-only">{m.import_cluster_dialog_title()}</Dialog.Title>
+		<Progress value={stepIndex} max={3} class="mr-6 w-auto shrink-0" />
 
-	{#if stepIndex === 1 || stepIndex === 3}
-		<div class="mt-auto flex w-full items-center justify-between gap-3 pt-4">
+		<div class="mt-4 flex min-h-0 flex-1 flex-col gap-6">
 			{#if stepIndex === 1}
-				<Button variant="outline" onclick={onBack}>{m.previous()}</Button>
-				<Button onclick={handleGenerateManifest} disabled={!canGoNext || isCreating}>
-					{#if isCreating}
-						<Spinner data-icon="inline-start" />
-						{m.import_cluster_generating()}
-					{:else}
-						<TerminalIcon data-icon="inline-start" />
-						{m.import_cluster_generate_install_command()}
-					{/if}
-				</Button>
+				{@render stepClusterInfo()}
+			{:else if stepIndex === 2}
+				{@render stepDeployAgent()}
 			{:else if stepIndex === 3}
-				<div></div>
-				<Button
-					onclick={() => {
-						bump('links');
-						const target = resolve('/(auth)/[cluster]/console', { cluster: clusterName });
-						goto(target);
-						onFinish();
-					}}>{m.done()}</Button
-				>
+				{@render stepVerifyBinding()}
+			{/if}
+
+			{#if stepIndex === 1 || stepIndex === 3}
+				<div class="mt-auto flex w-full items-center justify-between gap-3 pt-4">
+					{#if stepIndex === 1}
+						<Button variant="outline" onclick={() => (open = false)}>{m.cancel()}</Button>
+						<Button onclick={handleGenerateManifest} disabled={!canGoNext || isCreating}>
+							{#if isCreating}
+								<Spinner data-icon="inline-start" />
+								{m.import_cluster_generating()}
+							{:else}
+								<TerminalIcon data-icon="inline-start" />
+								{m.import_cluster_generate_install_command()}
+							{/if}
+						</Button>
+					{:else}
+						<div></div>
+						<Button onclick={handleFinish}>{m.done()}</Button>
+					{/if}
+				</div>
 			{/if}
 		</div>
-	{/if}
-</div>
+	</Dialog.Content>
+</Dialog.Root>
 
 {#snippet stepClusterInfo()}
 	<form
@@ -281,6 +369,98 @@
 					bind:value={clusterName}
 					required
 				/>
+			</Field.Field>
+
+			<Field.Field>
+				<Field.FieldLabel>{m.import_cluster_rancher_project_label()}</Field.FieldLabel>
+				<Field.FieldDescription>
+					{m.import_cluster_rancher_project_description()}
+				</Field.FieldDescription>
+
+				<Popover.Root bind:open={rancherProjectOpen} onOpenChange={handleRancherProjectOpenChange}>
+					<Popover.Trigger class="w-full">
+						{#snippet child({ props })}
+							<Button
+								{...props}
+								variant="outline"
+								role="combobox"
+								aria-expanded={rancherProjectOpen}
+								class="w-full justify-between"
+							>
+								<span class={cn('truncate', !rancherProjectID && 'text-muted-foreground')}>
+									{rancherProjectID || m.import_cluster_rancher_project_placeholder()}
+								</span>
+								<ChevronDownIcon class="ml-2 size-4 shrink-0 opacity-50" />
+							</Button>
+						{/snippet}
+					</Popover.Trigger>
+					<Popover.Content class="w-[var(--bits-popover-anchor-width)] min-w-xs p-0" align="start">
+						<Command.Root>
+							<Command.Input placeholder={m.import_cluster_rancher_project_search()} />
+							<Command.List>
+								{#if rancherProjectLoading}
+									<Command.Loading>
+										{m.import_cluster_rancher_project_loading()}
+									</Command.Loading>
+								{:else if rancherProjectError}
+									<div class="flex flex-col items-start gap-2 p-3">
+										<p class="text-sm text-destructive">
+											{m.import_cluster_rancher_project_error()}
+										</p>
+										<p class="text-xs text-muted-foreground">{rancherProjectError}</p>
+										<Button size="sm" variant="outline" onclick={fetchRancherProjects}>
+											{m.import_cluster_rancher_project_retry()}
+										</Button>
+									</div>
+								{:else}
+									<Command.Empty>
+										{m.import_cluster_rancher_project_empty()}
+									</Command.Empty>
+									<Command.Group>
+										{#if rancherProjects.length > 0}
+											<Command.Item
+												value={m.import_cluster_rancher_project_none()}
+												onSelect={() => {
+													rancherProjectID = '';
+													rancherProjectOpen = false;
+												}}
+											>
+												<CheckIcon
+													class={cn('mr-2 size-4', rancherProjectID && 'text-transparent')}
+												/>
+												{m.import_cluster_rancher_project_none()}
+											</Command.Item>
+										{/if}
+										{#each rancherProjects as project (project.id)}
+											<Command.Item
+												value={project.id}
+												onSelect={() => {
+													rancherProjectID = project.id;
+													rancherProjectOpen = false;
+												}}
+											>
+												<CheckIcon
+													class={cn(
+														'mr-2 size-4',
+														rancherProjectID !== project.id && 'text-transparent'
+													)}
+												/>
+												<div class="flex min-w-0 flex-col">
+													<span class="truncate font-medium">{project.id}</span>
+													{#if rancherProjectSecondaryText(project)}
+														<span class="truncate text-xs text-muted-foreground">
+															{rancherProjectSecondaryText(project)}
+														</span>
+													{/if}
+												</div>
+											</Command.Item>
+										{/each}
+									</Command.Group>
+								{/if}
+							</Command.List>
+						</Command.Root>
+					</Popover.Content>
+				</Popover.Root>
 			</Field.Field>
 
 			<Field.Field>
@@ -500,7 +680,12 @@
 			</Item.Media>
 			<Item.Content>
 				<Item.Title>{clusterName}</Item.Title>
-				<Item.Description>{m.import_cluster_target_cluster()}</Item.Description>
+				<Item.Description>
+					{m.import_cluster_target_cluster()}
+					{#if rancherProjectID}
+						· {m.import_cluster_rancher_project_confirmation({ id: rancherProjectID })}
+					{/if}
+				</Item.Description>
 			</Item.Content>
 			<Item.Actions>
 				{#if clusterStatus === 'pending'}
@@ -554,6 +739,14 @@
 							{m.import_cluster_managed()}
 						</span>
 					</div>
+					{#if rancherProjectID}
+						<div class="flex justify-between gap-4">
+							<span class="text-muted-foreground">
+								{m.import_cluster_rancher_project_confirmation_label()}
+							</span>
+							<span class="truncate font-medium">{rancherProjectID}</span>
+						</div>
+					{/if}
 					{#if selectedUsers.length > 0}
 						<div class="flex justify-between">
 							<span class="text-muted-foreground">{m.import_cluster_permissions()}</span>
