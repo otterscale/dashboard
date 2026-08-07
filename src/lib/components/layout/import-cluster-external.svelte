@@ -310,7 +310,7 @@
 <Dialog.Root bind:open>
 	<Dialog.Content class="flex max-h-[95vh] min-w-[38vw] flex-col overflow-hidden">
 		<Dialog.Title class="sr-only">{m.import_cluster_dialog_title()}</Dialog.Title>
-		<Progress value={stepIndex} max={3} class="mr-6 shrink-0" />
+		<Progress value={stepIndex} max={3} class="mr-6 w-auto shrink-0" />
 
 		<div class="mt-4 flex min-h-0 flex-1 flex-col gap-6">
 			{#if stepIndex === 1}
