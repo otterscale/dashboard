@@ -4,7 +4,7 @@
 
 	import { resolve } from '$app/paths';
 	import { startTour } from '$lib/components/layout';
-	import ImportCluster from '$lib/components/layout/dialog-import-cluster.svelte';
+	import ImportCluster from '$lib/components/layout/import-cluster-external.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Empty from '$lib/components/ui/empty/index.ts';
 	import { useSidebar } from '$lib/components/ui/sidebar';

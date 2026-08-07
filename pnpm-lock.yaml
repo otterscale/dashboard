@@ -17,6 +17,8 @@ overrides:
   brace-expansion@<5.0.8: 5.0.8
   marked: ^18.0.7
   postcss@<8.5.18: 8.5.18
+  '@otterscale/api': link:../api/ts
+  '@otterscale/types': link:../types
 
 importers:
 
@@ -204,11 +206,11 @@ importers:
         specifier: ^1.21.0
         version: 1.21.0(svelte@5.56.4(@typescript-eslint/types@8.62.0))
       '@otterscale/api':
-        specifier: ^1.2.1
-        version: 1.2.1
+        specifier: link:../api/ts
+        version: link:../api/ts
       '@otterscale/types':
-        specifier: ^1.1.2
-        version: 1.1.2
+        specifier: link:../types
+        version: link:../types
       '@playwright/test':
         specifier: ^1.61.1
         version: 1.61.1
@@ -760,12 +762,6 @@ packages:
 
   '@oslojs/jwt@0.2.0':
     resolution: {integrity: sha512-bLE7BtHrURedCn4Mco3ma9L4Y1GR2SMBuIvjWr7rmQ4/W/4Jy70TIAgZ+0nIlk0xHz1vNP8x8DCns45Sb2XRbg==}
-
-  '@otterscale/api@1.2.1':
-    resolution: {integrity: sha512-mlsVy9cqVwpHVEb9vx2RcAOPM/KANUDAUV9oZNhcz4ev2UTxTRw8Zzn464jcYjlMzLPgYiO/vdQX6UBNEHYjkQ==}
-
-  '@otterscale/types@1.1.2':
-    resolution: {integrity: sha512-7ZEHRs9aCVy1TQ/cfQc+VyZvZpjWxOmHW1Hap9O0iy7v2f3v7zxmgdBv4w4xlvPX1VZGq/EPz98SQZAT+6ebqA==}
 
   '@playwright/test@1.61.1':
     resolution: {integrity: sha512-8nKv6+0RJSL9FE4jYOEGXnPeM/Hg12qZpmqzZjRh3qM0Y7c3z1mrOTfFLids72RDQYVh9WpLEfR5WdpNX4fkig==}
@@ -3688,12 +3684,6 @@ snapshots:
   '@oslojs/jwt@0.2.0':
     dependencies:
       '@oslojs/encoding': 0.4.1
-
-  '@otterscale/api@1.2.1':
-    dependencies:
-      '@bufbuild/protobuf': 2.12.1
-
-  '@otterscale/types@1.1.2': {}
 
   '@playwright/test@1.61.1':
     dependencies:
