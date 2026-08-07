@@ -82,6 +82,9 @@
 		spec: {
 			interval: '15m',
 			timeout: '1h',
+			install: {
+				createNamespace: true
+			},
 			chart: {
 				spec: {}
 			},
@@ -260,6 +263,10 @@
 							name: {
 								...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema),
 								title: 'Name'
+							},
+							targetNamespace: {
+								...(lodash.get(jsonSchema, 'properties.spec.properties.targetNamespace') as Schema),
+								title: 'Target Namespace'
 							}
 						}
 					} as Schema}
@@ -268,12 +275,27 @@
 							translations: {
 								submit: 'Next'
 							}
+						},
+						targetNamespace: {
+							'ui:options': {
+								shadcn4Text: {
+									placeholder: `Created automatically if it does not exist.`
+								}
+							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{ namespace: namespace }}
+					initialValue={{ namespace: namespace, targetNamespace: namespace }}
 					bind:values={values['metadata']}
 					handleSubmit={{
 						posthook: () => {
+							// targetNamespace belongs to spec, not metadata; relocate it.
+							const targetNamespace = lodash.get(values, 'metadata.targetNamespace');
+							lodash.unset(values, 'metadata.targetNamespace');
+							if (targetNamespace) {
+								lodash.set(values, 'spec.targetNamespace', targetNamespace);
+							} else {
+								lodash.unset(values, 'spec.targetNamespace');
+							}
 							handleNext();
 						}
 					}}
@@ -364,7 +386,7 @@
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[2]} class="min-h-[23vh]">
+			<Tabs.Content value={steps[2]}>
 				{@const schema = {
 					...(lodash.get(jsonSchema, 'properties.spec.properties.values') as Schema),
 					type: 'string',
