@@ -148,17 +148,16 @@
 				resource: 'helmrepositories'
 			});
 
-			console.log(response.object);
-
 			if (!response.object) {
 				toast.info('There is no OtterScale Charts Helm Repository.');
 				return;
 			}
 
-			fetchChartsByHelmRepository(response.object as SourceToolkitFluxcdIoV1HelmRepository);
+			await fetchChartsByHelmRepository(response.object as SourceToolkitFluxcdIoV1HelmRepository);
 		} catch (error) {
 			console.error('Failed to list HelmRepositories:', error);
 			toast.error('Failed to list HelmRepository resources');
+		} finally {
 			isFetching = false;
 		}
 	}
