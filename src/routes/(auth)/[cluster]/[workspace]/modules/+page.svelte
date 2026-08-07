@@ -128,8 +128,9 @@
 
 			return entireModules
 				.filter((module: ModuleType) => {
-					const moduleVersion = module.version;
+					const moduleVersion = semver.valid(module.version);
 					return (
+						moduleVersion !== null &&
 						semver.major(moduleVersion) === semver.major(dashboardVersion) &&
 						semver.minor(moduleVersion) === semver.minor(dashboardVersion)
 					);
@@ -151,10 +152,10 @@
 		const pageSize = 50;
 
 		let currentPage = 1;
-		let entireModules: ModuleType[] = [];
+		let harborModules: HarborModule[] = [];
 
 		while (true) {
-			const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')}&latest_in_repository=true&page=${currentPage}&page_size=${pageSize}`;
+			const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')}&page=${currentPage}&page_size=${pageSize}`;
 			const response = await fetch('/bff/helm/repository/harbor', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -168,33 +169,60 @@
 				break;
 			}
 
-			const harborModules: HarborModule[] = await response.json();
-			if (harborModules.length === 0) {
+			const pageModules: HarborModule[] = await response.json();
+			if (pageModules.length === 0) {
 				break;
 			}
 
-			entireModules = [
-				...entireModules,
-				...harborModules.map((module: HarborModule) => {
-					return {
-						apiVersion: module.extra_attrs.apiVersion,
-						appVersion: module.extra_attrs.appVersion,
-						annotations: module.extra_attrs.annotations,
-						name: module.extra_attrs.name,
-						description: module.extra_attrs.description,
-						version: module.extra_attrs.version,
-						digest: module.digest,
-						icon: module.icon,
-						keywords: module.labels ?? [],
-						type: module.type
-					} as ModuleType;
-				})
-			];
+			harborModules = [...harborModules, ...pageModules];
+
+			if (pageModules.length < pageSize) {
+				break;
+			}
 
 			currentPage = currentPage + 1;
 		}
 
-		return entireModules;
+		const modulesByName = lodash.groupBy(
+			harborModules.map((module: HarborModule) => {
+				return {
+					apiVersion: module.extra_attrs.apiVersion,
+					appVersion: module.extra_attrs.appVersion,
+					annotations: module.extra_attrs.annotations,
+					name: module.extra_attrs.name,
+					description: module.extra_attrs.description,
+					version: module.extra_attrs.version,
+					digest: module.digest,
+					icon: module.icon,
+					keywords: module.labels ?? [],
+					type: module.type
+				} as ModuleType;
+			}),
+			(module) => module.name
+		);
+
+		return Object.values(modulesByName)
+			.map((versions) => {
+				const validVersions = versions
+					.filter((version) => {
+						const validVersion = semver.valid(version.version);
+
+						return (
+							validVersion !== null &&
+							semver.major(validVersion) === semver.major(dashboardVersion) &&
+							semver.minor(validVersion) === semver.minor(dashboardVersion)
+						);
+					})
+					.sort((a, b) => semver.rcompare(a.version, b.version));
+				const [latestValidVersion] = validVersions;
+				if (latestValidVersion) {
+					return {
+						...latestValidVersion,
+						versions: validVersions
+					};
+				}
+			})
+			.filter(Boolean) as ModuleType[];
 	}
 	async function fetchEntireModulesFromIndex(
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
@@ -214,15 +242,17 @@
 		const indexModules: Record<string, ChartType[]> = await response.json();
 		return Object.values(indexModules)
 			.map((versions) => {
-				const validVersions = versions.filter((version) => {
-					const validVersion = semver.valid(version.version);
+				const validVersions = versions
+					.filter((version) => {
+						const validVersion = semver.valid(version.version);
 
-					return (
-						validVersion !== null &&
-						semver.major(validVersion) === semver.major(dashboardVersion) &&
-						semver.minor(validVersion) === semver.minor(dashboardVersion)
-					);
-				});
+						return (
+							validVersion !== null &&
+							semver.major(validVersion) === semver.major(dashboardVersion) &&
+							semver.minor(validVersion) === semver.minor(dashboardVersion)
+						);
+					})
+					.sort((a, b) => semver.rcompare(a.version, b.version));
 				const [latestValidVersion] = validVersions;
 				if (latestValidVersion) {
 					return {
