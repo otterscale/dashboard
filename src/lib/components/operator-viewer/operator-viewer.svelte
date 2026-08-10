@@ -78,7 +78,7 @@
 			{/if}
 		{/snippet}
 		{#snippet create()}
-			<Upload {namespace} />
+			<Upload />
 		{/snippet}
 		{#snippet rowActions({ row })}
 			<Actions {row} {cluster} {namespace} />
