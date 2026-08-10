@@ -364,7 +364,7 @@
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[2]} class="min-h-[23vh]">
+			<Tabs.Content value={steps[2]}>
 				{@const schema = {
 					...(lodash.get(jsonSchema, 'properties.spec.properties.values') as Schema),
 					type: 'string',
