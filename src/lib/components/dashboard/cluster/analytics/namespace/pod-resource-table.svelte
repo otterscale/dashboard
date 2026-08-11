@@ -19,6 +19,7 @@
 		classifyThreshold,
 		escapePromqlStringLiteral,
 		fetchCombinedInstant,
+		LIVE_PODS,
 		thresholdClasses
 	} from '$lib/prometheus';
 	import { cn } from '$lib/utils';
@@ -58,15 +59,17 @@
 		return {
 			cpu: `sum by (namespace,pod)(irate(container_cpu_usage_seconds_total{${base}${cFilter}}[2m]))`,
 			mem: `sum by (namespace,pod)(container_memory_working_set_bytes{${base}${cFilter}})`,
-			memLimit: `sum by (namespace,pod)(kube_pod_container_resource_limits{${base},resource="memory",unit="byte"})`,
+			// The KSM-derived series below are gated on LIVE_PODS: they outlive a pod's execution,
+			// so without it every finished Job would keep its own row (0 usage, but a limit and an age).
+			memLimit: `sum by (namespace,pod)(kube_pod_container_resource_limits{${base},resource="memory",unit="byte"} ${LIVE_PODS})`,
 			// nvidia.com/gpu limits (KSM flattens dots to underscores) — allocated GPU count.
-			gpu: `sum by (namespace,pod)(kube_pod_container_resource_limits{${base},resource="nvidia_com_gpu"})`,
+			gpu: `sum by (namespace,pod)(kube_pod_container_resource_limits{${base},resource="nvidia_com_gpu"} ${LIVE_PODS})`,
 			// HAMI device-plugin monitor keys its per-container metrics by podname/podnamespace
 			// (its own pod owns the pod/namespace labels); the fetch loop falls back to podname.
 			gpuUtil: `avg by (podnamespace,podname)(Device_utilization_desc_of_container{podnamespace="${ns}"})`,
 			gpuMem: `sum by (podnamespace,podname)(Device_memory_desc_of_container{podnamespace="${ns}"})`,
-			restarts: `sum by (namespace,pod)(kube_pod_container_status_restarts_total{${base}${cFilter}})`,
-			created: `max by (namespace,pod)(kube_pod_created{${base}})`,
+			restarts: `sum by (namespace,pod)(kube_pod_container_status_restarts_total{${base}${cFilter}} ${LIVE_PODS})`,
+			created: `max by (namespace,pod)(kube_pod_created{${base}} ${LIVE_PODS})`,
 			netRx: `sum by (namespace,pod)(irate(container_network_receive_bytes_total{${base}}[2m]))`,
 			netTx: `sum by (namespace,pod)(irate(container_network_transmit_bytes_total{${base}}[2m]))`
 		};

@@ -12,7 +12,12 @@
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/messages';
-	import { classifyThreshold, fetchCombinedInstant, thresholdClasses } from '$lib/prometheus';
+	import {
+		classifyThreshold,
+		fetchCombinedInstant,
+		LIVE_PODS,
+		thresholdClasses
+	} from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -34,8 +39,8 @@
 		try {
 			const r = await fetchCombinedInstant(prometheusDriver, {
 				usage: `100 * sum(irate(container_cpu_usage_seconds_total{container!=""}[2m])) / sum(kube_node_status_allocatable{resource="cpu", unit="core"})`,
-				request: `100 * sum(kube_pod_container_resource_requests{resource="cpu", unit="core"}) / sum(kube_node_status_allocatable{resource="cpu", unit="core"})`,
-				limit: `100 * sum(kube_pod_container_resource_limits{resource="cpu", unit="core"}) / sum(kube_node_status_allocatable{resource="cpu", unit="core"})`,
+				request: `100 * sum(kube_pod_container_resource_requests{resource="cpu", unit="core"} ${LIVE_PODS}) / sum(kube_node_status_allocatable{resource="cpu", unit="core"})`,
+				limit: `100 * sum(kube_pod_container_resource_limits{resource="cpu", unit="core"} ${LIVE_PODS}) / sum(kube_node_status_allocatable{resource="cpu", unit="core"})`,
 				allocatable: `sum(kube_node_status_allocatable{resource="cpu", unit="core"})`
 			});
 			cpuUsage = r.usage[0]?.value ?? undefined;

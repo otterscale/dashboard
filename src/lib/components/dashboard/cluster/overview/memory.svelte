@@ -13,7 +13,12 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/messages';
-	import { classifyThreshold, fetchCombinedInstant, thresholdClasses } from '$lib/prometheus';
+	import {
+		classifyThreshold,
+		fetchCombinedInstant,
+		LIVE_PODS,
+		thresholdClasses
+	} from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -34,8 +39,8 @@
 		try {
 			const r = await fetchCombinedInstant(prometheusDriver, {
 				usage: `100 * sum(container_memory_working_set_bytes{container!=""}) / sum(kube_node_status_allocatable{resource="memory", unit="byte"})`,
-				request: `100 * sum(kube_pod_container_resource_requests{resource="memory", unit="byte"}) / sum(kube_node_status_allocatable{resource="memory", unit="byte"})`,
-				limit: `100 * sum(kube_pod_container_resource_limits{resource="memory", unit="byte"}) / sum(kube_node_status_allocatable{resource="memory", unit="byte"})`,
+				request: `100 * sum(kube_pod_container_resource_requests{resource="memory", unit="byte"} ${LIVE_PODS}) / sum(kube_node_status_allocatable{resource="memory", unit="byte"})`,
+				limit: `100 * sum(kube_pod_container_resource_limits{resource="memory", unit="byte"} ${LIVE_PODS}) / sum(kube_node_status_allocatable{resource="memory", unit="byte"})`,
 				allocatable: `sum(kube_node_status_allocatable{resource="memory", unit="byte"})`
 			});
 			memoryUsage = r.usage[0]?.value ?? undefined;

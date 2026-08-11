@@ -9,6 +9,16 @@ export function escapePromqlStringLiteral(value: string): string {
 }
 
 /**
+ * Restrict a per-pod KSM selector to non-terminated pods — the set `kubectl describe node`
+ * counts. KSM keeps emitting requests/limits for Succeeded/Failed pods until the object is
+ * deleted, so finished Jobs otherwise pile up and inflate every sum.
+ *
+ * Append to a selector: `kube_pod_container_resource_limits{...} ${LIVE_PODS}`.
+ */
+export const LIVE_PODS =
+	'and on (namespace, pod) (kube_pod_status_phase{phase=~"Pending|Running"} == 1)';
+
+/**
  * Identity prefix for standalone models — vLLM deployed directly, without the managed
  * serving stack. Such pods carry no `llm_inference_service` label, so they are keyed by
  * `model_name` instead. `:` can't appear in a managed model's `llm_inference_service`

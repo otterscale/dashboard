@@ -20,7 +20,12 @@
 	import * as Table from '$lib/components/ui/table/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/messages';
-	import { classifyThreshold, fetchCombinedInstant, thresholdClasses } from '$lib/prometheus';
+	import {
+		classifyThreshold,
+		fetchCombinedInstant,
+		LIVE_PODS,
+		thresholdClasses
+	} from '$lib/prometheus';
 	import { cn } from '$lib/utils';
 
 	let {
@@ -110,10 +115,6 @@
 	// Request/Limit ≥ 100% means the node can't schedule new pods even if Usage is low.
 	const ALLOC_CPU = 'sum(kube_node_status_allocatable{resource="cpu", unit="core"}) by (node)';
 	const ALLOC_MEM = 'sum(kube_node_status_allocatable{resource="memory", unit="byte"}) by (node)';
-	// Scope requests/limits to non-terminated pods, as `kubectl describe node` does: KSM keeps
-	// emitting them for Succeeded/Failed pods, so finished Jobs pile up and inflate the sums.
-	const LIVE_PODS =
-		'* on (namespace, pod) group_left() max by (namespace, pod) (kube_pod_status_phase{phase=~"Pending|Running"} == 1)';
 	const queries = {
 		cpuUse: `100 * sum(irate(container_cpu_usage_seconds_total{container!=""}[2m])) by (node) / ${ALLOC_CPU}`,
 		cpuReq: `100 * sum by (node) (kube_pod_container_resource_requests{resource="cpu", unit="core"} ${LIVE_PODS}) / ${ALLOC_CPU}`,
