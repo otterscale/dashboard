@@ -76,6 +76,15 @@
 		consumers: GpuConsumer[];
 	};
 
+	// One TopoLVM volume group on a node. `used` is derived (size − available); TopoLVM
+	// reports no used series of its own.
+	type DiskPool = {
+		used?: number;
+		total?: number;
+		// As % of pool capacity, comparable with the CPU/Mem/GPU columns.
+		usePct?: number;
+	};
+
 	type NodeRow = {
 		node: string;
 		cpuUse: number;
@@ -92,19 +101,34 @@
 		gpuUsePct?: number;
 		gpuLimPct?: number;
 		gpus: GpuDevice[];
+		// TopoLVM pools on this node, keyed by device class (`aidaptiv` is the AI100 drive).
+		// Empty on nodes TopoLVM doesn't manage.
+		disks: Record<string, DiskPool>;
 	};
 
 	// All ratios share the per-node allocatable base, so Usage/Request/Limit are comparable;
 	// Request/Limit ≥ 100% means the node can't schedule new pods even if Usage is low.
 	const ALLOC_CPU = 'sum(kube_node_status_allocatable{resource="cpu", unit="core"}) by (node)';
 	const ALLOC_MEM = 'sum(kube_node_status_allocatable{resource="memory", unit="byte"}) by (node)';
+	// Scope requests/limits to non-terminated pods, as `kubectl describe node` does: KSM keeps
+	// emitting them for Succeeded/Failed pods, so finished Jobs pile up and inflate the sums.
+	const LIVE_PODS =
+		'* on (namespace, pod) group_left() max by (namespace, pod) (kube_pod_status_phase{phase=~"Pending|Running"} == 1)';
 	const queries = {
 		cpuUse: `100 * sum(irate(container_cpu_usage_seconds_total{container!=""}[2m])) by (node) / ${ALLOC_CPU}`,
-		cpuReq: `100 * sum(kube_pod_container_resource_requests{resource="cpu", unit="core"}) by (node) / ${ALLOC_CPU}`,
-		cpuLim: `100 * sum(kube_pod_container_resource_limits{resource="cpu", unit="core"}) by (node) / ${ALLOC_CPU}`,
+		cpuReq: `100 * sum by (node) (kube_pod_container_resource_requests{resource="cpu", unit="core"} ${LIVE_PODS}) / ${ALLOC_CPU}`,
+		cpuLim: `100 * sum by (node) (kube_pod_container_resource_limits{resource="cpu", unit="core"} ${LIVE_PODS}) / ${ALLOC_CPU}`,
 		memUse: `100 * sum(container_memory_working_set_bytes{container!=""}) by (node) / ${ALLOC_MEM}`,
-		memReq: `100 * sum(kube_pod_container_resource_requests{resource="memory", unit="byte"}) by (node) / ${ALLOC_MEM}`,
-		memLim: `100 * sum(kube_pod_container_resource_limits{resource="memory", unit="byte"}) by (node) / ${ALLOC_MEM}`
+		memReq: `100 * sum by (node) (kube_pod_container_resource_requests{resource="memory", unit="byte"} ${LIVE_PODS}) / ${ALLOC_MEM}`,
+		memLim: `100 * sum by (node) (kube_pod_container_resource_limits{resource="memory", unit="byte"} ${LIVE_PODS}) / ${ALLOC_MEM}`,
+		// TopoLVM's node exporter; `node` is a ConstLabel there, so these join the rows above
+		// directly. Absent unless the phison-topolvm module sets
+		// `topolvm.node.prometheus.podMonitor.enabled`. Bytes, since the ratio needs both.
+		// Kept split by `device_class` so a second volume group can never be silently summed
+		// into the AI100 pool — `lvmd.deviceClasses` is a list, today holding only `aidaptiv`.
+		diskTotal: 'sum by (node, device_class) (topolvm_volumegroup_size_bytes)',
+		diskUsed:
+			'sum by (node, device_class) (topolvm_volumegroup_size_bytes) - sum by (node, device_class) (topolvm_volumegroup_available_bytes)'
 	};
 
 	// Numeric percentage fields filled from the combined pressure query (keyed by query name).
@@ -239,15 +263,25 @@
 					memUse: 0,
 					memReq: 0,
 					memLim: 0,
-					gpus: []
+					gpus: [],
+					disks: {}
 				});
 			for (const [key, vectors] of Object.entries(result)) {
 				for (const v of vectors) {
-					const node = (v.metric.labels as Record<string, string>).node;
+					const labels = v.metric.labels as Record<string, string>;
+					const node = labels.node;
 					if (!node) continue;
 					const value = Number(v.value?.value);
 					if (!Number.isFinite(value)) continue;
-					ensure(node)[key as PressureKey] = value;
+					if (key === 'diskUsed' || key === 'diskTotal') {
+						const deviceClass = labels.device_class;
+						if (!deviceClass) continue;
+						const pool = (ensure(node).disks[deviceClass] ??= {});
+						if (key === 'diskUsed') pool.used = value;
+						else pool.total = value;
+					} else {
+						ensure(node)[key as PressureKey] = value;
+					}
 				}
 			}
 			// Seed rows from GPU hosts too (a node may have GPUs but no pressure series).
@@ -259,6 +293,9 @@
 				row.gpuTotal = sumGpuField(row.gpus, 'total');
 				row.gpuUsePct = ratioPct(row.gpuUsage, row.gpuTotal);
 				row.gpuLimPct = ratioPct(row.gpuLimit, row.gpuTotal);
+				for (const pool of Object.values(row.disks)) {
+					pool.usePct = ratioPct(pool.used, pool.total);
+				}
 			}
 			rows = Object.values(byNode).sort((a, b) => pressure(b) - pressure(a));
 		} catch (error) {
@@ -305,6 +342,18 @@
 	// GPU columns/rows only render when at least one node reports a GPU.
 	const hasGpu = $derived(rows.some((row) => row.gpus.length > 0));
 
+	// One disk column per TopoLVM device class actually reported; none on clusters without the
+	// phison-topolvm module.
+	const diskClasses = $derived(
+		[...new Set(rows.flatMap((row) => Object.keys(row.disks)))].sort((a, b) => a.localeCompare(b))
+	);
+
+	// Device classes are chart config, not product names — spell out the ones we ship.
+	const DISK_CLASS_LABELS: Record<string, string> = { aidaptiv: 'AI100' };
+	function diskClassLabel(deviceClass: string): string {
+		return DISK_CLASS_LABELS[deviceClass] ?? deviceClass;
+	}
+
 	// Node rows expanded to show per-GPU-card details.
 	const expandedNodes = new SvelteSet<string>();
 	function toggleNode(node: string) {
@@ -321,7 +370,7 @@
 	const anyExpanded = $derived(expandedNodes.size > 0);
 
 	// Format a byte count as "12.34 Gi" (`digits` decimals); "—" when not reported.
-	function formatGpuBytes(value: number | undefined, digits = 2): string {
+	function formatBytes(value: number | undefined, digits = 2): string {
 		if (value === undefined || !Number.isFinite(value)) return '—';
 		const { value: scaled, unit } = formatWithBinarySuffix(BigInt(Math.round(value)));
 		return `${scaled.toFixed(digits)} ${unit}`.trim();
@@ -333,7 +382,8 @@
 
 {#snippet table(detailed: boolean)}
 	{@const showGpu = detailed && hasGpu}
-	{@const colSpan = 1 + columns.length + (showGpu ? 2 : 0)}
+	{@const shownDiskClasses = detailed ? diskClasses : []}
+	{@const colSpan = 1 + columns.length + (showGpu ? 2 : 0) + shownDiskClasses.length}
 	<div class="overflow-x-auto">
 		<Table.Root>
 			<Table.Header>
@@ -346,6 +396,11 @@
 						<Table.Head class="text-right whitespace-nowrap">GPU Usage</Table.Head>
 						<Table.Head class="text-right whitespace-nowrap">GPU Limit</Table.Head>
 					{/if}
+					{#each shownDiskClasses as deviceClass (deviceClass)}
+						<Table.Head class="text-right whitespace-nowrap">
+							{diskClassLabel(deviceClass)} Disk
+						</Table.Head>
+					{/each}
 				</Table.Row>
 			</Table.Header>
 			<Table.Body>
@@ -370,7 +425,7 @@
 									/>
 									<span>{row.node}</span>
 									<span class="text-xs text-muted-foreground">
-										({row.gpus.length} × {gpuModel} · {formatGpuBytes(row.gpuTotal, 0)})
+										({row.gpus.length} × {gpuModel} · {formatBytes(row.gpuTotal, 0)})
 									</span>
 								</div>
 							{:else}
@@ -400,6 +455,20 @@
 								{row.gpuLimPct !== undefined ? `${Math.round(row.gpuLimPct)}%` : '—'}
 							</Table.Cell>
 						{/if}
+						{#each shownDiskClasses as deviceClass (deviceClass)}
+							{@const pool = row.disks[deviceClass]}
+							<Table.Cell
+								class={cn(
+									'text-right font-mono tabular-nums',
+									pool?.usePct !== undefined && pctClass(pool.usePct)
+								)}
+								title={pool?.total !== undefined
+									? `${formatBytes(pool.used)} / ${formatBytes(pool.total)}`
+									: undefined}
+							>
+								{pool?.usePct !== undefined ? `${Math.round(pool.usePct)}%` : '—'}
+							</Table.Cell>
+						{/each}
 					</Table.Row>
 					{#if expandable && open}
 						<Table.Row class="hover:bg-transparent">
@@ -450,13 +519,13 @@
 													{/if}
 												</Table.Cell>
 												<Table.Cell class="text-right font-mono tabular-nums">
-													{formatGpuBytes(gpu.usage)}
+													{formatBytes(gpu.usage)}
 												</Table.Cell>
 												<Table.Cell class="text-right font-mono tabular-nums">
-													{formatGpuBytes(gpu.limit)}
+													{formatBytes(gpu.limit)}
 												</Table.Cell>
 												<Table.Cell class="text-right font-mono tabular-nums">
-													{formatGpuBytes(gpu.total)}
+													{formatBytes(gpu.total)}
 												</Table.Cell>
 											</Table.Row>
 										{/each}
