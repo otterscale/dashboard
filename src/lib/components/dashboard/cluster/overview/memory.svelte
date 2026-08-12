@@ -72,9 +72,9 @@
 	});
 
 	const chartConfig = {
-		usage: { label: 'Usage' },
-		request: { label: 'Request' },
-		limit: { label: 'Limit' }
+		usage: { label: m.usage() },
+		request: { label: m.request() },
+		limit: { label: m.limit() }
 	} satisfies Chart.ChartConfig;
 
 	function pctClass(value: number | undefined): string {
@@ -155,21 +155,21 @@
 				<div class="mx-auto grid w-fit grid-cols-2 gap-x-6 py-2">
 					<p class="col-start-1 row-start-1">
 						<span class="mr-2 inline-block aspect-square size-3 bg-chart-1 align-middle"></span>
-						usage
+						{m.usage()}
 					</p>
 					<p class="col-start-2 row-start-1 ml-auto {pctClass(memoryUsage?.value)}">
 						{Math.round(Number(memoryUsage?.value ?? 0))} %
 					</p>
 					<p class="col-start-1 row-start-2">
 						<span class="mr-2 inline-block aspect-square size-3 bg-chart-2 align-middle"></span>
-						request
+						{m.request()}
 					</p>
 					<p class="col-start-2 row-start-2 ml-auto {pctClass(memoryRequest?.value)}">
 						{Math.round(Number(memoryRequest?.value ?? 0))} %
 					</p>
 					<p class="col-start-1 row-start-3">
 						<span class="mr-2 inline-block aspect-square size-3 bg-chart-3 align-middle"></span>
-						limit
+						{m.limit()}
 					</p>
 					<p class="col-start-2 row-start-3 ml-auto {pctClass(memoryLimit?.value)}">
 						{Math.round(Number(memoryLimit?.value ?? 0))} %
