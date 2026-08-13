@@ -47,6 +47,7 @@
 	import { breadcrumbs } from '$lib/stores';
 	import { pulse } from '$lib/stores/pulse.svelte';
 	import { getAdditionalItems } from '$lib/utils/features';
+	import { hasRookCephCRD } from '$lib/utils/rook-ceph';
 
 	import type { LayoutData } from './$types';
 
@@ -70,6 +71,7 @@
 
 	let sidebarOpen = $state(true);
 	let importOpen = $state(false);
+	let hasRookCeph = $state(false);
 
 	async function fetchClusters(signal?: AbortSignal): Promise<Link[]> {
 		try {
@@ -162,6 +164,24 @@
 		return () => abortController.abort();
 	});
 
+	$effect(() => {
+		if (!activeCluster) {
+			hasRookCeph = false;
+			return;
+		}
+
+		const abortController = new AbortController();
+		hasRookCephCRD(transport, activeCluster, abortController.signal)
+			.then((exists) => {
+				if (!abortController.signal.aborted) hasRookCeph = exists;
+			})
+			.catch((err) => {
+				if (!abortController.signal.aborted) console.error(err);
+			});
+
+		return () => abortController.abort();
+	});
+
 	function resourceUrl(options: {
 		group: string;
 		version: string;
@@ -226,15 +246,19 @@
 								})
 							: ''
 					},
-					{
-						title: m.storage(),
-						url: page.params.workspace
-							? resolve('/(auth)/[cluster]/[workspace]/dashboard/storage', {
-									cluster: activeCluster,
-									workspace: page.params.workspace
-								})
-							: ''
-					}
+					...(hasRookCeph
+						? [
+								{
+									title: m.storage(),
+									url: page.params.workspace
+										? resolve('/(auth)/[cluster]/[workspace]/dashboard/storage', {
+												cluster: activeCluster,
+												workspace: page.params.workspace
+											})
+										: ''
+								}
+							]
+						: [])
 				]
 			},
 			{
