@@ -2,7 +2,7 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import GpuIcon from '@lucide/svelte/icons/gpu';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import { getContext } from 'svelte';
+	import { getContext, type Snippet } from 'svelte';
 
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
@@ -17,7 +17,8 @@
 		namespace = '',
 		view,
 		object,
-		onOpenChangeComplete
+		onOpenChangeComplete,
+		trigger
 	}: {
 		cluster: string;
 		namespace?: string;
@@ -25,6 +26,8 @@
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		object: any;
 		onOpenChangeComplete?: () => void;
+		/** Replaces the default menu-row trigger; callers outside a menu supply their own. */
+		trigger?: Snippet;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -68,15 +71,19 @@
 </script>
 
 <Dialog.Root bind:open {onOpenChangeComplete} onOpenChange={handleOpenChange}>
-	<Dialog.Trigger class="w-full">
-		<Item.Root class="flex-nowrap p-0 text-xs" size="sm">
-			<Item.Media>
-				<GpuIcon />
-			</Item.Media>
-			<Item.Content>
-				<Item.Title>{m.gpu_allocation()}</Item.Title>
-			</Item.Content>
-		</Item.Root>
+	<Dialog.Trigger class={trigger ? undefined : 'w-full'}>
+		{#if trigger}
+			{@render trigger()}
+		{:else}
+			<Item.Root class="flex-nowrap p-0 text-xs" size="sm">
+				<Item.Media>
+					<GpuIcon />
+				</Item.Media>
+				<Item.Content>
+					<Item.Title>{m.gpu_allocation()}</Item.Title>
+				</Item.Content>
+			</Item.Root>
+		{/if}
 	</Dialog.Trigger>
 	<Dialog.Content class="flex h-[85vh] max-h-[85vh] max-w-[90vw] min-w-[70vw] flex-col gap-3">
 		<Dialog.Header>
