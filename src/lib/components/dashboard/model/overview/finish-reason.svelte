@@ -113,8 +113,8 @@
 			<Card.Description>{m.llm_dashboard_finish_reason_description()}</Card.Description>
 		</div>
 		<Tooltip.Root>
-			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-				<InfoIcon class="size-5 text-muted-foreground" />
+			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}>
+				<InfoIcon class="size-4 text-muted-foreground" />
 			</Tooltip.Trigger>
 			<Tooltip.Content>
 				<p>{m.llm_dashboard_finish_reason_tooltip()}</p>

@@ -597,8 +597,8 @@
 			<p class="text-sm text-muted-foreground">{m.pod_detail_table_description()}</p>
 		</div>
 		<Sheet.Root>
-			<Sheet.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-				<Maximize2Icon class="size-5 text-muted-foreground" />
+			<Sheet.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}>
+				<Maximize2Icon class="size-4 text-muted-foreground" />
 			</Sheet.Trigger>
 			<Sheet.Content class="flex min-w-[50vw] flex-col gap-4 overflow-auto p-8">
 				<Sheet.Header class="p-0">
@@ -609,8 +609,8 @@
 			</Sheet.Content>
 		</Sheet.Root>
 		<Tooltip.Root>
-			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-				<InfoIcon class="size-5 text-muted-foreground" />
+			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}>
+				<InfoIcon class="size-4 text-muted-foreground" />
 			</Tooltip.Trigger>
 			<Tooltip.Content class="max-w-xs">
 				<p>{m.pod_detail_table_tooltip()}</p>
