@@ -4,7 +4,12 @@
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import { type TopBar, TopBarList } from '$lib/components/custom/top-bar-list';
-	import { classifyThreshold, fetchCombinedInstant, type ThresholdLevel } from '$lib/prometheus';
+	import {
+		classifyThreshold,
+		fetchCombinedInstant,
+		LIVE_PODS,
+		type ThresholdLevel
+	} from '$lib/prometheus';
 
 	// Reusable node-pressure ranking: one bar per node, sized by Request%, labelled with the
 	// Limit% beside it. Used for both CPU (resource="cpu", unit="core") and memory.
@@ -30,9 +35,13 @@
 	const alloc = $derived(
 		`sum(kube_node_status_allocatable{resource="${resource}", unit="${unit}"}) by (node)`
 	);
+	// LIVE_PODS on both sums: KSM keeps emitting requests/limits for Succeeded/Failed pods, so
+	// finished Jobs would pile into the node totals — the same defect fixed in the overview
+	// pressure table. Measured on a dev cluster with 7 completed pods, the CPU limit label read
+	// 642% against a true 108%.
 	const queries = $derived({
-		req: `100 * sum(kube_pod_container_resource_requests{resource="${resource}", unit="${unit}"}) by (node) / ${alloc}`,
-		lim: `100 * sum(kube_pod_container_resource_limits{resource="${resource}", unit="${unit}"}) by (node) / ${alloc}`
+		req: `100 * sum(kube_pod_container_resource_requests{resource="${resource}", unit="${unit}"} ${LIVE_PODS}) by (node) / ${alloc}`,
+		lim: `100 * sum(kube_pod_container_resource_limits{resource="${resource}", unit="${unit}"} ${LIVE_PODS}) by (node) / ${alloc}`
 	});
 
 	let bars = $state<TopBar[]>([]);
