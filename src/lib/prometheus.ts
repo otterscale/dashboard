@@ -19,6 +19,20 @@ export const LIVE_PODS =
 	'and on (namespace, pod) (kube_pod_status_phase{phase=~"Pending|Running"} == 1)';
 
 /**
+ * Drop the containers that *do* declare a limit for `resource`, leaving the uncapped ones.
+ * Counting what survives is the only way to tell a sum of limits from a ceiling: a container
+ * with no limit contributes nothing to the sum, so a mostly-uncapped scope reports a small
+ * number that reads like a tight bound.
+ *
+ * Matches on `container` as well as the pod, so a pod that caps some containers and not
+ * others keeps only the uncapped ones. Append to a per-container selector:
+ * `kube_pod_container_info ${LIVE_PODS} ${withoutLimit('memory')}`.
+ */
+export function withoutLimit(resource: string): string {
+	return `unless on (namespace, pod, container) kube_pod_container_resource_limits{resource="${resource}"}`;
+}
+
+/**
  * Identity prefix for standalone models — vLLM deployed directly, without the managed
  * serving stack. Such pods carry no `llm_inference_service` label, so they are keyed by
  * `model_name` instead. `:` can't appear in a managed model's `llm_inference_service`
