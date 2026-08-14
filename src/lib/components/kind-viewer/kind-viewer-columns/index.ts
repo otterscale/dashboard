@@ -11,12 +11,6 @@ import {
 	getApplicationUISchemas
 } from './application.js';
 import {
-	getObjectBucketClaimColumnDefinitions,
-	getObjectBucketClaimData,
-	getObjectBucketClaimDataSchemas,
-	getObjectBucketClaimUISchemas
-} from './cephobjectbucketclaim.js';
-import {
 	getClusterRoleColumnDefinitions,
 	getClusterRoleData,
 	getClusterRoleDataSchemas,
@@ -311,8 +305,6 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 			return getDataVolumeDataSchemas();
 		// case 'VirtualMachineInstancetype':
 		// 	return getVirtualMachineInstancetypeDataSchemas();
-		case 'ObjectBucketClaim':
-			return getObjectBucketClaimDataSchemas();
 		case 'Application':
 			return getApplicationDataSchemas();
 		case 'Task':
@@ -403,8 +395,6 @@ function getData(apiResource: APIResource, object: JsonObject): Record<string, J
 			return getDataVolumeData(resource);
 		// case 'VirtualMachineInstancetype':
 		// 	return getVirtualMachineInstancetypeData(resource);
-		case 'ObjectBucketClaim':
-			return getObjectBucketClaimData(resource);
 		case 'Application':
 			return getApplicationData(resource);
 		case 'Task':
@@ -492,8 +482,6 @@ function getUISchemas(kind: string): Record<string, UISchemaType> {
 			return getDataVolumeUISchemas();
 		// case 'VirtualMachineInstancetype':
 		// 	return getVirtualMachineInstancetypeUISchemas();
-		case 'ObjectBucketClaim':
-			return getObjectBucketClaimUISchemas();
 		case 'Application':
 			return getApplicationUISchemas();
 		case 'Task':
@@ -584,8 +572,6 @@ function getColumnDefinitions(
 			return getVirtualMachineColumnDefinitions(apiResource, uiSchemas, dataSchemas, cluster);
 		case 'DataVolume':
 			return getDataVolumeColumnDefinitions(apiResource, uiSchemas, dataSchemas);
-		case 'ObjectBucketClaim':
-			return getObjectBucketClaimColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'Application':
 			return getApplicationColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'Task':
