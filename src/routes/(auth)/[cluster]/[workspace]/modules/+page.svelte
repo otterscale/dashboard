@@ -151,11 +151,15 @@
 		const harborProjectName = parseHarborProjectName(helmRepository);
 		const pageSize = 50;
 
+		// OCI Helm charts are tagged with their chart version, so Harbor can
+		// pre-filter artifacts to the dashboard's major.minor series server-side.
+		const versionPrefix = `${semver.major(dashboardVersion)}.${semver.minor(dashboardVersion)}.`;
+
 		let currentPage = 1;
 		let harborModules: HarborModule[] = [];
 
 		while (true) {
-			const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')}&page=${currentPage}&page_size=${pageSize}`;
+			const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')},tags=~${encodeHarborURIComponent(versionPrefix)}&page=${currentPage}&page_size=${pageSize}`;
 			const response = await fetch('/bff/helm/repository/harbor', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
