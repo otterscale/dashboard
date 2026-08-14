@@ -14,8 +14,6 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/messages';
 
-	let { namespace }: { namespace: string } = $props();
-
 	const harborUniformResourceLocator = new SvelteURL(publicEnv.PUBLIC_HARBOR_URL ?? '');
 	const plainHttp = harborUniformResourceLocator.protocol === 'http:';
 </script>
@@ -33,7 +31,7 @@
 			</Dialog.Header>
 
 			<Item.Root class="w-full">
-				{@const command = `helm push <chart_package> oci://${harborUniformResourceLocator.host}/${namespace}${plainHttp ? ' --plain-http' : ''}`}
+				{@const command = `helm push <chart_package> oci://${harborUniformResourceLocator.host}/operators${plainHttp ? ' --plain-http' : ''}`}
 				<Item.Media variant="icon">
 					<SiHelm class="size-4" />
 				</Item.Media>
@@ -47,7 +45,7 @@
 			</Item.Root>
 
 			<Item.Root class="w-full">
-				{@const command = `docker push ${harborUniformResourceLocator.host}/<repository>[:<tag>]`}
+				{@const command = `docker push ${harborUniformResourceLocator.host}/operators[:<tag>]`}
 				<Item.Media variant="icon">
 					<SiDocker class="size-4" />
 				</Item.Media>

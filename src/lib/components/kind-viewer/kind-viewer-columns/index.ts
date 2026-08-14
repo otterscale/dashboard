@@ -83,6 +83,12 @@ import {
 	getGatewayUISchemas
 } from './gateway.js';
 import {
+	getGitRepositoryColumnDefinitions,
+	getGitRepositoryData,
+	getGitRepositoryDataSchemas,
+	getGitRepositoryUISchemas
+} from './gitrepository.js';
+import {
 	getHelmReleaseColumnDefinitions,
 	getHelmReleaseData,
 	getHelmReleaseDataSchemas,
@@ -100,14 +106,13 @@ import {
 	getHTTPRouteDataSchemas,
 	getHTTPRouteUISchemas
 } from './httproute.js';
-// Namespaced InstanceType is disabled — most users use ClusterInstanceType directly.
-// import {
-// 	getVirtualMachineInstancetypeColumnDefinitions,
-// 	getVirtualMachineInstancetypeData,
-// 	getVirtualMachineInstancetypeDataSchemas,
-// 	getVirtualMachineInstancetypeUISchemas
-// } from './instancetype.js';
 import { getJobColumnDefinitions, getJobData, getJobDataSchemas, getJobUISchemas } from './job.js';
+import {
+	getKustomizationColumnDefinitions,
+	getKustomizationData,
+	getKustomizationDataSchemas,
+	getKustomizationUISchemas
+} from './kustomization.js';
 import {
 	getLicenseColumnDefinitions,
 	getLicenseData,
@@ -290,6 +295,10 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 			return getWorkspaceDataSchemas();
 		case 'HelmRepository':
 			return getHelmRepositoryDataSchemas();
+		case 'GitRepository':
+			return getGitRepositoryDataSchemas();
+		case 'Kustomization':
+			return getKustomizationDataSchemas();
 		case 'HTTPRoute':
 			return getHTTPRouteDataSchemas();
 		case 'Gateway':
@@ -378,6 +387,10 @@ function getData(apiResource: APIResource, object: JsonObject): Record<string, J
 			return getWorkspaceData(resource);
 		case 'HelmRepository':
 			return getHelmRepositoryData(resource);
+		case 'GitRepository':
+			return getGitRepositoryData(resource);
+		case 'Kustomization':
+			return getKustomizationData(resource);
 		case 'HTTPRoute':
 			return getHTTPRouteData(resource);
 		case 'Gateway':
@@ -463,6 +476,10 @@ function getUISchemas(kind: string): Record<string, UISchemaType> {
 			return getWorkspaceUISchemas();
 		case 'HelmRepository':
 			return getHelmRepositoryUISchemas();
+		case 'GitRepository':
+			return getGitRepositoryUISchemas();
+		case 'Kustomization':
+			return getKustomizationUISchemas();
 		case 'HTTPRoute':
 			return getHTTPRouteUISchemas();
 		case 'Gateway':
@@ -553,6 +570,10 @@ function getColumnDefinitions(
 			return getWorkspaceColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'HelmRepository':
 			return getHelmRepositoryColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'GitRepository':
+			return getGitRepositoryColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'Kustomization':
+			return getKustomizationColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'HTTPRoute':
 			return getHTTPRouteColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'Gateway':
@@ -563,8 +584,6 @@ function getColumnDefinitions(
 			return getVirtualMachineColumnDefinitions(apiResource, uiSchemas, dataSchemas, cluster);
 		case 'DataVolume':
 			return getDataVolumeColumnDefinitions(apiResource, uiSchemas, dataSchemas);
-		// case 'VirtualMachineInstancetype':
-		// 	return getVirtualMachineInstancetypeColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'ObjectBucketClaim':
 			return getObjectBucketClaimColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'Application':

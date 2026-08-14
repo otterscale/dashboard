@@ -17,6 +17,7 @@ import DataVolumeCreate from './data-volume/create.svelte';
 import DefaultActions from './default/actions.svelte';
 import DefaultCreate from './default/create.svelte';
 import DeploymentActions from './deployment/actions.svelte';
+import GitRepositoryCreate from './git-repository/create.svelte';
 import HelmReleaseActions from './helm-release/actions.svelte';
 import HelmRepositoryActions from './helm-repository/actions.svelte';
 import HelmRepositoryCreate from './helm-repository/create.svelte';
@@ -86,6 +87,8 @@ function getCreate(kind: string, namespace?: string): CreateType {
 			return ClusterRoleBindingCreate as CreateType;
 		case 'DataVolume':
 			return DataVolumeCreate as CreateType;
+		case 'GitRepository':
+			return GitRepositoryCreate as CreateType;
 		case 'HelmRepository':
 			return HelmRepositoryCreate as CreateType;
 		case 'License':

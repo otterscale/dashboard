@@ -11,6 +11,7 @@
 	import CpuIcon from '@lucide/svelte/icons/cpu';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import GaugeIcon from '@lucide/svelte/icons/gauge';
+	import GitGraphIcon from '@lucide/svelte/icons/git-graph';
 	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 	import LayersIcon from '@lucide/svelte/icons/layers';
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
@@ -301,6 +302,31 @@
 							version: 'v1',
 							kind: 'HelmRepository',
 							resource: 'helmrepositories'
+						})
+					}
+				]
+			},
+			{
+				title: m.git_ops(),
+				icon: GitGraphIcon,
+				isActive: true,
+				items: [
+					{
+						title: m.kustomize(),
+						url: resourceUrl({
+							group: 'kustomize.toolkit.fluxcd.io',
+							version: 'v1',
+							kind: 'Kustomization',
+							resource: 'kustomizations'
+						})
+					},
+					{
+						title: m.git_repository(),
+						url: resourceUrl({
+							group: 'source.toolkit.fluxcd.io',
+							version: 'v1',
+							kind: 'GitRepository',
+							resource: 'gitrepositories'
 						})
 					}
 				]
