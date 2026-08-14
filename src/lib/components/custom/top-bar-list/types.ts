@@ -11,4 +11,8 @@ export type TopBar = {
 	id?: string;
 	// Optional short tag shown next to the label (e.g. to mark a standalone model).
 	badge?: string;
+	// Optional caveat about `displayValue` itself — rendered as a marker beside it, with this
+	// text as the tooltip. For values that are arithmetically right but incomplete, where the
+	// number would otherwise read as the whole story.
+	warning?: string;
 };
