@@ -185,6 +185,10 @@
 
 	// Above this count the list moves into a fixed-height scroll area (and gains a
 	// role switch) so the card stops growing with the member count.
+	// Shared by the card count badges so they keep the same footprint regardless of
+	// how many digits they show (and so a changing count never reflows its neighbours).
+	const COUNT_BADGE_CLASS = 'min-w-10 justify-center tabular-nums';
+
 	const MEMBERS_SCROLL_THRESHOLD = 6;
 	const MEMBER_ROLES = ['admin', 'edit', 'view'] as const;
 	const MEMBER_ROLE_FILTERS = ['all', ...MEMBER_ROLES] as const;
@@ -659,7 +663,7 @@
 							</Item.Description>
 						</Item.Content>
 						<Item.Actions>
-							<Badge>{allowedNamespaces.length}</Badge>
+							<Badge class={COUNT_BADGE_CLASS}>{allowedNamespaces.length}</Badge>
 						</Item.Actions>
 					</Item.Root>
 				</Card.Content>
@@ -725,7 +729,7 @@
 							{/if}
 							<!-- min-w reserves room for a 3-digit count so toggling a filter never
 							     reflows the button next to it -->
-							<Badge class="min-w-10 justify-center tabular-nums">
+							<Badge class={COUNT_BADGE_CLASS}>
 								{filteredMembers.length}
 							</Badge>
 						</div>
