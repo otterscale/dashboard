@@ -170,7 +170,9 @@
 			});
 
 			if (!response.ok) {
-				break;
+				throw new Error(
+					`Harbor artifacts request failed on page ${currentPage}: ${response.status} ${response.statusText}`
+				);
 			}
 
 			const pageModules: HarborModule[] = await response.json();
@@ -240,7 +242,9 @@
 		});
 
 		if (!response.ok) {
-			return [];
+			throw new Error(
+				`Harbor artifacts request failed on page ${currentPage}: ${response.status} ${response.statusText}`
+			);
 		}
 
 		const indexModules: Record<string, ChartType[]> = await response.json();
