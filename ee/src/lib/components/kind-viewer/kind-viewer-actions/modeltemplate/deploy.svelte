@@ -350,6 +350,8 @@
 
 	const mainContainersPath = ['spec', 'template', 'containers'];
 	const templateVolumesPath = ['spec', 'template', 'volumes'];
+	const baseRefsPath = ['spec', 'baseRefs'];
+	const localDiskPvcEvictorRef = { name: 'local-disk-pvc-evictor' };
 
 	function ensureEntryByName(target: object, path: Array<string | number>, name: string): number {
 		const index = lodash.findIndex(lodash.get(target, path), { name });
@@ -370,7 +372,13 @@
 
 	// Snapshot of the container/volume subtrees before the KV cache offloading
 	// bump, so re-submitting the step stays idempotent and disabling reverts.
-	let kvCacheOffloadingPristine: { containers: unknown; volumes: unknown } | null = null;
+	// baseRefs doesn't need this: whether the evictor ref is present is
+	// visible directly from its position, so enable/disable can check and
+	// mutate it in place instead of tracking a separate pristine copy.
+	let kvCacheOffloadingPristine: {
+		containers: unknown;
+		volumes: unknown;
+	} | null = null;
 
 	function snapshotKvCacheOffloadingTargets() {
 		if (kvCacheOffloadingPristine) return;
@@ -395,6 +403,26 @@
 			}
 		}
 		kvCacheOffloadingPristine = null;
+	}
+
+	function isLocalDiskPvcEvictorRef(ref: { name: string } | undefined): boolean {
+		return ref?.name === localDiskPvcEvictorRef.name;
+	}
+
+	// Enable: put it at the front, unless it's already there.
+	function prependLocalDiskPvcEvictorBaseRef() {
+		const current = lodash.get(values, baseRefsPath, []) as Array<{ name: string }>;
+		if (isLocalDiskPvcEvictorRef(current[0])) return;
+		lodash.set(values, baseRefsPath, [localDiskPvcEvictorRef, ...current]);
+	}
+
+	// Disable: only strip it if it's actually leading the array. Never
+	// touches baseRefs otherwise, so a template that has its own refs is
+	// left alone.
+	function removeLeadingLocalDiskPvcEvictorBaseRef() {
+		const current = lodash.get(values, baseRefsPath, []) as Array<{ name: string }>;
+		if (!isLocalDiskPvcEvictorRef(current[0])) return;
+		lodash.set(values, baseRefsPath, current.slice(1));
 	}
 
 	function applyKvCacheOffloadingResources(cpuQuantity: string) {
@@ -994,9 +1022,11 @@
 
 									snapshotKvCacheOffloadingTargets();
 									applyKvCacheOffloadingResources(cpu);
+									prependLocalDiskPvcEvictorBaseRef();
 								} else {
 									lodash.unset(values, kvCacheOffloadingPath);
 									pruneEmptyAncestors(values, kvCacheOffloadingPath);
+									removeLeadingLocalDiskPvcEvictorBaseRef();
 								}
 
 								handleNext();
