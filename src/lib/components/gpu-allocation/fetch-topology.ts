@@ -114,6 +114,43 @@ async function attachPvcSizes(
 	}
 }
 
+/**
+ * Attach the OtterScale workspace name to each pod by matching the pod's
+ * namespace against Workspace resources (spec.namespace). Listing workspaces
+ * may be forbidden for non-admin users; pods then simply show no workspace.
+ * Returns the namespace → workspace map for reuse by callers.
+ */
+async function attachWorkspaces(
+	client: ResourceClient,
+	cluster: string,
+	pods: PodInfo[]
+): Promise<Map<string, string>> {
+	const workspaceByNamespace = new Map<string, string>();
+	try {
+		const res = await client.list({
+			cluster,
+			group: 'tenant.otterscale.io',
+			version: 'v1alpha1',
+			resource: 'workspaces',
+			namespace: ''
+		});
+		for (const item of res.items) {
+			const obj = item.object as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+			const name = obj?.metadata?.name;
+			const namespace = obj?.spec?.namespace;
+			if (typeof name === 'string' && typeof namespace === 'string' && name && namespace) {
+				workspaceByNamespace.set(namespace, name);
+			}
+		}
+		for (const pod of pods) {
+			pod.workspace = workspaceByNamespace.get(pod.namespace) ?? '';
+		}
+	} catch {
+		console.warn('Failed to list workspaces');
+	}
+	return workspaceByNamespace;
+}
+
 export async function fetchLLMInferenceServiceTopology(
 	client: ResourceClient,
 	cluster: string,
@@ -252,11 +289,18 @@ export async function fetchLLMInferenceServiceTopology(
 	// 6. Cross-reference: find which pods use which GPUs
 	crossReferencePodGpus(allocationPods, gpus);
 
-	// 7. Resolve PVC sizes for the pods rendered in the diagram
-	await attachPvcSizes(client, cluster, pods);
+	// 7. Resolve PVC sizes and workspaces for the pods rendered in the diagram
+	const [, workspaceByNamespace] = await Promise.all([
+		attachPvcSizes(client, cluster, pods),
+		attachWorkspaces(client, cluster, pods)
+	]);
 
 	return {
-		llmInferenceService: { name: serviceName, namespace },
+		llmInferenceService: {
+			name: serviceName,
+			namespace,
+			workspace: workspaceByNamespace.get(namespace) ?? ''
+		},
 		pods,
 		gpus,
 		nodes
@@ -334,8 +378,11 @@ export async function fetchNodeTopology(
 	// 4. Cross-reference
 	crossReferencePodGpus(pods, gpus);
 
-	// 5. Resolve PVC sizes for the pods rendered in the diagram
-	await attachPvcSizes(client, cluster, pods);
+	// 5. Resolve PVC sizes and workspaces for the pods rendered in the diagram
+	await Promise.all([
+		attachPvcSizes(client, cluster, pods),
+		attachWorkspaces(client, cluster, pods)
+	]);
 
 	return { pods, gpus, nodes };
 }

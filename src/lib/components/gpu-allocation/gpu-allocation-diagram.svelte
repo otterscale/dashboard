@@ -72,7 +72,8 @@
 				position: { x: 0, y: 0 },
 				data: {
 					name: topologyData.llmInferenceService.name,
-					namespace: topologyData.llmInferenceService.namespace
+					namespace: topologyData.llmInferenceService.namespace,
+					workspace: topologyData.llmInferenceService.workspace ?? ''
 				}
 			});
 
@@ -89,6 +90,7 @@
 					data: {
 						name: pod.name,
 						namespace: pod.namespace,
+						workspace: pod.workspace ?? '',
 						status: pod.status,
 						gpuCount: pod.allocations.length,
 						role: pod.role ?? '',
@@ -193,6 +195,7 @@
 					data: {
 						name: pod.name,
 						namespace: pod.namespace,
+						workspace: pod.workspace ?? '',
 						status: pod.status,
 						gpuCount: pod.allocations.length,
 						role: pod.role ?? '',
@@ -356,7 +359,7 @@
 					</div>
 					<div class="flex items-center gap-2">
 						<span class="rounded-sm bg-chart-5/10 px-1 text-[9px] font-medium text-chart-5"
-							>KV→SSD</span
+							>KV Offload</span
 						>
 						<span>KV cache offload to SSD</span>
 					</div>

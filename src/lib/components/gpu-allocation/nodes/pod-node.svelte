@@ -55,6 +55,16 @@
 	const usedMem = $derived(Number(data.usedMem ?? 0));
 	const isMig = $derived(Boolean(data.isMig));
 
+	// Scope breadcrumb: "workspace / namespace" — the path encodes the ownership
+	// hierarchy, so no key labels are needed on the card itself.
+	const workspace = $derived(String(data.workspace ?? ''));
+	const namespace = $derived(String(data.namespace ?? ''));
+	const scopeTitle = $derived(
+		[workspace ? `Workspace: ${workspace}` : '', namespace ? `Namespace: ${namespace}` : '']
+			.filter(Boolean)
+			.join(' · ')
+	);
+
 	const pvcs = $derived((Array.isArray(data.pvcs) ? data.pvcs : []) as PodPvc[]);
 	const usesSsd = $derived(pvcs.length > 0);
 	const ssdTitle = $derived(
@@ -101,7 +111,7 @@
 				title={ssdTitle}
 			>
 				<HardDrive size={10} />
-				KV→SSD
+				KV Offload
 			</span>
 		{/if}
 		<span
@@ -113,9 +123,11 @@
 	</div>
 	<div class="space-y-1.5 px-3 py-2">
 		<div class="truncate text-xs font-medium" title={String(data.name ?? '')}>{data.name}</div>
-		{#if data.namespace}
-			<div class="truncate text-[11px] text-muted-foreground" title={String(data.namespace)}>
-				ns: {data.namespace}
+		{#if workspace || namespace}
+			<div class="truncate text-[11px] text-muted-foreground" title={scopeTitle}>
+				{#if workspace}<span class="text-foreground/80">{workspace}</span>
+					<span>/</span>
+				{/if}{namespace}
 			</div>
 		{/if}
 		<div class="flex flex-wrap items-center gap-1 pt-0.5">

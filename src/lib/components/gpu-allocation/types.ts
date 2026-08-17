@@ -34,6 +34,7 @@ export interface PodPvc {
 export interface PodInfo {
 	name: string;
 	namespace: string;
+	workspace?: string; // OtterScale workspace owning the pod's namespace
 	nodeName: string;
 	allocations: GpuAllocation[];
 	status: string;
@@ -54,7 +55,7 @@ export interface NodeInfo {
 }
 
 export interface TopologyData {
-	llmInferenceService?: { name: string; namespace: string };
+	llmInferenceService?: { name: string; namespace: string; workspace?: string };
 	pods: PodInfo[];
 	gpus: GpuInfo[];
 	nodes: NodeInfo[];
