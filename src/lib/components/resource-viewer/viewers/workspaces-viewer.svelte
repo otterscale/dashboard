@@ -239,64 +239,80 @@
 		version: string;
 		kind: string;
 		resource: string;
+		namespaced: boolean;
 	};
 
 	let relatedResources = $derived.by(() => {
-		const refs: RelatedResource[] = [];
+		const relatedResources: RelatedResource[] = [];
 		const status = object?.status;
-		if (!status) return refs;
+		if (!status) return relatedResources;
 
-		const singleRefs: {
-			ref: typeof status.namespaceRef;
+		const relatedResourceReference: {
+			reference: typeof status.namespaceRef;
 			group: string;
 			version: string;
 			kind: string;
 			resource: string;
+			namespaced: boolean;
 		}[] = [
 			{
-				ref: status.namespaceRef,
+				reference: status.namespaceRef,
 				group: '',
 				version: 'v1',
 				kind: 'Namespace',
-				resource: 'namespaces'
+				resource: 'namespaces',
+				namespaced: false
 			},
 			{
-				ref: status.resourceQuotaRef,
+				reference: status.resourceQuotaRef,
 				group: '',
 				version: 'v1',
 				kind: 'ResourceQuota',
-				resource: 'resourcequotas'
+				resource: 'resourcequotas',
+				namespaced: true
 			},
 			{
-				ref: status.configMapRef as { [k: string]: unknown; name: string; namespace?: string },
+				reference: status.configMapRef as {
+					[k: string]: unknown;
+					name: string;
+					namespace?: string;
+				},
 				group: '',
 				version: 'v1',
 				kind: 'ConfigMap',
-				resource: 'configmaps'
+				resource: 'configmaps',
+				namespaced: true
 			},
 			{
-				ref: status.limitRangeRef,
+				reference: status.limitRangeRef,
 				group: '',
 				version: 'v1',
 				kind: 'LimitRange',
-				resource: 'limitranges'
+				resource: 'limitranges',
+				namespaced: true
 			},
 			{
-				ref: status.networkPolicyRef,
+				reference: status.networkPolicyRef,
 				group: 'networking.k8s.io',
 				version: 'v1',
 				kind: 'NetworkPolicy',
-				resource: 'networkpolicies'
+				resource: 'networkpolicies',
+				namespaced: true
 			},
 			{
-				ref: status.helmRepositoryRef as { [k: string]: unknown; name: string; namespace?: string },
+				reference: status.helmRepositoryRef as {
+					[k: string]: unknown;
+					name: string;
+					namespace?: string;
+				},
 				group: 'source.toolkit.fluxcd.io',
 				version: 'v1',
 				kind: 'HelmRepository',
-				resource: 'helmrepositories'
+				resource: 'helmrepositories',
+				namespaced: true
 			},
 			{
-				ref: status.imagePullSecretRef as {
+				reference: status.imagePullSecretRef as {
 					[k: string]: unknown;
 					name: string;
 					namespace?: string;
@@ -304,29 +320,33 @@
 				group: '',
 				version: 'v1',
 				kind: 'Secret',
-				resource: 'secrets'
-			}
+				resource: 'secrets',
+				namespaced: true
+			},
+			...(status?.roleBindingRefs ?? []).map((roleBindingRef) => ({
+				reference: roleBindingRef,
+				group: 'rbac.authorization.k8s.io',
+				version: 'v1',
+				kind: 'RoleBinding',
+				resource: 'rolebindings',
+				namespaced: true
+			}))
 		];
 
-		for (const { ref, group, version, kind, resource } of singleRefs) {
-			if (ref?.name) {
-				refs.push({ name: ref.name, group, version, kind, resource });
+		for (const {
+			reference,
+			group,
+			version,
+			kind,
+			resource,
+			namespaced
+		} of relatedResourceReference) {
+			if (reference?.name) {
+				relatedResources.push({ name: reference.name, group, version, kind, resource, namespaced });
 			}
 		}
 
-		for (const roleBindingRef of status.roleBindingRefs ?? []) {
-			if (roleBindingRef.name) {
-				refs.push({
-					name: roleBindingRef.name,
-					group: 'rbac.authorization.k8s.io',
-					version: 'v1',
-					kind: 'RoleBinding',
-					resource: 'rolebindings'
-				});
-			}
-		}
-
-		return refs;
+		return relatedResources;
 	});
 </script>
 
@@ -773,39 +793,51 @@
 			</Card.Root>
 		</Field.Set>
 
+		{@const namespace = object.status?.namespaceRef?.name ?? ''}
 		<Field.Set>
-			<!-- Related Resources -->
-			<Item.Root class="p-0">
-				<Item.Content>
-					<Item.Title>Related Resources</Item.Title>
-					<Item.Description>
-						{relatedResources.length} resources related to {object.kind}
-						{object.metadata?.name}
-					</Item.Description>
-				</Item.Content>
-			</Item.Root>
 			{#if relatedResources.length > 0}
+				<!-- Related Resources -->
+				<Item.Root class="p-0">
+					<Item.Content>
+						<Item.Title>Related Resources</Item.Title>
+						<Item.Description>
+							{relatedResources.length} resources related to {object.kind}
+							{object.metadata?.name}
+						</Item.Description>
+					</Item.Content>
+				</Item.Root>
+
 				<div class="grid gap-4 xl:grid-cols-3 2xl:grid-cols-4">
-					{#each relatedResources as ref (ref.kind + ref.name)}
-						<Item.Root variant="outline">
-							{#snippet child({ props })}
-								{@const ns = object.status?.namespaceRef?.name ?? ''}
-								{@const url = resolve(
-									`/(auth)/${page.params.cluster}/${page.params.workspace}/${ref.name}?group=${ref.group}&version=${ref.version}&kind=${ref.kind}&resource=${ref.resource}&namespace=${ns}`
-								)}
-								<a href={url} target="_blank" rel="noopener noreferrer" {...props}>
-									<Item.Content>
-										<Item.Title>{ref.name}</Item.Title>
-										<Item.Description>
-											{ref.resource}.{ref.group ? `${ref.group}/${ref.version}` : ref.version}
-										</Item.Description>
-									</Item.Content>
-									<Item.Actions>
-										<ExternalLinkIcon class="size-4" />
-									</Item.Actions>
-								</a>
-							{/snippet}
-						</Item.Root>
+					{#each relatedResources as relatedResource (relatedResource.kind + relatedResource.name)}
+						{#if !relatedResource.namespaced || (relatedResource.namespaced && namespace)}
+							<Item.Root variant="outline">
+								{#snippet child({ props })}
+									{@const urlSearchParameters = new URLSearchParams({
+										group: relatedResource.group,
+										version: relatedResource.version,
+										kind: relatedResource.kind,
+										resource: relatedResource.resource,
+										...(relatedResource.namespaced ? { namespace: namespace } : {})
+									})}
+									{@const url = resolve(
+										`/(auth)/${page.params.cluster}/${page.params.workspace}/${relatedResource.name}?${urlSearchParameters}`
+									)}
+									<a href={url} target="_blank" rel="noopener noreferrer" {...props}>
+										<Item.Content>
+											<Item.Title>{relatedResource.name}</Item.Title>
+											<Item.Description>
+												{relatedResource.resource}.{relatedResource.group
+													? `${relatedResource.group}/${relatedResource.version}`
+													: relatedResource.version}
+											</Item.Description>
+										</Item.Content>
+										<Item.Actions>
+											<ExternalLinkIcon class="size-4" />
+										</Item.Actions>
+									</a>
+								{/snippet}
+							</Item.Root>
+						{/if}
 					{/each}
 				</div>
 			{:else}
