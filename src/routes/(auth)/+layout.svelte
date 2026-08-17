@@ -11,6 +11,7 @@
 	import CpuIcon from '@lucide/svelte/icons/cpu';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import GaugeIcon from '@lucide/svelte/icons/gauge';
+	import GitGraphIcon from '@lucide/svelte/icons/git-graph';
 	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 	import LayersIcon from '@lucide/svelte/icons/layers';
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
@@ -306,6 +307,31 @@
 				]
 			},
 			{
+				title: m.git_ops(),
+				icon: GitGraphIcon,
+				isActive: true,
+				items: [
+					{
+						title: m.kustomize(),
+						url: resourceUrl({
+							group: 'kustomize.toolkit.fluxcd.io',
+							version: 'v1',
+							kind: 'Kustomization',
+							resource: 'kustomizations'
+						})
+					},
+					{
+						title: m.git_repository(),
+						url: resourceUrl({
+							group: 'source.toolkit.fluxcd.io',
+							version: 'v1',
+							kind: 'GitRepository',
+							resource: 'gitrepositories'
+						})
+					}
+				]
+			},
+			{
 				title: m.workload(),
 				icon: ContainerIcon,
 				items: [
@@ -358,21 +384,6 @@
 							version: 'v1beta1',
 							kind: 'DataVolume',
 							resource: 'datavolumes'
-						})
-					}
-				]
-			},
-			{
-				title: m.storage(),
-				icon: HardDriveIcon,
-				items: [
-					{
-						title: m.object_storage(),
-						url: resourceUrl({
-							group: 'objectbucket.io',
-							version: 'v1alpha1',
-							kind: 'ObjectBucketClaim',
-							resource: 'objectbucketclaims'
 						})
 					}
 				]

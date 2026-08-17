@@ -6,6 +6,7 @@
 	import Gauge from '@lucide/svelte/icons/gauge';
 	import Grid from '@lucide/svelte/icons/grid';
 	import HeartPulse from '@lucide/svelte/icons/heart-pulse';
+	import ListFilter from '@lucide/svelte/icons/list-filter';
 	import Network from '@lucide/svelte/icons/network';
 	import Shield from '@lucide/svelte/icons/shield';
 	import Users from '@lucide/svelte/icons/users';
@@ -17,11 +18,14 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { typographyVariants } from '$lib/components/typography/index.ts';
+	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Card from '$lib/components/ui/card';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as Item from '$lib/components/ui/item';
+	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { Toggle } from '$lib/components/ui/toggle/index.js';
@@ -175,6 +179,60 @@
 
 	let isResourceQuotasGrid = $state(false);
 
+	type WorkspaceMember = NonNullable<
+		TenantOtterscaleIoV1Alpha1Workspace['spec']
+	>['members'][number];
+
+	// Above this count the list moves into a fixed-height scroll area (and gains a
+	// role switch) so the card stops growing with the member count.
+	// Shared by the card count badges so they keep the same footprint regardless of
+	// how many digits they show (and so a changing count never reflows its neighbours).
+	const COUNT_BADGE_CLASS = 'min-w-10 justify-center tabular-nums';
+
+	const MEMBERS_SCROLL_THRESHOLD = 6;
+	const MEMBER_ROLES = ['admin', 'edit', 'view'] as const;
+	const MEMBER_ROLE_FILTERS = ['all', ...MEMBER_ROLES] as const;
+
+	let memberRoleFilter = $state<string>('all');
+
+	const members = $derived(object.spec?.members ?? []);
+	const filteredMembers = $derived(
+		memberRoleFilter === 'all'
+			? members
+			: members.filter((member) => member.role === memberRoleFilter)
+	);
+	const memberRoleCounts = $derived(
+		Object.fromEntries(
+			MEMBER_ROLES.map((role) => [role, members.filter((member) => member.role === role).length])
+		) as Record<(typeof MEMBER_ROLES)[number], number>
+	);
+	const memberRoleSummary = $derived(
+		MEMBER_ROLES.filter((role) => memberRoleCounts[role] > 0)
+			.map((role) => `${memberRoleCounts[role]} ${role}`)
+			.join(' · ')
+	);
+
+	function getMemberLabel(member: WorkspaceMember): string {
+		return member.name || member.username || member.subject;
+	}
+
+	function getMemberInitials(member: WorkspaceMember): string {
+		const label = getMemberLabel(member);
+		const initials = label
+			.split(/[\s._-]+/)
+			.filter(Boolean)
+			.slice(0, 2)
+			.map((part) => part[0])
+			.join('');
+		return (initials || label.slice(0, 2)).toUpperCase();
+	}
+
+	function getMemberRoleVariant(role: WorkspaceMember['role']) {
+		if (role === 'admin') return 'default' as const;
+		if (role === 'edit') return 'secondary' as const;
+		return 'outline' as const;
+	}
+
 	type RelatedResource = {
 		name: string;
 		group: string;
@@ -301,6 +359,46 @@
 		</Field.Set>
 	</Field.Group>
 {:else}
+	{#snippet memberGrid()}
+		<div class="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2 2xl:grid-cols-3">
+			{#each filteredMembers as member (member.subject)}
+				<Item.Root class="p-0" size="sm">
+					<Item.Media>
+						<Avatar.Root size="sm">
+							<Avatar.Fallback>{getMemberInitials(member)}</Avatar.Fallback>
+						</Avatar.Root>
+					</Item.Media>
+					<Item.Content class="min-w-0">
+						<Item.Title class="w-full justify-between">
+							<span class="truncate">{getMemberLabel(member)}</span>
+							<span class="flex shrink-0 items-center gap-2">
+								{#if member.serviceAccount}
+									<Badge variant="destructive">service account</Badge>
+								{/if}
+								<Badge variant={getMemberRoleVariant(member.role)}>{member.role}</Badge>
+							</span>
+						</Item.Title>
+						<Item.Description class="min-w-0">
+							<Tooltip.Root>
+								<Tooltip.Trigger class="block max-w-full text-left font-mono">
+									{#if member.username}
+										<span class="block truncate">{member.username}</span>
+									{/if}
+									<span class="block truncate">{member.subject}</span>
+								</Tooltip.Trigger>
+								<Tooltip.Content class="font-mono">
+									{#if member.username}
+										<p>username: {member.username}</p>
+									{/if}
+									<p>subject: {member.subject}</p>
+								</Tooltip.Content>
+							</Tooltip.Root>
+						</Item.Description>
+					</Item.Content>
+				</Item.Root>
+			{/each}
+		</div>
+	{/snippet}
 	<Field.Group>
 		<!-- Spec Section -->
 		<Field.Set>
@@ -565,15 +663,16 @@
 							</Item.Description>
 						</Item.Content>
 						<Item.Actions>
-							<Badge>{allowedNamespaces.length}</Badge>
+							<Badge class={COUNT_BADGE_CLASS}>{allowedNamespaces.length}</Badge>
 						</Item.Actions>
 					</Item.Root>
 				</Card.Content>
 			</Card.Root>
 
 			<!-- Members -->
-			<Card.Root class="flex h-full flex-col border-0 bg-muted/30 shadow-none ring-0">
-				{@const members = object.spec?.members ?? []}
+			<!-- h-fit (not h-full): the fixed-height ScrollArea below makes this card taller than
+			     its siblings, and a stretched height would get clipped by Card.Root overflow-hidden -->
+			<Card.Root class="flex h-fit flex-col border-0 bg-muted/30 shadow-none ring-0">
 				<Card.Header>
 					<Card.Title>
 						<Item.Root class="p-0">
@@ -582,34 +681,93 @@
 							</Item.Media>
 							<Item.Content>
 								<Item.Title class={typographyVariants({ variant: 'h6' })}>Members</Item.Title>
+								{#if memberRoleSummary}
+									<Item.Description>{memberRoleSummary}</Item.Description>
+								{/if}
 							</Item.Content>
 						</Item.Root>
 					</Card.Title>
 					<Card.Action>
-						<Badge>{members.length}</Badge>
+						<div class="flex items-center gap-2">
+							{#if members.length > MEMBERS_SCROLL_THRESHOLD}
+								<Tooltip.Root>
+									<DropdownMenu.Root>
+										<Tooltip.Trigger>
+											<DropdownMenu.Trigger>
+												{#snippet child({ props })}
+													<Toggle
+														{...props}
+														aria-label="Filter Members By Role"
+														size="sm"
+														pressed={memberRoleFilter !== 'all'}
+													>
+														<ListFilter />
+													</Toggle>
+												{/snippet}
+											</DropdownMenu.Trigger>
+										</Tooltip.Trigger>
+										<DropdownMenu.Content align="end">
+											<DropdownMenu.Label>Filter by Role</DropdownMenu.Label>
+											<DropdownMenu.RadioGroup bind:value={memberRoleFilter}>
+												{#each MEMBER_ROLE_FILTERS as roleFilter (roleFilter)}
+													<DropdownMenu.RadioItem
+														value={roleFilter}
+														disabled={roleFilter !== 'all' && memberRoleCounts[roleFilter] === 0}
+														class="capitalize"
+													>
+														{roleFilter}
+														<DropdownMenu.Shortcut>
+															{roleFilter === 'all' ? members.length : memberRoleCounts[roleFilter]}
+														</DropdownMenu.Shortcut>
+													</DropdownMenu.RadioItem>
+												{/each}
+											</DropdownMenu.RadioGroup>
+										</DropdownMenu.Content>
+									</DropdownMenu.Root>
+									<Tooltip.Content>Filter by Role</Tooltip.Content>
+								</Tooltip.Root>
+							{/if}
+							<!-- min-w reserves room for a 3-digit count so toggling a filter never
+							     reflows the button next to it -->
+							<Badge class={COUNT_BADGE_CLASS}>
+								{filteredMembers.length}
+							</Badge>
+						</div>
 					</Card.Action>
 				</Card.Header>
-				<Card.Content class="flex flex-wrap gap-8">
-					<!-- Members must more than one -->
-					{#if members.length > 0}
-						{#each members as member, index (index)}
-							<Item.Root class="p-0" size="sm">
-								<Item.Content>
-									<Item.Title>
-										{member.name}
-										<Badge>{member.role}</Badge>
-										{#if member.serviceAccount}
-											<Badge variant="destructive">service account</Badge>
-										{/if}
-									</Item.Title>
-									<Item.Description>
-										<span>{member.username}</span>
-										<br />
-										<span> {member.subject}</span>
-									</Item.Description>
-								</Item.Content>
-							</Item.Root>
-						{/each}
+				<Card.Content>
+					{#if members.length === 0}
+						<Empty.Root class="h-full">
+							<Empty.Header>
+								<Empty.Media variant="icon">
+									<Users />
+								</Empty.Media>
+								<Empty.Title>No Members</Empty.Title>
+								<Empty.Description>
+									No members have been granted access to this workspace yet.
+								</Empty.Description>
+							</Empty.Header>
+						</Empty.Root>
+					{:else if filteredMembers.length === 0}
+						<Empty.Root class="h-full">
+							<Empty.Header>
+								<Empty.Media variant="icon">
+									<Users />
+								</Empty.Media>
+								<Empty.Title>No Matching Members</Empty.Title>
+								<Empty.Description>
+									No member holds the {memberRoleFilter} role in this workspace.
+								</Empty.Description>
+							</Empty.Header>
+						</Empty.Root>
+					{:else if filteredMembers.length > MEMBERS_SCROLL_THRESHOLD}
+						<ScrollArea class="h-72 w-full">
+							<div class="pr-3">
+								{@render memberGrid()}
+							</div>
+						</ScrollArea>
+					{:else}
+						{@render memberGrid()}
 					{/if}
 				</Card.Content>
 			</Card.Root>

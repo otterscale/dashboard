@@ -6,8 +6,6 @@ import type { Component, Snippet } from 'svelte';
 
 import ApplicationActions from './applications/actions.svelte';
 import ApplicationCreate from './applications/create.svelte';
-import ObjectBucketClaimActions from './ceph-object-bucket-claim/actions.svelte';
-import ObjectBucketClaimCreate from './ceph-object-bucket-claim/create.svelte';
 import ClusterRoleBindingActions from './cluster-role-binding/actions.svelte';
 import ClusterRoleBindingCreate from './cluster-role-binding/create.svelte';
 import CronJobActions from './cronjob/actions.svelte';
@@ -17,6 +15,7 @@ import DataVolumeCreate from './data-volume/create.svelte';
 import DefaultActions from './default/actions.svelte';
 import DefaultCreate from './default/create.svelte';
 import DeploymentActions from './deployment/actions.svelte';
+import GitRepositoryCreate from './git-repository/create.svelte';
 import HelmReleaseActions from './helm-release/actions.svelte';
 import HelmRepositoryActions from './helm-repository/actions.svelte';
 import HelmRepositoryCreate from './helm-repository/create.svelte';
@@ -86,14 +85,14 @@ function getCreate(kind: string, namespace?: string): CreateType {
 			return ClusterRoleBindingCreate as CreateType;
 		case 'DataVolume':
 			return DataVolumeCreate as CreateType;
+		case 'GitRepository':
+			return GitRepositoryCreate as CreateType;
 		case 'HelmRepository':
 			return HelmRepositoryCreate as CreateType;
 		case 'License':
 			return LicenseCreate as CreateType;
 		case 'Node':
 			return DisabledCreate as CreateType;
-		case 'ObjectBucketClaim':
-			return ObjectBucketClaimCreate as CreateType;
 		case 'Schedule':
 			return ScheduleCreate as CreateType;
 		case 'Task':
@@ -143,8 +142,6 @@ function getActions(kind: string, namespace?: string): ActionsType {
 			return LLMInferenceServiceConfigActions as ActionsType;
 		case 'Node':
 			return NodeActions as ActionsType;
-		case 'ObjectBucketClaim':
-			return ObjectBucketClaimActions as ActionsType;
 		case 'Pod':
 			return PodActions as ActionsType;
 		case 'ResourceQuota':
