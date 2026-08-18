@@ -1,9 +1,11 @@
 <script lang="ts">
 	import Box from '@lucide/svelte/icons/box';
+	import HardDrive from '@lucide/svelte/icons/hard-drive';
 	import type { NodeProps } from '@xyflow/svelte';
 	import { Handle, Position } from '@xyflow/svelte';
 
 	import { formatMemory } from '../format';
+	import type { PodPvc } from '../types';
 
 	let { data, selected }: NodeProps = $props();
 
@@ -52,6 +54,22 @@
 	const gpuCount = $derived(Number(data.gpuCount ?? 0));
 	const usedMem = $derived(Number(data.usedMem ?? 0));
 	const isMig = $derived(Boolean(data.isMig));
+
+	// Scope breadcrumb: "workspace / namespace" — the path encodes the ownership
+	// hierarchy, so no key labels are needed on the card itself.
+	const workspace = $derived(String(data.workspace ?? ''));
+	const namespace = $derived(String(data.namespace ?? ''));
+	const scopeTitle = $derived(
+		[workspace ? `Workspace: ${workspace}` : '', namespace ? `Namespace: ${namespace}` : '']
+			.filter(Boolean)
+			.join(' · ')
+	);
+
+	const pvcs = $derived((Array.isArray(data.pvcs) ? data.pvcs : []) as PodPvc[]);
+	const usesSsd = $derived(pvcs.length > 0);
+	const ssdTitle = $derived(
+		pvcs.map((pvc) => (pvc.size ? `${pvc.name} · ${pvc.size}` : pvc.name)).join('\n')
+	);
 </script>
 
 {#if data.hasTargetEdge}
@@ -85,8 +103,19 @@
 				MIG
 			</span>
 		{/if}
+		{#if usesSsd}
+			<span
+				class="{roleLabel || isMig
+					? ''
+					: 'ml-auto'} flex shrink-0 items-center gap-0.5 rounded-sm bg-chart-5/10 px-1.5 py-0.5 text-[10px] font-medium text-chart-5"
+				title={ssdTitle}
+			>
+				<HardDrive size={10} />
+				KV Offload
+			</span>
+		{/if}
 		<span
-			class="inline-block size-2 shrink-0 rounded-full {statusColor} {roleLabel || isMig
+			class="inline-block size-2 shrink-0 rounded-full {statusColor} {roleLabel || isMig || usesSsd
 				? ''
 				: 'ml-auto'}"
 			title={String(data.status ?? 'Unknown')}
@@ -94,9 +123,11 @@
 	</div>
 	<div class="space-y-1.5 px-3 py-2">
 		<div class="truncate text-xs font-medium" title={String(data.name ?? '')}>{data.name}</div>
-		{#if data.namespace}
-			<div class="truncate text-[11px] text-muted-foreground" title={String(data.namespace)}>
-				ns: {data.namespace}
+		{#if workspace || namespace}
+			<div class="truncate text-[11px] text-muted-foreground" title={scopeTitle}>
+				{#if workspace}<span class="text-foreground/80">{workspace}</span>
+					<span>/</span>
+				{/if}{namespace}
 			</div>
 		{/if}
 		<div class="flex flex-wrap items-center gap-1 pt-0.5">
