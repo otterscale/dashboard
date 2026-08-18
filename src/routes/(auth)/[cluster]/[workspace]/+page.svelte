@@ -31,7 +31,6 @@
 	const endpointMap: Record<string, string> = {
 		Application: 'ServiceEndpoint',
 		LLMInferenceService: 'ModelGatewayEndpoint',
-		ObjectBucketClaim: 'ObjectGatewayEndpoint',
 		Service: 'ServiceEndpoint'
 	};
 
@@ -79,8 +78,7 @@
 		const suffixMap: Record<string, string> = {
 			Application: ':<NodePort>',
 			Service: ':<NodePort>',
-			LLMInferenceService: `/${ns}/<Name>`,
-			ObjectBucketClaim: `/${ns}-<Name>`
+			LLMInferenceService: `/${ns}/<Name>`
 		};
 		return `Available at ${endpoint}${suffixMap[kind] ?? ''}`;
 	}

@@ -46,7 +46,7 @@
 
 	const module = $derived(row.original.chart as unknown as ModuleType);
 	const versions = $derived(
-		module.versions.map((moduleVersion) => moduleVersion.version).filter(Boolean)
+		(module.versions ?? []).map((moduleVersion) => moduleVersion.version).filter(Boolean)
 	);
 	const latestVersion = $derived(module.version);
 
