@@ -34,7 +34,7 @@
 		startTour,
 		WorkspaceSwitcher
 	} from '$lib/components/layout';
-	import Registe from '$lib/components/layout/dialog-import-cluster.svelte';
+	import ImportCluster from '$lib/components/layout/import-cluster-external.svelte';
 	import RegisteClusterTrigger from '$lib/components/layout/registe-cluster-trigger.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 	import { Button } from '$lib/components/ui/button';
@@ -891,7 +891,7 @@
 	{/each}
 {/snippet}
 
-<Registe
+<ImportCluster
 	bind:open={importOpen}
 	onsuccess={async () => {
 		links = await fetchClusters();
