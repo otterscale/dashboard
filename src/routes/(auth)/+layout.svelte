@@ -388,21 +388,6 @@
 					}
 				]
 			},
-			{
-				title: m.storage(),
-				icon: HardDriveIcon,
-				items: [
-					{
-						title: m.object_storage(),
-						url: resourceUrl({
-							group: 'objectbucket.io',
-							version: 'v1alpha1',
-							kind: 'ObjectBucketClaim',
-							resource: 'objectbucketclaims'
-						})
-					}
-				]
-			},
 			...(data.isClusterAdmin
 				? [
 						{
