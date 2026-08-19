@@ -419,6 +419,15 @@
 							icon: UserStarIcon,
 							items: [
 								{
+									title: m.resource(),
+									url: page.params.workspace
+										? resolve('/(auth)/[cluster]/[workspace]/resources', {
+												cluster: activeCluster,
+												workspace: page.params.workspace
+											})
+										: ''
+								},
+								{
 									title: m.workspace(),
 									url: resourceUrl({
 										group: 'tenant.otterscale.io',

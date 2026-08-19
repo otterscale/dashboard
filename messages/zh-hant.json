@@ -49,6 +49,7 @@
 	"operator": "操作器",
 	"storage": "儲存",
 	"cluster": "叢集",
+	"resource": "資源",
 	"osd": "物件儲存裝置",
 	"file_system": "檔案系統",
 	"virtual_machine": "虛擬機器",

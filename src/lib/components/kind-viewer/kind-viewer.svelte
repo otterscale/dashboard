@@ -329,128 +329,130 @@
 	{/if}
 {/snippet}
 
-{#if fetchError}
-	<Empty.Root>
-		<Empty.Header>
-			<Empty.Media class="rounded-full bg-muted p-4">
-				<BanIcon size={36} />
-			</Empty.Media>
-			<Empty.Title class="text-2xl font-bold">Failed to load data</Empty.Title>
-			<Empty.Description>
-				{fetchError.message}
-			</Empty.Description>
-		</Empty.Header>
-		<Empty.Content>
-			<Button onclick={resetAndReload}>Retry</Button>
-		</Empty.Content>
-	</Empty.Root>
-{:else if isMounted}
-	{#if columnDefinitions}
-		<DynamicTable
-			{data}
-			{columnDefinitions}
-			{uiSchemas}
-			gridLayout={GridLayout ? gridLayout : undefined}
-		>
-			{#snippet accessReview()}
-				{#if isClusterAdmin}
+<div class="h-full">
+	{#if fetchError}
+		<Empty.Root class="h-full bg-muted">
+			<Empty.Header>
+				<Empty.Media class="rounded-full bg-muted p-4">
+					<BanIcon size={36} />
+				</Empty.Media>
+				<Empty.Title class="text-2xl font-bold">Failed to load data</Empty.Title>
+				<Empty.Description>
+					{fetchError.message}
+				</Empty.Description>
+			</Empty.Header>
+			<Empty.Content>
+				<Button onclick={resetAndReload}>Retry</Button>
+			</Empty.Content>
+		</Empty.Root>
+	{:else if isMounted}
+		{#if columnDefinitions}
+			<DynamicTable
+				{data}
+				{columnDefinitions}
+				{uiSchemas}
+				gridLayout={GridLayout ? gridLayout : undefined}
+			>
+				{#snippet accessReview()}
+					{#if isClusterAdmin}
+						<Tooltip.Root>
+							<Tooltip.Trigger>
+								{#snippet child({ props })}
+									<Toggle
+										{...props}
+										bind:pressed={clustered}
+										onPressedChange={(pressed) => {
+											clustered = pressed;
+											resetAndReload();
+										}}
+										aria-label="switch clustered"
+										variant="outline"
+										class="data-[state=on]:*:text-destructive"
+									>
+										<UsersRoundIcon class="size-4" />
+									</Toggle>
+								{/snippet}
+							</Tooltip.Trigger>
+							<Tooltip.Content>Toggle Cluster-wide View</Tooltip.Content>
+						</Tooltip.Root>
+					{/if}
+				{/snippet}
+				{#snippet create()}
+					{#if schema}
+						<Create
+							role={isClusterAdmin ? 'Cluster Admin' : undefined}
+							{schema}
+							{validate}
+							{cluster}
+							{namespace}
+							group={apiResource.group}
+							version={apiResource.version}
+							kind={apiResource.kind}
+							resource={apiResource.resource}
+						>
+							{#snippet trigger(state)}
+								<Button
+									variant="outline"
+									onclick={() => {
+										state.open = !state.open;
+									}}
+								>
+									<PlusIcon />
+								</Button>
+							{/snippet}
+						</Create>
+					{:else}
+						<Button variant="outline" size="icon" disabled>
+							<PlusIcon />
+						</Button>
+					{/if}
+				{/snippet}
+				{#snippet bulkDelete({ table })}
+					<BulkDelete {table} {cluster} {namespace} {apiResource} />
+				{/snippet}
+				{#snippet reload()}
 					<Tooltip.Root>
 						<Tooltip.Trigger>
 							{#snippet child({ props })}
-								<Toggle
-									{...props}
-									bind:pressed={clustered}
-									onPressedChange={(pressed) => {
-										clustered = pressed;
-										resetAndReload();
-									}}
-									aria-label="switch clustered"
-									variant="outline"
-									class="data-[state=on]:*:text-destructive"
-								>
-									<UsersRoundIcon class="size-4" />
-								</Toggle>
+								<Button {...props} onclick={handleReload} variant="outline" size="icon">
+									{#if isWatching}
+										<CableIcon class="size-4" />
+									{:else}
+										<UnplugIcon class="size-4 text-destructive" />
+									{/if}
+								</Button>
 							{/snippet}
 						</Tooltip.Trigger>
-						<Tooltip.Content>Toggle Cluster-wide View</Tooltip.Content>
+						<Tooltip.Content>{isWatching ? 'Watching' : 'Reconnect'}</Tooltip.Content>
 					</Tooltip.Root>
-				{/if}
-			{/snippet}
-			{#snippet create()}
-				{#if schema}
-					<Create
-						role={isClusterAdmin ? 'Cluster Admin' : undefined}
-						{schema}
-						{validate}
-						{cluster}
-						{namespace}
-						group={apiResource.group}
-						version={apiResource.version}
-						kind={apiResource.kind}
-						resource={apiResource.resource}
-					>
-						{#snippet trigger(state)}
-							<Button
-								variant="outline"
-								onclick={() => {
-									state.open = !state.open;
-								}}
-							>
-								<PlusIcon />
+				{/snippet}
+				{#snippet rowActions({ row })}
+					{#if schema}
+						<Actions
+							role={isClusterAdmin ? 'Cluster Admin' : undefined}
+							{row}
+							object={row.original.raw as JsonObject | undefined}
+							{schema}
+							{validate}
+							{cluster}
+							namespace={namespace
+								? (row.original.raw as Record<string, Record<string, string>>)?.metadata
+										?.namespace || namespace
+								: namespace}
+							group={apiResource.group}
+							version={apiResource.version}
+							kind={apiResource.kind}
+							resource={apiResource.resource}
+						/>
+					{:else}
+						<div class="flex justify-end">
+							<Button size="icon" variant="ghost" class="shadow-none" aria-label="Actions" disabled>
+								<EllipsisIcon size={16} aria-hidden="true" />
 							</Button>
-						{/snippet}
-					</Create>
-				{:else}
-					<Button variant="outline" size="icon" disabled>
-						<PlusIcon />
-					</Button>
-				{/if}
-			{/snippet}
-			{#snippet bulkDelete({ table })}
-				<BulkDelete {table} {cluster} {namespace} {apiResource} />
-			{/snippet}
-			{#snippet reload()}
-				<Tooltip.Root>
-					<Tooltip.Trigger>
-						{#snippet child({ props })}
-							<Button {...props} onclick={handleReload} variant="outline" size="icon">
-								{#if isWatching}
-									<CableIcon class="size-4" />
-								{:else}
-									<UnplugIcon class="size-4 text-destructive" />
-								{/if}
-							</Button>
-						{/snippet}
-					</Tooltip.Trigger>
-					<Tooltip.Content>{isWatching ? 'Watching' : 'Reconnect'}</Tooltip.Content>
-				</Tooltip.Root>
-			{/snippet}
-			{#snippet rowActions({ row })}
-				{#if schema}
-					<Actions
-						role={isClusterAdmin ? 'Cluster Admin' : undefined}
-						{row}
-						object={row.original.raw as JsonObject | undefined}
-						{schema}
-						{validate}
-						{cluster}
-						namespace={namespace
-							? (row.original.raw as Record<string, Record<string, string>>)?.metadata?.namespace ||
-								namespace
-							: namespace}
-						group={apiResource.group}
-						version={apiResource.version}
-						kind={apiResource.kind}
-						resource={apiResource.resource}
-					/>
-				{:else}
-					<div class="flex justify-end">
-						<Button size="icon" variant="ghost" class="shadow-none" aria-label="Actions" disabled>
-							<EllipsisIcon size={16} aria-hidden="true" />
-						</Button>
-					</div>
-				{/if}
-			{/snippet}
-		</DynamicTable>
+						</div>
+					{/if}
+				{/snippet}
+			</DynamicTable>
+		{/if}
 	{/if}
-{/if}
+</div>

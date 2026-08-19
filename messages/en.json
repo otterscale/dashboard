@@ -49,6 +49,7 @@
 	"operator": "Operator",
 	"storage": "Storage",
 	"cluster": "Cluster",
+	"resource": "Resource",
 	"osd": "OSD",
 	"file_system": "File System",
 	"virtual_machine": "Virtual Machine",
