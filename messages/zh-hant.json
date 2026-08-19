@@ -772,5 +772,11 @@
 	"license_adjust_nodes_fifo_hint": "FIFO 模式：節點依加入叢集的順序自動授權。",
 	"license_adjust_nodes_readonly": "此授權已過期或無效，無法調整節點設定。",
 	"license_adjust_nodes_last_accepted": "上次接受：",
-	"containers_without_limit": "{containers} 個容器中有 {uncapped} 個未宣告 Limit"
+	"containers_without_limit": "{containers} 個容器中有 {uncapped} 個未宣告 Limit",
+	"guide_tour": "導覽教學",
+	"start_guide_tour": "開始導覽教學",
+	"terminal": "終端機",
+	"close_terminal": "關閉終端機",
+	"toggle_clusters": "切換叢集",
+	"switch_cluster_action": "切換叢集"
 }
