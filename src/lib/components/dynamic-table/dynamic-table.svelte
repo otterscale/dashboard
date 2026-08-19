@@ -30,7 +30,7 @@
 		type Table as TanStackTabke,
 		type VisibilityState
 	} from '@tanstack/table-core';
-	import { compileExpression } from 'filtrex';
+	import { parse, test } from 'liqe';
 	import lodash from 'lodash';
 	import { createRawSnippet, type Snippet } from 'svelte';
 
@@ -148,23 +148,14 @@
 	let globalFilter = $state('');
 	let globalFilterInput = $state('');
 	let globalFilterError: Error | null = $state(null);
-	const globalFilterExtraFunctions = {
-		Time: (time: string | number | Date) => new Date(time).getTime(),
-		now: () => Date.now(),
-		Seconds: (time: number) => time * 1000,
-		Minutes: (time: number) => time * 60 * 1000,
-		Hours: (time: number) => time * 60 * 60 * 1000,
-		Days: (time: number) => time * 24 * 60 * 60 * 1000,
-		Years: (time: number) => time * 365 * 24 * 60 * 60 * 1000,
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		size: (object: any) => {
-			return object ? Object.keys(object).length : undefined;
+	const parsedGlobalFilter = $derived.by(() => {
+		if (!globalFilter) return null;
+		try {
+			return parse(globalFilter);
+		} catch {
+			return null;
 		}
-	};
-	const globalFilterConstants = {
-		true: true,
-		false: false
-	};
+	});
 
 	let rowSelection = $state<RowSelectionState>({});
 	let columnFilters = $state<ColumnFiltersState>([]);
@@ -266,13 +257,9 @@
 		},
 		globalFilterFn: (row) => {
 			if (!globalFilter) return true;
+			if (!parsedGlobalFilter) return false;
 			try {
-				const filter = compileExpression(globalFilter, {
-					extraFunctions: globalFilterExtraFunctions,
-					constants: globalFilterConstants
-				});
-				const result = filter(row.original);
-				return Boolean(result);
+				return test(parsedGlobalFilter, row.original);
 			} catch {
 				return false;
 			}
@@ -343,10 +330,7 @@
 		try {
 			globalFilterError = null;
 			if (globalFilterInput) {
-				compileExpression(globalFilterInput, {
-					extraFunctions: globalFilterExtraFunctions,
-					constants: globalFilterConstants
-				});
+				parse(globalFilterInput);
 			}
 			globalFilter = globalFilterInput;
 			table.setGlobalFilter(globalFilterInput);
@@ -450,7 +434,7 @@
 				</InputGroup.Addon>
 				<InputGroup.Input
 					id={GLOBAL_FILTER_IDENTIFIER}
-					placeholder="e.g.. Name ~= &quot;resourceName&quot; and Namespace == &quot;namespace&quot;"
+					placeholder="e.g. Name:resourceName AND Namespace:namespace"
 					bind:value={globalFilterInput}
 					class="peer w-full"
 					onkeydown={handleKeyDown}
@@ -481,45 +465,45 @@
 							</Sheet.Trigger>
 							<Sheet.Content side="right" class="min-w-[23vw]">
 								<Sheet.Header>
-									<Sheet.Title>Filtrex Query Language Documentation</Sheet.Title>
+									<Sheet.Title>Liqe Query Language Documentation</Sheet.Title>
 									<Sheet.Description>
-										Filtrex is a simple, safe, and powerful expression language for filtering and
-										searching data. You can use Filtrex queries in the search box to filter table
-										rows using custom logic.
+										Liqe is a Lucene-like query language for filtering and searching data. You can
+										use Liqe queries in the search box to filter table rows using field-based
+										expressions.
 									</Sheet.Description>
 								</Sheet.Header>
 								<div class="overflow-auto p-4 text-sm">
 									<h3 class="font-semibold">Basic Syntax</h3>
 									<div class="p-4 font-mono">
-										<p>Field comparison: age &gt; 18</p>
-										<p>String matching: name == "Alice"</p>
-										<p>Logical operators: status == "active" and score &gt; 80</p>
-										<p>Field names with spaces: 'full name' == "Alice Smith"</p>
+										<p>Field matching: Name:resourceName</p>
+										<p>Nested fields: raw.metadata.name:resourceName</p>
+										<p>Field names with spaces: "full name":Alice</p>
+										<p>Quoted values: Name:"resource name"</p>
+									</div>
+
+									<br />
+
+									<h3 class="font-semibold">Comparisons &amp; Ranges</h3>
+									<div class="p-4 font-mono">
+										<p>Comparison: age:&gt;18, age:&gt;=18, age:&lt;18, age:&lt;=18</p>
+										<p>Inclusive range: age:[18 TO 30]</p>
+										<p>Exclusive range: age:{'{'}18 TO 30{'}'}</p>
+									</div>
+
+									<br />
+
+									<h3 class="font-semibold">Wildcards &amp; Regex</h3>
+									<div class="p-4 font-mono">
+										<p>Wildcards: Name:foo*, Name:foo?bar</p>
+										<p>Regex: Name:/^foo.*bar$/i</p>
 									</div>
 
 									<br />
 
 									<h3 class="font-semibold">Operators</h3>
 									<div class="p-4 font-mono">
-										<p>and, or, not</p>
-										<p>==, ~=, &gt;, &gt;=, &lt;, &lt;=</p>
-									</div>
-
-									<br />
-
-									<h3 class="font-semibold">Functions</h3>
-									<div class="p-4 font-mono">
-										<p>length(array) — Get array length</p>
-										<p>Time(date) — Convert date to timestamp</p>
-										<p>now() — Current timestamp</p>
-										<p>Seconds(n), Minutes(n), Hours(n), Days(n), Years(n)</p>
-									</div>
-
-									<br />
-
-									<h3 class="font-semibold">Constants</h3>
-									<div class="p-4 font-mono">
-										<p>true, false</p>
+										<p>AND, OR, NOT</p>
+										<p>Grouping with parentheses: (Name:foo OR Name:bar) AND Namespace:ns</p>
 									</div>
 
 									<br />
@@ -530,24 +514,13 @@
 										<p>Press <kbd>/</kbd> to focus the search box.</p>
 										<p>Press <kbd>esc</kbd> to clear the filter.</p>
 									</div>
-
-									<br />
-
-									<h3 class="font-semibold">Note</h3>
-									<div class="text-warning p-4 font-mono">
-										<p>
-											Operations between quantities with units (e.g., <code>Mi</code>,
-											<code>k</code>) are
-											<b>not supported yet</b>.
-										</p>
-									</div>
 								</div>
 								<Sheet.Footer>
 									<p class="mt-4 text-xs text-muted-foreground">
 										For advanced usage, refer to the <a
-											href="https://github.com/joewalnes/filtrex"
+											href="https://github.com/gajus/liqe"
 											target="_blank"
-											class="underline">Filtrex documentation</a
+											class="underline">Liqe documentation</a
 										>.
 									</p>
 								</Sheet.Footer>
