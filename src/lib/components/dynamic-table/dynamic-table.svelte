@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
-	import BookIcon from '@lucide/svelte/icons/book';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import ChevronFirstIcon from '@lucide/svelte/icons/chevron-first';
@@ -35,7 +34,7 @@
 	import { createRawSnippet, type Snippet } from 'svelte';
 
 	import { shortcut } from '$lib/actions/shortcut.svelte';
-	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
 	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import {
@@ -51,11 +50,11 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Pagination from '$lib/components/ui/pagination/index.js';
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
-	import * as Sheet from '$lib/components/ui/sheet';
 	import * as Table from '$lib/components/ui/table';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { cn } from '$lib/utils';
 
+	import DynamicTableSearchDocument from './dynamic-table-search-document.svelte';
 	import type { UISchemaType } from './utils';
 
 	let {
@@ -452,84 +451,7 @@
 					</Kbd.Group>
 				</InputGroup.Addon>
 			</InputGroup.Root>
-			<Tooltip.Root>
-				<Tooltip.Trigger>
-					{#snippet child({ props })}
-						<Sheet.Root>
-							<Sheet.Trigger
-								{...props}
-								aria-label="Document"
-								class={buttonVariants({ variant: 'outline', size: 'icon' })}
-							>
-								<BookIcon size={16} />
-							</Sheet.Trigger>
-							<Sheet.Content side="right" class="min-w-[23vw]">
-								<Sheet.Header>
-									<Sheet.Title>Liqe Query Language Documentation</Sheet.Title>
-									<Sheet.Description>
-										Liqe is a Lucene-like query language for filtering and searching data. You can
-										use Liqe queries in the search box to filter table rows using field-based
-										expressions.
-									</Sheet.Description>
-								</Sheet.Header>
-								<div class="overflow-auto p-4 text-sm">
-									<h3 class="font-semibold">Basic Syntax</h3>
-									<div class="p-4 font-mono">
-										<p>Field matching: Name:resourceName</p>
-										<p>Nested fields: raw.metadata.name:resourceName</p>
-										<p>Field names with spaces: "full name":Alice</p>
-										<p>Quoted values: Name:"resource name"</p>
-									</div>
-
-									<br />
-
-									<h3 class="font-semibold">Comparisons &amp; Ranges</h3>
-									<div class="p-4 font-mono">
-										<p>Comparison: age:&gt;18, age:&gt;=18, age:&lt;18, age:&lt;=18</p>
-										<p>Inclusive range: age:[18 TO 30]</p>
-										<p>Exclusive range: age:{'{'}18 TO 30{'}'}</p>
-									</div>
-
-									<br />
-
-									<h3 class="font-semibold">Wildcards &amp; Regex</h3>
-									<div class="p-4 font-mono">
-										<p>Wildcards: Name:foo*, Name:foo?bar</p>
-										<p>Regex: Name:/^foo.*bar$/i</p>
-									</div>
-
-									<br />
-
-									<h3 class="font-semibold">Operators</h3>
-									<div class="p-4 font-mono">
-										<p>AND, OR, NOT</p>
-										<p>Grouping with parentheses: (Name:foo OR Name:bar) AND Namespace:ns</p>
-									</div>
-
-									<br />
-
-									<h3 class="font-semibold">Tips</h3>
-									<div class="p-4 font-mono">
-										<p>Use <kbd>ctrl</kbd> + <kbd>⏎</kbd> to search.</p>
-										<p>Press <kbd>/</kbd> to focus the search box.</p>
-										<p>Press <kbd>esc</kbd> to clear the filter.</p>
-									</div>
-								</div>
-								<Sheet.Footer>
-									<p class="mt-4 text-xs text-muted-foreground">
-										For advanced usage, refer to the <a
-											href="https://github.com/gajus/liqe"
-											target="_blank"
-											class="underline">Liqe documentation</a
-										>.
-									</p>
-								</Sheet.Footer>
-							</Sheet.Content>
-						</Sheet.Root>
-					{/snippet}
-				</Tooltip.Trigger>
-				<Tooltip.Content>Search Documentation</Tooltip.Content>
-			</Tooltip.Root>
+			<DynamicTableSearchDocument />
 		</ButtonGroup.Root>
 		<!-- Accessors -->
 		<div class="ml-auto flex items-center gap-2">
