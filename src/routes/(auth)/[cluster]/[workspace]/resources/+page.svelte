@@ -1,3 +1,17 @@
+<script lang="ts" module>
+	type Identifier = {
+		group: string;
+		version: string;
+		resource: string;
+	};
+
+	export type SelfSubjectRulesReviewStatusResourceRule = {
+		verbs: string[];
+		apiGroups?: string[];
+		resources?: string[];
+	};
+</script>
+
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import BanIcon from '@lucide/svelte/icons/ban';
@@ -9,6 +23,7 @@
 	} from '@otterscale/api/resource/v1';
 	import lodash from 'lodash';
 	import { getContext, onMount } from 'svelte';
+	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 	import { page } from '$app/state';
 	import KindViewer from '$lib/components/kind-viewer/kind-viewer.svelte';
@@ -17,16 +32,9 @@
 	import * as Command from '$lib/components/ui/command/index.js';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item/index.js';
-	import Label from '$lib/components/ui/label/label.svelte';
 	import * as Popover from '$lib/components/ui/popover/index.js';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
-
-	type Identifier = {
-		group: string;
-		version: string;
-		resource: string;
-	};
 
 	const shortcuts: { label: string; identifier: Identifier }[] = [
 		{ label: 'Pod', identifier: { resource: 'pods', group: '', version: 'v1' } },
@@ -64,6 +72,52 @@
 		);
 	}
 
+	type VerbsByGroupResourceSubresource = Map<string, Map<string, Map<string, string[]>>>;
+
+	function getOrCreate<K, V>(map: Map<K, V>, key: K, create: () => V): V {
+		const existing = map.get(key);
+		if (existing) return existing;
+		const created = create();
+		map.set(key, created);
+		return created;
+	}
+
+	function buildVerbsMap(
+		apiResources: APIResource[],
+		resourceRules: SelfSubjectRulesReviewStatusResourceRule[]
+	): VerbsByGroupResourceSubresource {
+		const map: VerbsByGroupResourceSubresource = new Map();
+
+		for (const apiResource of apiResources) {
+			const [resource, subresource = ''] = apiResource.resource.split('/');
+			const group = apiResource.group || '';
+			const combinedResource = subresource ? `${resource}/${subresource}` : resource;
+
+			const verbs = resourceRules
+				.filter((rule) => {
+					const groupMatch = rule.apiGroups?.includes('*') || rule.apiGroups?.includes(group);
+					const resourceMatch = rule.resources?.some(
+						(r) => r === '*' || r === combinedResource || (subresource && r === `*/${subresource}`)
+					);
+					return groupMatch && resourceMatch;
+				})
+				.flatMap((rule) => rule.verbs);
+
+			const resourceMap = getOrCreate(map, group, () => new Map<string, Map<string, string[]>>());
+			const subresourceMap = getOrCreate(resourceMap, resource, () => new Map<string, string[]>());
+			subresourceMap.set(subresource, verbs);
+		}
+
+		return map;
+	}
+
+	function getVerbsByGroupResource(
+		verbsMap: VerbsByGroupResourceSubresource,
+		{ group, resource, subresource = '' }: { group: string; resource: string; subresource?: string }
+	): string[] {
+		return verbsMap.get(group)?.get(resource)?.get(subresource) ?? [];
+	}
+
 	const cluster = $derived(page.params.cluster ?? '');
 
 	const transport: Transport = getContext('transport');
@@ -84,6 +138,8 @@
 		const grouped = lodash.groupBy(main, (apiResource) => apiResource.group || 'core');
 		return { raw: raw, grouped: grouped };
 	}
+
+	const verbsMap = $derived(buildVerbsMap(apiResources, page.data.resourceRules));
 
 	onMount(async () => {
 		try {
@@ -169,12 +225,11 @@
 							{/snippet}
 						</Popover.Trigger>
 						<Popover.Content
-							class="grid max-h-96 w-full min-w-2xl grid-cols-[0.6fr_0_1fr] p-2"
+							class="grid h-[50vh] w-full min-w-2xl grid-cols-[0.6fr_0_1fr] gap-2 p-2"
 							align="end"
 						>
-							<Command.Root class="flex h-full min-w-0 flex-col items-center">
-								<Label class="p-2 text-xs text-muted-foreground">Shortcuts</Label>
-								<Command.List>
+							<Command.Root class="h-full min-w-0">
+								<Command.List class="h-full max-h-none">
 									<Command.Group>
 										{#each shortcuts as shortcut, index (index)}
 											<Command.Item
@@ -199,29 +254,23 @@
 								</Command.List>
 							</Command.Root>
 							<Separator orientation="vertical" />
-							<Command.Root class="min-w-0">
+							<Command.Root class="h-full min-w-0">
 								<Command.Input placeholder="Search resource..." />
-								<Command.List class="h-full overflow-y-auto">
+								<Command.List class="h-full max-h-none">
 									<Command.Empty>No resource found.</Command.Empty>
 									{#each Object.entries(groupedMainAPIResources) as [group, apiResources] (group)}
 										<Command.Group heading={group}>
 											{#each apiResources as apiResource, index (index)}
 												<Command.Item
-													value={`${apiResource.group}/${apiResource.version}/${apiResource.resource}`}
+													value={apiResource.group + apiResource.version + apiResource.resource}
 													onSelect={() => {
 														selectedAPIResource = apiResource;
 													}}
 												>
-													<Item.Root class="w-full p-0">
-														<Item.Content>
-															<Item.Title>{apiResource.resource}</Item.Title>
-														</Item.Content>
-														<Item.Actions
-															class="shrink-0 text-xs text-muted-foreground tabular-nums"
-														>
-															{apiResource.version}
-														</Item.Actions>
-													</Item.Root>
+													{apiResource.resource}
+													<Command.Shortcut>
+														{apiResource.version}
+													</Command.Shortcut>
 												</Command.Item>
 											{/each}
 										</Command.Group>
