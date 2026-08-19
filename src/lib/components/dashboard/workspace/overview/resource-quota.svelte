@@ -14,17 +14,26 @@
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import { formatCapacity, formatPercentage } from '$lib/formatter';
 	import { m } from '$lib/messages';
-	import { escapePromqlStringLiteral } from '$lib/prometheus';
+	import { escapePromqlStringLiteral, LIVE_PODS } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
 		namespace,
+		quotaUnlimited = false,
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		namespace: string;
+		/**
+		 * Workspace has no `spec.resourceQuota.hard`, so no ResourceQuota exists for the namespace
+		 * and `kube_resourcequota` reports nothing at all — neither `hard` nor `used`. The tile then
+		 * renders `used / ∞` from pod-level requests/limits instead of a ratio.
+		 */
+		quotaUnlimited?: boolean;
 		isReloading: boolean;
 	} = $props();
+
+	const UNLIMITED = '∞';
 
 	/** Which ResourceQuota resource keys to visualize (requests.* vs limits.*). */
 	let quotaView = $state<'requests' | 'limits'>('requests');
@@ -76,6 +85,19 @@
 		return `sum(${base}, type="${t}", resource="${resource}"})`;
 	}
 
+	/**
+	 * Pod-level stand-in for ResourceQuota's `used` counter, for namespaces that have no
+	 * ResourceQuota at all. Restricted to non-terminated pods, the same set the quota counts.
+	 */
+	function podResourceSum(kind: 'requests' | 'limits', resource: 'cpu' | 'memory'): string {
+		const nsLit = escapePromqlStringLiteral(namespace);
+		const unit = resource === 'cpu' ? 'core' : 'byte';
+		return (
+			`sum(kube_pod_container_resource_${kind}` +
+			`{namespace="${nsLit}",resource="${resource}",unit="${unit}"} ${LIVE_PODS}) or vector(0)`
+		);
+	}
+
 	/** KSM `resource` label on `kube_pod_container_resource_limits` (dots → underscores). */
 	const KSM_POD_RES_NVIDIA_GPU = 'nvidia_com_gpu';
 	const KSM_POD_RES_NVIDIA_GPUMEM = 'nvidia_com_gpumem';
@@ -101,6 +123,24 @@
 		} catch {
 			return null;
 		}
+	}
+
+	/** No ResourceQuota to read: only the numerators exist, and they come from the pods. */
+	async function fetchUnlimitedUsage() {
+		const [cpuReqU, cpuLimU, memReqU, memLimU, gpuMemUsedFromPods] = await Promise.all([
+			queryScalar(podResourceSum('requests', 'cpu')),
+			queryScalar(podResourceSum('limits', 'cpu')),
+			queryScalar(podResourceSum('requests', 'memory')),
+			queryScalar(podResourceSum('limits', 'memory')),
+			queryScalar(podContainerReadyGpuMemTotalSum(namespace))
+		]);
+
+		cpuUsedReq = cpuReqU;
+		cpuUsedLim = cpuLimU;
+		memUsedReq = memReqU;
+		memUsedLim = memLimU;
+		gpuMemUsed = gpuMemUsedFromPods ?? 0;
+		cpuHardReq = cpuHardLim = memHardReq = memHardLim = gpuMemHard = null;
 	}
 
 	async function fetchQuota() {
@@ -150,7 +190,7 @@
 		try {
 			hasError = false;
 			if (!namespace) return;
-			await fetchQuota();
+			await (quotaUnlimited ? fetchUnlimitedUsage() : fetchQuota());
 		} catch (error) {
 			hasError = true;
 			resetQuotaState();
@@ -187,6 +227,51 @@
 		return formatCapacity(nMb * 1024 * 1024);
 	}
 </script>
+
+<!-- No hard limit to divide by: keep the gauge shape but leave the track empty, and report the
+	 raw usage against ∞. `used === null` means the usage query itself failed. -->
+{#snippet unlimitedGauge(used: string | null)}
+	{#if used === null}
+		<div class="flex h-[168px] w-full flex-col items-center justify-center">
+			<ChartBar class="size-16 animate-pulse text-muted-foreground" />
+			<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
+		</div>
+	{:else}
+		{@const chartConfig = { data: { color: 'var(--chart-3)' } } satisfies Chart.ChartConfig}
+		<Chart.Container
+			config={chartConfig}
+			class="mx-auto my-auto aspect-square h-[168px] w-full max-w-[220px]"
+		>
+			<ArcChart
+				data={[{ value: 0 }]}
+				innerRadius={-15}
+				cornerRadius={15}
+				range={[-120, 120]}
+				maxValue={1}
+				series={[{ key: 'data', color: chartConfig.data.color }]}
+				props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
+				tooltipContext={false}
+			>
+				{#snippet aboveMarks()}
+					<Text
+						value={UNLIMITED}
+						textAnchor="middle"
+						verticalAnchor="middle"
+						class="fill-foreground text-3xl! font-bold"
+						dy={-15}
+					/>
+					<Text
+						value={`${used} / ${UNLIMITED}`}
+						textAnchor="middle"
+						verticalAnchor="middle"
+						class="text-md! text-muted-foreground"
+						dy={15}
+					/>
+				{/snippet}
+			</ArcChart>
+		</Chart.Container>
+	{/if}
+{/snippet}
 
 <Card.Root class="group relative h-full min-h-[160px] gap-2 overflow-hidden">
 	<Gauge
@@ -244,7 +329,11 @@
 				<Statistics.Header>
 					<div class="flex justify-between gap-4">
 						<Statistics.Title>{m.cpu()}</Statistics.Title>
-						{#if cpuHard !== null}
+						{#if quotaUnlimited}
+							<div class="flex items-center gap-1 text-xl">
+								<p class="font-bold">{UNLIMITED}</p>
+							</div>
+						{:else if cpuHard !== null}
 							<div class="flex items-center gap-1 text-xl">
 								<p class="font-bold">{formatCpuCores(cpuHard)}</p>
 							</div>
@@ -252,7 +341,9 @@
 					</div>
 				</Statistics.Header>
 				<Statistics.Content class="min-h-20">
-					{#if hasError || cpuUsed === null || cpuHard === null || cpuHard === 0 || formatPercentage(cpuUsed, cpuHard, 1) === null}
+					{#if quotaUnlimited}
+						{@render unlimitedGauge(hasError || cpuUsed === null ? null : formatCpuCores(cpuUsed))}
+					{:else if hasError || cpuUsed === null || cpuHard === null || cpuHard === 0 || formatPercentage(cpuUsed, cpuHard, 1) === null}
 						<div class="flex h-[168px] w-full flex-col items-center justify-center">
 							<ChartBar class="size-16 animate-pulse text-muted-foreground" />
 							<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
@@ -306,7 +397,11 @@
 				<Statistics.Header>
 					<div class="flex justify-between gap-4">
 						<Statistics.Title>{m.ram()}</Statistics.Title>
-						{#if memHard !== null}
+						{#if quotaUnlimited}
+							<div class="flex items-center gap-1 text-xl">
+								<p class="font-bold">{UNLIMITED}</p>
+							</div>
+						{:else if memHard !== null}
 							{@const { value, unit } = formatCapacity(memHard)}
 							<div class="flex items-center gap-1 text-xl">
 								<p class="font-bold">{value} {unit}</p>
@@ -315,7 +410,12 @@
 					</div>
 				</Statistics.Header>
 				<Statistics.Content class="min-h-20">
-					{#if hasError || memUsed === null || memHard === null || memHard === 0 || formatPercentage(memUsed, memHard, 1) === null}
+					{#if quotaUnlimited}
+						{@const used = memUsed === null ? null : formatCapacity(memUsed)}
+						{@render unlimitedGauge(
+							hasError || used === null ? null : `${used.value} ${used.unit}`
+						)}
+					{:else if hasError || memUsed === null || memHard === null || memHard === 0 || formatPercentage(memUsed, memHard, 1) === null}
 						<div class="flex h-[168px] w-full flex-col items-center justify-center">
 							<ChartBar class="size-16 animate-pulse text-muted-foreground" />
 							<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
@@ -371,7 +471,11 @@
 				<Statistics.Header>
 					<div class="flex justify-between gap-4">
 						<Statistics.Title>GPU Memory</Statistics.Title>
-						{#if gpuMemHard !== null}
+						{#if quotaUnlimited}
+							<div class="flex items-center gap-1 text-xl">
+								<p class="font-bold">{UNLIMITED}</p>
+							</div>
+						{:else if gpuMemHard !== null}
 							{@const { value, unit } = formatGpuMem(gpuMemHard)}
 							<div class="flex items-center gap-1 text-xl">
 								<p class="font-bold">{value} {unit}</p>
@@ -380,7 +484,12 @@
 					</div>
 				</Statistics.Header>
 				<Statistics.Content class="min-h-20">
-					{#if hasError || gpuMemUsed === null || gpuMemHard === null}
+					{#if quotaUnlimited}
+						{@const used = gpuMemUsed === null ? null : formatGpuMem(gpuMemUsed)}
+						{@render unlimitedGauge(
+							hasError || used === null ? null : `${used.value} ${used.unit}`
+						)}
+					{:else if hasError || gpuMemUsed === null || gpuMemHard === null}
 						<div class="flex h-[168px] w-full flex-col items-center justify-center">
 							<ChartBar class="size-16 animate-pulse text-muted-foreground" />
 							<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
