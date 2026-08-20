@@ -181,16 +181,15 @@
 		}
 	);
 
-	// svelte-ignore state_referenced_locally
-	let globalFilterTerm = $state(globalFilter);
-	let submitGlobalFilterError = $state<Error | null>(null);
-	const parseGlobalFilterError = $derived(structuredGlobalFilter.error);
+	let globalFilterTerm = $derived(globalFilter);
 
-	$effect(() => {
-		globalFilterTerm = globalFilter;
-		submitGlobalFilterError = null;
+	// A writable derived: recomputing to null whenever the query changes, but  handleSearch can assign a parse failure into it, which then survives until  the next query change.
+	// The `void` is what establishes that dependency.
+	let submitGlobalFilterError = $derived.by<Error | null>(() => {
+		void globalFilter;
+		return null;
 	});
-
+	const parseGlobalFilterError = $derived(structuredGlobalFilter.error);
 	const globalFilterError = $derived(submitGlobalFilterError ?? parseGlobalFilterError);
 
 	let rowSelection = $state<RowSelectionState>({});
