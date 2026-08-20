@@ -5,11 +5,20 @@
 		resource: string;
 	};
 
-	export type SelfSubjectRulesReviewStatusResourceRule = {
+	type ResourceRule = {
 		verbs: string[];
 		apiGroups?: string[];
 		resources?: string[];
+		resourceNames?: string[];
 	};
+
+	type Verbs = {
+		resourceVerbs: string[];
+		subresourceVerbs: Record<string, string[]>;
+		resourceNameVerbs: Record<string, string[]>;
+	};
+
+	type VerbsByGroupResource = Record<string, Record<string, Verbs>>;
 </script>
 
 <script lang="ts">
@@ -23,7 +32,6 @@
 	} from '@otterscale/api/resource/v1';
 	import lodash from 'lodash';
 	import { getContext, onMount } from 'svelte';
-	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
 	import { page } from '$app/state';
 	import KindViewer from '$lib/components/kind-viewer/kind-viewer.svelte';
@@ -36,86 +44,110 @@
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 
-	const shortcuts: { label: string; identifier: Identifier }[] = [
-		{ label: 'Pod', identifier: { resource: 'pods', group: '', version: 'v1' } },
-		{ label: 'Job', identifier: { resource: 'jobs', group: 'batch', version: 'v1' } },
-		{ label: 'Deployment', identifier: { resource: 'deployments', group: 'apps', version: 'v1' } },
-		{ label: 'DaemonSet', identifier: { resource: 'daemonsets', group: 'apps', version: 'v1' } },
-		{
-			label: 'Persistent Volume Claim',
-			identifier: { resource: 'persistentvolumeclaims', group: '', version: 'v1' }
-		},
-		{
-			label: 'Storage Class',
-			identifier: { resource: 'storageclasses', group: 'storage.k8s.io', version: 'v1' }
-		},
-		{
-			label: 'Gateway',
-			identifier: { resource: 'gateways', group: 'gateway.networking.k8s.io', version: 'v1' }
-		},
-		{ label: 'Service', identifier: { resource: 'services', group: '', version: 'v1' } }
+	const shortcutIdentifiers: { group: string; resource: string }[] = [
+		{ group: '', resource: 'pods' },
+		{ group: 'batch', resource: 'jobs' },
+		{ group: 'apps', resource: 'deployments' },
+		{ group: 'apps', resource: 'daemonsets' },
+		{ group: '', resource: 'persistentvolumeclaims' },
+		{ group: 'storage.k8s.io', resource: 'storageclasses' },
+		{ group: 'gateway.networking.k8s.io', resource: 'gateways' },
+		{ group: '', resource: 'services' }
 	];
 
-	function getAPIResourceByGroupVersionResource(
-		apiResources: APIResource[],
-		identifier: {
-			group: string;
-			version: string;
-			resource: string;
-		}
-	): APIResource | undefined {
-		return apiResources.find(
-			(apiResource) =>
-				(apiResource.group || 'core') === (identifier.group || 'core') &&
-				apiResource.version === identifier.version &&
-				apiResource.resource === identifier.resource
-		);
+	function hasVerb(verbs: string[], verb: string): boolean {
+		return verbs.includes('*') || verbs.includes(verb);
 	}
 
-	type VerbsByGroupResourceSubresource = Map<string, Map<string, Map<string, string[]>>>;
+	function matchesGroup(resourceRule: ResourceRule, group: string): boolean {
+		if (!resourceRule.apiGroups) return false;
 
-	function getOrCreate<K, V>(map: Map<K, V>, key: K, create: () => V): V {
-		const existing = map.get(key);
-		if (existing) return existing;
-		const created = create();
-		map.set(key, created);
-		return created;
+		for (const apiGroup of resourceRule.apiGroups) {
+			if (apiGroup === '*') return true;
+			if (apiGroup === group) return true;
+		}
+
+		return false;
+	}
+
+	function matchesResource(resourceRule: ResourceRule, resource: string): boolean {
+		if (!resourceRule.resources) return false;
+
+		const [mainResource, subresource = ''] = resource.split('/');
+
+		for (const resourceRuleResource of resourceRule.resources) {
+			if (resourceRuleResource === '*') return true;
+			if (resourceRuleResource === resource) return true;
+
+			if (subresource === '') continue;
+			if (resourceRuleResource === `*/${subresource}`) return true;
+			if (resourceRuleResource === `${mainResource}/*`) return true;
+		}
+
+		return false;
 	}
 
 	function buildVerbsMap(
 		apiResources: APIResource[],
-		resourceRules: SelfSubjectRulesReviewStatusResourceRule[]
-	): VerbsByGroupResourceSubresource {
-		const map: VerbsByGroupResourceSubresource = new Map();
+		resourceRules: ResourceRule[]
+	): VerbsByGroupResource {
+		const m: VerbsByGroupResource = {};
 
 		for (const apiResource of apiResources) {
-			const [resource, subresource = ''] = apiResource.resource.split('/');
-			const group = apiResource.group || '';
-			const combinedResource = subresource ? `${resource}/${subresource}` : resource;
+			const matchedResourceRules = resourceRules.filter(
+				(resourceRule) =>
+					matchesGroup(resourceRule, apiResource.group) &&
+					matchesResource(resourceRule, apiResource.resource)
+			);
 
-			const verbs = resourceRules
-				.filter((rule) => {
-					const groupMatch = rule.apiGroups?.includes('*') || rule.apiGroups?.includes(group);
-					const resourceMatch = rule.resources?.some(
-						(r) => r === '*' || r === combinedResource || (subresource && r === `*/${subresource}`)
-					);
-					return groupMatch && resourceMatch;
-				})
-				.flatMap((rule) => rule.verbs);
+			if (matchedResourceRules.length === 0) continue;
 
-			const resourceMap = getOrCreate(map, group, () => new Map<string, Map<string, string[]>>());
-			const subresourceMap = getOrCreate(resourceMap, resource, () => new Map<string, string[]>());
-			subresourceMap.set(subresource, verbs);
+			const resourceVerbs: string[] = [];
+			const resourceNameVerbs: Record<string, string[]> = {};
+
+			for (const resourceRule of matchedResourceRules) {
+				const resourceNames = resourceRule.resourceNames ?? [];
+
+				if (resourceNames.length === 0) {
+					resourceVerbs.push(...resourceRule.verbs);
+					continue;
+				}
+
+				for (const resourceName of resourceNames) {
+					resourceNameVerbs[resourceName] = [
+						...(resourceNameVerbs[resourceName] ?? []),
+						...resourceRule.verbs
+					];
+				}
+			}
+
+			if (resourceVerbs.length === 0 && Object.keys(resourceNameVerbs).length === 0) continue;
+
+			if (!m[apiResource.group]) {
+				m[apiResource.group] = {};
+			}
+
+			m[apiResource.group][apiResource.resource] = {
+				resourceVerbs: lodash.uniq(resourceVerbs).sort(),
+				resourceNameVerbs: lodash.mapValues(resourceNameVerbs, (values) =>
+					lodash.uniq(values).sort()
+				)
+			};
 		}
 
-		return map;
+		return m;
 	}
 
-	function getVerbsByGroupResource(
-		verbsMap: VerbsByGroupResourceSubresource,
-		{ group, resource, subresource = '' }: { group: string; resource: string; subresource?: string }
-	): string[] {
-		return verbsMap.get(group)?.get(resource)?.get(subresource) ?? [];
+	function getAPIResourceByGroupVersionResource(
+		apiResources: APIResource[],
+		identifier: Identifier
+	): APIResource | undefined {
+		return apiResources.find(
+			(apiResource) =>
+				apiResource.group === identifier.group &&
+				apiResource.version === identifier.version &&
+				apiResource.resource === identifier.resource
+		);
 	}
 
 	const cluster = $derived(page.params.cluster ?? '');
@@ -124,41 +156,52 @@
 	const client = createClient(ResourceService, transport);
 
 	let apiResources = $state<APIResource[]>([]);
-	let groupedMainAPIResources = $state<Record<string, APIResource[]>>({});
+	const groupedMainAPIResources = $derived(
+		lodash.groupBy(
+			apiResources.filter((apiResource) => !apiResource.resource.includes('/')),
+			(apiResource) => apiResource.group
+		)
+	);
 	let isLoaded = $state(false);
 	let hasError = $state(false);
-	let loadError = $state<any>(undefined);
+	let loadError = $state<{ name?: string; rawMessage?: string } | undefined>(undefined);
 
 	let selectedAPIResource = $state<APIResource | undefined>(undefined);
 
-	async function fetchAPIResources(cluster: string) {
+	async function fetchAPIResources(cluster: string): Promise<APIResource[]> {
 		const response = await client.discovery({ cluster } as DiscoveryRequest);
-		const raw: APIResource[] = response.apiResources;
-		const main = raw.filter((apiResource) => !apiResource.resource.includes('/'));
-		const grouped = lodash.groupBy(main, (apiResource) => apiResource.group || 'core');
-		return { raw: raw, grouped: grouped };
+		return response.apiResources;
 	}
 
-	const verbsMap = $derived(buildVerbsMap(apiResources, page.data.resourceRules));
+	const shortcuts = $derived(
+		shortcutIdentifiers.flatMap((shortcutIdentifier) => {
+			const apiResource = apiResources.find(
+				(candidate) =>
+					candidate.group === shortcutIdentifier.group &&
+					candidate.resource === shortcutIdentifier.resource
+			);
+			return apiResource ? [apiResource] : [];
+		})
+	);
+
+	const resourceRules = $derived<ResourceRule[]>(
+		page.data.selfsubjectrulesreviewStatus?.resourceRules ?? []
+	);
+	const verbsMap = $derived(buildVerbsMap(apiResources, resourceRules));
 
 	onMount(async () => {
 		try {
-			const { raw, grouped } = await fetchAPIResources(cluster);
+			apiResources = await fetchAPIResources(cluster);
 
-			apiResources = raw;
-			groupedMainAPIResources = grouped;
-
-			const matchedAPIResource = getAPIResourceByGroupVersionResource(raw, {
-				resource: 'pods',
-				group: '',
-				version: 'v1'
-			});
-			if (matchedAPIResource) {
-				selectedAPIResource = matchedAPIResource;
-			}
+			selectedAPIResource =
+				getAPIResourceByGroupVersionResource(apiResources, {
+					resource: 'pods',
+					group: '',
+					version: 'v1'
+				}) ?? apiResources.find((apiResource) => !apiResource.resource.includes('/'));
 		} catch (error) {
 			hasError = true;
-			loadError = error;
+			loadError = error as typeof loadError;
 		} finally {
 			isLoaded = true;
 		}
@@ -233,18 +276,14 @@
 									<Command.Group>
 										{#each shortcuts as shortcut, index (index)}
 											<Command.Item
-												value={`${shortcut.identifier.group}/${shortcut.identifier.version}/${shortcut.identifier.resource}`}
-												onSelect={() =>
-													(selectedAPIResource = getAPIResourceByGroupVersionResource(
-														apiResources,
-														shortcut.identifier
-													))}
+												value={`${shortcut.group}/${shortcut.version}/${shortcut.resource}`}
+												onSelect={() => (selectedAPIResource = shortcut)}
 											>
 												<Item.Root class="p-0" size="sm">
 													<Item.Content>
-														<Item.Title>{shortcut.label}</Item.Title>
+														<Item.Title>{shortcut.kind}</Item.Title>
 														<Item.Description>
-															{shortcut.identifier.group || 'core'}
+															{shortcut.group || 'core'}
 														</Item.Description>
 													</Item.Content>
 												</Item.Root>
@@ -258,9 +297,10 @@
 								<Command.Input placeholder="Search resource..." />
 								<Command.List class="h-full max-h-none">
 									<Command.Empty>No resource found.</Command.Empty>
-									{#each Object.entries(groupedMainAPIResources) as [group, apiResources] (group)}
-										<Command.Group heading={group}>
-											{#each apiResources as apiResource, index (index)}
+									{#each Object.entries(groupedMainAPIResources) as [group, groupAPIResources] (group)}
+										<Command.Group heading={group || 'core'}>
+											<Command.Separator />
+											{#each groupAPIResources as apiResource (`${apiResource.group}/${apiResource.version}/${apiResource.resource}`)}
 												<Command.Item
 													value={apiResource.group + apiResource.version + apiResource.resource}
 													onSelect={() => {
@@ -284,7 +324,17 @@
 		</div>
 		{#if selectedAPIResource}
 			{#key `${selectedAPIResource.group}/${selectedAPIResource.version}/${selectedAPIResource.resource}`}
-				<KindViewer isClusterAdmin={true} {cluster} apiResource={selectedAPIResource} />
+				{@const selectedVerbsKey = selectedAPIResource
+					? [selectedAPIResource.group, selectedAPIResource.resource]
+					: []}
+				{@const selectedVerbs = lodash.get(verbsMap, selectedVerbsKey, [])}
+				{JSON.stringify(selectedVerbs, null, 2)}
+				<!-- <KindViewer
+					isClusterAdmin={true}
+					verbs={selectedVerbs}
+					{cluster}
+					apiResource={selectedAPIResource}
+				/> -->
 			{/key}
 		{/if}
 	</div>
