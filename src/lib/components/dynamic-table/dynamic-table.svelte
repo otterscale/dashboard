@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
-	import BookIcon from '@lucide/svelte/icons/book';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import ChevronFirstIcon from '@lucide/svelte/icons/chevron-first';
@@ -30,12 +29,14 @@
 		type Table as TanStackTabke,
 		type VisibilityState
 	} from '@tanstack/table-core';
-	import { compileExpression } from 'filtrex';
+	import { type LiqeQuery, parse, test } from 'liqe';
 	import lodash from 'lodash';
 	import { createRawSnippet, type Snippet } from 'svelte';
 
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { shortcut } from '$lib/actions/shortcut.svelte';
-	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
 	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import {
@@ -51,11 +52,11 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Pagination from '$lib/components/ui/pagination/index.js';
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
-	import * as Sheet from '$lib/components/ui/sheet';
 	import * as Table from '$lib/components/ui/table';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { cn } from '$lib/utils';
 
+	import DynamicTableSearchDocument from './dynamic-table-search-document.svelte';
 	import type { UISchemaType } from './utils';
 
 	let {
@@ -91,10 +92,111 @@
 		>;
 	} = $props();
 
-	// gridsLayout is set once, capturing the initial value is intentional.
+	const PARAMETERS = {
+		QUERY: 'query',
+		VIEW: 'view',
+		SORT: 'sort',
+		PAGE: 'page',
+		SIZE: 'size',
+		HIDE: 'hide'
+	} as const;
+
+	const PAGE_SIZE = 9;
+	const PAGE_SIZES = [9, 18, 45, 90];
+
 	// svelte-ignore state_referenced_locally
 	const hasGridlayout = !!gridLayout;
-	let mode = $state<'table' | 'grid'>(hasGridlayout ? 'grid' : 'table');
+	const DEFAULT_MODE: 'table' | 'grid' = hasGridlayout ? 'grid' : 'table';
+
+	const mode = $derived.by<'table' | 'grid'>(() => {
+		const value = page.url.searchParams.get(PARAMETERS.VIEW);
+		// A pasted `?view=grid` link would otherwise render nothing at all on a
+		// table that wasn't given a gridLayout snippet.
+		if (value === 'grid' && hasGridlayout) return 'grid';
+		if (value === 'table') return 'table';
+		return DEFAULT_MODE;
+	});
+
+	const globalFilter = $derived(page.url.searchParams.get(PARAMETERS.QUERY) ?? '');
+
+	const sorting = $derived.by<SortingState>(() =>
+		page.url.searchParams.getAll(PARAMETERS.SORT).flatMap((entry) => {
+			// Sort params follow the common `field:direction` convention.
+			// Column ids may themselves contain ':', so split on the last one.
+			const separatorIndex = entry.lastIndexOf(':');
+			if (separatorIndex === -1) return [];
+
+			const field = entry.slice(0, separatorIndex);
+			const direction = entry.slice(separatorIndex + 1);
+
+			// Anything the encoder wouldn't have produced is dropped rather than
+			// guessed — an unknown column or direction means a stale link.
+			if (!validColumnIds.has(field)) return [];
+			if (direction !== 'asc' && direction !== 'desc') return [];
+
+			return [{ id: field, desc: direction === 'desc' }];
+		})
+	);
+
+	const pagination = $derived.by<PaginationState>(() => {
+		const pageParameter = Number(page.url.searchParams.get(PARAMETERS.PAGE));
+		const sizeParameter = Number(page.url.searchParams.get(PARAMETERS.SIZE));
+		return {
+			pageIndex:
+				Number.isFinite(pageParameter) && pageParameter > 1 ? Math.floor(pageParameter) - 1 : 0,
+			pageSize:
+				Number.isFinite(sizeParameter) && sizeParameter > 0 ? Math.floor(sizeParameter) : PAGE_SIZE
+		};
+	});
+
+	// svelte-ignore state_referenced_locally
+	const initialColumnVisibility: VisibilityState = Object.fromEntries(
+		columnDefinitions
+			.filter(
+				(columnDefinition) =>
+					(columnDefinition.meta as { defaultHidden?: boolean } | undefined)?.defaultHidden === true
+			)
+			.map(getColumnId)
+			.filter((columnId): columnId is string => columnId != null)
+			.map((columnId) => [columnId, false])
+	);
+
+	const columnVisibility = $derived.by<VisibilityState>(() => {
+		if (!page.url.searchParams.has(PARAMETERS.HIDE)) return initialColumnVisibility;
+		const hidden = (page.url.searchParams.get(PARAMETERS.HIDE) ?? '')
+			.split(',')
+			.map((id) => id.trim())
+			.filter(Boolean);
+		return Object.fromEntries(hidden.map((id) => [id, false]));
+	});
+
+	const structuredGlobalFilter = $derived.by<{ query: LiqeQuery | null; error: Error | null }>(
+		() => {
+			if (!globalFilter) return { query: null, error: null };
+			try {
+				return { query: parse(globalFilter), error: null };
+			} catch (error) {
+				return { query: null, error: error as Error };
+			}
+		}
+	);
+
+	let globalFilterTerm = $derived(globalFilter);
+
+	// A writable derived: recomputing to null whenever the query changes, but  handleSearch can assign a parse failure into it, which then survives until  the next query change.
+	// The `void` is what establishes that dependency.
+	let submitGlobalFilterError = $derived.by<Error | null>(() => {
+		void globalFilter;
+		return null;
+	});
+	const parseGlobalFilterError = $derived(structuredGlobalFilter.error);
+	const globalFilterError = $derived(submitGlobalFilterError ?? parseGlobalFilterError);
+
+	let rowSelection = $state<RowSelectionState>({});
+	let columnFilters = $state<ColumnFiltersState>([]);
+	let columnSizing = $state<ColumnSizingState>({});
+
+	const GLOBAL_FILTER_IDENTIFIER = 'global_filter_identifier';
 
 	// columnDefinitions are set once, capturing the initial value is intentional.
 	// svelte-ignore state_referenced_locally
@@ -144,44 +246,6 @@
 		}
 	];
 
-	const GLOBAL_FILTER_IDENTIFIER = 'global_filter_identifier';
-	let globalFilter = $state('');
-	let globalFilterInput = $state('');
-	let globalFilterError: Error | null = $state(null);
-	const globalFilterExtraFunctions = {
-		Time: (time: string | number | Date) => new Date(time).getTime(),
-		now: () => Date.now(),
-		Seconds: (time: number) => time * 1000,
-		Minutes: (time: number) => time * 60 * 1000,
-		Hours: (time: number) => time * 60 * 60 * 1000,
-		Days: (time: number) => time * 24 * 60 * 60 * 1000,
-		Years: (time: number) => time * 365 * 24 * 60 * 60 * 1000,
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		size: (object: any) => {
-			return object ? Object.keys(object).length : undefined;
-		}
-	};
-	const globalFilterConstants = {
-		true: true,
-		false: false
-	};
-
-	let rowSelection = $state<RowSelectionState>({});
-	let columnFilters = $state<ColumnFiltersState>([]);
-	// svelte-ignore state_referenced_locally
-	const initialColumnVisibility: VisibilityState = Object.fromEntries(
-		columnDefinitions
-			.filter(
-				(col) => (col.meta as { defaultHidden?: boolean } | undefined)?.defaultHidden === true
-			)
-			.map((col) => [col.id ?? (col as { accessorKey?: string }).accessorKey, false])
-			.filter(([id]) => id != null)
-	);
-	let columnVisibility = $state<VisibilityState>(initialColumnVisibility);
-	let columnSizing = $state<ColumnSizingState>({});
-	let sorting = $state<SortingState>([]);
-	let pagination = $state<PaginationState>({ pageIndex: 0, pageSize: hasGridlayout ? 9 : 10 });
-
 	let table = createSvelteTable<Record<string, JsonValue>>({
 		columns,
 		get data() {
@@ -200,18 +264,29 @@
 			}
 		},
 		onGlobalFilterChange: (updater) => {
-			if (typeof updater === 'function') {
-				globalFilter = updater(globalFilter);
-			} else {
-				globalFilter = updater;
-			}
+			const next = typeof updater === 'function' ? updater(globalFilter) : updater;
+			const query = (next ?? '') as string;
+			commit(
+				(params) => {
+					if (query) {
+						params.set(PARAMETERS.QUERY, query);
+					} else {
+						params.delete(PARAMETERS.QUERY);
+					}
+					// A new query invalidates the current page.
+					params.delete(PARAMETERS.PAGE);
+				},
+				// Searching is an explicit, deliberate action, so it earns a
+				// history entry: back returns to the previous query.
+				{ history: 'push' }
+			);
 		},
 		onColumnVisibilityChange: (updater) => {
-			if (typeof updater === 'function') {
-				columnVisibility = updater(columnVisibility);
-			} else {
-				columnVisibility = updater;
-			}
+			const next = typeof updater === 'function' ? updater(columnVisibility) : updater;
+			const hidden = Object.entries(next)
+				.filter(([, visible]) => visible === false)
+				.map(([id]) => id);
+			commit((params) => params.set(PARAMETERS.HIDE, hidden.join(',')));
 		},
 		onColumnSizingChange: (updater) => {
 			if (typeof updater === 'function') {
@@ -221,11 +296,19 @@
 			}
 		},
 		onPaginationChange: (updater) => {
-			if (typeof updater === 'function') {
-				pagination = updater(pagination);
-			} else {
-				pagination = updater;
-			}
+			const next = typeof updater === 'function' ? updater(pagination) : updater;
+			commit((params) => {
+				if (next.pageIndex > 0) {
+					params.set(PARAMETERS.PAGE, String(next.pageIndex + 1));
+				} else {
+					params.delete(PARAMETERS.PAGE);
+				}
+				if (next.pageSize !== PAGE_SIZE) {
+					params.set(PARAMETERS.SIZE, String(next.pageSize));
+				} else {
+					params.delete(PARAMETERS.SIZE);
+				}
+			});
 		},
 		onRowSelectionChange: (updater) => {
 			if (typeof updater === 'function') {
@@ -235,11 +318,15 @@
 			}
 		},
 		onSortingChange: (updater) => {
-			if (typeof updater === 'function') {
-				sorting = updater(sorting);
-			} else {
-				sorting = updater;
-			}
+			const next = typeof updater === 'function' ? updater(sorting) : updater;
+			commit((params) => {
+				params.delete(PARAMETERS.SORT);
+				for (const entry of next) {
+					params.append(PARAMETERS.SORT, `${entry.id}:${entry.desc ? 'desc' : 'asc'}`);
+				}
+				// Re-sorting invalidates the current page.
+				params.delete(PARAMETERS.PAGE);
+			});
 		},
 		state: {
 			get globalFilter() {
@@ -266,13 +353,9 @@
 		},
 		globalFilterFn: (row) => {
 			if (!globalFilter) return true;
+			if (!structuredGlobalFilter.query) return false;
 			try {
-				const filter = compileExpression(globalFilter, {
-					extraFunctions: globalFilterExtraFunctions,
-					constants: globalFilterConstants
-				});
-				const result = filter(row.original);
-				return Boolean(result);
+				return test(structuredGlobalFilter.query, row.original);
 			} catch {
 				return false;
 			}
@@ -280,6 +363,77 @@
 		columnResizeMode: 'onChange',
 		autoResetPageIndex: false
 	});
+
+	function getColumnId(columnDefinition: ColumnDef<Record<string, JsonValue>>): string | undefined {
+		return columnDefinition.id ?? (columnDefinition as { accessorKey?: string }).accessorKey;
+	}
+
+	// svelte-ignore state_referenced_locally
+	const validColumnIds = new Set(
+		columnDefinitions.map(getColumnId).filter((id): id is string => id != null)
+	);
+
+	function commit(
+		patch: (urlSearchParameters: URLSearchParams) => void,
+		{ history = 'replace' }: { history?: 'replace' | 'push' } = {}
+	) {
+		const url = new URL(page.url);
+		patch(url.searchParams);
+		// A patch can be a no-op (re-selecting the current page size, toggling a
+		// column that is already hidden). Navigating anyway would stack identical
+		// history entries and make the back button feel broken.
+		if (url.href === page.url.href) return;
+		// The URL is cloned from page.url, so the base path is already applied —
+		// resolve() would double it, and its type doesn't accept query strings.
+		// eslint-disable-next-line svelte/no-navigation-without-resolve
+		void goto(url, {
+			replaceState: history === 'replace',
+			keepFocus: true,
+			noScroll: true,
+			// Filtering is client-side; the data prop must survive the navigation.
+			invalidateAll: false
+		});
+	}
+
+	function setMode(next: 'table' | 'grid') {
+		commit((params) => {
+			if (next === DEFAULT_MODE) {
+				params.delete(PARAMETERS.VIEW);
+			} else {
+				params.set(PARAMETERS.VIEW, next);
+			}
+		});
+	}
+
+	function handleKeyDown(event: KeyboardEvent) {
+		if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+			event.preventDefault();
+			handleSearch();
+		}
+
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			handleClear();
+		}
+	}
+
+	function handleSearch() {
+		try {
+			if (globalFilterTerm) {
+				parse(globalFilterTerm);
+			}
+			submitGlobalFilterError = null;
+			table.setGlobalFilter(globalFilterTerm);
+		} catch (error) {
+			submitGlobalFilterError = error as Error;
+		}
+	}
+
+	function handleClear() {
+		globalFilterTerm = '';
+		submitGlobalFilterError = null;
+		table.setGlobalFilter('');
+	}
 
 	function getAlignment(uiSchema: UISchemaType): 'start' | 'center' | 'end' {
 		const map: Record<NonNullable<UISchemaType>, 'start' | 'center' | 'end'> = {
@@ -327,39 +481,6 @@
 	function isTerminating(row: Row<Record<string, JsonValue>>): boolean {
 		return lodash.get(row.original, 'raw.metadata.deletionTimestamp') != null;
 	}
-
-	function handleKeyDown(event: KeyboardEvent) {
-		if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-			event.preventDefault();
-			handleSearch();
-		}
-
-		if (event.key === 'Escape') {
-			event.preventDefault();
-			handleClear();
-		}
-	}
-	function handleSearch() {
-		try {
-			globalFilterError = null;
-			if (globalFilterInput) {
-				compileExpression(globalFilterInput, {
-					extraFunctions: globalFilterExtraFunctions,
-					constants: globalFilterConstants
-				});
-			}
-			globalFilter = globalFilterInput;
-			table.setGlobalFilter(globalFilterInput);
-		} catch (error) {
-			globalFilterError = error as Error;
-		}
-	}
-	function handleClear() {
-		globalFilterInput = '';
-		globalFilter = '';
-		globalFilterError = null;
-		table.setGlobalFilter('');
-	}
 </script>
 
 <svelte:window
@@ -385,7 +506,7 @@
 							{...props}
 							variant={mode === 'table' ? 'secondary' : 'outline'}
 							size="icon"
-							onclick={() => (mode = 'table')}
+							onclick={() => setMode('table')}
 							aria-pressed={mode === 'table'}
 						>
 							<SheetIcon />
@@ -402,7 +523,7 @@
 							disabled={!gridLayout}
 							variant={mode === 'grid' ? 'secondary' : 'outline'}
 							size="icon"
-							onclick={() => (mode = 'grid')}
+							onclick={() => setMode('grid')}
 							aria-pressed={mode === 'grid'}
 						>
 							<LayoutGridIcon />
@@ -450,8 +571,8 @@
 				</InputGroup.Addon>
 				<InputGroup.Input
 					id={GLOBAL_FILTER_IDENTIFIER}
-					placeholder="e.g.. Name ~= &quot;resourceName&quot; and Namespace == &quot;namespace&quot;"
-					bind:value={globalFilterInput}
+					placeholder="e.g. Name:resourceName AND Namespace:namespace"
+					bind:value={globalFilterTerm}
 					class="peer w-full"
 					onkeydown={handleKeyDown}
 				/>
@@ -468,95 +589,7 @@
 					</Kbd.Group>
 				</InputGroup.Addon>
 			</InputGroup.Root>
-			<Tooltip.Root>
-				<Tooltip.Trigger>
-					{#snippet child({ props })}
-						<Sheet.Root>
-							<Sheet.Trigger
-								{...props}
-								aria-label="Document"
-								class={buttonVariants({ variant: 'outline', size: 'icon' })}
-							>
-								<BookIcon size={16} />
-							</Sheet.Trigger>
-							<Sheet.Content side="right" class="min-w-[23vw]">
-								<Sheet.Header>
-									<Sheet.Title>Filtrex Query Language Documentation</Sheet.Title>
-									<Sheet.Description>
-										Filtrex is a simple, safe, and powerful expression language for filtering and
-										searching data. You can use Filtrex queries in the search box to filter table
-										rows using custom logic.
-									</Sheet.Description>
-								</Sheet.Header>
-								<div class="overflow-auto p-4 text-sm">
-									<h3 class="font-semibold">Basic Syntax</h3>
-									<div class="p-4 font-mono">
-										<p>Field comparison: age &gt; 18</p>
-										<p>String matching: name == "Alice"</p>
-										<p>Logical operators: status == "active" and score &gt; 80</p>
-										<p>Field names with spaces: 'full name' == "Alice Smith"</p>
-									</div>
-
-									<br />
-
-									<h3 class="font-semibold">Operators</h3>
-									<div class="p-4 font-mono">
-										<p>and, or, not</p>
-										<p>==, ~=, &gt;, &gt;=, &lt;, &lt;=</p>
-									</div>
-
-									<br />
-
-									<h3 class="font-semibold">Functions</h3>
-									<div class="p-4 font-mono">
-										<p>length(array) — Get array length</p>
-										<p>Time(date) — Convert date to timestamp</p>
-										<p>now() — Current timestamp</p>
-										<p>Seconds(n), Minutes(n), Hours(n), Days(n), Years(n)</p>
-									</div>
-
-									<br />
-
-									<h3 class="font-semibold">Constants</h3>
-									<div class="p-4 font-mono">
-										<p>true, false</p>
-									</div>
-
-									<br />
-
-									<h3 class="font-semibold">Tips</h3>
-									<div class="p-4 font-mono">
-										<p>Use <kbd>ctrl</kbd> + <kbd>⏎</kbd> to search.</p>
-										<p>Press <kbd>/</kbd> to focus the search box.</p>
-										<p>Press <kbd>esc</kbd> to clear the filter.</p>
-									</div>
-
-									<br />
-
-									<h3 class="font-semibold">Note</h3>
-									<div class="text-warning p-4 font-mono">
-										<p>
-											Operations between quantities with units (e.g., <code>Mi</code>,
-											<code>k</code>) are
-											<b>not supported yet</b>.
-										</p>
-									</div>
-								</div>
-								<Sheet.Footer>
-									<p class="mt-4 text-xs text-muted-foreground">
-										For advanced usage, refer to the <a
-											href="https://github.com/joewalnes/filtrex"
-											target="_blank"
-											class="underline">Filtrex documentation</a
-										>.
-									</p>
-								</Sheet.Footer>
-							</Sheet.Content>
-						</Sheet.Root>
-					{/snippet}
-				</Tooltip.Trigger>
-				<Tooltip.Content>Search Documentation</Tooltip.Content>
-			</Tooltip.Root>
+			<DynamicTableSearchDocument />
 		</ButtonGroup.Root>
 		<!-- Accessors -->
 		<div class="ml-auto flex items-center gap-2">
@@ -598,7 +631,7 @@
 				<SelectContent
 					class="[&_*[role=option]]:ps-2 [&_*[role=option]]:pe-8 [&_*[role=option]>span]:inset-s-auto [&_*[role=option]>span]:inset-e-2"
 				>
-					{#each [5, 10, 20, 50, 100] as pageSize (pageSize)}
+					{#each PAGE_SIZES as pageSize (pageSize)}
 						<SelectItem value={pageSize.toString()}>
 							{pageSize}
 						</SelectItem>
