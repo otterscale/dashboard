@@ -29,6 +29,7 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	import type { DataSchemaType, UISchemaType } from '../dynamic-table/utils';
+	import type { ResourceRuleVerbs } from '../resources/types';
 	import BulkDelete from './bulk-delete.svelte';
 	import type { ActionsType, CreateType } from './kind-viewer-actions';
 	import { getActions, getCreate } from './kind-viewer-actions';
@@ -42,6 +43,7 @@
 
 	let {
 		isClusterAdmin,
+		resourceRuleVerbs,
 		cluster,
 		namespace: namespaceProp,
 		apiResource,
@@ -49,6 +51,7 @@
 		fieldSelector = ''
 	}: {
 		isClusterAdmin: boolean;
+		resourceRuleVerbs: ResourceRuleVerbs;
 		cluster: string;
 		namespace?: string;
 		apiResource: APIResource;
@@ -443,6 +446,7 @@
 							version={apiResource.version}
 							kind={apiResource.kind}
 							resource={apiResource.resource}
+							{resourceRuleVerbs}
 						/>
 					{:else}
 						<div class="flex justify-end">
