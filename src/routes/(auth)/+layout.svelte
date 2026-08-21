@@ -4,6 +4,7 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import BotIcon from '@lucide/svelte/icons/bot';
 	import BoxIcon from '@lucide/svelte/icons/box';
+	import BoxesIcon from '@lucide/svelte/icons/boxes';
 	import BracesIcon from '@lucide/svelte/icons/braces';
 	import CircleQuestionMarkIcon from '@lucide/svelte/icons/circle-question-mark';
 	import CompassIcon from '@lucide/svelte/icons/compass';
@@ -333,7 +334,7 @@
 			{
 				title: m.git_ops(),
 				icon: GitGraphIcon,
-				isActive: true,
+				isActive: false,
 				items: [
 					{
 						title: m.kustomize(),
@@ -415,27 +416,9 @@
 			...(data.isClusterAdmin
 				? [
 						{
-							title: m.administration(),
-							icon: UserStarIcon,
+							title: m.platform_apps(),
+							icon: BoxesIcon,
 							items: [
-								{
-									title: m.resource(),
-									url: page.params.workspace
-										? resolve('/(auth)/[cluster]/[workspace]/resources', {
-												cluster: activeCluster,
-												workspace: page.params.workspace
-											})
-										: ''
-								},
-								{
-									title: m.workspace(),
-									url: resourceUrl({
-										group: 'tenant.otterscale.io',
-										version: 'v1alpha1',
-										kind: 'Workspace',
-										resource: 'workspaces'
-									})
-								},
 								{
 									title: m.module(),
 									url: page.params.workspace
@@ -462,6 +445,34 @@
 										kind: 'HelmRelease',
 										resource: 'helmreleases',
 										labelSelector: 'app.kubernetes.io/managed-by!=kro'
+									})
+								}
+							]
+						}
+					]
+				: []),
+			...(data.isClusterAdmin
+				? [
+						{
+							title: m.administration(),
+							icon: UserStarIcon,
+							items: [
+								{
+									title: m.resource(),
+									url: page.params.workspace
+										? resolve('/(auth)/[cluster]/[workspace]/resources', {
+												cluster: activeCluster,
+												workspace: page.params.workspace
+											})
+										: ''
+								},
+								{
+									title: m.workspace(),
+									url: resourceUrl({
+										group: 'tenant.otterscale.io',
+										version: 'v1alpha1',
+										kind: 'Workspace',
+										resource: 'workspaces'
 									})
 								},
 								...(page.params.workspace

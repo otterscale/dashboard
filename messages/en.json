@@ -507,6 +507,7 @@
 	"platform": "Platform",
 	"ai_studio": "AI Studio",
 	"apps": "Apps",
+	"platform_apps": "Platform Apps",
 	"release": "Release",
 	"helm_release": "Helm Release",
 	"application_hub": "Hub",

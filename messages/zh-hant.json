@@ -507,6 +507,7 @@
 	"platform": "平台",
 	"ai_studio": "AI 工作室",
 	"apps": "應用",
+	"platform_apps": "平台應用",
 	"release": "版本",
 	"helm_release": "Helm 版本",
 	"application_hub": "應用中心",
