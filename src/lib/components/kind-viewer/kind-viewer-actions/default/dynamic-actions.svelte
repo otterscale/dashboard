@@ -1,9 +1,5 @@
 <script lang="ts">
 	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
-	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
-	import ScrollTextIcon from '@lucide/svelte/icons/scroll-text';
-	import SquareTerminalIcon from '@lucide/svelte/icons/square-terminal';
-	import TrendingUpDownIcon from '@lucide/svelte/icons/trending-up-down';
 	import type { Schema } from '@sjsf/form';
 	import type { ValidateFunction } from 'ajv';
 	import lodash from 'lodash';
@@ -53,9 +49,9 @@
 		)
 	);
 
-	function hasSubresourceVerb(subresource: string, verb: string): boolean {
-		return hasVerb(resourceRuleVerbs.subresourceVerbs[subresource] ?? [], verb);
-	}
+	// function hasSubresourceVerb(subresource: string, verb: string): boolean {
+	// 	return hasVerb(resourceRuleVerbs.subresourceVerbs[subresource] ?? [], verb);
+	// }
 
 	function hasResourceVerb(verb: string): boolean {
 		return hasVerb(resourceInstanceVerbs, verb);
@@ -65,22 +61,10 @@
 	const canEdit = $derived(hasResourceVerb('update') || hasResourceVerb('patch'));
 	const canDelete = $derived(hasResourceVerb('delete'));
 
-	const canLogs = $derived(hasSubresourceVerb('log', 'get'));
-	const canExecute = $derived(hasSubresourceVerb('exec', 'create'));
-	const canPortForward = $derived(hasSubresourceVerb('portforward', 'create'));
-	const canScale = $derived(hasSubresourceVerb('scale', 'update'));
+	// const canLogs = $derived(hasSubresourceVerb('log', 'get'));
+	// const canExecute = $derived(hasSubresourceVerb('exec', 'create'));
 
-	const hasSubresourceAction = $derived(canLogs || canExecute || canPortForward || canScale);
-
-	function notImplemented(action: string) {
-		console.log('[placeholder]', action, {
-			cluster,
-			namespace,
-			resource,
-			name: object?.metadata?.name
-		});
-		actionsOpen = false;
-	}
+	// const hasSubresourceAction = $derived(canLogs || canExecute || canPortForward || canScale);
 </script>
 
 <DropdownMenu.Root bind:open={actionsOpen}>
@@ -143,7 +127,7 @@
 			{/if}
 		</DropdownMenu.Group>
 
-		{#if hasSubresourceAction}
+		<!-- {#if hasSubresourceAction}
 			<DropdownMenu.Separator />
 			<DropdownMenu.Group>
 				{#if canLogs}
@@ -158,20 +142,8 @@
 						Terminal
 					</DropdownMenu.Item>
 				{/if}
-				{#if canPortForward}
-					<DropdownMenu.Item onSelect={() => notImplemented('port-forward')}>
-						<ExternalLinkIcon size={16} aria-hidden="true" />
-						Port Forward
-					</DropdownMenu.Item>
-				{/if}
-				{#if canScale}
-					<DropdownMenu.Item onSelect={() => notImplemented('scale')}>
-						<TrendingUpDownIcon size={16} aria-hidden="true" />
-						Scale
-					</DropdownMenu.Item>
-				{/if}
 			</DropdownMenu.Group>
-		{/if}
+		{/if} -->
 
 		{#if canDelete}
 			<DropdownMenu.Separator />
