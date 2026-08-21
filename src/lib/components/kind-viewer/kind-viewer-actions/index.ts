@@ -4,6 +4,8 @@ import type { Row } from '@tanstack/table-core';
 import { type ValidateFunction } from 'ajv';
 import type { Component, Snippet } from 'svelte';
 
+import type { ResourceRuleVerbs } from '$lib/components/resources/types';
+
 import ApplicationActions from './applications/actions.svelte';
 import ApplicationCreate from './applications/create.svelte';
 import ClusterRoleBindingActions from './cluster-role-binding/actions.svelte';
@@ -19,9 +21,6 @@ import GitRepositoryCreate from './git-repository/create.svelte';
 import HelmReleaseActions from './helm-release/actions.svelte';
 import HelmRepositoryActions from './helm-repository/actions.svelte';
 import HelmRepositoryCreate from './helm-repository/create.svelte';
-// Namespaced InstanceType is disabled — most users use ClusterInstanceType directly.
-// import InstanceTypeActions from './instance-type/actions.svelte';
-// import InstanceTypeCreate from './instance-type/create.svelte';
 import JobActions from './job/actions.svelte';
 import LicenseCreate from './license/create.svelte';
 import LLMInferenceServiceActions from './llm-inference-service/actions.svelte';
@@ -74,6 +73,7 @@ type ActionsType = Component<{
 	version?: string;
 	kind?: string;
 	resource?: string;
+	resourceRuleVerbs?: ResourceRuleVerbs;
 	onsuccess?: () => void;
 }> | null;
 
