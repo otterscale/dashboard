@@ -51,7 +51,7 @@
 		fieldSelector = ''
 	}: {
 		isClusterAdmin: boolean;
-		resourceRuleVerbs: ResourceRuleVerbs;
+		resourceRuleVerbs?: ResourceRuleVerbs;
 		cluster: string;
 		namespace?: string;
 		apiResource: APIResource;

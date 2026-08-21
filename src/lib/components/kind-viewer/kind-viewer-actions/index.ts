@@ -73,7 +73,7 @@ type ActionsType = Component<{
 	version?: string;
 	kind?: string;
 	resource?: string;
-	resourceRuleVerbs: ResourceRuleVerbs;
+	resourceRuleVerbs?: ResourceRuleVerbs;
 	onsuccess?: () => void;
 }> | null;
 
