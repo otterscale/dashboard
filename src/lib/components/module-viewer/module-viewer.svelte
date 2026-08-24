@@ -7,7 +7,7 @@
 	import type { ValidateFunction } from 'ajv';
 	import type { Snippet } from 'svelte';
 
-	import { DynamicTable, UrlTableState } from '$lib/components/dynamic-table';
+	import { DynamicTable, SearchParametersTableState } from '$lib/components/dynamic-table';
 	import type { DataSchemaType, UISchemaType } from '$lib/components/dynamic-table/utils';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Empty from '$lib/components/ui/empty/index.js';
@@ -45,7 +45,7 @@
 	const columnDefinitions: ColumnDef<Record<ModuleAttribute, JsonValue>>[] =
 		getChartColumnDefinitions(uiSchemas, dataSchemas);
 	// This table is the subject of its page, so its view belongs in the URL.
-	const tableState = new UrlTableState();
+	const tableState = new SearchParametersTableState();
 </script>
 
 <div class="space-y-4">

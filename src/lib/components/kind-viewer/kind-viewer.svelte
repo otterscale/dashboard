@@ -22,7 +22,7 @@
 	import { SvelteMap } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
 
-	import { DynamicTable, UrlTableState } from '$lib/components/dynamic-table';
+	import { DynamicTable, SearchParametersTableState } from '$lib/components/dynamic-table';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import { Toggle } from '$lib/components/ui/toggle';
@@ -285,7 +285,7 @@
 	const GridLayout: GridLayoutType = $derived(getGridLayout(apiResource.kind, namespace));
 
 	// This table is the subject of its page, so its view belongs in the URL.
-	const tableState = new UrlTableState();
+	const tableState = new SearchParametersTableState();
 </script>
 
 {#snippet gridLayout({
