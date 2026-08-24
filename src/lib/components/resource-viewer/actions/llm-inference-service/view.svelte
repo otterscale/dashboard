@@ -1,4 +1,4 @@
-<script lang="ts">
+<!-- <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import { BotIcon } from '@lucide/svelte';
 	import Box from '@lucide/svelte/icons/box';
@@ -28,14 +28,14 @@
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as Item from '$lib/components/ui/item';
 
-	import DeploymentViewer from '../related-resources-viewer/deployment.svelte';
-	import HttpRouteViewer from '../related-resources-viewer/http-route.svelte';
-	import InferencePoolViewer from '../related-resources-viewer/inference-pool.svelte';
-	import LeaderWorkerSetViewer from '../related-resources-viewer/leader-worker-set.svelte';
-	import PodViewer from '../related-resources-viewer/pod.svelte';
-	import ReplicaSetViewer from '../related-resources-viewer/replica-set.svelte';
-	import ServiceViewer from '../related-resources-viewer/service.svelte';
-	import StatefulSetViewer from '../related-resources-viewer/stateful-set.svelte';
+	import DeploymentViewer from '../../related-resources-viewer/deployment.svelte';
+	import HttpRouteViewer from '../../related-resources-viewer/http-route.svelte';
+	import InferencePoolViewer from '../../related-resources-viewer/inference-pool.svelte';
+	import LeaderWorkerSetViewer from '../../related-resources-viewer/leader-worker-set.svelte';
+	import PodViewer from '../../related-resources-viewer/pod.svelte';
+	import ReplicaSetViewer from '../../related-resources-viewer/replica-set.svelte';
+	import ServiceViewer from '../../related-resources-viewer/service.svelte';
+	import StatefulSetViewer from '../../related-resources-viewer/stateful-set.svelte';
 
 	let { object } = $props<{ object: ServingKserveIoV1Alpha1LLMInferenceService }>();
 
@@ -499,4 +499,4 @@
 			</Empty.Root>
 		{/if}
 	</Field.Set>
-</Field.Group>
+</Field.Group> -->

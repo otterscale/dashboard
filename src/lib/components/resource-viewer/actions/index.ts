@@ -2,11 +2,11 @@ import type { JsonObject } from '@bufbuild/protobuf';
 import type { Schema } from '@sjsf/form';
 import type { Component } from 'svelte';
 
-import DefaultViewer from './default-viewer.svelte';
-import LicenseViewer from './license-viewer.svelte';
-import LLMInferenceServiceViewer from './llm-inference-service-viewer.svelte';
-import WorkspaceEditor from './workspace-editor.svelte';
-import WorkspaceViewer from './workspaces-viewer.svelte';
+import DefaultViewer from './default/view.svelte';
+import LicenseViewer from './license/view.svelte';
+import LLMInferenceServiceViewer from './llm-inference-service/view.svelte';
+import WorkspaceEditor from './workspace/edit.svelte';
+import WorkspaceViewer from './workspace/view.svelte';
 
 type ViewerProps = { object: JsonObject; schema?: Schema };
 type ViewerType = Component<ViewerProps>;
