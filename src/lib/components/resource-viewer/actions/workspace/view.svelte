@@ -1,166 +1,85 @@
 <script lang="ts">
+	import { createClient, type Transport } from '@connectrpc/connect';
 	import Box from '@lucide/svelte/icons/box';
 	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import CircleX from '@lucide/svelte/icons/circle-x';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import Gauge from '@lucide/svelte/icons/gauge';
-	import Grid from '@lucide/svelte/icons/grid';
 	import HeartPulse from '@lucide/svelte/icons/heart-pulse';
-	import ListFilter from '@lucide/svelte/icons/list-filter';
 	import Network from '@lucide/svelte/icons/network';
 	import Shield from '@lucide/svelte/icons/shield';
 	import Users from '@lucide/svelte/icons/users';
 	import Zap from '@lucide/svelte/icons/zap';
-	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
-	import { InstantVector, PrometheusDriver } from 'prometheus-query';
-	import { onDestroy, onMount } from 'svelte';
+	import { type GetRequest, ResourceService } from '@otterscale/api/resource/v1';
+	import type { CoreV1ResourceQuota, TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
+	import { getContext, onDestroy, onMount } from 'svelte';
 
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import {
+		binarySuffixFactors,
+		formatWithBinarySuffix,
+		quantityToScalar
+	} from '$lib/components/dynamic-table/utils';
 	import { typographyVariants } from '$lib/components/typography/index.ts';
-	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Badge } from '$lib/components/ui/badge';
+	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Card from '$lib/components/ui/card';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as Item from '$lib/components/ui/item';
-	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
-	import { Toggle } from '$lib/components/ui/toggle/index.js';
-	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { cn } from '$lib/utils';
 
 	let { object }: { object: TenantOtterscaleIoV1Alpha1Workspace } = $props();
 
 	const abortController = new AbortController();
 
+	const transport: Transport = getContext('transport');
+	const resourceClient = createClient(ResourceService, transport);
+
 	let resourceQuotaUsed: Record<string, string> = $state({});
 	let isLoaded = $state(false);
 
-	const K8S_QUANTITY_RE = /^(\d+(?:\.\d+)?)\s*(Ki|Mi|Gi|Ti|Pi|Ei|k|M|G|T|P|E|m)?$/;
-	const K8S_MULTIPLIERS: Record<string, number> = {
-		'': 1,
-		m: 0.001,
-		k: 1e3,
-		M: 1e6,
-		G: 1e9,
-		T: 1e12,
-		P: 1e15,
-		E: 1e18,
-		Ki: 1024,
-		Mi: 1024 ** 2,
-		Gi: 1024 ** 3,
-		Ti: 1024 ** 4,
-		Pi: 1024 ** 5,
-		Ei: 1024 ** 6
-	};
-
-	function parseK8sQuantity(raw: string | number): number {
-		if (typeof raw === 'number') return raw;
-		const match = raw.match(K8S_QUANTITY_RE);
-		if (!match) return NaN;
-		return parseFloat(match[1]) * (K8S_MULTIPLIERS[match[2] ?? ''] ?? 1);
-	}
-
-	function formatResourceValue(key: string, value: number): string {
-		if (key.includes('cpu')) {
-			return value < 1 ? `${Math.round(value * 1000)}m` : `${value}`;
-		}
-		if (key.includes('memory')) {
-			const gi = value / 1024 ** 3;
-			if (gi >= 1) return `${Math.round(gi * 10) / 10}Gi`;
-			const mi = value / 1024 ** 2;
-			if (mi >= 1) return `${Math.round(mi)}Mi`;
-			return `${Math.round(value / 1024)}Ki`;
-		}
-		if (key.includes('gpumem')) {
-			const gi = value / 1024;
-			return `${Math.round(gi * 10) / 10}Gi`;
-		}
-		return String(Math.round(value));
-	}
-
 	function formatHardValue(key: string, raw: string | number): string {
 		if (!key.includes('gpumem')) return String(raw);
-		if (typeof raw === 'string' && !K8S_QUANTITY_RE.test(raw)) return raw;
-		const base = parseK8sQuantity(raw);
-		if (Number.isNaN(base)) return String(raw);
-		const gi = base / 1024;
-		return `${Math.round(gi * 10) / 10}Gi`;
+		try {
+			// gpumem hard quota is expressed in Mi, matching quantity-cell.svelte's baseUnit convention
+			const bytes = BigInt(quantityToScalar(String(raw))) * binarySuffixFactors.Mi;
+			const { value, unit } = formatWithBinarySuffix(bytes);
+			return `${Math.round(value * 10) / 10}${unit}`;
+		} catch {
+			return String(raw);
+		}
 	}
 
-	async function fetchResourceQuotaMetrics() {
+	async function fetchResourceQuota() {
 		const namespace = object.status?.resourceQuotaRef?.namespace ?? '';
-		if (!namespace) return;
-
-		const prometheusDriver = new PrometheusDriver({
-			endpoint: `/proxy/${page.params.cluster}/prometheus`,
-			baseURL: '/api/v1',
-			headers: { 'x-proxy-target': 'api' }
-		});
+		const name = object.status?.resourceQuotaRef?.name ?? '';
+		if (!namespace || !name) return;
 
 		try {
-			const gpuResourceMap: Record<string, string> = {
-				nvidia_com_gpumem: 'nvidia.com/gpumem'
-			};
-
-			// gpumem is a per-GPU value; total used = gpu_count × gpumem_per_gpu per container
-			const gpuMemLimitsTotalQuery = `sum((kube_pod_container_resource_limits{namespace="${namespace}",resource="nvidia_com_gpu"} * on (namespace, pod, container) kube_pod_container_resource_limits{namespace="${namespace}",resource="nvidia_com_gpumem"}) and on (namespace, pod, container) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`;
-
-			const [limitsResponse, requestsResponse, gpuMemLimitsTotal] = await Promise.all([
-				prometheusDriver.instantQuery(
-					`sum by (resource) (kube_pod_container_resource_limits{namespace="${namespace}"} and on (namespace, pod) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`
-				),
-				prometheusDriver.instantQuery(
-					`sum by (resource) (kube_pod_container_resource_requests{namespace="${namespace}"} and on (namespace, pod) kube_pod_container_status_ready{namespace="${namespace}"} == 1)`
-				),
-				prometheusDriver.instantQuery(gpuMemLimitsTotalQuery)
-			]);
-
-			const usedMap: Record<string, string> = {};
-			for (const v of limitsResponse.result as InstantVector[]) {
-				const metricResource = (v.metric.labels as Record<string, string>).resource;
-				if (!metricResource) continue;
-				// gpumem handled separately below
-				if (metricResource === 'nvidia_com_gpumem') continue;
-				const quotaResource = gpuResourceMap[metricResource] ?? metricResource;
-				usedMap[`limits.${quotaResource}`] = formatResourceValue(
-					`limits.${quotaResource}`,
-					v.value.value
-				);
-			}
-			// gpumem limits: use gpu × gpumem total
-			const gpuMemLimitsVec = (gpuMemLimitsTotal.result as InstantVector[])[0];
-			if (gpuMemLimitsVec) {
-				usedMap['limits.nvidia.com/gpumem'] = formatResourceValue(
-					'limits.nvidia.com/gpumem',
-					gpuMemLimitsVec.value.value
-				);
-			}
-
-			for (const v of requestsResponse.result as InstantVector[]) {
-				const metricResource = (v.metric.labels as Record<string, string>).resource;
-				if (!metricResource) continue;
-				const quotaResource = gpuResourceMap[metricResource] ?? metricResource;
-				usedMap[`requests.${quotaResource}`] = formatResourceValue(
-					`requests.${quotaResource}`,
-					v.value.value
-				);
-				if (gpuResourceMap[metricResource]) {
-					usedMap[quotaResource] = formatResourceValue(quotaResource, v.value.value);
-				}
-			}
-
-			resourceQuotaUsed = usedMap;
+			const response = await resourceClient.get(
+				{
+					cluster: page.params.cluster,
+					namespace,
+					name,
+					group: '',
+					version: 'v1',
+					resource: 'resourcequotas'
+				} as GetRequest,
+				{ signal: abortController.signal }
+			);
+			const resourceQuota = response.object as CoreV1ResourceQuota | undefined;
+			resourceQuotaUsed = resourceQuota?.status?.used ?? {};
 		} catch (error) {
-			console.error('Failed to fetch ResourceQuota metrics from Prometheus:', error);
+			console.error('Failed to fetch ResourceQuota status:', error);
 		}
 	}
 
 	onMount(async () => {
-		await fetchResourceQuotaMetrics();
+		await fetchResourceQuota();
 		isLoaded = true;
 	});
 
@@ -168,63 +87,23 @@
 		abortController.abort();
 	});
 
-	function getGridLayout(key: string) {
-		if (key === 'requests.cpu') return 'md:row-start-1 2xl:row-start-2';
-		if (key === 'requests.memory') return 'md:row-start-2 2xl:row-start-2';
-		if (key === 'limits.cpu') return 'md:row-start-1 2xl:row-start-1';
-		if (key === 'limits.memory') return 'md:row-start-2 2xl:row-start-1';
-		if (key === 'limits.nvidia.com/gpumem') return 'md:row-start-4 2xl:row-start-1';
-		return '2xl:row-start-3 md:row-start-5';
-	}
-
-	let isResourceQuotasGrid = $state(false);
-
 	type WorkspaceMember = NonNullable<
 		TenantOtterscaleIoV1Alpha1Workspace['spec']
 	>['members'][number];
 
-	// Above this count the list moves into a fixed-height scroll area (and gains a
-	// role switch) so the card stops growing with the member count.
-	// Shared by the card count badges so they keep the same footprint regardless of
-	// how many digits they show (and so a changing count never reflows its neighbours).
-	const COUNT_BADGE_CLASS = 'min-w-10 justify-center tabular-nums';
+	// Above this count the member list collapses behind a "Show all" toggle so the
+	// card doesn't grow unbounded with the member count.
+	const MEMBERS_COLLAPSED_LIMIT = 6;
 
-	const MEMBERS_SCROLL_THRESHOLD = 6;
-	const MEMBER_ROLES = ['admin', 'edit', 'view'] as const;
-	const MEMBER_ROLE_FILTERS = ['all', ...MEMBER_ROLES] as const;
-
-	let memberRoleFilter = $state<string>('all');
+	let showAllMembers = $state(false);
 
 	const members = $derived(object.spec?.members ?? []);
-	const filteredMembers = $derived(
-		memberRoleFilter === 'all'
-			? members
-			: members.filter((member) => member.role === memberRoleFilter)
-	);
-	const memberRoleCounts = $derived(
-		Object.fromEntries(
-			MEMBER_ROLES.map((role) => [role, members.filter((member) => member.role === role).length])
-		) as Record<(typeof MEMBER_ROLES)[number], number>
-	);
-	const memberRoleSummary = $derived(
-		MEMBER_ROLES.filter((role) => memberRoleCounts[role] > 0)
-			.map((role) => `${memberRoleCounts[role]} ${role}`)
-			.join(' · ')
+	const visibleMembers = $derived(
+		showAllMembers ? members : members.slice(0, MEMBERS_COLLAPSED_LIMIT)
 	);
 
 	function getMemberLabel(member: WorkspaceMember): string {
 		return member.name || member.username || member.subject;
-	}
-
-	function getMemberInitials(member: WorkspaceMember): string {
-		const label = getMemberLabel(member);
-		const initials = label
-			.split(/[\s._-]+/)
-			.filter(Boolean)
-			.slice(0, 2)
-			.map((part) => part[0])
-			.join('');
-		return (initials || label.slice(0, 2)).toUpperCase();
 	}
 
 	function getMemberRoleVariant(role: WorkspaceMember['role']) {
@@ -381,13 +260,8 @@
 {:else}
 	{#snippet memberGrid()}
 		<div class="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2 2xl:grid-cols-3">
-			{#each filteredMembers as member (member.subject)}
+			{#each visibleMembers as member (member.subject)}
 				<Item.Root class="p-0" size="sm">
-					<Item.Media>
-						<Avatar.Root size="sm">
-							<Avatar.Fallback>{getMemberInitials(member)}</Avatar.Fallback>
-						</Avatar.Root>
-					</Item.Media>
 					<Item.Content class="min-w-0">
 						<Item.Title class="w-full justify-between">
 							<span class="truncate">{getMemberLabel(member)}</span>
@@ -398,22 +272,9 @@
 								<Badge variant={getMemberRoleVariant(member.role)}>{member.role}</Badge>
 							</span>
 						</Item.Title>
-						<Item.Description class="min-w-0">
-							<Tooltip.Root>
-								<Tooltip.Trigger class="block max-w-full text-left font-mono">
-									{#if member.username}
-										<span class="block truncate">{member.username}</span>
-									{/if}
-									<span class="block truncate">{member.subject}</span>
-								</Tooltip.Trigger>
-								<Tooltip.Content class="font-mono">
-									{#if member.username}
-										<p>username: {member.username}</p>
-									{/if}
-									<p>subject: {member.subject}</p>
-								</Tooltip.Content>
-							</Tooltip.Root>
-						</Item.Description>
+						{#if member.username}
+							<Item.Description class="truncate font-mono">{member.username}</Item.Description>
+						{/if}
 					</Item.Content>
 				</Item.Root>
 			{/each}
@@ -425,8 +286,6 @@
 			<!-- Status Conditions -->
 			<Card.Root class="flex h-full flex-col border-0 bg-muted/30 shadow-none ring-0">
 				{@const conditions = object.status?.conditions ?? []}
-				{@const readyCondition = conditions.find((condition) => condition.type === 'Ready')}
-				{@const isReady = readyCondition?.status === 'True' ? true : false}
 				<Card.Header>
 					<Card.Title>
 						<Item.Root class="p-0">
@@ -441,36 +300,20 @@
 				</Card.Header>
 				<Card.Content>
 					{#if conditions.length > 0}
-						{#if isReady}
-							<Item.Root class={cn('p-0', !isReady ? '**:text-destructive' : '**:text-none')}>
-								<Item.Content>
-									<Item.Title class={typographyVariants({ variant: 'h6' })}>
-										{readyCondition?.reason}
-									</Item.Title>
-									<Item.Description>{readyCondition?.message}</Item.Description>
-								</Item.Content>
-							</Item.Root>
-						{:else}
-							{#each [...conditions].sort((p, n) => {
-								const previous = new Date(p.lastTransitionTime ?? 0).getTime();
-								const next = new Date(n.lastTransitionTime ?? 0).getTime();
-								return next - previous;
-							}) as condition, index (index)}
+						<div class="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
+							{#each conditions as condition, index (index)}
 								<Item.Root
-									class={cn(
-										'p-0',
-										condition.status === 'False' ? '**:text-destructive' : '**:text-none'
-									)}
+									class={cn('w-fit p-0', condition.status === 'False' && 'text-destructive')}
 								>
-									<Item.Content>
-										<Item.Title class={typographyVariants({ variant: 'h6' })}>
-											{condition?.reason}
+									<Item.Content class="gap-2">
+										<Item.Description>{condition.type}</Item.Description>
+										<Item.Title class={typographyVariants({ variant: 'large' })}>
+											{condition.status}
 										</Item.Title>
-										<Item.Description>{condition?.message}</Item.Description>
 									</Item.Content>
 								</Item.Root>
 							{/each}
-						{/if}
+						</div>
 					{:else}
 						<Empty.Root class="h-full">
 							<Empty.Header>
@@ -500,26 +343,6 @@
 								<Item.Title class={typographyVariants({ variant: 'h6' })}>Resource Quota</Item.Title
 								>
 							</Item.Content>
-							<Item.Actions>
-								<Tooltip.Root>
-									<Tooltip.Trigger>
-										{#snippet child({ props })}
-											<Toggle
-												{...props}
-												aria-label="Toggle Resource Quota Grid"
-												size="sm"
-												onclick={() => {
-													isResourceQuotasGrid = !isResourceQuotasGrid;
-												}}
-												class="data-[state=on]:*:[svg]:fill-muted-foreground/50"
-											>
-												<Grid />
-											</Toggle>
-										{/snippet}
-									</Tooltip.Trigger>
-									<Tooltip.Content>Toggle Grid Layout</Tooltip.Content>
-								</Tooltip.Root>
-							</Item.Actions>
 						</Item.Root>
 					</Card.Title>
 				</Card.Header>
@@ -527,16 +350,14 @@
 					{#if Object.keys(resourceQuotaHard).length > 0}
 						<div class="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-5">
 							{#each Object.keys(resourceQuotaHard) as key, index (index)}
-								<Item.Root
-									class={cn('w-fit p-0', isResourceQuotasGrid ? getGridLayout(key) : 'flex')}
-								>
+								<Item.Root class="w-fit p-0">
 									<Item.Content class="flex gap-2">
 										<Item.Description>
 											{key}
 										</Item.Description>
 										<Item.Title class={cn(typographyVariants({ variant: 'large' }))}>
 											{resourceQuotaUsed[key] !== undefined
-												? resourceQuotaUsed[key]
+												? formatHardValue(key, resourceQuotaUsed[key])
 												: '?'}/{formatHardValue(key, resourceQuotaHard[key])}
 										</Item.Title>
 									</Item.Content>
@@ -579,35 +400,27 @@
 					{#if limits.length > 0}
 						{#each limits as limit, index (index)}
 							{@const { type, ...thresholds } = limit}
-							<Item.Root class="justify-between py-0 pl-0">
-								<Item.Content>
-									<Item.Title class="uppercase">
-										{type}
-									</Item.Title>
-								</Item.Content>
-								<Item.Footer
-									class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
-								>
-									{#each Object.entries(thresholds) as [key, values], index (index)}
-										{#if values && typeof values === 'object'}
-											<Item.Root class="p-0">
-												<Item.Content>
-													<Item.Title
-														class={cn('capitalize', typographyVariants({ variant: 'muted' }))}
-													>
-														{key}
-													</Item.Title>
-													<Item.Description>
-														{#each Object.entries(values) as [key, value], index (index)}
-															<p class="font-mono text-primary">{key}:{value}</p>
-														{/each}
+							<Item.Title class={cn('mb-2 uppercase', typographyVariants({ variant: 'muted' }))}>
+								{type}
+							</Item.Title>
+							<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+								{#each Object.entries(thresholds) as [thresholdKey, values], index (index)}
+									{#if values && typeof values === 'object'}
+										{#each Object.entries(values) as [resourceKey, value], index (index)}
+											<Item.Root class="w-fit p-0">
+												<Item.Content class="gap-2">
+													<Item.Description class="capitalize">
+														{thresholdKey}.{resourceKey}
 													</Item.Description>
+													<Item.Title class={typographyVariants({ variant: 'large' })}>
+														{value}
+													</Item.Title>
 												</Item.Content>
 											</Item.Root>
-										{/if}
-									{/each}
-								</Item.Footer>
-							</Item.Root>
+										{/each}
+									{/if}
+								{/each}
+							</div>
 							<Separator class="my-2 last:hidden" />
 						{/each}
 					{:else}
@@ -682,16 +495,11 @@
 								{/if}
 							</Item.Description>
 						</Item.Content>
-						<Item.Actions>
-							<Badge class={COUNT_BADGE_CLASS}>{allowedNamespaces.length}</Badge>
-						</Item.Actions>
 					</Item.Root>
 				</Card.Content>
 			</Card.Root>
 
 			<!-- Members -->
-			<!-- h-fit (not h-full): the fixed-height ScrollArea below makes this card taller than
-			     its siblings, and a stretched height would get clipped by Card.Root overflow-hidden -->
 			<Card.Root class="flex h-fit flex-col border-0 bg-muted/30 shadow-none ring-0">
 				<Card.Header>
 					<Card.Title>
@@ -701,59 +509,9 @@
 							</Item.Media>
 							<Item.Content>
 								<Item.Title class={typographyVariants({ variant: 'h6' })}>Members</Item.Title>
-								{#if memberRoleSummary}
-									<Item.Description>{memberRoleSummary}</Item.Description>
-								{/if}
 							</Item.Content>
 						</Item.Root>
 					</Card.Title>
-					<Card.Action>
-						<div class="flex items-center gap-2">
-							{#if members.length > MEMBERS_SCROLL_THRESHOLD}
-								<Tooltip.Root>
-									<DropdownMenu.Root>
-										<Tooltip.Trigger>
-											<DropdownMenu.Trigger>
-												{#snippet child({ props })}
-													<Toggle
-														{...props}
-														aria-label="Filter Members By Role"
-														size="sm"
-														pressed={memberRoleFilter !== 'all'}
-													>
-														<ListFilter />
-													</Toggle>
-												{/snippet}
-											</DropdownMenu.Trigger>
-										</Tooltip.Trigger>
-										<DropdownMenu.Content align="end">
-											<DropdownMenu.Label>Filter by Role</DropdownMenu.Label>
-											<DropdownMenu.RadioGroup bind:value={memberRoleFilter}>
-												{#each MEMBER_ROLE_FILTERS as roleFilter (roleFilter)}
-													<DropdownMenu.RadioItem
-														value={roleFilter}
-														disabled={roleFilter !== 'all' && memberRoleCounts[roleFilter] === 0}
-														class="capitalize"
-													>
-														{roleFilter}
-														<DropdownMenu.Shortcut>
-															{roleFilter === 'all' ? members.length : memberRoleCounts[roleFilter]}
-														</DropdownMenu.Shortcut>
-													</DropdownMenu.RadioItem>
-												{/each}
-											</DropdownMenu.RadioGroup>
-										</DropdownMenu.Content>
-									</DropdownMenu.Root>
-									<Tooltip.Content>Filter by Role</Tooltip.Content>
-								</Tooltip.Root>
-							{/if}
-							<!-- min-w reserves room for a 3-digit count so toggling a filter never
-							     reflows the button next to it -->
-							<Badge class={COUNT_BADGE_CLASS}>
-								{filteredMembers.length}
-							</Badge>
-						</div>
-					</Card.Action>
 				</Card.Header>
 				<Card.Content>
 					{#if members.length === 0}
@@ -768,26 +526,19 @@
 								</Empty.Description>
 							</Empty.Header>
 						</Empty.Root>
-					{:else if filteredMembers.length === 0}
-						<Empty.Root class="h-full">
-							<Empty.Header>
-								<Empty.Media variant="icon">
-									<Users />
-								</Empty.Media>
-								<Empty.Title>No Matching Members</Empty.Title>
-								<Empty.Description>
-									No member holds the {memberRoleFilter} role in this workspace.
-								</Empty.Description>
-							</Empty.Header>
-						</Empty.Root>
-					{:else if filteredMembers.length > MEMBERS_SCROLL_THRESHOLD}
-						<ScrollArea class="h-72 w-full">
-							<div class="pr-3">
-								{@render memberGrid()}
-							</div>
-						</ScrollArea>
 					{:else}
 						{@render memberGrid()}
+						{#if members.length > MEMBERS_COLLAPSED_LIMIT}
+							<div class="mt-4 flex justify-center">
+								<Button
+									variant="ghost"
+									size="sm"
+									onclick={() => (showAllMembers = !showAllMembers)}
+								>
+									{showAllMembers ? 'Show less' : `Show all ${members.length}`}
+								</Button>
+							</div>
+						{/if}
 					{/if}
 				</Card.Content>
 			</Card.Root>
