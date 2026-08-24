@@ -92,6 +92,9 @@
 		>;
 	} = $props();
 
+	/* Constants and Keys */
+
+	// Query Parameter Keys
 	const PARAMETERS = {
 		QUERY: 'query',
 		VIEW: 'view',
@@ -100,14 +103,31 @@
 		SIZE: 'size',
 		HIDE: 'hide'
 	} as const;
-
+	// Filter
+	const GLOBAL_FILTER_IDENTIFIER = 'global_filter_identifier';
+	// Pagination
 	const PAGE_SIZE = 9;
 	const PAGE_SIZES = [9, 18, 45, 90];
-
+	// View
 	// svelte-ignore state_referenced_locally
 	const hasGridlayout = !!gridLayout;
 	const DEFAULT_MODE: 'table' | 'grid' = hasGridlayout ? 'grid' : 'table';
+	// Column Visibility
+	// svelte-ignore state_referenced_locally
+	const initialColumnVisibility: VisibilityState = Object.fromEntries(
+		columnDefinitions
+			.filter(
+				(columnDefinition) =>
+					(columnDefinition.meta as { defaultHidden?: boolean } | undefined)?.defaultHidden === true
+			)
+			.map(getColumnId)
+			.filter((columnId): columnId is string => columnId != null)
+			.map((columnId) => [columnId, false])
+	);
 
+	/* Table State */
+
+	// View
 	const mode = $derived.by<'table' | 'grid'>(() => {
 		const value = page.url.searchParams.get(PARAMETERS.VIEW);
 		// A pasted `?view=grid` link would otherwise render nothing at all on a
@@ -116,9 +136,10 @@
 		if (value === 'table') return 'table';
 		return DEFAULT_MODE;
 	});
-
+	// Filter
 	const globalFilter = $derived(page.url.searchParams.get(PARAMETERS.QUERY) ?? '');
-
+	let columnFilters = $state<ColumnFiltersState>([]);
+	// Sort
 	const sorting = $derived.by<SortingState>(() =>
 		page.url.searchParams.getAll(PARAMETERS.SORT).flatMap((entry) => {
 			// Sort params follow the common `field:direction` convention.
@@ -137,7 +158,7 @@
 			return [{ id: field, desc: direction === 'desc' }];
 		})
 	);
-
+	// Pagination
 	const pagination = $derived.by<PaginationState>(() => {
 		const pageParameter = Number(page.url.searchParams.get(PARAMETERS.PAGE));
 		const sizeParameter = Number(page.url.searchParams.get(PARAMETERS.SIZE));
@@ -148,19 +169,7 @@
 				Number.isFinite(sizeParameter) && sizeParameter > 0 ? Math.floor(sizeParameter) : PAGE_SIZE
 		};
 	});
-
-	// svelte-ignore state_referenced_locally
-	const initialColumnVisibility: VisibilityState = Object.fromEntries(
-		columnDefinitions
-			.filter(
-				(columnDefinition) =>
-					(columnDefinition.meta as { defaultHidden?: boolean } | undefined)?.defaultHidden === true
-			)
-			.map(getColumnId)
-			.filter((columnId): columnId is string => columnId != null)
-			.map((columnId) => [columnId, false])
-	);
-
+	// Column Visibility
 	const columnVisibility = $derived.by<VisibilityState>(() => {
 		if (!page.url.searchParams.has(PARAMETERS.HIDE)) return initialColumnVisibility;
 		const hidden = (page.url.searchParams.get(PARAMETERS.HIDE) ?? '')
@@ -169,7 +178,21 @@
 			.filter(Boolean);
 		return Object.fromEntries(hidden.map((id) => [id, false]));
 	});
+	let rowSelection = $state<RowSelectionState>({});
+	// Sizing
+	let columnSizing = $state<ColumnSizingState>({});
 
+	/* Logic */
+
+	// Filter
+	let globalFilterTerm = $derived(globalFilter);
+	// A writable derived: recomputing to null whenever the query changes, but  handleSearch can assign a parse failure into it, which then survives until  the next query change.
+	// The `void` is what establishes that dependency.
+	let submitGlobalFilterError = $derived.by<Error | null>(() => {
+		void globalFilter;
+		return null;
+	});
+	// Global Filter Query Parsing
 	const structuredGlobalFilter = $derived.by<{ query: LiqeQuery | null; error: Error | null }>(
 		() => {
 			if (!globalFilter) return { query: null, error: null };
@@ -180,23 +203,9 @@
 			}
 		}
 	);
-
-	let globalFilterTerm = $derived(globalFilter);
-
-	// A writable derived: recomputing to null whenever the query changes, but  handleSearch can assign a parse failure into it, which then survives until  the next query change.
-	// The `void` is what establishes that dependency.
-	let submitGlobalFilterError = $derived.by<Error | null>(() => {
-		void globalFilter;
-		return null;
-	});
+	// Errors
 	const parseGlobalFilterError = $derived(structuredGlobalFilter.error);
 	const globalFilterError = $derived(submitGlobalFilterError ?? parseGlobalFilterError);
-
-	let rowSelection = $state<RowSelectionState>({});
-	let columnFilters = $state<ColumnFiltersState>([]);
-	let columnSizing = $state<ColumnSizingState>({});
-
-	const GLOBAL_FILTER_IDENTIFIER = 'global_filter_identifier';
 
 	// columnDefinitions are set once, capturing the initial value is intentional.
 	// svelte-ignore state_referenced_locally
@@ -246,6 +255,7 @@
 		}
 	];
 
+	/* Instance */
 	let table = createSvelteTable<Record<string, JsonValue>>({
 		columns,
 		get data() {
@@ -364,15 +374,8 @@
 		autoResetPageIndex: false
 	});
 
-	function getColumnId(columnDefinition: ColumnDef<Record<string, JsonValue>>): string | undefined {
-		return columnDefinition.id ?? (columnDefinition as { accessorKey?: string }).accessorKey;
-	}
-
-	// svelte-ignore state_referenced_locally
-	const validColumnIds = new Set(
-		columnDefinitions.map(getColumnId).filter((id): id is string => id != null)
-	);
-
+	/* helpers */
+	// Filter
 	function commit(
 		patch: (urlSearchParameters: URLSearchParams) => void,
 		{ history = 'replace' }: { history?: 'replace' | 'push' } = {}
@@ -394,7 +397,15 @@
 			invalidateAll: false
 		});
 	}
-
+	// Visibility
+	function getColumnId(columnDefinition: ColumnDef<Record<string, JsonValue>>): string | undefined {
+		return columnDefinition.id ?? (columnDefinition as { accessorKey?: string }).accessorKey;
+	}
+	// svelte-ignore state_referenced_locally
+	const validColumnIds = new Set(
+		columnDefinitions.map(getColumnId).filter((id): id is string => id != null)
+	);
+	// Mode
 	function setMode(next: 'table' | 'grid') {
 		commit((params) => {
 			if (next === DEFAULT_MODE) {
@@ -404,20 +415,14 @@
 			}
 		});
 	}
-
-	function handleKeyDown(event: KeyboardEvent) {
-		if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-			event.preventDefault();
-			handleSearch();
-		}
-
-		if (event.key === 'Escape') {
-			event.preventDefault();
-			handleClear();
-		}
+	// Row
+	function isTerminating(row: Row<Record<string, JsonValue>>): boolean {
+		return lodash.get(row.original, 'raw.metadata.deletionTimestamp') != null;
 	}
 
-	function handleSearch() {
+	/* Handlers */
+	// Filter
+	function handleGlobalFilter() {
 		try {
 			if (globalFilterTerm) {
 				parse(globalFilterTerm);
@@ -428,13 +433,24 @@
 			submitGlobalFilterError = error as Error;
 		}
 	}
+	function handleGlobalFilterKeyDown(event: KeyboardEvent) {
+		if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+			event.preventDefault();
+			handleGlobalFilter();
+		}
 
-	function handleClear() {
+		if (event.key === 'Escape') {
+			event.preventDefault();
+			handleGlobalFilterClear();
+		}
+	}
+	function handleGlobalFilterClear() {
 		globalFilterTerm = '';
 		submitGlobalFilterError = null;
 		table.setGlobalFilter('');
 	}
 
+	/* User Interface */
 	function getAlignment(uiSchema: UISchemaType): 'start' | 'center' | 'end' {
 		const map: Record<NonNullable<UISchemaType>, 'start' | 'center' | 'end'> = {
 			boolean: 'center',
@@ -476,10 +492,6 @@
 			default:
 				return 'text-end';
 		}
-	}
-
-	function isTerminating(row: Row<Record<string, JsonValue>>): boolean {
-		return lodash.get(row.original, 'raw.metadata.deletionTimestamp') != null;
 	}
 </script>
 
@@ -574,7 +586,7 @@
 					placeholder="e.g. Name:resourceName AND Namespace:namespace"
 					bind:value={globalFilterTerm}
 					class="peer w-full"
-					onkeydown={handleKeyDown}
+					onkeydown={handleGlobalFilterKeyDown}
 				/>
 				<InputGroup.Addon align="inline-end" class="hidden peer-focus:flex">
 					<Kbd.Group>
@@ -610,7 +622,7 @@
 	{#if mode === 'table'}
 		{@render tableLayout()}
 	{:else if mode === 'grid'}
-		{@render gridLayout?.({ table, handleClear })}
+		{@render gridLayout?.({ table, handleClear: handleGlobalFilterClear })}
 	{/if}
 
 	<!-- Pagination -->
@@ -827,7 +839,7 @@
 									</Empty.Description>
 								</Empty.Header>
 								<Empty.Content>
-									<Button onclick={handleClear}>
+									<Button onclick={handleGlobalFilterClear}>
 										<EraserIcon size={16} class="opacity-60" />
 										Reset
 									</Button>
