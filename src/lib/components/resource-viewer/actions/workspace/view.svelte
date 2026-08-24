@@ -21,10 +21,8 @@
 		formatWithBinarySuffix,
 		quantityToScalar
 	} from '$lib/components/dynamic-table/utils';
-	import { typographyVariants } from '$lib/components/typography/index.ts';
 	import { Badge } from '$lib/components/ui/badge';
 	import Button from '$lib/components/ui/button/button.svelte';
-	import * as Card from '$lib/components/ui/card';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as Item from '$lib/components/ui/item';
@@ -281,267 +279,225 @@
 		</div>
 	{/snippet}
 	<Field.Group>
-		<!-- Spec Section -->
+		<!-- Status Conditions -->
 		<Field.Set>
-			<!-- Status Conditions -->
-			<Card.Root class="flex h-full flex-col border-0 bg-muted/30 shadow-none ring-0">
-				{@const conditions = object.status?.conditions ?? []}
-				<Card.Header>
-					<Card.Title>
-						<Item.Root class="p-0">
-							<Item.Media>
-								<HeartPulse size={20} />
-							</Item.Media>
-							<Item.Content>
-								<Item.Title class={typographyVariants({ variant: 'h6' })}>Status</Item.Title>
-							</Item.Content>
-						</Item.Root>
-					</Card.Title>
-				</Card.Header>
-				<Card.Content>
-					{#if conditions.length > 0}
-						<div class="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
-							{#each conditions as condition, index (index)}
-								<Item.Root
-									class={cn('w-fit p-0', condition.status === 'False' && 'text-destructive')}
-								>
-									<Item.Content class="gap-2">
-										<Item.Description>{condition.type}</Item.Description>
-										<Item.Title class={typographyVariants({ variant: 'large' })}>
-											{condition.status}
-										</Item.Title>
-									</Item.Content>
-								</Item.Root>
-							{/each}
-						</div>
-					{:else}
-						<Empty.Root class="h-full">
-							<Empty.Header>
-								<Empty.Media variant="icon">
-									<HeartPulse />
-								</Empty.Media>
-								<Empty.Title>No Status Available</Empty.Title>
-								<Empty.Description>
-									There are no status conditions to display for this workspace.
-								</Empty.Description>
-							</Empty.Header>
-						</Empty.Root>
-					{/if}
-				</Card.Content>
-			</Card.Root>
-
-			<!-- Resource Quota -->
-			<Card.Root class="flex h-full flex-col border-0 bg-muted/30 shadow-none ring-0">
-				{@const resourceQuotaHard = object.spec?.resourceQuota?.hard ?? {}}
-				<Card.Header>
-					<Card.Title>
-						<Item.Root class="p-0">
-							<Item.Media>
-								<Gauge size={20} />
-							</Item.Media>
-							<Item.Content>
-								<Item.Title class={typographyVariants({ variant: 'h6' })}>Resource Quota</Item.Title
-								>
-							</Item.Content>
-						</Item.Root>
-					</Card.Title>
-				</Card.Header>
-				<Card.Content>
-					{#if Object.keys(resourceQuotaHard).length > 0}
-						<div class="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-5">
-							{#each Object.keys(resourceQuotaHard) as key, index (index)}
-								<Item.Root class="w-fit p-0">
-									<Item.Content class="flex gap-2">
-										<Item.Description>
-											{key}
-										</Item.Description>
-										<Item.Title class={cn(typographyVariants({ variant: 'large' }))}>
-											{resourceQuotaUsed[key] !== undefined
-												? formatHardValue(key, resourceQuotaUsed[key])
-												: '?'}/{formatHardValue(key, resourceQuotaHard[key])}
-										</Item.Title>
-									</Item.Content>
-								</Item.Root>
-							{/each}
-						</div>
-					{:else}
-						<Empty.Root class="h-full">
-							<Empty.Header>
-								<Empty.Media variant="icon">
-									<Gauge />
-								</Empty.Media>
-								<Empty.Title>No Resource Quota Configured</Empty.Title>
-								<Empty.Description>
-									Resource Quota is not configured yet. Please click the edit button at the top
-									right to configure Resource Quota.
-								</Empty.Description>
-							</Empty.Header>
-						</Empty.Root>
-					{/if}
-				</Card.Content>
-			</Card.Root>
-
-			<!-- Limit Range -->
-			<Card.Root class="flex h-full flex-col border-0 bg-muted/30 shadow-none ring-0">
-				{@const limits = object.spec?.limitRange?.limits ?? []}
-				<Card.Header>
-					<Card.Title>
-						<Item.Root class="p-0">
-							<Item.Media>
-								<Zap size={20} />
-							</Item.Media>
-							<Item.Content>
-								<Item.Title class={typographyVariants({ variant: 'h6' })}>Limit Range</Item.Title>
-							</Item.Content>
-						</Item.Root>
-					</Card.Title>
-				</Card.Header>
-				<Card.Content class="h-full ">
-					{#if limits.length > 0}
-						{#each limits as limit, index (index)}
-							{@const { type, ...thresholds } = limit}
-							<Item.Title class={cn('mb-2 uppercase', typographyVariants({ variant: 'muted' }))}>
-								{type}
-							</Item.Title>
-							<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-								{#each Object.entries(thresholds) as [thresholdKey, values], index (index)}
-									{#if values && typeof values === 'object'}
-										{#each Object.entries(values) as [resourceKey, value], index (index)}
-											<Item.Root class="w-fit p-0">
-												<Item.Content class="gap-2">
-													<Item.Description class="capitalize">
-														{thresholdKey}.{resourceKey}
-													</Item.Description>
-													<Item.Title class={typographyVariants({ variant: 'large' })}>
-														{value}
-													</Item.Title>
-												</Item.Content>
-											</Item.Root>
-										{/each}
-									{/if}
-								{/each}
-							</div>
-							<Separator class="my-2 last:hidden" />
-						{/each}
-					{:else}
-						<Empty.Root class="h-full">
-							<Empty.Header>
-								<Empty.Media variant="icon">
-									<Zap />
-								</Empty.Media>
-								<Empty.Title>No Limit Range Configured</Empty.Title>
-								<Empty.Description>
-									Limit Range is not configured yet. Please click the edit button at the top right
-									to configure Limit Range.
-								</Empty.Description>
-							</Empty.Header>
-						</Empty.Root>
-					{/if}
-				</Card.Content>
-			</Card.Root>
-
-			<!-- Network Isolation -->
-			<Card.Root class="flex h-full flex-col border-0 bg-muted/30 shadow-none ring-0">
-				<Card.Header>
-					<Card.Title>
-						<Item.Root class="p-0">
-							<Item.Media>
-								<Shield size={20} />
-							</Item.Media>
-							<Item.Content>
-								<Item.Title class={typographyVariants({ variant: 'h6' })}>
-									Network Isolation
+			{@const conditions = object.status?.conditions ?? []}
+			<Item.Root class="p-0">
+				<Item.Media>
+					<HeartPulse size={20} />
+				</Item.Media>
+				<Item.Content>
+					<Item.Title>Status</Item.Title>
+				</Item.Content>
+			</Item.Root>
+			{#if conditions.length > 0}
+				<div class="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
+					{#each conditions as condition, index (index)}
+						<Item.Root class={cn('w-fit p-0', condition.status === 'False' && 'text-destructive')}>
+							<Item.Content class="gap-2">
+								<Item.Description>{condition.type}</Item.Description>
+								<Item.Title>
+									{condition.message}
 								</Item.Title>
 							</Item.Content>
 						</Item.Root>
-					</Card.Title>
-				</Card.Header>
-				<Card.Content class="grid grid-cols-1 gap-4 lg:grid-cols-2">
-					<Item.Root class="flex w-full items-center justify-between p-0">
-						<Item.Content>
-							<Item.Title class={typographyVariants({ variant: 'h6' })}>Enabled</Item.Title>
-							<Item.Description>
-								{@const enabled = object.spec?.networkIsolation?.enabled ?? null}
-								{#if enabled === true}
-									<CircleCheck size={40} class="text-chart-2" />
-								{:else}
-									<CircleX size={40} class="text-destructive" />
-								{/if}
-							</Item.Description>
-						</Item.Content>
-					</Item.Root>
-					<Item.Root class="p-0">
-						{@const allowedNamespaces = object.spec?.networkIsolation?.allowedNamespaces ?? []}
+					{/each}
+				</div>
+			{:else}
+				<Empty.Root class="h-full">
+					<Empty.Header>
+						<Empty.Media variant="icon">
+							<HeartPulse />
+						</Empty.Media>
+						<Empty.Title>No Status Available</Empty.Title>
+						<Empty.Description>
+							There are no status conditions to display for this workspace.
+						</Empty.Description>
+					</Empty.Header>
+				</Empty.Root>
+			{/if}
+		</Field.Set>
 
-						<Item.Content>
-							<Item.Title class={typographyVariants({ variant: 'h6' })}>
-								Allowed Namespaces
-							</Item.Title>
-							<Item.Description>
-								{#if allowedNamespaces.length > 0}
-									<div class="flex flex-wrap gap-1">
-										{#each allowedNamespaces as allowedNamespace, index (index)}
-											<Badge variant="secondary" class={typographyVariants({ variant: 'muted' })}>
-												<Network class="size-3" />
-												{allowedNamespace}
-											</Badge>
-										{/each}
-									</div>
-								{:else}
-									<Badge variant="outline" class={typographyVariants({ variant: 'muted' })}>
-										<Network class="size-3" />
-										<p class="italic">No namespaces allowed</p>
-									</Badge>
-								{/if}
-							</Item.Description>
-						</Item.Content>
-					</Item.Root>
-				</Card.Content>
-			</Card.Root>
-
-			<!-- Members -->
-			<Card.Root class="flex h-fit flex-col border-0 bg-muted/30 shadow-none ring-0">
-				<Card.Header>
-					<Card.Title>
-						<Item.Root class="p-0">
-							<Item.Media>
-								<Users size={20} />
-							</Item.Media>
-							<Item.Content>
-								<Item.Title class={typographyVariants({ variant: 'h6' })}>Members</Item.Title>
+		<!-- Resource Quota -->
+		<Field.Set>
+			{@const resourceQuotaHard = object.spec?.resourceQuota?.hard ?? {}}
+			<Item.Root class="p-0">
+				<Item.Media>
+					<Gauge size={20} />
+				</Item.Media>
+				<Item.Content>
+					<Item.Title>Resource Quota</Item.Title>
+				</Item.Content>
+			</Item.Root>
+			{#if Object.keys(resourceQuotaHard).length > 0}
+				<div class="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-5">
+					{#each Object.keys(resourceQuotaHard) as key, index (index)}
+						<Item.Root class="w-fit p-0">
+							<Item.Content class="flex gap-2">
+								<Item.Description>
+									{key}
+								</Item.Description>
+								<Item.Title>
+									{resourceQuotaUsed[key] !== undefined
+										? formatHardValue(key, resourceQuotaUsed[key])
+										: '?'}/{formatHardValue(key, resourceQuotaHard[key])}
+								</Item.Title>
 							</Item.Content>
 						</Item.Root>
-					</Card.Title>
-				</Card.Header>
-				<Card.Content>
-					{#if members.length === 0}
-						<Empty.Root class="h-full">
-							<Empty.Header>
-								<Empty.Media variant="icon">
-									<Users />
-								</Empty.Media>
-								<Empty.Title>No Members</Empty.Title>
-								<Empty.Description>
-									No members have been granted access to this workspace yet.
-								</Empty.Description>
-							</Empty.Header>
-						</Empty.Root>
-					{:else}
-						{@render memberGrid()}
-						{#if members.length > MEMBERS_COLLAPSED_LIMIT}
-							<div class="mt-4 flex justify-center">
-								<Button
-									variant="ghost"
-									size="sm"
-									onclick={() => (showAllMembers = !showAllMembers)}
-								>
-									{showAllMembers ? 'Show less' : `Show all ${members.length}`}
-								</Button>
-							</div>
-						{/if}
-					{/if}
-				</Card.Content>
-			</Card.Root>
+					{/each}
+				</div>
+			{:else}
+				<Empty.Root class="h-full">
+					<Empty.Header>
+						<Empty.Media variant="icon">
+							<Gauge />
+						</Empty.Media>
+						<Empty.Title>No Resource Quota Configured</Empty.Title>
+						<Empty.Description>
+							Resource Quota is not configured yet. Please click the edit button at the top right to
+							configure Resource Quota.
+						</Empty.Description>
+					</Empty.Header>
+				</Empty.Root>
+			{/if}
+		</Field.Set>
+
+		<!-- Limit Range -->
+		<Field.Set>
+			{@const limits = object.spec?.limitRange?.limits ?? []}
+			<Item.Root class="p-0">
+				<Item.Media>
+					<Zap size={20} />
+				</Item.Media>
+				<Item.Content>
+					<Item.Title>Limit Range</Item.Title>
+				</Item.Content>
+			</Item.Root>
+			{#if limits.length > 0}
+				{#each limits as limit, index (index)}
+					{@const { type, ...thresholds } = limit}
+					<Item.Title class="mb-2 uppercase">
+						{type}
+					</Item.Title>
+					<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+						{#each Object.entries(thresholds) as [thresholdKey, values], index (index)}
+							{#if values && typeof values === 'object'}
+								{#each Object.entries(values) as [resourceKey, value], index (index)}
+									<Item.Root class="w-fit p-0">
+										<Item.Content class="gap-2">
+											<Item.Description class="capitalize">
+												{thresholdKey}.{resourceKey}
+											</Item.Description>
+											<Item.Title>
+												{value}
+											</Item.Title>
+										</Item.Content>
+									</Item.Root>
+								{/each}
+							{/if}
+						{/each}
+					</div>
+					<Separator class="my-2 last:hidden" />
+				{/each}
+			{:else}
+				<Empty.Root class="h-full">
+					<Empty.Header>
+						<Empty.Media variant="icon">
+							<Zap />
+						</Empty.Media>
+						<Empty.Title>No Limit Range Configured</Empty.Title>
+						<Empty.Description>
+							Limit Range is not configured yet. Please click the edit button at the top right to
+							configure Limit Range.
+						</Empty.Description>
+					</Empty.Header>
+				</Empty.Root>
+			{/if}
+		</Field.Set>
+
+		<!-- Network Isolation -->
+		<Field.Set>
+			<Item.Root class="p-0">
+				<Item.Media>
+					<Shield size={20} />
+				</Item.Media>
+				<Item.Content>
+					<Item.Title>Network Isolation</Item.Title>
+				</Item.Content>
+			</Item.Root>
+			<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+				<Item.Root class="flex w-full items-center justify-between p-0">
+					<Item.Content>
+						<Item.Title>Enabled</Item.Title>
+						<Item.Description>
+							{@const enabled = object.spec?.networkIsolation?.enabled ?? null}
+							{#if enabled === true}
+								<CircleCheck size={40} class="text-chart-2" />
+							{:else}
+								<CircleX size={40} class="text-destructive" />
+							{/if}
+						</Item.Description>
+					</Item.Content>
+				</Item.Root>
+				<Item.Root class="p-0">
+					{@const allowedNamespaces = object.spec?.networkIsolation?.allowedNamespaces ?? []}
+
+					<Item.Content>
+						<Item.Title>Allowed Namespaces</Item.Title>
+						<Item.Description>
+							{#if allowedNamespaces.length > 0}
+								<div class="flex flex-wrap gap-1">
+									{#each allowedNamespaces as allowedNamespace, index (index)}
+										<Badge variant="secondary">
+											<Network class="size-3" />
+											{allowedNamespace}
+										</Badge>
+									{/each}
+								</div>
+							{:else}
+								<Badge variant="outline">
+									<Network class="size-3" />
+									<p class="italic">No namespaces allowed</p>
+								</Badge>
+							{/if}
+						</Item.Description>
+					</Item.Content>
+				</Item.Root>
+			</div>
+		</Field.Set>
+
+		<!-- Members -->
+		<Field.Set>
+			<Item.Root class="p-0">
+				<Item.Media>
+					<Users size={20} />
+				</Item.Media>
+				<Item.Content>
+					<Item.Title>Members</Item.Title>
+				</Item.Content>
+			</Item.Root>
+			{#if members.length === 0}
+				<Empty.Root class="h-full">
+					<Empty.Header>
+						<Empty.Media variant="icon">
+							<Users />
+						</Empty.Media>
+						<Empty.Title>No Members</Empty.Title>
+						<Empty.Description>
+							No members have been granted access to this workspace yet.
+						</Empty.Description>
+					</Empty.Header>
+				</Empty.Root>
+			{:else}
+				{@render memberGrid()}
+				{#if members.length > MEMBERS_COLLAPSED_LIMIT}
+					<div class="flex justify-center">
+						<Button variant="ghost" size="sm" onclick={() => (showAllMembers = !showAllMembers)}>
+							{showAllMembers ? 'Show less' : `Show all ${members.length}`}
+						</Button>
+					</div>
+				{/if}
+			{/if}
 		</Field.Set>
 
 		{@const namespace = object.status?.namespaceRef?.name ?? ''}
