@@ -1,4 +1,5 @@
 import type { SortingState } from '@tanstack/table-core';
+import { SvelteURL } from 'svelte/reactivity';
 
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
@@ -256,7 +257,7 @@ class SearchParametersTableState extends TableStateBase implements TableState {
 	) {
 		// Clone: `page.url` is a read-only reactive source,
 		// and mutating it would change the state without navigating.
-		const url = new URL(page.url);
+		const url = new SvelteURL(page.url);
 		// A live view of `url`, so every edit below lands in `url.href`.
 		const searchParameters = url.searchParams;
 
