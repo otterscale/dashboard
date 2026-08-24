@@ -1,3 +1,7 @@
+<script lang="ts" module>
+	type WorkspaceMember = NonNullable<TenantOtterscaleIoV1Alpha1Workspace['spec']>['members'][number];
+</script>
+
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import Box from '@lucide/svelte/icons/box';
@@ -85,25 +89,17 @@
 		abortController.abort();
 	});
 
-	type WorkspaceMember = NonNullable<
-		TenantOtterscaleIoV1Alpha1Workspace['spec']
-	>['members'][number];
-
 	// Above this count the member list collapses behind a "Show all" toggle so the
 	// card doesn't grow unbounded with the member count.
 	const MEMBERS_COLLAPSED_LIMIT = 6;
-
 	let showAllMembers = $state(false);
-
 	const members = $derived(object.spec?.members ?? []);
 	const visibleMembers = $derived(
 		showAllMembers ? members : members.slice(0, MEMBERS_COLLAPSED_LIMIT)
 	);
-
 	function getMemberLabel(member: WorkspaceMember): string {
 		return member.name || member.username || member.subject;
 	}
-
 	function getMemberRoleVariant(role: WorkspaceMember['role']) {
 		if (role === 'admin') return 'default' as const;
 		if (role === 'edit') return 'secondary' as const;
@@ -256,65 +252,48 @@
 		</Field.Set>
 	</Field.Group>
 {:else}
-	{#snippet memberGrid()}
-		<div class="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2 2xl:grid-cols-3">
-			{#each visibleMembers as member (member.subject)}
-				<Item.Root class="p-0" size="sm">
-					<Item.Content class="min-w-0">
-						<Item.Title class="w-full justify-between">
-							<span class="truncate">{getMemberLabel(member)}</span>
-							<span class="flex shrink-0 items-center gap-2">
-								{#if member.serviceAccount}
-									<Badge variant="destructive">service account</Badge>
-								{/if}
-								<Badge variant={getMemberRoleVariant(member.role)}>{member.role}</Badge>
-							</span>
-						</Item.Title>
-						{#if member.username}
-							<Item.Description class="truncate font-mono">{member.username}</Item.Description>
-						{/if}
-					</Item.Content>
-				</Item.Root>
-			{/each}
-		</div>
-	{/snippet}
 	<Field.Group>
 		<!-- Status Conditions -->
 		<Field.Set>
 			{@const conditions = object.status?.conditions ?? []}
+			{#if conditions.length > 0}
 			<Item.Root class="p-0">
-				<Item.Media>
-					<HeartPulse size={20} />
-				</Item.Media>
 				<Item.Content>
 					<Item.Title>Status</Item.Title>
+					<Item.Description>conditions</Item.Description>
 				</Item.Content>
 			</Item.Root>
-			{#if conditions.length > 0}
 				<div class="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
 					{#each conditions as condition, index (index)}
-						<Item.Root class={cn('w-fit p-0', condition.status === 'False' && 'text-destructive')}>
-							<Item.Content class="gap-2">
-								<Item.Description>{condition.type}</Item.Description>
-								<Item.Title>
-									{condition.message}
-								</Item.Title>
-							</Item.Content>
-						</Item.Root>
+						{#if condition.status === 'True'}
+							<Item.Root class="p-0">
+								<Item.Content>
+									<Item.Title >
+										{condition.type}
+									</Item.Title>
+									<Item.Description>
+										{condition.lastTransitionTime}
+									</Item.Description>
+								</Item.Content>
+								<Item.Actions>
+									<Badge>{condition.type}</Badge>
+								</Item.Actions>
+							</Item.Root>
+						{:else}
+							<Item.Root class="p-0">
+								<Item.Content>
+									<Item.Title>
+										{condition.reason}
+									</Item.Title>
+									<Item.Description>{condition.message}</Item.Description>
+								</Item.Content>
+								<Item.Actions>
+									<Badge variant="destructive">{condition.type}</Badge>
+								</Item.Actions>
+							</Item.Root>
+						{/if}
 					{/each}
 				</div>
-			{:else}
-				<Empty.Root class="h-full">
-					<Empty.Header>
-						<Empty.Media variant="icon">
-							<HeartPulse />
-						</Empty.Media>
-						<Empty.Title>No Status Available</Empty.Title>
-						<Empty.Description>
-							There are no status conditions to display for this workspace.
-						</Empty.Description>
-					</Empty.Header>
-				</Empty.Root>
 			{/if}
 		</Field.Set>
 
@@ -322,15 +301,13 @@
 		<Field.Set>
 			{@const resourceQuotaHard = object.spec?.resourceQuota?.hard ?? {}}
 			<Item.Root class="p-0">
-				<Item.Media>
-					<Gauge size={20} />
-				</Item.Media>
 				<Item.Content>
 					<Item.Title>Resource Quota</Item.Title>
+					<Item.Description>used/hard</Item.Description>
 				</Item.Content>
 			</Item.Root>
 			{#if Object.keys(resourceQuotaHard).length > 0}
-				<div class="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-5">
+				<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
 					{#each Object.keys(resourceQuotaHard) as key, index (index)}
 						<Item.Root class="w-fit p-0">
 							<Item.Content class="flex gap-2">
@@ -340,25 +317,12 @@
 								<Item.Title>
 									{resourceQuotaUsed[key] !== undefined
 										? formatHardValue(key, resourceQuotaUsed[key])
-										: '?'}/{formatHardValue(key, resourceQuotaHard[key])}
+										: '-'}/{formatHardValue(key, resourceQuotaHard[key])}
 								</Item.Title>
 							</Item.Content>
 						</Item.Root>
 					{/each}
 				</div>
-			{:else}
-				<Empty.Root class="h-full">
-					<Empty.Header>
-						<Empty.Media variant="icon">
-							<Gauge />
-						</Empty.Media>
-						<Empty.Title>No Resource Quota Configured</Empty.Title>
-						<Empty.Description>
-							Resource Quota is not configured yet. Please click the edit button at the top right to
-							configure Resource Quota.
-						</Empty.Description>
-					</Empty.Header>
-				</Empty.Root>
 			{/if}
 		</Field.Set>
 
@@ -366,27 +330,22 @@
 		<Field.Set>
 			{@const limits = object.spec?.limitRange?.limits ?? []}
 			<Item.Root class="p-0">
-				<Item.Media>
-					<Zap size={20} />
-				</Item.Media>
 				<Item.Content>
 					<Item.Title>Limit Range</Item.Title>
+					<Item.Description>limits</Item.Description>
 				</Item.Content>
 			</Item.Root>
 			{#if limits.length > 0}
 				{#each limits as limit, index (index)}
 					{@const { type, ...thresholds } = limit}
-					<Item.Title class="mb-2 uppercase">
-						{type}
-					</Item.Title>
-					<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+					<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
 						{#each Object.entries(thresholds) as [thresholdKey, values], index (index)}
 							{#if values && typeof values === 'object'}
 								{#each Object.entries(values) as [resourceKey, value], index (index)}
 									<Item.Root class="w-fit p-0">
 										<Item.Content class="gap-2">
-											<Item.Description class="capitalize">
-												{thresholdKey}.{resourceKey}
+											<Item.Description>
+												{type}.{thresholdKey}.{resourceKey}
 											</Item.Description>
 											<Item.Title>
 												{value}
@@ -397,35 +356,19 @@
 							{/if}
 						{/each}
 					</div>
-					<Separator class="my-2 last:hidden" />
 				{/each}
-			{:else}
-				<Empty.Root class="h-full">
-					<Empty.Header>
-						<Empty.Media variant="icon">
-							<Zap />
-						</Empty.Media>
-						<Empty.Title>No Limit Range Configured</Empty.Title>
-						<Empty.Description>
-							Limit Range is not configured yet. Please click the edit button at the top right to
-							configure Limit Range.
-						</Empty.Description>
-					</Empty.Header>
-				</Empty.Root>
 			{/if}
 		</Field.Set>
 
 		<!-- Network Isolation -->
 		<Field.Set>
 			<Item.Root class="p-0">
-				<Item.Media>
-					<Shield size={20} />
-				</Item.Media>
 				<Item.Content>
 					<Item.Title>Network Isolation</Item.Title>
+					<Item.Description>isolation settings</Item.Description>
 				</Item.Content>
 			</Item.Root>
-			<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+			<div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
 				<Item.Root class="flex w-full items-center justify-between p-0">
 					<Item.Content>
 						<Item.Title>Enabled</Item.Title>
@@ -441,7 +384,6 @@
 				</Item.Root>
 				<Item.Root class="p-0">
 					{@const allowedNamespaces = object.spec?.networkIsolation?.allowedNamespaces ?? []}
-
 					<Item.Content>
 						<Item.Title>Allowed Namespaces</Item.Title>
 						<Item.Description>
@@ -489,7 +431,26 @@
 					</Empty.Header>
 				</Empty.Root>
 			{:else}
-				{@render memberGrid()}
+				<div class="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2 2xl:grid-cols-3">
+					{#each visibleMembers as member (member.subject)}
+						<Item.Root class="p-0" size="sm">
+							<Item.Content class="min-w-0">
+								<Item.Title class="w-full justify-between">
+									<span class="truncate">{getMemberLabel(member)}</span>
+									<span class="flex shrink-0 items-center gap-2">
+										{#if member.serviceAccount}
+											<Badge variant="destructive">service account</Badge>
+										{/if}
+										<Badge variant={getMemberRoleVariant(member.role)}>{member.role}</Badge>
+									</span>
+								</Item.Title>
+								{#if member.username}
+									<Item.Description class="truncate font-mono">{member.username}</Item.Description>
+								{/if}
+							</Item.Content>
+						</Item.Root>
+					{/each}
+				</div>
 				{#if members.length > MEMBERS_COLLAPSED_LIMIT}
 					<div class="flex justify-center">
 						<Button variant="ghost" size="sm" onclick={() => (showAllMembers = !showAllMembers)}>
