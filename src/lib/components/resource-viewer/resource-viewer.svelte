@@ -14,7 +14,7 @@
 	import Ajv, { type ValidateFunction } from 'ajv';
 	import { getContext, onDestroy, onMount } from 'svelte';
 
-	import { getActions, type ActionsType } from '$lib/components/kind-viewer/kind-viewer-actions';
+	import { type ActionsType, getActions } from '$lib/components/kind-viewer/kind-viewer-actions';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button';
 	import * as Empty from '$lib/components/ui/empty/index.js';

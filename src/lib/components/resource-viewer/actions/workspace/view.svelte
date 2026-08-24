@@ -1,5 +1,7 @@
 <script lang="ts" module>
-	type WorkspaceMember = NonNullable<TenantOtterscaleIoV1Alpha1Workspace['spec']>['members'][number];
+	type WorkspaceMember = NonNullable<
+		TenantOtterscaleIoV1Alpha1Workspace['spec']
+	>['members'][number];
 </script>
 
 <script lang="ts">
@@ -30,9 +32,7 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as Item from '$lib/components/ui/item';
-	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
-	import { cn } from '$lib/utils';
 
 	let { object }: { object: TenantOtterscaleIoV1Alpha1Workspace } = $props();
 
@@ -257,18 +257,18 @@
 		<Field.Set>
 			{@const conditions = object.status?.conditions ?? []}
 			{#if conditions.length > 0}
-			<Item.Root class="p-0">
-				<Item.Content>
-					<Item.Title>Status</Item.Title>
-					<Item.Description>conditions</Item.Description>
-				</Item.Content>
-			</Item.Root>
-				<div class="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-3">
+				<Item.Root class="p-0">
+					<Item.Content>
+						<Item.Title>Status</Item.Title>
+						<Item.Description>status.conditions</Item.Description>
+					</Item.Content>
+				</Item.Root>
+				<div class="grid grid-cols-1 rounded-lg bg-muted">
 					{#each conditions as condition, index (index)}
 						{#if condition.status === 'True'}
-							<Item.Root class="p-0">
+							<Item.Root>
 								<Item.Content>
-									<Item.Title >
+									<Item.Title>
 										{condition.type}
 									</Item.Title>
 									<Item.Description>
@@ -280,7 +280,7 @@
 								</Item.Actions>
 							</Item.Root>
 						{:else}
-							<Item.Root class="p-0">
+							<Item.Root>
 								<Item.Content>
 									<Item.Title>
 										{condition.reason}
@@ -303,14 +303,14 @@
 			<Item.Root class="p-0">
 				<Item.Content>
 					<Item.Title>Resource Quota</Item.Title>
-					<Item.Description>used/hard</Item.Description>
+					<Item.Description>spec.resourceQuota.used/spec.resourceQuota.hard</Item.Description>
 				</Item.Content>
 			</Item.Root>
 			{#if Object.keys(resourceQuotaHard).length > 0}
-				<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+				<div class="grid grid-cols-1 rounded-lg bg-muted md:grid-cols-3">
 					{#each Object.keys(resourceQuotaHard) as key, index (index)}
-						<Item.Root class="w-fit p-0">
-							<Item.Content class="flex gap-2">
+						<Item.Root>
+							<Item.Content>
 								<Item.Description>
 									{key}
 								</Item.Description>
@@ -332,18 +332,18 @@
 			<Item.Root class="p-0">
 				<Item.Content>
 					<Item.Title>Limit Range</Item.Title>
-					<Item.Description>limits</Item.Description>
+					<Item.Description>spec.limitRange.limits</Item.Description>
 				</Item.Content>
 			</Item.Root>
 			{#if limits.length > 0}
 				{#each limits as limit, index (index)}
 					{@const { type, ...thresholds } = limit}
-					<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+					<div class="grid grid-cols-1 rounded-lg bg-muted md:grid-cols-3">
 						{#each Object.entries(thresholds) as [thresholdKey, values], index (index)}
 							{#if values && typeof values === 'object'}
 								{#each Object.entries(values) as [resourceKey, value], index (index)}
-									<Item.Root class="w-fit p-0">
-										<Item.Content class="gap-2">
+									<Item.Root>
+										<Item.Content>
 											<Item.Description>
 												{type}.{thresholdKey}.{resourceKey}
 											</Item.Description>
@@ -360,46 +360,12 @@
 			{/if}
 		</Field.Set>
 
-		<!-- Network Isolation -->
-		<Field.Set>
-			<Item.Root class="p-0">
-				<Item.Content>
-					<Item.Title>Network Isolation</Item.Title>
-				</Item.Content>
-				<Item.Actions>
-					{@const enabled = object.spec?.networkIsolation?.enabled ?? null}
-					<Button variant="ghost" onclick={() => (showAllMembers = !showAllMembers)}>
-						{enabled ? 'enabled' : 'disabled'}
-					</Button>
-				</Item.Actions>
-			</Item.Root>
-			<div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-				{@const allowedNamespaces = object.spec?.networkIsolation?.allowedNamespaces ?? []}
-				<Item.Root class="p-0">
-					<Item.Content>
-						<Item.Title>Allowed Namespaces</Item.Title>
-						<Item.Description>
-							{#if allowedNamespaces.length > 0}
-								<div class="flex flex-wrap gap-1">
-									{#each allowedNamespaces as allowedNamespace, index (index)}
-										<Badge variant="outline">
-											{allowedNamespace}
-										</Badge>
-									{/each}
-								</div>
-							{/if}
-						</Item.Description>
-					</Item.Content>
-				</Item.Root>
-			</div>
-		</Field.Set>
-
 		<!-- Members -->
 		<Field.Set>
 			<Item.Root class="p-0">
 				<Item.Content>
 					<Item.Title>Members</Item.Title>
-					<Item.Description>members</Item.Description>
+					<Item.Description>spec.members</Item.Description>
 				</Item.Content>
 				{#if members.length > MEMBERS_COLLAPSED_LIMIT}
 					<Item.Actions>
@@ -410,22 +376,53 @@
 				{/if}
 			</Item.Root>
 			{#if members.length > 0}
-				<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+				<div class="grid grid-cols-1 rounded-lg bg-muted md:grid-cols-3">
 					{#each visibleMembers as member (member.subject)}
-						<Item.Root class="p-0" size="sm">
-							<Item.Content class="min-w-0">
-								<Item.Title class="w-full justify-between">
-									<span class="truncate">{getMemberLabel(member)}</span>
-									<span class="flex shrink-0 items-center gap-2">
-										{#if member.serviceAccount}
-											<Badge variant="destructive">service account</Badge>
-										{/if}
-										<Badge variant={getMemberRoleVariant(member.role)}>{member.role}</Badge>
-									</span>
+						<Item.Root>
+							<Item.Content>
+								<Item.Title>
+									{getMemberLabel(member)}
 								</Item.Title>
 								{#if member.username}
-									<Item.Description class="truncate font-mono">{member.username}</Item.Description>
+									<Item.Description>{member.username}</Item.Description>
 								{/if}
+							</Item.Content>
+							<Item.Actions>
+								{#if member.serviceAccount}
+									<Badge variant="destructive">service account</Badge>
+								{/if}
+								<Badge variant={getMemberRoleVariant(member.role)}>{member.role}</Badge>
+							</Item.Actions>
+						</Item.Root>
+					{/each}
+				</div>
+			{/if}
+		</Field.Set>
+
+		<!-- Network Isolation -->
+		<Field.Set>
+			{@const allowedNamespaces = object.spec?.networkIsolation?.allowedNamespaces ?? []}
+			<Item.Root class="p-0">
+				<Item.Content>
+					<Item.Title>Network Isolation</Item.Title>
+					<Item.Description>spec.networkIsolation</Item.Description>
+				</Item.Content>
+				<Item.Actions>
+					{@const enabled = object.spec?.networkIsolation?.enabled ?? null}
+					<Badge variant="outline">
+						{enabled ? 'enabled' : 'disabled'}
+					</Badge>
+				</Item.Actions>
+			</Item.Root>
+			{#if allowedNamespaces.length > 0}
+				<div class="grid grid-cols-1 rounded-lg bg-muted lg:grid-cols-3">
+					{#each allowedNamespaces as allowedNamespace, index (index)}
+						<Item.Root>
+							<Item.Content>
+								<Item.Description>Allowed Namespace</Item.Description>
+								<Item.Title>
+									{allowedNamespace}
+								</Item.Title>
 							</Item.Content>
 						</Item.Root>
 					{/each}
@@ -441,8 +438,7 @@
 					<Item.Content>
 						<Item.Title>Related Resources</Item.Title>
 						<Item.Description>
-							{relatedResources.length} resources related to {object.kind}
-							{object.metadata?.name}
+							{relatedResources.length} related resources
 						</Item.Description>
 					</Item.Content>
 				</Item.Root>
