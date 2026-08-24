@@ -12,7 +12,6 @@
 	} from '$lib/components/custom/datetime-picker';
 	import Reloader from '$lib/components/custom/reloader/reloader.svelte';
 	import { Overview } from '$lib/components/dashboard/storage/overview';
-	import RookCephViewer from '$lib/components/resource-viewer/viewers/rook-ceph-viewer.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Item from '$lib/components/ui/item';
 	import * as Sheet from '$lib/components/ui/sheet';
@@ -74,9 +73,6 @@
 							<ActivityIcon />
 						</Button>
 					</Sheet.Trigger>
-					<Sheet.Content class="min-w-[77vw] overflow-auto p-8">
-						<RookCephViewer {cluster} />
-					</Sheet.Content>
 				</Sheet.Root>
 			</Item.Actions>
 		</Item.Root>
