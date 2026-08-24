@@ -11,8 +11,10 @@
 		type WatchRequest
 	} from '@otterscale/api/resource/v1';
 	import type { Schema } from '@sjsf/form';
+	import Ajv, { type ValidateFunction } from 'ajv';
 	import { getContext, onDestroy, onMount } from 'svelte';
 
+	import { getActions, type ActionsType } from '$lib/components/kind-viewer/kind-viewer-actions';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button';
 	import * as Empty from '$lib/components/ui/empty/index.js';
@@ -65,6 +67,13 @@
 	let schema: Schema | undefined = $state(undefined);
 	let object: ResourceObject | undefined = $state(undefined);
 	let error: ViewerError | null = $state(null);
+
+	const jsonSchemaValidator = new Ajv({ allErrors: true, strict: false, logger: false });
+	const validate: ValidateFunction | undefined = $derived(
+		schema ? jsonSchemaValidator.compile($state.snapshot(schema)) : undefined
+	);
+
+	const Actions: ActionsType = $derived(getActions(kind, namespace));
 
 	let isGetting = $state(false);
 	let getAbortController: AbortController | null = null;
@@ -307,7 +316,22 @@
 						{/if}
 					</div>
 				</Item.Content>
-				<Item.Actions></Item.Actions>
+				<Item.Actions>
+					{#if Actions && schema && validate}
+						<Actions
+							role={isClusterAdmin ? 'Cluster Admin' : undefined}
+							{object}
+							{schema}
+							{validate}
+							{cluster}
+							{namespace}
+							{group}
+							{version}
+							{kind}
+							{resource}
+						/>
+					{/if}
+				</Item.Actions>
 			</Item.Root>
 		</Field.Set>
 		{#if object}
