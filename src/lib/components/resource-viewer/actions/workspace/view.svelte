@@ -365,42 +365,28 @@
 			<Item.Root class="p-0">
 				<Item.Content>
 					<Item.Title>Network Isolation</Item.Title>
-					<Item.Description>isolation settings</Item.Description>
 				</Item.Content>
+				<Item.Actions>
+					{@const enabled = object.spec?.networkIsolation?.enabled ?? null}
+					<Button variant="ghost" onclick={() => (showAllMembers = !showAllMembers)}>
+						{enabled ? 'enabled' : 'disabled'}
+					</Button>
+				</Item.Actions>
 			</Item.Root>
 			<div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-				<Item.Root class="flex w-full items-center justify-between p-0">
-					<Item.Content>
-						<Item.Title>Enabled</Item.Title>
-						<Item.Description>
-							{@const enabled = object.spec?.networkIsolation?.enabled ?? null}
-							{#if enabled === true}
-								<CircleCheck size={40} class="text-chart-2" />
-							{:else}
-								<CircleX size={40} class="text-destructive" />
-							{/if}
-						</Item.Description>
-					</Item.Content>
-				</Item.Root>
+				{@const allowedNamespaces = object.spec?.networkIsolation?.allowedNamespaces ?? []}
 				<Item.Root class="p-0">
-					{@const allowedNamespaces = object.spec?.networkIsolation?.allowedNamespaces ?? []}
 					<Item.Content>
 						<Item.Title>Allowed Namespaces</Item.Title>
 						<Item.Description>
 							{#if allowedNamespaces.length > 0}
 								<div class="flex flex-wrap gap-1">
 									{#each allowedNamespaces as allowedNamespace, index (index)}
-										<Badge variant="secondary">
-											<Network class="size-3" />
+										<Badge variant="outline">
 											{allowedNamespace}
 										</Badge>
 									{/each}
 								</div>
-							{:else}
-								<Badge variant="outline">
-									<Network class="size-3" />
-									<p class="italic">No namespaces allowed</p>
-								</Badge>
 							{/if}
 						</Item.Description>
 					</Item.Content>
@@ -411,27 +397,20 @@
 		<!-- Members -->
 		<Field.Set>
 			<Item.Root class="p-0">
-				<Item.Media>
-					<Users size={20} />
-				</Item.Media>
 				<Item.Content>
 					<Item.Title>Members</Item.Title>
+					<Item.Description>members</Item.Description>
 				</Item.Content>
+				{#if members.length > MEMBERS_COLLAPSED_LIMIT}
+					<Item.Actions>
+						<Button variant="ghost" onclick={() => (showAllMembers = !showAllMembers)}>
+							{showAllMembers ? 'less' : 'all'}
+						</Button>
+					</Item.Actions>
+				{/if}
 			</Item.Root>
-			{#if members.length === 0}
-				<Empty.Root class="h-full">
-					<Empty.Header>
-						<Empty.Media variant="icon">
-							<Users />
-						</Empty.Media>
-						<Empty.Title>No Members</Empty.Title>
-						<Empty.Description>
-							No members have been granted access to this workspace yet.
-						</Empty.Description>
-					</Empty.Header>
-				</Empty.Root>
-			{:else}
-				<div class="grid grid-cols-1 gap-x-8 gap-y-4 md:grid-cols-2 2xl:grid-cols-3">
+			{#if members.length > 0}
+				<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
 					{#each visibleMembers as member (member.subject)}
 						<Item.Root class="p-0" size="sm">
 							<Item.Content class="min-w-0">
@@ -451,13 +430,6 @@
 						</Item.Root>
 					{/each}
 				</div>
-				{#if members.length > MEMBERS_COLLAPSED_LIMIT}
-					<div class="flex justify-center">
-						<Button variant="ghost" size="sm" onclick={() => (showAllMembers = !showAllMembers)}>
-							{showAllMembers ? 'Show less' : `Show all ${members.length}`}
-						</Button>
-					</div>
-				{/if}
 			{/if}
 		</Field.Set>
 
