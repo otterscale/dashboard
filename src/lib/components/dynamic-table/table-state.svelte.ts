@@ -384,13 +384,15 @@ function decodePageSize(value: string | null): number | null {
 }
 
 function decodeHiddenColumnIds(value: string): string[] {
-	return value
-		.split(',')
-		.map((id) => id.trim())
-		// `''.split(',')` is `['']`,
-		// so this filter is what produces the empty state,
-		// and it also tolerates a hand-typed `a,,b`.
-		.filter(Boolean);
+	return (
+		value
+			.split(',')
+			.map((id) => id.trim())
+			// `''.split(',')` is `['']`,
+			// so this filter is what produces the empty state,
+			// and it also tolerates a hand-typed `a,,b`.
+			.filter(Boolean)
+	);
 }
 
 /** `null` deletes the parameter; `''` sets it to an empty value, which differs. */
