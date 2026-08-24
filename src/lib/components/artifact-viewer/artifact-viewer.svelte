@@ -5,7 +5,7 @@
 	import type { ColumnDef } from '@tanstack/table-core';
 	import type { Snippet } from 'svelte';
 
-	import { DynamicTable } from '$lib/components/dynamic-table';
+	import { DynamicTable, UrlTableState } from '$lib/components/dynamic-table';
 	import type { DataSchemaType, UISchemaType } from '$lib/components/dynamic-table/utils';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Empty from '$lib/components/ui/empty/index.js';
@@ -37,6 +37,8 @@
 	const dataSchemas: Record<string, DataSchemaType> = getChartDataSchemas();
 	const columnDefinitions: ColumnDef<Record<ChartAttribute, JsonValue>>[] =
 		getChartColumnDefinitions(uiSchemas, dataSchemas);
+	// This table is the subject of its page, so its view belongs in the URL.
+	const tableState = new UrlTableState();
 </script>
 
 <div class="space-y-4">
@@ -48,7 +50,7 @@
 			</Item.Content>
 		</Item.Root>
 	</div>
-	<DynamicTable data={charts} {columnDefinitions} {uiSchemas} {reload}>
+	<DynamicTable data={charts} {columnDefinitions} {uiSchemas} {tableState} {reload}>
 		{#snippet gridLayout({ table, handleClear })}
 			{#if table.getRowModel().rows?.length}
 				<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">

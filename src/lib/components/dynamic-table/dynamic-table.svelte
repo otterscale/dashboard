@@ -24,17 +24,14 @@
 		type PaginationState,
 		type Row,
 		type RowSelectionState,
-		type SortingState,
 		type Table as TableType,
-		type Table as TanStackTabke,
+		type Table as TanStackTable,
 		type VisibilityState
 	} from '@tanstack/table-core';
 	import { type LiqeQuery, parse, test } from 'liqe';
 	import lodash from 'lodash';
 	import { createRawSnippet, type Snippet } from 'svelte';
 
-	import { goto } from '$app/navigation';
-	import { page } from '$app/state';
 	import { shortcut } from '$lib/actions/shortcut.svelte';
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
@@ -57,12 +54,14 @@
 	import { cn } from '$lib/utils';
 
 	import DynamicTableSearchDocument from './dynamic-table-search-document.svelte';
+	import type { TableState, TableMode } from './table-state.svelte';
 	import type { UISchemaType } from './utils';
 
 	let {
 		data,
 		columnDefinitions,
 		uiSchemas,
+		tableState,
 		// dataSchemas,
 		accessReview,
 		create,
@@ -75,11 +74,16 @@
 		data: Record<string, JsonValue>[];
 		columnDefinitions: ColumnDef<Record<string, JsonValue>>[];
 		uiSchemas: Record<string, UISchemaType>;
+		/**
+		 * Owns the state worth outliving this component — sort, page, search, which columns are hidden, which view.
+		 * Required, because how that state is stored is a decision only the caller can make: `UrlTableState` puts it in the page URL (at most one such table per page), `MemoryTableState` keeps it local to the instance.
+		 */
+		tableState: TableState;
 		// dataSchemas: Record<string, DataSchemaType>;
 		accessReview?: Snippet;
 		create?: Snippet;
-		bulkCreate?: Snippet<[{ table: TanStackTabke<Record<string, JsonValue>> }]>;
-		bulkDelete?: Snippet<[{ table: TanStackTabke<Record<string, JsonValue>> }]>;
+		bulkCreate?: Snippet<[{ table: TanStackTable<Record<string, JsonValue>> }]>;
+		bulkDelete?: Snippet<[{ table: TanStackTable<Record<string, JsonValue>> }]>;
 		rowActions?: Snippet<[{ row: Row<Record<string, JsonValue>> }]>;
 		reload?: Snippet;
 		gridLayout?: Snippet<
@@ -94,27 +98,21 @@
 
 	/* Constants and Keys */
 
-	// Query Parameter Keys
-	const PARAMETERS = {
-		QUERY: 'query',
-		VIEW: 'view',
-		SORT: 'sort',
-		PAGE: 'page',
-		SIZE: 'size',
-		HIDE: 'hide'
-	} as const;
 	// Filter
 	const GLOBAL_FILTER_IDENTIFIER = 'global_filter_identifier';
 	// Pagination
 	const PAGE_SIZE = 9;
 	const PAGE_SIZES = [9, 18, 45, 90];
-	// View
-	// svelte-ignore state_referenced_locally
-	const hasGridlayout = !!gridLayout;
-	const DEFAULT_MODE: 'table' | 'grid' = hasGridlayout ? 'grid' : 'table';
-	// Column Visibility
-	// svelte-ignore state_referenced_locally
-	const initialColumnVisibility: VisibilityState = Object.fromEntries(
+
+	/* Columns */
+
+	function getColumnId(columnDefinition: ColumnDef<Record<string, JsonValue>>): string | undefined {
+		return columnDefinition.id ?? (columnDefinition as { accessorKey?: string }).accessorKey;
+	}
+	const columnIds = $derived(
+		new Set(columnDefinitions.map(getColumnId).filter((id): id is string => id != null))
+	);
+	const defaultHiddenColumnIds = $derived(
 		columnDefinitions
 			.filter(
 				(columnDefinition) =>
@@ -122,64 +120,35 @@
 			)
 			.map(getColumnId)
 			.filter((columnId): columnId is string => columnId != null)
-			.map((columnId) => [columnId, false])
 	);
 
 	/* Table State */
 
-	// View
-	const mode = $derived.by<'table' | 'grid'>(() => {
-		const value = page.url.searchParams.get(PARAMETERS.VIEW);
-		// A pasted `?view=grid` link would otherwise render nothing at all on a
-		// table that wasn't given a gridLayout snippet.
-		if (value === 'grid' && hasGridlayout) return 'grid';
-		if (value === 'table') return 'table';
-		return DEFAULT_MODE;
+	// `tableState` reports what the viewer chose, or null where they chose nothing;
+	// the defaults are applied here, because this is what knows the columns and whether there is a grid layout to switch to.
+	const defaultMode = $derived<TableMode>(gridLayout ? 'grid' : 'table');
+	const mode = $derived.by<TableMode>(() => {
+		const derivedMode = tableState.mode ?? defaultMode;
+		// The grid view renders nothing without a snippet to render it with, so a
+		// persisted `grid` on a table that has none falls back instead of blanking.
+		if (derivedMode === 'grid' && !gridLayout) return 'table'
+		return derivedMode;
 	});
-	// Filter
-	const globalFilter = $derived(page.url.searchParams.get(PARAMETERS.QUERY) ?? '');
-	let columnFilters = $state<ColumnFiltersState>([]);
-	// Sort
-	const sorting = $derived.by<SortingState>(() =>
-		page.url.searchParams.getAll(PARAMETERS.SORT).flatMap((entry) => {
-			// Sort params follow the common `field:direction` convention.
-			// Column ids may themselves contain ':', so split on the last one.
-			const separatorIndex = entry.lastIndexOf(':');
-			if (separatorIndex === -1) return [];
-
-			const field = entry.slice(0, separatorIndex);
-			const direction = entry.slice(separatorIndex + 1);
-
-			// Anything the encoder wouldn't have produced is dropped rather than
-			// guessed — an unknown column or direction means a stale link.
-			if (!validColumnIds.has(field)) return [];
-			if (direction !== 'asc' && direction !== 'desc') return [];
-
-			return [{ id: field, desc: direction === 'desc' }];
-		})
-	);
-	// Pagination
-	const pagination = $derived.by<PaginationState>(() => {
-		const pageParameter = Number(page.url.searchParams.get(PARAMETERS.PAGE));
-		const sizeParameter = Number(page.url.searchParams.get(PARAMETERS.SIZE));
-		return {
-			pageIndex:
-				Number.isFinite(pageParameter) && pageParameter > 1 ? Math.floor(pageParameter) - 1 : 0,
-			pageSize:
-				Number.isFinite(sizeParameter) && sizeParameter > 0 ? Math.floor(sizeParameter) : PAGE_SIZE
-		};
+	const globalFilter = $derived(tableState.globalFilter);
+	// A sort naming a column this table doesn't have is dropped rather than guessed at — an unknown column means a stale link.
+	const sorting = $derived(tableState.sorting?.filter((entry) => columnIds.has(entry.id)) ?? []);
+	const pagination = $derived<PaginationState>({
+		pageIndex: tableState.pageIndex ?? 0,
+		pageSize: tableState.pageSize ?? PAGE_SIZE
 	});
-	// Column Visibility
 	const columnVisibility = $derived.by<VisibilityState>(() => {
-		if (!page.url.searchParams.has(PARAMETERS.HIDE)) return initialColumnVisibility;
-		const hidden = (page.url.searchParams.get(PARAMETERS.HIDE) ?? '')
-			.split(',')
-			.map((id) => id.trim())
-			.filter(Boolean);
+		const hidden = tableState.hiddenColumnIds ?? defaultHiddenColumnIds;
 		return Object.fromEntries(hidden.map((id) => [id, false]));
 	});
+
+	// Transient, and deliberately lost when the component goes away.
+	let columnFilters = $state<ColumnFiltersState>([]);
 	let rowSelection = $state<RowSelectionState>({});
-	// Sizing
 	let columnSizing = $state<ColumnSizingState>({});
 
 	/* Logic */
@@ -274,29 +243,16 @@
 			}
 		},
 		onGlobalFilterChange: (updater) => {
-			const next = typeof updater === 'function' ? updater(globalFilter) : updater;
-			const query = (next ?? '') as string;
-			commit(
-				(params) => {
-					if (query) {
-						params.set(PARAMETERS.QUERY, query);
-					} else {
-						params.delete(PARAMETERS.QUERY);
-					}
-					// A new query invalidates the current page.
-					params.delete(PARAMETERS.PAGE);
-				},
-				// Searching is an explicit, deliberate action, so it earns a
-				// history entry: back returns to the previous query.
-				{ history: 'push' }
-			);
+			const next = typeof updater === 'function' ? updater(tableState.globalFilter) : updater;
+			tableState.setGlobalFilter((next ?? '') as string);
 		},
 		onColumnVisibilityChange: (updater) => {
 			const next = typeof updater === 'function' ? updater(columnVisibility) : updater;
-			const hidden = Object.entries(next)
-				.filter(([, visible]) => visible === false)
-				.map(([id]) => id);
-			commit((params) => params.set(PARAMETERS.HIDE, hidden.join(',')));
+			tableState.setHiddenColumnIds(
+				Object.entries(next)
+					.filter(([, visible]) => visible === false)
+					.map(([columnId]) => columnId)
+			);
 		},
 		onColumnSizingChange: (updater) => {
 			if (typeof updater === 'function') {
@@ -307,18 +263,11 @@
 		},
 		onPaginationChange: (updater) => {
 			const next = typeof updater === 'function' ? updater(pagination) : updater;
-			commit((params) => {
-				if (next.pageIndex > 0) {
-					params.set(PARAMETERS.PAGE, String(next.pageIndex + 1));
-				} else {
-					params.delete(PARAMETERS.PAGE);
-				}
-				if (next.pageSize !== PAGE_SIZE) {
-					params.set(PARAMETERS.SIZE, String(next.pageSize));
-				} else {
-					params.delete(PARAMETERS.SIZE);
-				}
-			});
+			// Only a departure from the default is worth persisting.
+			tableState.setPagination(
+				next.pageIndex > 0 ? next.pageIndex : null,
+				next.pageSize !== PAGE_SIZE ? next.pageSize : null
+			);
 		},
 		onRowSelectionChange: (updater) => {
 			if (typeof updater === 'function') {
@@ -329,18 +278,11 @@
 		},
 		onSortingChange: (updater) => {
 			const next = typeof updater === 'function' ? updater(sorting) : updater;
-			commit((params) => {
-				params.delete(PARAMETERS.SORT);
-				for (const entry of next) {
-					params.append(PARAMETERS.SORT, `${entry.id}:${entry.desc ? 'desc' : 'asc'}`);
-				}
-				// Re-sorting invalidates the current page.
-				params.delete(PARAMETERS.PAGE);
-			});
+			tableState.setSorting(next);
 		},
 		state: {
 			get globalFilter() {
-				return globalFilter;
+				return tableState.globalFilter;
 			},
 			get columnFilters() {
 				return columnFilters;
@@ -363,7 +305,7 @@
 		},
 		globalFilterFn: (row) => {
 			if (!globalFilter) return true;
-			if (!structuredGlobalFilter.query) return false;
+			if (!structuredGlobalFilter.query) return true;
 			try {
 				return test(structuredGlobalFilter.query, row.original);
 			} catch {
@@ -375,52 +317,17 @@
 	});
 
 	/* helpers */
-	// Filter
-	function commit(
-		patch: (urlSearchParameters: URLSearchParams) => void,
-		{ history = 'replace' }: { history?: 'replace' | 'push' } = {}
-	) {
-		const url = new URL(page.url);
-		patch(url.searchParams);
-		// A patch can be a no-op (re-selecting the current page size, toggling a
-		// column that is already hidden). Navigating anyway would stack identical
-		// history entries and make the back button feel broken.
-		if (url.href === page.url.href) return;
-		// The URL is cloned from page.url, so the base path is already applied —
-		// resolve() would double it, and its type doesn't accept query strings.
-		// eslint-disable-next-line svelte/no-navigation-without-resolve
-		void goto(url, {
-			replaceState: history === 'replace',
-			keepFocus: true,
-			noScroll: true,
-			// Filtering is client-side; the data prop must survive the navigation.
-			invalidateAll: false
-		});
-	}
-	// Visibility
-	function getColumnId(columnDefinition: ColumnDef<Record<string, JsonValue>>): string | undefined {
-		return columnDefinition.id ?? (columnDefinition as { accessorKey?: string }).accessorKey;
-	}
-	// svelte-ignore state_referenced_locally
-	const validColumnIds = new Set(
-		columnDefinitions.map(getColumnId).filter((id): id is string => id != null)
-	);
-	// Mode
-	function setMode(next: 'table' | 'grid') {
-		commit((params) => {
-			if (next === DEFAULT_MODE) {
-				params.delete(PARAMETERS.VIEW);
-			} else {
-				params.set(PARAMETERS.VIEW, next);
-			}
-		});
-	}
 	// Row
 	function isTerminating(row: Row<Record<string, JsonValue>>): boolean {
 		return lodash.get(row.original, 'raw.metadata.deletionTimestamp') != null;
 	}
 
 	/* Handlers */
+	// Mode
+	function handleMode(next: TableMode) {
+		// Only a departure from the default is worth persisting.
+		tableState.setMode(next === defaultMode ? null : next);
+	}
 	// Filter
 	function handleGlobalFilter() {
 		try {
@@ -434,7 +341,7 @@
 		}
 	}
 	function handleGlobalFilterKeyDown(event: KeyboardEvent) {
-		if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+		if (event.key === 'Enter') {
 			event.preventDefault();
 			handleGlobalFilter();
 		}
@@ -518,7 +425,7 @@
 							{...props}
 							variant={mode === 'table' ? 'secondary' : 'outline'}
 							size="icon"
-							onclick={() => setMode('table')}
+							onclick={() => handleMode('table')}
 							aria-pressed={mode === 'table'}
 						>
 							<SheetIcon />
@@ -535,7 +442,7 @@
 							disabled={!gridLayout}
 							variant={mode === 'grid' ? 'secondary' : 'outline'}
 							size="icon"
-							onclick={() => setMode('grid')}
+							onclick={() => handleMode('grid')}
 							aria-pressed={mode === 'grid'}
 						>
 							<LayoutGridIcon />
