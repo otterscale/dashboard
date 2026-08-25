@@ -11,7 +11,6 @@ type RelatedResource = {
 	version: string;
 	kind: string;
 	resource: string;
-	namespaced: boolean;
 	name: string;
 	/**
 	 * Where this resource lives, when that is not the namespace the section was

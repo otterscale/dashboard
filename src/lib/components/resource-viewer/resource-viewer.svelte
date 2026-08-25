@@ -22,7 +22,6 @@
 
 	import type { ViewerType as ResourceViewerType } from './actions';
 	import { getResourceViewer } from './actions';
-	import type { RelatedResource } from './types';
 
 	let {
 		cluster,
@@ -44,24 +43,6 @@
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
-
-	/**
-	 * This resource, in the shape a view needs to link to it.
-	 *
-	 * `namespaced` is read off the presence of a namespace because that is the only
-	 * signal the detail URL carries: it is built with one only for a namespaced
-	 * resource. Discovery would be authoritative but costs a round trip to learn
-	 * something the caller already decided.
-	 */
-	const self = $derived<RelatedResource>({
-		group,
-		version,
-		kind,
-		resource,
-		namespaced: Boolean(namespace),
-		name,
-		namespace
-	});
 
 	type ResourceObject = {
 		kind?: string;
@@ -324,7 +305,7 @@
 		</Field.Set>
 		{#if object}
 			{@const ResourceViewer: ResourceViewerType = getResourceViewer(resource)}
-			<ResourceViewer {object} {schema} {self} />
+			<ResourceViewer {group} {version} {kind} {resource} {namespace} {name} {object} {schema} />
 		{/if}
 	</Field.Group>
 {/if}

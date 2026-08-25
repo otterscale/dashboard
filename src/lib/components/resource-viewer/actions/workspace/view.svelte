@@ -8,6 +8,7 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import { type GetRequest, ResourceService } from '@otterscale/api/resource/v1';
 	import type { CoreV1ResourceQuota, TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
+	import lodash from 'lodash';
 	import { getContext, onDestroy, onMount } from 'svelte';
 
 	import { page } from '$app/state';
@@ -26,9 +27,22 @@
 	import type { RelatedResource } from '../../types';
 
 	let {
-		object,
-		self
-	}: { object: TenantOtterscaleIoV1Alpha1Workspace; self: RelatedResource } = $props();
+		group,
+		version,
+		kind,
+		resource,
+		namespace,
+		name,
+		object
+	}: {
+		group: string;
+		version: string;
+		kind: string;
+		resource: string;
+		name: string;
+		namespace: string;
+		object: TenantOtterscaleIoV1Alpha1Workspace;
+	} = $props();
 
 	const abortController = new AbortController();
 
@@ -76,8 +90,6 @@
 		abortController.abort();
 	});
 
-	// Above this count the member list collapses behind a "Show all" toggle so the
-	// card doesn't grow unbounded with the member count.
 	const MEMBERS_COLLAPSED_LIMIT = 6;
 	let showAllMembers = $state(false);
 	function getMemberLabel(member: WorkspaceMember): string {
@@ -89,77 +101,71 @@
 		return 'outline' as const;
 	}
 
-	type ResourceReference = { name?: string; namespace?: string };
-
 	const statusResourceReferenceIdentifiers = {
 		namespaceRef: {
 			group: '',
 			version: 'v1',
 			kind: 'Namespace',
-			resource: 'namespaces',
-			namespaced: false
+			resource: 'namespaces'
 		},
 		resourceQuotaRef: {
 			group: '',
 			version: 'v1',
 			kind: 'ResourceQuota',
-			resource: 'resourcequotas',
-			namespaced: true
+			resource: 'resourcequotas'
 		},
 		configMapRef: {
 			group: '',
 			version: 'v1',
 			kind: 'ConfigMap',
-			resource: 'configmaps',
-			namespaced: true
+			resource: 'configmaps'
 		},
 		limitRangeRef: {
 			group: '',
 			version: 'v1',
 			kind: 'LimitRange',
-			resource: 'limitranges',
-			namespaced: true
+			resource: 'limitranges'
 		},
 		networkPolicyRef: {
 			group: 'networking.k8s.io',
 			version: 'v1',
 			kind: 'NetworkPolicy',
-			resource: 'networkpolicies',
-			namespaced: true
+			resource: 'networkpolicies'
 		},
 		helmRepositoryRef: {
 			group: 'source.toolkit.fluxcd.io',
 			version: 'v1',
 			kind: 'HelmRepository',
-			resource: 'helmrepositories',
-			namespaced: true
+			resource: 'helmrepositories'
 		},
 		imagePullSecretRef: {
 			group: '',
 			version: 'v1',
 			kind: 'Secret',
-			resource: 'secrets',
-			namespaced: true
+			resource: 'secrets'
 		},
 		roleBindingRefs: {
 			group: 'rbac.authorization.k8s.io',
 			version: 'v1',
 			kind: 'RoleBinding',
-			resource: 'rolebindings',
-			namespaced: true
+			resource: 'rolebindings'
 		}
 	};
 
-	let relatedResources = $derived.by(() => {
-		const status = (object.status ?? {}) as Record<
-			string,
-			ResourceReference | ResourceReference[] | undefined
-		>;
-
-		return Object.entries(statusResourceReferenceIdentifiers).flatMap(([key, identifier]) => {
-			const reference = status[key];
-			return (Array.isArray(reference) ? reference : [reference]).flatMap((ref) =>
-				ref?.name ? [{ ...identifier, name: ref.name } satisfies RelatedResource] : []
+	const relatedResources = $derived.by(() => {
+		return Object.entries(object.status ?? {}).flatMap(([key, reference]) => {
+			const identifier = lodash.get(statusResourceReferenceIdentifiers, key, {} as RelatedResource);
+			if (!identifier) return [];
+			return (Array.isArray(reference) ? reference : [reference]).flatMap((r) =>
+				r?.name
+					? [
+							{
+								...identifier,
+								name: r.name,
+								namespace: r.namespace ?? undefined
+							} satisfies RelatedResource
+						]
+					: []
 			);
 		});
 	});
@@ -356,12 +362,6 @@
 				</div>
 			{/if}
 		</Field.Set>
-		<!-- The children a Workspace creates live in the namespace it created, not in
-		     the Workspace's own, so that is the fallback these entries resolve against. -->
-		<RelatedResources
-			{self}
-			{relatedResources}
-			namespace={object.status?.namespaceRef?.name ?? ''}
-		/>
+		<RelatedResources {group} {version} {kind} {resource} {namespace} {name} {relatedResources} />
 	</Field.Group>
 {/if}
