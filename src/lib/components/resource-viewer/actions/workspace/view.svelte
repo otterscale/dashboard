@@ -6,12 +6,10 @@
 
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
 	import { type GetRequest, ResourceService } from '@otterscale/api/resource/v1';
 	import type { CoreV1ResourceQuota, TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import { getContext, onDestroy, onMount } from 'svelte';
 
-	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import {
 		binarySuffixFactors,
@@ -24,7 +22,13 @@
 	import * as Item from '$lib/components/ui/item';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 
-	let { object }: { object: TenantOtterscaleIoV1Alpha1Workspace } = $props();
+	import RelatedResources from '../../related-resources.svelte';
+	import type { RelatedResource } from '../../types';
+
+	let {
+		object,
+		self
+	}: { object: TenantOtterscaleIoV1Alpha1Workspace; self: RelatedResource } = $props();
 
 	const abortController = new AbortController();
 
@@ -84,15 +88,6 @@
 		if (role === 'edit') return 'secondary' as const;
 		return 'outline' as const;
 	}
-
-	type RelatedResource = {
-		group: string;
-		version: string;
-		kind: string;
-		resource: string;
-		namespaced: boolean;
-		name: string;
-	};
 
 	type ResourceReference = { name?: string; namespace?: string };
 
@@ -361,52 +356,12 @@
 				</div>
 			{/if}
 		</Field.Set>
-		<Field.Set>
-			{@const namespace = object.status?.namespaceRef?.name ?? ''}
-			{#if relatedResources.length > 0}
-				<Item.Root class="p-0">
-					<Item.Content>
-						<Item.Title>Related Resources</Item.Title>
-						<Item.Description>
-							{relatedResources.length} related resources
-						</Item.Description>
-					</Item.Content>
-				</Item.Root>
-				<div class="min-h-xl grid grid-cols-1 gap-4 p-0 lg:grid-cols-3">
-					{#each relatedResources as relatedResource, index (index)}
-						{@const urlSearchParameters = new URLSearchParams({
-							group: relatedResource.group,
-							version: relatedResource.version,
-							kind: relatedResource.kind,
-							resource: relatedResource.resource,
-							...(relatedResource.namespaced ? { namespace: namespace } : {}),
-							query: `Name:${relatedResource.name}`
-						})}
-						{@const url = resolve(
-							`/(auth)/${page.params.cluster}/${page.params.workspace}?${urlSearchParameters}`
-						)}
-						{#if !relatedResource.namespaced || (relatedResource.namespaced && namespace)}
-							<Item.Root variant="outline">
-								{#snippet child({ props })}
-									<a href={url} target="_blank" rel="noopener noreferrer" {...props}>
-										<Item.Content>
-											<Item.Title>{relatedResource.name}</Item.Title>
-											<Item.Description>
-												{relatedResource.resource}.{relatedResource.group
-													? `${relatedResource.group}/${relatedResource.version}`
-													: relatedResource.version}
-											</Item.Description>
-										</Item.Content>
-										<Item.Actions>
-											<ExternalLinkIcon class="size-4" />
-										</Item.Actions>
-									</a>
-								{/snippet}
-							</Item.Root>
-						{/if}
-					{/each}
-				</div>
-			{/if}
-		</Field.Set>
+		<!-- The children a Workspace creates live in the namespace it created, not in
+		     the Workspace's own, so that is the fallback these entries resolve against. -->
+		<RelatedResources
+			{self}
+			{relatedResources}
+			namespace={object.status?.namespaceRef?.name ?? ''}
+		/>
 	</Field.Group>
 {/if}

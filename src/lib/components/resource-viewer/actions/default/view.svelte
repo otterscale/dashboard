@@ -9,11 +9,19 @@
 	import * as Code from '$lib/components/custom/code';
 	import { Button } from '$lib/components/ui/button';
 	import * as Empty from '$lib/components/ui/empty/index.js';
+	import * as Field from '$lib/components/ui/field/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
-	let { object, schema }: { object: JsonObject; schema: Schema } = $props();
+	import RelatedResources from '../../related-resources.svelte';
+	import type { RelatedResource } from '../../types';
+
+	let {
+		object,
+		schema,
+		self
+	}: { object: JsonObject; schema: Schema; self: RelatedResource } = $props();
 </script>
 
 <Tooltip.Root>
@@ -80,3 +88,10 @@
 	</Tooltip.Trigger>
 	<Tooltip.Content>View</Tooltip.Content>
 </Tooltip.Root>
+
+<!-- Every resource gets at least itself, so a page reached by a shared link
+     always offers a way into the list the resource belongs to. A kind with its
+     own view adds whatever else it points at. -->
+<Field.Group>
+	<RelatedResources {self} namespace={self.namespace ?? ''} />
+</Field.Group>

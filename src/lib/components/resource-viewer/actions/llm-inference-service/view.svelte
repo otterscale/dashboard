@@ -1,3 +1,98 @@
+<script lang="ts">
+	import { BotIcon } from '@lucide/svelte';
+	import type { ServingKserveIoV1Alpha1LLMInferenceService } from '@otterscale/types';
+
+	import { Badge } from '$lib/components/ui/badge';
+	import * as Card from '$lib/components/ui/card';
+	import * as Field from '$lib/components/ui/field/index.js';
+	import * as Item from '$lib/components/ui/item';
+
+	import RelatedResources from '../../related-resources.svelte';
+	import type { RelatedResource } from '../../types';
+
+	let {
+		object,
+		self
+	}: { object: ServingKserveIoV1Alpha1LLMInferenceService; self: RelatedResource } = $props();
+
+	// Unmet conditions first: a service that is not ready is the case worth reading.
+	const conditions = $derived(
+		[...(object?.status?.conditions ?? [])].sort(
+			(previous, next) => Number(previous.status === 'True') - Number(next.status === 'True')
+		)
+	);
+	const readyCondition = $derived(conditions.find((condition) => condition.type === 'Ready'));
+	const isReady = $derived(readyCondition?.status === 'True');
+</script>
+
+<Field.Group class="space-y-4 *:gap-4">
+	<Field.Set>
+		<Card.Root class="flex h-full flex-col border-0 bg-muted/30 shadow-none ring-0">
+			<Card.Header>
+				<Card.Title>
+					<Item.Root class="p-0">
+						<Item.Media>
+							<BotIcon />
+						</Item.Media>
+						<Item.Content>
+							<Item.Title>{object?.spec?.model?.name}</Item.Title>
+							<Item.Description>{object?.spec?.model?.uri}</Item.Description>
+						</Item.Content>
+						<Item.Actions>
+							{#if isReady}
+								<Badge>{readyCondition?.reason ?? 'Ready'}</Badge>
+							{:else}
+								<Badge variant="destructive">{readyCondition?.reason ?? 'Not Ready'}</Badge>
+							{/if}
+						</Item.Actions>
+					</Item.Root>
+				</Card.Title>
+			</Card.Header>
+			<Card.Content class="flex flex-col gap-2">
+				{#if conditions.length > 0}
+					<div class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+						{#each conditions as condition, index (index)}
+							<Item.Root class="p-0">
+								<Item.Content>
+									{#if condition.status === 'True'}
+										<Item.Title class="flex items-center gap-2 text-sm font-medium">
+											{condition.type}
+										</Item.Title>
+										<Item.Description class="text-xs">
+											{condition.lastTransitionTime}
+										</Item.Description>
+									{:else}
+										<Item.Title class="flex items-center gap-2 text-sm font-medium">
+											{condition.reason}
+										</Item.Title>
+										<Item.Description class="text-xs">{condition.message}</Item.Description>
+									{/if}
+								</Item.Content>
+								<Item.Actions>
+									{#if condition.status === 'True'}
+										<Badge>{condition.type}</Badge>
+									{:else}
+										<Badge variant="destructive">{condition.type}</Badge>
+									{/if}
+								</Item.Actions>
+							</Item.Root>
+						{/each}
+					</div>
+				{:else}
+					<Item.Root class="p-0">
+						<Item.Content>
+							<Item.Description>There are no status conditions to display.</Item.Description>
+						</Item.Content>
+					</Item.Root>
+				{/if}
+			</Card.Content>
+		</Card.Root>
+	</Field.Set>
+	<!-- Only itself for now: the workloads this service owns are matched by label
+	     rather than named in its status, so listing them needs a fetch. -->
+	<RelatedResources {self} namespace={self.namespace ?? ''} />
+</Field.Group>
+
 <!-- <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import { BotIcon } from '@lucide/svelte';
