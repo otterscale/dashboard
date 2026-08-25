@@ -16,7 +16,8 @@
 		resource,
 		namespace,
 		name,
-		object
+		object,
+		relatedResources = []
 	}: {
 		group: string;
 		version: string;
@@ -25,9 +26,8 @@
 		name: string;
 		namespace: string;
 		object: JsonObject;
+		relatedResources?: RelatedResource[];
 	} = $props();
-
-	const relatedResources = [] as RelatedResource[];
 </script>
 
 <Field.Group class="space-y-4 *:gap-4 *:not-has-[*]:hidden">

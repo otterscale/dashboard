@@ -6,11 +6,9 @@
 	import {
 		type GetRequest,
 		ResourceService,
-		type SchemaRequest,
 		WatchEvent_Type,
 		type WatchRequest
 	} from '@otterscale/api/resource/v1';
-	import type { Schema } from '@sjsf/form';
 	import { getContext, onDestroy, onMount } from 'svelte';
 
 	import * as Alert from '$lib/components/ui/alert/index.js';
@@ -20,8 +18,8 @@
 	import * as Item from '$lib/components/ui/item';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 
-	import type { ViewerType as ResourceViewerType } from './actions';
-	import { getResourceViewer } from './actions';
+	import DefaultViewer from './actions/default/view.svelte';
+	import type { GetRelatedResources, RelatedResource } from './types';
 
 	let {
 		cluster,
@@ -30,7 +28,8 @@
 		version,
 		kind,
 		resource,
-		name
+		name,
+		getRelatedResources
 	}: {
 		cluster: string;
 		namespace: string;
@@ -39,6 +38,11 @@
 		kind: string;
 		resource: string;
 		name: string;
+		/**
+		 * What this resource relates to. Left out, the viewer links to the resource
+		 * itself and nothing more.
+		 */
+		getRelatedResources?: GetRelatedResources;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -59,7 +63,6 @@
 	} & JsonObject;
 	type ViewerError = { name?: string; rawMessage?: string; message?: string };
 
-	let schema: Schema | undefined = $state(undefined);
 	let object: ResourceObject | undefined = $state(undefined);
 	let error: ViewerError | null = $state(null);
 
@@ -72,18 +75,6 @@
 		getAbortController = new AbortController();
 
 		try {
-			const schemaResponse = await resourceClient.schema(
-				{
-					cluster,
-					group,
-					version,
-					kind
-				} as SchemaRequest,
-				{ signal: getAbortController?.signal }
-			);
-
-			schema = schemaResponse.schema ?? {};
-
 			const getResponse = await resourceClient.get(
 				{
 					cluster,
@@ -165,6 +156,45 @@
 	}
 
 	const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+	// Re-run whenever the object changes — a watch event can add or drop a
+	// relation — and drop whatever the previous run was still doing, so a slow
+	// getter cannot resolve over a newer one.
+	let relatedResources: RelatedResource[] = $state([]);
+	$effect(() => {
+		const currentObject = object;
+		if (!getRelatedResources || !currentObject) {
+			relatedResources = [];
+			return;
+		}
+
+		const abortController = new AbortController();
+		(async () => {
+			try {
+				const resources = await getRelatedResources({
+					cluster,
+					group,
+					version,
+					kind,
+					resource,
+					namespace,
+					name,
+					object: currentObject,
+					transport,
+					signal: abortController.signal
+				});
+				if (abortController.signal.aborted) return;
+				relatedResources = resources;
+			} catch (e) {
+				// A getter that fails should cost the section its links, not the page.
+				if (abortController.signal.aborted) return;
+				console.error('Failed to get related resources:', e);
+				relatedResources = [];
+			}
+		})();
+
+		return () => abortController.abort();
+	});
 
 	let isMounted = $state(false);
 	onMount(async () => {
@@ -304,8 +334,16 @@
 			</div>
 		</Field.Set>
 		{#if object}
-			{@const ResourceViewer: ResourceViewerType = getResourceViewer(resource)}
-			<ResourceViewer {group} {version} {kind} {resource} {namespace} {name} {object} {schema} />
+			<DefaultViewer
+				{group}
+				{version}
+				{kind}
+				{resource}
+				{namespace}
+				{name}
+				{object}
+				{relatedResources}
+			/>
 		{/if}
 	</Field.Group>
 {/if}
