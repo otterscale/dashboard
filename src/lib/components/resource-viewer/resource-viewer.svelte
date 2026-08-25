@@ -11,6 +11,7 @@
 	} from '@otterscale/api/resource/v1';
 	import { getContext, onDestroy, onMount } from 'svelte';
 
+	import { getRelatedResourcesGetter } from '$lib/components/resource-viewer/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button';
 	import * as Empty from '$lib/components/ui/empty/index.js';
@@ -18,8 +19,8 @@
 	import * as Item from '$lib/components/ui/item';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 
-	import DefaultViewer from './actions/default/view.svelte';
-	import type { GetRelatedResources, RelatedResource } from './types';
+	import DefaultViewer from './related-resource-getters/default/view.svelte';
+	import type { RelatedResource } from './types';
 
 	let {
 		cluster,
@@ -28,8 +29,7 @@
 		version,
 		kind,
 		resource,
-		name,
-		getRelatedResources
+		name
 	}: {
 		cluster: string;
 		namespace: string;
@@ -38,11 +38,6 @@
 		kind: string;
 		resource: string;
 		name: string;
-		/**
-		 * What this resource relates to. Left out, the viewer links to the resource
-		 * itself and nothing more.
-		 */
-		getRelatedResources?: GetRelatedResources;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -160,6 +155,7 @@
 	// Re-run whenever the object changes — a watch event can add or drop a
 	// relation — and drop whatever the previous run was still doing, so a slow
 	// getter cannot resolve over a newer one.
+	const getRelatedResources = $derived(getRelatedResourcesGetter(resource));
 	let relatedResources: RelatedResource[] = $state([]);
 	$effect(() => {
 		const currentObject = object;

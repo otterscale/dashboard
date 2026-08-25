@@ -6,7 +6,7 @@ import {
 } from '@otterscale/api/resource/v1';
 import lodash from 'lodash';
 
-import type { GetRelatedResources, RelatedResource } from '../../types';
+import type { GetRelatedResources, RelatedResource } from '../types';
 
 /** One object Helm applied, as Flux records it in `status.inventory`. */
 type InventoryEntry = { id?: string; v?: string };

@@ -2,10 +2,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import type { ResolvedPathname } from '$app/types';
-	import {
-		findRelatedResourcesGetter,
-		ResourceViewer
-	} from '$lib/components/resource-viewer/index.js';
+	import { ResourceViewer } from '$lib/components/resource-viewer/index.js';
 	import { breadcrumbs } from '$lib/stores';
 
 	$effect(() => {
@@ -29,7 +26,6 @@
 		]);
 	});
 
-	const isClusterAdmin = $derived(page.data.isClusterAdmin === true);
 	const cluster = $derived(page.params.cluster ?? '');
 	// Unlike other pages, namespace here is obtained from query params.
 	// This is because admins can query resources across different namespaces.
@@ -41,19 +37,8 @@
 	const resource = $derived(page.url.searchParams.get('resource') ?? '');
 	// What this kind relates to, injected rather than looked up by the viewer —
 	// so a page can hand in its own getter without the viewer knowing the kind.
-	const getRelatedResources = $derived(findRelatedResourcesGetter(resource));
 </script>
 
 {#key page.url.href}
-	<ResourceViewer
-		{isClusterAdmin}
-		{cluster}
-		{namespace}
-		{name}
-		{group}
-		{version}
-		{kind}
-		{resource}
-		{getRelatedResources}
-	/>
+	<ResourceViewer {cluster} {namespace} {name} {group} {version} {kind} {resource} />
 {/key}

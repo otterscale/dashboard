@@ -1,6 +1,6 @@
 import ResourceViewer from './resource-viewer.svelte';
 
-export { findRelatedResourcesGetter } from './actions';
+export { getRelatedResourcesGetter } from './related-resource-getters';
 export { ResourceViewer };
 export type {
 	GetRelatedResources,

@@ -1,7 +1,7 @@
 import { createClient } from '@connectrpc/connect';
 import { type ListRequest, ResourceService } from '@otterscale/api/resource/v1';
 
-import type { GetRelatedResources, RelatedResource, RelatedResourceIdentifier } from '../../types';
+import type { GetRelatedResources, RelatedResource, RelatedResourceIdentifier } from '../types';
 
 /** The identity of a listed object — all the linking needs from an item. */
 type ListedObject = { metadata?: { name?: string; namespace?: string } };

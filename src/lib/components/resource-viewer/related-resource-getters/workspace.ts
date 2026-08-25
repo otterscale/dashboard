@@ -1,6 +1,6 @@
 import lodash from 'lodash';
 
-import type { GetRelatedResources, RelatedResource, RelatedResourceIdentifier } from '../../types';
+import type { GetRelatedResources, RelatedResource, RelatedResourceIdentifier } from '../types';
 
 /** A reference as a Workspace writes it into `status`. */
 type ResourceReference = { name?: string; namespace?: string };
