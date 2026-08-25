@@ -20,14 +20,12 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as Item from '$lib/components/ui/item';
-	import Separator from '$lib/components/ui/separator/separator.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 
 	import type { ViewerType as ResourceViewerType } from './actions';
 	import { getResourceViewer } from './actions';
 
 	let {
-		isClusterAdmin,
 		cluster,
 		namespace,
 		group,
@@ -36,7 +34,6 @@
 		resource,
 		name
 	}: {
-		isClusterAdmin: boolean;
 		cluster: string;
 		namespace: string;
 		group: string;
@@ -277,62 +274,43 @@
 					<Item.Title class="text-xl font-bold">
 						{object?.metadata?.name}
 					</Item.Title>
-					<Separator class="invisible" />
-					<div class="grid gap-2 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-						{#if object?.metadata}
-							{@const Metadatacluster = { key: 'Cluster', value: cluster }}
-							{@const MetadataNamespace = {
-								key: 'Namespace',
-								value: namespace
-							}}
-							{@const MetadataCreationTimestamp = {
-								key: 'Creation Timestamp',
-								value: object.metadata?.creationTimestamp
-									? new Date(object.metadata?.creationTimestamp).toLocaleString('sv-SE')
-									: ''
-							}}
-							{@const MetadataGeneration = {
-								key: 'Generation',
-								value: object.metadata?.generation
-							}}
-							{@const MetadataResourceVersion = {
-								key: 'Resource Version',
-								value: object.metadata?.resourceVersion
-							}}
-							{#each [Metadatacluster, MetadataNamespace, MetadataCreationTimestamp, MetadataGeneration, MetadataResourceVersion] as metadata, index (index)}
-								{#if metadata.value}
-									<Item.Root class="p-0">
-										<Item.Content>
-											<Item.Description>
-												{metadata.key}
-											</Item.Description>
-											<Item.Title>
-												{metadata.value}
-											</Item.Title>
-										</Item.Content>
-									</Item.Root>
-								{/if}
-							{/each}
-						{/if}
-					</div>
 				</Item.Content>
-				<Item.Actions>
-					{#if Actions && schema && validate}
-						<Actions
-							role={isClusterAdmin ? 'Cluster Admin' : undefined}
-							{object}
-							{schema}
-							{validate}
-							{cluster}
-							{namespace}
-							{group}
-							{version}
-							{kind}
-							{resource}
-						/>
-					{/if}
-				</Item.Actions>
 			</Item.Root>
+			<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+				{#if object?.metadata}
+					{@const Metadatacluster = { key: 'Cluster', value: cluster }}
+					{@const MetadataNamespace = {
+						key: 'Namespace',
+						value: namespace
+					}}
+					{@const MetadataCreationTimestamp = {
+						key: 'Creation Timestamp',
+						value: object.metadata?.creationTimestamp
+							? new Date(object.metadata?.creationTimestamp).toLocaleString('sv-SE')
+							: ''
+					}}
+					{@const MetadataGeneration = {
+						key: 'Generation',
+						value: object.metadata?.generation
+					}}
+					{@const MetadataResourceVersion = {
+						key: 'Resource Version',
+						value: object.metadata?.resourceVersion
+					}}
+					{#each [Metadatacluster, MetadataNamespace, MetadataCreationTimestamp, MetadataGeneration, MetadataResourceVersion].filter((metadata) => metadata.value) as metadata, index (index)}
+						<Item.Root class="p-0">
+							<Item.Content>
+								<Item.Description>
+									{metadata.key}
+								</Item.Description>
+								<Item.Title>
+									{metadata.value}
+								</Item.Title>
+							</Item.Content>
+						</Item.Root>
+					{/each}
+				{/if}
+			</div>
 		</Field.Set>
 		{#if object}
 			{@const ResourceViewer: ResourceViewerType = getResourceViewer(resource)}
