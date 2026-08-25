@@ -6,16 +6,7 @@
 
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import Box from '@lucide/svelte/icons/box';
-	import CircleCheck from '@lucide/svelte/icons/circle-check';
-	import CircleX from '@lucide/svelte/icons/circle-x';
 	import ExternalLinkIcon from '@lucide/svelte/icons/external-link';
-	import Gauge from '@lucide/svelte/icons/gauge';
-	import HeartPulse from '@lucide/svelte/icons/heart-pulse';
-	import Network from '@lucide/svelte/icons/network';
-	import Shield from '@lucide/svelte/icons/shield';
-	import Users from '@lucide/svelte/icons/users';
-	import Zap from '@lucide/svelte/icons/zap';
 	import { type GetRequest, ResourceService } from '@otterscale/api/resource/v1';
 	import type { CoreV1ResourceQuota, TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
 	import { getContext, onDestroy, onMount } from 'svelte';
@@ -29,7 +20,7 @@
 	} from '$lib/components/dynamic-table/utils';
 	import { Badge } from '$lib/components/ui/badge';
 	import Button from '$lib/components/ui/button/button.svelte';
-	import * as Empty from '$lib/components/ui/empty/index.js';
+	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
@@ -44,16 +35,9 @@
 	let resourceQuotaUsed: Record<string, string> = $state({});
 	let isLoaded = $state(false);
 
-	function formatHardValue(key: string, raw: string | number): string {
-		if (!key.includes('gpumem')) return String(raw);
-		try {
-			// gpumem hard quota is expressed in Mi, matching quantity-cell.svelte's baseUnit convention
-			const bytes = BigInt(quantityToScalar(String(raw))) * binarySuffixFactors.Mi;
-			const { value, unit } = formatWithBinarySuffix(bytes);
-			return `${Math.round(value * 10) / 10}${unit}`;
-		} catch {
-			return String(raw);
-		}
+	function formatQuantity(bytes: bigint): string {
+		const { value, unit } = formatWithBinarySuffix(bytes);
+		return `${Math.round(value * 10) / 10}${unit}`;
 	}
 
 	async function fetchResourceQuota() {
@@ -93,10 +77,6 @@
 	// card doesn't grow unbounded with the member count.
 	const MEMBERS_COLLAPSED_LIMIT = 6;
 	let showAllMembers = $state(false);
-	const members = $derived(object.spec?.members ?? []);
-	const visibleMembers = $derived(
-		showAllMembers ? members : members.slice(0, MEMBERS_COLLAPSED_LIMIT)
-	);
 	function getMemberLabel(member: WorkspaceMember): string {
 		return member.name || member.username || member.subject;
 	}
@@ -226,28 +206,8 @@
 {#if !isLoaded}
 	<Field.Group>
 		<Field.Set>
-			{#each Array(13).keys() as index (index)}
-				{#if index % 2 === 0}
-					{#if index % 3 !== 0}
-						{#if index % 5 === 0}
-							{#if index % 7 !== 0}
-								{#if index % 11 === 0}
-									<Skeleton class="h-1 w-full" />
-								{:else}
-									<Skeleton class="h-11 w-5/6" />
-								{/if}
-							{:else}
-								<Skeleton class="h-7 w-4/5" />
-							{/if}
-						{:else}
-							<Skeleton class="h-5 w-3/4" />
-						{/if}
-					{:else}
-						<Skeleton class="h-3 w-2/3" />
-					{/if}
-				{:else}
-					<Skeleton class="h-2 w-1/2" />
-				{/if}
+			{#each Array(23).keys() as index (index)}
+				<Skeleton class="h-5 w-full" />
 			{/each}
 		</Field.Set>
 	</Field.Group>
@@ -257,237 +217,269 @@
 		<Field.Set>
 			{@const conditions = object.status?.conditions ?? []}
 			{#if conditions.length > 0}
-				<Item.Root class="p-0">
-					<Item.Content>
-						<Item.Title>Status</Item.Title>
-						<Item.Description>status.conditions</Item.Description>
-					</Item.Content>
-				</Item.Root>
-				<div class="grid grid-cols-1 rounded-lg bg-muted">
-					{#each conditions as condition, index (index)}
-						{#if condition.status === 'True'}
-							<Item.Root>
-								<Item.Content>
-									<Item.Title>
-										{condition.type}
-									</Item.Title>
-									<Item.Description>
-										{condition.lastTransitionTime}
-									</Item.Description>
-								</Item.Content>
-								<Item.Actions>
-									<Badge>{condition.type}</Badge>
-								</Item.Actions>
-							</Item.Root>
-						{:else}
-							<Item.Root>
-								<Item.Content>
-									<Item.Title>
-										{condition.reason}
-									</Item.Title>
-									<Item.Description>{condition.message}</Item.Description>
-								</Item.Content>
-								<Item.Actions>
-									<Badge variant="destructive">{condition.type}</Badge>
-								</Item.Actions>
-							</Item.Root>
-						{/if}
-					{/each}
-				</div>
+				<Card.Root class="shadow-none ring-0">
+					<Card.Header class="p-0">
+						<Item.Root class="p-0">
+							<Item.Content>
+								<Item.Title>Status</Item.Title>
+								<Item.Description>status.conditions</Item.Description>
+							</Item.Content>
+						</Item.Root>
+					</Card.Header>
+					<Card.Content class="min-h-xl grid grid-cols-1 gap-4 rounded-lg bg-muted p-0">
+						{#each conditions as condition, index (index)}
+							{#if condition.status === 'True'}
+								<Item.Root>
+									<Item.Content>
+										<Item.Title>
+											{condition.type}
+										</Item.Title>
+										<Item.Description>
+											{condition.lastTransitionTime}
+										</Item.Description>
+									</Item.Content>
+									<Item.Actions>
+										<Badge>{condition.type}</Badge>
+									</Item.Actions>
+								</Item.Root>
+							{:else}
+								<Item.Root>
+									<Item.Content>
+										<Item.Title>
+											{condition.reason}
+										</Item.Title>
+										<Item.Description>{condition.message}</Item.Description>
+									</Item.Content>
+									<Item.Actions>
+										<Badge variant="destructive">{condition.type}</Badge>
+									</Item.Actions>
+								</Item.Root>
+							{/if}
+						{/each}
+					</Card.Content>
+				</Card.Root>
 			{/if}
 		</Field.Set>
 
 		<!-- Resource Quota -->
 		<Field.Set>
 			{@const resourceQuotaHard = object.spec?.resourceQuota?.hard ?? {}}
-			<Item.Root class="p-0">
-				<Item.Content>
-					<Item.Title>Resource Quota</Item.Title>
-					<Item.Description>spec.resourceQuota.used/spec.resourceQuota.hard</Item.Description>
-				</Item.Content>
-			</Item.Root>
 			{#if Object.keys(resourceQuotaHard).length > 0}
-				<div class="grid grid-cols-1 rounded-lg bg-muted md:grid-cols-3">
-					{#each Object.keys(resourceQuotaHard) as key, index (index)}
-						<Item.Root>
+				<Card.Root class="shadow-none ring-0">
+					<Card.Header class="p-0">
+						<Item.Root class="p-0">
 							<Item.Content>
-								<Item.Description>
-									{key}
-								</Item.Description>
-								<Item.Title>
-									{resourceQuotaUsed[key] !== undefined
-										? formatHardValue(key, resourceQuotaUsed[key])
-										: '-'}/{formatHardValue(key, resourceQuotaHard[key])}
-								</Item.Title>
+								<Item.Title>Resource Quota</Item.Title>
+								<Item.Description>spec.resourceQuota.used/spec.resourceQuota.hard</Item.Description>
 							</Item.Content>
 						</Item.Root>
-					{/each}
-				</div>
+					</Card.Header>
+					<Card.Content
+						class="min-h-xl grid grid-cols-1 gap-4 rounded-lg bg-muted p-0 md:grid-cols-3"
+					>
+						{#each Object.keys(resourceQuotaHard) as key, index (index)}
+							{@const keyResourceQuotaUsed = resourceQuotaUsed[key]}
+							{@const keyResourceQuotaUsedMultiplication =
+								key === 'gpumem' ? binarySuffixFactors.Mi : BigInt(1)}
+							{@const keyResourceQuotaHard = resourceQuotaHard[key]}
+							{@const numerator =
+								keyResourceQuotaUsed !== undefined
+									? formatQuantity(
+											BigInt(quantityToScalar(String(keyResourceQuotaUsed))) *
+												keyResourceQuotaUsedMultiplication
+										)
+									: ' - '}
+							{@const denominator = formatQuantity(
+								BigInt(quantityToScalar(String(keyResourceQuotaHard)))
+							)}
+							<Item.Root>
+								<Item.Content>
+									<Item.Description>
+										{key}
+									</Item.Description>
+									<Item.Title>
+										{numerator}/{denominator}
+									</Item.Title>
+								</Item.Content>
+							</Item.Root>
+						{/each}
+					</Card.Content>
+				</Card.Root>
 			{/if}
 		</Field.Set>
 
 		<!-- Limit Range -->
 		<Field.Set>
 			{@const limits = object.spec?.limitRange?.limits ?? []}
-			<Item.Root class="p-0">
-				<Item.Content>
-					<Item.Title>Limit Range</Item.Title>
-					<Item.Description>spec.limitRange.limits</Item.Description>
-				</Item.Content>
-			</Item.Root>
 			{#if limits.length > 0}
-				{#each limits as limit, index (index)}
-					{@const { type, ...thresholds } = limit}
-					<div class="grid grid-cols-1 rounded-lg bg-muted md:grid-cols-3">
-						{#each Object.entries(thresholds) as [thresholdKey, values], index (index)}
-							{#if values && typeof values === 'object'}
-								{#each Object.entries(values) as [resourceKey, value], index (index)}
-									<Item.Root>
-										<Item.Content>
-											<Item.Description>
-												{type}.{thresholdKey}.{resourceKey}
-											</Item.Description>
-											<Item.Title>
-												{value}
-											</Item.Title>
-										</Item.Content>
-									</Item.Root>
-								{/each}
-							{/if}
+				<Card.Root class="shadow-none ring-0">
+					<Card.Header class="p-0">
+						<Item.Root class="p-0">
+							<Item.Content>
+								<Item.Title>Limit Range</Item.Title>
+								<Item.Description>spec.limitRange.limits</Item.Description>
+							</Item.Content>
+						</Item.Root>
+					</Card.Header>
+					<Card.Content
+						class="min-h-xl grid grid-cols-1 gap-4 rounded-lg bg-muted p-0 md:grid-cols-3"
+					>
+						{#each limits as limit, index (index)}
+							{@const { type, ...thresholds } = limit}
+							{#each Object.entries(thresholds) as [thresholdKey, values], index (index)}
+								{#if values && typeof values === 'object'}
+									{#each Object.entries(values) as [resourceKey, value], index (index)}
+										<Item.Root>
+											<Item.Content>
+												<Item.Description>
+													{type}.{thresholdKey}.{resourceKey}
+												</Item.Description>
+												<Item.Title>
+													{value}
+												</Item.Title>
+											</Item.Content>
+										</Item.Root>
+									{/each}
+								{/if}
+							{/each}
 						{/each}
-					</div>
-				{/each}
+					</Card.Content>
+				</Card.Root>
 			{/if}
 		</Field.Set>
 
 		<!-- Members -->
 		<Field.Set>
-			<Item.Root class="p-0">
-				<Item.Content>
-					<Item.Title>Members</Item.Title>
-					<Item.Description>spec.members</Item.Description>
-				</Item.Content>
-				{#if members.length > MEMBERS_COLLAPSED_LIMIT}
-					<Item.Actions>
-						<Button variant="ghost" onclick={() => (showAllMembers = !showAllMembers)}>
-							{showAllMembers ? 'less' : 'all'}
-						</Button>
-					</Item.Actions>
-				{/if}
-			</Item.Root>
+			{@const members = object.spec?.members ?? []}
 			{#if members.length > 0}
-				<div class="grid grid-cols-1 rounded-lg bg-muted md:grid-cols-3">
-					{#each visibleMembers as member (member.subject)}
-						<Item.Root>
+				<Card.Root class="shadow-none ring-0">
+					<Card.Header class="p-0">
+						<Item.Root class="p-0">
 							<Item.Content>
-								<Item.Title>
-									{getMemberLabel(member)}
-								</Item.Title>
-								{#if member.username}
-									<Item.Description>{member.username}</Item.Description>
-								{/if}
+								<Item.Title>Members</Item.Title>
+								<Item.Description>spec.members</Item.Description>
 							</Item.Content>
-							<Item.Actions>
-								{#if member.serviceAccount}
-									<Badge variant="destructive">service account</Badge>
-								{/if}
-								<Badge variant={getMemberRoleVariant(member.role)}>{member.role}</Badge>
-							</Item.Actions>
+							{#if members.length > MEMBERS_COLLAPSED_LIMIT}
+								<Item.Actions>
+									<Button variant="ghost" onclick={() => (showAllMembers = !showAllMembers)}>
+										{showAllMembers ? 'less' : 'all'}
+									</Button>
+								</Item.Actions>
+							{/if}
 						</Item.Root>
-					{/each}
-				</div>
+					</Card.Header>
+					<Card.Content
+						class="min-h-xl grid grid-cols-1 gap-4 rounded-lg bg-muted p-0 md:grid-cols-3"
+					>
+						{#each members.slice(0, MEMBERS_COLLAPSED_LIMIT) as member (member.subject)}
+							<Item.Root>
+								<Item.Content>
+									<Item.Title>
+										{getMemberLabel(member)}
+									</Item.Title>
+									{#if member.username}
+										<Item.Description>{member.username}</Item.Description>
+									{/if}
+								</Item.Content>
+								<Item.Actions>
+									{#if member.serviceAccount}
+										<Badge variant="destructive">service account</Badge>
+									{/if}
+									<Badge variant={getMemberRoleVariant(member.role)}>{member.role}</Badge>
+								</Item.Actions>
+							</Item.Root>
+						{/each}
+					</Card.Content>
+				</Card.Root>
 			{/if}
 		</Field.Set>
 
 		<!-- Network Isolation -->
 		<Field.Set>
 			{@const allowedNamespaces = object.spec?.networkIsolation?.allowedNamespaces ?? []}
-			<Item.Root class="p-0">
-				<Item.Content>
-					<Item.Title>Network Isolation</Item.Title>
-					<Item.Description>spec.networkIsolation</Item.Description>
-				</Item.Content>
-				<Item.Actions>
-					{@const enabled = object.spec?.networkIsolation?.enabled ?? null}
-					<Badge variant="outline">
-						{enabled ? 'enabled' : 'disabled'}
-					</Badge>
-				</Item.Actions>
-			</Item.Root>
+			{@const enabled = object.spec?.networkIsolation?.enabled ?? null}
 			{#if allowedNamespaces.length > 0}
-				<div class="grid grid-cols-1 rounded-lg bg-muted lg:grid-cols-3">
-					{#each allowedNamespaces as allowedNamespace, index (index)}
-						<Item.Root>
+				<Card.Root class="shadow-none ring-0">
+					<Card.Header class="p-0">
+						<Item.Root class="p-0">
 							<Item.Content>
-								<Item.Description>Allowed Namespace</Item.Description>
-								<Item.Title>
-									{allowedNamespace}
-								</Item.Title>
+								<Item.Title>Network Isolation</Item.Title>
+								<Item.Description>spec.networkIsolation</Item.Description>
 							</Item.Content>
+							<Item.Actions>
+								<Badge variant="outline">
+									{enabled ? 'enabled' : 'disabled'}
+								</Badge>
+							</Item.Actions>
 						</Item.Root>
-					{/each}
-				</div>
+					</Card.Header>
+					<Card.Content
+						class="min-h-xl grid grid-cols-1 gap-4 rounded-lg bg-muted p-0 lg:grid-cols-3"
+					>
+						{#each allowedNamespaces as allowedNamespace, index (index)}
+							<Item.Root>
+								<Item.Content>
+									<Item.Description>Allowed Namespace</Item.Description>
+									<Item.Title>
+										{allowedNamespace}
+									</Item.Title>
+								</Item.Content>
+							</Item.Root>
+						{/each}
+					</Card.Content>
+				</Card.Root>
 			{/if}
 		</Field.Set>
 
+		<!-- Related Resources -->
 		{@const namespace = object.status?.namespaceRef?.name ?? ''}
 		<Field.Set>
 			{#if relatedResources.length > 0}
-				<!-- Related Resources -->
-				<Item.Root class="p-0">
-					<Item.Content>
-						<Item.Title>Related Resources</Item.Title>
-						<Item.Description>
-							{relatedResources.length} related resources
-						</Item.Description>
-					</Item.Content>
-				</Item.Root>
-
-				<div class="grid gap-4 xl:grid-cols-3 2xl:grid-cols-4">
-					{#each relatedResources as relatedResource (relatedResource.kind + relatedResource.name)}
-						{#if !relatedResource.namespaced || (relatedResource.namespaced && namespace)}
-							<Item.Root variant="outline">
-								{#snippet child({ props })}
-									{@const urlSearchParameters = new URLSearchParams({
-										group: relatedResource.group,
-										version: relatedResource.version,
-										kind: relatedResource.kind,
-										resource: relatedResource.resource,
-										...(relatedResource.namespaced ? { namespace: namespace } : {})
-									})}
-									{@const url = resolve(
-										`/(auth)/${page.params.cluster}/${page.params.workspace}/${relatedResource.name}?${urlSearchParameters}`
-									)}
-									<a href={url} target="_blank" rel="noopener noreferrer" {...props}>
-										<Item.Content>
-											<Item.Title>{relatedResource.name}</Item.Title>
-											<Item.Description>
-												{relatedResource.resource}.{relatedResource.group
-													? `${relatedResource.group}/${relatedResource.version}`
-													: relatedResource.version}
-											</Item.Description>
-										</Item.Content>
-										<Item.Actions>
-											<ExternalLinkIcon class="size-4" />
-										</Item.Actions>
-									</a>
-								{/snippet}
-							</Item.Root>
-						{/if}
-					{/each}
-				</div>
-			{:else}
-				<Empty.Root class="h-full">
-					<Empty.Header>
-						<Empty.Media variant="icon">
-							<Box />
-						</Empty.Media>
-						<Empty.Title>No Related Resources</Empty.Title>
-						<Empty.Description>
-							There are no related resources to display for this workspace.
-						</Empty.Description>
-					</Empty.Header>
-				</Empty.Root>
+				<Card.Root class="shadow-none ring-0">
+					<Card.Header class="p-0">
+						<Item.Root class="p-0">
+							<Item.Content>
+								<Item.Title>Related Resources</Item.Title>
+								<Item.Description>
+									{relatedResources.length} related resources
+								</Item.Description>
+							</Item.Content>
+						</Item.Root>
+					</Card.Header>
+					<Card.Content class="min-h-xl grid grid-cols-1 gap-4 p-0 lg:grid-cols-3">
+						{#each relatedResources as relatedResource (relatedResource.kind + relatedResource.name)}
+							{@const urlSearchParameters = new URLSearchParams({
+								group: relatedResource.group,
+								version: relatedResource.version,
+								kind: relatedResource.kind,
+								resource: relatedResource.resource,
+								...(relatedResource.namespaced ? { namespace: namespace } : {})
+							})}
+							{@const url = resolve(
+								`/(auth)/${page.params.cluster}/${page.params.workspace}/${relatedResource.name}?${urlSearchParameters}`
+							)}
+							{#if !relatedResource.namespaced || (relatedResource.namespaced && namespace)}
+								<Item.Root variant="outline">
+									{#snippet child({ props })}
+										<a href={url} target="_blank" rel="noopener noreferrer" {...props}>
+											<Item.Content>
+												<Item.Title>{relatedResource.name}</Item.Title>
+												<Item.Description>
+													{relatedResource.resource}.{relatedResource.group
+														? `${relatedResource.group}/${relatedResource.version}`
+														: relatedResource.version}
+												</Item.Description>
+											</Item.Content>
+											<Item.Actions>
+												<ExternalLinkIcon class="size-4" />
+											</Item.Actions>
+										</a>
+									{/snippet}
+								</Item.Root>
+							{/if}
+						{/each}
+					</Card.Content>
+				</Card.Root>
 			{/if}
 		</Field.Set>
 	</Field.Group>
