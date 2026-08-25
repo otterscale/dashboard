@@ -3,6 +3,7 @@ import type { Schema } from '@sjsf/form';
 import type { Component } from 'svelte';
 
 import DefaultViewer from './default/view.svelte';
+import HelmReleaseViewer from './helm-release/view.svelte';
 import LicenseViewer from './license/view.svelte';
 import LLMInferenceServiceViewer from './llm-inference-service/view.svelte';
 import WorkspaceViewer from './workspace/view.svelte';
@@ -25,6 +26,9 @@ function getResourceViewer(resource: string): ViewerType {
 	}
 	if (resource === 'llminferenceservices') {
 		return LLMInferenceServiceViewer as ViewerType;
+	}
+	if (resource === 'helmreleases') {
+		return HelmReleaseViewer as ViewerType;
 	}
 	if (resource === 'licenses') {
 		return LicenseViewer as ViewerType;
