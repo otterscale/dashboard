@@ -331,6 +331,7 @@
 		</Field.Set>
 		{#if object}
 			<DefaultViewer
+				{cluster}
 				{group}
 				{version}
 				{kind}
