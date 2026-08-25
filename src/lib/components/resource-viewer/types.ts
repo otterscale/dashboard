@@ -24,6 +24,12 @@ type RelatedResource = {
 };
 
 /**
+ * A related resource kind, before whatever names it has are known — what a
+ * getter pairs with each name it reads off an object or a listing.
+ */
+type RelatedResourceIdentifier = Omit<RelatedResource, 'name' | 'namespace'>;
+
+/**
  * What a related-resources getter is given: the identity of the resource being
  * viewed, the object itself, and the means to reach the cluster — some kinds
  * read their relations straight off the object, others have to list or discover
@@ -56,4 +62,9 @@ type GetRelatedResources = (
 	context: RelatedResourcesContext
 ) => RelatedResource[] | Promise<RelatedResource[]>;
 
-export type { GetRelatedResources, RelatedResource, RelatedResourcesContext };
+export type {
+	GetRelatedResources,
+	RelatedResource,
+	RelatedResourceIdentifier,
+	RelatedResourcesContext
+};

@@ -1,40 +1,30 @@
-import type { JsonObject } from '@bufbuild/protobuf';
-import type { Schema } from '@sjsf/form';
-import type { Component } from 'svelte';
+import type { GetRelatedResources } from '../types';
+import { getHelmReleaseRelatedResources } from './helm-release/related-resources';
+import { getLLMInferenceServiceRelatedResources } from './llm-inference-service/related-resources';
+import { getWorkspaceRelatedResources } from './workspace/related-resources';
 
-import DefaultViewer from './default/view.svelte';
-import HelmReleaseViewer from './helm-release/view.svelte';
-import LicenseViewer from './license/view.svelte';
-import LLMInferenceServiceViewer from './llm-inference-service/view.svelte';
-import WorkspaceViewer from './workspace/view.svelte';
-
-type ViewerProps = {
-	group: string;
-	version: string;
-	kind: string;
-	resource: string;
-	namespace: string;
-	name: string;
-	object: JsonObject;
-	schema?: Schema;
+/**
+ * The kinds whose relations are worth drawing, by plural resource. A kind absent
+ * from this map has none worth listing, and the viewer links to just the
+ * resource itself.
+ */
+const relatedResourcesGetters: Record<string, GetRelatedResources> = {
+	workspaces: getWorkspaceRelatedResources,
+	llminferenceservices: getLLMInferenceServiceRelatedResources,
+	helmreleases: getHelmReleaseRelatedResources
 };
-type ViewerType = Component<ViewerProps>;
 
-function getResourceViewer(resource: string): ViewerType {
-	if (resource === 'workspaces') {
-		return WorkspaceViewer as ViewerType;
-	}
-	if (resource === 'llminferenceservices') {
-		return LLMInferenceServiceViewer as ViewerType;
-	}
-	if (resource === 'helmreleases') {
-		return HelmReleaseViewer as ViewerType;
-	}
-	if (resource === 'licenses') {
-		return LicenseViewer as ViewerType;
-	}
-	return DefaultViewer as ViewerType;
+/**
+ * Whatever knows a resource's relations, for a page to hand to the viewer.
+ * Returns `undefined` for a kind with nothing mapped.
+ */
+function findRelatedResourcesGetter(resource: string): GetRelatedResources | undefined {
+	return relatedResourcesGetters[resource];
 }
 
-export { getResourceViewer };
-export type { ViewerProps, ViewerType };
+export {
+	findRelatedResourcesGetter,
+	getHelmReleaseRelatedResources,
+	getLLMInferenceServiceRelatedResources,
+	getWorkspaceRelatedResources
+};
