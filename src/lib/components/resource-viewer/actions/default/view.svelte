@@ -30,10 +30,7 @@
 	const relatedResources = [] as RelatedResource[];
 </script>
 
-<Field.Group>
-	<Field.Set>
-		<RelatedResources {group} {version} {kind} {resource} {namespace} {name} {relatedResources} />
-	</Field.Set>
+<Field.Group class="space-y-4 *:gap-4 *:not-has-[*]:hidden">
 	<Field.Set>
 		{@const entries = Object.entries(object).filter(
 			([key]) => key !== 'apiVersion' && key !== 'kind'
@@ -51,12 +48,15 @@
 					<Code.Root
 						code={stringify(value)}
 						lang="yaml"
-						class="no-shiki-limit border-none bg-muted"
+						class="no-shiki-limit max-h-[50vh] overflow-y-auto border-none bg-muted"
 					>
 						<Code.CopyButton />
 					</Code.Root>
 				</Tabs.Content>
 			{/each}
 		</Tabs.Root>
+	</Field.Set>
+	<Field.Set>
+		<RelatedResources {group} {version} {kind} {resource} {namespace} {name} {relatedResources} />
 	</Field.Set>
 </Field.Group>

@@ -180,7 +180,7 @@
 		</Field.Set>
 	</Field.Group>
 {:else}
-	<Field.Group class="space-y-4 *:gap-4">
+	<Field.Group class="space-y-4 *:gap-4 *:not-has-[*]:hidden">
 		<Field.Set>
 			{@const conditions = object.status?.conditions ?? []}
 			{#if conditions.length > 0}
@@ -191,7 +191,7 @@
 					</Item.Content>
 				</Item.Root>
 
-				<div class="min-h-xl grid grid-cols-1 gap-4 rounded-lg bg-muted p-0">
+				<div class="min-h-xl grid grid-cols-1 gap-4 rounded-lg bg-muted p-0 md:grid-cols-3">
 					{#each conditions as condition, index (index)}
 						{#if condition.status === 'True'}
 							<Item.Root>

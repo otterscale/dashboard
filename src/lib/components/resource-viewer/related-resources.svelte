@@ -37,12 +37,6 @@
 		});
 		return resolve(`/(auth)/${page.params.cluster}/${page.params.workspace}?${searchParameters}`);
 	}
-
-	function getAPIVersion(relatedResource: RelatedResource): string {
-		return relatedResource.group
-			? `${relatedResource.group}/${relatedResource.version}`
-			: relatedResource.version;
-	}
 </script>
 
 <Field.Set>
@@ -62,9 +56,11 @@
 					<!-- eslint-disable svelte/no-navigation-without-resolve -->
 					<a href={getResourceURL(resource)} target="_blank" rel="noopener noreferrer" {...props}>
 						<Item.Content>
-							<Item.Title>{resource.name}</Item.Title>
+							<Item.Title>
+								{resource.namespace ? `${resource.namespace}/${resource.name}` : resource.name}
+							</Item.Title>
 							<Item.Description>
-								{resource.resource}.{getAPIVersion(resource)}
+								{resource.group ? resource.group : 'core'}.{resource.version}.{resource.resource}
 							</Item.Description>
 						</Item.Content>
 						<Item.Actions>
