@@ -11,16 +11,17 @@
 	} from '@otterscale/api/resource/v1';
 	import { getContext, onDestroy, onMount } from 'svelte';
 
-	import { getRelatedResourcesGetter } from '$lib/components/resource-viewer/index.js';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
+	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
-	import DefaultViewer from './related-resource-getters/default/view.svelte';
-	import type { RelatedResource } from './types';
+	import RelatedConditions from './related-conditions.svelte';
+	import RelatedEvents from './related-events.svelte';
+	import RelatedResources from './related-resources.svelte';
 
 	let {
 		cluster,
@@ -155,42 +156,6 @@
 	// Re-run whenever the object changes — a watch event can add or drop a
 	// relation — and drop whatever the previous run was still doing, so a slow
 	// getter cannot resolve over a newer one.
-	const getRelatedResources = $derived(getRelatedResourcesGetter(resource));
-	let relatedResources: RelatedResource[] = $state([]);
-	$effect(() => {
-		const currentObject = object;
-		if (!getRelatedResources || !currentObject) {
-			relatedResources = [];
-			return;
-		}
-
-		const abortController = new AbortController();
-		(async () => {
-			try {
-				const resources = await getRelatedResources({
-					cluster,
-					group,
-					version,
-					kind,
-					resource,
-					namespace,
-					name,
-					object: currentObject,
-					transport,
-					signal: abortController.signal
-				});
-				if (abortController.signal.aborted) return;
-				relatedResources = resources;
-			} catch (e) {
-				// A getter that fails should cost the section its links, not the page.
-				if (abortController.signal.aborted) return;
-				console.error('Failed to get related resources:', e);
-				relatedResources = [];
-			}
-		})();
-
-		return () => abortController.abort();
-	});
 
 	let isMounted = $state(false);
 	onMount(async () => {
@@ -330,17 +295,33 @@
 			</div>
 		</Field.Set>
 		{#if object}
-			<DefaultViewer
-				{cluster}
-				{group}
-				{version}
-				{kind}
-				{resource}
-				{namespace}
-				{name}
-				{object}
-				{relatedResources}
-			/>
+			<Field.Set>
+				<Tabs.Root value="related-resource" class="w-full">
+					<Tabs.List>
+						<Tabs.Trigger value="related-resource">Related Resource</Tabs.Trigger>
+						<Tabs.Trigger value="event">Event</Tabs.Trigger>
+						<Tabs.Trigger value="condition">Condition</Tabs.Trigger>
+					</Tabs.List>
+					<Tabs.Content value="related-resource">
+						<RelatedResources
+							{cluster}
+							{group}
+							{version}
+							{kind}
+							{resource}
+							{namespace}
+							{name}
+							{object}
+						/>
+					</Tabs.Content>
+					<Tabs.Content value="event">
+						<RelatedEvents {cluster} {namespace} {kind} {name} />
+					</Tabs.Content>
+					<Tabs.Content value="condition">
+						<RelatedConditions {object} />
+					</Tabs.Content>
+				</Tabs.Root>
+			</Field.Set>
 		{/if}
 	</Field.Group>
 {/if}

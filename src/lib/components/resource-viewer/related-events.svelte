@@ -42,7 +42,9 @@
 			reason: (lodash.get(object, 'reason') as string) ?? '—',
 			message: (lodash.get(object, 'message') as string) ?? '—',
 			count:
-				(lodash.get(object, 'count') as number) ?? (lodash.get(object, 'series.count') as number) ?? 1,
+				(lodash.get(object, 'count') as number) ??
+				(lodash.get(object, 'series.count') as number) ??
+				1,
 			lastSeen:
 				(lodash.get(object, 'lastTimestamp') as string) ??
 				(lodash.get(object, 'eventTime') as string) ??
