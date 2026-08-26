@@ -534,11 +534,8 @@
 						key: 'Generation',
 						value: object.metadata?.generation
 					}}
-					{@const MetadataResourceVersion = {
-						key: 'Resource Version',
-						value: object.metadata?.resourceVersion
-					}}
-					{#each [Metadatacluster, MetadataNamespace, MetadataCreationTimestamp, MetadataGeneration, MetadataResourceVersion].filter((metadata) => metadata.value) as metadata, index (index)}
+
+					{#each [Metadatacluster, MetadataNamespace, MetadataCreationTimestamp, MetadataGeneration].filter((metadata) => metadata.value) as metadata, index (index)}
 						<Item.Root class="p-0">
 							<Item.Content>
 								<Item.Description>

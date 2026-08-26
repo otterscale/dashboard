@@ -137,19 +137,21 @@
 			<ChevronLeftIcon size={16} aria-hidden="true" />
 		</Button>
 		<ButtonGroup.Root>
-			<Button size="icon" variant="outline">{String(pagination.pageIndex + 1)}</Button>
 			<Select
 				type="single"
 				value={String(pagination.pageIndex + 1)}
 				onValueChange={(value) => table.setPageIndex(Number(value) - 1)}
 			>
-				<SelectTrigger class="w-fit whitespace-nowrap" aria-label="Jump to page"></SelectTrigger>
+				<SelectTrigger class="w-fit whitespace-nowrap" aria-label="Jump to page">
+					{String(pagination.pageIndex + 1)}
+				</SelectTrigger>
 				<SelectContent>
 					{#each pageNumbers as pageNumber (pageNumber)}
 						<SelectItem value={String(pageNumber)}>{pageNumber}</SelectItem>
 					{/each}
 				</SelectContent>
 			</Select>
+			<Button size="icon" variant="outline">{String(pageNumbers.length)}</Button>
 		</ButtonGroup.Root>
 		<Button
 			variant="outline"
@@ -170,24 +172,26 @@
 			<ChevronLastIcon size={16} aria-hidden="true" />
 		</Button>
 	</div>
-	<Table.Root>
-		<Table.Header>
-			{@render header()}
-		</Table.Header>
-		<Table.Body>
-			{#if loading}
-				<Table.Row>
-					<Table.Cell colspan={columns.length} class="text-center">{loadingMessage}</Table.Cell>
-				</Table.Row>
-			{:else}
-				{#each table.getRowModel().rows as tableRow (tableRow.id)}
-					{@render row(tableRow.original)}
-				{:else}
+	<div class="overflow-hidden rounded-md border bg-background">
+		<Table.Root>
+			<Table.Header class="bg-muted">
+				{@render header()}
+			</Table.Header>
+			<Table.Body>
+				{#if loading}
 					<Table.Row>
-						<Table.Cell colspan={columns.length} class="text-center">{emptyMessage}</Table.Cell>
+						<Table.Cell colspan={columns.length} class="text-center">{loadingMessage}</Table.Cell>
 					</Table.Row>
-				{/each}
-			{/if}
-		</Table.Body>
-	</Table.Root>
+				{:else}
+					{#each table.getRowModel().rows as tableRow (tableRow.id)}
+						{@render row(tableRow.original)}
+					{:else}
+						<Table.Row>
+							<Table.Cell colspan={columns.length} class="text-center">{emptyMessage}</Table.Cell>
+						</Table.Row>
+					{/each}
+				{/if}
+			</Table.Body>
+		</Table.Root>
+	</div>
 </div>
