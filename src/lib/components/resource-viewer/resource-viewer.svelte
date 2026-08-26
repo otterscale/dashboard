@@ -556,8 +556,8 @@
 		</Field.Set>
 		{#if object}
 			<Field.Set>
-				<Tabs.Root value="related-resource" class="w-full">
-					<Tabs.List>
+				<Tabs.Root value="related-resource" class="w-full space-y-4">
+					<Tabs.List class="ml-auto">
 						<Tabs.Trigger value="related-resource">Related Resource</Tabs.Trigger>
 						{#if showEventTab}
 							<Tabs.Trigger value="event">Event</Tabs.Trigger>
@@ -567,10 +567,7 @@
 						{/if}
 					</Tabs.List>
 					<Tabs.Content value="related-resource">
-						<RelatedInformationTable
-							data={sortedRelatedResources}
-							columns={relatedResourceColumns}
-						>
+						<RelatedInformationTable data={sortedRelatedResources} columns={relatedResourceColumns}>
 							{#snippet header()}
 								<Table.Row>
 									<Table.Head>Group</Table.Head>
@@ -603,11 +600,7 @@
 					</Tabs.Content>
 					{#if showEventTab}
 						<Tabs.Content value="event">
-							<RelatedInformationTable
-								data={events}
-								columns={eventColumns}
-								loading={isEventsLoading}
-							>
+							<RelatedInformationTable data={events} columns={eventColumns}>
 								{#snippet header()}
 									<Table.Row>
 										<Table.Head>Name</Table.Head>
@@ -643,10 +636,7 @@
 					{/if}
 					{#if showConditionTab}
 						<Tabs.Content value="condition">
-							<RelatedInformationTable
-								data={conditions}
-								columns={conditionColumns}
-							>
+							<RelatedInformationTable data={conditions} columns={conditionColumns}>
 								{#snippet header()}
 									<Table.Row>
 										<Table.Head>Type</Table.Head>

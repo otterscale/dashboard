@@ -14,32 +14,32 @@
 	} from '@tanstack/table-core';
 	import type { Snippet } from 'svelte';
 
-	import { Button } from '$lib/components/ui/button/index.js';
+	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
 	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
 	import { createSvelteTable } from '$lib/components/ui/data-table/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
+	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as InputGroup from '$lib/components/ui/input-group/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
+
+	import Spinner from '../ui/spinner/spinner.svelte';
 
 	let {
 		data,
 		columns,
-		loading = false,
-		pageSize = 5,
+		loading,
 		header,
 		row
 	}: {
 		data: TData[];
 		columns: ColumnDef<TData>[];
 		loading?: boolean;
-		pageSize?: number;
 		header: Snippet;
 		row: Snippet<[TData]>;
 	} = $props();
 
-	const placeholder = 'Filter…'
-	const emptyMessage = 'No results.'
-	const loadingMessage = 'Loading…'
+	const placeholder = 'Filter Related Information';
+	const pageSize = 5;
 
 	let globalFilter = $state('');
 	let pagination = $state<PaginationState>({ pageIndex: 0, pageSize });
@@ -128,21 +128,32 @@
 			<ChevronLeftIcon size={16} aria-hidden="true" />
 		</Button>
 		<ButtonGroup.Root>
-			<Select
-				type="single"
-				value={String(pagination.pageIndex + 1)}
-				onValueChange={(value) => table.setPageIndex(Number(value) - 1)}
-			>
-				<SelectTrigger class="w-fit whitespace-nowrap" aria-label="Jump to page">
-					{String(pagination.pageIndex + 1)}
-				</SelectTrigger>
-				<SelectContent>
-					{#each pageNumbers as pageNumber (pageNumber)}
-						<SelectItem value={String(pageNumber)}>{pageNumber}</SelectItem>
-					{/each}
-				</SelectContent>
-			</Select>
-			<Button size="icon" variant="outline">{String(pageNumbers.length)}</Button>
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger>
+					{#snippet child({ props })}
+						<Button {...props} variant="outline" size="icon" aria-label="Jump to page">
+							{String(pagination.pageIndex + 1)}
+						</Button>
+					{/snippet}
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content>
+					<DropdownMenu.Group>
+						<DropdownMenu.RadioGroup
+							value={String(pagination.pageIndex + 1)}
+							onValueChange={(value) => table.setPageIndex(Number(value) - 1)}
+						>
+							{#each pageNumbers as pageNumber (pageNumber)}
+								<DropdownMenu.RadioItem value={String(pageNumber)}>
+									{pageNumber}
+								</DropdownMenu.RadioItem>
+							{/each}
+						</DropdownMenu.RadioGroup>
+					</DropdownMenu.Group>
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
+			<ButtonGroup.Text class={buttonVariants({ size: 'icon', variant: 'secondary' })}>
+				{String(pageNumbers.length)}
+			</ButtonGroup.Text>
 		</ButtonGroup.Root>
 		<Button
 			variant="outline"
@@ -164,24 +175,38 @@
 		</Button>
 	</div>
 	<div class="overflow-hidden rounded-md border bg-background">
-		<Table.Root>
+		<Table.Root class="[&_td]:p-4 [&_th]:p-4">
 			<Table.Header class="bg-muted">
 				{@render header()}
 			</Table.Header>
-			<Table.Body>
-				{#if loading}
-					<Table.Row>
-						<Table.Cell colspan={columns.length} class="text-center">{loadingMessage}</Table.Cell>
-					</Table.Row>
+			<Table.Body
+				class="[&_td:first-child]:rounded-l-lg [&_td:last-child]:rounded-r-lg [&_tr]:border-none"
+			>
+				{#each table.getRowModel().rows as tableRow (tableRow.id)}
+					{@render row(tableRow.original)}
 				{:else}
-					{#each table.getRowModel().rows as tableRow (tableRow.id)}
-						{@render row(tableRow.original)}
-					{:else}
-						<Table.Row>
-							<Table.Cell colspan={columns.length} class="text-center">{emptyMessage}</Table.Cell>
-						</Table.Row>
-					{/each}
-				{/if}
+					<Table.Row>
+						<Table.Cell colspan={columns.length} class="text-center">
+							<Empty.Root>
+								<Empty.Header>
+									<Empty.Media variant="icon">
+										{#if loading}
+											<Spinner />
+										{:else}
+											<SearchIcon />
+										{/if}
+									</Empty.Media>
+									<Empty.Title>{loading ? 'Loading' : 'No Data'}</Empty.Title>
+									<Empty.Description>
+										{loading
+											? 'Fetching the latest data, this should only take a moment.'
+											: 'No matching records were found. Try adjusting your filters or search criteria.'}
+									</Empty.Description>
+								</Empty.Header>
+							</Empty.Root>
+						</Table.Cell>
+					</Table.Row>
+				{/each}
 			</Table.Body>
 		</Table.Root>
 	</div>
