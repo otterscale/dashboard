@@ -573,23 +573,35 @@
 			</Item.Root>
 			<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
 				{#if object?.metadata}
-					{@const Metadatacluster = { key: 'Cluster', value: cluster }}
+					{@const Metadatacluster = { key: 'Cluster', value: cluster, data: cluster }}
 					{@const MetadataNamespace = {
 						key: 'Namespace',
-						value: namespace
+						value: namespace,
+						data: namespace
 					}}
 					{@const MetadataCreationTimestamp = {
 						key: 'Creation Timestamp',
 						value: object.metadata?.creationTimestamp
 							? new Date(object.metadata?.creationTimestamp).toLocaleString('sv-SE')
-							: ''
+							: '',
+						data: object.metadata?.creationTimestamp
 					}}
 					{@const MetadataGeneration = {
 						key: 'Generation',
-						value: object.metadata?.generation
+						value: object.metadata?.generation,
+						data: object.metadata?.generation
 					}}
-
-					{#each [Metadatacluster, MetadataNamespace, MetadataCreationTimestamp, MetadataGeneration].filter((metadata) => metadata.value) as metadata, index (index)}
+					{@const MetadataLabels = {
+						key: 'Labels' as const,
+						value: Object.keys(object.metadata?.labels ?? {}).length,
+						data: object.metadata?.labels
+					}}
+					{@const MetadataAnnotations = {
+						key: 'Annotations' as const,
+						value: Object.keys(object.metadata?.annotations ?? {}).length,
+						data: object.metadata?.annotations
+					}}
+					{#each [Metadatacluster, MetadataNamespace, MetadataCreationTimestamp, MetadataGeneration, MetadataLabels, MetadataAnnotations].filter((metadata) => metadata.value) as metadata, index (index)}
 						<Item.Root class="p-0">
 							<Item.Content>
 								<Item.Description>
