@@ -36,6 +36,7 @@
 	import RelatedInformationTable from './related-information-table.svelte';
 	import { getRelatedResourcesGetter } from './related-resource-getters';
 	import type { RelatedResource } from './types';
+	import { computeStatus, type ResourceObject, type StatusResult } from './utils';
 
 	let {
 		cluster,
@@ -72,19 +73,6 @@
 		'Secret'
 	]);
 
-	type ResourceObject = {
-		kind?: string;
-		apiVersion?: string;
-		metadata?: {
-			name?: string;
-			namespace?: string;
-			creationTimestamp?: string;
-			generation?: number;
-			resourceVersion?: string;
-			labels?: Record<string, string>;
-			annotations?: Record<string, string>;
-		};
-	} & JsonObject;
 	type ViewerError = { name?: string; rawMessage?: string; message?: string };
 
 	let object: ResourceObject | undefined = $state(undefined);
@@ -272,7 +260,10 @@
 		return () => abortController.abort();
 	});
 
-	type RelatedResourceRow = RelatedResource & { id: string; status: string };
+	type RelatedResourceRow = RelatedResource & {
+		id: string;
+		status?: StatusResult;
+	};
 
 	const relatedResourceColumns: ColumnDef<RelatedResourceRow>[] = [
 		{ accessorKey: 'group' },
@@ -286,30 +277,13 @@
 		return `${row.group}/${row.version}/${row.resource}/${row.namespace ?? ''}/${row.name}`;
 	}
 
-	// A related resource is only ever an identifier (see types.ts); its status has
-	// to be read off the live object, one GET per row. Objects without a `Ready`
-	// condition — either no status.conditions at all, or conditions that don't
-	// include one typed `Ready` — show no status rather than a guess.
-	function deriveRelatedResourceStatus(object: JsonObject | undefined): string {
-		const conditions = lodash.get(object, 'status.conditions');
-		if (!Array.isArray(conditions)) return '';
-
-		const readyCondition = conditions.find(
-			(condition) => lodash.get(condition, 'type') === 'Ready'
-		);
-		const readyStatus = lodash.get(readyCondition, 'status');
-		if (readyStatus === 'True') return 'Ready';
-		if (readyStatus === 'False') return 'Not Ready';
-		return '';
-	}
-
 	const sortedRelatedResources = $derived<(RelatedResource & { id: string })[]>(
 		lodash
 			.sortBy(relatedResources, ['group', 'version', 'resource', 'namespace', 'name'])
 			.map((resource) => ({ ...resource, id: getRelatedResourceRowId(resource) }))
 	);
 
-	let relatedResourceStatuses: Record<string, string> = $state({});
+	let relatedResourceStatuses: Record<string, StatusResult> = $state({});
 	let relatedResourceStatusesAbortController: AbortController | null = null;
 	// Re-fetch statuses whenever the related-resource list changes; a slow batch
 	// of GETs should not resolve over a newer list.
@@ -340,14 +314,14 @@
 							} as GetRequest,
 							{ signal: abortController.signal }
 						);
-						return [row.id, deriveRelatedResourceStatus(response.object as JsonObject)] as const;
+						return [row.id, computeStatus(response.object as ResourceObject)] as const;
 					} catch {
-						return [row.id, 'Unknown'] as const;
+						return [row.id, { status: undefined, message: undefined } as StatusResult] as const;
 					}
 				})
 			);
 			if (abortController.signal.aborted) return;
-			relatedResourceStatuses = Object.fromEntries(entries);
+			relatedResourceStatuses = Object.fromEntries(entries) as Record<string, StatusResult>;
 		})();
 
 		return () => abortController.abort();
@@ -356,7 +330,7 @@
 	const relatedResourceRows = $derived<RelatedResourceRow[]>(
 		sortedRelatedResources.map((resource) => ({
 			...resource,
-			status: relatedResourceStatuses[resource.id] ?? 'Loading…'
+			status: lodash.get(relatedResourceStatuses, resource.id, undefined)
 		}))
 	);
 
@@ -373,7 +347,6 @@
 	};
 
 	let events: EventRow[] = $state([]);
-	let isEventsLoading = $state(true);
 
 	function getEventResourceURL(event: EventRow): string {
 		return getResourceURL({
@@ -419,7 +392,6 @@
 		const currentAbortController = new AbortController();
 		eventsAbortController = currentAbortController;
 
-		isEventsLoading = true;
 		try {
 			const response = await resourceClient.list(
 				{
@@ -440,8 +412,6 @@
 			if (currentAbortController.signal.aborted) return;
 			console.error('Failed to list events:', e);
 			events = [];
-		} finally {
-			if (!currentAbortController.signal.aborted) isEventsLoading = false;
 		}
 	}
 
@@ -479,7 +449,7 @@
 		return raw.map((condition, index) => ({
 			id: `${lodash.get(condition, 'type') ?? index}`,
 			type: (lodash.get(condition, 'type') as string) ?? '—',
-			status: (lodash.get(condition, 'status') as string) ?? 'Unknown',
+			status: (lodash.get(condition, 'status') as string) ?? undefined,
 			reason: (lodash.get(condition, 'reason') as string) ?? '—',
 			message: (lodash.get(condition, 'message') as string) ?? '—',
 			lastTransitionTime: (lodash.get(condition, 'lastTransitionTime') as string) ?? ''
@@ -726,8 +696,8 @@
 											{relatedResource.name}
 										</a>
 									</Table.Cell>
-									<Table.Cell>{relatedResource.namespace ?? '—'}</Table.Cell>
-									<Table.Cell>{relatedResource.status}</Table.Cell>
+									<Table.Cell>{relatedResource.namespace}</Table.Cell>
+									<Table.Cell>{relatedResource.status?.status}</Table.Cell>
 								</Table.Row>
 							{/snippet}
 						</RelatedInformationTable>
