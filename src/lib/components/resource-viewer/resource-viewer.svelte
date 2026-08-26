@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { JsonObject } from '@bufbuild/protobuf';
 	import { createClient, type Transport } from '@connectrpc/connect';
+	import { FileIcon } from '@lucide/svelte';
 	import Ban from '@lucide/svelte/icons/ban';
 	import Layers from '@lucide/svelte/icons/layers';
 	import {
@@ -14,15 +15,20 @@
 	import type { Schema } from '@sjsf/form';
 	import { type ColumnDef } from '@tanstack/table-core';
 	import lodash from 'lodash';
+	import { mode as themeMode } from 'mode-watcher';
 	import { getContext, onDestroy, onMount } from 'svelte';
+	import Monaco from 'svelte-monaco';
+	import { stringify } from 'yaml';
 
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import CopyButton from '$lib/components/custom/copy-button/copy-button.svelte';
 	import * as Alert from '$lib/components/ui/alert/index.js';
-	import { Button } from '$lib/components/ui/button';
+	import { Button, buttonVariants } from '$lib/components/ui/button';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as Item from '$lib/components/ui/item';
+	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
@@ -410,6 +416,10 @@
 		}));
 	});
 
+	// --- YAML tab ---
+
+	const objectYaml = $derived(object ? stringify(object) : '');
+
 	const conditionColumns: ColumnDef<ConditionRow>[] = [
 		{ accessorKey: 'type' },
 		{ accessorKey: 'status' },
@@ -520,6 +530,46 @@
 						{object?.metadata?.name}
 					</Item.Title>
 				</Item.Content>
+				<Item.Actions>
+					<Sheet.Root>
+						<Sheet.Trigger class={buttonVariants({ size: 'icon', variant: 'ghost' })}>
+							<FileIcon />
+						</Sheet.Trigger>
+						<Sheet.Content class="h-full min-w-[50vw] p-6">
+							<Item.Root class="p-0">
+								<Item.Content>
+									<Item.Title>
+										{#if namespace}
+											{namespace}/{name}
+										{:else}
+											{name}
+										{/if}
+									</Item.Title>
+									<Item.Description>{group}.{version}.{resource}</Item.Description>
+								</Item.Content>
+								<Item.Actions>
+									<CopyButton text={stringify(object)} />
+								</Item.Actions>
+							</Item.Root>
+							<div class="mt-auto h-[90vh] overflow-hidden rounded-lg">
+								<Monaco
+									options={{
+										language: 'yaml',
+										readOnly: true,
+										folding: true,
+										foldingStrategy: 'indentation',
+										minimap: { enabled: false },
+										scrollBeyondLastLine: false,
+										automaticLayout: true,
+										padding: { top: 8, bottom: 8 }
+									}}
+									theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs'}
+									value={objectYaml}
+								/>
+							</div>
+						</Sheet.Content>
+					</Sheet.Root>
+				</Item.Actions>
 			</Item.Root>
 			<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
 				{#if object?.metadata}
