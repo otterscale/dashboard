@@ -272,22 +272,92 @@
 		return () => abortController.abort();
 	});
 
-	type RelatedResourceRow = RelatedResource & { id: string };
+	type RelatedResourceRow = RelatedResource & { id: string; status: string };
 
 	const relatedResourceColumns: ColumnDef<RelatedResourceRow>[] = [
 		{ accessorKey: 'group' },
 		{ accessorKey: 'version' },
 		{ accessorKey: 'resource' },
 		{ accessorKey: 'name' },
-		{ accessorKey: 'namespace' }
+		{ accessorKey: 'namespace' },
+		{ accessorKey: 'status' }
 	];
 	function getRelatedResourceRowId(row: RelatedResource): string {
 		return `${row.group}/${row.version}/${row.resource}/${row.namespace ?? ''}/${row.name}`;
 	}
-	const sortedRelatedResources = $derived<RelatedResourceRow[]>(
+
+	// A related resource is only ever an identifier (see types.ts); its status has
+	// to be read off the live object, one GET per row. Objects without a `Ready`
+	// condition — either no status.conditions at all, or conditions that don't
+	// include one typed `Ready` — show no status rather than a guess.
+	function deriveRelatedResourceStatus(object: JsonObject | undefined): string {
+		const conditions = lodash.get(object, 'status.conditions');
+		if (!Array.isArray(conditions)) return '';
+
+		const readyCondition = conditions.find(
+			(condition) => lodash.get(condition, 'type') === 'Ready'
+		);
+		const readyStatus = lodash.get(readyCondition, 'status');
+		if (readyStatus === 'True') return 'Ready';
+		if (readyStatus === 'False') return 'Not Ready';
+		return '';
+	}
+
+	const sortedRelatedResources = $derived<(RelatedResource & { id: string })[]>(
 		lodash
 			.sortBy(relatedResources, ['group', 'version', 'resource', 'namespace', 'name'])
 			.map((resource) => ({ ...resource, id: getRelatedResourceRowId(resource) }))
+	);
+
+	let relatedResourceStatuses: Record<string, string> = $state({});
+	let relatedResourceStatusesAbortController: AbortController | null = null;
+	// Re-fetch statuses whenever the related-resource list changes; a slow batch
+	// of GETs should not resolve over a newer list.
+	$effect(() => {
+		const rows = sortedRelatedResources;
+
+		relatedResourceStatusesAbortController?.abort();
+		if (rows.length === 0) {
+			relatedResourceStatuses = {};
+			return;
+		}
+
+		const abortController = new AbortController();
+		relatedResourceStatusesAbortController = abortController;
+
+		(async () => {
+			const entries = await Promise.all(
+				rows.map(async (row) => {
+					try {
+						const response = await resourceClient.get(
+							{
+								cluster,
+								namespace: row.namespace ?? '',
+								group: row.group,
+								version: row.version,
+								resource: row.resource,
+								name: row.name
+							} as GetRequest,
+							{ signal: abortController.signal }
+						);
+						return [row.id, deriveRelatedResourceStatus(response.object as JsonObject)] as const;
+					} catch {
+						return [row.id, 'Unknown'] as const;
+					}
+				})
+			);
+			if (abortController.signal.aborted) return;
+			relatedResourceStatuses = Object.fromEntries(entries);
+		})();
+
+		return () => abortController.abort();
+	});
+
+	const relatedResourceRows = $derived<RelatedResourceRow[]>(
+		sortedRelatedResources.map((resource) => ({
+			...resource,
+			status: relatedResourceStatuses[resource.id] ?? 'Loading…'
+		}))
 	);
 
 	// --- Event tab ---
@@ -619,7 +689,7 @@
 		{#if object}
 			<Field.Set>
 				<Tabs.Root value="related-resource" class="w-full space-y-4">
-					<Tabs.List class="ml-auto">
+					<Tabs.List>
 						<Tabs.Trigger value="related-resource">Related Resource</Tabs.Trigger>
 						{#if showEventTab}
 							<Tabs.Trigger value="event">Event</Tabs.Trigger>
@@ -629,7 +699,7 @@
 						{/if}
 					</Tabs.List>
 					<Tabs.Content value="related-resource">
-						<RelatedInformationTable data={sortedRelatedResources} columns={relatedResourceColumns}>
+						<RelatedInformationTable data={relatedResourceRows} columns={relatedResourceColumns}>
 							{#snippet header()}
 								<Table.Row>
 									<Table.Head>Group</Table.Head>
@@ -637,6 +707,7 @@
 									<Table.Head>Resource</Table.Head>
 									<Table.Head>Name</Table.Head>
 									<Table.Head>Namespace</Table.Head>
+									<Table.Head>Status</Table.Head>
 								</Table.Row>
 							{/snippet}
 							{#snippet row(relatedResource)}
@@ -656,6 +727,7 @@
 										</a>
 									</Table.Cell>
 									<Table.Cell>{relatedResource.namespace ?? '—'}</Table.Cell>
+									<Table.Cell>{relatedResource.status}</Table.Cell>
 								</Table.Row>
 							{/snippet}
 						</RelatedInformationTable>
