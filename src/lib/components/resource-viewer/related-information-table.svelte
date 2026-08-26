@@ -179,9 +179,7 @@
 			<Table.Header class="bg-muted">
 				{@render header()}
 			</Table.Header>
-			<Table.Body
-				class="[&_td:first-child]:rounded-l-lg [&_td:last-child]:rounded-r-lg [&_tr]:border-none"
-			>
+			<Table.Body class="[&_tr]:border-none">
 				{#each table.getRowModel().rows as tableRow (tableRow.id)}
 					{@render row(tableRow.original)}
 				{:else}
