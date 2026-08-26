@@ -266,24 +266,28 @@
 		return () => abortController.abort();
 	});
 
-	const relatedResourceColumns: ColumnDef<RelatedResource>[] = [
+	type RelatedResourceRow = RelatedResource & { id: string };
+
+	const relatedResourceColumns: ColumnDef<RelatedResourceRow>[] = [
 		{ accessorKey: 'group' },
 		{ accessorKey: 'version' },
 		{ accessorKey: 'resource' },
 		{ accessorKey: 'name' },
 		{ accessorKey: 'namespace' }
 	];
-	const sortedRelatedResources = $derived(
-		lodash.sortBy(relatedResources, ['group', 'version', 'resource', 'namespace', 'name'])
-	);
 	function getRelatedResourceRowId(row: RelatedResource): string {
 		return `${row.group}/${row.version}/${row.resource}/${row.namespace ?? ''}/${row.name}`;
 	}
+	const sortedRelatedResources = $derived<RelatedResourceRow[]>(
+		lodash
+			.sortBy(relatedResources, ['group', 'version', 'resource', 'namespace', 'name'])
+			.map((resource) => ({ ...resource, id: getRelatedResourceRowId(resource) }))
+	);
 
 	// --- Event tab ---
 
 	type EventRow = {
-		key: string;
+		id: string;
 		name: string;
 		type: string;
 		reason: string;
@@ -308,7 +312,7 @@
 
 	function toEventRow(eventObject: JsonObject, index: number): EventRow {
 		return {
-			key: (lodash.get(eventObject, 'metadata.uid') as string) ?? String(index),
+			id: (lodash.get(eventObject, 'metadata.uid') as string) ?? String(index),
 			name: (lodash.get(eventObject, 'metadata.name') as string) ?? '',
 			type: (lodash.get(eventObject, 'type') as string) ?? 'Normal',
 			reason: (lodash.get(eventObject, 'reason') as string) ?? '—',
@@ -385,7 +389,7 @@
 	// --- Condition tab ---
 
 	type ConditionRow = {
-		key: string;
+		id: string;
 		type: string;
 		status: string;
 		reason: string;
@@ -397,7 +401,7 @@
 		const raw = lodash.get(object, 'status.conditions');
 		if (!Array.isArray(raw)) return [];
 		return raw.map((condition, index) => ({
-			key: `${lodash.get(condition, 'type') ?? index}`,
+			id: `${lodash.get(condition, 'type') ?? index}`,
 			type: (lodash.get(condition, 'type') as string) ?? '—',
 			status: (lodash.get(condition, 'status') as string) ?? 'Unknown',
 			reason: (lodash.get(condition, 'reason') as string) ?? '—',
@@ -566,7 +570,6 @@
 						<RelatedInformationTable
 							data={sortedRelatedResources}
 							columns={relatedResourceColumns}
-							getRowId={getRelatedResourceRowId}
 							placeholder="Filter related resources…"
 							emptyMessage="No related resources."
 						>
@@ -605,7 +608,6 @@
 							<RelatedInformationTable
 								data={events}
 								columns={eventColumns}
-								getRowId={(row) => row.key}
 								placeholder="Filter events…"
 								emptyMessage="No events found."
 								loading={isEventsLoading}
@@ -649,7 +651,6 @@
 							<RelatedInformationTable
 								data={conditions}
 								columns={conditionColumns}
-								getRowId={(row) => row.key}
 								placeholder="Filter conditions…"
 								emptyMessage="No conditions reported."
 							>

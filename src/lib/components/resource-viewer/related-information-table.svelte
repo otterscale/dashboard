@@ -1,4 +1,4 @@
-<script lang="ts" generics="TData extends object">
+<script lang="ts" generics="TData extends { id: string }">
 	import ChevronFirstIcon from '@lucide/svelte/icons/chevron-first';
 	import ChevronLastIcon from '@lucide/svelte/icons/chevron-last';
 	import ChevronLeftIcon from '@lucide/svelte/icons/chevron-left';
@@ -17,19 +17,13 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
 	import { createSvelteTable } from '$lib/components/ui/data-table/index.js';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as InputGroup from '$lib/components/ui/input-group/index.js';
-	import {
-		Select,
-		SelectContent,
-		SelectItem,
-		SelectTrigger
-	} from '$lib/components/ui/select/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 
 	let {
 		data,
 		columns,
-		getRowId,
 		placeholder = 'Filter…',
 		emptyMessage = 'No results.',
 		loading = false,
@@ -40,7 +34,6 @@
 	}: {
 		data: TData[];
 		columns: ColumnDef<TData>[];
-		getRowId?: (row: TData, index: number) => string;
 		placeholder?: string;
 		emptyMessage?: string;
 		loading?: boolean;
@@ -58,7 +51,7 @@
 		get data() {
 			return data;
 		},
-		getRowId,
+		getRowId: (dataRow) => dataRow.id,
 		getCoreRowModel: getCoreRowModel(),
 		getFilteredRowModel: getFilteredRowModel(),
 		getPaginationRowModel: getPaginationRowModel(),
@@ -137,20 +130,27 @@
 			<ChevronLeftIcon size={16} aria-hidden="true" />
 		</Button>
 		<ButtonGroup.Root>
-			<Select
-				type="single"
-				value={String(pagination.pageIndex + 1)}
-				onValueChange={(value) => table.setPageIndex(Number(value) - 1)}
-			>
-				<SelectTrigger class="w-fit whitespace-nowrap" aria-label="Jump to page">
-					{String(pagination.pageIndex + 1)}
-				</SelectTrigger>
-				<SelectContent>
+			<DropdownMenu.Root>
+				<DropdownMenu.Trigger>
+					{#snippet child({ props })}
+						<Button
+							{...props}
+							variant="outline"
+							class="w-fit whitespace-nowrap"
+							aria-label="Jump to page"
+						>
+							{String(pagination.pageIndex + 1)}
+						</Button>
+					{/snippet}
+				</DropdownMenu.Trigger>
+				<DropdownMenu.Content align="start">
 					{#each pageNumbers as pageNumber (pageNumber)}
-						<SelectItem value={String(pageNumber)}>{pageNumber}</SelectItem>
+						<DropdownMenu.Item onSelect={() => table.setPageIndex(pageNumber - 1)}>
+							{pageNumber}
+						</DropdownMenu.Item>
 					{/each}
-				</SelectContent>
-			</Select>
+				</DropdownMenu.Content>
+			</DropdownMenu.Root>
 			<Button size="icon" variant="outline">{String(pageNumbers.length)}</Button>
 		</ButtonGroup.Root>
 		<Button
