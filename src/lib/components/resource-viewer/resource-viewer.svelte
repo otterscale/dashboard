@@ -570,8 +570,6 @@
 						<RelatedInformationTable
 							data={sortedRelatedResources}
 							columns={relatedResourceColumns}
-							placeholder="Filter related resources…"
-							emptyMessage="No related resources."
 						>
 							{#snippet header()}
 								<Table.Row>
@@ -608,10 +606,7 @@
 							<RelatedInformationTable
 								data={events}
 								columns={eventColumns}
-								placeholder="Filter events…"
-								emptyMessage="No events found."
 								loading={isEventsLoading}
-								loadingMessage="Loading events…"
 							>
 								{#snippet header()}
 									<Table.Row>
@@ -651,8 +646,6 @@
 							<RelatedInformationTable
 								data={conditions}
 								columns={conditionColumns}
-								placeholder="Filter conditions…"
-								emptyMessage="No conditions reported."
 							>
 								{#snippet header()}
 									<Table.Row>

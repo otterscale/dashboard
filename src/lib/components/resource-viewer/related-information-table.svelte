@@ -24,24 +24,22 @@
 	let {
 		data,
 		columns,
-		placeholder = 'Filter…',
-		emptyMessage = 'No results.',
 		loading = false,
-		loadingMessage = 'Loading…',
 		pageSize = 5,
 		header,
 		row
 	}: {
 		data: TData[];
 		columns: ColumnDef<TData>[];
-		placeholder?: string;
-		emptyMessage?: string;
 		loading?: boolean;
-		loadingMessage?: string;
 		pageSize?: number;
 		header: Snippet;
 		row: Snippet<[TData]>;
 	} = $props();
+
+	const placeholder = 'Filter…'
+	const emptyMessage = 'No results.'
+	const loadingMessage = 'Loading…'
 
 	let globalFilter = $state('');
 	let pagination = $state<PaginationState>({ pageIndex: 0, pageSize });
@@ -130,27 +128,20 @@
 			<ChevronLeftIcon size={16} aria-hidden="true" />
 		</Button>
 		<ButtonGroup.Root>
-			<DropdownMenu.Root>
-				<DropdownMenu.Trigger>
-					{#snippet child({ props })}
-						<Button
-							{...props}
-							variant="outline"
-							class="w-fit whitespace-nowrap"
-							aria-label="Jump to page"
-						>
-							{String(pagination.pageIndex + 1)}
-						</Button>
-					{/snippet}
-				</DropdownMenu.Trigger>
-				<DropdownMenu.Content align="start">
+			<Select
+				type="single"
+				value={String(pagination.pageIndex + 1)}
+				onValueChange={(value) => table.setPageIndex(Number(value) - 1)}
+			>
+				<SelectTrigger class="w-fit whitespace-nowrap" aria-label="Jump to page">
+					{String(pagination.pageIndex + 1)}
+				</SelectTrigger>
+				<SelectContent>
 					{#each pageNumbers as pageNumber (pageNumber)}
-						<DropdownMenu.Item onSelect={() => table.setPageIndex(pageNumber - 1)}>
-							{pageNumber}
-						</DropdownMenu.Item>
+						<SelectItem value={String(pageNumber)}>{pageNumber}</SelectItem>
 					{/each}
-				</DropdownMenu.Content>
-			</DropdownMenu.Root>
+				</SelectContent>
+			</Select>
 			<Button size="icon" variant="outline">{String(pageNumbers.length)}</Button>
 		</ButtonGroup.Root>
 		<Button
