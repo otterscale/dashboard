@@ -5,10 +5,10 @@
 	import * as Table from '$lib/components/ui/table/index.js';
 
 	import RelatedInformationTable from '../related-information-table.svelte';
-	import type { ResourceObject } from '../types';
+	import type { Resource } from '../types';
 	import { formatTimestamp } from '../utils';
 
-	let { object }: { object: ResourceObject | undefined } = $props();
+	let { object }: { object: Resource | undefined } = $props();
 
 	type ConditionRow = {
 		id: string;

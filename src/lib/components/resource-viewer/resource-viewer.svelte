@@ -27,9 +27,9 @@
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
-	import ConditionTab from './related-inforamtion/conditions.svelte';
-	import EventTab from './related-inforamtion/evens.svelte';
-	import RelatedResourceTab from './related-inforamtion/related-resources.svelte';
+	import Conditions from './related-inforamtion/conditions.svelte';
+	import Events from './related-inforamtion/evens.svelte';
+	import RelatedResources from './related-inforamtion/related-resources.svelte';
 	import type { Resource } from './types';
 
 	let {
@@ -65,9 +65,6 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	let object: Resource | undefined = $state(undefined);
-	let error: ViewerError | null = $state(null);
-
 	let schema: Schema | undefined = $state(undefined);
 	async function fetchSchema() {
 		try {
@@ -84,11 +81,8 @@
 		}
 	}
 
-	const showConditionTab = $derived(
-		!!lodash.get(schema, 'properties.status.properties.conditions')
-	);
-	const showEventTab = $derived(!EVENT_UNSUPPORTED_KINDS.has(kind));
-
+	let object: Resource | undefined = $state(undefined);
+	let error: { name: string; rawMessage: string } | Error | null = $state(null);
 	let isGetting = $state(false);
 	let getAbortController: AbortController | null = null;
 	async function GetResource() {
@@ -109,7 +103,7 @@
 				} as GetRequest,
 				{ signal: getAbortController?.signal }
 			);
-			object = getResponse.object as ResourceObject | undefined;
+			object = getResponse.object as Resource | undefined;
 		} catch (e) {
 			error = e as Error;
 		} finally {
@@ -120,7 +114,6 @@
 
 	let isWatching = $state(false);
 	let watchAbortController: AbortController | null = null;
-
 	async function watchResource() {
 		if (isWatching || isDestroyed) return;
 
@@ -258,7 +251,7 @@
 			<Alert.Root variant="destructive" class="border-none bg-destructive/5">
 				<Alert.Title class="font-bold">{error?.name}</Alert.Title>
 				<Alert.Description class="text-start">
-					{error?.rawMessage}
+					{lodash.get(error, 'rawMessage')}
 				</Alert.Description>
 			</Alert.Root>
 			<div class="flex gap-4">
@@ -372,17 +365,19 @@
 		{#if object}
 			<Field.Set>
 				<Tabs.Root value="related-resource" class="w-full space-y-4">
+					{@const hasEvents = !EVENT_UNSUPPORTED_KINDS.has(kind)}
+					{@const hasConditions = !!lodash.get(schema, 'properties.status.properties.conditions')}
 					<Tabs.List>
 						<Tabs.Trigger value="related-resource">Related Resource</Tabs.Trigger>
-						{#if showEventTab}
+						{#if hasEvents}
 							<Tabs.Trigger value="event">Event</Tabs.Trigger>
 						{/if}
-						{#if showConditionTab}
+						{#if hasConditions}
 							<Tabs.Trigger value="condition">Condition</Tabs.Trigger>
 						{/if}
 					</Tabs.List>
 					<Tabs.Content value="related-resource">
-						<RelatedResourceTab
+						<RelatedResources
 							{cluster}
 							{namespace}
 							{group}
@@ -393,14 +388,14 @@
 							{object}
 						/>
 					</Tabs.Content>
-					{#if showEventTab}
+					{#if hasEvents}
 						<Tabs.Content value="event">
-							<EventTab {cluster} {namespace} {kind} {name} />
+							<Events {cluster} {namespace} {kind} {name} />
 						</Tabs.Content>
 					{/if}
-					{#if showConditionTab}
+					{#if hasConditions}
 						<Tabs.Content value="condition">
-							<ConditionTab {object} />
+							<Conditions {object} />
 						</Tabs.Content>
 					{/if}
 				</Tabs.Root>

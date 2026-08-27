@@ -11,7 +11,7 @@
 
 	import RelatedInformationTable from '../related-information-table.svelte';
 	import { getRelatedResourcesGetter } from '../related-resource-getters';
-	import type { RelatedResource, ResourceObject } from '../types';
+	import type { RelatedResource, Resource } from '../types';
 	import { getResourceURL } from '../utils';
 
 	let {
@@ -31,7 +31,7 @@
 		kind: string;
 		resource: string;
 		name: string;
-		object: ResourceObject | undefined;
+		object?: Resource;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -44,11 +44,12 @@
 
 	const columns: ColumnDef<RelatedResourceRow>[] = [
 		{ accessorKey: 'group' },
-		{ accessorKey: 'version' },
-		{ accessorKey: 'resource' },
+		{ accessorKey: 'message' },
 		{ accessorKey: 'name' },
 		{ accessorKey: 'namespace' },
-		{ accessorKey: 'status' }
+		{ accessorKey: 'resource' },
+		{ accessorKey: 'status' },
+		{ accessorKey: 'version' }
 	];
 
 	function getRowId(row: RelatedResource): string {
@@ -134,7 +135,7 @@
 						);
 						return [row.id, compute(response.object as KubernetesResource)] as const;
 					} catch {
-						return [row.id, { status: undefined, message: undefined } as Result] as const;
+						return [row.id, null] as const;
 					}
 				})
 			);
@@ -156,18 +157,17 @@
 <RelatedInformationTable data={rows} {columns}>
 	{#snippet header()}
 		<Table.Row>
-			<Table.Head>Group</Table.Head>
-			<Table.Head>Version</Table.Head>
 			<Table.Head>Resource</Table.Head>
 			<Table.Head>Name</Table.Head>
 			<Table.Head>Namespace</Table.Head>
+			<Table.Head>Version</Table.Head>
+			<Table.Head>Group</Table.Head>
 			<Table.Head>Status</Table.Head>
+			<Table.Head>Message</Table.Head>
 		</Table.Row>
 	{/snippet}
 	{#snippet row(relatedResource)}
 		<Table.Row>
-			<Table.Cell>{relatedResource.group || 'core'}</Table.Cell>
-			<Table.Cell>{relatedResource.version}</Table.Cell>
 			<Table.Cell>{relatedResource.resource}</Table.Cell>
 			<Table.Cell>
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
@@ -181,7 +181,10 @@
 				</a>
 			</Table.Cell>
 			<Table.Cell>{relatedResource.namespace}</Table.Cell>
+			<Table.Cell>{relatedResource.version}</Table.Cell>
+			<Table.Cell>{relatedResource.group || 'core'}</Table.Cell>
 			<Table.Cell>{relatedResource.status?.status}</Table.Cell>
+			<Table.Cell>{relatedResource.status?.message}</Table.Cell>
 		</Table.Row>
 	{/snippet}
 </RelatedInformationTable>

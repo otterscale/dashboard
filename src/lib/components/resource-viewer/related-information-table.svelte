@@ -20,9 +20,8 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as InputGroup from '$lib/components/ui/input-group/index.js';
-	import * as Table from '$lib/components/ui/table/index.js';
-
 	import Spinner from '$lib/components/ui/spinner/spinner.svelte';
+	import * as Table from '$lib/components/ui/table/index.js';
 
 	let {
 		data,
