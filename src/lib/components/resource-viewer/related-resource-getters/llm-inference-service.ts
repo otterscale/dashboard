@@ -1,3 +1,4 @@
+import type { JsonObject } from '@bufbuild/protobuf';
 import { createClient } from '@connectrpc/connect';
 import { type ListRequest, ResourceService } from '@otterscale/api/resource/v1';
 
@@ -71,7 +72,10 @@ const getLLMInferenceServiceRelatedResources: GetRelatedResources = async ({
 							{
 								...identifier,
 								name: metadata.name,
-								namespace: metadata.namespace ?? undefined
+								namespace: metadata.namespace ?? undefined,
+								// The list already carried the object, so the section need not
+								// fetch it again.
+								object: item.object as JsonObject
 							} satisfies RelatedResource
 						]
 					: [];

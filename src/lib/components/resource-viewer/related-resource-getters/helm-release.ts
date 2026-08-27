@@ -1,7 +1,9 @@
+import type { JsonObject } from '@bufbuild/protobuf';
 import { createClient } from '@connectrpc/connect';
 import {
 	type APIResource,
 	type DiscoveryRequest,
+	type GetRequest,
 	ResourceService
 } from '@otterscale/api/resource/v1';
 import lodash from 'lodash';
@@ -30,7 +32,8 @@ function groupAPIResourcesByGroupKind(apiResources: APIResource[]): Map<string, 
 /**
  * A HelmRelease's relations are the objects Helm applied, which Flux lists in
  * `status.inventory` — but as `namespace_name_group_kind`, so each entry needs
- * discovery before it can become a link.
+ * discovery before it can become a link. Each one is then fetched, the same as
+ * every other getter, so the section has the object and not just a link to it.
  */
 const getHelmReleaseRelatedResources: GetRelatedResources = async ({
 	cluster,
@@ -57,7 +60,7 @@ const getHelmReleaseRelatedResources: GetRelatedResources = async ({
 		return candidates.find((candidate) => candidate.version === entryVersion) ?? candidates[0];
 	}
 
-	return entries.flatMap((entry) => {
+	const identities = entries.flatMap((entry) => {
 		// Flux encodes each applied object as `namespace_name_group_kind`, with an
 		// empty group for core resources and an empty namespace for cluster-scoped
 		// ones. None of the four parts can itself contain an underscore.
@@ -87,6 +90,31 @@ const getHelmReleaseRelatedResources: GetRelatedResources = async ({
 			} satisfies RelatedResource
 		];
 	});
+
+	return Promise.all(
+		identities.map(async (identity) => {
+			try {
+				const getResponse = await resourceClient.get(
+					{
+						cluster,
+						namespace: identity.namespace ?? '',
+						group: identity.group,
+						version: identity.version,
+						resource: identity.resource,
+						name: identity.name
+					} as GetRequest,
+					{ signal }
+				);
+				return { ...identity, object: getResponse.object as JsonObject } satisfies RelatedResource;
+			} catch (error) {
+				// An entry the inventory still lists but the cluster no longer has keeps
+				// its link, just without an object to show for it.
+				if (signal.aborted) return identity;
+				console.error(`Failed to get ${identity.resource} ${identity.name}:`, error);
+				return identity;
+			}
+		})
+	);
 };
 
 export { getHelmReleaseRelatedResources };

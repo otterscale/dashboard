@@ -1,3 +1,6 @@
+import type { JsonObject } from '@bufbuild/protobuf';
+import { createClient } from '@connectrpc/connect';
+import { type GetRequest, ResourceService } from '@otterscale/api/resource/v1';
 import lodash from 'lodash';
 
 import type { GetRelatedResources, RelatedResource, RelatedResourceClass } from '../types';
@@ -64,13 +67,19 @@ const statusResourceReferenceIdentifiers: Record<string, RelatedResourceClass> =
 
 /**
  * A Workspace's relations are the objects it created, and it names every one of
- * them in its own `status` — so this reads the object and asks the cluster
- * nothing.
+ * them in its own `status` — so the identities come straight off the object.
+ * Each one is then fetched, the same as every other getter, so the section has
+ * the object and not just a link to it.
  */
-const getWorkspaceRelatedResources: GetRelatedResources = ({ object }) => {
+const getWorkspaceRelatedResources: GetRelatedResources = async ({
+	cluster,
+	object,
+	transport,
+	signal
+}) => {
 	const status = (lodash.get(object, ['status']) ?? {}) as Record<string, unknown>;
 
-	return Object.entries(status).flatMap(([key, value]) => {
+	const identities = Object.entries(status).flatMap(([key, value]) => {
 		const identifier = statusResourceReferenceIdentifiers[key];
 		if (!identifier) return [];
 
@@ -89,6 +98,33 @@ const getWorkspaceRelatedResources: GetRelatedResources = ({ object }) => {
 				: []
 		);
 	});
+
+	const resourceClient = createClient(ResourceService, transport);
+
+	return Promise.all(
+		identities.map(async (identity) => {
+			try {
+				const response = await resourceClient.get(
+					{
+						cluster,
+						namespace: identity.namespace ?? '',
+						group: identity.group,
+						version: identity.version,
+						resource: identity.resource,
+						name: identity.name
+					} as GetRequest,
+					{ signal }
+				);
+				return { ...identity, object: response.object as JsonObject } satisfies RelatedResource;
+			} catch (error) {
+				// A reference the Workspace still lists but the cluster no longer has
+				// keeps its link, just without an object to show for it.
+				if (signal.aborted) return identity;
+				console.error(`Failed to get ${identity.resource} ${identity.name}:`, error);
+				return identity;
+			}
+		})
+	);
 };
 
 export { getWorkspaceRelatedResources };

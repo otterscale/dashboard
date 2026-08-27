@@ -45,13 +45,20 @@ type RelatedResource = {
 	 * created rather than its own.
 	 */
 	namespace?: string;
+	/**
+	 * The related object itself, as the cluster returned it. Every getter now
+	 * fetches its relations, so this is populated whenever the object still
+	 * exists — and left unset only when the `get` failed or the object was
+	 * deleted out from under the reference.
+	 */
+	object?: JsonObject;
 };
 
 /**
  * A related resource kind, before whatever names it has are known — what a
  * getter pairs with each name it reads off an object or a listing.
  */
-type RelatedResourceClass = Omit<RelatedResource, 'name' | 'namespace'>;
+type RelatedResourceClass = Omit<RelatedResource, 'name' | 'namespace' | 'object'>;
 
 /**
  * What a related-resources getter is given: the identity of the resource being
@@ -81,10 +88,11 @@ type RelatedResourcesContext = {
  * How a page teaches the viewer what a kind relates to. Injected rather than
  * looked up, so the knowledge of a kind's relations lives with the page that
  * cares about that kind instead of in a registry the viewer has to carry.
+ *
+ * Always async: every getter reaches the cluster now, if only to fetch the
+ * objects it already knows the identities of.
  */
-type GetRelatedResources = (
-	context: RelatedResourcesContext
-) => RelatedResource[] | Promise<RelatedResource[]>;
+type GetRelatedResources = (context: RelatedResourcesContext) => Promise<RelatedResource[]>;
 
 export type {
 	GetRelatedResources,

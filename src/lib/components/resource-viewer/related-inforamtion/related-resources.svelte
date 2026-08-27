@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { JsonObject } from '@bufbuild/protobuf';
-	import { createClient, type Transport } from '@connectrpc/connect';
-	import { type GetRequest, ResourceService } from '@otterscale/api/resource/v1';
+	import { type Transport } from '@connectrpc/connect';
 	import { type ColumnDef } from '@tanstack/table-core';
 	import lodash from 'lodash';
 	import { getContext } from 'svelte';
@@ -35,7 +34,6 @@
 	} = $props();
 
 	const transport: Transport = getContext('transport');
-	const resourceClient = createClient(ResourceService, transport);
 
 	type RelatedResourceRow = RelatedResource & {
 		id: string;
@@ -102,49 +100,16 @@
 			.map((related) => ({ ...related, id: getRowId(related) }))
 	);
 
-	let statuses: Record<string, Result> = $state({});
-	let statusesAbortController: AbortController | null = null;
-	// Re-fetch statuses whenever the related-resource list changes; a slow batch
-	// of GETs should not resolve over a newer list.
-	$effect(() => {
-		const rows = sortedRelatedResources;
-
-		statusesAbortController?.abort();
-		if (rows.length === 0) {
-			statuses = {};
-			return;
-		}
-
-		const abortController = new AbortController();
-		statusesAbortController = abortController;
-
-		(async () => {
-			const entries = await Promise.all(
-				rows.map(async (row) => {
-					try {
-						const response = await resourceClient.get(
-							{
-								cluster,
-								namespace: row.namespace ?? '',
-								group: row.group,
-								version: row.version,
-								resource: row.resource,
-								name: row.name
-							} as GetRequest,
-							{ signal: abortController.signal }
-						);
-						return [row.id, compute(response.object as KubernetesResource)] as const;
-					} catch {
-						return [row.id, null] as const;
-					}
-				})
-			);
-			if (abortController.signal.aborted) return;
-			statuses = Object.fromEntries(entries) as Record<string, Result>;
-		})();
-
-		return () => abortController.abort();
-	});
+	// Compute a status for every row from the object its getter already fetched.
+	// A row without one is a reference the cluster no longer resolves, so it simply
+	// has no status — there is nothing left here to fetch.
+	const statuses = $derived<Record<string, Result>>(
+		Object.fromEntries(
+			sortedRelatedResources
+				.filter((row) => row.object)
+				.map((row) => [row.id, compute(row.object as KubernetesResource)])
+		)
+	);
 
 	const rows = $derived<RelatedResourceRow[]>(
 		sortedRelatedResources.map((related) => ({

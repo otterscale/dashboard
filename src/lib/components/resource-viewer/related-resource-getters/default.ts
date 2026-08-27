@@ -1,5 +1,5 @@
 import type { GetRelatedResources } from '../types';
 
-const getDefaultRelatedResources: GetRelatedResources = () => [];
+const getDefaultRelatedResources: GetRelatedResources = async () => [];
 
 export { getDefaultRelatedResources };
