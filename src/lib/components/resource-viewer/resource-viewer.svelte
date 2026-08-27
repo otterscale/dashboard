@@ -32,11 +32,11 @@
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
+	import { compute, type KubernetesResource, type Result } from '$lib/utils/kstatus';
 
 	import RelatedInformationTable from './related-information-table.svelte';
 	import { getRelatedResourcesGetter } from './related-resource-getters';
 	import type { RelatedResource } from './types';
-	import { computeStatus, type ResourceObject, type StatusResult } from './utils';
 
 	let {
 		cluster,
@@ -262,7 +262,7 @@
 
 	type RelatedResourceRow = RelatedResource & {
 		id: string;
-		status?: StatusResult;
+		status?: Result;
 	};
 
 	const relatedResourceColumns: ColumnDef<RelatedResourceRow>[] = [
@@ -283,7 +283,7 @@
 			.map((resource) => ({ ...resource, id: getRelatedResourceRowId(resource) }))
 	);
 
-	let relatedResourceStatuses: Record<string, StatusResult> = $state({});
+	let relatedResourceStatuses: Record<string, Result> = $state({});
 	let relatedResourceStatusesAbortController: AbortController | null = null;
 	// Re-fetch statuses whenever the related-resource list changes; a slow batch
 	// of GETs should not resolve over a newer list.
@@ -314,14 +314,14 @@
 							} as GetRequest,
 							{ signal: abortController.signal }
 						);
-						return [row.id, computeStatus(response.object as ResourceObject)] as const;
+						return [row.id, compute(response.object as KubernetesResource)] as const;
 					} catch {
-						return [row.id, { status: undefined, message: undefined } as StatusResult] as const;
+						return [row.id, { status: undefined, message: undefined } as Result] as const;
 					}
 				})
 			);
 			if (abortController.signal.aborted) return;
-			relatedResourceStatuses = Object.fromEntries(entries) as Record<string, StatusResult>;
+			relatedResourceStatuses = Object.fromEntries(entries) as Record<string, Result>;
 		})();
 
 		return () => abortController.abort();
