@@ -8,10 +8,10 @@
 	import * as Table from '$lib/components/ui/table/index.js';
 	import { compute, type KubernetesResource, type Result } from '$lib/utils/kstatus';
 
-	import RelatedInformationTable from '../related-information-table.svelte';
 	import { getRelatedResourcesGetter } from '../related-resource-getters';
 	import type { RelatedResource, Resource } from '../types';
 	import { getResourceURL } from '../utils';
+	import RelatedInformationTable from './table.svelte';
 
 	let {
 		cluster,

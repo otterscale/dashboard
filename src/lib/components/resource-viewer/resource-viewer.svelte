@@ -364,18 +364,31 @@
 		</Field.Set>
 		{#if object}
 			<Field.Set>
-				<Tabs.Root value="related-resource" class="w-full space-y-4">
-					{@const hasEvents = !EVENT_UNSUPPORTED_KINDS.has(kind)}
-					{@const hasConditions = !!lodash.get(schema, 'properties.status.properties.conditions')}
+				{@const hasConditions = !!lodash.get(schema, 'properties.status.properties.conditions')}
+				{@const hasEvents = !EVENT_UNSUPPORTED_KINDS.has(kind)}
+				<Tabs.Root
+					value={hasConditions ? 'condition' : hasEvents ? 'event' : 'related-resource'}
+					class="w-full space-y-2"
+				>
 					<Tabs.List>
-						<Tabs.Trigger value="related-resource">Related Resource</Tabs.Trigger>
-						{#if hasEvents}
-							<Tabs.Trigger value="event">Event</Tabs.Trigger>
-						{/if}
 						{#if hasConditions}
 							<Tabs.Trigger value="condition">Condition</Tabs.Trigger>
 						{/if}
+						{#if hasEvents}
+							<Tabs.Trigger value="event">Event</Tabs.Trigger>
+						{/if}
+						<Tabs.Trigger value="related-resource">Related Resource</Tabs.Trigger>
 					</Tabs.List>
+					{#if hasConditions}
+						<Tabs.Content value="condition">
+							<Conditions {object} />
+						</Tabs.Content>
+					{/if}
+					{#if hasEvents}
+						<Tabs.Content value="event">
+							<Events {cluster} {namespace} {kind} {name} />
+						</Tabs.Content>
+					{/if}
 					<Tabs.Content value="related-resource">
 						<RelatedResources
 							{cluster}
@@ -388,16 +401,6 @@
 							{object}
 						/>
 					</Tabs.Content>
-					{#if hasEvents}
-						<Tabs.Content value="event">
-							<Events {cluster} {namespace} {kind} {name} />
-						</Tabs.Content>
-					{/if}
-					{#if hasConditions}
-						<Tabs.Content value="condition">
-							<Conditions {object} />
-						</Tabs.Content>
-					{/if}
 				</Tabs.Root>
 			</Field.Set>
 		{/if}

@@ -85,7 +85,7 @@
 	const pageNumbers = $derived(Array.from({ length: pageCount }, (_, index) => index + 1));
 </script>
 
-<div class="space-y-3">
+<div class="space-y-4">
 	<div class="flex items-center gap-2">
 		<InputGroup.Root>
 			<InputGroup.Addon>

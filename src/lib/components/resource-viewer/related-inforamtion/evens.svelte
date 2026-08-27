@@ -8,8 +8,8 @@
 
 	import * as Table from '$lib/components/ui/table/index.js';
 
-	import RelatedInformationTable from '../related-information-table.svelte';
 	import { formatTimestamp, getResourceURL } from '../utils';
+	import RelatedInformationTable from './table.svelte';
 
 	let {
 		cluster,

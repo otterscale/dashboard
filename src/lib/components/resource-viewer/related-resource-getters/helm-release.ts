@@ -8,46 +8,57 @@ import {
 } from '@otterscale/api/resource/v1';
 import lodash from 'lodash';
 
-import type { GetRelatedResources, RelatedResource } from '../types';
+import type { GetRelatedResources, RelatedResource, RelatedResourceClass } from '../types';
 
 /** One object Helm applied, as Flux records it in `status.inventory`. */
 type InventoryEntry = { id?: string; v?: string };
 
+/** A `spec.chart.spec.sourceRef` or `spec.dependsOn` entry: named, sometimes with a kind and namespace. */
+type ObjectReference = { kind?: string; name?: string; namespace?: string };
+
 /**
- * What the cluster serves, by `group/kind`. An inventory entry names a group and
- * a kind; a link needs the version and the plural resource too, and discovery is
- * what knows them.
+ * The source kinds a HelmRelease's `spec.chart.spec.sourceRef` can name. Flux
+ * treats a reference that omits its kind as a HelmRepository.
  */
-function groupAPIResourcesByGroupKind(apiResources: APIResource[]): Map<string, APIResource[]> {
-	const groupedAPIResources = new Map<string, APIResource[]>();
-	for (const apiResource of apiResources) {
-		// Subresources (`pods/log`) are not something to link to.
-		if (apiResource.resource.includes('/')) continue;
-		const key = `${apiResource.group}/${apiResource.kind}`;
-		groupedAPIResources.set(key, [...(groupedAPIResources.get(key) ?? []), apiResource]);
+const chartSourceIdentifiers: Record<string, RelatedResourceClass> = {
+	HelmRepository: {
+		group: 'source.toolkit.fluxcd.io',
+		version: 'v1',
+		kind: 'HelmRepository',
+		resource: 'helmrepositories'
+	},
+	GitRepository: {
+		group: 'source.toolkit.fluxcd.io',
+		version: 'v1',
+		kind: 'GitRepository',
+		resource: 'gitrepositories'
+	},
+	Bucket: {
+		group: 'source.toolkit.fluxcd.io',
+		version: 'v1',
+		kind: 'Bucket',
+		resource: 'buckets'
 	}
-	return groupedAPIResources;
-}
+};
+
+/** What every `spec.dependsOn` entry points at — another HelmRelease that must be ready first. */
+const helmReleaseIdentifier: RelatedResourceClass = {
+	group: 'helm.toolkit.fluxcd.io',
+	version: 'v2',
+	kind: 'HelmRelease',
+	resource: 'helmreleases'
+};
 
 /**
- * A HelmRelease's relations are the objects Helm applied, which Flux lists in
- * `status.inventory` — but as `namespace_name_group_kind`, so each entry needs
- * discovery before it can become a link. Each one is then fetched, the same as
- * every other getter, so the section has the object and not just a link to it.
+ * The identities the inventory entries resolve to. Discovery turns each
+ * `namespace_name_group_kind` id into a linkable group/version/resource; an
+ * entry whose kind the cluster no longer serves is dropped.
  */
-const getHelmReleaseRelatedResources: GetRelatedResources = async ({
-	cluster,
-	object,
-	transport,
-	signal
-}) => {
-	const entries = (lodash.get(object, ['status', 'inventory', 'entries']) ??
-		[]) as InventoryEntry[];
-	if (entries.length === 0) return [];
-
-	const resourceClient = createClient(ResourceService, transport);
-	const response = await resourceClient.discovery({ cluster } as DiscoveryRequest, { signal });
-	const apiResourcesByGroupKind = groupAPIResourcesByGroupKind(response.apiResources);
+function resolveInventoryIdentities(
+	entries: InventoryEntry[],
+	apiResources: APIResource[]
+): RelatedResource[] {
+	const apiResourcesByGroupKind = groupAPIResourcesByGroupKind(apiResources);
 
 	function findAPIResource(
 		entryGroup: string,
@@ -60,7 +71,7 @@ const getHelmReleaseRelatedResources: GetRelatedResources = async ({
 		return candidates.find((candidate) => candidate.version === entryVersion) ?? candidates[0];
 	}
 
-	const identities = entries.flatMap((entry) => {
+	return entries.flatMap((entry) => {
 		// Flux encodes each applied object as `namespace_name_group_kind`, with an
 		// empty group for core resources and an empty namespace for cluster-scoped
 		// ones. None of the four parts can itself contain an underscore.
@@ -90,6 +101,85 @@ const getHelmReleaseRelatedResources: GetRelatedResources = async ({
 			} satisfies RelatedResource
 		];
 	});
+}
+
+/**
+ * What the cluster serves, by `group/kind`. An inventory entry names a group and
+ * a kind; a link needs the version and the plural resource too, and discovery is
+ * what knows them.
+ */
+function groupAPIResourcesByGroupKind(apiResources: APIResource[]): Map<string, APIResource[]> {
+	const groupedAPIResources = new Map<string, APIResource[]>();
+	for (const apiResource of apiResources) {
+		// Subresources (`pods/log`) are not something to link to.
+		if (apiResource.resource.includes('/')) continue;
+		const key = `${apiResource.group}/${apiResource.kind}`;
+		groupedAPIResources.set(key, [...(groupedAPIResources.get(key) ?? []), apiResource]);
+	}
+	return groupedAPIResources;
+}
+
+/**
+ * A HelmRelease's relations are the objects Helm applied, which Flux lists in
+ * `status.inventory` — but as `namespace_name_group_kind`, so each entry needs
+ * discovery before it can become a link. It also names its chart source in
+ * `spec.chart.spec.sourceRef` and the releases it waits on in `spec.dependsOn`,
+ * and those identities come straight off the object. Each relation is then
+ * fetched, the same as every other getter, so the section has the object and not
+ * just a link to it.
+ */
+const getHelmReleaseRelatedResources: GetRelatedResources = async ({
+	cluster,
+	namespace,
+	object,
+	transport,
+	signal
+}) => {
+	const resourceClient = createClient(ResourceService, transport);
+
+	// `spec.chart.spec.sourceRef` names the chart's source; a missing kind means a
+	// HelmRepository. `spec.dependsOn` lists other HelmReleases that must be ready
+	// first. Both default a missing namespace to the release's own.
+	const specIdentities: RelatedResource[] = [];
+
+	const sourceRef = lodash.get(object, ['spec', 'chart', 'spec', 'sourceRef']) as
+		| ObjectReference
+		| undefined;
+	if (sourceRef?.name) {
+		const identifier =
+			chartSourceIdentifiers[sourceRef.kind ?? 'HelmRepository'] ??
+			chartSourceIdentifiers.HelmRepository;
+		specIdentities.push({
+			...identifier,
+			name: sourceRef.name,
+			namespace: sourceRef.namespace ?? namespace
+		});
+	}
+
+	const dependsOn = (lodash.get(object, ['spec', 'dependsOn']) ?? []) as ObjectReference[];
+	for (const dependency of dependsOn) {
+		if (!dependency?.name) continue;
+		specIdentities.push({
+			...helmReleaseIdentifier,
+			name: dependency.name,
+			namespace: dependency.namespace ?? namespace
+		});
+	}
+
+	const entries = (lodash.get(object, ['status', 'inventory', 'entries']) ??
+		[]) as InventoryEntry[];
+
+	// Only the inventory needs discovery, and only when it has entries to resolve.
+	const inventoryIdentities =
+		entries.length === 0
+			? []
+			: resolveInventoryIdentities(
+					entries,
+					(await resourceClient.discovery({ cluster } as DiscoveryRequest, { signal })).apiResources
+				);
+
+	const identities = [...specIdentities, ...inventoryIdentities];
+	if (identities.length === 0) return [];
 
 	return Promise.all(
 		identities.map(async (identity) => {
