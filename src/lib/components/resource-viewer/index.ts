@@ -4,7 +4,7 @@ export { getRelatedResourcesGetter } from './related-resource-getters';
 export type {
 	GetRelatedResources,
 	RelatedResource,
-	RelatedResourceIdentifier,
+	RelatedResourceClass,
 	RelatedResourcesContext
 } from './types';
 export { ResourceViewer };

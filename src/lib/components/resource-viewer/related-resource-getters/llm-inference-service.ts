@@ -1,7 +1,7 @@
 import { createClient } from '@connectrpc/connect';
 import { type ListRequest, ResourceService } from '@otterscale/api/resource/v1';
 
-import type { GetRelatedResources, RelatedResource, RelatedResourceIdentifier } from '../types';
+import type { GetRelatedResources, RelatedResource, RelatedResourceClass } from '../types';
 
 /** The identity of a listed object — all the linking needs from an item. */
 type ListedObject = { metadata?: { name?: string; namespace?: string } };
@@ -10,7 +10,7 @@ type ListedObject = { metadata?: { name?: string; namespace?: string } };
  * What the controller creates for a service. Nothing on the object names these,
  * so each kind has to be listed for.
  */
-const relatedResourceIdentifiers: RelatedResourceIdentifier[] = [
+const relatedResourceIdentifiers: RelatedResourceClass[] = [
 	{ group: 'apps', version: 'v1', kind: 'Deployment', resource: 'deployments' },
 	{
 		group: 'leaderworkerset.x-k8s.io',
@@ -51,7 +51,7 @@ const getLLMInferenceServiceRelatedResources: GetRelatedResources = async ({
 	const resourceClient = createClient(ResourceService, transport);
 	const labelSelector = `app.kubernetes.io/part-of=llminferenceservice,app.kubernetes.io/name=${name}`;
 
-	async function list(identifier: RelatedResourceIdentifier): Promise<RelatedResource[]> {
+	async function list(identifier: RelatedResourceClass): Promise<RelatedResource[]> {
 		try {
 			const response = await resourceClient.list(
 				{

@@ -1,6 +1,6 @@
 import lodash from 'lodash';
 
-import type { GetRelatedResources, RelatedResource, RelatedResourceIdentifier } from '../types';
+import type { GetRelatedResources, RelatedResource, RelatedResourceClass } from '../types';
 
 /** A reference as a Workspace writes it into `status`. */
 type ResourceReference = { name?: string; namespace?: string };
@@ -11,7 +11,7 @@ type ResourceReference = { name?: string; namespace?: string };
  * from this map is something other than a reference (`conditions`, `phase`) and
  * is skipped rather than linked to.
  */
-const statusResourceReferenceIdentifiers: Record<string, RelatedResourceIdentifier> = {
+const statusResourceReferenceIdentifiers: Record<string, RelatedResourceClass> = {
 	namespaceRef: {
 		group: '',
 		version: 'v1',

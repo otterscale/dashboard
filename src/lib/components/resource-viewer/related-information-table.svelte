@@ -22,7 +22,7 @@
 	import * as InputGroup from '$lib/components/ui/input-group/index.js';
 	import * as Table from '$lib/components/ui/table/index.js';
 
-	import Spinner from '../ui/spinner/spinner.svelte';
+	import Spinner from '$lib/components/ui/spinner/spinner.svelte';
 
 	let {
 		data,

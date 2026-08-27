@@ -1,27 +1,22 @@
 <script lang="ts">
-	import type { JsonObject } from '@bufbuild/protobuf';
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import { FileIcon } from '@lucide/svelte';
 	import Ban from '@lucide/svelte/icons/ban';
 	import Layers from '@lucide/svelte/icons/layers';
 	import {
 		type GetRequest,
-		type ListRequest,
 		ResourceService,
 		type SchemaRequest,
 		WatchEvent_Type,
 		type WatchRequest
 	} from '@otterscale/api/resource/v1';
 	import type { Schema } from '@sjsf/form';
-	import { type ColumnDef } from '@tanstack/table-core';
 	import lodash from 'lodash';
 	import { mode as themeMode } from 'mode-watcher';
 	import { getContext, onDestroy, onMount } from 'svelte';
 	import Monaco from 'svelte-monaco';
 	import { stringify } from 'yaml';
 
-	import { resolve } from '$app/paths';
-	import { page } from '$app/state';
 	import CopyButton from '$lib/components/custom/copy-button/copy-button.svelte';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Button, buttonVariants } from '$lib/components/ui/button';
@@ -30,13 +25,12 @@
 	import * as Item from '$lib/components/ui/item';
 	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
-	import * as Table from '$lib/components/ui/table/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
-	import { compute, type KubernetesResource, type Result } from '$lib/utils/kstatus';
 
-	import RelatedInformationTable from './related-information-table.svelte';
-	import { getRelatedResourcesGetter } from './related-resource-getters';
-	import type { RelatedResource } from './types';
+	import ConditionTab from './related-inforamtion/conditions.svelte';
+	import EventTab from './related-inforamtion/evens.svelte';
+	import RelatedResourceTab from './related-inforamtion/related-resources.svelte';
+	import type { Resource } from './types';
 
 	let {
 		cluster,
@@ -56,11 +50,6 @@
 		name: string;
 	} = $props();
 
-	const transport: Transport = getContext('transport');
-	const resourceClient = createClient(ResourceService, transport);
-
-	// Kinds that never receive Kubernetes Events; there's no schema field to
-	// detect this from, so it's hardcoded.
 	const EVENT_UNSUPPORTED_KINDS = new Set([
 		'ClusterRoleBinding',
 		'ClusterRole',
@@ -73,9 +62,10 @@
 		'Secret'
 	]);
 
-	type ViewerError = { name?: string; rawMessage?: string; message?: string };
+	const transport: Transport = getContext('transport');
+	const resourceClient = createClient(ResourceService, transport);
 
-	let object: ResourceObject | undefined = $state(undefined);
+	let object: Resource | undefined = $state(undefined);
 	let error: ViewerError | null = $state(null);
 
 	let schema: Schema | undefined = $state(undefined);
@@ -99,14 +89,9 @@
 	);
 	const showEventTab = $derived(!EVENT_UNSUPPORTED_KINDS.has(kind));
 
-	function formatTimestamp(value: string): string {
-		return value ? new Date(value).toLocaleString('sv-SE') : '—';
-	}
-
 	let isGetting = $state(false);
 	let getAbortController: AbortController | null = null;
 	async function GetResource() {
-		console.log('get');
 		if (isGetting || isDestroyed) return;
 
 		isGetting = true;
@@ -124,7 +109,7 @@
 				} as GetRequest,
 				{ signal: getAbortController?.signal }
 			);
-			object = getResponse.object;
+			object = getResponse.object as ResourceObject | undefined;
 		} catch (e) {
 			error = e as Error;
 		} finally {
@@ -195,278 +180,7 @@
 
 	const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-	function getResourceURL(target: {
-		group: string;
-		version: string;
-		kind: string;
-		resource: string;
-		name: string;
-		namespace?: string;
-	}): string {
-		const searchParameters = new URLSearchParams({
-			group: target.group,
-			version: target.version,
-			kind: target.kind,
-			resource: target.resource,
-			...(target.namespace ? { namespace: target.namespace } : {}),
-			query: `Name:${target.name}`
-		});
-		return resolve(`/(auth)/${page.params.cluster}/${page.params.workspace}?${searchParameters}`);
-	}
-
-	// --- Related resources tab ---
-
-	function getRelatedResourceURL(relatedResource: RelatedResource): string {
-		return getResourceURL(relatedResource);
-	}
-
-	const getRelatedResources = $derived(getRelatedResourcesGetter(resource));
-	let relatedResources: RelatedResource[] = $state([]);
-	// Re-run whenever the object changes — a watch event can add or drop a
-	// relation — and drop whatever the previous run was still doing, so a slow
-	// getter cannot resolve over a newer one.
-	$effect(() => {
-		const currentObject = object;
-		if (!getRelatedResources || !currentObject) {
-			relatedResources = [];
-			return;
-		}
-
-		const abortController = new AbortController();
-		(async () => {
-			try {
-				const resources = await getRelatedResources({
-					cluster,
-					group,
-					version,
-					kind,
-					resource,
-					namespace,
-					name,
-					object: currentObject,
-					transport,
-					signal: abortController.signal
-				});
-				if (abortController.signal.aborted) return;
-				relatedResources = resources;
-			} catch (e) {
-				// A getter that fails should cost the section its links, not the page.
-				if (abortController.signal.aborted) return;
-				console.error('Failed to get related resources:', e);
-				relatedResources = [];
-			}
-		})();
-
-		return () => abortController.abort();
-	});
-
-	type RelatedResourceRow = RelatedResource & {
-		id: string;
-		status?: Result;
-	};
-
-	const relatedResourceColumns: ColumnDef<RelatedResourceRow>[] = [
-		{ accessorKey: 'group' },
-		{ accessorKey: 'version' },
-		{ accessorKey: 'resource' },
-		{ accessorKey: 'name' },
-		{ accessorKey: 'namespace' },
-		{ accessorKey: 'status' }
-	];
-	function getRelatedResourceRowId(row: RelatedResource): string {
-		return `${row.group}/${row.version}/${row.resource}/${row.namespace ?? ''}/${row.name}`;
-	}
-
-	const sortedRelatedResources = $derived<(RelatedResource & { id: string })[]>(
-		lodash
-			.sortBy(relatedResources, ['group', 'version', 'resource', 'namespace', 'name'])
-			.map((resource) => ({ ...resource, id: getRelatedResourceRowId(resource) }))
-	);
-
-	let relatedResourceStatuses: Record<string, Result> = $state({});
-	let relatedResourceStatusesAbortController: AbortController | null = null;
-	// Re-fetch statuses whenever the related-resource list changes; a slow batch
-	// of GETs should not resolve over a newer list.
-	$effect(() => {
-		const rows = sortedRelatedResources;
-
-		relatedResourceStatusesAbortController?.abort();
-		if (rows.length === 0) {
-			relatedResourceStatuses = {};
-			return;
-		}
-
-		const abortController = new AbortController();
-		relatedResourceStatusesAbortController = abortController;
-
-		(async () => {
-			const entries = await Promise.all(
-				rows.map(async (row) => {
-					try {
-						const response = await resourceClient.get(
-							{
-								cluster,
-								namespace: row.namespace ?? '',
-								group: row.group,
-								version: row.version,
-								resource: row.resource,
-								name: row.name
-							} as GetRequest,
-							{ signal: abortController.signal }
-						);
-						return [row.id, compute(response.object as KubernetesResource)] as const;
-					} catch {
-						return [row.id, { status: undefined, message: undefined } as Result] as const;
-					}
-				})
-			);
-			if (abortController.signal.aborted) return;
-			relatedResourceStatuses = Object.fromEntries(entries) as Record<string, Result>;
-		})();
-
-		return () => abortController.abort();
-	});
-
-	const relatedResourceRows = $derived<RelatedResourceRow[]>(
-		sortedRelatedResources.map((resource) => ({
-			...resource,
-			status: lodash.get(relatedResourceStatuses, resource.id, undefined)
-		}))
-	);
-
-	// --- Event tab ---
-
-	type EventRow = {
-		id: string;
-		name: string;
-		type: string;
-		reason: string;
-		message: string;
-		count: number;
-		lastSeen: string;
-	};
-
-	let events: EventRow[] = $state([]);
-
-	function getEventResourceURL(event: EventRow): string {
-		return getResourceURL({
-			group: '',
-			version: 'v1',
-			kind: 'Event',
-			resource: 'events',
-			name: event.name,
-			namespace
-		});
-	}
-
-	function toEventRow(eventObject: JsonObject, index: number): EventRow {
-		return {
-			id: (lodash.get(eventObject, 'metadata.uid') as string) ?? String(index),
-			name: (lodash.get(eventObject, 'metadata.name') as string) ?? '',
-			type: (lodash.get(eventObject, 'type') as string) ?? 'Normal',
-			reason: (lodash.get(eventObject, 'reason') as string) ?? '—',
-			message: (lodash.get(eventObject, 'message') as string) ?? '—',
-			count:
-				(lodash.get(eventObject, 'count') as number) ??
-				(lodash.get(eventObject, 'series.count') as number) ??
-				1,
-			lastSeen:
-				(lodash.get(eventObject, 'lastTimestamp') as string) ??
-				(lodash.get(eventObject, 'eventTime') as string) ??
-				(lodash.get(eventObject, 'metadata.creationTimestamp') as string) ??
-				''
-		};
-	}
-
-	// Kubernetes' own field selector, not a client-side filter: events for every other
-	// object in the namespace never cross the wire.
-	function buildEventFieldSelector(): string {
-		const selectors = [`involvedObject.name=${name}`, `involvedObject.kind=${kind}`];
-		if (namespace) selectors.push(`involvedObject.namespace=${namespace}`);
-		return selectors.join(',');
-	}
-
-	let eventsAbortController: AbortController | null = null;
-	async function fetchEvents() {
-		eventsAbortController?.abort();
-		const currentAbortController = new AbortController();
-		eventsAbortController = currentAbortController;
-
-		try {
-			const response = await resourceClient.list(
-				{
-					cluster,
-					namespace,
-					group: '',
-					version: 'v1',
-					resource: 'events',
-					fieldSelector: buildEventFieldSelector()
-				} as ListRequest,
-				{ signal: currentAbortController.signal }
-			);
-			if (currentAbortController.signal.aborted) return;
-			events = response.items
-				.map((item, index) => toEventRow(item.object as JsonObject, index))
-				.sort((a, b) => (a.lastSeen < b.lastSeen ? 1 : -1));
-		} catch (e) {
-			if (currentAbortController.signal.aborted) return;
-			console.error('Failed to list events:', e);
-			events = [];
-		}
-	}
-
-	$effect(() => {
-		if (!showEventTab) return;
-		void namespace;
-		void kind;
-		void name;
-		fetchEvents();
-	});
-
-	const eventColumns: ColumnDef<EventRow>[] = [
-		{ accessorKey: 'name' },
-		{ accessorKey: 'type' },
-		{ accessorKey: 'reason' },
-		{ accessorKey: 'message' },
-		{ accessorKey: 'count' },
-		{ accessorKey: 'lastSeen' }
-	];
-
-	// --- Condition tab ---
-
-	type ConditionRow = {
-		id: string;
-		type: string;
-		status: string;
-		reason: string;
-		message: string;
-		lastTransitionTime: string;
-	};
-
-	const conditions = $derived.by<ConditionRow[]>(() => {
-		const raw = lodash.get(object, 'status.conditions');
-		if (!Array.isArray(raw)) return [];
-		return raw.map((condition, index) => ({
-			id: `${lodash.get(condition, 'type') ?? index}`,
-			type: (lodash.get(condition, 'type') as string) ?? '—',
-			status: (lodash.get(condition, 'status') as string) ?? undefined,
-			reason: (lodash.get(condition, 'reason') as string) ?? '—',
-			message: (lodash.get(condition, 'message') as string) ?? '—',
-			lastTransitionTime: (lodash.get(condition, 'lastTransitionTime') as string) ?? ''
-		}));
-	});
-
-	// --- YAML tab ---
-
 	const objectYaml = $derived(object ? stringify(object) : '');
-
-	const conditionColumns: ColumnDef<ConditionRow>[] = [
-		{ accessorKey: 'type' },
-		{ accessorKey: 'status' },
-		{ accessorKey: 'reason' },
-		{ accessorKey: 'message' },
-		{ accessorKey: 'lastTransitionTime' }
-	];
 
 	let isMounted = $state(false);
 	onMount(async () => {
@@ -486,7 +200,6 @@
 		if (watchAbortController) {
 			watchAbortController.abort();
 		}
-		eventsAbortController?.abort();
 	});
 </script>
 
@@ -669,97 +382,25 @@
 						{/if}
 					</Tabs.List>
 					<Tabs.Content value="related-resource">
-						<RelatedInformationTable data={relatedResourceRows} columns={relatedResourceColumns}>
-							{#snippet header()}
-								<Table.Row>
-									<Table.Head>Group</Table.Head>
-									<Table.Head>Version</Table.Head>
-									<Table.Head>Resource</Table.Head>
-									<Table.Head>Name</Table.Head>
-									<Table.Head>Namespace</Table.Head>
-									<Table.Head>Status</Table.Head>
-								</Table.Row>
-							{/snippet}
-							{#snippet row(relatedResource)}
-								<Table.Row>
-									<Table.Cell>{relatedResource.group || 'core'}</Table.Cell>
-									<Table.Cell>{relatedResource.version}</Table.Cell>
-									<Table.Cell>{relatedResource.resource}</Table.Cell>
-									<Table.Cell>
-										<!-- eslint-disable svelte/no-navigation-without-resolve -->
-										<a
-											href={getRelatedResourceURL(relatedResource)}
-											target="_blank"
-											rel="noopener noreferrer"
-											class="hover:underline"
-										>
-											{relatedResource.name}
-										</a>
-									</Table.Cell>
-									<Table.Cell>{relatedResource.namespace}</Table.Cell>
-									<Table.Cell>{relatedResource.status?.status}</Table.Cell>
-								</Table.Row>
-							{/snippet}
-						</RelatedInformationTable>
+						<RelatedResourceTab
+							{cluster}
+							{namespace}
+							{group}
+							{version}
+							{kind}
+							{resource}
+							{name}
+							{object}
+						/>
 					</Tabs.Content>
 					{#if showEventTab}
 						<Tabs.Content value="event">
-							<RelatedInformationTable data={events} columns={eventColumns}>
-								{#snippet header()}
-									<Table.Row>
-										<Table.Head>Name</Table.Head>
-										<Table.Head>Type</Table.Head>
-										<Table.Head>Reason</Table.Head>
-										<Table.Head>Message</Table.Head>
-										<Table.Head>Count</Table.Head>
-										<Table.Head>Last Seen</Table.Head>
-									</Table.Row>
-								{/snippet}
-								{#snippet row(event)}
-									<Table.Row>
-										<Table.Cell>
-											<!-- eslint-disable svelte/no-navigation-without-resolve -->
-											<a
-												href={getEventResourceURL(event)}
-												target="_blank"
-												rel="noopener noreferrer"
-												class="hover:underline"
-											>
-												{event.name}
-											</a>
-										</Table.Cell>
-										<Table.Cell>{event.type}</Table.Cell>
-										<Table.Cell>{event.reason}</Table.Cell>
-										<Table.Cell title={event.message}>{event.message}</Table.Cell>
-										<Table.Cell>{event.count}</Table.Cell>
-										<Table.Cell>{formatTimestamp(event.lastSeen)}</Table.Cell>
-									</Table.Row>
-								{/snippet}
-							</RelatedInformationTable>
+							<EventTab {cluster} {namespace} {kind} {name} />
 						</Tabs.Content>
 					{/if}
 					{#if showConditionTab}
 						<Tabs.Content value="condition">
-							<RelatedInformationTable data={conditions} columns={conditionColumns}>
-								{#snippet header()}
-									<Table.Row>
-										<Table.Head>Type</Table.Head>
-										<Table.Head>Status</Table.Head>
-										<Table.Head>Reason</Table.Head>
-										<Table.Head>Message</Table.Head>
-										<Table.Head>Last Transition</Table.Head>
-									</Table.Row>
-								{/snippet}
-								{#snippet row(condition)}
-									<Table.Row>
-										<Table.Cell>{condition.type}</Table.Cell>
-										<Table.Cell>{condition.status}</Table.Cell>
-										<Table.Cell>{condition.reason}</Table.Cell>
-										<Table.Cell title={condition.message}>{condition.message}</Table.Cell>
-										<Table.Cell>{formatTimestamp(condition.lastTransitionTime)}</Table.Cell>
-									</Table.Row>
-								{/snippet}
-							</RelatedInformationTable>
+							<ConditionTab {object} />
 						</Tabs.Content>
 					{/if}
 				</Tabs.Root>

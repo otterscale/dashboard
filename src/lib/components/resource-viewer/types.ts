@@ -2,6 +2,30 @@ import type { JsonObject } from '@bufbuild/protobuf';
 import type { Transport } from '@connectrpc/connect';
 
 /**
+ * The fetched resource, narrowed to the fields the viewer and its tabs actually
+ * read. It still carries an open index signature because getters and `compute`
+ * treat it as an arbitrary object.
+ */
+type Resource = {
+	apiVersion?: string;
+	kind?: string;
+	metadata?: {
+		name?: string;
+		namespace?: string;
+		uid?: string;
+		creationTimestamp?: string;
+		generation?: number;
+		resourceVersion?: string;
+		labels?: Record<string, string>;
+		annotations?: Record<string, string>;
+	};
+	status?: {
+		conditions?: unknown;
+	};
+	[key: string]: unknown;
+};
+
+/**
  * A resource worth linking to from another resource's page.
  *
  * `kind` and `namespaced` are carried rather than looked up because the link is
@@ -27,7 +51,7 @@ type RelatedResource = {
  * A related resource kind, before whatever names it has are known — what a
  * getter pairs with each name it reads off an object or a listing.
  */
-type RelatedResourceIdentifier = Omit<RelatedResource, 'name' | 'namespace'>;
+type RelatedResourceClass = Omit<RelatedResource, 'name' | 'namespace'>;
 
 /**
  * What a related-resources getter is given: the identity of the resource being
@@ -65,6 +89,7 @@ type GetRelatedResources = (
 export type {
 	GetRelatedResources,
 	RelatedResource,
-	RelatedResourceIdentifier,
-	RelatedResourcesContext
+	RelatedResourceClass,
+	RelatedResourcesContext,
+	Resource
 };
