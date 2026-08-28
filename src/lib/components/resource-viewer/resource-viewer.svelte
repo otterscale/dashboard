@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { FileIcon } from '@lucide/svelte';
+	import { ListIcon } from '@lucide/svelte';
 	import Ban from '@lucide/svelte/icons/ban';
 	import Layers from '@lucide/svelte/icons/layers';
 	import {
@@ -12,22 +12,21 @@
 	} from '@otterscale/api/resource/v1';
 	import type { Schema } from '@sjsf/form';
 	import lodash from 'lodash';
-	import { mode as themeMode } from 'mode-watcher';
 	import { getContext, onDestroy, onMount } from 'svelte';
-	import Monaco from 'svelte-monaco';
-	import { stringify } from 'yaml';
 
-	import CopyButton from '$lib/components/custom/copy-button/copy-button.svelte';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Button, buttonVariants } from '$lib/components/ui/button';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as Item from '$lib/components/ui/item';
-	import * as Sheet from '$lib/components/ui/sheet/index.js';
+	import * as Select from '$lib/components/ui/select/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
+	import { cn } from '$lib/utils';
 
 	import Conditions from './related-inforamtion/conditions.svelte';
+	import Yaml from './related-inforamtion/data.svelte';
 	import Events from './related-inforamtion/evens.svelte';
 	import RelatedResources from './related-inforamtion/related-resources.svelte';
 	import type { Resource } from './types';
@@ -173,7 +172,21 @@
 
 	const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-	const objectYaml = $derived(object ? stringify(object) : '');
+	const hasConditions = $derived(!!lodash.get(schema, 'properties.status.properties.conditions'));
+	const hasEvents = $derived(!EVENT_UNSUPPORTED_KINDS.has(kind));
+
+	let selectedRelatedInformation = $state({
+		value: 'related-resource',
+		label: 'Related Resources'
+	});
+	const relatedInformations = $derived(
+		[
+			{ value: 'data', label: 'Data' },
+			hasConditions ? { value: 'condition', label: 'Conditions' } : null,
+			hasEvents ? { value: 'event', label: 'Recent Events' } : null,
+			{ value: 'related-resource', label: 'Related Resources' }
+		].filter(Boolean)
+	);
 
 	let isMounted = $state(false);
 	onMount(async () => {
@@ -260,8 +273,8 @@
 			</div>
 		</Empty.Content>
 	</Empty.Root>
-{:else}
-	<Field.Group class="pb-8">
+{:else if object}
+	<Field.Group class="space-y-4 pb-8">
 		<Field.Set>
 			<!-- Header -->
 			<Item.Root class="w-full p-0">
@@ -277,44 +290,28 @@
 					</Item.Title>
 				</Item.Content>
 				<Item.Actions>
-					<Sheet.Root>
-						<Sheet.Trigger class={buttonVariants({ size: 'icon', variant: 'ghost' })}>
-							<FileIcon />
-						</Sheet.Trigger>
-						<Sheet.Content class="h-full min-w-[50vw] p-6">
-							<Item.Root class="p-0">
-								<Item.Content>
-									<Item.Title>
-										{#if namespace}
-											{namespace}/{name}
-										{:else}
-											{name}
-										{/if}
-									</Item.Title>
-									<Item.Description>{group}.{version}.{resource}</Item.Description>
-								</Item.Content>
-								<Item.Actions>
-									<CopyButton text={stringify(object)} />
-								</Item.Actions>
-							</Item.Root>
-							<div class="mt-auto h-[90vh] overflow-hidden rounded-lg">
-								<Monaco
-									options={{
-										language: 'yaml',
-										readOnly: true,
-										folding: true,
-										foldingStrategy: 'indentation',
-										minimap: { enabled: false },
-										scrollBeyondLastLine: false,
-										automaticLayout: true,
-										padding: { top: 8, bottom: 8 }
-									}}
-									theme={themeMode.current === 'dark' ? 'vs-dark' : 'vs'}
-									value={objectYaml}
-								/>
-							</div>
-						</Sheet.Content>
-					</Sheet.Root>
+					<DropdownMenu.Root>
+						<DropdownMenu.Trigger>
+							{#snippet child({ props })}
+								<Button {...props} variant="ghost">
+									<ListIcon />
+								</Button>
+							{/snippet}
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Content align="end" class="w-fit">
+							<DropdownMenu.Group>
+								{#each relatedInformations as relatedInformation (relatedInformation.value)}
+									<DropdownMenu.Item
+										onSelect={() => {
+											selectedRelatedInformation = relatedInformation;
+										}}
+									>
+										{relatedInformation.label}
+									</DropdownMenu.Item>
+								{/each}
+							</DropdownMenu.Group>
+						</DropdownMenu.Content>
+					</DropdownMenu.Root>
 				</Item.Actions>
 			</Item.Root>
 			<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
@@ -362,47 +359,34 @@
 				{/if}
 			</div>
 		</Field.Set>
-		{#if object}
-			<Field.Set>
-				{@const hasConditions = !!lodash.get(schema, 'properties.status.properties.conditions')}
-				{@const hasEvents = !EVENT_UNSUPPORTED_KINDS.has(kind)}
-				<Tabs.Root
-					value={hasConditions ? 'condition' : hasEvents ? 'event' : 'related-resource'}
-					class="w-full space-y-2"
-				>
-					<Tabs.List>
-						{#if hasConditions}
-							<Tabs.Trigger value="condition">Condition</Tabs.Trigger>
-						{/if}
-						{#if hasEvents}
-							<Tabs.Trigger value="event">Event</Tabs.Trigger>
-						{/if}
-						<Tabs.Trigger value="related-resource">Related Resource</Tabs.Trigger>
-					</Tabs.List>
-					{#if hasConditions}
-						<Tabs.Content value="condition">
-							<Conditions {object} />
-						</Tabs.Content>
-					{/if}
-					{#if hasEvents}
-						<Tabs.Content value="event">
-							<Events {cluster} {namespace} {kind} {name} />
-						</Tabs.Content>
-					{/if}
-					<Tabs.Content value="related-resource">
-						<RelatedResources
-							{cluster}
-							{namespace}
-							{group}
-							{version}
-							{kind}
-							{resource}
-							{name}
-							{object}
-						/>
+		<Field.Set>
+			<Tabs.Root value={selectedRelatedInformation.value} class="w-full">
+				<Tabs.Content value="data">
+					<Yaml {object} />
+				</Tabs.Content>
+				{#if hasConditions}
+					<Tabs.Content value="condition">
+						<Conditions {object} />
 					</Tabs.Content>
-				</Tabs.Root>
-			</Field.Set>
-		{/if}
+				{/if}
+				{#if hasEvents}
+					<Tabs.Content value="event">
+						<Events {cluster} {namespace} {kind} {name} />
+					</Tabs.Content>
+				{/if}
+				<Tabs.Content value="related-resource">
+					<RelatedResources
+						{cluster}
+						{namespace}
+						{group}
+						{version}
+						{kind}
+						{resource}
+						{name}
+						{object}
+					/>
+				</Tabs.Content>
+			</Tabs.Root>
+		</Field.Set>
 	</Field.Group>
 {/if}
