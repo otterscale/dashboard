@@ -142,12 +142,7 @@
 		<Table.Row>
 			<Table.Cell>
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
-				<a
-					href={getEventResourceURL(event)}
-					target="_blank"
-					rel="noopener noreferrer"
-					class="hover:underline"
-				>
+				<a href={getEventResourceURL(event)} rel="noopener noreferrer" class="hover:underline">
 					{event.name}
 				</a>
 			</Table.Cell>

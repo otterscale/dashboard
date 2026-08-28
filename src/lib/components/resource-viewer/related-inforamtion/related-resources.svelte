@@ -136,12 +136,7 @@
 			<Table.Cell>{relatedResource.resource}</Table.Cell>
 			<Table.Cell>
 				<!-- eslint-disable svelte/no-navigation-without-resolve -->
-				<a
-					href={getResourceURL(relatedResource)}
-					target="_blank"
-					rel="noopener noreferrer"
-					class="hover:underline"
-				>
+				<a href={getResourceURL(relatedResource)} rel="noopener noreferrer" class="hover:underline">
 					{relatedResource.name}
 				</a>
 			</Table.Cell>
