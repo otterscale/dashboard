@@ -56,7 +56,8 @@ function getRelatedResourcesGetter(resource: string): GetRelatedResources {
 	if (resource === 'workspaces') return withDefaultRelatedResources(getWorkspaceRelatedResources);
 	if (resource === 'llminferenceservices')
 		return withDefaultRelatedResources(getLLMInferenceServiceRelatedResources);
-	if (resource === 'helmreleases') return withDefaultRelatedResources(getHelmReleaseRelatedResources);
+	if (resource === 'helmreleases')
+		return withDefaultRelatedResources(getHelmReleaseRelatedResources);
 	return getDefaultRelatedResources;
 }
 

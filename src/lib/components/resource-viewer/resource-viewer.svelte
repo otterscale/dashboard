@@ -15,15 +15,13 @@
 	import { getContext, onDestroy, onMount } from 'svelte';
 
 	import * as Alert from '$lib/components/ui/alert/index.js';
-	import { Button, buttonVariants } from '$lib/components/ui/button';
+	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as Item from '$lib/components/ui/item';
-	import * as Select from '$lib/components/ui/select/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
-	import { cn } from '$lib/utils';
 
 	import Conditions from './related-inforamtion/conditions.svelte';
 	import Yaml from './related-inforamtion/data.svelte';
@@ -300,14 +298,16 @@
 						</DropdownMenu.Trigger>
 						<DropdownMenu.Content align="end" class="w-fit">
 							<DropdownMenu.Group>
-								{#each relatedInformations as relatedInformation (relatedInformation.value)}
-									<DropdownMenu.Item
-										onSelect={() => {
-											selectedRelatedInformation = relatedInformation;
-										}}
-									>
-										{relatedInformation.label}
-									</DropdownMenu.Item>
+								{#each relatedInformations as relatedInformation, index (index)}
+									{#if relatedInformation}
+										<DropdownMenu.Item
+											onSelect={() => {
+												selectedRelatedInformation = relatedInformation;
+											}}
+										>
+											{relatedInformation.label}
+										</DropdownMenu.Item>
+									{/if}
 								{/each}
 							</DropdownMenu.Group>
 						</DropdownMenu.Content>

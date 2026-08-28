@@ -12,8 +12,6 @@
 
 	let { object }: { object: Resource | undefined } = $props();
 
-	// `filterInput` follows the text box immediately; `debouncedFilter` is the
-	// value that actually drives the lodash lookup (via runed).
 	let filterInput = $state('');
 	const debouncedFilter = new Debounced(() => filterInput.trim(), 300);
 

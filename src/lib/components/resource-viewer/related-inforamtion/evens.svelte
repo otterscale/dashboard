@@ -54,7 +54,8 @@
 			kind: 'Event',
 			resource: 'events',
 			name: event.name,
-			namespace
+			namespace,
+			uid: event.id
 		});
 	}
 
@@ -77,8 +78,6 @@
 		};
 	}
 
-	// Kubernetes' own field selector, not a client-side filter: events for every other
-	// object in the namespace never cross the wire.
 	function buildFieldSelector(): string {
 		const selectors = [`involvedObject.name=${name}`, `involvedObject.kind=${kind}`];
 		if (namespace) selectors.push(`involvedObject.namespace=${namespace}`);

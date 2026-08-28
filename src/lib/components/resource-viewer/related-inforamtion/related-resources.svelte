@@ -38,6 +38,7 @@
 	type RelatedResourceRow = RelatedResource & {
 		id: string;
 		status?: Result;
+		uid: string;
 	};
 
 	const columns: ColumnDef<RelatedResourceRow>[] = [
@@ -51,15 +52,9 @@
 		{ accessorKey: 'version' }
 	];
 
-	function getRowId(row: RelatedResource): string {
-		return `${row.group}/${row.version}/${row.resource}/${row.namespace ?? ''}/${row.name}`;
-	}
-
 	const getRelatedResources = $derived(getRelatedResourcesGetter(resource));
 	let relatedResources: RelatedResource[] = $state([]);
-	// Re-run whenever the object changes — a watch event can add or drop a
-	// relation — and drop whatever the previous run was still doing, so a slow
-	// getter cannot resolve over a newer one.
+
 	$effect(() => {
 		const currentObject = object;
 		if (!getRelatedResources || !currentObject) {
@@ -85,7 +80,6 @@
 				if (abortController.signal.aborted) return;
 				relatedResources = resources;
 			} catch (e) {
-				// A getter that fails should cost the section its links, not the page.
 				if (abortController.signal.aborted) return;
 				console.error('Failed to get related resources:', e);
 				relatedResources = [];
@@ -95,27 +89,28 @@
 		return () => abortController.abort();
 	});
 
-	const sortedRelatedResources = $derived<(RelatedResource & { id: string })[]>(
-		lodash
-			.sortBy(relatedResources, ['group', 'version', 'resource', 'namespace', 'name'])
-			.map((related) => ({ ...related, id: getRowId(related) }))
-	);
-
-	// Compute a status for every row from the object its getter already fetched.
-	// A row without one is a reference the cluster no longer resolves, so it simply
-	// has no status — there is nothing left here to fetch.
-	const statuses = $derived<Record<string, Result>>(
-		Object.fromEntries(
-			sortedRelatedResources
-				.filter((row) => row.object)
-				.map((row) => [row.id, compute(row.object as KubernetesResource)])
-		)
-	);
-
 	const rows = $derived<RelatedResourceRow[]>(
-		sortedRelatedResources.map((related) => ({
-			...related,
-			status: lodash.get(statuses, related.id, undefined)
+		relatedResources.map((relatedResource) => ({
+			...relatedResource,
+			status: compute(relatedResource.object as KubernetesResource),
+			id: lodash.get(
+				relatedResource,
+				'object.metadata.uid',
+				relatedResource.group +
+					relatedResource.version +
+					relatedResource.resource +
+					relatedResource.namespace +
+					relatedResource.name
+			) as string,
+			uid: lodash.get(
+				relatedResource,
+				'object.metadata.uid',
+				relatedResource.group +
+					relatedResource.version +
+					relatedResource.resource +
+					relatedResource.namespace +
+					relatedResource.name
+			) as string
 		}))
 	);
 </script>
