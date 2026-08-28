@@ -10,6 +10,7 @@
 	import lodash from 'lodash';
 	import { getContext, onMount } from 'svelte';
 
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import KindViewer from '$lib/components/kind-viewer/kind-viewer.svelte';
 	import type {
@@ -157,7 +158,49 @@
 	let isLoaded = $state(false);
 	let hasError = $state(false);
 	let loadError = $state<{ name?: string; rawMessage?: string } | undefined>(undefined);
-	let selectedAPIResource = $state<APIResource | undefined>(undefined);
+
+	const identifier = $derived({
+		group: page.url.searchParams.get('group') ?? '',
+		version: page.url.searchParams.get('version') ?? '',
+		kind: page.url.searchParams.get('kind') ?? '',
+		resource: page.url.searchParams.get('resource') ?? ''
+	});
+
+	const selectedAPIResource = $derived.by(() => {
+		if (apiResources.length === 0) return undefined;
+
+		if (identifier.resource || identifier.kind) {
+			const matched = apiResources.find(
+				(apiResource) =>
+					apiResource.group === identifier.group &&
+					(identifier.version === '' || apiResource.version === identifier.version) &&
+					(identifier.resource
+						? apiResource.resource === identifier.resource
+						: apiResource.kind === identifier.kind)
+			);
+			if (matched) return matched;
+		}
+
+		return (
+			getAPIResourceByGroupVersionResource(apiResources, {
+				resource: 'pods',
+				group: '',
+				version: 'v1'
+			}) ?? apiResources.find((apiResource) => !apiResource.resource.includes('/'))
+		);
+	});
+
+	function selectAPIResource(apiResource: APIResource, replaceState = false): void {
+		const url = new URL(page.url);
+		url.searchParams.set('group', apiResource.group);
+		url.searchParams.set('version', apiResource.version);
+		url.searchParams.set('kind', apiResource.kind);
+		url.searchParams.set('resource', apiResource.resource);
+
+		if (url.href === page.url.href) return;
+		// eslint-disable-next-line svelte/no-navigation-without-resolve
+		void goto(url, { replaceState, keepFocus: true, noScroll: true, invalidateAll: false });
+	}
 
 	const groupedMainAPIResources = $derived(
 		lodash.groupBy(
@@ -198,12 +241,10 @@
 		try {
 			apiResources = await fetchAPIResources(cluster);
 
-			selectedAPIResource =
-				getAPIResourceByGroupVersionResource(apiResources, {
-					resource: 'pods',
-					group: '',
-					version: 'v1'
-				}) ?? apiResources.find((apiResource) => !apiResource.resource.includes('/'));
+			// Reflect the resolved default selection in the URL so it is shareable.
+			if (!identifier.resource && !identifier.kind && selectedAPIResource) {
+				selectAPIResource(selectedAPIResource, true);
+			}
 		} catch (error) {
 			hasError = true;
 			loadError = error as typeof loadError;
@@ -282,7 +323,7 @@
 										{#each shortcuts as shortcut (`${shortcut.group}/${shortcut.version}/${shortcut.resource}`)}
 											<Command.Item
 												value={`${shortcut.group}/${shortcut.version}/${shortcut.resource}`}
-												onSelect={() => (selectedAPIResource = shortcut)}
+												onSelect={() => selectAPIResource(shortcut)}
 											>
 												<Item.Root class="p-0" size="sm">
 													<Item.Content>
@@ -308,9 +349,7 @@
 											{#each groupAPIResources as apiResource (`${apiResource.group}/${apiResource.version}/${apiResource.resource}`)}
 												<Command.Item
 													value={`${apiResource.group}/${apiResource.version}/${apiResource.resource}`}
-													onSelect={() => {
-														selectedAPIResource = apiResource;
-													}}
+													onSelect={() => selectAPIResource(apiResource)}
 												>
 													{apiResource.resource}
 													<Command.Shortcut>
