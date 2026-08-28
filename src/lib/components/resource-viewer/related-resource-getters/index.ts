@@ -1,6 +1,6 @@
 import type { GetRelatedResources, RelatedResource } from '../types';
 import {
-	buildSelfRelatedResource,
+	// buildSelfRelatedResource,
 	getDefaultRelatedResources,
 	getOwnerReferenceRelatedResources
 } from './default';
@@ -48,7 +48,7 @@ function withDefaultRelatedResources(getSpecific: GetRelatedResources): GetRelat
 			getSpecific(context),
 			getOwnerReferenceRelatedResources(context)
 		]);
-		return dedupeRelatedResources([buildSelfRelatedResource(context), ...specific, ...owners]);
+		return dedupeRelatedResources([...specific, ...owners]);
 	};
 }
 
