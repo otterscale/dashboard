@@ -8,7 +8,7 @@ import {
 } from '@otterscale/api/resource/v1';
 import lodash from 'lodash';
 
-import type { GetRelatedResources, RelatedResource } from '../types';
+import type { GetRelatedResources, RelatedResource, RelatedResourcesContext } from '../types';
 
 /** An entry of `metadata.ownerReferences`: the object this one belongs to. */
 type OwnerReference = { apiVersion?: string; kind?: string; name?: string };
@@ -41,16 +41,42 @@ function groupAPIResourcesByGroupKind(apiResources: APIResource[]): Map<string, 
 }
 
 /**
- * Any object's default relations are its owners: whatever
- * `metadata.ownerReferences` names — the ReplicaSet behind a Pod, the Deployment
- * behind that, the controller CR behind a managed object. Each reference carries
- * only a kind and an apiVersion, so discovery turns it into a linkable
- * group/version/resource; a kind the cluster no longer serves is dropped. An
- * owner always lives in the object's own namespace, or none when it is
- * cluster-scoped. Each owner is then fetched, the same as every other getter, so
- * the section has the object and not just a link to it.
+ * The resource being viewed, as a relation to itself. Every section leads with
+ * the object itself — it is the centre the rest hang off, and this way its
+ * status sits in the same table as its relations'. Nothing is fetched: the
+ * object is already in hand.
  */
-const getDefaultRelatedResources: GetRelatedResources = async ({
+function buildSelfRelatedResource({
+	group,
+	version,
+	kind,
+	resource,
+	namespace,
+	name,
+	object
+}: RelatedResourcesContext): RelatedResource {
+	return {
+		group,
+		version,
+		kind,
+		resource,
+		name,
+		namespace: namespace || undefined,
+		source: 'self',
+		object
+	};
+}
+
+/**
+ * An object's owners: whatever `metadata.ownerReferences` names — the ReplicaSet
+ * behind a Pod, the Deployment behind that, the controller CR behind a managed
+ * object. Each reference carries only a kind and an apiVersion, so discovery
+ * turns it into a linkable group/version/resource; a kind the cluster no longer
+ * serves is dropped. An owner always lives in the object's own namespace, or
+ * none when it is cluster-scoped. Each owner is then fetched, the same as every
+ * other getter, so the section has the object and not just a link to it.
+ */
+const getOwnerReferenceRelatedResources: GetRelatedResources = async ({
 	cluster,
 	namespace,
 	object,
@@ -92,6 +118,7 @@ const getDefaultRelatedResources: GetRelatedResources = async ({
 				kind: apiResource.kind,
 				resource: apiResource.resource,
 				name: ownerReference.name,
+				source: 'ownerReference',
 				// An owner reference is always same-namespace; a cluster-scoped owner
 				// has none, and passing one would send the get down the wrong path.
 				namespace: apiResource.namespaced ? namespace : ''
@@ -127,4 +154,13 @@ const getDefaultRelatedResources: GetRelatedResources = async ({
 	);
 };
 
-export { getDefaultRelatedResources };
+/**
+ * Any object's default relations are itself and its owners. A specific getter
+ * adds what is particular to its kind on top of this.
+ */
+const getDefaultRelatedResources: GetRelatedResources = async (context) => {
+	const owners = await getOwnerReferenceRelatedResources(context);
+	return [buildSelfRelatedResource(context), ...owners];
+};
+
+export { buildSelfRelatedResource, getDefaultRelatedResources, getOwnerReferenceRelatedResources };

@@ -92,6 +92,7 @@ const getLLMInferenceServiceRelatedResources: GetRelatedResources = async ({
 								...identifier,
 								name: metadata.name,
 								namespace: metadata.namespace ?? undefined,
+								source: 'labelSelector',
 								// The list already carried the object, so the section need not
 								// fetch it again.
 								object: item.object as JsonObject
@@ -120,6 +121,7 @@ const getLLMInferenceServiceRelatedResources: GetRelatedResources = async ({
 		configIdentitiesByName.set(ref.name, {
 			...llmInferenceServiceConfigIdentifier,
 			name: ref.name,
+			source: 'objectReference',
 			namespace
 		});
 	}
@@ -128,6 +130,7 @@ const getLLMInferenceServiceRelatedResources: GetRelatedResources = async ({
 		configIdentitiesByName.set(config.name, {
 			...llmInferenceServiceConfigIdentifier,
 			name: config.name,
+			source: 'objectReference',
 			namespace: config.namespace ?? namespace
 		});
 	}

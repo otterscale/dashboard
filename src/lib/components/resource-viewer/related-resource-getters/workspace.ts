@@ -90,6 +90,7 @@ const getWorkspaceRelatedResources: GetRelatedResources = async ({
 						{
 							...identifier,
 							name: reference.name,
+							source: 'objectReference',
 							// A Workspace links to children in the namespace it created, not
 							// the one it lives in.
 							namespace: reference.namespace ?? undefined

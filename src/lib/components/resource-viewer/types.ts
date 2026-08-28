@@ -26,6 +26,24 @@ type Resource = {
 };
 
 /**
+ * How a getter came to know about a relation — which is also why it is shown:
+ *
+ * - `self` — the resource being viewed, listed as the centre of its own section.
+ * - `ownerReference` — named in the object's `metadata.ownerReferences`.
+ * - `labelSelector` — found by listing a kind for objects that carry the
+ *   viewed object's name as a label.
+ * - `objectReference` — named by a field the object carries in its `spec` or
+ *   `status` (a `*Ref`, a `sourceRef`, `dependsOn`, `baseRefs`, …).
+ * - `inventory` — listed in a Flux `status.inventory` of applied objects.
+ */
+type RelatedResourceSource =
+	| 'self'
+	| 'ownerReference'
+	| 'labelSelector'
+	| 'objectReference'
+	| 'inventory';
+
+/**
  * A resource worth linking to from another resource's page.
  *
  * `kind` and `namespaced` are carried rather than looked up because the link is
@@ -39,6 +57,8 @@ type RelatedResource = {
 	kind: string;
 	resource: string;
 	name: string;
+	/** Where this relation came from — see {@link RelatedResourceSource}. */
+	source: RelatedResourceSource;
 	/**
 	 * Where this resource lives, when that is not the namespace the section was
 	 * given. A Workspace, for instance, links to children in the namespace it
@@ -58,7 +78,7 @@ type RelatedResource = {
  * A related resource kind, before whatever names it has are known — what a
  * getter pairs with each name it reads off an object or a listing.
  */
-type RelatedResourceClass = Omit<RelatedResource, 'name' | 'namespace' | 'object'>;
+type RelatedResourceClass = Omit<RelatedResource, 'name' | 'namespace' | 'object' | 'source'>;
 
 /**
  * What a related-resources getter is given: the identity of the resource being
@@ -98,6 +118,7 @@ export type {
 	GetRelatedResources,
 	RelatedResource,
 	RelatedResourceClass,
+	RelatedResourceSource,
 	RelatedResourcesContext,
 	Resource
 };

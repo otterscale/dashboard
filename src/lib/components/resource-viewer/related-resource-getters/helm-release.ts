@@ -95,6 +95,7 @@ function resolveInventoryIdentities(
 				kind: apiResource.kind,
 				resource: apiResource.resource,
 				name: entryName,
+				source: 'inventory',
 				// Kept as the empty string for a cluster-scoped object, so it does not
 				// fall back to the namespace of the release.
 				namespace: entryNamespace
@@ -152,6 +153,7 @@ const getHelmReleaseRelatedResources: GetRelatedResources = async ({
 		specIdentities.push({
 			...identifier,
 			name: sourceRef.name,
+			source: 'objectReference',
 			namespace: sourceRef.namespace ?? namespace
 		});
 	}
@@ -162,6 +164,7 @@ const getHelmReleaseRelatedResources: GetRelatedResources = async ({
 		specIdentities.push({
 			...helmReleaseIdentifier,
 			name: dependency.name,
+			source: 'objectReference',
 			namespace: dependency.namespace ?? namespace
 		});
 	}

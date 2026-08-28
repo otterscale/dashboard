@@ -46,6 +46,7 @@
 		{ accessorKey: 'name' },
 		{ accessorKey: 'namespace' },
 		{ accessorKey: 'resource' },
+		{ accessorKey: 'source' },
 		{ accessorKey: 'status' },
 		{ accessorKey: 'version' }
 	];
@@ -127,6 +128,7 @@
 			<Table.Head>Namespace</Table.Head>
 			<Table.Head>Version</Table.Head>
 			<Table.Head>Group</Table.Head>
+			<Table.Head>Source</Table.Head>
 			<Table.Head>Status</Table.Head>
 			<Table.Head>Message</Table.Head>
 		</Table.Row>
@@ -143,6 +145,7 @@
 			<Table.Cell>{relatedResource.namespace}</Table.Cell>
 			<Table.Cell>{relatedResource.version}</Table.Cell>
 			<Table.Cell>{relatedResource.group || 'core'}</Table.Cell>
+			<Table.Cell>{relatedResource.source}</Table.Cell>
 			<Table.Cell>{relatedResource.status?.status}</Table.Cell>
 			<Table.Cell>{relatedResource.status?.message}</Table.Cell>
 		</Table.Row>
