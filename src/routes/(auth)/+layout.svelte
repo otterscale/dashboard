@@ -2,6 +2,7 @@
 	import 'driver.js/dist/driver.css';
 
 	import { createClient, type Transport } from '@connectrpc/connect';
+	import TerminalIcon from '@lucide/svelte/icons/terminal';
 	import BotIcon from '@lucide/svelte/icons/bot';
 	import BoxIcon from '@lucide/svelte/icons/box';
 	import BoxesIcon from '@lucide/svelte/icons/boxes';
@@ -18,6 +19,7 @@
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
 	import NetworkIcon from '@lucide/svelte/icons/network';
 	import UserStarIcon from '@lucide/svelte/icons/user-star';
+	import XIcon from '@lucide/svelte/icons/x';
 	import { type Link, LinkService } from '@otterscale/api/link/v1';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
@@ -35,11 +37,13 @@
 		startTour,
 		WorkspaceSwitcher
 	} from '$lib/components/layout';
-	import ImportCluster from '$lib/components/layout/import-cluster-external.svelte';
+	import Registe from '$lib/components/layout/dialog-import-cluster.svelte';
 	import RegisteClusterTrigger from '$lib/components/layout/registe-cluster-trigger.svelte';
+	import { Terminal } from '$lib/components/applications/terminal';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import * as Resizable from '$lib/components/ui/resizable';
 	import { Separator } from '$lib/components/ui/separator';
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { Skeleton } from '$lib/components/ui/skeleton';
@@ -48,7 +52,6 @@
 	import { breadcrumbs } from '$lib/stores';
 	import { pulse } from '$lib/stores/pulse.svelte';
 	import { getAdditionalItems } from '$lib/utils/features';
-	import { hasRookCephCRD } from '$lib/utils/rook-ceph';
 
 	import type { LayoutData } from './$types';
 
@@ -72,7 +75,7 @@
 
 	let sidebarOpen = $state(true);
 	let importOpen = $state(false);
-	let hasRookCeph = $state(false);
+	let terminalOpen = $state(false);
 
 	async function fetchClusters(signal?: AbortSignal): Promise<Link[]> {
 		try {
@@ -165,24 +168,6 @@
 		return () => abortController.abort();
 	});
 
-	$effect(() => {
-		if (!activeCluster) {
-			hasRookCeph = false;
-			return;
-		}
-
-		const abortController = new AbortController();
-		hasRookCephCRD(transport, activeCluster, abortController.signal)
-			.then((exists) => {
-				if (!abortController.signal.aborted) hasRookCeph = exists;
-			})
-			.catch((err) => {
-				if (!abortController.signal.aborted) console.error(err);
-			});
-
-		return () => abortController.abort();
-	});
-
 	function resourceUrl(options: {
 		group: string;
 		version: string;
@@ -247,19 +232,15 @@
 								})
 							: ''
 					},
-					...(hasRookCeph
-						? [
-								{
-									title: m.storage(),
-									url: page.params.workspace
-										? resolve('/(auth)/[cluster]/[workspace]/dashboard/storage', {
-												cluster: activeCluster,
-												workspace: page.params.workspace
-											})
-										: ''
-								}
-							]
-						: [])
+					{
+						title: m.storage(),
+						url: page.params.workspace
+							? resolve('/(auth)/[cluster]/[workspace]/dashboard/storage', {
+									cluster: activeCluster,
+									workspace: page.params.workspace
+								})
+							: ''
+					}
 				]
 			},
 			{
@@ -409,6 +390,21 @@
 							version: 'v1beta1',
 							kind: 'DataVolume',
 							resource: 'datavolumes'
+						})
+					}
+				]
+			},
+			{
+				title: m.storage(),
+				icon: HardDriveIcon,
+				items: [
+					{
+						title: m.object_storage(),
+						url: resourceUrl({
+							group: 'objectbucket.io',
+							version: 'v1alpha1',
+							kind: 'ObjectBucketClaim',
+							resource: 'objectbucketclaims'
 						})
 					}
 				]
@@ -831,11 +827,28 @@
 						{#snippet child({ props })}
 							<Button {...props} variant="ghost" size="icon" class="size-7" onclick={startTour}>
 								<CircleQuestionMarkIcon />
-								<span class="sr-only">Guide Tour</span>
+								<span class="sr-only">{m.guide_tour()}</span>
 							</Button>
 						{/snippet}
 					</Tooltip.Trigger>
-					<Tooltip.Content>Start Guide Tour</Tooltip.Content>
+					<Tooltip.Content>{m.start_guide_tour()}</Tooltip.Content>
+				</Tooltip.Root>
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<Button
+								{...props}
+								variant="ghost"
+								size="icon"
+								class="size-7"
+								onclick={() => (terminalOpen = !terminalOpen)}
+							>
+								<TerminalIcon />
+								<span class="sr-only">{m.terminal()}</span>
+							</Button>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content>{m.terminal()}</Tooltip.Content>
 				</Tooltip.Root>
 				<Tooltip.Root>
 					<DropdownMenu.Root>
@@ -850,7 +863,7 @@
 										class="size-7"
 									>
 										<LayersIcon />
-										<span class="sr-only">Toggle Clusters</span>
+										<span class="sr-only">{m.toggle_clusters()}</span>
 									</Button>
 									{#if !activeCluster}
 										<span class="absolute top-3.5 right-3.5 flex size-2.5 transition-all">
@@ -885,13 +898,46 @@
 							</DropdownMenu.Group>
 						</DropdownMenu.Content>
 					</DropdownMenu.Root>
-					<Tooltip.Content>Switch Cluster</Tooltip.Content>
+					<Tooltip.Content>{m.switch_cluster_action()}</Tooltip.Content>
 				</Tooltip.Root>
 			</div>
 		</header>
-		<main class="flex min-w-0 flex-1 flex-col overflow-auto px-2 md:px-4 lg:px-8">
-			{@render children()}
-		</main>
+		<Resizable.PaneGroup direction="vertical" class="min-h-0 flex-1">
+			<Resizable.Pane>
+				<main class="flex h-full min-w-0 flex-col overflow-auto px-2 md:px-4 lg:px-8">
+					{@render children()}
+				</main>
+			</Resizable.Pane>
+			{#if terminalOpen}
+				<Resizable.Handle withHandle />
+				<Resizable.Pane defaultSize={30} minSize={15} class="flex flex-col">
+					<div class="flex shrink-0 items-center justify-between border-b px-4 py-1.5">
+						<span class="flex items-center gap-2 text-sm font-medium">
+							<TerminalIcon class="size-4" />
+							{m.terminal()}
+						</span>
+						<Button
+							variant="ghost"
+							size="icon"
+							class="size-6"
+							onclick={() => (terminalOpen = false)}
+						>
+							<XIcon />
+							<span class="sr-only">{m.close_terminal()}</span>
+						</Button>
+					</div>
+					<div class="min-h-0 flex-1 overflow-hidden bg-[#1e1e1e] p-3">
+						<Terminal
+							cluster={activeCluster}
+							namespace="cdi"
+							podName="cdi-deployment-d6ff6857c-2wtbd"
+							containerName="cdi-deployment"
+							command={['bash']}
+						/>
+					</div>
+				</Resizable.Pane>
+			{/if}
+		</Resizable.PaneGroup>
 	</Sidebar.Inset>
 </Sidebar.Provider>
 
@@ -935,7 +981,7 @@
 	{/each}
 {/snippet}
 
-<ImportCluster
+<Registe
 	bind:open={importOpen}
 	onsuccess={async () => {
 		links = await fetchClusters();
