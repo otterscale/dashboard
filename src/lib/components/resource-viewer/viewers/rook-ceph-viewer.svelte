@@ -42,6 +42,8 @@
 	const resourceClient = createClient(ResourceService, transport);
 
 	const namespace = 'rook-ceph';
+	const POLL_INTERVAL_MS = 10000;
+	const RETRY_INTERVAL_MS = 3000;
 
 	type RelatedResource =
 		| CephRookIoV1CephCluster
@@ -50,37 +52,61 @@
 		| CephRookIoV1CephObjectStore
 		| AppsV1Deployment
 		| CoreV1Pod;
+
+	type ResourceIdentifier = { group: string; version: string; resource: string };
+
 	// AbortController is used to terminate all watch streams when the component is destroyed
 	const abortController = new AbortController();
 
 	const getKey = (o: RelatedResource) => o?.metadata?.uid ?? o?.metadata?.name ?? '';
+
+	/** Returns the list's resourceVersion, or null when the request failed. */
+	async function list<T extends RelatedResource>(
+		identifier: ResourceIdentifier,
+		setObjects: (items: T[]) => void
+	): Promise<string | null> {
+		try {
+			const response = await resourceClient.list(
+				{
+					cluster,
+					namespace,
+					...identifier
+				},
+				{ signal: abortController.signal }
+			);
+			setObjects(response.items.map((item) => item.object as T));
+			return response.resourceVersion;
+		} catch (error) {
+			if (abortController.signal.aborted) return null;
+			console.error(`Failed to list ${identifier.resource}:`, error);
+			return null;
+		}
+	}
+
+	async function listAndPoll<T extends RelatedResource>(
+		identifier: ResourceIdentifier,
+		setObjects: (items: T[]) => void
+	) {
+		while (!abortController.signal.aborted) {
+			const resourceVersion = await list<T>(identifier, setObjects);
+			await sleep(resourceVersion === null ? RETRY_INTERVAL_MS : POLL_INTERVAL_MS);
+		}
+	}
+
 	async function listAndWatch<T extends RelatedResource>(
-		identifier: { group: string; version: string; resource: string },
+		identifier: ResourceIdentifier,
 		setObjects: (items: T[]) => void,
 		updateObject: (updater: (previous: T[]) => T[]) => void
 	) {
 		while (!abortController.signal.aborted) {
-			let resourceVersion = '';
-
 			// === 1. List: Get initial snapshot ===
-			try {
-				const response = await resourceClient.list(
-					{
-						cluster,
-						namespace,
-						...identifier
-					},
-					{ signal: abortController.signal }
-				);
-				const items = response.items.map((item) => item.object as T);
-				setObjects(items);
-				resourceVersion = response.resourceVersion;
-			} catch (error) {
+			const listedResourceVersion = await list<T>(identifier, setObjects);
+			if (listedResourceVersion === null) {
 				if (abortController.signal.aborted) return;
-				console.error(`Failed to list ${identifier.resource}:`, error);
-				await sleep(3000);
+				await sleep(RETRY_INTERVAL_MS);
 				continue;
 			}
+			let resourceVersion = listedResourceVersion;
 
 			// === 2. Watch: Stream events starting from this resourceVersion ===
 			try {
@@ -236,25 +262,21 @@
 	}
 
 	onMount(() => {
-		listAndWatch<CephRookIoV1CephCluster>(
+		listAndPoll<CephRookIoV1CephCluster>(
 			{ group: 'ceph.rook.io', version: 'v1', resource: 'cephclusters' },
-			(items) => (cephClusters = items),
-			(updater) => (cephClusters = updater(cephClusters))
+			(items) => (cephClusters = items)
 		);
-		listAndWatch<CephRookIoV1CephBlockPool>(
+		listAndPoll<CephRookIoV1CephBlockPool>(
 			{ group: 'ceph.rook.io', version: 'v1', resource: 'cephblockpools' },
-			(items) => (cephBlockPools = items),
-			(updater) => (cephBlockPools = updater(cephBlockPools))
+			(items) => (cephBlockPools = items)
 		);
-		listAndWatch<CephRookIoV1CephFilesystem>(
+		listAndPoll<CephRookIoV1CephFilesystem>(
 			{ group: 'ceph.rook.io', version: 'v1', resource: 'cephfilesystems' },
-			(items) => (cephFilesystems = items),
-			(updater) => (cephFilesystems = updater(cephFilesystems))
+			(items) => (cephFilesystems = items)
 		);
-		listAndWatch<CephRookIoV1CephObjectStore>(
+		listAndPoll<CephRookIoV1CephObjectStore>(
 			{ group: 'ceph.rook.io', version: 'v1', resource: 'cephobjectstores' },
-			(items) => (cephObjectStores = items),
-			(updater) => (cephObjectStores = updater(cephObjectStores))
+			(items) => (cephObjectStores = items)
 		);
 		listAndWatch<AppsV1Deployment>(
 			{ group: 'apps', version: 'v1', resource: 'deployments' },
