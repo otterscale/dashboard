@@ -32,6 +32,7 @@
 		NavMain,
 		NavSecondary,
 		NavUser,
+		NotificationTrigger,
 		startTour,
 		WorkspaceSwitcher
 	} from '$lib/components/layout';
@@ -837,6 +838,7 @@
 					</Tooltip.Trigger>
 					<Tooltip.Content>Start Guide Tour</Tooltip.Content>
 				</Tooltip.Root>
+				<NotificationTrigger />
 				<Tooltip.Root>
 					<DropdownMenu.Root>
 						<Tooltip.Trigger>
