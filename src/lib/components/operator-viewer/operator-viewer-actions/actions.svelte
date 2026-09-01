@@ -8,7 +8,6 @@
 
 	import type { ChartAttribute } from '../table-layout';
 	import InstallFromHarbor from './install-from-harbor.svelte';
-	import InstallFromIndex from './install-from-index.svelte';
 	import View from './view.svelte';
 
 	let {
@@ -22,8 +21,6 @@
 	} = $props();
 
 	let actionsOpen = $state(false);
-	const isHarbor = $derived(row.original.Source === 'harbor');
-	const isIndex = $derived(!isHarbor);
 </script>
 
 <DropdownMenu.Root bind:open={actionsOpen}>
@@ -45,38 +42,20 @@
 			>
 				<View {row} />
 			</DropdownMenu.Item>
-			{#if isHarbor}
-				<DropdownMenu.Item
-					onSelect={(e) => {
-						e.preventDefault();
+			<DropdownMenu.Item
+				onSelect={(e) => {
+					e.preventDefault();
+				}}
+			>
+				<InstallFromHarbor
+					{row}
+					{cluster}
+					{namespace}
+					onOpenChangeComplete={() => {
+						actionsOpen = false;
 					}}
-				>
-					<InstallFromHarbor
-						{row}
-						{cluster}
-						{namespace}
-						onOpenChangeComplete={() => {
-							actionsOpen = false;
-						}}
-					/>
-				</DropdownMenu.Item>
-			{/if}
-			{#if isIndex}
-				<DropdownMenu.Item
-					onSelect={(e) => {
-						e.preventDefault();
-					}}
-				>
-					<InstallFromIndex
-						{row}
-						{cluster}
-						{namespace}
-						onOpenChangeComplete={() => {
-							actionsOpen = false;
-						}}
-					/>
-				</DropdownMenu.Item>
-			{/if}
+				/>
+			</DropdownMenu.Item>
 		</DropdownMenu.Group>
 	</DropdownMenu.Content>
 </DropdownMenu.Root>

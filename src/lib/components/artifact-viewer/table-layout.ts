@@ -7,7 +7,7 @@ import { DynamicTableCell, DynamicTableHeader } from '$lib/components/dynamic-ta
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
 
-import type { ArtifactChartType, IndexChartType } from './types';
+import type { ArtifactChartType } from './types';
 
 type ChartAttribute =
 	| 'Helm Repository'
@@ -17,7 +17,6 @@ type ChartAttribute =
 	| 'Version'
 	| 'Type'
 	| 'Labels'
-	| 'Source'
 	| 'icon'
 	| 'helmRepository'
 	| 'chart';
@@ -31,7 +30,6 @@ function getChartDataSchemas(): Record<ChartAttribute, DataSchemaType> {
 		Version: 'text',
 		Type: 'text',
 		Labels: 'array',
-		Source: 'text',
 		icon: 'text',
 		helmRepository: 'object',
 		chart: 'object'
@@ -47,7 +45,6 @@ function getChartUISchemas(): Record<ChartAttribute, UISchemaType> {
 		Version: 'text',
 		Type: 'text',
 		Labels: 'array',
-		Source: 'text',
 		icon: 'text',
 		helmRepository: 'object',
 		chart: 'object'
@@ -66,29 +63,9 @@ function getChartDataFromHarbor(
 		Version: artifactChart.extra_attrs?.version as JsonValue,
 		Type: artifactChart.type ?? null,
 		Labels: (artifactChart.labels ?? []) as JsonValue,
-		Source: 'harbor',
 		icon: artifactChart.extra_attrs?.icon as JsonValue,
 		helmRepository: helmRepository as JsonValue,
 		chart: artifactChart as unknown as JsonValue
-	};
-}
-
-function getChartDataFromIndex(
-	indexChart: IndexChartType,
-	helmRepository: SourceToolkitFluxcdIoV1HelmRepository
-): Record<ChartAttribute, JsonValue> {
-	return {
-		'Helm Repository': helmRepository.metadata?.name ?? null,
-		'Chart Name': indexChart.name ?? null,
-		Description: indexChart.description as JsonValue,
-		Digest: indexChart.digest ?? null,
-		Version: indexChart.version as JsonValue,
-		Type: indexChart.type ?? null,
-		Labels: (indexChart.keywords ?? []) as JsonValue,
-		Source: 'index',
-		icon: indexChart.icon as JsonValue,
-		helmRepository: helmRepository as JsonValue,
-		chart: indexChart as unknown as JsonValue
 	};
 }
 
@@ -103,7 +80,6 @@ function getChartColumnDefinitions(
 		'Type',
 		'Version',
 		'Labels',
-		'Source',
 		'Helm Repository'
 	];
 
@@ -136,7 +112,6 @@ export {
 	type ChartAttribute,
 	getChartColumnDefinitions,
 	getChartDataFromHarbor,
-	getChartDataFromIndex,
 	getChartDataSchemas,
 	getChartUISchemas
 };

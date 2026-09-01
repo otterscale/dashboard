@@ -19,10 +19,6 @@ interface ChartType {
 	version: string;
 }
 
-interface IndexChartType extends ChartType {
-	versions: ChartType[];
-}
-
 interface HelmRepositoryChartVersion {
 	name: string;
 	version: string;
@@ -105,6 +101,5 @@ export {
 	createHelmRepositoryChartArtifact,
 	type HelmRepositoryChartArtifact,
 	type HelmRepositoryChartVersion,
-	type IndexChartType,
 	isHelmRepositoryChartArtifact
 };

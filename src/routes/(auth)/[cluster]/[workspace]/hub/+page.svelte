@@ -13,14 +13,9 @@
 	import { ArtifactViewer } from '$lib/components/artifact-viewer';
 	import {
 		type ChartAttribute,
-		getChartDataFromHarbor,
-		getChartDataFromIndex
+		getChartDataFromHarbor
 	} from '$lib/components/artifact-viewer/table-layout';
-	import type {
-		ArtifactChartType,
-		ChartType,
-		IndexChartType
-	} from '$lib/components/artifact-viewer/types';
+	import type { ArtifactChartType } from '$lib/components/artifact-viewer/types';
 	import {
 		encodeHarborURIComponent,
 		parseHarborHost,
@@ -53,11 +48,17 @@
 	async function fetchChartsByHelmRepository(
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
 	) {
+		const helmRepositoryName = helmRepository.metadata?.name ?? '';
+
+		// Charts are installed from Harbor only, so a repository we cannot browse
+		// through the Harbor API has nothing installable behind it.
 		const fromHarbor =
 			lodash.get(helmRepository, ['metadata', 'labels', 'tenant.otterscale.io/from-harbor']) ===
 			'true';
-		const helmRepositoryName = helmRepository.metadata?.name ?? '';
-		const repositoryUrl = helmRepository.spec?.url ?? '';
+		if (!fromHarbor) {
+			toast.info(`HelmRepository "${helmRepositoryName}": skipped, not backed by Harbor`);
+			return;
+		}
 
 		let currentPage = 1;
 		const pageSize = 50;
@@ -65,62 +66,36 @@
 		try {
 			let chartsByHelmRepository: Record<ChartAttribute, JsonValue>[] = [];
 
-			if (fromHarbor) {
-				const harborHost = parseHarborHost(helmRepository);
-				const harborProjectName = parseHarborProjectName(helmRepository);
-				while (true) {
-					const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')}&page=${currentPage}&page_size=${pageSize}&latest_in_repository=true`;
-					const response = await fetch('/bff/helm/repository/harbor', {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({
-							harborHost,
-							apiPath: artifactsUrl
-						})
-					});
-
-					if (!response.ok) {
-						break;
-					}
-
-					const artifactCharts: ArtifactChartType[] = await response.json();
-					if (artifactCharts.length === 0) {
-						break;
-					}
-
-					chartsByHelmRepository = [
-						...chartsByHelmRepository,
-						...artifactCharts.map((artifactChart) =>
-							getChartDataFromHarbor(artifactChart, helmRepository)
-						)
-					];
-
-					currentPage = currentPage + 1;
-				}
-			} else {
-				const response = await fetch('/bff/helm/repository/index', {
+			const harborHost = parseHarborHost(helmRepository);
+			const harborProjectName = parseHarborProjectName(helmRepository);
+			while (true) {
+				const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')}&page=${currentPage}&page_size=${pageSize}&latest_in_repository=true`;
+				const response = await fetch('/bff/helm/repository/harbor', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
-						repositoryUrl
+						harborHost,
+						apiPath: artifactsUrl
 					})
 				});
-				if (response.ok) {
-					const indexCharts: Record<string, ChartType[]> = (await response.json()) ?? {};
-					chartsByHelmRepository = (
-						Object.values(indexCharts)
-							.map((versions) => {
-								const [latestVersion] = versions;
-								if (latestVersion) {
-									return {
-										...latestVersion,
-										versions: versions
-									};
-								}
-							})
-							.filter(Boolean) as IndexChartType[]
-					).map((chart) => getChartDataFromIndex(chart, helmRepository));
+
+				if (!response.ok) {
+					break;
 				}
+
+				const artifactCharts: ArtifactChartType[] = await response.json();
+				if (artifactCharts.length === 0) {
+					break;
+				}
+
+				chartsByHelmRepository = [
+					...chartsByHelmRepository,
+					...artifactCharts.map((artifactChart) =>
+						getChartDataFromHarbor(artifactChart, helmRepository)
+					)
+				];
+
+				currentPage = currentPage + 1;
 			}
 
 			charts = [...charts, ...chartsByHelmRepository];
