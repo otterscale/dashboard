@@ -13,6 +13,7 @@
 	import { parseDocument, stringify } from 'yaml';
 
 	import { filterRequiredSchema, getInitialValues } from '$lib/components/dynamic-form/utils';
+	import { formatValidationErrors } from '$lib/components/kind-viewer/schema';
 	import SchemaViewer from '$lib/components/schema-viewer/schema-viewer.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -169,7 +170,9 @@
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const parsed = document.toJS() as Record<string, any>;
 		if (!validate(parsed)) {
-			toast.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
+			toast.error('Validation errors found. Please fix them before submitting.', {
+				description: formatValidationErrors(validate.errors)
+			});
 			return;
 		}
 
