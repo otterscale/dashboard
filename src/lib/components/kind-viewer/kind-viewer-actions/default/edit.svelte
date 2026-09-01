@@ -70,6 +70,7 @@
 	import type { Node } from 'yaml';
 	import { isMap, isPair, isScalar, parseDocument, stringify, visit } from 'yaml';
 
+	import { formatValidationErrors, withNullPruning } from '$lib/components/kind-viewer/schema';
 	import SchemaViewer from '$lib/components/schema-viewer/schema-viewer.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -99,6 +100,11 @@
 		object: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 		onOpenChangeComplete: () => void;
 	} = $props();
+
+	// The object round-tripped from the cluster carries `null` for unset fields
+	// (e.g. status.conditions[].lastProbeTime), which the strict schema rejects;
+	// tolerate them here so an unmodified resource can be re-submitted.
+	const nullTolerantValidate = $derived(withNullPruning(validate));
 
 	let value = $state('');
 	let open = $state(false);
@@ -139,9 +145,9 @@
 
 		// Validate Semantic
 		const representation = document.toJS();
-		const valid = validate(representation);
-		if (!valid && validate.errors) {
-			validate.errors.forEach((error) => {
+		const valid = nullTolerantValidate(representation);
+		if (!valid && nullTolerantValidate.errors) {
+			nullTolerantValidate.errors.forEach((error) => {
 				let targetPath: string[] = [];
 				let errorMessage = '';
 
@@ -156,10 +162,7 @@
 				// Locate Errors
 				targetPath = error.instancePath.split('/').filter((path) => path !== '');
 				const node = document.getIn(targetPath, true) as unknown as Node;
-				const severity =
-					node && isScalar(node) && node.value === null
-						? monaco.MarkerSeverity.Hint
-						: monaco.MarkerSeverity.Error;
+				const severity = monaco.MarkerSeverity.Error;
 
 				if (node && node.range) {
 					const [start, end] = node.range.map((point) => model.getPositionAt(point));
@@ -233,8 +236,10 @@
 		}
 
 		const parsed = document.toJS();
-		if (!validate(parsed)) {
-			toast.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
+		if (!nullTolerantValidate(parsed)) {
+			toast.error('Validation errors found. Please fix them before submitting.', {
+				description: formatValidationErrors(nullTolerantValidate.errors)
+			});
 			return;
 		}
 
