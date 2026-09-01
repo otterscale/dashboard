@@ -22,9 +22,7 @@
 	const plainHttp = harborUniformResourceLocator.protocol === 'http:';
 
 	const harborProject = $derived(
-		chartVariant.harborWarehouse.mode === 'fixed'
-			? chartVariant.harborWarehouse.project
-			: namespace
+		chartVariant.harborWarehouse.mode === 'fixed' ? chartVariant.harborWarehouse.project : namespace
 	);
 </script>
 
