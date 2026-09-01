@@ -24,6 +24,11 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
+	import {
+		ClusterReleaseScope,
+		ClusterReleaseServiceAccountName,
+		ReleaseScopeLabel
+	} from '$lib/utils/helm-release';
 	import { computeValuesDelta } from '$lib/utils/helm-values';
 
 	import type { ChartAttribute } from '../table-layout';
@@ -83,6 +88,12 @@
 		spec: {
 			interval: '15m',
 			timeout: '1h',
+			serviceAccountName: ClusterReleaseServiceAccountName,
+			commonMetadata: {
+				labels: {
+					[ReleaseScopeLabel]: ClusterReleaseScope
+				}
+			},
 			chart: {
 				spec: {}
 			},
@@ -207,6 +218,9 @@
 					bind:values={values['metadata']}
 					handleSubmit={{
 						posthook: () => {
+							// The metadata form replaces `values.metadata` wholesale, so stamp the
+							// scope label afterwards — it has to survive into the reviewed YAML.
+							lodash.set(values, ['metadata', 'labels', ReleaseScopeLabel], ClusterReleaseScope);
 							handleNext();
 						}
 					}}

@@ -15,6 +15,11 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
+	import {
+		ClusterReleaseScope,
+		ClusterReleaseServiceAccountName,
+		ReleaseScopeLabel
+	} from '$lib/utils/helm-release';
 
 	import type { ModuleAttribute } from '../table-layout';
 	import { type ModuleType } from '../types';
@@ -70,10 +75,19 @@
 					kind,
 					metadata: {
 						name: module.name,
-						namespace
+						namespace,
+						labels: {
+							[ReleaseScopeLabel]: ClusterReleaseScope
+						}
 					},
 					spec: {
 						releaseName: module.name,
+						serviceAccountName: ClusterReleaseServiceAccountName,
+						commonMetadata: {
+							labels: {
+								[ReleaseScopeLabel]: ClusterReleaseScope
+							}
+						},
 						targetNamespace: lodash.get(module, ['annotations', 'module.otterscale.io/namespace']),
 						install: {
 							createNamespace: true,
