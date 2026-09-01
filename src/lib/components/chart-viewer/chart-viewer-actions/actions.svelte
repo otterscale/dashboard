@@ -7,15 +7,18 @@
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
 	import type { ChartAttribute } from '../table-layout';
+	import type { ChartVariant } from '../variants';
 	import InstallFromHarbor from './install-from-harbor.svelte';
 	import View from './view.svelte';
 
 	let {
 		row,
+		chartVariant,
 		cluster,
 		namespace
 	}: {
 		row: Row<Record<ChartAttribute, JsonValue>>;
+		chartVariant: ChartVariant;
 		cluster: string;
 		namespace: string;
 	} = $props();
@@ -49,6 +52,7 @@
 			>
 				<InstallFromHarbor
 					{row}
+					{chartVariant}
 					{cluster}
 					{namespace}
 					onOpenChangeComplete={() => {

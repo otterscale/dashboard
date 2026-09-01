@@ -22,9 +22,9 @@ const ClusterReleaseScope = 'cluster';
 const WorkspaceReleaseScope = 'workspace';
 
 /** Impersonated by FluxCD for workspace-level releases (`spec.serviceAccountName`). */
-const WorkspaceReleaseServiceAccountName = 'workspace-sa';
+const WorkspaceReleaseServiceAccountName = 'workspace-deployer';
 /** Impersonated by FluxCD for cluster-level releases (`spec.serviceAccountName`). */
-const ClusterReleaseServiceAccountName = 'cluster-sa';
+const PlatformReleaseServiceAccountName = 'platform-deployer';
 
 const ClusterReleaseLabelSelector = `${ReleaseScopeLabel}!=${WorkspaceReleaseScope}`;
 const WorkspaceReleaseLabelSelector = `${ReleaseScopeLabel}=${WorkspaceReleaseScope}`;
@@ -32,7 +32,7 @@ const WorkspaceReleaseLabelSelector = `${ReleaseScopeLabel}=${WorkspaceReleaseSc
 export {
 	ClusterReleaseLabelSelector,
 	ClusterReleaseScope,
-	ClusterReleaseServiceAccountName,
+	PlatformReleaseServiceAccountName,
 	ReleaseScopeLabel,
 	WorkspaceReleaseLabelSelector,
 	WorkspaceReleaseScope,

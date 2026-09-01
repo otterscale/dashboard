@@ -12,10 +12,11 @@ interface ModuleMetadataType {
 	home: string;
 	icon: string;
 	keywords: string[];
-	maintainers: {
-		email: string;
+	maintainers: Array<{
 		name: string;
-	};
+		email?: string;
+		url?: string;
+	}>;
 	name: string;
 	type: string;
 	urls: string[];

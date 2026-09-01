@@ -17,7 +17,7 @@
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import {
 		ClusterReleaseScope,
-		ClusterReleaseServiceAccountName,
+		PlatformReleaseServiceAccountName,
 		ReleaseScopeLabel
 	} from '$lib/utils/helm-release';
 
@@ -82,7 +82,7 @@
 					},
 					spec: {
 						releaseName: module.name,
-						serviceAccountName: ClusterReleaseServiceAccountName,
+						serviceAccountName: PlatformReleaseServiceAccountName,
 						commonMetadata: {
 							labels: {
 								[ReleaseScopeLabel]: ClusterReleaseScope

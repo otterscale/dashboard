@@ -1,28 +1,13 @@
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
-	import { type ListRequest, ResourceService } from '@otterscale/api/resource/v1';
-	import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
-	import lodash from 'lodash';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext, onMount } from 'svelte';
-	import { toast } from 'svelte-sonner';
 
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { ArtifactViewer } from '$lib/components/artifact-viewer';
-	import {
-		type ChartAttribute,
-		getChartDataFromHarbor
-	} from '$lib/components/artifact-viewer/table-layout';
-	import type { ArtifactChartType } from '$lib/components/artifact-viewer/types';
-	import {
-		encodeHarborURIComponent,
-		parseHarborHost,
-		parseHarborProjectName
-	} from '$lib/components/artifact-viewer/utils.svelte.ts';
-	import Button from '$lib/components/ui/button/button.svelte';
-	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { ChartViewer, HubChartVariant, listCharts } from '$lib/components/chart-viewer';
+	import type { ChartAttribute } from '$lib/components/chart-viewer/table-layout';
 	import { m } from '$lib/messages';
 	import { breadcrumbs } from '$lib/stores';
 
@@ -44,108 +29,17 @@
 	const resourceClient = createClient(ResourceService, transport);
 
 	let charts: Record<ChartAttribute, JsonValue>[] = $state([]);
-
-	async function fetchChartsByHelmRepository(
-		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
-	) {
-		const helmRepositoryName = helmRepository.metadata?.name ?? '';
-
-		// Charts are installed from Harbor only, so a repository we cannot browse
-		// through the Harbor API has nothing installable behind it.
-		const fromHarbor =
-			lodash.get(helmRepository, ['metadata', 'labels', 'tenant.otterscale.io/from-harbor']) ===
-			'true';
-		if (!fromHarbor) {
-			toast.info(`HelmRepository "${helmRepositoryName}": skipped, not backed by Harbor`);
-			return;
-		}
-
-		let currentPage = 1;
-		const pageSize = 50;
-
-		try {
-			let chartsByHelmRepository: Record<ChartAttribute, JsonValue>[] = [];
-
-			const harborHost = parseHarborHost(helmRepository);
-			const harborProjectName = parseHarborProjectName(helmRepository);
-			while (true) {
-				const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')}&page=${currentPage}&page_size=${pageSize}&latest_in_repository=true`;
-				const response = await fetch('/bff/helm/repository/harbor', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						harborHost,
-						apiPath: artifactsUrl
-					})
-				});
-
-				if (!response.ok) {
-					break;
-				}
-
-				const artifactCharts: ArtifactChartType[] = await response.json();
-				if (artifactCharts.length === 0) {
-					break;
-				}
-
-				chartsByHelmRepository = [
-					...chartsByHelmRepository,
-					...artifactCharts.map((artifactChart) =>
-						getChartDataFromHarbor(artifactChart, helmRepository)
-					)
-				];
-
-				currentPage = currentPage + 1;
-			}
-
-			charts = [...charts, ...chartsByHelmRepository];
-		} catch (error) {
-			console.error(`HelmRepository "${helmRepositoryName}": error fetching charts:`, error);
-			toast.error(`HelmRepository "${helmRepositoryName}": unable to reach repository`);
-		}
-	}
-
 	let isFetching = $state(false);
 
 	async function fetchCharts() {
 		if (isFetching || !namespace) return;
 
 		isFetching = true;
-		charts = [];
-
 		try {
-			const response = await resourceClient.list({
-				cluster,
-				namespace,
-				group: 'source.toolkit.fluxcd.io',
-				version: 'v1',
-				resource: 'helmrepositories'
-			} as ListRequest);
-
-			const helmRepositories: (SourceToolkitFluxcdIoV1HelmRepository | undefined)[] =
-				response.items.map((item) => item.object);
-
-			if (helmRepositories.length === 0) {
-				toast.info('No HelmRepository resources found in this namespace');
-				isFetching = false;
-				return;
-			}
-
-			helmRepositories.forEach((helmRepository) => {
-				if (helmRepository) {
-					fetchChartsByHelmRepository(helmRepository);
-					isFetching = false;
-				}
-			});
-		} catch (error) {
-			console.error('Failed to list HelmRepositories:', error);
-			toast.error('Failed to list HelmRepository resources');
+			charts = await listCharts(resourceClient, cluster, namespace, HubChartVariant);
+		} finally {
 			isFetching = false;
 		}
-	}
-
-	function handleReload() {
-		fetchCharts();
 	}
 
 	let isMounted = $state(false);
@@ -158,25 +52,13 @@
 
 {#key cluster + namespace}
 	{#if isMounted}
-		<ArtifactViewer {cluster} {namespace} {charts}>
-			{#snippet reload()}
-				<Tooltip.Root>
-					<Tooltip.Trigger>
-						{#snippet child({ props })}
-							<Button
-								{...props}
-								onclick={handleReload}
-								disabled={isFetching}
-								variant="outline"
-								size="icon"
-							>
-								<RefreshCwIcon />
-							</Button>
-						{/snippet}
-					</Tooltip.Trigger>
-					<Tooltip.Content>Reload</Tooltip.Content>
-				</Tooltip.Root>
-			{/snippet}
-		</ArtifactViewer>
+		<ChartViewer
+			chartVariant={HubChartVariant}
+			{cluster}
+			{namespace}
+			{charts}
+			{isFetching}
+			onReload={fetchCharts}
+		/>
 	{/if}
 {/key}

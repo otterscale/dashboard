@@ -19,7 +19,7 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import {
 		ClusterReleaseScope,
-		ClusterReleaseServiceAccountName,
+		PlatformReleaseServiceAccountName,
 		ReleaseScopeLabel
 	} from '$lib/utils/helm-release';
 
@@ -84,7 +84,7 @@
 			},
 			spec: {
 				releaseName: module.name,
-				serviceAccountName: ClusterReleaseServiceAccountName,
+				serviceAccountName: PlatformReleaseServiceAccountName,
 				commonMetadata: {
 					labels: {
 						[ReleaseScopeLabel]: ClusterReleaseScope
