@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Activity from '@lucide/svelte/icons/activity';
 	import Server from '@lucide/svelte/icons/server';
 	import type { NodeProps } from '@xyflow/svelte';
 	import { Handle, Position } from '@xyflow/svelte';
@@ -13,6 +14,14 @@
 	const usedMem = $derived(Number(data.usedMem ?? 0));
 	const usedMemPct = $derived(toPercent(usedMem, totalMem));
 	const isMig = $derived(Boolean(data.isMig));
+
+	// Mean measured compute utilization across the node's cards (DCGM); undefined when none
+	// of them reported, so the row disappears rather than claiming an idle node.
+	const computePct = $derived.by(() => {
+		const compute = data.compute;
+		if (typeof compute !== 'number' || !Number.isFinite(compute)) return undefined;
+		return Math.min(100, Math.max(0, Math.round(compute)));
+	});
 </script>
 
 {#if data.hasTargetEdge}
@@ -29,22 +38,32 @@
 			<Server size={14} class="text-muted-foreground" />
 		</div>
 		<span class="truncate text-sm font-semibold">Node</span>
-		{#if isMig}
+		<div class="ml-auto flex shrink-0 items-center gap-1.5">
+			{#if computePct !== undefined}
+				<!-- Mean over the node's cards, in the header so it costs the card no height. -->
+				<span
+					class="flex items-center gap-0.5 rounded-full bg-chart-2/10 px-1.5 py-0.5 text-[10px] font-medium text-chart-2 tabular-nums"
+					title="Mean compute (SM) utilization across this node's GPU cards, measured by DCGM"
+				>
+					<Activity size={9} />
+					{computePct}%
+				</span>
+			{/if}
+			{#if isMig}
+				<span
+					class="rounded-sm bg-chart-3/10 px-1.5 py-0.5 text-[10px] font-medium text-chart-3"
+					title="This node has MIG-partitioned GPUs"
+				>
+					MIG
+				</span>
+			{/if}
 			<span
-				class="ml-auto rounded-sm bg-chart-3/10 px-1.5 py-0.5 text-[10px] font-medium text-chart-3"
-				title="This node has MIG-partitioned GPUs"
+				class="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+				title="{healthyCount} of {gpuCount} GPUs healthy"
 			>
-				MIG
+				{healthyCount}/{gpuCount} GPU
 			</span>
-		{/if}
-		<span
-			class="{isMig
-				? ''
-				: 'ml-auto'} rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-			title="{healthyCount} of {gpuCount} GPUs healthy"
-		>
-			{healthyCount}/{gpuCount} GPU
-		</span>
+		</div>
 	</div>
 	<div class="space-y-1.5 px-3 py-2">
 		<div class="truncate text-xs font-medium" title={String(data.name ?? '')}>{data.name}</div>
