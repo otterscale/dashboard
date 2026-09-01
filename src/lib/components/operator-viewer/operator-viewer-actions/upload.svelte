@@ -16,6 +16,10 @@
 
 	const harborUniformResourceLocator = new SvelteURL(publicEnv.PUBLIC_HARBOR_URL ?? '');
 	const plainHttp = harborUniformResourceLocator.protocol === 'http:';
+
+	const harborProject = $derived(
+		chartVariant.harborWarehouse.mode === 'fixed' ? chartVariant.harborWarehouse.project : namespace
+	);
 </script>
 
 <Tooltip.Root>
