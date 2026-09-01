@@ -293,7 +293,7 @@
 		</Empty.Content>
 	</Empty.Root>
 {:else}
-	<div class="space-y-4">
+	<div class="flex flex-col space-y-4 pb-8">
 		<div class="flex items-end justify-between gap-4">
 			<Item.Root class="p-0">
 				<Item.Content class="text-left">
