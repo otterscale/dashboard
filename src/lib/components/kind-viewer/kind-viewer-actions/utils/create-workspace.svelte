@@ -26,6 +26,7 @@
 	import { page } from '$app/state';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import RoleComboboxWidget from '$lib/components/dynamic-form/widgets/role-combobox.svelte';
+	import UnitInputWidget from '$lib/components/dynamic-form/widgets/unit-input.svelte';
 	import UserComboboxWidget, {
 		getDisplayName,
 		type KeycloakUser
@@ -659,6 +660,17 @@
 										class:
 											'grid grid-cols-2 gap-3 [&_input]:read-only:bg-muted [&_input]:read-only:opacity-50 [&_input]:read-only:cursor-not-allowed [&_input]:read-only:focus-visible:ring-0 [&_input]:read-only:focus-visible:ring-offset-0 [&_input]:read-only:focus-visible:border-input'
 									}
+								}
+							},
+							// gpumem is counted in MiB and a suffix multiplies that base unit
+							// instead of replacing it (88888Gi is 88888 * 2^30 MiB), so show
+							// the unit on the input rather than letting anyone type one.
+							'limits.nvidia.com/gpumem': {
+								'ui:components': {
+									textWidget: UnitInputWidget
+								},
+								'ui:options': {
+									TailoredUnitInputUnit: 'Mi'
 								}
 							}
 						}
