@@ -9,9 +9,9 @@
 	export type QuantityMetadata = {
 		type: QuantityType;
 		/**
-		 * Base unit of the raw scalar value. Defaults to bytes. Set when the source
-		 * value is already expressed in a binary unit, e.g. `nvidia.com/gpumem` is
-		 * measured in `Mi`, so a value of `2400000` means 2400000 MiB, not bytes.
+		 * Unit the raw scalar counts in. Defaults to bytes. Set when the source value
+		 * is expressed in a binary unit, e.g. `nvidia.com/gpumem` is measured in `Mi`,
+		 * so a value of `2400000` means 2400000 MiB, not bytes.
 		 */
 		baseUnit?: BinaryBaseUnit;
 	};
@@ -20,7 +20,7 @@
 <script lang="ts">
 	import { type Column, type Row } from '@tanstack/table-core';
 
-	import { binarySuffixFactors, formatWithBinarySuffix, quantityToScalar } from '../utils';
+	import { formatWithBinarySuffix, quantityToBytes } from '../utils';
 
 	let {
 		row,
@@ -47,10 +47,7 @@
 		{data}
 	{:else if metadata.type === 'discrete'}
 		<!-- Discrete quantity in Kubernetes: integer with optional binary prefix  -->
-		{@const bytes =
-			BigInt(quantityToScalar(data)) *
-			(metadata.baseUnit ? binarySuffixFactors[metadata.baseUnit] : BigInt(1))}
-		{@const { value, unit } = formatWithBinarySuffix(bytes)}
+		{@const { value, unit } = formatWithBinarySuffix(quantityToBytes(data, metadata.baseUnit))}
 		{`${value.toFixed(0)} ${unit}`}
 	{/if}
 {/if}
