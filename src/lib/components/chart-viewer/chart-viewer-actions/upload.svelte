@@ -14,8 +14,16 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/messages';
 
+	import type { ChartVariant } from '../variants';
+
+	let { chartVariant, namespace }: { chartVariant: ChartVariant; namespace: string } = $props();
+
 	const harborUniformResourceLocator = new SvelteURL(publicEnv.PUBLIC_HARBOR_URL ?? '');
 	const plainHttp = harborUniformResourceLocator.protocol === 'http:';
+
+	const harborProject = $derived(
+		chartVariant.harborWarehouse.mode === 'fixed' ? chartVariant.harborWarehouse.project : namespace
+	);
 </script>
 
 <Tooltip.Root>
@@ -31,7 +39,7 @@
 			</Dialog.Header>
 
 			<Item.Root class="w-full">
-				{@const command = `helm push <chart_package> oci://${harborUniformResourceLocator.host}/operators${plainHttp ? ' --plain-http' : ''}`}
+				{@const command = `helm push <chart_package> oci://${harborUniformResourceLocator.host}/${harborProject}${plainHttp ? ' --plain-http' : ''}`}
 				<Item.Media variant="icon">
 					<SiHelm class="size-4" />
 				</Item.Media>
@@ -45,7 +53,7 @@
 			</Item.Root>
 
 			<Item.Root class="w-full">
-				{@const command = `docker push ${harborUniformResourceLocator.host}/operators[:<tag>]`}
+				{@const command = `docker push ${harborUniformResourceLocator.host}/${chartVariant.dockerPushTarget}[:<tag>]`}
 				<Item.Media variant="icon">
 					<SiDocker class="size-4" />
 				</Item.Media>

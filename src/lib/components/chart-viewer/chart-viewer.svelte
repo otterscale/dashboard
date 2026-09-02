@@ -2,35 +2,41 @@
 	import type { JsonValue } from '@bufbuild/protobuf';
 	import Columns3Icon from '@lucide/svelte/icons/columns-3';
 	import EraserIcon from '@lucide/svelte/icons/eraser';
+	import RefreshCwIcon from '@lucide/svelte/icons/refresh-cw';
 	import type { ColumnDef } from '@tanstack/table-core';
-	import type { Snippet } from 'svelte';
 
 	import { DynamicTable, SearchParametersTableState } from '$lib/components/dynamic-table';
 	import type { DataSchemaType, UISchemaType } from '$lib/components/dynamic-table/utils';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 
+	import Actions from './chart-viewer-actions/actions.svelte';
+	import Upload from './chart-viewer-actions/upload.svelte';
 	import Grid from './grid-layout.svelte';
-	import Actions from './operator-viewer-actions/actions.svelte';
-	import Upload from './operator-viewer-actions/upload.svelte';
 	import {
 		type ChartAttribute,
 		getChartColumnDefinitions,
 		getChartDataSchemas,
 		getChartUISchemas
 	} from './table-layout.ts';
+	import type { ChartVariant } from './variants';
 
 	let {
+		chartVariant,
 		cluster,
 		namespace,
 		charts,
-		reload
+		isFetching,
+		onReload
 	}: {
+		chartVariant: ChartVariant;
 		cluster: string;
 		namespace: string;
 		charts: Record<ChartAttribute, JsonValue>[];
-		reload: Snippet;
+		isFetching: boolean;
+		onReload: () => void;
 	} = $props();
 
 	const uiSchemas: Record<string, UISchemaType> = getChartUISchemas();
@@ -45,17 +51,35 @@
 	<div class="flex items-end justify-between gap-4">
 		<Item.Root class="p-0">
 			<Item.Content class="text-left">
-				<Item.Title class="text-xl font-bold">Operator</Item.Title>
+				<Item.Title class="text-xl font-bold">{chartVariant.title}</Item.Title>
 				<Item.Description class="text-base">{cluster}/{namespace}</Item.Description>
 			</Item.Content>
 		</Item.Root>
 	</div>
-	<DynamicTable data={charts} {columnDefinitions} {uiSchemas} {tableState} {reload}>
+	<DynamicTable data={charts} {columnDefinitions} {uiSchemas} {tableState}>
+		{#snippet reload()}
+			<Tooltip.Root>
+				<Tooltip.Trigger>
+					{#snippet child({ props })}
+						<Button
+							{...props}
+							onclick={onReload}
+							disabled={isFetching}
+							variant="outline"
+							size="icon"
+						>
+							<RefreshCwIcon />
+						</Button>
+					{/snippet}
+				</Tooltip.Trigger>
+				<Tooltip.Content>Reload</Tooltip.Content>
+			</Tooltip.Root>
+		{/snippet}
 		{#snippet gridLayout({ table, handleClear })}
 			{#if table.getRowModel().rows?.length}
 				<div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
 					{#each table.getRowModel().rows as row (row.id)}
-						<Grid {row} {cluster} {namespace} />
+						<Grid {row} {chartVariant} {cluster} {namespace} />
 					{/each}
 				</div>
 			{:else}
@@ -80,10 +104,10 @@
 			{/if}
 		{/snippet}
 		{#snippet create()}
-			<Upload />
+			<Upload {chartVariant} {namespace} />
 		{/snippet}
 		{#snippet rowActions({ row })}
-			<Actions {row} {cluster} {namespace} />
+			<Actions {row} {chartVariant} {cluster} {namespace} />
 		{/snippet}
 	</DynamicTable>
 </div>

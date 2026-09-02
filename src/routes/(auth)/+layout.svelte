@@ -48,6 +48,10 @@
 	import { breadcrumbs } from '$lib/stores';
 	import { pulse } from '$lib/stores/pulse.svelte';
 	import { getAdditionalItems } from '$lib/utils/features';
+	import {
+		ClusterReleaseLabelSelector,
+		WorkspaceReleaseLabelSelector
+	} from '$lib/utils/helm-release';
 	import { hasRookCephCRD } from '$lib/utils/rook-ceph';
 
 	import type { LayoutData } from './$types';
@@ -314,10 +318,11 @@
 					{
 						title: m.release(),
 						url: resourceUrl({
-							group: 'kro.run',
-							version: 'v1alpha1',
+							group: 'helm.toolkit.fluxcd.io',
+							version: 'v2',
 							kind: 'HelmRelease',
-							resource: 'helmreleases'
+							resource: 'helmreleases',
+							labelSelector: WorkspaceReleaseLabelSelector
 						})
 					},
 					{
@@ -444,7 +449,7 @@
 										version: 'v2',
 										kind: 'HelmRelease',
 										resource: 'helmreleases',
-										labelSelector: 'app.kubernetes.io/managed-by!=kro'
+										labelSelector: ClusterReleaseLabelSelector
 									})
 								}
 							]
