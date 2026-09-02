@@ -22,12 +22,12 @@
 	import { version } from '$app/environment';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import type { ChartType } from '$lib/components/artifact-viewer/types';
+	import type { ChartType } from '$lib/components/chart-viewer/types';
 	import {
 		encodeHarborURIComponent,
 		parseHarborHost,
 		parseHarborProjectName
-	} from '$lib/components/artifact-viewer/utils.svelte';
+	} from '$lib/components/chart-viewer/utils.svelte';
 	import { ModuleViewer } from '$lib/components/module-viewer';
 	import { getChartData, type ModuleAttribute } from '$lib/components/module-viewer/table-layout';
 	import type {

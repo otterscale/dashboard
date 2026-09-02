@@ -1,5 +1,5 @@
 import { env as publicEnv } from '$env/dynamic/public';
-import { encodeHarborURIComponent } from '$lib/components/artifact-viewer/utils.svelte';
+import { encodeHarborURIComponent } from '$lib/components/chart-viewer/utils.svelte';
 
 interface ProjectType {
 	project_id: number;
