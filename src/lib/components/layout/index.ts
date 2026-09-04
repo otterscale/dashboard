@@ -2,5 +2,6 @@ export { default as DialogAbout } from './dialog-about.svelte';
 export { default as NavMain } from './nav-main.svelte';
 export { default as NavSecondary } from './nav-secondary.svelte';
 export { default as NavUser } from './nav-user.svelte';
+export { default as NotificationTrigger } from './notification-trigger.svelte';
 export * from './start-tour';
 export { default as WorkspaceSwitcher } from './workspace-switcher.svelte';
