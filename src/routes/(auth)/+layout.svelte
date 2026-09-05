@@ -8,11 +8,9 @@
 	import BracesIcon from '@lucide/svelte/icons/braces';
 	import CircleQuestionMarkIcon from '@lucide/svelte/icons/circle-question-mark';
 	import CompassIcon from '@lucide/svelte/icons/compass';
-	import ContainerIcon from '@lucide/svelte/icons/container';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import GaugeIcon from '@lucide/svelte/icons/gauge';
-	import GitGraphIcon from '@lucide/svelte/icons/git-graph';
 	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 	import LayersIcon from '@lucide/svelte/icons/layers';
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
@@ -332,64 +330,6 @@
 							version: 'v1',
 							kind: 'HelmRepository',
 							resource: 'helmrepositories'
-						})
-					}
-				]
-			},
-			{
-				title: m.git_ops(),
-				icon: GitGraphIcon,
-				isActive: false,
-				items: [
-					{
-						title: m.kustomize(),
-						url: resourceUrl({
-							group: 'kustomize.toolkit.fluxcd.io',
-							version: 'v1',
-							kind: 'Kustomization',
-							resource: 'kustomizations'
-						})
-					},
-					{
-						title: m.git_repository(),
-						url: resourceUrl({
-							group: 'source.toolkit.fluxcd.io',
-							version: 'v1',
-							kind: 'GitRepository',
-							resource: 'gitrepositories'
-						})
-					}
-				]
-			},
-			{
-				title: m.workload(),
-				icon: ContainerIcon,
-				items: [
-					{
-						title: m.application(),
-						url: resourceUrl({
-							group: 'kro.run',
-							version: 'v1alpha1',
-							kind: 'Application',
-							resource: 'applications'
-						})
-					},
-					{
-						title: m.schedule(),
-						url: resourceUrl({
-							group: 'kro.run',
-							version: 'v1alpha1',
-							kind: 'Schedule',
-							resource: 'schedules'
-						})
-					},
-					{
-						title: m.task(),
-						url: resourceUrl({
-							group: 'kro.run',
-							version: 'v1alpha1',
-							kind: 'Task',
-							resource: 'tasks'
 						})
 					}
 				]
