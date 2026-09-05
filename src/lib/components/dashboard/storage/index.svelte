@@ -66,15 +66,6 @@
 					{m.storage_dashboard_description()}
 				</Item.Description>
 			</Item.Content>
-			<Item.Actions>
-				<Sheet.Root>
-					<Sheet.Trigger>
-						<Button>
-							<ActivityIcon />
-						</Button>
-					</Sheet.Trigger>
-				</Sheet.Root>
-			</Item.Actions>
 		</Item.Root>
 	</div>
 	{#if prometheusDriver}
