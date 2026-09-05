@@ -35,7 +35,6 @@
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
-	import { m } from '$lib/messages';
 	import { bump } from '$lib/stores/pulse.svelte';
 
 	let {
@@ -120,11 +119,6 @@
 		isSubmitting = false;
 	}
 
-	$effect(() => {
-		open;
-		reset();
-	});
-
 	function handleNext() {
 		currentStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
 	}
@@ -138,7 +132,14 @@
 	}
 </script>
 
-<Dialog.Root bind:open>
+<Dialog.Root
+	bind:open
+	onOpenChangeComplete={(isOpen) => {
+		if (isOpen) return;
+
+		reset();
+	}}
+>
 	{@render trigger?.({
 		get open() {
 			return open;
