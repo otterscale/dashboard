@@ -23,26 +23,30 @@
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
+	import { ReleaseScopeLabel } from '$lib/utils/helm-release';
 	import { computeValuesDelta } from '$lib/utils/helm-values';
 
 	import type { ChartAttribute } from '../table-layout';
 	import { type ArtifactChartType } from '../types';
 	import { encodeHarborURIComponent, parseHarborHost } from '../utils.svelte';
+	import type { ChartVariant } from '../variants';
 
 	let {
 		row,
+		chartVariant,
 		cluster,
 		namespace,
 		onOpenChangeComplete
 	}: {
 		row: Row<Record<ChartAttribute, JsonValue>>;
+		chartVariant: ChartVariant;
 		cluster: string;
 		namespace: string;
 		onOpenChangeComplete: () => void;
 	} = $props();
 
-	const group = 'kro.run';
-	const version = 'v1alpha1';
+	const group = 'helm.toolkit.fluxcd.io';
+	const version = 'v2';
 	const kind = 'HelmRelease';
 	const resource = 'helmreleases';
 
@@ -74,7 +78,10 @@
 	});
 	const validate = $derived(jsonSchemaValidator.compile(jsonSchema ?? {}));
 
-	// Container for Data.
+	// Container for Data. `chartVariant` is a static descriptor for the page
+	// this dialog was opened from, so seeding the release from it once is
+	// intentional.
+	// svelte-ignore state_referenced_locally
 	let values = $state({
 		apiVersion: `${group}/${version}`,
 		kind,
@@ -82,6 +89,23 @@
 		spec: {
 			interval: '15m',
 			timeout: '1h',
+			serviceAccountName: chartVariant.release.serviceAccountName,
+			...(chartVariant.release.propagateScopeLabel
+				? {
+						commonMetadata: {
+							labels: {
+								[ReleaseScopeLabel]: chartVariant.release.scope
+							}
+						}
+					}
+				: {}),
+			...(chartVariant.release.createNamespace
+				? {
+						install: {
+							createNamespace: true
+						}
+					}
+				: {}),
 			chart: {
 				spec: {}
 			},
@@ -260,6 +284,10 @@
 							name: {
 								...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema),
 								title: 'Name'
+							},
+							targetNamespace: {
+								...(lodash.get(jsonSchema, 'properties.spec.properties.targetNamespace') as Schema),
+								title: 'Target Namespace'
 							}
 						}
 					} as Schema}
@@ -268,12 +296,39 @@
 							translations: {
 								submit: 'Next'
 							}
+						},
+						targetNamespace: {
+							'ui:options': {
+								shadcn4Text: {
+									// A workspace release always lands in its own namespace, so the
+									// field is shown for context but cannot be retargeted.
+									readonly: !chartVariant.release.editableTargetNamespace,
+									placeholder: chartVariant.release.editableTargetNamespace
+										? 'Created automatically if it does not exist.'
+										: undefined
+								}
+							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{ namespace: namespace }}
+					initialValue={{ namespace: namespace, targetNamespace: namespace }}
 					bind:values={values['metadata']}
 					handleSubmit={{
 						posthook: () => {
+							// targetNamespace belongs to spec, not metadata; relocate it.
+							const targetNamespace = lodash.get(values, 'metadata.targetNamespace');
+							lodash.unset(values, 'metadata.targetNamespace');
+							if (targetNamespace) {
+								lodash.set(values, 'spec.targetNamespace', targetNamespace);
+							} else {
+								lodash.unset(values, 'spec.targetNamespace');
+							}
+							// The metadata form replaces `values.metadata` wholesale, so stamp the
+							// scope label afterwards — it has to survive into the reviewed YAML.
+							lodash.set(
+								values,
+								['metadata', 'labels', ReleaseScopeLabel],
+								chartVariant.release.scope
+							);
 							handleNext();
 						}
 					}}

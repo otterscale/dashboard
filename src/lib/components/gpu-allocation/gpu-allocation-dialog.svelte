@@ -2,6 +2,7 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import GpuIcon from '@lucide/svelte/icons/gpu';
 	import { ResourceService } from '@otterscale/api/resource/v1';
+	import { PrometheusDriver } from 'prometheus-query';
 	import { getContext, type Snippet } from 'svelte';
 
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -9,6 +10,7 @@
 	import { m } from '$lib/messages';
 
 	import { fetchLLMInferenceServiceTopology, fetchNodeTopology } from './fetch-topology';
+	import { fetchGpuUtilization } from './fetch-utilization';
 	import GpuAllocationDiagram from './gpu-allocation-diagram.svelte';
 	import type { TopologyData, TopologyView } from './types';
 
@@ -40,17 +42,52 @@
 	let error = $state<string | null>(null);
 	let topologyData = $state<TopologyData | null>(null);
 
+	/** Bumped per open so a slow metrics response can't land on a later topology. */
+	let requestId = 0;
+
+	/**
+	 * Attach measured per-card usage to the topology already on screen. Runs after the
+	 * diagram renders rather than as part of `fetchData`, so an unreachable Prometheus
+	 * only costs the utilization bars — never the allocation view itself.
+	 */
+	async function attachUtilization(data: TopologyData, id: number) {
+		if (data.gpus.length === 0) return;
+
+		try {
+			const prometheus = new PrometheusDriver({
+				endpoint: `/proxy/${cluster}/prometheus`,
+				baseURL: '/api/v1',
+				headers: { 'x-proxy-target': 'api' }
+			});
+			const utilization = await fetchGpuUtilization(
+				prometheus,
+				data.gpus.map((gpu) => gpu.device.id)
+			);
+			if (id !== requestId || utilization.size === 0) return;
+
+			topologyData = {
+				...data,
+				gpus: data.gpus.map((gpu) => ({ ...gpu, utilization: utilization.get(gpu.device.id) }))
+			};
+		} catch (err) {
+			console.warn('Failed to fetch GPU utilization:', err);
+		}
+	}
+
 	async function fetchData() {
+		const id = ++requestId;
 		isLoading = true;
 		error = null;
 		topologyData = null;
 
 		try {
-			if (view === 'llm-inference-service') {
-				topologyData = await fetchLLMInferenceServiceTopology(client, cluster, namespace, name);
-			} else {
-				topologyData = await fetchNodeTopology(client, cluster, object);
-			}
+			const data =
+				view === 'llm-inference-service'
+					? await fetchLLMInferenceServiceTopology(client, cluster, namespace, name)
+					: await fetchNodeTopology(client, cluster, object);
+			if (id !== requestId) return;
+			topologyData = data;
+			void attachUtilization(data, id);
 		} catch (err) {
 			console.error('Failed to fetch GPU allocation:', err);
 			error = m.gpu_allocation_fetch_error({ message: (err as ConnectError).message });

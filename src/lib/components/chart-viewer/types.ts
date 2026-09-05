@@ -9,18 +9,15 @@ interface ChartType {
 	home: string;
 	icon: string;
 	keywords: string[];
-	maintainers: {
-		email: string;
+	maintainers: Array<{
 		name: string;
-	};
+		email?: string;
+		url?: string;
+	}>;
 	name: string;
 	type: string;
 	urls: string[];
 	version: string;
-}
-
-interface IndexChartType extends ChartType {
-	versions: ChartType[];
 }
 
 interface HelmRepositoryChartVersion {
@@ -105,6 +102,5 @@ export {
 	createHelmRepositoryChartArtifact,
 	type HelmRepositoryChartArtifact,
 	type HelmRepositoryChartVersion,
-	type IndexChartType,
 	isHelmRepositoryChartArtifact
 };

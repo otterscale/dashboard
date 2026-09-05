@@ -10,15 +10,18 @@
 	import * as Card from '$lib/components/ui/card/index.js';
 	import * as Item from '$lib/components/ui/item';
 
-	import Actions from './operator-viewer-actions/actions.svelte';
+	import Actions from './chart-viewer-actions/actions.svelte';
 	import type { ChartAttribute } from './table-layout';
+	import type { ChartVariant } from './variants';
 
 	let {
 		row,
+		chartVariant,
 		cluster,
 		namespace
 	}: {
 		row: Row<Record<ChartAttribute, JsonValue>>;
+		chartVariant: ChartVariant;
 		cluster: string;
 		namespace: string;
 	} = $props();
@@ -45,7 +48,7 @@
 				</Item.Description>
 			</Item.Content>
 			<Item.Actions>
-				<Actions {row} {cluster} {namespace} />
+				<Actions {row} {chartVariant} {cluster} {namespace} />
 			</Item.Actions>
 		</Item.Root>
 	</Card.Header>
