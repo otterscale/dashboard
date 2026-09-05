@@ -8,11 +8,9 @@
 	import BracesIcon from '@lucide/svelte/icons/braces';
 	import CircleQuestionMarkIcon from '@lucide/svelte/icons/circle-question-mark';
 	import CompassIcon from '@lucide/svelte/icons/compass';
-	import ContainerIcon from '@lucide/svelte/icons/container';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import GaugeIcon from '@lucide/svelte/icons/gauge';
-	import GitGraphIcon from '@lucide/svelte/icons/git-graph';
 	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 	import LayersIcon from '@lucide/svelte/icons/layers';
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
