@@ -49,5 +49,4 @@ describe('Rancher Project mapping', () => {
 			''
 		);
 	});
-
 });
