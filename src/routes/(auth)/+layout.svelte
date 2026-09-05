@@ -337,64 +337,6 @@
 				]
 			},
 			{
-				title: m.git_ops(),
-				icon: GitGraphIcon,
-				isActive: false,
-				items: [
-					{
-						title: m.kustomize(),
-						url: resourceUrl({
-							group: 'kustomize.toolkit.fluxcd.io',
-							version: 'v1',
-							kind: 'Kustomization',
-							resource: 'kustomizations'
-						})
-					},
-					{
-						title: m.git_repository(),
-						url: resourceUrl({
-							group: 'source.toolkit.fluxcd.io',
-							version: 'v1',
-							kind: 'GitRepository',
-							resource: 'gitrepositories'
-						})
-					}
-				]
-			},
-			{
-				title: m.workload(),
-				icon: ContainerIcon,
-				items: [
-					{
-						title: m.application(),
-						url: resourceUrl({
-							group: 'kro.run',
-							version: 'v1alpha1',
-							kind: 'Application',
-							resource: 'applications'
-						})
-					},
-					{
-						title: m.schedule(),
-						url: resourceUrl({
-							group: 'kro.run',
-							version: 'v1alpha1',
-							kind: 'Schedule',
-							resource: 'schedules'
-						})
-					},
-					{
-						title: m.task(),
-						url: resourceUrl({
-							group: 'kro.run',
-							version: 'v1alpha1',
-							kind: 'Task',
-							resource: 'tasks'
-						})
-					}
-				]
-			},
-			{
 				title: m.compute(),
 				icon: CpuIcon,
 				items: [
