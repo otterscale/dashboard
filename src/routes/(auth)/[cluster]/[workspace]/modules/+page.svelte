@@ -22,12 +22,12 @@
 	import { version } from '$app/environment';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import type { ChartType } from '$lib/components/artifact-viewer/types';
+	import type { ChartType } from '$lib/components/chart-viewer/types';
 	import {
 		encodeHarborURIComponent,
 		parseHarborHost,
 		parseHarborProjectName
-	} from '$lib/components/artifact-viewer/utils.svelte';
+	} from '$lib/components/chart-viewer/utils.svelte';
 	import { ModuleViewer } from '$lib/components/module-viewer';
 	import { getChartData, type ModuleAttribute } from '$lib/components/module-viewer/table-layout';
 	import type {
@@ -125,16 +125,7 @@
 				? await fetchEntireModulesFromHarbor(helmRepository)
 				: await fetchEntireModulesFromIndex(helmRepository);
 
-			return entireModules
-				.filter((module: ModuleType) => {
-					const moduleVersion = semver.valid(module.version);
-					return (
-						moduleVersion !== null &&
-						semver.major(moduleVersion) === semver.major(dashboardVersion) &&
-						semver.minor(moduleVersion) === semver.minor(dashboardVersion)
-					);
-				})
-				.filter((module: ModuleType) => module.name.startsWith('otterscale-'));
+			return entireModules;
 		} catch (error) {
 			const helmRepositoryName = helmRepository.metadata?.name ?? '';
 			console.error(`HelmRepository "${helmRepositoryName}": error fetching modules:`, error);
@@ -206,17 +197,7 @@
 
 		return Object.values(modulesByName)
 			.map((versions) => {
-				const validVersions = versions
-					.filter((version) => {
-						const validVersion = semver.valid(version.version);
-
-						return (
-							validVersion !== null &&
-							semver.major(validVersion) === semver.major(dashboardVersion) &&
-							semver.minor(validVersion) === semver.minor(dashboardVersion)
-						);
-					})
-					.sort((p, n) => semver.rcompare(p.version, n.version));
+				const validVersions = versions.sort((p, n) => semver.rcompare(p.version, n.version));
 				const [latestValidVersion] = validVersions;
 				if (latestValidVersion) {
 					return {
@@ -245,17 +226,7 @@
 		const indexModules: Record<string, ChartType[]> = await response.json();
 		return Object.values(indexModules)
 			.map((versions) => {
-				const validVersions = versions
-					.filter((version) => {
-						const validVersion = semver.valid(version.version);
-
-						return (
-							validVersion !== null &&
-							semver.major(validVersion) === semver.major(dashboardVersion) &&
-							semver.minor(validVersion) === semver.minor(dashboardVersion)
-						);
-					})
-					.sort((p, n) => semver.rcompare(p.version, n.version));
+				const validVersions = versions.sort((p, n) => semver.rcompare(p.version, n.version));
 				const [latestValidVersion] = validVersions;
 				if (latestValidVersion) {
 					return {

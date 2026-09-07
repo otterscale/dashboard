@@ -1,9 +1,7 @@
 <script lang="ts">
-	import type { JsonObject } from '@bufbuild/protobuf';
 	import { createClient, type Transport } from '@connectrpc/connect';
+	import { ListIcon } from '@lucide/svelte';
 	import Ban from '@lucide/svelte/icons/ban';
-	import Braces from '@lucide/svelte/icons/braces';
-	import File from '@lucide/svelte/icons/file';
 	import Layers from '@lucide/svelte/icons/layers';
 	import {
 		type GetRequest,
@@ -13,28 +11,25 @@
 		type WatchRequest
 	} from '@otterscale/api/resource/v1';
 	import type { Schema } from '@sjsf/form';
+	import lodash from 'lodash';
 	import { getContext, onDestroy, onMount } from 'svelte';
-	import { stringify } from 'yaml';
 
-	import * as Code from '$lib/components/custom/code';
-	import { typographyVariants } from '$lib/components/typography/index.ts';
 	import * as Alert from '$lib/components/ui/alert/index.js';
-	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
+	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
 	import * as Item from '$lib/components/ui/item';
-	import Label from '$lib/components/ui/label/label.svelte';
-	import Separator from '$lib/components/ui/separator/separator.svelte';
-	import * as Sheet from '$lib/components/ui/sheet/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
-	import * as Tooltip from '$lib/components/ui/tooltip';
+	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
-	import type { EditorType, ViewerType } from './viewers';
-	import { getEditor, getResourceViewer } from './viewers';
+	import Conditions from './related-inforamtion/conditions.svelte';
+	import Yaml from './related-inforamtion/data.svelte';
+	import Events from './related-inforamtion/evens.svelte';
+	import RelatedResources from './related-inforamtion/related-resources.svelte';
+	import type { Resource } from './types';
 
 	let {
-		isClusterAdmin,
 		cluster,
 		namespace,
 		group,
@@ -43,7 +38,6 @@
 		resource,
 		name
 	}: {
-		isClusterAdmin: boolean;
 		cluster: string;
 		namespace: string;
 		group: string;
@@ -53,31 +47,39 @@
 		name: string;
 	} = $props();
 
+	const EVENT_UNSUPPORTED_KINDS = new Set([
+		'ClusterRoleBinding',
+		'ClusterRole',
+		'LimitRange',
+		'Namespace',
+		'NetworkPolicy',
+		'ResourceQuota',
+		'RoleBinding',
+		'Role',
+		'Secret'
+	]);
+
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	type ResourceObject = {
-		kind?: string;
-		apiVersion?: string;
-		metadata?: {
-			name?: string;
-			namespace?: string;
-			creationTimestamp?: string;
-			generation?: number;
-			resourceVersion?: string;
-			labels?: Record<string, string>;
-			annotations?: Record<string, string>;
-		};
-		status?: {
-			namespaceRef?: { name?: string };
-		};
-	} & JsonObject;
-	type ViewerError = { name?: string; rawMessage?: string; message?: string };
-
 	let schema: Schema | undefined = $state(undefined);
-	let object: ResourceObject | undefined = $state(undefined);
-	let error: ViewerError | null = $state(null);
+	async function fetchSchema() {
+		try {
+			const schemaResponse = await resourceClient.schema({
+				cluster,
+				group,
+				version,
+				kind
+			} as SchemaRequest);
+			return schemaResponse.schema as Schema;
+		} catch (e) {
+			console.error('Failed to fetch schema:', e);
+			return undefined;
+		}
+	}
 
+	let object: Resource | undefined = $state(undefined);
+	let error: { name: string; rawMessage: string } | Error | null = $state(null);
 	let isGetting = $state(false);
 	let getAbortController: AbortController | null = null;
 	async function GetResource() {
@@ -87,18 +89,6 @@
 		getAbortController = new AbortController();
 
 		try {
-			const schemaResponse = await resourceClient.schema(
-				{
-					cluster,
-					group,
-					version,
-					kind
-				} as SchemaRequest,
-				{ signal: getAbortController?.signal }
-			);
-
-			schema = schemaResponse.schema ?? {};
-
 			const getResponse = await resourceClient.get(
 				{
 					cluster,
@@ -110,7 +100,7 @@
 				} as GetRequest,
 				{ signal: getAbortController?.signal }
 			);
-			object = getResponse.object;
+			object = getResponse.object as Resource | undefined;
 		} catch (e) {
 			error = e as Error;
 		} finally {
@@ -121,7 +111,6 @@
 
 	let isWatching = $state(false);
 	let watchAbortController: AbortController | null = null;
-
 	async function watchResource() {
 		if (isWatching || isDestroyed) return;
 
@@ -181,9 +170,26 @@
 
 	const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+	const hasConditions = $derived(!!lodash.get(schema, 'properties.status.properties.conditions'));
+	const hasEvents = $derived(!EVENT_UNSUPPORTED_KINDS.has(kind));
+
+	let selectedRelatedInformation = $state({
+		value: 'related-resource',
+		label: 'Related Resources'
+	});
+	const relatedInformations = $derived(
+		[
+			{ value: 'data', label: 'Data' },
+			hasConditions ? { value: 'condition', label: 'Conditions' } : null,
+			hasEvents ? { value: 'event', label: 'Recent Events' } : null,
+			{ value: 'related-resource', label: 'Related Resources' }
+		].filter(Boolean)
+	);
+
 	let isMounted = $state(false);
 	onMount(async () => {
-		await GetResource();
+		const [, fetchedSchema] = await Promise.all([GetResource(), fetchSchema()]);
+		schema = fetchedSchema;
 		isMounted = true;
 		watchResource();
 	});
@@ -233,47 +239,11 @@
 				<Item.Actions>
 					<Skeleton class="size-10" />
 				</Item.Actions>
-				<Item.Footer class="flex flex-col items-start space-y-4">
-					{#each Array(2)}
-						<Item.Root class="p-0">
-							<Item.Media>
-								<Skeleton class="h-5 w-10" />
-							</Item.Media>
-							<Item.Content>
-								<Item.Title>
-									{#each Array(3)}
-										<Skeleton class="h-3 w-30" />
-									{/each}
-								</Item.Title>
-							</Item.Content>
-						</Item.Root>
-					{/each}
-				</Item.Footer>
 			</Item.Root>
 		</Field.Set>
 		<Field.Set>
 			{#each Array(13).keys() as index (index)}
-				{#if index % 2 === 0}
-					{#if index % 3 !== 0}
-						{#if index % 5 === 0}
-							{#if index % 7 !== 0}
-								{#if index % 11 === 0}
-									<Skeleton class="h-1 w-full" />
-								{:else}
-									<Skeleton class="h-11 w-5/6" />
-								{/if}
-							{:else}
-								<Skeleton class="h-7 w-4/5" />
-							{/if}
-						{:else}
-							<Skeleton class="h-5 w-3/4" />
-						{/if}
-					{:else}
-						<Skeleton class="h-3 w-2/3" />
-					{/if}
-				{:else}
-					<Skeleton class="h-2 w-1/2" />
-				{/if}
+				<Skeleton class="h-5 w-full" />
 			{/each}
 		</Field.Set>
 	</Field.Group>
@@ -292,7 +262,7 @@
 			<Alert.Root variant="destructive" class="border-none bg-destructive/5">
 				<Alert.Title class="font-bold">{error?.name}</Alert.Title>
 				<Alert.Description class="text-start">
-					{error?.rawMessage}
+					{lodash.get(error, 'rawMessage')}
 				</Alert.Description>
 			</Alert.Root>
 			<div class="flex gap-4">
@@ -301,176 +271,122 @@
 			</div>
 		</Empty.Content>
 	</Empty.Root>
-{:else}
-	{@const Inspector: ViewerType = getResourceViewer(resource)}
-	<Field.Group class="pb-8">
+{:else if object}
+	<Field.Group class="space-y-4 pb-8">
 		<Field.Set>
 			<!-- Header -->
 			<Item.Root class="w-full p-0">
 				<Item.Media variant="image" class="bg-muted-foreground/50 p-2">
-					<Layers size={48} />
+					<Layers />
 				</Item.Media>
 				<Item.Content>
 					<Item.Description>
-						<Badge variant="outline">{object?.kind}</Badge>
-						{object?.apiVersion}
+						{object?.kind}
 					</Item.Description>
-					<Item.Title class={typographyVariants({ variant: 'h3' })}>
+					<Item.Title class="text-xl font-bold">
 						{object?.metadata?.name}
 					</Item.Title>
-					<Separator class="invisible" />
-					<div class="grid gap-2 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
-						{#if object?.metadata}
-							{@const clusterData = { name: 'Cluster', information: cluster }}
-							{@const namespaceData = {
-								name: 'Namespace',
-								information:
-									object?.kind === 'Workspace' ? object?.status?.namespaceRef?.name : namespace
-							}}
-							{@const creationTimestampData = {
-								name: 'Creation Timestamp',
-								information: new Date(object.metadata?.creationTimestamp ?? '').toLocaleString(
-									'sv-SE'
-								)
-							}}
-							{@const generationData = {
-								name: 'Generation',
-								information: object.metadata?.generation
-							}}
-							{@const resourceVersionData = {
-								name: 'Resource Version',
-								information: object.metadata?.resourceVersion
-							}}
-							{#each [clusterData, namespaceData, creationTimestampData, generationData, resourceVersionData] as data, index (index)}
-								{#if data.information}
-									<Item.Root class="p-0">
-										<Item.Content>
-											<Item.Description>
-												{data.name}
-											</Item.Description>
-											<Item.Title>
-												{data.information}
-											</Item.Title>
-										</Item.Content>
-									</Item.Root>
-								{/if}
-							{/each}
-						{/if}
-					</div>
 				</Item.Content>
 				<Item.Actions>
-					{@const Editor: EditorType = getEditor(resource)}
-					<Tooltip.Root>
-						<Tooltip.Trigger>
+					<DropdownMenu.Root>
+						<DropdownMenu.Trigger>
 							{#snippet child({ props })}
-								<Sheet.Root>
-									<Sheet.Trigger>
-										<Button {...props} variant="outline" size="icon-lg">
-											<File />
-										</Button>
-									</Sheet.Trigger>
-									<Sheet.Content
-										side="right"
-										class="flex h-full max-w-[62vw] min-w-[50vw] flex-col gap-0 overflow-y-auto p-4"
-									>
-										<Sheet.Header class="shruk-0 space-y-4">
-											<Sheet.Title>
-												{name}
-												<p class="text-muted-foreground">
-													{!group ? 'core' : group}/{version}/{kind}/{resource}
-												</p>
-											</Sheet.Title>
-											<Sheet.Description>
-												{schema?.description}
-											</Sheet.Description>
-										</Sheet.Header>
-										{#if object}
-											<Code.Root
-												code={stringify(object)}
-												lang="yaml"
-												class="no-shiki-limit m-4 border-none bg-muted"
-											>
-												<Code.CopyButton />
-											</Code.Root>
-										{:else}
-											<Empty.Root class="m-4 bg-muted/50">
-												<Empty.Header>
-													<Empty.Media variant="icon">
-														<Braces size={36} />
-													</Empty.Media>
-													<Empty.Title>No Data</Empty.Title>
-													<Empty.Description>
-														No data is currently available for this resource.
-														<br />
-														To populate this resource, please add properties or values through the resource
-														editor.
-													</Empty.Description>
-												</Empty.Header>
-												<Empty.Content></Empty.Content>
-											</Empty.Root>
-										{/if}
-									</Sheet.Content>
-								</Sheet.Root>
+								<Button {...props} variant="ghost">
+									<ListIcon />
+								</Button>
 							{/snippet}
-						</Tooltip.Trigger>
-						<Tooltip.Content>View Resource</Tooltip.Content>
-					</Tooltip.Root>
-					{#if Editor}
-						<Editor
-							role={isClusterAdmin ? 'Cluster Admin' : undefined}
-							{cluster}
-							{group}
-							{version}
-							{kind}
-							{resource}
-							{schema}
-							{object}
-							onsuccess={() => {
-								resourceClient
-									.get({
-										cluster,
-										namespace,
-										group,
-										version,
-										resource,
-										name
-									} as GetRequest)
-									.then((response) => {
-										object = response.object;
-									});
-							}}
-						/>
-					{/if}
+						</DropdownMenu.Trigger>
+						<DropdownMenu.Content align="end" class="w-fit">
+							<DropdownMenu.Group>
+								{#each relatedInformations as relatedInformation, index (index)}
+									{#if relatedInformation}
+										<DropdownMenu.Item
+											onSelect={() => {
+												selectedRelatedInformation = relatedInformation;
+											}}
+										>
+											{relatedInformation.label}
+										</DropdownMenu.Item>
+									{/if}
+								{/each}
+							</DropdownMenu.Group>
+						</DropdownMenu.Content>
+					</DropdownMenu.Root>
 				</Item.Actions>
-				<Item.Footer class="flex flex-col items-start justify-start gap-2">
-					<!-- Tags -->
-					{@const tags = {
-						Labels: object?.metadata?.labels ?? {},
-						Annotations: object?.metadata?.annotations ?? {}
-					}}
-					{#each Object.entries(tags) as [key, values], index (index)}
-						{#if Object.keys(values).length > 0}
-							<Item.Root class="grid w-full grid-cols-[80px_1fr] p-0">
-								<Item.Media class="relative flex w-fit items-center self-start">
-									<Label>{key}</Label>
-								</Item.Media>
-								<Item.Content class="group flex flex-row flex-wrap gap-2">
-									{#each Object.entries(values) as [key, value], index (index)}
-										<Badge variant="outline" class="max-w-full border">
-											<p class="text-muted-foreground">{key}</p>
-											<Separator orientation="vertical" class="h-1" />
-											<p class="max-w-xs truncate">{value}</p>
-										</Badge>
-									{/each}
-								</Item.Content>
-							</Item.Root>
-						{/if}
-					{/each}
-				</Item.Footer>
 			</Item.Root>
+			<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+				{#if object?.metadata}
+					{@const Metadatacluster = { key: 'Cluster', value: cluster, data: cluster }}
+					{@const MetadataNamespace = {
+						key: 'Namespace',
+						value: namespace,
+						data: namespace
+					}}
+					{@const MetadataCreationTimestamp = {
+						key: 'Creation Timestamp',
+						value: object.metadata?.creationTimestamp
+							? new Date(object.metadata?.creationTimestamp).toLocaleString('sv-SE')
+							: '',
+						data: object.metadata?.creationTimestamp
+					}}
+					{@const MetadataGeneration = {
+						key: 'Generation',
+						value: object.metadata?.generation,
+						data: object.metadata?.generation
+					}}
+					{@const MetadataLabels = {
+						key: 'Labels' as const,
+						value: Object.keys(object.metadata?.labels ?? {}).length,
+						data: object.metadata?.labels
+					}}
+					{@const MetadataAnnotations = {
+						key: 'Annotations' as const,
+						value: Object.keys(object.metadata?.annotations ?? {}).length,
+						data: object.metadata?.annotations
+					}}
+					{#each [Metadatacluster, MetadataNamespace, MetadataCreationTimestamp, MetadataGeneration, MetadataLabels, MetadataAnnotations].filter((metadata) => metadata.value) as metadata, index (index)}
+						<Item.Root class="p-0">
+							<Item.Content>
+								<Item.Description>
+									{metadata.key}
+								</Item.Description>
+								<Item.Title>
+									{metadata.value}
+								</Item.Title>
+							</Item.Content>
+						</Item.Root>
+					{/each}
+				{/if}
+			</div>
 		</Field.Set>
-		{#if object}
-			<Inspector {object} {schema} />
-		{/if}
+		<Field.Set>
+			<Tabs.Root value={selectedRelatedInformation.value} class="w-full">
+				<Tabs.Content value="data">
+					<Yaml {object} />
+				</Tabs.Content>
+				{#if hasConditions}
+					<Tabs.Content value="condition">
+						<Conditions {object} />
+					</Tabs.Content>
+				{/if}
+				{#if hasEvents}
+					<Tabs.Content value="event">
+						<Events {cluster} {namespace} {kind} {name} />
+					</Tabs.Content>
+				{/if}
+				<Tabs.Content value="related-resource">
+					<RelatedResources
+						{cluster}
+						{namespace}
+						{group}
+						{version}
+						{kind}
+						{resource}
+						{name}
+						{object}
+					/>
+				</Tabs.Content>
+			</Tabs.Root>
+		</Field.Set>
 	</Field.Group>
 {/if}

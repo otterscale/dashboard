@@ -1,11 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-	applyRancherProjectID,
-	createRancherProjectLoader,
-	findRancherProjectID,
-	rancherProjectSecondaryText
-} from './rancher-project';
+import { createRancherProjectLoader, rancherProjectSecondaryText } from './rancher-project';
 
 describe('createRancherProjectLoader', () => {
 	it('shares an in-flight request and reloads after it settles', async () => {
@@ -53,22 +48,5 @@ describe('Rancher Project mapping', () => {
 		expect(rancherProjectSecondaryText({ id: 'c-m-cluster:p-team', displayName: 'p-team' })).toBe(
 			''
 		);
-	});
-
-	it('finds only the exact cluster Link', () => {
-		const links = [
-			{ cluster: 'production', rancherProjectId: 'c-m-cluster:p-prod' },
-			{ cluster: 'production-canary', rancherProjectId: 'c-m-cluster:p-canary' }
-		];
-		expect(findRancherProjectID(links, 'production')).toBe('c-m-cluster:p-prod');
-		expect(findRancherProjectID(links, 'prod')).toBeUndefined();
-	});
-
-	it('includes the Workspace field only for a non-empty Link value', () => {
-		const withProject = applyRancherProjectID({ spec: {} }, 'local:p-default');
-		const withoutProject = applyRancherProjectID({ spec: {} }, '');
-
-		expect(withProject.spec).toEqual({ rancherProjectID: 'local:p-default' });
-		expect(withoutProject.spec).toEqual({});
 	});
 });
