@@ -14,6 +14,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { formatLatency } from '$lib/formatter';
 	import { m } from '$lib/messages';
 	import {
 		type ActivityState,
@@ -202,6 +203,7 @@
 							}}
 						>
 							{#snippet formatter({ item, name, value })}
+								{@const latency = formatLatency(Number(value))}
 								<div
 									style="--color-bg: {item.color}; --color-border: {item.color};"
 									class="size-2.5 shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)"
@@ -211,8 +213,8 @@
 										<span class="text-muted-foreground">{name}</span>
 									</div>
 									<span class="font-mono font-medium text-foreground tabular-nums">
-										{(Number(value) * 1000).toFixed(0)}
-										{m.ms()}
+										{latency.value}
+										{latency.unit}
 									</span>
 								</div>
 							{/snippet}
