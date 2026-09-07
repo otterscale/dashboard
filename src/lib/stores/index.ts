@@ -34,49 +34,20 @@ function persistentWritable<T>(key: string, initialValue: T): Writable<T> {
 	return store;
 }
 
-// temp
-export interface Notification {
-	id: string;
-	from: string;
-	title: string;
-	content: string;
-	read: boolean;
-	archived: boolean;
-	deleted: boolean;
-	created: Date;
-	updated: Date;
-}
-
 interface AppStores {
 	// Navigation
 	breadcrumbs: Writable<Path[]>;
 
 	// Role
 	role: Writable<string>;
-
-	// Notification
-	notifications: Writable<Notification[]>;
 }
 
 // Create stores
 const createStores = (): AppStores => ({
 	breadcrumbs: writable<Path[]>([{ title: m.home(), url: resolve('/') }]),
 	// Persistent role store
-	role: persistentWritable<string>('otterscale:role', ''),
-	notifications: writable<Notification[]>([
-		{
-			id: '1',
-			from: 'system@otterscale.com',
-			title: m.notification_welcome_title({ site: m.site_title() }),
-			content: m.notification_welcome_content(),
-			read: false,
-			archived: false,
-			deleted: false,
-			created: new Date(Date.now() - 86400000),
-			updated: new Date(Date.now() - 86400000)
-		}
-	])
+	role: persistentWritable<string>('otterscale:role', '')
 });
 
 // Export individual stores
-export const { breadcrumbs, role, notifications } = createStores();
+export const { breadcrumbs, role } = createStores();

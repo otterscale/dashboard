@@ -1,157 +1,216 @@
 <script lang="ts">
-	import ArchiveIcon from '@lucide/svelte/icons/archive';
-	import ArchiveRestoreIcon from '@lucide/svelte/icons/archive-restore';
-	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
-	import MailIcon from '@lucide/svelte/icons/mail';
-	import MailOpenIcon from '@lucide/svelte/icons/mail-open';
+	import BellIcon from '@lucide/svelte/icons/bell';
+	import CheckCheckIcon from '@lucide/svelte/icons/check-check';
+	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
+	import InfoIcon from '@lucide/svelte/icons/info';
+	import OctagonXIcon from '@lucide/svelte/icons/octagon-x';
 	import Trash2Icon from '@lucide/svelte/icons/trash-2';
+	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
+	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { CopyButton } from '$lib/components/custom/copy-button';
+	import { Badge } from '$lib/components/ui/badge';
+	import { Button } from '$lib/components/ui/button';
+	import * as Empty from '$lib/components/ui/empty';
+	import * as Item from '$lib/components/ui/item';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
 	import { Separator } from '$lib/components/ui/separator';
 	import * as Sheet from '$lib/components/ui/sheet';
-	import * as Tabs from '$lib/components/ui/tabs';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { siteConfig } from '$lib/config/site';
 	import { formatTimeAgo } from '$lib/formatter';
 	import { m } from '$lib/messages';
-	import { type Notification, notifications } from '$lib/stores';
+	import { notificationCenter, type NotificationLevel } from '$lib/stores/notifications.svelte';
+	import { cn } from '$lib/utils';
 
 	let { open = $bindable(false) }: { open: boolean } = $props();
 
-	async function unreadNotifition(id: string) {
-		notifications.update((items) => items.map((n) => (n.id === id ? { ...n, read: false } : n)));
+	const levelIcons: Record<NotificationLevel, typeof InfoIcon> = {
+		success: CircleCheckIcon,
+		error: OctagonXIcon,
+		warning: TriangleAlertIcon,
+		info: InfoIcon
+	};
+
+	const hasUnread = $derived(notificationCenter.unreadCount > 0);
+
+	/** Notifications whose full, unclamped text is shown. */
+	const expanded = new SvelteSet<string>();
+
+	/** Which clamped texts actually overflow; only their cards are expandable. */
+	const truncated = new SvelteMap<string, boolean>();
+
+	/** Marks whether a clamp hides text; skipped while expanded so the card stays collapsible. */
+	function trackTruncation(key: string, skip: boolean) {
+		return (node: HTMLElement) => {
+			if (skip) return;
+			const measure = () => truncated.set(key, node.scrollHeight > node.clientHeight + 1);
+			measure();
+			const observer = new ResizeObserver(measure);
+			observer.observe(node);
+			return () => observer.disconnect();
+		};
 	}
-	async function readNotifition(id: string) {
-		notifications.update((items) => items.map((n) => (n.id === id ? { ...n, read: true } : n)));
+
+	function toggleExpanded(id: string) {
+		if (!expanded.delete(id)) expanded.add(id);
 	}
-	async function unarchiveNotifition(id: string) {
-		notifications.update((items) =>
-			items.map((n) => (n.id === id ? { ...n, archived: false } : n))
-		);
+	function onCardClick(event: MouseEvent, id: string, expandable: boolean) {
+		if (!expandable) return;
+		// Clicks on the card's own buttons (copy, delete) must not toggle it.
+		if (event.target instanceof Element && event.target.closest('button')) return;
+		// Neither should a click that ends a text selection.
+		if (window.getSelection()?.toString()) return;
+		toggleExpanded(id);
 	}
-	async function archiveNotifition(id: string) {
-		notifications.update((items) => items.map((n) => (n.id === id ? { ...n, archived: true } : n)));
+	function onCardKeydown(event: KeyboardEvent, id: string, expandable: boolean) {
+		if (!expandable) return;
+		if (event.target !== event.currentTarget) return;
+		if (event.key !== 'Enter' && event.key !== ' ') return;
+		event.preventDefault();
+		toggleExpanded(id);
 	}
-	async function deleteNotifition(id: string) {
-		notifications.update((items) => items.map((n) => (n.id === id ? { ...n, deleted: true } : n)));
+	function clearAll() {
+		notificationCenter.clearAll();
+		expanded.clear();
+	}
+	function deleteNotification(id: string) {
+		notificationCenter.delete(id);
+		expanded.delete(id);
 	}
 </script>
 
 <Sheet.Root bind:open>
 	<Sheet.Content side="right" class="rounded-l-lg p-6">
-		<Tabs.Root value="unread" class="space-y-2">
-			<h1 class="text-xl font-semibold text-foreground">{m.notifications()}</h1>
-			<Tabs.List class="grid w-full grid-cols-3">
-				<Tabs.Trigger value="unread">{m.unread()}</Tabs.Trigger>
-				<Tabs.Trigger value="archived">{m.archived()}</Tabs.Trigger>
-				<Tabs.Trigger value="all">{m.all()}</Tabs.Trigger>
-			</Tabs.List>
+		<div class="flex min-h-0 flex-1 flex-col gap-2">
+			<Sheet.Title class="text-xl">{m.notifications()}</Sheet.Title>
+			<div class="flex items-center justify-end gap-1">
+				<Button
+					variant="ghost"
+					size="sm"
+					disabled={!hasUnread}
+					onclick={() => notificationCenter.markAllRead()}
+				>
+					<CheckCheckIcon data-icon="inline-start" />
+					{m.mark_all_as_read()}
+				</Button>
+				<Button
+					variant="ghost"
+					size="sm"
+					disabled={notificationCenter.items.length === 0}
+					onclick={clearAll}
+				>
+					<Trash2Icon data-icon="inline-start" />
+					{m.clear_all()}
+				</Button>
+			</div>
 			<Separator />
-			<Tabs.Content value="unread">
-				{@render list($notifications.filter((n) => !n.read && !n.archived && !n.deleted))}
-			</Tabs.Content>
-			<Tabs.Content value="archived">
-				{@render list($notifications.filter((n) => n.archived && !n.deleted))}
-			</Tabs.Content>
-			<Tabs.Content value="all">
-				{@render list($notifications.filter((n) => !n.deleted))}
-			</Tabs.Content>
-		</Tabs.Root>
+			<ScrollArea class="min-h-0 flex-1">
+				{#if notificationCenter.items.length === 0}
+					<Empty.Root>
+						<Empty.Header>
+							<Empty.Media variant="icon">
+								<BellIcon />
+							</Empty.Media>
+							<Empty.Title>{m.no_notifications()}</Empty.Title>
+						</Empty.Header>
+					</Empty.Root>
+				{:else}
+					<Item.Group class="gap-2 pb-4">
+						{#each notificationCenter.items as notification (notification.id)}
+							{@const LevelIcon = levelIcons[notification.level]}
+							{@const isExpanded = expanded.has(notification.id)}
+							{@const isExpandable =
+								isExpanded ||
+								truncated.get(`${notification.id}:title`) ||
+								truncated.get(`${notification.id}:content`) ||
+								false}
+							<Item.Root
+								variant="outline"
+								size="sm"
+								class={cn(
+									'flex-nowrap',
+									isExpandable && 'cursor-pointer transition-colors hover:bg-muted/50'
+								)}
+								role={isExpandable ? 'button' : undefined}
+								tabindex={isExpandable ? 0 : undefined}
+								aria-expanded={isExpandable ? isExpanded : undefined}
+								onclick={(event: MouseEvent) => onCardClick(event, notification.id, isExpandable)}
+								onkeydown={(event: KeyboardEvent) =>
+									onCardKeydown(event, notification.id, isExpandable)}
+							>
+								<Item.Media variant="icon" class="relative">
+									<LevelIcon
+										aria-hidden="true"
+										class={cn(notification.level === 'error' && 'text-destructive')}
+									/>
+									{#if !notification.read}
+										<span class="absolute -top-1 -right-1 size-2 rounded-full bg-primary"></span>
+									{/if}
+								</Item.Media>
+								<Item.Content class="min-w-0">
+									<!-- line-clamp makes Item.Title a block; this wrapper keeps the badge on the row. -->
+									<div class="flex items-start gap-1.5">
+										<Item.Title class="line-clamp-none min-w-0">
+											<span
+												class={cn('text-xs wrap-anywhere', !isExpanded && 'line-clamp-2')}
+												{@attach trackTruncation(`${notification.id}:title`, isExpanded)}
+											>
+												{notification.title}
+											</span>
+										</Item.Title>
+										{#if notification.count > 1}
+											<Badge variant="secondary" class="h-4 shrink-0 px-1 text-[10px] tabular-nums">
+												×{notification.count}
+											</Badge>
+										{/if}
+									</div>
+									<!-- Description and meta share one line, so every card is title + meta tall. -->
+									{@const meta = [
+										notification.content,
+										notification.from || siteConfig.title,
+										formatTimeAgo(notification.updated)
+									]
+										.filter(Boolean)
+										.join(' · ')}
+									<span
+										class={cn(
+											'text-xs wrap-anywhere whitespace-pre-wrap text-muted-foreground',
+											!isExpanded && 'line-clamp-2'
+										)}
+										{@attach trackTruncation(`${notification.id}:content`, isExpanded)}
+									>
+										{meta}
+									</span>
+								</Item.Content>
+								<Item.Actions class="gap-0 self-start">
+									<CopyButton
+										variant="ghost"
+										size="icon-xs"
+										text={[notification.title, notification.content].filter(Boolean).join('\n')}
+									/>
+									<Tooltip.Root>
+										<Tooltip.Trigger>
+											{#snippet child({ props })}
+												<Button
+													{...props}
+													variant="ghost"
+													size="icon-xs"
+													onclick={() => deleteNotification(notification.id)}
+												>
+													<Trash2Icon />
+													<span class="sr-only">{m.delete()}</span>
+												</Button>
+											{/snippet}
+										</Tooltip.Trigger>
+										<Tooltip.Content>{m.delete()}</Tooltip.Content>
+									</Tooltip.Root>
+								</Item.Actions>
+							</Item.Root>
+						{/each}
+					</Item.Group>
+				{/if}
+			</ScrollArea>
+		</div>
 	</Sheet.Content>
 </Sheet.Root>
-
-{#snippet list(notifications: Notification[])}
-	<ScrollArea class="h-screen">
-		<div class="flex flex-col gap-4 py-4 pt-0">
-			{#each notifications as notification (notification.id)}
-				<Tooltip.Root>
-					<Tooltip.Trigger>
-						<div
-							class="flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-all hover:bg-accent"
-						>
-							<div class="flex w-full items-center gap-2">
-								{#if !notification.read}
-									<span class="flex h-2 w-2 rounded-full bg-blue-600"></span>
-								{/if}
-								<div class="text-sm font-semibold">{notification.from ?? siteConfig.title}</div>
-
-								<div class="ml-auto text-xs [&_svg]:size-5">
-									<DropdownMenu.Root>
-										<DropdownMenu.Trigger>
-											<EllipsisIcon />
-										</DropdownMenu.Trigger>
-										<DropdownMenu.Content side="left" align="start">
-											<DropdownMenu.Group>
-												{#if notification.read}
-													<DropdownMenu.Item
-														onclick={() => {
-															unreadNotifition(notification.id);
-														}}
-													>
-														<MailIcon />
-														<span>{m.mark_as_unread()}</span>
-													</DropdownMenu.Item>
-												{:else}
-													<DropdownMenu.Item
-														onclick={() => {
-															readNotifition(notification.id);
-														}}
-													>
-														<MailOpenIcon />
-														<span>{m.mark_as_read()}</span>
-													</DropdownMenu.Item>
-												{/if}
-												{#if notification.archived}
-													<DropdownMenu.Item
-														onclick={() => {
-															unarchiveNotifition(notification.id);
-														}}
-													>
-														<ArchiveRestoreIcon />
-														<span>{m.mark_as_unarchived()}</span>
-													</DropdownMenu.Item>
-												{:else}
-													<DropdownMenu.Item
-														onclick={() => {
-															archiveNotifition(notification.id);
-														}}
-													>
-														<ArchiveIcon />
-														<span>{m.mark_as_archived()}</span>
-													</DropdownMenu.Item>
-												{/if}
-												<DropdownMenu.Separator />
-												<DropdownMenu.Item
-													onclick={() => {
-														deleteNotifition(notification.id);
-													}}
-												>
-													<Trash2Icon class="text-red-500" />
-													<span class="text-red-500">{m.delete()}</span>
-												</DropdownMenu.Item>
-											</DropdownMenu.Group>
-										</DropdownMenu.Content>
-									</DropdownMenu.Root>
-								</div>
-							</div>
-							<div class="flex flex-col space-y-1">
-								<span class="text-xs font-medium">{notification.title}</span>
-								<span class="line-clamp-2 text-left text-xs text-muted-foreground">
-									{notification.content.substring(0, 300)}
-								</span>
-							</div>
-
-							<div class="text-xs">
-								{formatTimeAgo(notification.created)}
-							</div>
-						</div>
-					</Tooltip.Trigger>
-					<Tooltip.Content side="left" class="w-[350px] break-words whitespace-pre-wrap">
-						<span class="break-words whitespace-pre-wrap">{notification.content}</span>
-					</Tooltip.Content>
-				</Tooltip.Root>
-			{/each}
-		</div>
-	</ScrollArea>
-{/snippet}
