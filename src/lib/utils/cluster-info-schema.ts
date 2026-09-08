@@ -24,7 +24,8 @@ export const NODE_PORT_MAX = 65535;
 export const CLUSTER_INFO_REQUIRED_FIELDS = [
 	'externalAddress',
 	'nodePortRangeMin',
-	'nodePortRangeMax'
+	'nodePortRangeMax',
+	'inferenceURL'
 ] as const;
 
 /**
@@ -53,7 +54,7 @@ export const clusterInfoFieldsSchema = {
 		},
 		inferenceURL: {
 			type: 'string',
-			pattern: '^(https?://.+)?$'
+			pattern: '^(?!.*://).+$'
 		}
 	}
 } as const;

@@ -127,8 +127,8 @@
 		}
 	};
 
-	// Step 2: externalAddress/nodePortRangeMin/nodePortRangeMax are always required;
-	// inferenceURL is optional but format-checked. Cluster info is always enabled now, so this
+	// Step 2: externalAddress/nodePortRangeMin/nodePortRangeMax/inferenceURL are all required.
+	// Cluster info is always enabled now, so this
 	// is a flat schema (no `if`/`then` toggle). The rules come from cluster-info-schema.ts, the
 	// same fragment /bff/cluster-import validates the request against, so the two can't drift
 	// apart; only title/errorMessage (display, not a rule) are added here.
@@ -201,6 +201,7 @@
 		},
 		inferenceURL: {
 			'ui:options': {
+				help: m.import_cluster_inference_url_description(),
 				shadcn4Text: { placeholder: m.import_cluster_inference_url_placeholder() }
 			}
 		}
