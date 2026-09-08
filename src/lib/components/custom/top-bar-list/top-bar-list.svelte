@@ -26,7 +26,8 @@
 		isLoaded,
 		onBarClick,
 		scrollable,
-		activity
+		activity,
+		legend
 	}: {
 		title: string;
 		description: string;
@@ -41,6 +42,11 @@
 		// cards sharing a row stay the same height regardless of how many bars each has.
 		// Leave false to let the list grow with its content.
 		scrollable?: boolean;
+		// Optional colour key for stacked bars (see `TopBar.segments`). Shown only in the
+		// maximized sheet: a legend row in the card would push its list down and break the
+		// shared baseline with the neighbouring cards, and the value column already names
+		// both numbers.
+		legend?: { label: string; class: string }[];
 	} = $props();
 
 	const maxValue = $derived(bars.reduce((m, b) => Math.max(m, b.value), 0));
@@ -59,12 +65,8 @@
 				<Badge variant="secondary" class="shrink-0">{bar.badge}</Badge>
 			{/if}
 		</span>
-		<span class={cn('shrink-0 font-mono text-sm whitespace-nowrap tabular-nums', bar.textClass)}>
+		<span class={cn('shrink-0 font-mono text-xs whitespace-nowrap tabular-nums', bar.textClass)}>
 			{#if bar.warning}
-				<!-- Ahead of the value, not after it: the value column is flush with the card's right
-				     edge, so a trailing marker pushes its own row's digits left and breaks the column
-				     the other rows line up on. Projected onto a span because the whole row is already
-				     a <button> when the list is clickable, and a nested button would be invalid. -->
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						{#snippet child({ props })}
@@ -82,11 +84,32 @@
 		</span>
 	</span>
 	<span class="relative h-2.5 w-full overflow-hidden rounded bg-muted">
-		<span
-			class={cn('absolute inset-y-0 left-0 rounded bg-chart-1', bar.barClass)}
-			style="width: {pct}%"
-		></span>
+		{#if bar.segments}
+			<span class="absolute inset-y-0 left-0 flex overflow-hidden rounded" style="width: {pct}%">
+				{#each bar.segments as segment, i (i)}
+					<span class={cn('h-full', segment.class)} style="flex: {segment.value} 1 0"></span>
+				{/each}
+			</span>
+		{:else}
+			<span
+				class={cn('absolute inset-y-0 left-0 rounded bg-chart-1', bar.barClass)}
+				style="width: {pct}%"
+			></span>
+		{/if}
 	</span>
+{/snippet}
+
+{#snippet legendRow()}
+	{#if legend && legend.length > 0}
+		<ul class="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-xs text-muted-foreground">
+			{#each legend as item (item.label)}
+				<li class="flex items-center gap-1.5">
+					<span class={cn('size-2.5 shrink-0 rounded-[2px]', item.class)}></span>
+					<span>{item.label}</span>
+				</li>
+			{/each}
+		</ul>
+	{/if}
 {/snippet}
 
 {#snippet list()}
@@ -135,6 +158,7 @@
 						<Sheet.Title>{title}</Sheet.Title>
 						<Sheet.Description>{description}</Sheet.Description>
 					</Sheet.Header>
+					{@render legendRow()}
 					{@render list()}
 				</Sheet.Content>
 			</Sheet.Root>
