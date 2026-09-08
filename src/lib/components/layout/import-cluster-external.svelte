@@ -7,17 +7,28 @@
 	import PlusIcon from '@lucide/svelte/icons/plus';
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import TerminalIcon from '@lucide/svelte/icons/terminal';
+	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import UserIcon from '@lucide/svelte/icons/user';
 	import XIcon from '@lucide/svelte/icons/x';
 	import { type Link, LinkService, type RancherProject } from '@otterscale/api/link/v1';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { AppsV1Deployment } from '@otterscale/types';
+	import {
+		type FormState,
+		type FormValue,
+		getValueSnapshot,
+		type Schema,
+		type UiSchemaRoot
+	} from '@sjsf/form';
+	import Ajv from 'ajv';
+	import ajvErrors from 'ajv-errors';
 	import { getContext, onDestroy } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import * as Code from '$lib/components/custom/code';
+	import Form from '$lib/components/dynamic-form/form.svelte';
 	import * as Avatar from '$lib/components/ui/avatar';
 	import { Button } from '$lib/components/ui/button';
 	import * as Collapsible from '$lib/components/ui/collapsible';
@@ -25,7 +36,6 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Empty from '$lib/components/ui/empty';
 	import * as Field from '$lib/components/ui/field';
-	import { Input } from '$lib/components/ui/input';
 	import * as Item from '$lib/components/ui/item';
 	import * as Popover from '$lib/components/ui/popover';
 	import { Progress } from '$lib/components/ui/progress';
@@ -65,8 +75,10 @@
 
 	let stepIndex = $state(1);
 	let clusterName = $state('');
-	let installUrl = $state('');
-	let manifestYaml = $state('');
+	let installCommand = $state('');
+	let agentValues = $state('');
+	let robotName = $state('');
+	let robotRotated = $state(false);
 	let clusterStatus = $state<'pending' | 'installing' | 'done'>('pending');
 	let isCreating = $state(false);
 	let errorMessage = $state('');
@@ -100,11 +112,112 @@
 		wasOpen = open;
 	});
 
-	const installCommand = $derived(
-		installUrl ? `kubectl apply -f ${installUrl}` : m.import_cluster_generating_command()
-	);
+	// Mirrors core.ValidateClusterName on the server.
+	const CLUSTER_NAME_PATTERN = '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$';
 
-	const canGoNext = $derived(stepIndex === 1 ? clusterName.trim().length > 0 : false);
+	function defaultClusterInfoValues(): FormValue {
+		return {
+			clusterName: '',
+			clusterInfoEnabled: true,
+			externalAddress: '',
+			nodePortRange: '30000-32767',
+			inferenceURL: ''
+		};
+	}
+
+	// externalAddress/nodePortRange/inferenceURL only exist under `then`, so they're both
+	// required-when-enabled and hidden-when-disabled — sjsf re-derives visible fields live.
+	const clusterInfoSchema: Schema = {
+		type: 'object',
+		properties: {
+			clusterName: {
+				type: 'string',
+				title: m.import_cluster_name_label(),
+				pattern: CLUSTER_NAME_PATTERN,
+				maxLength: 63,
+				errorMessage: m.import_cluster_name_invalid()
+			},
+			clusterInfoEnabled: {
+				type: 'boolean',
+				title: m.import_cluster_access_label()
+			}
+		},
+		required: ['clusterName', 'clusterInfoEnabled'],
+		if: {
+			properties: { clusterInfoEnabled: { const: true } },
+			required: ['clusterInfoEnabled']
+		},
+		then: {
+			required: ['externalAddress', 'nodePortRange'],
+			properties: {
+				externalAddress: {
+					type: 'string',
+					title: m.import_cluster_external_address_label(),
+					pattern: '^(?!.*://).+$',
+					errorMessage: m.import_cluster_external_address_invalid()
+				},
+				nodePortRange: {
+					type: 'string',
+					title: m.import_cluster_node_port_range_label(),
+					pattern: '^[0-9]+-[0-9]+$',
+					errorMessage: m.import_cluster_node_port_range_invalid()
+				},
+				inferenceURL: {
+					type: 'string',
+					title: m.import_cluster_inference_url_label(),
+					pattern: '^(https?://.+)?$',
+					errorMessage: m.import_cluster_inference_url_invalid()
+				}
+			}
+		}
+	} as Schema;
+
+	const clusterInfoUiSchema: UiSchemaRoot = {
+		'ui:options': {
+			layouts: {
+				'object-properties': { class: 'gap-4' }
+			}
+		},
+		clusterName: {
+			'ui:options': {
+				shadcn4Text: { placeholder: m.import_cluster_name_placeholder() }
+			}
+		},
+		clusterInfoEnabled: {
+			'ui:components': { checkboxWidget: 'switchWidget' },
+			'ui:options': { help: m.import_cluster_access_description() }
+		},
+		externalAddress: {
+			'ui:options': {
+				help: m.import_cluster_external_address_description(),
+				shadcn4Text: { placeholder: m.import_cluster_external_address_placeholder() }
+			}
+		},
+		nodePortRange: {
+			'ui:options': {
+				shadcn4Text: { placeholder: '30000-32767' }
+			}
+		},
+		inferenceURL: {
+			'ui:options': {
+				shadcn4Text: { placeholder: m.import_cluster_inference_url_placeholder() }
+			}
+		}
+	} as UiSchemaRoot;
+
+	let clusterInfoFormReference: FormState<FormValue> | null = $state(null);
+
+	// Redundant with the sjsf form's own submit-time validation below; kept live so the
+	// "Generate command" button reflects validity as the user types, matching how the field
+	// itself will be validated.
+	const validateClusterInfo = ajvErrors(new Ajv({ allErrors: true, strict: true })).compile(
+		clusterInfoSchema
+	);
+	const canGoNext = $derived(
+		stepIndex === 1 && clusterInfoFormReference !== null
+			? validateClusterInfo(getValueSnapshot(clusterInfoFormReference))
+			: false
+	);
 
 	function reset() {
 		lifecycle += 1;
@@ -116,13 +229,16 @@
 
 		stepIndex = 1;
 		clusterName = '';
-		installUrl = '';
-		manifestYaml = '';
+		installCommand = '';
+		agentValues = '';
+		robotName = '';
+		robotRotated = false;
 		clusterStatus = 'pending';
 		isCreating = false;
 		errorMessage = '';
 		isYamlOpen = false;
 		rancherProjectID = '';
+		clusterInfoFormReference = null;
 		rancherProjects = [];
 		rancherProjectOpen = false;
 		rancherProjectLoading = false;
@@ -210,31 +326,67 @@
 		selectedUsers = selectedUsers.filter((s) => s.id !== id);
 	}
 
-	async function handleGenerateManifest() {
-		if (!clusterName.trim() || isCreating) return;
+	// The visible button lives outside the sjsf `<form>`, so it triggers that form's own
+	// submit programmatically; the real work runs in submitClusterInfo below, which only
+	// fires once the form's own schema validation succeeds.
+	function handleGenerateCommand() {
+		if (!canGoNext || isCreating || !clusterInfoFormReference) return;
+		clusterInfoFormReference.submit(new SubmitEvent('submit', { cancelable: true }));
+	}
+
+	async function submitClusterInfo(form: FormState<FormValue>) {
+		if (isCreating) return;
 		isCreating = true;
 		errorMessage = '';
 
+		const values = getValueSnapshot(form) as {
+			clusterName: string;
+			clusterInfoEnabled: boolean;
+			externalAddress?: string;
+			nodePortRange?: string;
+			inferenceURL?: string;
+		};
+		// Normalized once: polling and the final step both compare against this value.
+		clusterName = values.clusterName.trim();
+
 		try {
-			const response = await linkClient.getAgentManifest({
-				cluster: clusterName,
-				extraUsers: selectedUsers.map((u) => u.id).filter((id) => id),
-				rancherProjectId: rancherProjectID
+			const response = await fetch('/bff/cluster-import', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					cluster: clusterName,
+					extraUsers: selectedUsers.map((u) => u.id).filter((id) => id),
+					rancherProjectId: rancherProjectID,
+					clusterInfo: {
+						enabled: values.clusterInfoEnabled,
+						externalAddress: (values.externalAddress ?? '').trim(),
+						nodePortRange: (values.nodePortRange ?? '').trim(),
+						inferenceURL: (values.inferenceURL ?? '').trim()
+					}
+				})
 			});
 
-			installUrl = response.url;
-			manifestYaml = response.manifest;
+			if (!response.ok) {
+				throw new Error((await response.text()) || m.import_cluster_command_failed());
+			}
+
+			const result = (await response.json()) as {
+				installCommand: string;
+				values: string;
+				robot: { name: string; rotated: boolean };
+			};
+
+			installCommand = result.installCommand;
+			agentValues = result.values;
+			robotName = result.robot.name;
+			robotRotated = result.robot.rotated;
 			clusterStatus = 'pending';
 			stepIndex = 2;
 
-			toast.success(m.import_cluster_manifest_generated({ name: clusterName }));
+			toast.success(m.import_cluster_command_generated({ name: clusterName }));
 			pollForConnection();
 		} catch (e) {
-			if (e instanceof ConnectError) {
-				errorMessage = e.message;
-			} else {
-				errorMessage = e instanceof Error ? e.message : m.import_cluster_manifest_failed();
-			}
+			errorMessage = e instanceof Error ? e.message : m.import_cluster_command_failed();
 			toast.error(errorMessage);
 		} finally {
 			isCreating = false;
@@ -325,7 +477,7 @@
 				<div class="mt-auto flex w-full items-center justify-between gap-3 pt-4">
 					{#if stepIndex === 1}
 						<Button variant="outline" onclick={() => (open = false)}>{m.cancel()}</Button>
-						<Button onclick={handleGenerateManifest} disabled={!canGoNext || isCreating}>
+						<Button onclick={handleGenerateCommand} disabled={!canGoNext || isCreating}>
 							{#if isCreating}
 								<Spinner data-icon="inline-start" />
 								{m.import_cluster_generating()}
@@ -345,31 +497,21 @@
 </Dialog.Root>
 
 {#snippet stepClusterInfo()}
-	<form
-		class="flex flex-col gap-6"
-		onsubmit={(e) => {
-			e.preventDefault();
-			if (canGoNext) handleGenerateManifest();
-		}}
-	>
+	<div class="flex flex-col gap-6">
 		<div class="flex flex-col gap-1">
 			<h3 class="text-xl font-bold">{m.import_cluster_info_title()}</h3>
 			<p class="text-sm text-muted-foreground">{m.import_cluster_info_description()}</p>
 		</div>
 
 		<Field.FieldGroup>
-			<Field.Field>
-				<Field.FieldLabel for="wizard-cluster-name"
-					>{m.import_cluster_name_label()}</Field.FieldLabel
-				>
-				<Input
-					id="wizard-cluster-name"
-					type="text"
-					placeholder={m.import_cluster_name_placeholder()}
-					bind:value={clusterName}
-					required
-				/>
-			</Field.Field>
+			<Form
+				schema={clusterInfoSchema}
+				uiSchema={clusterInfoUiSchema}
+				initialValue={defaultClusterInfoValues()}
+				bind:reference={clusterInfoFormReference}
+				handleSubmit={{ posthook: submitClusterInfo }}
+				class="**:data-[slot=dynamic-form-mode-controller]:hidden"
+			/>
 
 			<Field.Field>
 				<Field.FieldLabel>{m.import_cluster_rancher_project_label()}</Field.FieldLabel>
@@ -609,9 +751,7 @@
 				{/if}
 			</Field.Field>
 		</Field.FieldGroup>
-
-		<button type="submit" class="hidden" disabled={!canGoNext || isCreating}>{m.submit()}</button>
-	</form>
+	</div>
 {/snippet}
 
 {#snippet stepDeployAgent()}
@@ -622,6 +762,20 @@
 				{m.import_cluster_deploy_agent_description()}
 			</p>
 		</div>
+
+		{#if robotRotated}
+			<Item.Root variant="outline" class="border-amber-500/50 bg-amber-500/5">
+				<Item.Media variant="icon" class="size-10 rounded-full bg-amber-500/10 text-amber-500">
+					<TriangleAlertIcon />
+				</Item.Media>
+				<Item.Content>
+					<Item.Title>{m.import_cluster_robot_rotated_title()}</Item.Title>
+					<Item.Description>
+						{m.import_cluster_robot_rotated_description({ name: robotName })}
+					</Item.Description>
+				</Item.Content>
+			</Item.Root>
+		{/if}
 
 		<div
 			class={cn(
@@ -647,7 +801,7 @@
 				{m.import_cluster_install_command_description()}
 			</Field.FieldDescription>
 
-			{#if manifestYaml}
+			{#if agentValues}
 				<Collapsible.Root
 					bind:open={isYamlOpen}
 					class={cn('flex flex-col', isYamlOpen && 'min-h-0 flex-1')}
@@ -657,7 +811,7 @@
 					>
 						<span class="flex items-center gap-2">
 							<FileCodeIcon class="size-4" />
-							{m.import_cluster_preview_yaml()}
+							{m.import_cluster_preview_values()}
 						</span>
 						<ChevronDownIcon
 							class="size-4 transition-transform duration-200 group-data-[state=open]:rotate-180"
@@ -665,7 +819,7 @@
 					</Collapsible.Trigger>
 					<Collapsible.Content class="flex min-h-0 flex-1 flex-col">
 						<div class="mt-2 min-h-0 flex-1 overflow-auto rounded-md border">
-							<Code.Root lang="yaml" class="w-full text-xs" code={manifestYaml}>
+							<Code.Root lang="yaml" class="w-full text-xs" code={agentValues}>
 								<Code.CopyButton />
 							</Code.Root>
 						</div>
@@ -745,6 +899,12 @@
 								{m.import_cluster_rancher_project_confirmation_label()}
 							</span>
 							<span class="truncate font-medium">{rancherProjectID}</span>
+						</div>
+					{/if}
+					{#if robotName}
+						<div class="flex justify-between gap-4">
+							<span class="text-muted-foreground">{m.import_cluster_harbor_robot()}</span>
+							<span class="truncate font-medium">{robotName}</span>
 						</div>
 					{/if}
 					{#if selectedUsers.length > 0}
