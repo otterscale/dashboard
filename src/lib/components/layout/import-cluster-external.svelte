@@ -89,10 +89,12 @@
 	// Mirrors core.ValidateClusterName on the server.
 	const CLUSTER_NAME_PATTERN = '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$';
 
+	function defaultClusterNameValues(): FormValue {
+		return { clusterName: '' };
+	}
+
 	function defaultClusterInfoValues(): FormValue {
 		return {
-			clusterName: '',
-			clusterInfoEnabled: true,
 			externalAddress: '',
 			nodePortRangeMin: 30000,
 			nodePortRangeMax: 32767,
@@ -100,12 +102,10 @@
 		};
 	}
 
-	// externalAddress/nodePortRangeMin/nodePortRangeMax/inferenceURL only exist under `then`, so
-	// they're both required-when-enabled and hidden-when-disabled — sjsf re-derives visible fields
-	// live. Their rules come from cluster-info-schema.ts, the same fragment
-	// /bff/cluster-import validates the request against, so the two can't drift apart; only
-	// title/errorMessage (display, not a rule) are added here.
-	const clusterInfoSchema: Schema = {
+	// Step 1: just the name. Mirrors core.ValidateClusterName on the server.
+	// `errorMessage` is an ajv-errors extension sjsf's `Schema` type doesn't model — cast, same
+	// as clusterInfoSchema below.
+	const clusterNameSchema: Schema = {
 		type: 'object',
 		properties: {
 			clusterName: {
@@ -114,66 +114,66 @@
 				pattern: CLUSTER_NAME_PATTERN,
 				maxLength: 63,
 				errorMessage: m.import_cluster_name_invalid()
-			},
-			clusterInfoEnabled: {
-				type: 'boolean',
-				title: m.import_cluster_access_label()
 			}
 		},
-		required: ['clusterName', 'clusterInfoEnabled'],
-		if: {
-			properties: { clusterInfoEnabled: { const: true } },
-			required: ['clusterInfoEnabled']
-		},
-		then: {
-			required: [...CLUSTER_INFO_REQUIRED_FIELDS],
-			properties: {
-				externalAddress: {
-					...clusterInfoFieldsSchema.properties.externalAddress,
-					title: m.import_cluster_external_address_label(),
-					errorMessage: m.import_cluster_external_address_invalid()
-				},
-				nodePortRangeMin: {
-					...clusterInfoFieldsSchema.properties.nodePortRangeMin,
-					title: m.import_cluster_node_port_range_min_label(),
-					errorMessage: m.import_cluster_node_port_range_bounds_invalid()
-				},
-				nodePortRangeMax: {
-					...clusterInfoFieldsSchema.properties.nodePortRangeMax,
-					title: m.import_cluster_node_port_range_max_label(),
-					errorMessage: {
-						type: m.import_cluster_node_port_range_bounds_invalid(),
-						minimum: m.import_cluster_node_port_range_bounds_invalid(),
-						maximum: m.import_cluster_node_port_range_bounds_invalid(),
-						exclusiveMinimum: m.import_cluster_node_port_range_order_invalid()
-					}
-				},
-				inferenceURL: {
-					...clusterInfoFieldsSchema.properties.inferenceURL,
-					title: m.import_cluster_inference_url_label(),
-					errorMessage: m.import_cluster_inference_url_invalid()
-				}
+		required: ['clusterName']
+	} as unknown as Schema;
+
+	const clusterNameUiSchema: UiSchemaRoot = {
+		clusterName: {
+			'ui:options': {
+				shadcn4Text: { placeholder: m.import_cluster_name_placeholder() }
 			}
 		}
-		// sjsf's Schema type predates ajv's `$data` extension (used below by nodePortRangeMax's
+	};
+
+	// Step 2: externalAddress/nodePortRangeMin/nodePortRangeMax are always required;
+	// inferenceURL is optional but format-checked. Cluster info is always enabled now, so this
+	// is a flat schema (no `if`/`then` toggle). The rules come from cluster-info-schema.ts, the
+	// same fragment /bff/cluster-import validates the request against, so the two can't drift
+	// apart; only title/errorMessage (display, not a rule) are added here.
+	const clusterInfoSchema: Schema = {
+		type: 'object',
+		required: [...CLUSTER_INFO_REQUIRED_FIELDS],
+		properties: {
+			externalAddress: {
+				...clusterInfoFieldsSchema.properties.externalAddress,
+				title: m.import_cluster_external_address_label(),
+				errorMessage: m.import_cluster_external_address_invalid()
+			},
+			nodePortRangeMin: {
+				...clusterInfoFieldsSchema.properties.nodePortRangeMin,
+				title: m.import_cluster_node_port_range_label(),
+				errorMessage: m.import_cluster_node_port_range_bounds_invalid()
+			},
+			nodePortRangeMax: {
+				...clusterInfoFieldsSchema.properties.nodePortRangeMax,
+				errorMessage: {
+					type: m.import_cluster_node_port_range_bounds_invalid(),
+					minimum: m.import_cluster_node_port_range_bounds_invalid(),
+					maximum: m.import_cluster_node_port_range_bounds_invalid(),
+					exclusiveMinimum: m.import_cluster_node_port_range_order_invalid()
+				}
+			},
+			inferenceURL: {
+				...clusterInfoFieldsSchema.properties.inferenceURL,
+				title: m.import_cluster_inference_url_label(),
+				errorMessage: m.import_cluster_inference_url_invalid()
+			}
+		}
+		// sjsf's Schema type predates ajv's `$data` extension (used above by nodePortRangeMax's
 		// exclusiveMinimum), so the two shapes don't structurally overlap enough for a direct
 		// `as Schema` — routed through `unknown`, same as ajv itself treats it at runtime.
 	} as unknown as Schema;
 
 	const clusterInfoUiSchema: UiSchemaRoot = {
 		'ui:options': {
+			// Two-column grid: externalAddress/inferenceURL share the first row,
+			// nodePortRangeMin/nodePortRangeMax the second. `order` drives which cell each lands in.
+			order: ['externalAddress', 'inferenceURL', 'nodePortRangeMin', 'nodePortRangeMax'],
 			layouts: {
-				'object-properties': { class: 'gap-4' }
+				'object-properties': { class: 'grid grid-cols-2 gap-4' }
 			}
-		},
-		clusterName: {
-			'ui:options': {
-				shadcn4Text: { placeholder: m.import_cluster_name_placeholder() }
-			}
-		},
-		clusterInfoEnabled: {
-			'ui:components': { checkboxWidget: 'switchWidget' },
-			'ui:options': { help: m.import_cluster_access_description() }
 		},
 		externalAddress: {
 			'ui:options': {
@@ -187,7 +187,9 @@
 			}
 		},
 		nodePortRangeMax: {
+			// Sits directly right of nodePortRangeMin under the shared "NodePort Range" label.
 			'ui:options': {
+				hideTitle: true,
 				shadcn4Number: { placeholder: '32767' }
 			}
 		},
@@ -198,19 +200,32 @@
 		}
 	} as UiSchemaRoot;
 
+	let clusterNameFormReference: FormState<FormValue> | null = $state(null);
 	let clusterInfoFormReference: FormState<FormValue> | null = $state(null);
 
-	// Redundant with the sjsf form's own submit-time validation below; kept live so the
-	// "Generate command" button reflects validity as the user types, matching how the field
-	// itself will be validated.
+	// Redundant with each sjsf form's own submit-time validation below; kept live so the
+	// "Next" / "Generate command" buttons reflect validity as the user types.
+	const validateClusterName = ajvErrors(new Ajv({ allErrors: true, strict: true })).compile(
+		clusterNameSchema
+	);
 	const validateClusterInfo = ajvErrors(
 		new Ajv({ allErrors: true, strict: true, $data: true })
 	).compile(clusterInfoSchema);
-	const canGoNext = $derived(
-		stepIndex === 1 && clusterInfoFormReference !== null
-			? validateClusterInfo(getValueSnapshot(clusterInfoFormReference))
-			: false
-	);
+	const canGoNext = $derived.by(() => {
+		if (stepIndex === 1) {
+			return (
+				clusterNameFormReference !== null &&
+				validateClusterName(getValueSnapshot(clusterNameFormReference))
+			);
+		}
+		if (stepIndex === 2) {
+			return (
+				clusterInfoFormReference !== null &&
+				validateClusterInfo(getValueSnapshot(clusterInfoFormReference))
+			);
+		}
+		return false;
+	});
 
 	function reset() {
 		abortController?.abort();
@@ -227,13 +242,23 @@
 		isCreating = false;
 		errorMessage = '';
 		isYamlOpen = false;
+		clusterNameFormReference = null;
 		clusterInfoFormReference = null;
 		selectedUsers = [];
 	}
 
-	// The visible button lives outside the sjsf `<form>`, so it triggers that form's own
-	// submit programmatically; the real work runs in submitClusterInfo below, which only
-	// fires once the form's own schema validation succeeds.
+	// Each visible wizard button lives outside its sjsf `<form>`, so it triggers that form's
+	// own submit programmatically; the form's posthook only fires once its schema validation
+	// succeeds. Step 1 just advances; step 2 does the real work in submitClusterInfo.
+	function handleNext() {
+		if (!canGoNext || isCreating || !clusterNameFormReference) return;
+		clusterNameFormReference.submit(new SubmitEvent('submit', { cancelable: true }));
+	}
+
+	function goToClusterInfo() {
+		stepIndex = 2;
+	}
+
 	function handleGenerateCommand() {
 		if (!canGoNext || isCreating || !clusterInfoFormReference) return;
 		clusterInfoFormReference.submit(new SubmitEvent('submit', { cancelable: true }));
@@ -244,16 +269,17 @@
 		isCreating = true;
 		errorMessage = '';
 
+		const nameValues = clusterNameFormReference
+			? (getValueSnapshot(clusterNameFormReference) as { clusterName: string })
+			: { clusterName: '' };
 		const values = getValueSnapshot(form) as {
-			clusterName: string;
-			clusterInfoEnabled: boolean;
 			externalAddress?: string;
 			nodePortRangeMin?: number;
 			nodePortRangeMax?: number;
 			inferenceURL?: string;
 		};
 		// Normalized once: polling and the final step both compare against this value.
-		clusterName = values.clusterName.trim();
+		clusterName = nameValues.clusterName.trim();
 
 		try {
 			const response = await fetch('/bff/cluster-import', {
@@ -263,7 +289,7 @@
 					cluster: clusterName,
 					extraUsers: selectedUsers.map((u) => u.id).filter((id) => id),
 					clusterInfo: {
-						enabled: values.clusterInfoEnabled,
+						enabled: true,
 						externalAddress: (values.externalAddress ?? '').trim(),
 						nodePortRangeMin: values.nodePortRangeMin,
 						nodePortRangeMax: values.nodePortRangeMax,
@@ -287,7 +313,7 @@
 			robotName = result.robot.name;
 			robotRotated = result.robot.rotated;
 			clusterStatus = 'pending';
-			stepIndex = 2;
+			stepIndex = 3;
 
 			toast.success(m.import_cluster_command_generated({ name: clusterName }));
 			pollForConnection();
@@ -342,7 +368,7 @@
 				const available = conditions.find((c) => c.type === 'Available');
 				if (available?.status === 'True') {
 					clusterStatus = 'done';
-					stepIndex = 3;
+					stepIndex = 4;
 					break;
 				}
 			} catch {
@@ -368,21 +394,30 @@
 <Dialog.Root bind:open>
 	<Dialog.Content class="flex max-h-[95vh] min-w-[38vw] flex-col overflow-hidden">
 		<Dialog.Title class="sr-only">{m.import_cluster_dialog_title()}</Dialog.Title>
-		<Progress value={stepIndex} max={3} class="mt-1 mr-6 w-auto shrink-0" />
+		<Progress value={stepIndex} max={4} class="mt-1 mr-6 w-auto shrink-0" />
 
 		<div class="mt-4 flex min-h-0 flex-1 flex-col gap-6">
-			{#if stepIndex === 1}
-				{@render stepClusterInfo()}
-			{:else if stepIndex === 2}
-				{@render stepDeployAgent()}
+			{#if stepIndex <= 2}
+				<!-- Both step forms stay mounted so going Back from step 2 keeps what was typed. -->
+				<div class={stepIndex === 1 ? 'contents' : 'hidden'}>
+					{@render stepClusterName()}
+				</div>
+				<div class={stepIndex === 2 ? 'contents' : 'hidden'}>
+					{@render stepClusterInfo()}
+				</div>
 			{:else if stepIndex === 3}
+				{@render stepDeployAgent()}
+			{:else if stepIndex === 4}
 				{@render stepVerifyBinding()}
 			{/if}
 
-			{#if stepIndex === 1 || stepIndex === 3}
+			{#if stepIndex === 1 || stepIndex === 2 || stepIndex === 4}
 				<div class="mt-auto flex w-full items-center justify-between gap-3 pt-4">
 					{#if stepIndex === 1}
 						<Button variant="outline" onclick={() => (open = false)}>{m.cancel()}</Button>
+						<Button onclick={handleNext} disabled={!canGoNext}>{m.next()}</Button>
+					{:else if stepIndex === 2}
+						<Button variant="outline" onclick={() => (stepIndex = 1)}>{m.back()}</Button>
 						<Button onclick={handleGenerateCommand} disabled={!canGoNext || isCreating}>
 							{#if isCreating}
 								<Spinner data-icon="inline-start" />
@@ -402,11 +437,33 @@
 	</Dialog.Content>
 </Dialog.Root>
 
-{#snippet stepClusterInfo()}
+{#snippet stepClusterName()}
 	<div class="flex flex-col gap-6">
 		<div class="flex flex-col gap-1">
 			<h3 class="text-xl font-bold">{m.import_cluster_info_title()}</h3>
 			<p class="text-sm text-muted-foreground">{m.import_cluster_info_description()}</p>
+		</div>
+
+		<Field.FieldGroup>
+			<Form
+				schema={clusterNameSchema}
+				uiSchema={clusterNameUiSchema}
+				initialValue={defaultClusterNameValues()}
+				bind:reference={clusterNameFormReference}
+				handleSubmit={{ posthook: goToClusterInfo }}
+				class="**:data-[slot=dynamic-form-mode-controller]:hidden"
+			/>
+
+			<ImportClusterAdministrators bind:users={selectedUsers} />
+		</Field.FieldGroup>
+	</div>
+{/snippet}
+
+{#snippet stepClusterInfo()}
+	<div class="flex flex-col gap-6">
+		<div class="flex flex-col gap-1">
+			<h3 class="text-xl font-bold">{m.import_cluster_access_label()}</h3>
+			<p class="text-sm text-muted-foreground">{m.import_cluster_access_description()}</p>
 		</div>
 
 		<Field.FieldGroup>
@@ -418,8 +475,6 @@
 				handleSubmit={{ posthook: submitClusterInfo }}
 				class="**:data-[slot=dynamic-form-mode-controller]:hidden"
 			/>
-
-			<ImportClusterAdministrators bind:users={selectedUsers} />
 		</Field.FieldGroup>
 	</div>
 {/snippet}
