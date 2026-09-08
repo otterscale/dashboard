@@ -1,16 +1,12 @@
 <script lang="ts">
-	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import CheckIcon from '@lucide/svelte/icons/check';
+	import { createClient, type Transport } from '@connectrpc/connect';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import FileCodeIcon from '@lucide/svelte/icons/file-code';
-	import PlusIcon from '@lucide/svelte/icons/plus';
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import TerminalIcon from '@lucide/svelte/icons/terminal';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
-	import UserIcon from '@lucide/svelte/icons/user';
-	import XIcon from '@lucide/svelte/icons/x';
-	import { type Link, LinkService, type RancherProject } from '@otterscale/api/link/v1';
+	import { type Link, LinkService } from '@otterscale/api/link/v1';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { AppsV1Deployment } from '@otterscale/types';
 	import {
@@ -29,15 +25,16 @@
 	import { resolve } from '$app/paths';
 	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
-	import * as Avatar from '$lib/components/ui/avatar';
+	import ImportClusterAdministrators, {
+		type KeycloakUser
+	} from '$lib/components/layout/import-cluster-administrators.svelte';
+	import ImportClusterRancherProject from '$lib/components/layout/import-cluster-rancher-project.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Collapsible from '$lib/components/ui/collapsible';
-	import * as Command from '$lib/components/ui/command';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Empty from '$lib/components/ui/empty';
 	import * as Field from '$lib/components/ui/field';
 	import * as Item from '$lib/components/ui/item';
-	import * as Popover from '$lib/components/ui/popover';
 	import { Progress } from '$lib/components/ui/progress';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { m } from '$lib/messages';
@@ -47,10 +44,6 @@
 		CLUSTER_INFO_REQUIRED_FIELDS,
 		clusterInfoFieldsSchema
 	} from '$lib/utils/cluster-info-schema';
-	import {
-		createRancherProjectLoader,
-		rancherProjectSecondaryText
-	} from '$lib/utils/rancher-project';
 
 	let {
 		open = $bindable(false),
@@ -62,20 +55,9 @@
 
 	const POLL_INTERVAL = 3000;
 
-	interface KeycloakUser {
-		id: string;
-		username: string;
-		email?: string;
-		firstName?: string;
-		lastName?: string;
-	}
-
 	const transport: Transport = getContext('transport');
 	const linkClient = createClient(LinkService, transport);
 	const resourceClient = createClient(ResourceService, transport);
-	const loadRancherProjects = createRancherProjectLoader(() =>
-		linkClient.listRancherProjects({}).then((response) => response.projects)
-	);
 
 	let stepIndex = $state(1);
 	let clusterName = $state('');
@@ -87,49 +69,25 @@
 	let isCreating = $state(false);
 	let errorMessage = $state('');
 	let isYamlOpen = $state(false);
+	// Owned here so reset() can clear it and submitClusterInfo can read it; the
+	// picker UI and its data-loading live in <ImportClusterRancherProject>.
 	let rancherProjectID = $state('');
-	let rancherProjects = $state<RancherProject[]>([]);
-	let rancherProjectOpen = $state(false);
-	let rancherProjectLoading = $state(false);
-	let rancherProjectError = $state('');
-	// Stays false until listRancherProjects has returned successfully at least
-	// once; drives whether the Rancher-project picker renders at all.
-	let rancherProjectsFetched = $state(false);
 
-	// Rancher isn't wired up on every deployment. Once we've confirmed there are
-	// no projects to pick (and no error worth retrying), drop the field entirely
-	// rather than showing an empty selector.
-	const showRancherProjectField = $derived(
-		!rancherProjectsFetched || rancherProjectError !== '' || rancherProjects.length > 0
-	);
-
+	// Owned here so reset() can clear it and submitClusterInfo can read it; the
+	// picker UI and its user search live in <ImportClusterAdministrators>.
 	let selectedUsers = $state<KeycloakUser[]>([]);
-	let userSearchOpen = $state(false);
-	let userSearchQuery = $state('');
-	let userSearchResults = $state<KeycloakUser[]>([]);
-	let userSearchLoading = $state(false);
-	let userSearchInitialized = false;
-	let userDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 	let isPolling = false;
 	let abortController: AbortController | null = null;
-	let lifecycle = 0;
 	let wasOpen = open;
 
 	onDestroy(() => {
 		abortController?.abort();
-		if (userDebounceTimer) clearTimeout(userDebounceTimer);
 	});
 
 	$effect(() => {
 		if (wasOpen && !open) reset();
 		wasOpen = open;
-	});
-
-	// Probe for Rancher projects as soon as the dialog opens so the picker can
-	// decide whether to render before the user ever reaches for it.
-	$effect(() => {
-		if (open && !rancherProjectsFetched) fetchRancherProjects();
 	});
 
 	// Mirrors core.ValidateClusterName on the server.
@@ -259,12 +217,9 @@
 	);
 
 	function reset() {
-		lifecycle += 1;
 		abortController?.abort();
 		abortController = null;
 		isPolling = false;
-		if (userDebounceTimer) clearTimeout(userDebounceTimer);
-		userDebounceTimer = null;
 
 		stepIndex = 1;
 		clusterName = '';
@@ -278,93 +233,7 @@
 		isYamlOpen = false;
 		rancherProjectID = '';
 		clusterInfoFormReference = null;
-		rancherProjects = [];
-		rancherProjectOpen = false;
-		rancherProjectLoading = false;
-		rancherProjectError = '';
-		rancherProjectsFetched = false;
 		selectedUsers = [];
-		userSearchOpen = false;
-		userSearchQuery = '';
-		userSearchResults = [];
-		userSearchLoading = false;
-		userSearchInitialized = false;
-	}
-
-	async function fetchRancherProjects() {
-		if (rancherProjectLoading) return;
-		const requestLifecycle = lifecycle;
-		rancherProjectLoading = true;
-		rancherProjectError = '';
-
-		try {
-			const projects = await loadRancherProjects();
-			if (requestLifecycle !== lifecycle) return;
-			rancherProjects = projects;
-			rancherProjectsFetched = true;
-			if (!projects.some((project) => project.id === rancherProjectID)) {
-				rancherProjectID = '';
-			}
-		} catch (error) {
-			if (requestLifecycle !== lifecycle) return;
-			rancherProjects = [];
-			rancherProjectError =
-				error instanceof ConnectError || error instanceof Error
-					? error.message
-					: m.import_cluster_rancher_project_error();
-		} finally {
-			if (requestLifecycle === lifecycle) rancherProjectLoading = false;
-		}
-	}
-
-	function handleRancherProjectOpenChange(isOpen: boolean) {
-		if (isOpen) fetchRancherProjects();
-	}
-
-	function displayName(u: KeycloakUser): string {
-		const full = `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim();
-		return full || u.username;
-	}
-
-	async function fetchUsers(q: string) {
-		userSearchLoading = true;
-		try {
-			const res = await fetch(`/rest/users?search=${encodeURIComponent(q)}&max=10`);
-			userSearchResults = res.ok ? ((await res.json()) as KeycloakUser[]) : [];
-		} catch (e) {
-			console.error('Failed to search users:', e);
-			userSearchResults = [];
-		} finally {
-			userSearchLoading = false;
-		}
-	}
-
-	function handleUserSearch(q: string) {
-		userSearchQuery = q;
-		if (userDebounceTimer) clearTimeout(userDebounceTimer);
-		userDebounceTimer = setTimeout(() => {
-			fetchUsers(q);
-		}, 300);
-	}
-
-	function handleUserPopoverOpenChange(open: boolean) {
-		if (open && !userSearchInitialized) {
-			userSearchInitialized = true;
-			fetchUsers('');
-		}
-	}
-
-	function toggleUser(u: KeycloakUser) {
-		const i = selectedUsers.findIndex((s) => s.id === u.id);
-		if (i >= 0) {
-			selectedUsers.splice(i, 1);
-		} else {
-			selectedUsers.push(u);
-		}
-	}
-
-	function removeUser(id: string) {
-		selectedUsers = selectedUsers.filter((s) => s.id !== id);
 	}
 
 	// The visible button lives outside the sjsf `<form>`, so it triggers that form's own
@@ -556,251 +425,9 @@
 				class="**:data-[slot=dynamic-form-mode-controller]:hidden"
 			/>
 
-			{#if showRancherProjectField}
-				<Field.Field>
-					<Field.FieldLabel>{m.import_cluster_rancher_project_label()}</Field.FieldLabel>
-					<Field.FieldDescription>
-						{m.import_cluster_rancher_project_description()}
-					</Field.FieldDescription>
+			<ImportClusterRancherProject bind:value={rancherProjectID} />
 
-					<Popover.Root
-						bind:open={rancherProjectOpen}
-						onOpenChange={handleRancherProjectOpenChange}
-					>
-						<Popover.Trigger class="w-full">
-							{#snippet child({ props })}
-								<Button
-									{...props}
-									variant="outline"
-									role="combobox"
-									aria-expanded={rancherProjectOpen}
-									class="w-full justify-between"
-								>
-									<span class={cn('truncate', !rancherProjectID && 'text-muted-foreground')}>
-										{rancherProjectID || m.import_cluster_rancher_project_placeholder()}
-									</span>
-									<ChevronDownIcon class="ml-2 size-4 shrink-0 opacity-50" />
-								</Button>
-							{/snippet}
-						</Popover.Trigger>
-						<Popover.Content
-							class="w-[var(--bits-popover-anchor-width)] min-w-xs p-0"
-							align="start"
-						>
-							<Command.Root>
-								<Command.Input placeholder={m.import_cluster_rancher_project_search()} />
-								<Command.List>
-									{#if rancherProjectLoading}
-										<Command.Loading>
-											{m.import_cluster_rancher_project_loading()}
-										</Command.Loading>
-									{:else if rancherProjectError}
-										<div class="flex flex-col items-start gap-2 p-3">
-											<p class="text-sm text-destructive">
-												{m.import_cluster_rancher_project_error()}
-											</p>
-											<p class="text-xs text-muted-foreground">{rancherProjectError}</p>
-											<Button size="sm" variant="outline" onclick={fetchRancherProjects}>
-												{m.import_cluster_rancher_project_retry()}
-											</Button>
-										</div>
-									{:else}
-										<Command.Empty>
-											{m.import_cluster_rancher_project_empty()}
-										</Command.Empty>
-										<Command.Group>
-											{#if rancherProjects.length > 0}
-												<Command.Item
-													value={m.import_cluster_rancher_project_none()}
-													onSelect={() => {
-														rancherProjectID = '';
-														rancherProjectOpen = false;
-													}}
-												>
-													<CheckIcon
-														class={cn('mr-2 size-4', rancherProjectID && 'text-transparent')}
-													/>
-													{m.import_cluster_rancher_project_none()}
-												</Command.Item>
-											{/if}
-											{#each rancherProjects as project (project.id)}
-												<Command.Item
-													value={project.id}
-													onSelect={() => {
-														rancherProjectID = project.id;
-														rancherProjectOpen = false;
-													}}
-												>
-													<CheckIcon
-														class={cn(
-															'mr-2 size-4',
-															rancherProjectID !== project.id && 'text-transparent'
-														)}
-													/>
-													<div class="flex min-w-0 flex-col">
-														<span class="truncate font-medium">{project.id}</span>
-														{#if rancherProjectSecondaryText(project)}
-															<span class="truncate text-xs text-muted-foreground">
-																{rancherProjectSecondaryText(project)}
-															</span>
-														{/if}
-													</div>
-												</Command.Item>
-											{/each}
-										</Command.Group>
-									{/if}
-								</Command.List>
-							</Command.Root>
-						</Popover.Content>
-					</Popover.Root>
-				</Field.Field>
-			{/if}
-
-			<Field.Field>
-				<Field.FieldLabel>{m.import_cluster_administrators()}</Field.FieldLabel>
-				<Field.FieldDescription>
-					{m.import_cluster_administrators_description()}
-				</Field.FieldDescription>
-
-				{#if selectedUsers.length === 0}
-					<Empty.Root class="rounded-md border">
-						<Empty.Header>
-							<Empty.Media>
-								<Avatar.Group>
-									<Avatar.Root>
-										<Avatar.Fallback><UserIcon class="size-4" /></Avatar.Fallback>
-									</Avatar.Root>
-									<Avatar.Root>
-										<Avatar.Fallback><UserIcon class="size-4" /></Avatar.Fallback>
-									</Avatar.Root>
-									<Avatar.Root>
-										<Avatar.Fallback><UserIcon class="size-4" /></Avatar.Fallback>
-									</Avatar.Root>
-								</Avatar.Group>
-							</Empty.Media>
-							<Empty.Title>{m.import_cluster_no_administrators()}</Empty.Title>
-							<Empty.Description>
-								{m.import_cluster_no_administrators_description()}
-							</Empty.Description>
-						</Empty.Header>
-						<Empty.Content>
-							<Popover.Root bind:open={userSearchOpen} onOpenChange={handleUserPopoverOpenChange}>
-								<Popover.Trigger>
-									{#snippet child({ props })}
-										<Button {...props}>
-											<PlusIcon data-icon="inline-start" />
-											{m.import_cluster_add_administrator()}
-										</Button>
-									{/snippet}
-								</Popover.Trigger>
-								<Popover.Content class="w-80 p-0" align="center">
-									<Command.Root shouldFilter={false}>
-										<Command.Input
-											placeholder={m.import_cluster_search_users_placeholder()}
-											value={userSearchQuery}
-											oninput={(e) => handleUserSearch(e.currentTarget.value)}
-										/>
-										<Command.List>
-											{#if userSearchLoading}
-												<Command.Loading>{m.import_cluster_searching()}</Command.Loading>
-											{:else}
-												<Command.Empty>{m.import_cluster_no_users_found()}</Command.Empty>
-												<Command.Group>
-													{#each userSearchResults as user (user.id)}
-														{@const isSelected = selectedUsers.some((s) => s.id === user.id)}
-														<Command.Item value={user.id} onSelect={() => toggleUser(user)}>
-															<CheckIcon
-																class={cn('mr-2 size-4', !isSelected && 'text-transparent')}
-															/>
-															<div class="flex flex-col">
-																<span class="font-medium">{displayName(user)}</span>
-																<span class="text-xs text-muted-foreground">
-																	{user.email || user.username}
-																</span>
-															</div>
-														</Command.Item>
-													{/each}
-												</Command.Group>
-											{/if}
-										</Command.List>
-									</Command.Root>
-								</Popover.Content>
-							</Popover.Root>
-						</Empty.Content>
-					</Empty.Root>
-				{:else}
-					<div class="flex flex-col gap-2">
-						{#each selectedUsers as user (user.id)}
-							<Item.Root variant="outline">
-								<Item.Media>
-									<Avatar.Root>
-										<Avatar.Fallback>
-											{displayName(user).charAt(0).toUpperCase()}
-										</Avatar.Fallback>
-									</Avatar.Root>
-								</Item.Media>
-								<Item.Content>
-									<Item.Title>{displayName(user)}</Item.Title>
-									<Item.Description>{user.email || user.username}</Item.Description>
-								</Item.Content>
-								<Item.Actions>
-									<Button
-										variant="ghost"
-										size="icon"
-										onclick={() => removeUser(user.id)}
-										aria-label={m.import_cluster_remove_user({ name: displayName(user) })}
-									>
-										<XIcon />
-									</Button>
-								</Item.Actions>
-							</Item.Root>
-						{/each}
-
-						<Popover.Root bind:open={userSearchOpen} onOpenChange={handleUserPopoverOpenChange}>
-							<Popover.Trigger>
-								{#snippet child({ props })}
-									<Button {...props} variant="outline" class="w-full justify-start">
-										<PlusIcon data-icon="inline-start" />
-										{m.import_cluster_add_administrator()}
-									</Button>
-								{/snippet}
-							</Popover.Trigger>
-							<Popover.Content class="w-80 p-0" align="start">
-								<Command.Root shouldFilter={false}>
-									<Command.Input
-										placeholder={m.import_cluster_search_users_placeholder()}
-										value={userSearchQuery}
-										oninput={(e) => handleUserSearch(e.currentTarget.value)}
-									/>
-									<Command.List>
-										{#if userSearchLoading}
-											<Command.Loading>{m.import_cluster_searching()}</Command.Loading>
-										{:else}
-											<Command.Empty>{m.import_cluster_no_users_found()}</Command.Empty>
-											<Command.Group>
-												{#each userSearchResults as user (user.id)}
-													{@const isSelected = selectedUsers.some((s) => s.id === user.id)}
-													<Command.Item value={user.id} onSelect={() => toggleUser(user)}>
-														<CheckIcon
-															class={cn('mr-2 size-4', !isSelected && 'text-transparent')}
-														/>
-														<div class="flex flex-col">
-															<span class="font-medium">{displayName(user)}</span>
-															<span class="text-xs text-muted-foreground">
-																{user.email || user.username}
-															</span>
-														</div>
-													</Command.Item>
-												{/each}
-											</Command.Group>
-										{/if}
-									</Command.List>
-								</Command.Root>
-							</Popover.Content>
-						</Popover.Root>
-					</div>
-				{/if}
-			</Field.Field>
+			<ImportClusterAdministrators bind:users={selectedUsers} />
 		</Field.FieldGroup>
 	</div>
 {/snippet}
