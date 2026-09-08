@@ -188,8 +188,14 @@
 		},
 		nodePortRangeMax: {
 			// Sits directly right of nodePortRangeMin under the shared "NodePort Range" label.
+			// It has no title of its own, so bottom-align its grid cell (`justify-end` on a
+			// full-height flex column) to keep its input level with nodePortRangeMin's input
+			// rather than floating up beside that label.
 			'ui:options': {
 				hideTitle: true,
+				layouts: {
+					'object-property': { class: 'flex flex-col justify-end' }
+				},
 				shadcn4Number: { placeholder: '32767' }
 			}
 		},
