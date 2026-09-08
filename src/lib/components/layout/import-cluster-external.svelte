@@ -28,7 +28,6 @@
 	import ImportClusterAdministrators, {
 		type KeycloakUser
 	} from '$lib/components/layout/import-cluster-administrators.svelte';
-	import ImportClusterRancherProject from '$lib/components/layout/import-cluster-rancher-project.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Collapsible from '$lib/components/ui/collapsible';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -69,9 +68,6 @@
 	let isCreating = $state(false);
 	let errorMessage = $state('');
 	let isYamlOpen = $state(false);
-	// Owned here so reset() can clear it and submitClusterInfo can read it; the
-	// picker UI and its data-loading live in <ImportClusterRancherProject>.
-	let rancherProjectID = $state('');
 
 	// Owned here so reset() can clear it and submitClusterInfo can read it; the
 	// picker UI and its user search live in <ImportClusterAdministrators>.
@@ -231,7 +227,6 @@
 		isCreating = false;
 		errorMessage = '';
 		isYamlOpen = false;
-		rancherProjectID = '';
 		clusterInfoFormReference = null;
 		selectedUsers = [];
 	}
@@ -267,7 +262,6 @@
 				body: JSON.stringify({
 					cluster: clusterName,
 					extraUsers: selectedUsers.map((u) => u.id).filter((id) => id),
-					rancherProjectId: rancherProjectID,
 					clusterInfo: {
 						enabled: values.clusterInfoEnabled,
 						externalAddress: (values.externalAddress ?? '').trim(),
@@ -425,8 +419,6 @@
 				class="**:data-[slot=dynamic-form-mode-controller]:hidden"
 			/>
 
-			<ImportClusterRancherProject bind:value={rancherProjectID} />
-
 			<ImportClusterAdministrators bind:users={selectedUsers} />
 		</Field.FieldGroup>
 	</div>
@@ -514,9 +506,6 @@
 				<Item.Title>{clusterName}</Item.Title>
 				<Item.Description>
 					{m.import_cluster_target_cluster()}
-					{#if rancherProjectID}
-						· {m.import_cluster_rancher_project_confirmation({ id: rancherProjectID })}
-					{/if}
 				</Item.Description>
 			</Item.Content>
 			<Item.Actions>
@@ -571,14 +560,6 @@
 							{m.import_cluster_managed()}
 						</span>
 					</div>
-					{#if rancherProjectID}
-						<div class="flex justify-between gap-4">
-							<span class="text-muted-foreground">
-								{m.import_cluster_rancher_project_confirmation_label()}
-							</span>
-							<span class="truncate font-medium">{rancherProjectID}</span>
-						</div>
-					{/if}
 					{#if robotName}
 						<div class="flex justify-between gap-4">
 							<span class="text-muted-foreground">{m.import_cluster_harbor_robot()}</span>
