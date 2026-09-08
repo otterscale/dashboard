@@ -92,6 +92,16 @@
 	let rancherProjectOpen = $state(false);
 	let rancherProjectLoading = $state(false);
 	let rancherProjectError = $state('');
+	// Stays false until listRancherProjects has returned successfully at least
+	// once; drives whether the Rancher-project picker renders at all.
+	let rancherProjectsFetched = $state(false);
+
+	// Rancher isn't wired up on every deployment. Once we've confirmed there are
+	// no projects to pick (and no error worth retrying), drop the field entirely
+	// rather than showing an empty selector.
+	const showRancherProjectField = $derived(
+		!rancherProjectsFetched || rancherProjectError !== '' || rancherProjects.length > 0
+	);
 
 	let selectedUsers = $state<KeycloakUser[]>([]);
 	let userSearchOpen = $state(false);
@@ -114,6 +124,12 @@
 	$effect(() => {
 		if (wasOpen && !open) reset();
 		wasOpen = open;
+	});
+
+	// Probe for Rancher projects as soon as the dialog opens so the picker can
+	// decide whether to render before the user ever reaches for it.
+	$effect(() => {
+		if (open && !rancherProjectsFetched) fetchRancherProjects();
 	});
 
 	// Mirrors core.ValidateClusterName on the server.
@@ -266,6 +282,7 @@
 		rancherProjectOpen = false;
 		rancherProjectLoading = false;
 		rancherProjectError = '';
+		rancherProjectsFetched = false;
 		selectedUsers = [];
 		userSearchOpen = false;
 		userSearchQuery = '';
@@ -284,6 +301,7 @@
 			const projects = await loadRancherProjects();
 			if (requestLifecycle !== lifecycle) return;
 			rancherProjects = projects;
+			rancherProjectsFetched = true;
 			if (!projects.some((project) => project.id === rancherProjectID)) {
 				rancherProjectID = '';
 			}
@@ -538,97 +556,105 @@
 				class="**:data-[slot=dynamic-form-mode-controller]:hidden"
 			/>
 
-			<Field.Field>
-				<Field.FieldLabel>{m.import_cluster_rancher_project_label()}</Field.FieldLabel>
-				<Field.FieldDescription>
-					{m.import_cluster_rancher_project_description()}
-				</Field.FieldDescription>
+			{#if showRancherProjectField}
+				<Field.Field>
+					<Field.FieldLabel>{m.import_cluster_rancher_project_label()}</Field.FieldLabel>
+					<Field.FieldDescription>
+						{m.import_cluster_rancher_project_description()}
+					</Field.FieldDescription>
 
-				<Popover.Root bind:open={rancherProjectOpen} onOpenChange={handleRancherProjectOpenChange}>
-					<Popover.Trigger class="w-full">
-						{#snippet child({ props })}
-							<Button
-								{...props}
-								variant="outline"
-								role="combobox"
-								aria-expanded={rancherProjectOpen}
-								class="w-full justify-between"
-							>
-								<span class={cn('truncate', !rancherProjectID && 'text-muted-foreground')}>
-									{rancherProjectID || m.import_cluster_rancher_project_placeholder()}
-								</span>
-								<ChevronDownIcon class="ml-2 size-4 shrink-0 opacity-50" />
-							</Button>
-						{/snippet}
-					</Popover.Trigger>
-					<Popover.Content class="w-[var(--bits-popover-anchor-width)] min-w-xs p-0" align="start">
-						<Command.Root>
-							<Command.Input placeholder={m.import_cluster_rancher_project_search()} />
-							<Command.List>
-								{#if rancherProjectLoading}
-									<Command.Loading>
-										{m.import_cluster_rancher_project_loading()}
-									</Command.Loading>
-								{:else if rancherProjectError}
-									<div class="flex flex-col items-start gap-2 p-3">
-										<p class="text-sm text-destructive">
-											{m.import_cluster_rancher_project_error()}
-										</p>
-										<p class="text-xs text-muted-foreground">{rancherProjectError}</p>
-										<Button size="sm" variant="outline" onclick={fetchRancherProjects}>
-											{m.import_cluster_rancher_project_retry()}
-										</Button>
-									</div>
-								{:else}
-									<Command.Empty>
-										{m.import_cluster_rancher_project_empty()}
-									</Command.Empty>
-									<Command.Group>
-										{#if rancherProjects.length > 0}
-											<Command.Item
-												value={m.import_cluster_rancher_project_none()}
-												onSelect={() => {
-													rancherProjectID = '';
-													rancherProjectOpen = false;
-												}}
-											>
-												<CheckIcon
-													class={cn('mr-2 size-4', rancherProjectID && 'text-transparent')}
-												/>
-												{m.import_cluster_rancher_project_none()}
-											</Command.Item>
-										{/if}
-										{#each rancherProjects as project (project.id)}
-											<Command.Item
-												value={project.id}
-												onSelect={() => {
-													rancherProjectID = project.id;
-													rancherProjectOpen = false;
-												}}
-											>
-												<CheckIcon
-													class={cn(
-														'mr-2 size-4',
-														rancherProjectID !== project.id && 'text-transparent'
-													)}
-												/>
-												<div class="flex min-w-0 flex-col">
-													<span class="truncate font-medium">{project.id}</span>
-													{#if rancherProjectSecondaryText(project)}
-														<span class="truncate text-xs text-muted-foreground">
-															{rancherProjectSecondaryText(project)}
-														</span>
-													{/if}
-												</div>
-											</Command.Item>
-										{/each}
-									</Command.Group>
-								{/if}
-							</Command.List>
-						</Command.Root>
-					</Popover.Content>
-				</Popover.Root>
-			</Field.Field>
+					<Popover.Root
+						bind:open={rancherProjectOpen}
+						onOpenChange={handleRancherProjectOpenChange}
+					>
+						<Popover.Trigger class="w-full">
+							{#snippet child({ props })}
+								<Button
+									{...props}
+									variant="outline"
+									role="combobox"
+									aria-expanded={rancherProjectOpen}
+									class="w-full justify-between"
+								>
+									<span class={cn('truncate', !rancherProjectID && 'text-muted-foreground')}>
+										{rancherProjectID || m.import_cluster_rancher_project_placeholder()}
+									</span>
+									<ChevronDownIcon class="ml-2 size-4 shrink-0 opacity-50" />
+								</Button>
+							{/snippet}
+						</Popover.Trigger>
+						<Popover.Content
+							class="w-[var(--bits-popover-anchor-width)] min-w-xs p-0"
+							align="start"
+						>
+							<Command.Root>
+								<Command.Input placeholder={m.import_cluster_rancher_project_search()} />
+								<Command.List>
+									{#if rancherProjectLoading}
+										<Command.Loading>
+											{m.import_cluster_rancher_project_loading()}
+										</Command.Loading>
+									{:else if rancherProjectError}
+										<div class="flex flex-col items-start gap-2 p-3">
+											<p class="text-sm text-destructive">
+												{m.import_cluster_rancher_project_error()}
+											</p>
+											<p class="text-xs text-muted-foreground">{rancherProjectError}</p>
+											<Button size="sm" variant="outline" onclick={fetchRancherProjects}>
+												{m.import_cluster_rancher_project_retry()}
+											</Button>
+										</div>
+									{:else}
+										<Command.Empty>
+											{m.import_cluster_rancher_project_empty()}
+										</Command.Empty>
+										<Command.Group>
+											{#if rancherProjects.length > 0}
+												<Command.Item
+													value={m.import_cluster_rancher_project_none()}
+													onSelect={() => {
+														rancherProjectID = '';
+														rancherProjectOpen = false;
+													}}
+												>
+													<CheckIcon
+														class={cn('mr-2 size-4', rancherProjectID && 'text-transparent')}
+													/>
+													{m.import_cluster_rancher_project_none()}
+												</Command.Item>
+											{/if}
+											{#each rancherProjects as project (project.id)}
+												<Command.Item
+													value={project.id}
+													onSelect={() => {
+														rancherProjectID = project.id;
+														rancherProjectOpen = false;
+													}}
+												>
+													<CheckIcon
+														class={cn(
+															'mr-2 size-4',
+															rancherProjectID !== project.id && 'text-transparent'
+														)}
+													/>
+													<div class="flex min-w-0 flex-col">
+														<span class="truncate font-medium">{project.id}</span>
+														{#if rancherProjectSecondaryText(project)}
+															<span class="truncate text-xs text-muted-foreground">
+																{rancherProjectSecondaryText(project)}
+															</span>
+														{/if}
+													</div>
+												</Command.Item>
+											{/each}
+										</Command.Group>
+									{/if}
+								</Command.List>
+							</Command.Root>
+						</Popover.Content>
+					</Popover.Root>
+				</Field.Field>
+			{/if}
 
 			<Field.Field>
 				<Field.FieldLabel>{m.import_cluster_administrators()}</Field.FieldLabel>
