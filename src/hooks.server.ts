@@ -1,5 +1,3 @@
-import '$lib/server/tls';
-
 import { type Handle, type HandleServerError, redirect, type RequestEvent } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 
