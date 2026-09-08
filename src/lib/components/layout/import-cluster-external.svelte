@@ -44,6 +44,10 @@
 	import { bump } from '$lib/stores/pulse.svelte';
 	import { cn } from '$lib/utils';
 	import {
+		CLUSTER_INFO_REQUIRED_FIELDS,
+		clusterInfoFieldsSchema
+	} from '$lib/utils/cluster-info-schema';
+	import {
 		createRancherProjectLoader,
 		rancherProjectSecondaryText
 	} from '$lib/utils/rancher-project';
@@ -120,13 +124,17 @@
 			clusterName: '',
 			clusterInfoEnabled: true,
 			externalAddress: '',
-			nodePortRange: '30000-32767',
+			nodePortRangeMin: 30000,
+			nodePortRangeMax: 32767,
 			inferenceURL: ''
 		};
 	}
 
-	// externalAddress/nodePortRange/inferenceURL only exist under `then`, so they're both
-	// required-when-enabled and hidden-when-disabled — sjsf re-derives visible fields live.
+	// externalAddress/nodePortRangeMin/nodePortRangeMax/inferenceURL only exist under `then`, so
+	// they're both required-when-enabled and hidden-when-disabled — sjsf re-derives visible fields
+	// live. Their rules come from cluster-info-schema.ts, the same fragment
+	// /bff/cluster-import validates the request against, so the two can't drift apart; only
+	// title/errorMessage (display, not a rule) are added here.
 	const clusterInfoSchema: Schema = {
 		type: 'object',
 		properties: {
@@ -148,29 +156,39 @@
 			required: ['clusterInfoEnabled']
 		},
 		then: {
-			required: ['externalAddress', 'nodePortRange'],
+			required: [...CLUSTER_INFO_REQUIRED_FIELDS],
 			properties: {
 				externalAddress: {
-					type: 'string',
+					...clusterInfoFieldsSchema.properties.externalAddress,
 					title: m.import_cluster_external_address_label(),
-					pattern: '^(?!.*://).+$',
 					errorMessage: m.import_cluster_external_address_invalid()
 				},
-				nodePortRange: {
-					type: 'string',
-					title: m.import_cluster_node_port_range_label(),
-					pattern: '^[0-9]+-[0-9]+$',
-					errorMessage: m.import_cluster_node_port_range_invalid()
+				nodePortRangeMin: {
+					...clusterInfoFieldsSchema.properties.nodePortRangeMin,
+					title: m.import_cluster_node_port_range_min_label(),
+					errorMessage: m.import_cluster_node_port_range_bounds_invalid()
+				},
+				nodePortRangeMax: {
+					...clusterInfoFieldsSchema.properties.nodePortRangeMax,
+					title: m.import_cluster_node_port_range_max_label(),
+					errorMessage: {
+						type: m.import_cluster_node_port_range_bounds_invalid(),
+						minimum: m.import_cluster_node_port_range_bounds_invalid(),
+						maximum: m.import_cluster_node_port_range_bounds_invalid(),
+						exclusiveMinimum: m.import_cluster_node_port_range_order_invalid()
+					}
 				},
 				inferenceURL: {
-					type: 'string',
+					...clusterInfoFieldsSchema.properties.inferenceURL,
 					title: m.import_cluster_inference_url_label(),
-					pattern: '^(https?://.+)?$',
 					errorMessage: m.import_cluster_inference_url_invalid()
 				}
 			}
 		}
-	} as Schema;
+		// sjsf's Schema type predates ajv's `$data` extension (used below by nodePortRangeMax's
+		// exclusiveMinimum), so the two shapes don't structurally overlap enough for a direct
+		// `as Schema` — routed through `unknown`, same as ajv itself treats it at runtime.
+	} as unknown as Schema;
 
 	const clusterInfoUiSchema: UiSchemaRoot = {
 		'ui:options': {
@@ -193,9 +211,14 @@
 				shadcn4Text: { placeholder: m.import_cluster_external_address_placeholder() }
 			}
 		},
-		nodePortRange: {
+		nodePortRangeMin: {
 			'ui:options': {
-				shadcn4Text: { placeholder: '30000-32767' }
+				shadcn4Number: { placeholder: '30000' }
+			}
+		},
+		nodePortRangeMax: {
+			'ui:options': {
+				shadcn4Number: { placeholder: '32767' }
 			}
 		},
 		inferenceURL: {
@@ -210,9 +233,9 @@
 	// Redundant with the sjsf form's own submit-time validation below; kept live so the
 	// "Generate command" button reflects validity as the user types, matching how the field
 	// itself will be validated.
-	const validateClusterInfo = ajvErrors(new Ajv({ allErrors: true, strict: true })).compile(
-		clusterInfoSchema
-	);
+	const validateClusterInfo = ajvErrors(
+		new Ajv({ allErrors: true, strict: true, $data: true })
+	).compile(clusterInfoSchema);
 	const canGoNext = $derived(
 		stepIndex === 1 && clusterInfoFormReference !== null
 			? validateClusterInfo(getValueSnapshot(clusterInfoFormReference))
@@ -343,7 +366,8 @@
 			clusterName: string;
 			clusterInfoEnabled: boolean;
 			externalAddress?: string;
-			nodePortRange?: string;
+			nodePortRangeMin?: number;
+			nodePortRangeMax?: number;
 			inferenceURL?: string;
 		};
 		// Normalized once: polling and the final step both compare against this value.
@@ -360,7 +384,8 @@
 					clusterInfo: {
 						enabled: values.clusterInfoEnabled,
 						externalAddress: (values.externalAddress ?? '').trim(),
-						nodePortRange: (values.nodePortRange ?? '').trim(),
+						nodePortRangeMin: values.nodePortRangeMin,
+						nodePortRangeMax: values.nodePortRangeMax,
 						inferenceURL: (values.inferenceURL ?? '').trim()
 					}
 				})

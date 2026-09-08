@@ -1,4 +1,5 @@
 import { error, json } from '@sveltejs/kit';
+import Ajv from 'ajv';
 
 import {
 	buildAgentInstallCommands,
@@ -7,6 +8,7 @@ import {
 } from '$lib/server/agent-install';
 import { ensureAgentRobot } from '$lib/server/harbor-robot';
 import { issueJoinToken, JoinTokenError } from '$lib/server/join-token';
+import { clusterInfoFieldsSchema } from '$lib/utils/cluster-info-schema';
 
 import type { RequestHandler } from './$types';
 
@@ -17,9 +19,42 @@ interface ImportClusterRequest {
 	clusterInfo?: {
 		enabled?: boolean;
 		externalAddress?: string;
-		nodePortRange?: string;
+		nodePortRangeMin?: number;
+		nodePortRangeMax?: number;
 		inferenceURL?: string;
 	};
+}
+
+// Same fragment the client form compiles (import-cluster-external.svelte) — the client only
+// adds title/errorMessage on top for display; the rules themselves live in one place so this
+// endpoint can't silently drift from what the form already enforced. $data is needed for
+// nodePortRangeMax's cross-reference to nodePortRangeMin.
+const ajv = new Ajv({ allErrors: true, strict: true, $data: true });
+const validateClusterInfoFields = ajv.compile(clusterInfoFieldsSchema);
+// inferenceURL's format applies even while the rest of clusterInfo is disabled (a caller could
+// send one without enabling the rest); compiled from the same property so the rule can't diverge.
+const validateInferenceURL = ajv.compile(clusterInfoFieldsSchema.properties.inferenceURL);
+
+function describeClusterInfoError(errors: typeof validateClusterInfoFields.errors): string {
+	const err = errors?.[0];
+	if (!err) return 'clusterInfo is invalid';
+	if (err.keyword === 'required') {
+		return `clusterInfo.${err.params.missingProperty} is required unless cluster info is disabled`;
+	}
+	switch (err.instancePath) {
+		case '/externalAddress':
+			return 'clusterInfo.externalAddress must be a bare host or IP — no scheme, no port';
+		case '/nodePortRangeMin':
+			return 'clusterInfo.nodePortRangeMin must be a port number between 0 and 65535';
+		case '/nodePortRangeMax':
+			return err.keyword === 'exclusiveMinimum'
+				? 'clusterInfo.nodePortRangeMax must be greater than clusterInfo.nodePortRangeMin'
+				: 'clusterInfo.nodePortRangeMax must be a port number between 0 and 65535';
+		case '/inferenceURL':
+			return 'clusterInfo.inferenceURL must be an absolute http or https URL';
+		default:
+			return `clusterInfo is invalid: ${err.instancePath || err.keyword}`;
+	}
 }
 
 export const POST: RequestHandler = async ({ fetch, locals, request }) => {
@@ -41,26 +76,26 @@ export const POST: RequestHandler = async ({ fetch, locals, request }) => {
 
 	const clusterInfoEnabled = body.clusterInfo?.enabled ?? false;
 	const externalAddress = body.clusterInfo?.externalAddress?.trim() ?? '';
-	const nodePortRange = body.clusterInfo?.nodePortRange?.trim() ?? '';
-	if (clusterInfoEnabled) {
-		// Mirrors the agent chart's own validate.yaml checks.
-		if (!externalAddress) {
-			error(400, 'clusterInfo.externalAddress is required unless cluster info is disabled');
-		}
-		if (externalAddress.includes('://')) {
-			error(400, 'clusterInfo.externalAddress must be a bare address, without a scheme');
-		}
-		if (!/^[0-9]+-[0-9]+$/.test(nodePortRange)) {
-			error(400, 'clusterInfo.nodePortRange must look like "30000-32767"');
-		}
-		const [low, high] = nodePortRange.split('-').map(Number);
-		if (low >= high) {
-			error(400, `clusterInfo.nodePortRange is inverted: "${nodePortRange}"`);
-		}
-	}
-
+	const nodePortRangeMin = body.clusterInfo?.nodePortRangeMin;
+	const nodePortRangeMax = body.clusterInfo?.nodePortRangeMax;
 	const inferenceURL = body.clusterInfo?.inferenceURL?.trim() ?? '';
-	if (inferenceURL && !/^https?:\/\//.test(inferenceURL)) {
+
+	// externalAddress/nodePortRange are only required while cluster info is enabled — mirrors
+	// the client form's if/then — but inferenceURL's own format is checked either way, since a
+	// caller could send one without enabling the rest. Both branches validate through the same
+	// compiled schema, so the rules can't drift from what the form already enforced.
+	if (clusterInfoEnabled) {
+		if (
+			!validateClusterInfoFields({
+				externalAddress,
+				nodePortRangeMin,
+				nodePortRangeMax,
+				inferenceURL
+			})
+		) {
+			error(400, describeClusterInfoError(validateClusterInfoFields.errors));
+		}
+	} else if (inferenceURL && !validateInferenceURL(inferenceURL)) {
 		error(400, 'clusterInfo.inferenceURL must be an absolute http or https URL');
 	}
 
@@ -102,7 +137,8 @@ export const POST: RequestHandler = async ({ fetch, locals, request }) => {
 			clusterInfo: {
 				enabled: clusterInfoEnabled,
 				externalAddress,
-				nodePortRange,
+				nodePortRangeMin: nodePortRangeMin ?? 0,
+				nodePortRangeMax: nodePortRangeMax ?? 0,
 				inferenceURL: inferenceURL || undefined
 			},
 			harborRobotName: robot.name,

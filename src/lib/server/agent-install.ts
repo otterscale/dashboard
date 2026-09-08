@@ -34,7 +34,8 @@ const VALUES_DELIMITER = 'OTTERSCALE_VALUES';
 export interface ClusterInfoInput {
 	enabled: boolean;
 	externalAddress: string;
-	nodePortRange: string;
+	nodePortRangeMin: number;
+	nodePortRangeMax: number;
 	inferenceURL?: string;
 }
 
@@ -114,7 +115,11 @@ function buildValues(input: AgentInstallInput): Record<string, unknown> {
 			? {
 					enabled: true,
 					externalAddress: input.clusterInfo.externalAddress,
-					nodePortRange: input.clusterInfo.nodePortRange,
+					// The chart's own contract (otterscale-agent values.yaml) wants a single
+					// "min-max" string; nodePortRangeMin/Max only exist so the wizard and this
+					// endpoint can validate "min < max" as a JSON Schema rule. This is the one
+					// place they get joined back into that string.
+					nodePortRange: `${input.clusterInfo.nodePortRangeMin}-${input.clusterInfo.nodePortRangeMax}`,
 					...(input.clusterInfo.inferenceURL
 						? { inferenceURL: input.clusterInfo.inferenceURL }
 						: {})
@@ -169,7 +174,8 @@ export async function resolveAgentChartVersion(fetcher = fetch): Promise<string 
 		const versions = entries
 			.map((entry) => entry.version)
 			.filter(
-				(version): version is string => typeof version === 'string' && semver.valid(version) !== null
+				(version): version is string =>
+					typeof version === 'string' && semver.valid(version) !== null
 			);
 		if (versions.length === 0) {
 			console.warn(
