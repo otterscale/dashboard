@@ -487,7 +487,7 @@
 {/snippet}
 
 {#snippet stepDeployAgent()}
-	<div class="flex min-h-0 flex-1 flex-col gap-6">
+	<div class="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto">
 		<div class="flex flex-col gap-1">
 			<h3 class="text-xl font-bold">{m.import_cluster_deploy_agent_title()}</h3>
 			<p class="text-sm text-muted-foreground">
@@ -521,7 +521,7 @@
 
 			<Code.Root
 				lang="bash"
-				class="w-full shrink-0 pr-12 text-sm [&_pre.shiki]:[scrollbar-width:none] [&_pre.shiki::-webkit-scrollbar]:hidden"
+				class="max-h-[40vh] w-full shrink-0 overflow-auto pr-12 text-sm [&_pre.shiki]:overflow-visible"
 				variant="secondary"
 				code={installCommand}
 				hideLines
