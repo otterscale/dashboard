@@ -70,7 +70,7 @@ function required(name: string): string {
 }
 
 /** PUBLIC_ vars are filtered out of $env/dynamic/private, so read the public side. */
-function requiredPublic(name: string): string {
+function requiredPublic(name: `PUBLIC_${string}`): string {
 	const value = publicEnv[name];
 	if (!value) {
 		throw new Error(`${name} is not configured; the otterscale chart sets it on the dashboard`);
