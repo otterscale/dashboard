@@ -619,6 +619,7 @@
 	"import_cluster_robot_rotated_description": "{name} already existed. Harbor reveals a robot secret only when it creates the account, so it was replaced. Anything still holding the old secret stays broken until this command runs.",
 	"import_cluster_target_cluster": "Target Cluster",
 	"import_cluster_waiting_connection": "Waiting for connection",
+	"import_cluster_connection_check_failed": "Can't reach the API to check for the connection — still retrying. {message}",
 	"import_cluster_installing": "Installing...",
 	"import_cluster_managed_status": "Managed successfully",
 	"import_cluster_managed_successfully_title": "Managed Successfully",

@@ -619,6 +619,7 @@
 	"import_cluster_robot_rotated_description": "{name} 原本就存在。Harbor 只在建立帳號時吐出一次密鑰，因此已重新建立。仍持有舊密鑰的元件會一直失效，直到這條指令執行完成。",
 	"import_cluster_target_cluster": "目標叢集",
 	"import_cluster_waiting_connection": "等待連線",
+	"import_cluster_connection_check_failed": "無法連到 API 確認連線狀態，仍在重試。{message}",
 	"import_cluster_installing": "安裝中...",
 	"import_cluster_managed_status": "已成功納管",
 	"import_cluster_managed_successfully_title": "納管成功",

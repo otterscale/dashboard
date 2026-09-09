@@ -1,5 +1,10 @@
 <script lang="ts">
-	import { createClient, type Transport } from '@connectrpc/connect';
+	import {
+		Code as ConnectCode,
+		ConnectError,
+		createClient,
+		type Transport
+	} from '@connectrpc/connect';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import TerminalIcon from '@lucide/svelte/icons/terminal';
@@ -62,6 +67,10 @@
 	let clusterStatus = $state<'pending' | 'installing' | 'done'>('pending');
 	let isCreating = $state(false);
 	let errorMessage = $state('');
+	// Set once the connection poll has failed enough times in a row that it's
+	// worth telling the user the check itself is broken (vs the agent just not
+	// having connected yet). Cleared on the next successful poll.
+	let pollError = $state('');
 
 	// Owned here so reset() can clear it and submitClusterInfo can read it; the
 	// picker UI and its user search live in <ImportClusterAdministrators>.
@@ -267,6 +276,7 @@
 		clusterStatus = 'pending';
 		isCreating = false;
 		errorMessage = '';
+		pollError = '';
 		clusterNameFormReference = null;
 		clusterInfoFormReference = null;
 		selectedUsers = [];
@@ -349,6 +359,11 @@
 		}
 	}
 
+	// Consecutive poll failures to tolerate before showing `pollError`. A single
+	// dropped request during an otherwise-fine wait shouldn't flash a warning;
+	// three in a row (~9s) means the check itself is broken.
+	const POLL_ERROR_THRESHOLD = 3;
+
 	async function pollForConnection() {
 		if (isPolling) return;
 		isPolling = true;
@@ -357,23 +372,43 @@
 		abortController = new AbortController();
 		const signal = abortController.signal;
 
+		let failures = 0;
+		function notePollFailure(what: string, e: unknown) {
+			console.error(`import-cluster: ${what} failed while polling for the connection`, e);
+			failures += 1;
+			if (failures >= POLL_ERROR_THRESHOLD) {
+				pollError = e instanceof Error ? e.message : String(e);
+			}
+		}
+		function notePollSuccess() {
+			failures = 0;
+			pollError = '';
+		}
+
 		while (!signal.aborted && clusterStatus === 'pending') {
 			try {
 				const response = await linkClient.listLinks({});
 				if (signal.aborted) break;
+				notePollSuccess();
 
 				const found = response.links.some((link: Link) => link.cluster === clusterName);
 				if (found) {
 					clusterStatus = 'installing';
 					break;
 				}
-			} catch {
-				// retry silently
+			} catch (e) {
+				if (signal.aborted) break;
+				notePollFailure('listLinks', e);
 			}
 			if (!signal.aborted) {
 				await new Promise((r) => setTimeout(r, POLL_INTERVAL));
 			}
 		}
+
+		// New check, fresh slate: a stale failure from the pending phase shouldn't
+		// linger into the installing phase.
+		failures = 0;
+		pollError = '';
 
 		while (!signal.aborted && clusterStatus === 'installing') {
 			try {
@@ -389,6 +424,7 @@
 					name: 'tenant-operator'
 				});
 				if (signal.aborted) break;
+				notePollSuccess();
 
 				const obj = response.object as AppsV1Deployment;
 				const conditions = obj?.status?.conditions ?? [];
@@ -398,8 +434,16 @@
 					stepIndex = 4;
 					break;
 				}
-			} catch {
-				// deployment may not exist yet, retry silently
+			} catch (e) {
+				if (signal.aborted) break;
+				// NotFound is expected here: the agent has registered but the
+				// tenant-operator manifests may not be applied yet. Anything else is
+				// a genuine failure of the check.
+				if (e instanceof ConnectError && e.code === ConnectCode.NotFound) {
+					notePollSuccess();
+				} else {
+					notePollFailure('tenant-operator lookup', e);
+				}
 			}
 			if (!signal.aborted) {
 				await new Promise((r) => setTimeout(r, POLL_INTERVAL));
@@ -583,6 +627,12 @@
 				{/if}
 			</Item.Actions>
 		</Item.Root>
+
+		{#if pollError && clusterStatus !== 'done'}
+			<p class="text-xs text-amber-500">
+				{m.import_cluster_connection_check_failed({ message: pollError })}
+			</p>
+		{/if}
 	</div>
 {/snippet}
 
