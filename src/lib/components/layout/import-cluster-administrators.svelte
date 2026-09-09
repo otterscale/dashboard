@@ -83,6 +83,8 @@
 		} else {
 			users.push(u);
 		}
+		// Close on every pick: add another via the trigger again.
+		popoverOpen = false;
 	}
 
 	function removeUser(id: string) {
@@ -144,11 +146,9 @@
 	</Field.FieldDescription>
 
 	<!--
-		The picker (and its Popover) is rendered once, outside the empty/list branches:
-		selecting the first user flips users.length 0→1, and if the Popover lived inside
-		that conditional it would be torn down and remounted mid-interaction — the new
-		instance reopens itself (popoverOpen is still true for multi-select) and steals
-		focus to its trigger.
+		The picker (and its Popover) is rendered once here, outside the empty/list
+		branches: selecting the first user flips users.length 0→1, and a Popover
+		living inside that conditional would be torn down and remounted mid-click.
 	-->
 	{#if users.length === 0}
 		<Empty.Root class="rounded-md border">
