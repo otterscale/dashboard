@@ -57,15 +57,9 @@ export async function issueJoinToken(
 
 		// 403, not 502: the route already checked this role, so seeing one here means the two disagree.
 		if (code === CONNECT_CODE_PERMISSION_DENIED || code === CONNECT_CODE_UNAUTHENTICATED) {
-			throw new JoinTokenError(
-				`The otterscale API refused to issue a join token: ${message}`,
-				403
-			);
+			throw new JoinTokenError(`The otterscale API refused to issue a join token: ${message}`, 403);
 		}
-		throw new JoinTokenError(
-			`Failed to issue a join token (${response.status}): ${message}`,
-			502
-		);
+		throw new JoinTokenError(`Failed to issue a join token (${response.status}): ${message}`, 502);
 	}
 
 	const body = (await response.json().catch(() => ({}))) as { joinToken?: string };
