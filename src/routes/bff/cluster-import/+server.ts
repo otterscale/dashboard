@@ -59,7 +59,7 @@ function describeClusterInfoError(errors: typeof validateClusterInfoFields.error
 				? 'clusterInfo.nodePortRange.max must be greater than clusterInfo.nodePortRange.min'
 				: 'clusterInfo.nodePortRange.max must be a whole port number between 1 and 65535';
 		case '/inferenceURL':
-			return 'clusterInfo.inferenceURL must be a bare host or IP — no scheme, no port';
+			return 'clusterInfo.inferenceURL must be an absolute http or https URL';
 		default:
 			return `clusterInfo is invalid: ${err.instancePath || err.keyword}`;
 	}
@@ -103,7 +103,7 @@ export const POST: RequestHandler = async ({ fetch, locals, request }) => {
 			error(400, describeClusterInfoError(validateClusterInfoFields.errors));
 		}
 	} else if (inferenceURL && !validateInferenceURL(inferenceURL)) {
-		error(400, 'clusterInfo.inferenceURL must be a bare host or IP — no scheme, no port');
+		error(400, 'clusterInfo.inferenceURL must be an absolute http or https URL');
 	}
 
 	// The caller is added unconditionally, so importing a cluster can't lock them out of it.

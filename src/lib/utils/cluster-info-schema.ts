@@ -2,7 +2,10 @@
  * Structural validation rules for the import-cluster wizard's "cluster info"
  * fields (externalAddress / nodePortRange / inferenceURL), shared between the
  * client form (import-cluster-external.svelte) and the server route
- * (bff/cluster-import/+server.ts) so the two can't drift apart.
+ * (bff/cluster-import/+server.ts) so the two can't drift apart. They also mirror
+ * the otterscale-agent chart's own `templates/validate.yaml`: externalAddress is
+ * a bare host (the chart rejects a scheme), inferenceURL is an absolute
+ * http(s):// URL (the chart requires one).
  *
  * Deliberately free of `title`/`errorMessage`: those are i18n'd display
  * concerns the client layers on top per field. This file only owns the rules
@@ -25,8 +28,8 @@
 export const NODE_PORT_MIN = 1;
 export const NODE_PORT_MAX = 65535;
 
-// inferenceURL is deliberately absent: it's optional. Its format is still
-// checked (below) whenever a value is present.
+// inferenceURL is deliberately absent: it's optional. Its format (an absolute
+// http(s):// URL) is still checked below whenever a value is present.
 export const CLUSTER_INFO_REQUIRED_FIELDS = ['externalAddress', 'nodePortRange'] as const;
 
 // The two fields required *within* nodePortRange (the object itself is required
@@ -69,11 +72,12 @@ export const clusterInfoFieldsSchema = {
 				}
 			}
 		},
-		// Optional (not in CLUSTER_INFO_REQUIRED_FIELDS): an empty string passes
-		// (`.*`); a non-empty value must be a bare host or IP — no scheme.
+		// Optional (not in CLUSTER_INFO_REQUIRED_FIELDS): an empty string passes;
+		// a non-empty value must be an absolute http(s):// URL, matching the
+		// otterscale-agent chart's `hasPrefix "http://"/"https://"` check.
 		inferenceURL: {
 			type: 'string',
-			pattern: '^(?!.*://).*$'
+			pattern: '^(https?://.+)?$'
 		}
 	}
 } as const;
