@@ -21,11 +21,12 @@
 export const NODE_PORT_MIN = 0;
 export const NODE_PORT_MAX = 65535;
 
+// inferenceURL is deliberately absent: it's optional. Its format is still
+// checked (below) whenever a value is present.
 export const CLUSTER_INFO_REQUIRED_FIELDS = [
 	'externalAddress',
 	'nodePortRangeMin',
-	'nodePortRangeMax',
-	'inferenceURL'
+	'nodePortRangeMax'
 ] as const;
 
 /**
@@ -52,9 +53,11 @@ export const clusterInfoFieldsSchema = {
 			maximum: NODE_PORT_MAX,
 			exclusiveMinimum: { $data: '1/nodePortRangeMin' }
 		},
+		// Optional (not in CLUSTER_INFO_REQUIRED_FIELDS): an empty string passes
+		// (`.*`); a non-empty value must be a bare host or IP — no scheme.
 		inferenceURL: {
 			type: 'string',
-			pattern: '^(?!.*://).+$'
+			pattern: '^(?!.*://).*$'
 		}
 	}
 } as const;

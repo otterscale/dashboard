@@ -31,10 +31,9 @@ interface ImportClusterRequest {
 // nodePortRangeMax's cross-reference to nodePortRangeMin.
 const ajv = new Ajv({ allErrors: true, strict: true, $data: true });
 const validateClusterInfoFields = ajv.compile(clusterInfoFieldsSchema);
-// inferenceURL's format applies even while the rest of clusterInfo is disabled (a caller could
-// send one without enabling the rest); compiled from the same property so the rule can't diverge.
-// It's only *required* while clusterInfo is enabled — the standalone check just format-guards a
-// value that was sent.
+// inferenceURL is optional; its format is only checked when a non-empty value is sent. Compiled
+// from the same property so the rule can't diverge, and used on both the enabled and disabled
+// paths below.
 const validateInferenceURL = ajv.compile(clusterInfoFieldsSchema.properties.inferenceURL);
 
 function describeClusterInfoError(errors: typeof validateClusterInfoFields.errors): string {
@@ -82,10 +81,10 @@ export const POST: RequestHandler = async ({ fetch, locals, request }) => {
 	const nodePortRangeMax = body.clusterInfo?.nodePortRangeMax;
 	const inferenceURL = body.clusterInfo?.inferenceURL?.trim() ?? '';
 
-	// externalAddress/nodePortRange/inferenceURL are only required while cluster info is enabled,
-	// but inferenceURL's own format is still checked when disabled, since a caller could send one
-	// without enabling the rest. Both branches validate through the same compiled schema, so the
-	// rules can't drift from what the form enforced.
+	// externalAddress/nodePortRange are required only while cluster info is enabled; inferenceURL
+	// is always optional, its format checked only when a non-empty value is sent. Both branches
+	// validate through the same compiled schema, so the rules can't drift from what the form
+	// enforced.
 	if (clusterInfoEnabled) {
 		if (
 			!validateClusterInfoFields({
