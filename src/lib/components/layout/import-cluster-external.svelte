@@ -383,7 +383,10 @@
 					group: 'apps',
 					version: 'v1',
 					resource: 'deployments',
-					name: 'tenant-operator-controller-manager'
+					// Matches the Deployment name in the otterscale-agent chart's
+					// files/tenant-operator/install.yaml (not the kubebuilder-default
+					// `<project>-controller-manager`).
+					name: 'tenant-operator'
 				});
 				if (signal.aborted) break;
 

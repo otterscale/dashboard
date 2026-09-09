@@ -12,13 +12,10 @@ import { env as publicEnv } from '$env/dynamic/public';
 /** Harbor's built-in system administrator. Not configurable in Harbor. */
 const HARBOR_ADMIN_USERNAME = 'admin';
 
-/** Derived from the cluster name, so re-importing finds the same robot instead of a new one. */
-const ROBOT_NAME_PREFIX = 'otterscale-agent-';
-
 const ROBOTS_PATH = '/api/v2.0/robots';
 
 export interface AgentRobot {
-	/** Full Harbor name, e.g. `robot$otterscale-agent-prod`. */
+	/** Full Harbor name, e.g. `robot$prod`. */
 	name: string;
 	secret: string;
 	/** True when this replaced an existing robot; its old secret is now dead. */
@@ -161,19 +158,20 @@ async function deleteRobot(id: number): Promise<void> {
 
 /**
  * Creates the cluster's Harbor robot, replacing any robot of the same name.
- * Harbor never reveals a secret after creation, so an existing robot has to
- * be rotated (delete-then-create) rather than reused. The caller should
- * surface `rotated` as a warning: anything holding the old secret breaks.
+ * The robot is named after the cluster, so re-importing finds the same robot
+ * instead of a new one. Harbor never reveals a secret after creation, so an
+ * existing robot has to be rotated (delete-then-create) rather than reused. The
+ * caller should surface `rotated` as a warning: anything holding the old secret
+ * breaks.
  */
 export async function ensureAgentRobot(cluster: string): Promise<AgentRobot> {
-	const name = `${ROBOT_NAME_PREFIX}${cluster}`;
-	const fullName = `robot$${name}`;
+	const fullName = `robot$${cluster}`;
 
 	const existing = await findRobot(fullName);
 	if (existing) {
 		await deleteRobot(existing.id);
 	}
 
-	const created = await createRobot(name);
+	const created = await createRobot(cluster);
 	return { name: created.name, secret: created.secret, rotated: existing !== null };
 }

@@ -1,11 +1,3 @@
-/**
- * Builds the single command the import-cluster wizard hands an operator: a helm
- * install of otterscale-agent, join token included.
- *
- * The token comes from LinkService.IssueJoinToken (lib/server/join-token.ts),
- * not derived here — the server already holds the root join secret, and a
- * second copy of that derivation would drift.
- */
 import semver from 'semver';
 import { parse as parseYaml, stringify } from 'yaml';
 
