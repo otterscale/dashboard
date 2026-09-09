@@ -143,6 +143,13 @@
 		{m.import_cluster_administrators_description()}
 	</Field.FieldDescription>
 
+	<!--
+		The picker (and its Popover) is rendered once, outside the empty/list branches:
+		selecting the first user flips users.length 0→1, and if the Popover lived inside
+		that conditional it would be torn down and remounted mid-interaction — the new
+		instance reopens itself (popoverOpen is still true for multi-select) and steals
+		focus to its trigger.
+	-->
 	{#if users.length === 0}
 		<Empty.Root class="rounded-md border">
 			<Empty.Header>
@@ -164,9 +171,6 @@
 					{m.import_cluster_no_administrators_description()}
 				</Empty.Description>
 			</Empty.Header>
-			<Empty.Content>
-				{@render userSearch('center', 'default', '')}
-			</Empty.Content>
 		</Empty.Root>
 	{:else}
 		<div class="flex flex-col gap-2">
@@ -195,8 +199,8 @@
 					</Item.Actions>
 				</Item.Root>
 			{/each}
-
-			{@render userSearch('start', 'outline', 'w-full justify-start')}
 		</div>
 	{/if}
+
+	{@render userSearch('start', 'outline', 'w-full justify-start')}
 </Field.Field>
