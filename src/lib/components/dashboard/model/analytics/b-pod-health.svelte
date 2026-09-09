@@ -46,9 +46,6 @@
 	let terminatedByPod = $state<Record<string, TerminatedInfo>>({});
 	let xidByGpu = $state<GpuEntry[]>([]);
 	let nodeCount = $state(0);
-	// Engine image tag(s) + key runtime config — metadata, not a health signal.
-	let engineImages = $state<string[]>([]);
-	let engineConfig = $state<Record<string, string>>({});
 	let isLoaded = $state(false);
 
 	// Join on `container` too so the model container is picked by the vLLM metric's own
@@ -62,12 +59,9 @@
 		)})`;
 	}
 
-	function containerSelector(extra = ''): string {
+	function containerSelector(): string {
 		const ns = (namespace ?? '').trim();
-		const parts: string[] = [];
-		if (ns) parts.push(`namespace="${escapePromqlStringLiteral(ns)}"`);
-		if (extra) parts.push(extra);
-		return `{${parts.join(',')}}`;
+		return ns ? `{namespace="${escapePromqlStringLiteral(ns)}"}` : '{}';
 	}
 
 	function regexEscape(node: string): string {
@@ -121,8 +115,8 @@
 		const cs = containerSelector();
 		const join = modelJoin();
 
-		// Preemption + engine info are native vLLM metrics (they already carry
-		// namespace/pod/llm_inference_service), so they need no kube join.
+		// Preemption is a native vLLM metric (it already carries namespace/pod/
+		// llm_inference_service), so it needs no kube join.
 		const preempt = vllmMetricWithSelector('vllm:num_preemptions_total', namespace, selectedModel);
 
 		const mainQueries = {
@@ -135,10 +129,7 @@
 				` / sum(rate(container_cpu_cfs_periods_total${cs}[5m]) ${join}) * 100`,
 			lastTermExit: `kube_pod_container_status_last_terminated_exitcode${cs} ${join}`,
 			preemptTotal: `sum(increase(${preempt}[24h]))`,
-			preemptPerPod: `sum by(pod) (increase(${preempt}[24h])) > 0`,
-			// Engine image: pick the model's engine container via the same join the tiles use.
-			engineImage: `kube_pod_container_info${cs} ${join}`,
-			engineConfig: vllmMetricWithSelector('vllm:cache_config_info', namespace, selectedModel)
+			preemptPerPod: `sum by(pod) (increase(${preempt}[24h])) > 0`
 		};
 
 		const nodesPromise = fetchModelNodes(prometheusDriver, namespace, selectedModel);
@@ -185,33 +176,9 @@
 		throttlePct = Number.isFinite(throttleV) ? throttleV : 0;
 		preemptTotal = Math.round(scalarFromVectors(main.preemptTotal));
 		preemptByPod = perPodFromVectors(main.preemptPerPod);
-		engineImages = [
-			...new Set(
-				(main.engineImage ?? [])
-					.map((v) => (v.metric.labels as Record<string, string>).image)
-					.filter((s): s is string => Boolean(s))
-			)
-		];
-		engineConfig =
-			((main.engineConfig ?? [])[0]?.metric.labels as Record<string, string> | undefined) ?? {};
 		nodeCount = nodes.length;
 		xidTotal = xid.total;
 		xidByGpu = xid.byGpu;
-	}
-
-	/** Extract the tag from an image ref, dropping any `@sha256:…` digest. */
-	function imageTag(image: string): string {
-		const noDigest = image.includes('@') ? image.slice(0, image.indexOf('@')) : image;
-		const lastSlash = noDigest.lastIndexOf('/');
-		const lastPart = lastSlash >= 0 ? noDigest.slice(lastSlash + 1) : noDigest;
-		const colon = lastPart.lastIndexOf(':');
-		return colon >= 0 ? lastPart.slice(colon + 1) : 'latest';
-	}
-
-	function kvOffloadText(): string {
-		const backend = engineConfig.kv_offloading_backend ?? '—';
-		const gb = engineConfig.cpu_offload_gb;
-		return gb && gb !== '0' ? `${backend} (${gb} GB)` : backend;
 	}
 
 	const reloadManager = new ReloadManager(fetch);
@@ -240,24 +207,6 @@
 	const preemptLevel = $derived<ThresholdLevel>(
 		classifyThreshold(preemptTotal, { green: 0, orange: 10 })
 	);
-	const engineVersion = $derived.by(() => {
-		const tags = [...new Set(engineImages.map(imageTag))];
-		return tags.length === 0 ? '—' : tags.join(' / ');
-	});
-	const engineConfigRows = $derived(
-		Object.keys(engineConfig).length === 0
-			? []
-			: [
-					{ label: m.cfg_gpu_mem_util(), value: engineConfig.gpu_memory_utilization ?? '—' },
-					{ label: m.cfg_gpu_blocks(), value: engineConfig.num_gpu_blocks ?? '—' },
-					{ label: m.cfg_kv_offload(), value: kvOffloadText() }
-				]
-	);
-	// Prefix Caching (vLLM APC) — its own tile: it's the precondition for the L1 cache line.
-	const prefixCacheOn = $derived(engineConfig.enable_prefix_caching === 'True');
-	const prefixCacheValue = $derived(
-		'enable_prefix_caching' in engineConfig ? (prefixCacheOn ? m.status_on() : m.status_off()) : '—'
-	);
 	// "Last died from SIGBUS" — the closest available signal to /dev/shm exhaustion.
 	// No usage gauge exists for a memory-backed emptyDir, so we count the crash signature instead.
 	const shmCrashPods = $derived(
@@ -269,24 +218,6 @@
 	const shmCrashCount = $derived(shmCrashPods.length);
 	const shmLevel = $derived<ThresholdLevel>(shmCrashCount > 0 ? 'red' : 'green');
 
-	const severityRank = { green: 0, orange: 1, red: 2 } as const;
-	const levels = $derived([
-		restartLevel,
-		oomLevel,
-		xidLevel,
-		throttleLevel,
-		shmLevel,
-		preemptLevel
-	] as const);
-	const overallLevel = $derived<ThresholdLevel>(
-		levels.reduce<ThresholdLevel>(
-			(acc, lvl) => (severityRank[lvl] > severityRank[acc] ? lvl : acc),
-			'green'
-		)
-	);
-	const issueCount = $derived(levels.filter((l) => l === 'red').length);
-	const warningCount = $derived(levels.filter((l) => l === 'orange').length);
-
 	function valueColorClass(level: ThresholdLevel): string {
 		if (level === 'red') return 'text-destructive';
 		if (level === 'orange') return 'text-chart-1';
@@ -296,11 +227,11 @@
 
 <Statistics.Root type="count" class="overflow-visible">
 	<Statistics.Header class="flex flex-row items-center gap-2 space-y-0">
-		<div class="grid flex-1 gap-1">
-			<Statistics.Title class="text-base leading-normal text-foreground">
+		<div class="grid min-w-0 flex-1 gap-1">
+			<Statistics.Title class="truncate text-base leading-normal text-foreground">
 				{m.pod_hardware_status()}
 			</Statistics.Title>
-			<p class="text-sm text-muted-foreground">
+			<p class="truncate text-sm text-muted-foreground">
 				{m.llm_dashboard_pod_hardware_status_description()}
 			</p>
 		</div>
@@ -319,72 +250,13 @@
 				<LoaderCircle class="size-12 animate-spin" />
 			</div>
 		{:else}
-			<div class="grid h-65 grid-cols-3 place-content-center gap-x-2 gap-y-6">
+			<!-- Six tiles, two per row: the card sits in a quarter-width column, so three abreast
+			     would squeeze the labels. Each tile's colour is its own status; there is no roll-up. -->
+			<div class="grid h-65 grid-cols-2 place-content-center gap-x-2 gap-y-5">
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						<div class="flex flex-col items-center gap-1">
-							<p
-								class={cn('max-w-full truncate text-2xl font-bold', valueColorClass('green'))}
-								title={engineVersion}
-							>
-								{engineVersion}
-							</p>
-							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-								{m.metric_engine()}
-							</p>
-						</div>
-					</Tooltip.Trigger>
-					<Tooltip.Content side="bottom" class="max-w-sm">
-						{#if engineImages.length === 0 && engineConfigRows.length === 0}
-							<p class="text-xs">{m.no_data_display()}</p>
-						{:else}
-							<div class="flex flex-col gap-1 text-xs">
-								{#each engineImages as img (img)}
-									<div class="flex items-center gap-3">
-										<span class="text-muted-foreground">{m.engine_image()}</span>
-										<span class="ml-auto font-mono break-all">{img}</span>
-									</div>
-								{/each}
-								{#if engineConfigRows.length > 0}
-									<ul class="mt-1 flex flex-col gap-1 border-t pt-2">
-										{#each engineConfigRows as row (row.label)}
-											<li class="flex items-center gap-3">
-												<span class="text-muted-foreground">{row.label}</span>
-												<span class="ml-auto font-mono tabular-nums">{row.value}</span>
-											</li>
-										{/each}
-									</ul>
-								{/if}
-							</div>
-						{/if}
-					</Tooltip.Content>
-				</Tooltip.Root>
-
-				<Tooltip.Root>
-					<Tooltip.Trigger>
-						<div class="flex flex-col items-center gap-1">
-							<p
-								class={cn(
-									'text-3xl font-bold',
-									prefixCacheOn ? valueColorClass('green') : 'text-muted-foreground'
-								)}
-							>
-								{prefixCacheValue}
-							</p>
-							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-								{m.cfg_prefix_caching()}
-							</p>
-						</div>
-					</Tooltip.Trigger>
-					<Tooltip.Content side="bottom" class="max-w-xs">
-						<p class="text-xs">{m.llm_dashboard_prefix_caching_hint()}</p>
-					</Tooltip.Content>
-				</Tooltip.Root>
-
-				<Tooltip.Root>
-					<Tooltip.Trigger>
-						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-3xl font-bold', valueColorClass(restartLevel))}>
+							<p class={cn('text-2xl font-bold tabular-nums', valueColorClass(restartLevel))}>
 								{restartTotal}
 							</p>
 							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
@@ -409,7 +281,7 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-3xl font-bold', valueColorClass(oomLevel))}>
+							<p class={cn('text-2xl font-bold tabular-nums', valueColorClass(oomLevel))}>
 								{oomTotal}
 							</p>
 							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
@@ -434,7 +306,7 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-3xl font-bold', valueColorClass(xidLevel))}>
+							<p class={cn('text-2xl font-bold tabular-nums', valueColorClass(xidLevel))}>
 								{nodeCount === 0 ? '—' : xidTotal}
 							</p>
 							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
@@ -464,7 +336,7 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-3xl font-bold', valueColorClass(throttleLevel))}>
+							<p class={cn('text-2xl font-bold tabular-nums', valueColorClass(throttleLevel))}>
 								{throttlePct.toFixed(1)}%
 							</p>
 							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
@@ -480,7 +352,7 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-3xl font-bold', valueColorClass(shmLevel))}>
+							<p class={cn('text-2xl font-bold tabular-nums', valueColorClass(shmLevel))}>
 								{shmCrashCount}
 							</p>
 							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
@@ -512,7 +384,7 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-3xl font-bold', valueColorClass(preemptLevel))}>
+							<p class={cn('text-2xl font-bold tabular-nums', valueColorClass(preemptLevel))}>
 								{preemptTotal}
 							</p>
 							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
@@ -540,19 +412,6 @@
 						{/if}
 					</Tooltip.Content>
 				</Tooltip.Root>
-
-				<div class="flex flex-col items-center gap-1">
-					<p class={cn('text-3xl font-bold', valueColorClass(overallLevel))}>
-						{#if overallLevel === 'green'}
-							{m.status_ok()}
-						{:else}
-							{issueCount + warningCount}
-						{/if}
-					</p>
-					<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-						{m.metric_overall_status()}
-					</p>
-				</div>
 			</div>
 		{/if}
 	</Statistics.Content>
