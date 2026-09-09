@@ -4,8 +4,8 @@
  * client form (import-cluster-external.svelte) and the server route
  * (bff/cluster-import/+server.ts) so the two can't drift apart. They also mirror
  * the otterscale-agent chart's own `templates/validate.yaml`: externalAddress is
- * a bare host (the chart rejects a scheme), inferenceURL is an absolute
- * http(s):// URL (the chart requires one).
+ * a bare host (the chart rejects both a scheme and a trailing `:port`),
+ * inferenceURL is an absolute http(s):// URL (the chart requires one).
  *
  * Deliberately free of `title`/`errorMessage`: those are i18n'd display
  * concerns the client layers on top per field. This file only owns the rules
@@ -46,8 +46,12 @@ export const clusterInfoFieldsSchema = {
 	required: CLUSTER_INFO_REQUIRED_FIELDS,
 	properties: {
 		externalAddress: {
+			// Bare host or IP only. `(?!.*://)` rejects a scheme; `(?![^:]+:\d+$)`
+			// rejects a trailing `:port` (a single-colon `host:port`, mirroring the
+			// chart's "ends with :digits and splits into exactly 2 parts" check) while
+			// leaving colon-rich IPv6 literals alone. The port comes from nodePortRange.
 			type: 'string',
-			pattern: '^(?!.*://).+$'
+			pattern: '^(?!.*://)(?![^:]+:\\d+$).+$'
 		},
 		nodePortRange: {
 			type: 'object',

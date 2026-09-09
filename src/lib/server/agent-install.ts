@@ -17,8 +17,21 @@ const AGENT_RELEASE = 'otterscale-agent';
 const AGENT_CHART_REPO = 'https://otterscale.github.io/helm-charts';
 const AGENT_CHART_NAME = 'otterscale-agent';
 
-/** Name of the Secret the agent mounts its trusted CA from — read here, not assumed. */
+/**
+ * Toggle for whether agent.serverURL is served by a private CA the agent must be
+ * told to trust: set it (to "otterscale-ca") to make the wizard emit a
+ * `trustedCA` block, leave it unset under a public CA. Only the presence is read
+ * — the agent chart's validate.yaml pins both the Secret name and key while
+ * tenantOperator is enabled (which the wizard always does), so those are the
+ * constants below, and a different value is rejected rather than emitted. The
+ * Secret itself is provisioned on the target cluster out of band; the chart only
+ * references it by name.
+ */
 const TRUSTED_CA_ENV = 'AGENT_TRUSTED_CA_SECRET_NAME';
+
+/** Pinned by the agent chart (validate.yaml / deployment.yaml); not configurable there. */
+const TRUSTED_CA_SECRET = 'otterscale-ca';
+const TRUSTED_CA_KEY = 'ca.crt';
 
 /** Not EOF: the generated values below can't plausibly contain this line. */
 const VALUES_DELIMITER = 'OTTERSCALE_VALUES';
@@ -71,14 +84,6 @@ function agentServerURL(): string {
 	return `${requiredPublic('PUBLIC_WEB_URL')}/api/`;
 }
 
-/** The trusted-CA Secret's key, from NODE_EXTRA_CA_CERTS's basename; null under a public CA. */
-function trustedCAKey(): string | null {
-	const path = env.NODE_EXTRA_CA_CERTS;
-	if (!path) return null;
-	const key = path.split('/').pop();
-	return key || null;
-}
-
 /** Mirrors core.ValidateClusterName (otterscale/internal/core/link.go). */
 export function validateClusterName(cluster: string): string | null {
 	if (!cluster) return 'must not be empty';
@@ -128,12 +133,18 @@ function buildValues(input: AgentInstallInput): Record<string, unknown> {
 		}
 	};
 
-	// Named, not inlined: the agent shares the release's namespace and reads the
-	// Secret directly. Both absent under a public CA.
-	const caSecretName = env[TRUSTED_CA_ENV];
-	const caKey = trustedCAKey();
-	if (caSecretName && caKey) {
-		values.trustedCA = { secretName: caSecretName, key: caKey };
+	// Presence is the toggle; the name/key are the chart's to pin. A non-empty
+	// value that isn't the pinned name is a misconfiguration — fail here rather
+	// than emit a command `helm` rejects at template time. Omitted entirely under
+	// a public CA, where the agent needs no extra trust.
+	const caToggle = env[TRUSTED_CA_ENV];
+	if (caToggle) {
+		if (caToggle !== TRUSTED_CA_SECRET) {
+			throw new Error(
+				`${TRUSTED_CA_ENV} must be "${TRUSTED_CA_SECRET}" or unset: the agent chart pins the trusted-CA Secret name while tenantOperator is enabled`
+			);
+		}
+		values.trustedCA = { secretName: TRUSTED_CA_SECRET, key: TRUSTED_CA_KEY };
 	}
 
 	return values;

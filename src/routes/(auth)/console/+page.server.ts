@@ -20,8 +20,10 @@ async function fetchLinks(fetch: typeof globalThis.fetch) {
 
 	if (!res.ok) return [];
 
-	const { links } = (await res.json()) as LinkResponse;
-	return links;
+	// Connect's proto3 JSON omits an empty repeated field, so `links` is absent
+	// (not []) when no cluster is registered yet.
+	const { links } = (await res.json()) as Partial<LinkResponse>;
+	return links ?? [];
 }
 
 export const load: PageServerLoad = async ({ fetch, url }) => {

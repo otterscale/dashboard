@@ -89,8 +89,10 @@
 		wasOpen = open;
 	});
 
-	// Mirrors core.ValidateClusterName on the server.
-	const CLUSTER_NAME_PATTERN = '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$';
+	// Mirrors core.ValidateClusterName on the server. The `-` is escaped (`\-`)
+	// so the string is also a valid regex under the `v` flag, which browsers now
+	// use to compile the HTML `pattern` attribute sjsf renders this into.
+	const CLUSTER_NAME_PATTERN = '^[a-z0-9]([a-z0-9\\-]*[a-z0-9])?$';
 
 	function defaultClusterNameValues(): FormValue {
 		return { clusterName: '' };
