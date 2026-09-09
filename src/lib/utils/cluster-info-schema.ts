@@ -17,8 +17,13 @@
  * chart's own contract.
  */
 
-/** Full valid TCP port range; the chart itself doesn't constrain this further. */
-export const NODE_PORT_MIN = 0;
+/**
+ * Usable TCP port range. Port 0 is reserved (means "any" at the socket layer),
+ * so a NodePort range can't start there. The chart doesn't constrain this
+ * further — Kubernetes' own default service-node-port-range is 30000-32767, but
+ * a cluster can be configured wider, so this only rejects impossible values.
+ */
+export const NODE_PORT_MIN = 1;
 export const NODE_PORT_MAX = 65535;
 
 // inferenceURL is deliberately absent: it's optional. Its format is still
@@ -31,8 +36,8 @@ export const CLUSTER_INFO_REQUIRED_FIELDS = [
 
 /**
  * Validates against `{ externalAddress, nodePortRangeMin, nodePortRangeMax, inferenceURL }`.
- * Requires an ajv instance compiled with `$data: true` (for nodePortRangeMax's
- * cross-reference to nodePortRangeMin).
+ * Requires an ajv instance compiled with `$data: true` (nodePortRangeMin/Max
+ * cross-reference each other to enforce min < max).
  */
 export const clusterInfoFieldsSchema = {
 	type: 'object',
@@ -42,10 +47,16 @@ export const clusterInfoFieldsSchema = {
 			type: 'string',
 			pattern: '^(?!.*://).+$'
 		},
+		// min < max is enforced from both sides ($data cross-references the sibling
+		// field, so an ajv instance compiled with `$data: true` is required): a bad
+		// order flags *both* inputs, not just one. An empty sibling makes the $data
+		// pointer resolve to undefined, which ajv skips — the `required` rule on the
+		// parent object is what catches a missing value.
 		nodePortRangeMin: {
 			type: 'integer',
 			minimum: NODE_PORT_MIN,
-			maximum: NODE_PORT_MAX
+			maximum: NODE_PORT_MAX,
+			exclusiveMaximum: { $data: '1/nodePortRangeMax' }
 		},
 		nodePortRangeMax: {
 			type: 'integer',

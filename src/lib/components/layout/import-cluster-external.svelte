@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
-	import FileCodeIcon from '@lucide/svelte/icons/file-code';
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import TerminalIcon from '@lucide/svelte/icons/terminal';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
@@ -29,7 +27,6 @@
 		type KeycloakUser
 	} from '$lib/components/layout/import-cluster-administrators.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import * as Collapsible from '$lib/components/ui/collapsible';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Empty from '$lib/components/ui/empty';
 	import * as Field from '$lib/components/ui/field';
@@ -38,7 +35,6 @@
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { m } from '$lib/messages';
 	import { bump } from '$lib/stores/pulse.svelte';
-	import { cn } from '$lib/utils';
 	import {
 		CLUSTER_INFO_REQUIRED_FIELDS,
 		clusterInfoFieldsSchema
@@ -61,13 +57,11 @@
 	let stepIndex = $state(1);
 	let clusterName = $state('');
 	let installCommand = $state('');
-	let agentValues = $state('');
 	let robotName = $state('');
 	let robotRotated = $state(false);
 	let clusterStatus = $state<'pending' | 'installing' | 'done'>('pending');
 	let isCreating = $state(false);
 	let errorMessage = $state('');
-	let isYamlOpen = $state(false);
 
 	// Owned here so reset() can clear it and submitClusterInfo can read it; the
 	// picker UI and its user search live in <ImportClusterAdministrators>.
@@ -135,16 +129,34 @@
 	const clusterInfoSchema: Schema = {
 		type: 'object',
 		required: [...CLUSTER_INFO_REQUIRED_FIELDS],
+		// `required` errors belong to the object, not the property, so ajv-errors takes
+		// the message from here (keyed by the missing field) rather than the field's own
+		// `errorMessage` below.
+		errorMessage: {
+			required: {
+				nodePortRangeMin: m.import_cluster_node_port_range_required(),
+				nodePortRangeMax: m.import_cluster_node_port_range_required()
+			}
+		},
 		properties: {
 			externalAddress: {
 				...clusterInfoFieldsSchema.properties.externalAddress,
 				title: m.import_cluster_external_address_label(),
 				errorMessage: m.import_cluster_external_address_invalid()
 			},
+			// Both range inputs carry the full keyword→message map: `type` catches a blank
+			// or non-numeric entry, `minimum`/`maximum` an out-of-range port, and the
+			// exclusive bound (via $data) the min/max ordering — flagged on whichever
+			// input the user can fix.
 			nodePortRangeMin: {
 				...clusterInfoFieldsSchema.properties.nodePortRangeMin,
 				title: m.import_cluster_node_port_range_label(),
-				errorMessage: m.import_cluster_node_port_range_bounds_invalid()
+				errorMessage: {
+					type: m.import_cluster_node_port_range_bounds_invalid(),
+					minimum: m.import_cluster_node_port_range_bounds_invalid(),
+					maximum: m.import_cluster_node_port_range_bounds_invalid(),
+					exclusiveMaximum: m.import_cluster_node_port_range_min_order_invalid()
+				}
 			},
 			nodePortRangeMax: {
 				...clusterInfoFieldsSchema.properties.nodePortRangeMax,
@@ -183,6 +195,7 @@
 		},
 		nodePortRangeMin: {
 			'ui:options': {
+				help: m.import_cluster_node_port_range_description(),
 				shadcn4Number: { placeholder: '30000' }
 			}
 		},
@@ -242,13 +255,11 @@
 		stepIndex = 1;
 		clusterName = '';
 		installCommand = '';
-		agentValues = '';
 		robotName = '';
 		robotRotated = false;
 		clusterStatus = 'pending';
 		isCreating = false;
 		errorMessage = '';
-		isYamlOpen = false;
 		clusterNameFormReference = null;
 		clusterInfoFormReference = null;
 		selectedUsers = [];
@@ -311,12 +322,10 @@
 
 			const result = (await response.json()) as {
 				installCommand: string;
-				values: string;
 				robot: { name: string; rotated: boolean };
 			};
 
 			installCommand = result.installCommand;
-			agentValues = result.values;
 			robotName = result.robot.name;
 			robotRotated = result.robot.rotated;
 			clusterStatus = 'pending';
@@ -509,12 +518,7 @@
 			</Item.Root>
 		{/if}
 
-		<div
-			class={cn(
-				'flex flex-col gap-3 rounded-lg border bg-card p-4',
-				isYamlOpen && 'min-h-0 flex-1'
-			)}
-		>
+		<div class="flex flex-col gap-3 rounded-lg border bg-card p-4">
 			<Field.FieldLabel class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
 				{m.import_cluster_install_command_label()}
 			</Field.FieldLabel>
@@ -532,32 +536,6 @@
 			<Field.FieldDescription>
 				{m.import_cluster_install_command_description()}
 			</Field.FieldDescription>
-
-			{#if agentValues}
-				<Collapsible.Root
-					bind:open={isYamlOpen}
-					class={cn('flex flex-col', isYamlOpen && 'min-h-0 flex-1')}
-				>
-					<Collapsible.Trigger
-						class="group flex w-full items-center justify-between border-t pt-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-					>
-						<span class="flex items-center gap-2">
-							<FileCodeIcon class="size-4" />
-							{m.import_cluster_preview_values()}
-						</span>
-						<ChevronDownIcon
-							class="size-4 transition-transform duration-200 group-data-[state=open]:rotate-180"
-						/>
-					</Collapsible.Trigger>
-					<Collapsible.Content class="flex min-h-0 flex-1 flex-col">
-						<div class="mt-2 min-h-0 flex-1 overflow-auto rounded-md border">
-							<Code.Root lang="yaml" class="w-full text-xs" code={agentValues}>
-								<Code.CopyButton />
-							</Code.Root>
-						</div>
-					</Collapsible.Content>
-				</Collapsible.Root>
-			{/if}
 		</div>
 
 		<Item.Root variant="outline">

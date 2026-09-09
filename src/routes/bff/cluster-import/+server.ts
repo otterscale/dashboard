@@ -46,11 +46,13 @@ function describeClusterInfoError(errors: typeof validateClusterInfoFields.error
 		case '/externalAddress':
 			return 'clusterInfo.externalAddress must be a bare host or IP — no scheme, no port';
 		case '/nodePortRangeMin':
-			return 'clusterInfo.nodePortRangeMin must be a port number between 0 and 65535';
+			return err.keyword === 'exclusiveMaximum'
+				? 'clusterInfo.nodePortRangeMin must be less than clusterInfo.nodePortRangeMax'
+				: 'clusterInfo.nodePortRangeMin must be a whole port number between 1 and 65535';
 		case '/nodePortRangeMax':
 			return err.keyword === 'exclusiveMinimum'
 				? 'clusterInfo.nodePortRangeMax must be greater than clusterInfo.nodePortRangeMin'
-				: 'clusterInfo.nodePortRangeMax must be a port number between 0 and 65535';
+				: 'clusterInfo.nodePortRangeMax must be a whole port number between 1 and 65535';
 		case '/inferenceURL':
 			return 'clusterInfo.inferenceURL must be a bare host or IP — no scheme, no port';
 		default:

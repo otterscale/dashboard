@@ -55,8 +55,6 @@ export interface AgentInstallInput {
 
 export interface AgentInstallCommands {
 	installCommand: string;
-	/** The same values as the heredoc body, for the wizard's preview pane. */
-	values: string;
 }
 
 function required(name: string): string {
@@ -223,5 +221,5 @@ export function buildAgentInstallCommands(input: AgentInstallInput): AgentInstal
 		VALUES_DELIMITER
 	].join('\n');
 
-	return { installCommand, values };
+	return { installCommand };
 }
