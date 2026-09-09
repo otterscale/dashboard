@@ -189,13 +189,13 @@
 		},
 		externalAddress: {
 			'ui:options': {
-				help: m.import_cluster_external_address_description(),
+				description: m.import_cluster_external_address_description(),
 				shadcn4Text: { placeholder: m.import_cluster_external_address_placeholder() }
 			}
 		},
 		nodePortRangeMin: {
 			'ui:options': {
-				help: m.import_cluster_node_port_range_description(),
+				description: m.import_cluster_node_port_range_description(),
 				shadcn4Number: { placeholder: '30000' }
 			}
 		},
@@ -214,7 +214,7 @@
 		},
 		inferenceURL: {
 			'ui:options': {
-				help: m.import_cluster_inference_url_description(),
+				description: m.import_cluster_inference_url_description(),
 				shadcn4Text: { placeholder: m.import_cluster_inference_url_placeholder() }
 			}
 		}
