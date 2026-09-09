@@ -50,7 +50,6 @@ export interface AgentInstallInput {
 	clusterAdminUsers: string[];
 	/** From issueJoinToken. Authorizes the agent to register `cluster`. */
 	joinToken: string;
-	rancherProjectID?: string;
 	clusterInfo: ClusterInfoInput;
 	harborRobotName: string;
 	harborRobotSecret: string;
@@ -122,7 +121,6 @@ function buildValues(input: AgentInstallInput): Record<string, unknown> {
 			: { enabled: false },
 		tenantOperator: {
 			enabled: true,
-			...(input.rancherProjectID ? { rancherProjectID: input.rancherProjectID } : {}),
 			harbor: {
 				url: requiredPublic('PUBLIC_HARBOR_URL'),
 				robot: {

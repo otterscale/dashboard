@@ -15,7 +15,6 @@ import type { RequestHandler } from './$types';
 interface ImportClusterRequest {
 	cluster?: string;
 	extraUsers?: string[];
-	rancherProjectId?: string;
 	clusterInfo?: {
 		enabled?: boolean;
 		externalAddress?: string;
@@ -140,7 +139,6 @@ export const POST: RequestHandler = async ({ fetch, locals, request }) => {
 			cluster,
 			clusterAdminUsers,
 			joinToken,
-			rancherProjectID: body.rancherProjectId?.trim() || undefined,
 			clusterInfo: {
 				enabled: clusterInfoEnabled,
 				externalAddress,
