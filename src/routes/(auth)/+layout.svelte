@@ -46,7 +46,12 @@
 	import { m } from '$lib/messages';
 	import { breadcrumbs } from '$lib/stores';
 	import { pulse } from '$lib/stores/pulse.svelte';
-	import { getAdditionalItems } from '$lib/utils/features';
+	import {
+		type ClusterFeatures,
+		getAdditionalItems,
+		getAdditionalNavGroups,
+		probeClusterFeatures
+	} from '$lib/utils/features';
 	import {
 		ClusterReleaseLabelSelector,
 		WorkspaceReleaseLabelSelector
@@ -76,6 +81,7 @@
 	let sidebarOpen = $state(true);
 	let importOpen = $state(false);
 	let hasRookCeph = $state(false);
+	let clusterFeatures = $state<ClusterFeatures>({});
 
 	async function fetchClusters(signal?: AbortSignal): Promise<Link[]> {
 		try {
@@ -178,6 +184,24 @@
 		hasRookCephCRD(transport, activeCluster, abortController.signal)
 			.then((exists) => {
 				if (!abortController.signal.aborted) hasRookCeph = exists;
+			})
+			.catch((err) => {
+				if (!abortController.signal.aborted) console.error(err);
+			});
+
+		return () => abortController.abort();
+	});
+
+	$effect(() => {
+		if (!activeCluster) {
+			clusterFeatures = {};
+			return;
+		}
+
+		const abortController = new AbortController();
+		probeClusterFeatures(transport, activeCluster, abortController.signal)
+			.then((features) => {
+				if (!abortController.signal.aborted) clusterFeatures = features;
 			})
 			.catch((err) => {
 				if (!abortController.signal.aborted) console.error(err);
@@ -359,6 +383,9 @@
 					}
 				]
 			},
+			...(data.isClusterAdmin
+				? getAdditionalNavGroups(clusterFeatures, resourceUrl, data.isClusterAdmin)
+				: []),
 			...(data.isClusterAdmin
 				? [
 						{

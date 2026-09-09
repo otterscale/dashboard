@@ -31,6 +31,7 @@
 	import type { DataSchemaType, UISchemaType } from '../dynamic-table/utils';
 	import type { ResourceRuleVerbs } from '../resources/types';
 	import BulkDelete from './bulk-delete.svelte';
+	import { getKindExtension } from './extensions';
 	import type { ActionsType, CreateType } from './kind-viewer-actions';
 	import { getActions, getCreate } from './kind-viewer-actions';
 	import {
@@ -61,14 +62,20 @@
 
 	let clustered = $derived(isClusterAdmin);
 
+	const kindExtension = $derived(getKindExtension(apiResource.group, apiResource.kind));
+
 	let schema: Schema | undefined = $state(undefined);
 	let validate: ValidateFunction | undefined = $state(undefined);
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	const uiSchemas: Record<string, UISchemaType> = $derived(getUISchemas(apiResource.kind));
-	const dataSchemas: Record<string, DataSchemaType> = $derived(getDataSchemas(apiResource.kind));
+	const uiSchemas: Record<string, UISchemaType> = $derived(
+		getUISchemas(apiResource.kind, apiResource.group)
+	);
+	const dataSchemas: Record<string, DataSchemaType> = $derived(
+		getDataSchemas(apiResource.kind, apiResource.group)
+	);
 	const namespace = $derived.by(() => {
 		return apiResource.namespaced ? namespaceProp : undefined;
 	});
@@ -280,8 +287,8 @@
 		}
 	}
 
-	const Create: CreateType = $derived(getCreate(apiResource.kind, namespace));
-	const Actions: ActionsType = $derived(getActions(apiResource.kind, namespace));
+	const Create: CreateType = $derived(getCreate(apiResource.kind, namespace, apiResource.group));
+	const Actions: ActionsType = $derived(getActions(apiResource.kind, namespace, apiResource.group));
 	const GridLayout: GridLayoutType = $derived(getGridLayout(apiResource.kind, namespace));
 
 	// This table is the subject of its page, so its view belongs in the URL.
@@ -415,7 +422,9 @@
 					{/if}
 				{/snippet}
 				{#snippet bulkDelete({ table })}
-					<BulkDelete {table} {cluster} {namespace} {apiResource} />
+					{#if !kindExtension?.readOnly}
+						<BulkDelete {table} {cluster} {namespace} {apiResource} />
+					{/if}
 				{/snippet}
 				{#snippet reload()}
 					<Tooltip.Root>
