@@ -31,25 +31,24 @@ interface RobotRef {
 }
 
 /**
- * Exactly what tenant-operator/internal/harbor/client.go exercises, no more.
- * robot:* needs both scopes: the API is system-wide, but Harbor authorizes a
- * project-level robot against the project's own namespace. repository
- * pull/push is needed transitively — Harbor won't let a robot grant access it
- * doesn't hold, and the per-workspace robots it creates carry those.
- * project:delete/repository:delete/artifact:delete are deliberately absent, so
- * a leaked secret can't destroy an image or project.
+ * Mirrors the Harbor permission set tenant-operator/internal/harbor/client.go
+ * relies on — no more. robot list/read at system scope only lets it discover
+ * existing robots; the per-workspace robots it actually creates and deletes are
+ * project-scoped, so robot create/delete sit under the project entry.
+ * repository pull/push is needed transitively — Harbor won't let a robot grant
+ * access it doesn't hold, and the per-workspace robots it creates carry those.
+ * project:delete / repository:delete / artifact:delete are deliberately absent,
+ * so a leaked secret can't destroy an image or project.
  */
 const ROBOT_PERMISSIONS = [
 	{
 		kind: 'system',
 		namespace: '/',
 		access: [
-			{ resource: 'project', action: 'create' },
 			{ resource: 'project', action: 'list' },
-			{ resource: 'robot', action: 'create' },
-			{ resource: 'robot', action: 'read' },
+			{ resource: 'project', action: 'create' },
 			{ resource: 'robot', action: 'list' },
-			{ resource: 'robot', action: 'delete' }
+			{ resource: 'robot', action: 'read' }
 		]
 	},
 	{
@@ -57,16 +56,15 @@ const ROBOT_PERMISSIONS = [
 		namespace: '*',
 		access: [
 			{ resource: 'project', action: 'read' },
-			{ resource: 'member', action: 'create' },
-			{ resource: 'member', action: 'read' },
 			{ resource: 'member', action: 'list' },
+			{ resource: 'member', action: 'read' },
+			{ resource: 'member', action: 'create' },
 			{ resource: 'member', action: 'update' },
 			{ resource: 'member', action: 'delete' },
-			{ resource: 'robot', action: 'create' },
-			{ resource: 'robot', action: 'read' },
 			{ resource: 'robot', action: 'list' },
+			{ resource: 'robot', action: 'read' },
+			{ resource: 'robot', action: 'create' },
 			{ resource: 'robot', action: 'delete' },
-			{ resource: 'repository', action: 'list' },
 			{ resource: 'repository', action: 'pull' },
 			{ resource: 'repository', action: 'push' }
 		]
