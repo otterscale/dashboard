@@ -19,8 +19,10 @@ interface ImportClusterRequest {
 	clusterInfo?: {
 		enabled?: boolean;
 		externalAddress?: string;
-		nodePortRangeMin?: number;
-		nodePortRangeMax?: number;
+		nodePortRange?: {
+			min?: number;
+			max?: number;
+		};
 		inferenceURL?: string;
 	};
 }
@@ -28,7 +30,7 @@ interface ImportClusterRequest {
 // Same fragment the client form compiles (import-cluster-external.svelte) — the client only
 // adds title/errorMessage on top for display; the rules themselves live in one place so this
 // endpoint can't silently drift from what the form already enforced. $data is needed for
-// nodePortRangeMax's cross-reference to nodePortRangeMin.
+// nodePortRange.max's cross-reference to nodePortRange.min.
 const ajv = new Ajv({ allErrors: true, strict: true, $data: true });
 const validateClusterInfoFields = ajv.compile(clusterInfoFieldsSchema);
 // inferenceURL is optional; its format is only checked when a non-empty value is sent. Compiled
@@ -40,19 +42,22 @@ function describeClusterInfoError(errors: typeof validateClusterInfoFields.error
 	const err = errors?.[0];
 	if (!err) return 'clusterInfo is invalid';
 	if (err.keyword === 'required') {
-		return `clusterInfo.${err.params.missingProperty} is required unless cluster info is disabled`;
+		// missingProperty is `min`/`max` when instancePath points at `/nodePortRange`,
+		// otherwise a top-level field (`externalAddress`, `nodePortRange`).
+		const path = err.instancePath ? `${err.instancePath.slice(1)}.` : '';
+		return `clusterInfo.${path}${err.params.missingProperty} is required unless cluster info is disabled`;
 	}
 	switch (err.instancePath) {
 		case '/externalAddress':
 			return 'clusterInfo.externalAddress must be a bare host or IP — no scheme, no port';
-		case '/nodePortRangeMin':
+		case '/nodePortRange/min':
 			return err.keyword === 'exclusiveMaximum'
-				? 'clusterInfo.nodePortRangeMin must be less than clusterInfo.nodePortRangeMax'
-				: 'clusterInfo.nodePortRangeMin must be a whole port number between 1 and 65535';
-		case '/nodePortRangeMax':
+				? 'clusterInfo.nodePortRange.min must be less than clusterInfo.nodePortRange.max'
+				: 'clusterInfo.nodePortRange.min must be a whole port number between 1 and 65535';
+		case '/nodePortRange/max':
 			return err.keyword === 'exclusiveMinimum'
-				? 'clusterInfo.nodePortRangeMax must be greater than clusterInfo.nodePortRangeMin'
-				: 'clusterInfo.nodePortRangeMax must be a whole port number between 1 and 65535';
+				? 'clusterInfo.nodePortRange.max must be greater than clusterInfo.nodePortRange.min'
+				: 'clusterInfo.nodePortRange.max must be a whole port number between 1 and 65535';
 		case '/inferenceURL':
 			return 'clusterInfo.inferenceURL must be a bare host or IP — no scheme, no port';
 		default:
@@ -79,8 +84,8 @@ export const POST: RequestHandler = async ({ fetch, locals, request }) => {
 
 	const clusterInfoEnabled = body.clusterInfo?.enabled ?? false;
 	const externalAddress = body.clusterInfo?.externalAddress?.trim() ?? '';
-	const nodePortRangeMin = body.clusterInfo?.nodePortRangeMin;
-	const nodePortRangeMax = body.clusterInfo?.nodePortRangeMax;
+	const nodePortRangeMin = body.clusterInfo?.nodePortRange?.min;
+	const nodePortRangeMax = body.clusterInfo?.nodePortRange?.max;
 	const inferenceURL = body.clusterInfo?.inferenceURL?.trim() ?? '';
 
 	// externalAddress/nodePortRange are required only while cluster info is enabled; inferenceURL
@@ -91,8 +96,7 @@ export const POST: RequestHandler = async ({ fetch, locals, request }) => {
 		if (
 			!validateClusterInfoFields({
 				externalAddress,
-				nodePortRangeMin,
-				nodePortRangeMax,
+				nodePortRange: { min: nodePortRangeMin, max: nodePortRangeMax },
 				inferenceURL
 			})
 		) {

@@ -114,9 +114,9 @@ function buildValues(input: AgentInstallInput): Record<string, unknown> {
 					enabled: true,
 					externalAddress: input.clusterInfo.externalAddress,
 					// The chart's own contract (otterscale-agent values.yaml) wants a single
-					// "min-max" string; nodePortRangeMin/Max only exist so the wizard and this
-					// endpoint can validate "min < max" as a JSON Schema rule. This is the one
-					// place they get joined back into that string.
+					// "min-max" string; the wizard and endpoint carry min/max separately only so
+					// "min < max" is a JSON Schema rule. This is the one place they get joined
+					// back into that string.
 					nodePortRange: `${input.clusterInfo.nodePortRangeMin}-${input.clusterInfo.nodePortRangeMax}`,
 					...(input.clusterInfo.inferenceURL
 						? { inferenceURL: input.clusterInfo.inferenceURL }

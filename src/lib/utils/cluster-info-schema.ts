@@ -8,13 +8,12 @@
  * concerns the client layers on top per field. This file only owns the rules
  * that must stay identical on both sides.
  *
- * nodePortRange is split into nodePortRangeMin/nodePortRangeMax (rather than
- * kept as one "min-max" string) specifically so "min < max" is expressible as
- * a JSON Schema rule via ajv's `$data` cross-field reference, instead of a
- * hand-written check. The otterscale-agent chart still wants a single
- * "min-max" string — that join happens once, in
- * lib/server/agent-install.ts#buildValues, right before the value enters the
- * chart's own contract.
+ * nodePortRange is a `{ min, max }` object (rather than one "min-max" string)
+ * specifically so "min < max" is expressible as a JSON Schema rule via ajv's
+ * `$data` cross-field reference, instead of a hand-written check. The
+ * otterscale-agent chart still wants a single "min-max" string — that join
+ * happens once, in lib/server/agent-install.ts#buildValues, right before the
+ * value enters the chart's own contract.
  */
 
 /**
@@ -28,15 +27,15 @@ export const NODE_PORT_MAX = 65535;
 
 // inferenceURL is deliberately absent: it's optional. Its format is still
 // checked (below) whenever a value is present.
-export const CLUSTER_INFO_REQUIRED_FIELDS = [
-	'externalAddress',
-	'nodePortRangeMin',
-	'nodePortRangeMax'
-] as const;
+export const CLUSTER_INFO_REQUIRED_FIELDS = ['externalAddress', 'nodePortRange'] as const;
+
+// The two fields required *within* nodePortRange (the object itself is required
+// by CLUSTER_INFO_REQUIRED_FIELDS above).
+export const NODE_PORT_RANGE_REQUIRED_FIELDS = ['min', 'max'] as const;
 
 /**
- * Validates against `{ externalAddress, nodePortRangeMin, nodePortRangeMax, inferenceURL }`.
- * Requires an ajv instance compiled with `$data: true` (nodePortRangeMin/Max
+ * Validates against `{ externalAddress, nodePortRange: { min, max }, inferenceURL }`.
+ * Requires an ajv instance compiled with `$data: true` (nodePortRange.min/max
  * cross-reference each other to enforce min < max).
  */
 export const clusterInfoFieldsSchema = {
@@ -47,22 +46,28 @@ export const clusterInfoFieldsSchema = {
 			type: 'string',
 			pattern: '^(?!.*://).+$'
 		},
-		// min < max is enforced from both sides ($data cross-references the sibling
-		// field, so an ajv instance compiled with `$data: true` is required): a bad
-		// order flags *both* inputs, not just one. An empty sibling makes the $data
-		// pointer resolve to undefined, which ajv skips — the `required` rule on the
-		// parent object is what catches a missing value.
-		nodePortRangeMin: {
-			type: 'integer',
-			minimum: NODE_PORT_MIN,
-			maximum: NODE_PORT_MAX,
-			exclusiveMaximum: { $data: '1/nodePortRangeMax' }
-		},
-		nodePortRangeMax: {
-			type: 'integer',
-			minimum: NODE_PORT_MIN,
-			maximum: NODE_PORT_MAX,
-			exclusiveMinimum: { $data: '1/nodePortRangeMin' }
+		nodePortRange: {
+			type: 'object',
+			required: NODE_PORT_RANGE_REQUIRED_FIELDS,
+			properties: {
+				// min < max is enforced from both sides ($data cross-references the
+				// sibling field, so an ajv instance compiled with `$data: true` is
+				// required): a bad order flags *both* inputs, not just one. An empty
+				// sibling makes the $data pointer resolve to undefined, which ajv skips
+				// — the `required` rule on this object is what catches a missing value.
+				min: {
+					type: 'integer',
+					minimum: NODE_PORT_MIN,
+					maximum: NODE_PORT_MAX,
+					exclusiveMaximum: { $data: '1/max' }
+				},
+				max: {
+					type: 'integer',
+					minimum: NODE_PORT_MIN,
+					maximum: NODE_PORT_MAX,
+					exclusiveMinimum: { $data: '1/min' }
+				}
+			}
 		},
 		// Optional (not in CLUSTER_INFO_REQUIRED_FIELDS): an empty string passes
 		// (`.*`); a non-empty value must be a bare host or IP — no scheme.

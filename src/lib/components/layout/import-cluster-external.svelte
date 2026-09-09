@@ -90,8 +90,7 @@
 	function defaultClusterInfoValues(): FormValue {
 		return {
 			externalAddress: '',
-			nodePortRangeMin: 30000,
-			nodePortRangeMax: 32767,
+			nodePortRange: { min: 30000, max: 32767 },
 			inferenceURL: ''
 		};
 	}
@@ -121,50 +120,54 @@
 		}
 	};
 
-	// Step 2: externalAddress/nodePortRangeMin/nodePortRangeMax are required; inferenceURL is
-	// optional but format-checked when present. Cluster info is always enabled now, so this
+	// Step 2: externalAddress and nodePortRange (an object of min/max) are required; inferenceURL
+	// is optional but format-checked when present. Cluster info is always enabled now, so this
 	// is a flat schema (no `if`/`then` toggle). The rules come from cluster-info-schema.ts, the
 	// same fragment /bff/cluster-import validates the request against, so the two can't drift
 	// apart; only title/errorMessage (display, not a rule) are added here.
 	const clusterInfoSchema: Schema = {
 		type: 'object',
 		required: [...CLUSTER_INFO_REQUIRED_FIELDS],
-		// `required` errors belong to the object, not the property, so ajv-errors takes
-		// the message from here (keyed by the missing field) rather than the field's own
-		// `errorMessage` below.
-		errorMessage: {
-			required: {
-				nodePortRangeMin: m.import_cluster_node_port_range_required(),
-				nodePortRangeMax: m.import_cluster_node_port_range_required()
-			}
-		},
 		properties: {
 			externalAddress: {
 				...clusterInfoFieldsSchema.properties.externalAddress,
 				title: m.import_cluster_external_address_label(),
 				errorMessage: m.import_cluster_external_address_invalid()
 			},
-			// Both range inputs carry the full keyword→message map: `type` catches a blank
-			// or non-numeric entry, `minimum`/`maximum` an out-of-range port, and the
-			// exclusive bound (via $data) the min/max ordering — flagged on whichever
-			// input the user can fix.
-			nodePortRangeMin: {
-				...clusterInfoFieldsSchema.properties.nodePortRangeMin,
+			// nodePortRange groups the two port inputs under one "NodePort Range" label +
+			// description. Both inputs carry the full keyword→message map: `type` catches a
+			// blank or non-numeric entry, `minimum`/`maximum` an out-of-range port, and the
+			// exclusive bound (via $data) the min/max ordering — flagged on whichever input
+			// the user can fix. The `required` errors belong to this object, not its
+			// properties, so ajv-errors takes them from here keyed by the missing field.
+			nodePortRange: {
+				...clusterInfoFieldsSchema.properties.nodePortRange,
 				title: m.import_cluster_node_port_range_label(),
 				errorMessage: {
-					type: m.import_cluster_node_port_range_bounds_invalid(),
-					minimum: m.import_cluster_node_port_range_bounds_invalid(),
-					maximum: m.import_cluster_node_port_range_bounds_invalid(),
-					exclusiveMaximum: m.import_cluster_node_port_range_min_order_invalid()
-				}
-			},
-			nodePortRangeMax: {
-				...clusterInfoFieldsSchema.properties.nodePortRangeMax,
-				errorMessage: {
-					type: m.import_cluster_node_port_range_bounds_invalid(),
-					minimum: m.import_cluster_node_port_range_bounds_invalid(),
-					maximum: m.import_cluster_node_port_range_bounds_invalid(),
-					exclusiveMinimum: m.import_cluster_node_port_range_order_invalid()
+					required: {
+						min: m.import_cluster_node_port_range_required(),
+						max: m.import_cluster_node_port_range_required()
+					}
+				},
+				properties: {
+					min: {
+						...clusterInfoFieldsSchema.properties.nodePortRange.properties.min,
+						errorMessage: {
+							type: m.import_cluster_node_port_range_bounds_invalid(),
+							minimum: m.import_cluster_node_port_range_bounds_invalid(),
+							maximum: m.import_cluster_node_port_range_bounds_invalid(),
+							exclusiveMaximum: m.import_cluster_node_port_range_min_order_invalid()
+						}
+					},
+					max: {
+						...clusterInfoFieldsSchema.properties.nodePortRange.properties.max,
+						errorMessage: {
+							type: m.import_cluster_node_port_range_bounds_invalid(),
+							minimum: m.import_cluster_node_port_range_bounds_invalid(),
+							maximum: m.import_cluster_node_port_range_bounds_invalid(),
+							exclusiveMinimum: m.import_cluster_node_port_range_order_invalid()
+						}
+					}
 				}
 			},
 			inferenceURL: {
@@ -173,16 +176,16 @@
 				errorMessage: m.import_cluster_inference_url_invalid()
 			}
 		}
-		// sjsf's Schema type predates ajv's `$data` extension (used above by nodePortRangeMax's
+		// sjsf's Schema type predates ajv's `$data` extension (used above by nodePortRange.max's
 		// exclusiveMinimum), so the two shapes don't structurally overlap enough for a direct
 		// `as Schema` — routed through `unknown`, same as ajv itself treats it at runtime.
 	} as unknown as Schema;
 
 	const clusterInfoUiSchema: UiSchemaRoot = {
 		'ui:options': {
-			// Two-column grid: externalAddress/inferenceURL share the first row,
-			// nodePortRangeMin/nodePortRangeMax the second. `order` drives which cell each lands in.
-			order: ['externalAddress', 'inferenceURL', 'nodePortRangeMin', 'nodePortRangeMax'],
+			// Two-column grid: externalAddress/inferenceURL share the first row; the
+			// nodePortRange group spans the full width below them. `order` drives placement.
+			order: ['externalAddress', 'inferenceURL', 'nodePortRange'],
 			layouts: {
 				'object-properties': { class: 'grid grid-cols-2 gap-4' }
 			}
@@ -193,29 +196,33 @@
 				shadcn4Text: { placeholder: m.import_cluster_external_address_placeholder() }
 			}
 		},
-		nodePortRangeMin: {
-			'ui:options': {
-				description: m.import_cluster_node_port_range_description(),
-				shadcn4Number: { placeholder: '30000' }
-			}
-		},
-		nodePortRangeMax: {
-			// Sits directly right of nodePortRangeMin under the shared "NodePort Range" label.
-			// It has no title of its own, so bottom-align its grid cell (`justify-end` on a
-			// full-height flex column) to keep its input level with nodePortRangeMin's input
-			// rather than floating up beside that label.
-			'ui:options': {
-				hideTitle: true,
-				layouts: {
-					'object-property': { class: 'flex flex-col justify-end' }
-				},
-				shadcn4Number: { placeholder: '32767' }
-			}
-		},
 		inferenceURL: {
 			'ui:options': {
 				description: m.import_cluster_inference_url_description(),
 				shadcn4Text: { placeholder: m.import_cluster_inference_url_placeholder() }
+			}
+		},
+		nodePortRange: {
+			'ui:options': {
+				description: m.import_cluster_node_port_range_description(),
+				// Full-width row in the parent grid; its own two-column sub-grid puts min
+				// and max side by side under the shared "NodePort Range" label + description.
+				layouts: {
+					'object-property': { class: 'col-span-2' },
+					'object-properties': { class: 'grid grid-cols-2 gap-4' }
+				}
+			},
+			min: {
+				'ui:options': {
+					hideTitle: true,
+					shadcn4Number: { placeholder: '30000' }
+				}
+			},
+			max: {
+				'ui:options': {
+					hideTitle: true,
+					shadcn4Number: { placeholder: '32767' }
+				}
 			}
 		}
 	} as UiSchemaRoot;
@@ -292,8 +299,7 @@
 			: { clusterName: '' };
 		const values = getValueSnapshot(form) as {
 			externalAddress?: string;
-			nodePortRangeMin?: number;
-			nodePortRangeMax?: number;
+			nodePortRange?: { min?: number; max?: number };
 			inferenceURL?: string;
 		};
 		// Normalized once: polling and the final step both compare against this value.
@@ -309,8 +315,10 @@
 					clusterInfo: {
 						enabled: true,
 						externalAddress: (values.externalAddress ?? '').trim(),
-						nodePortRangeMin: values.nodePortRangeMin,
-						nodePortRangeMax: values.nodePortRangeMax,
+						nodePortRange: {
+							min: values.nodePortRange?.min,
+							max: values.nodePortRange?.max
+						},
 						inferenceURL: (values.inferenceURL ?? '').trim()
 					}
 				})
