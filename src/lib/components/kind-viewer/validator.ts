@@ -1,6 +1,7 @@
 import type { Schema } from '@sjsf/form';
 import Ajv, { type ValidateFunction } from 'ajv';
 
+// TODO: replace with validator injection.
 // One Ajv instance for the app. Ajv's own cache is keyed by schema object identity,
 // which a freshly fetched schema never matches, so validators are cached by resource key.
 const ajv = new Ajv({ allErrors: true, strict: false, logger: false });
