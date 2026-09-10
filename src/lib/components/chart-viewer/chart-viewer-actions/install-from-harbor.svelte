@@ -88,7 +88,7 @@
 		metadata: {},
 		spec: {
 			interval: '15m',
-			timeout: '1h',
+			timeout: '15m',
 			serviceAccountName: chartVariant.release.serviceAccountName,
 			...(chartVariant.release.propagateScopeLabel
 				? {

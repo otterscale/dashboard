@@ -99,7 +99,7 @@
 					upgrade: { remediation: { retries: remediationRetries } }
 				}),
 				interval: '15m',
-				timeout: '1h',
+				timeout: '15m',
 				...(dependenciesOfSelectedModules.length > 0 && {
 					dependsOn: dependenciesOfSelectedModules
 				}),
