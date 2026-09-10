@@ -6,6 +6,7 @@ import type { Component, Snippet } from 'svelte';
 
 import type { ResourceRuleVerbs } from '$lib/components/resources/types';
 
+import { getKindExtension } from '../extensions';
 import ApplicationActions from './applications/actions.svelte';
 import ApplicationCreate from './applications/create.svelte';
 import ClusterRoleBindingActions from './cluster-role-binding/actions.svelte';
@@ -77,7 +78,16 @@ type ActionsType = Component<{
 	onsuccess?: () => void;
 }> | null;
 
-function getCreate(kind: string, namespace?: string): CreateType {
+// `group` disambiguates kinds whose names collide across API groups; extension
+// kinds (see ../extensions) are dispatched on it before the built-in switch.
+function getCreate(kind: string, namespace?: string, group?: string): CreateType {
+	const extension = getKindExtension(group, kind);
+	if (extension?.readOnly) {
+		return DisabledCreate as CreateType;
+	}
+	if (extension?.Create) {
+		return extension.Create;
+	}
 	switch (kind) {
 		case 'Application':
 			return ApplicationCreate as CreateType;
@@ -113,7 +123,11 @@ function getCreate(kind: string, namespace?: string): CreateType {
 	}
 }
 
-function getActions(kind: string, namespace?: string): ActionsType {
+function getActions(kind: string, namespace?: string, group?: string): ActionsType {
+	const extension = getKindExtension(group, kind);
+	if (extension?.Actions) {
+		return extension.Actions;
+	}
 	switch (kind) {
 		case 'Application':
 			return ApplicationActions as ActionsType;

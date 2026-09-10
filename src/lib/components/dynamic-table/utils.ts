@@ -230,11 +230,7 @@ function jsonValueToDate(value: JsonValue | undefined): Date | null {
 	return date;
 }
 
-function getRelativeTime(now: number, timestamp: number) {
-	const milliseconds = Math.max(timestamp, 0);
-
-	const seconds = Math.floor((now - milliseconds) / 1000);
-	if (seconds < 5) return { value: 'Just', unit: 'now' };
+function getTimeSpan(seconds: number) {
 	if (seconds < 60) return { value: seconds, unit: 'second' };
 
 	const minutes = Math.floor(seconds / 60);
@@ -254,6 +250,20 @@ function getRelativeTime(now: number, timestamp: number) {
 
 	const years = Math.floor(days / 365);
 	return { value: years, unit: 'year' };
+}
+
+function getRelativeTime(now: number, timestamp: number) {
+	const milliseconds = Math.max(timestamp, 0);
+
+	const elapsedSeconds = Math.floor((now - milliseconds) / 1000);
+	if (Math.abs(elapsedSeconds) < 5) return { value: 'Just', unit: 'now' };
+
+	const { value, unit } = getTimeSpan(Math.abs(elapsedSeconds));
+
+	// Future timestamps (e.g. a backup's expiration) read as "in 29 day".
+	if (elapsedSeconds < 0) return { value: `in ${value}`, unit };
+
+	return { value, unit };
 }
 
 type UISchemaType =
