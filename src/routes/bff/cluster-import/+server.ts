@@ -1,11 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import Ajv from 'ajv';
 
-import {
-	buildAgentInstallCommands,
-	resolveAgentChartVersion,
-	validateClusterName
-} from '$lib/server/agent-install';
+import { buildAgentInstallCommands, validateClusterName } from '$lib/server/agent-install';
 import { ensureAgentRobot } from '$lib/server/harbor-robot';
 import { issueJoinToken, JoinTokenError } from '$lib/server/join-token';
 import { clusterInfoFieldsSchema } from '$lib/utils/cluster-info-schema';
@@ -110,9 +106,6 @@ export const POST: RequestHandler = async ({ fetch, locals, request }) => {
 		...new Set([locals.session.user.sub, ...(body.extraUsers ?? [])].filter(Boolean))
 	];
 
-	// Degrades to null rather than throwing — nothing to unwind if unreachable.
-	const chartVersion = await resolveAgentChartVersion(fetch);
-
 	// Issued before the robot: if this fails, no robot secret has been rotated yet.
 	let joinToken: string;
 	try {
@@ -135,7 +128,6 @@ export const POST: RequestHandler = async ({ fetch, locals, request }) => {
 
 	try {
 		const commands = buildAgentInstallCommands({
-			chartVersion,
 			cluster,
 			clusterAdminUsers,
 			joinToken,
