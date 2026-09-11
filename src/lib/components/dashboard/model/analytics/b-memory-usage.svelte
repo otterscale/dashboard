@@ -13,7 +13,7 @@
 	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import {
 		computeStep,
 		type DataPoint,
@@ -222,8 +222,8 @@
 			</p>
 		</div>
 		<Tooltip.Root>
-			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-				<InfoIcon class="size-5 text-muted-foreground" />
+			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}>
+				<InfoIcon class="size-4 text-muted-foreground" />
 			</Tooltip.Trigger>
 			<Tooltip.Content>
 				<p>{m.llm_dashboard_memory_usage_tooltip()}</p>

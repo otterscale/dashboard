@@ -27,8 +27,8 @@
 			driver.instantQuery(
 				'(DCGM_FI_DEV_FB_FREE + DCGM_FI_DEV_FB_RESERVED + DCGM_FI_DEV_FB_USED) * (1024 * 1024)' // DCGM return in Mi
 			),
-			driver.instantQuery('sum by (deviceuuid) (vGPU_device_memory_limit_in_bytes)'),
-			driver.instantQuery('sum by (deviceuuid) (vGPU_device_memory_usage_in_bytes)')
+			driver.instantQuery('sum by (device_uuid) (hami_vgpu_memory_limit_bytes)'),
+			driver.instantQuery('sum by (device_uuid) (hami_vgpu_memory_used_bytes)')
 		]);
 
 		const vgpuLimits = vgpuLimitResponse.result.map((series) => {
@@ -38,11 +38,13 @@
 			return { ...series.metric.labels, usage: series.value?.value };
 		});
 
-		const limitsByDeviceUUID = lodash.mapValues(lodash.groupBy(vgpuLimits, 'deviceuuid'), (group) =>
-			lodash.sumBy(group, 'limit')
+		const limitsByDeviceUUID = lodash.mapValues(
+			lodash.groupBy(vgpuLimits, 'device_uuid'),
+			(group) => lodash.sumBy(group, 'limit')
 		);
-		const usagesByDeviceUUID = lodash.mapValues(lodash.groupBy(vgpuUsages, 'deviceuuid'), (group) =>
-			lodash.sumBy(group, 'usage')
+		const usagesByDeviceUUID = lodash.mapValues(
+			lodash.groupBy(vgpuUsages, 'device_uuid'),
+			(group) => lodash.sumBy(group, 'usage')
 		);
 
 		gpus = fieldBufferResponse.result.map((series) => {
