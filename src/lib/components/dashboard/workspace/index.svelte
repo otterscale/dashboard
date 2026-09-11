@@ -19,13 +19,10 @@
 
 	let {
 		cluster,
-		namespace,
-		quotaUnlimited = false
+		namespace
 	}: {
 		cluster: string;
 		namespace: string;
-		/** Workspace has no `spec.resourceQuota.hard`, so its namespace carries no ResourceQuota. */
-		quotaUnlimited?: boolean;
 	} = $props();
 
 	let isReloading = $state(true);
@@ -38,8 +35,7 @@
 	const widgets = $derived(
 		workspaceOverviewWidgets.map((w) => ({
 			...w,
-			// `quotaUnlimited` only means anything to the quota tile — keep it off the other widgets.
-			props: { namespace, ...(w.key === 'resource-quota' ? { quotaUnlimited } : {}) }
+			props: { namespace }
 		}))
 	);
 

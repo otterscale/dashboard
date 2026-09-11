@@ -18,9 +18,8 @@
 	const cluster = $derived(page.params.cluster ?? '');
 	const workspace = $derived(page.params.workspace ?? '');
 	const namespace = $derived(page.data.namespace ?? '');
-	const quotaUnlimited = $derived(page.data.quotaUnlimited ?? false);
 </script>
 
-{#key cluster + workspace + namespace + quotaUnlimited}
-	<WorkspaceDashboard {cluster} {namespace} {quotaUnlimited} />
+{#key cluster + workspace + namespace}
+	<WorkspaceDashboard {cluster} {namespace} />
 {/key}

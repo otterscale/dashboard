@@ -19,21 +19,22 @@
 	let {
 		prometheusDriver,
 		namespace,
-		quotaUnlimited = false,
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		namespace: string;
-		/**
-		 * Workspace has no `spec.resourceQuota.hard`, so no ResourceQuota exists for the namespace
-		 * and `kube_resourcequota` reports nothing at all — neither `hard` nor `used`. The tile then
-		 * renders `used / ∞` from pod-level requests/limits instead of a ratio.
-		 */
-		quotaUnlimited?: boolean;
 		isReloading: boolean;
 	} = $props();
 
 	const UNLIMITED = '∞';
+
+	/**
+	 * No ResourceQuota exists for the namespace (the workspace was created without
+	 * `spec.resourceQuota.hard`), so `kube_resourcequota` reports nothing at all — neither `hard`
+	 * nor `used`. Detected from Prometheus on every fetch; the tile then renders `used / ∞` from
+	 * pod-level requests/limits instead of a ratio.
+	 */
+	let quotaUnlimited = $state(false);
 
 	/** Which ResourceQuota resource keys to visualize (requests.* vs limits.*). */
 	let quotaView = $state<'requests' | 'limits'>('requests');
@@ -83,6 +84,12 @@
 		const ns = escapePromqlStringLiteral(namespace);
 		const base = `kube_resourcequota{namespace="${ns}"`;
 		return `sum(${base}, type="${t}", resource="${resource}"})`;
+	}
+
+	/** Number of ResourceQuota series KSM exports for the namespace; empty when none exists. */
+	function rqCount() {
+		const ns = escapePromqlStringLiteral(namespace);
+		return `count(kube_resourcequota{namespace="${ns}", type="hard"})`;
 	}
 
 	/**
@@ -186,10 +193,20 @@
 		gpuMemUsed = gpuMemHard = null;
 	}
 
+	/**
+	 * Whether the namespace has a ResourceQuota, per Prometheus. Throws on query failure so a
+	 * Prometheus outage shows as an error instead of being mistaken for an unlimited workspace.
+	 */
+	async function hasResourceQuota(): Promise<boolean> {
+		const r = await prometheusDriver.instantQuery(rqCount(), new Date());
+		return (instantScalar(r) ?? 0) > 0;
+	}
+
 	async function fetch() {
 		try {
 			hasError = false;
 			if (!namespace) return;
+			quotaUnlimited = !(await hasResourceQuota());
 			await (quotaUnlimited ? fetchUnlimitedUsage() : fetchQuota());
 		} catch (error) {
 			hasError = true;
