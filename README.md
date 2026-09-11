@@ -38,6 +38,25 @@ graph LR
 
 Built with SvelteKit, TypeScript, Tailwind CSS, and Vite. UI building blocks include Monaco Editor, xterm.js, NoVNC, and LayerChart, with internationalization powered by Inlang Paraglide.
 
+## Local development
+
+```bash
+pnpm install
+cp .env.example .env   # then fill in the values for your environment
+pnpm dev
+```
+
+If Keycloak / the API use a private-CA (self-signed) certificate, server-side
+requests fail with `UNABLE_TO_VERIFY_LEAF_SIGNATURE`. Export the cluster CA and
+point Node at it (the Helm chart does the equivalent with the mounted
+`otterscale-ca` secret):
+
+```bash
+kubectl get secret -n otterscale-system otterscale-ca \
+  -o jsonpath='{.data.ca\.crt}' | base64 -d > ./otterscale-ca.crt
+NODE_EXTRA_CA_CERTS=$PWD/otterscale-ca.crt pnpm dev --host
+```
+
 ## Documentation
 
 Setup, configuration, and deployment guides will be published in the project documentation. See `.env.example` for the environment variables the app expects.

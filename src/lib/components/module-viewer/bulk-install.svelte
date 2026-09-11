@@ -17,6 +17,11 @@
 	import * as Item from '$lib/components/ui/item';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import {
+		ClusterReleaseScope,
+		PlatformReleaseServiceAccountName,
+		ReleaseScopeLabel
+	} from '$lib/utils/helm-release';
 
 	import { type ModuleType } from './types';
 
@@ -72,10 +77,19 @@
 			kind,
 			metadata: {
 				name: module.name,
-				namespace
+				namespace,
+				labels: {
+					[ReleaseScopeLabel]: ClusterReleaseScope
+				}
 			},
 			spec: {
 				releaseName: module.name,
+				serviceAccountName: PlatformReleaseServiceAccountName,
+				commonMetadata: {
+					labels: {
+						[ReleaseScopeLabel]: ClusterReleaseScope
+					}
+				},
 				targetNamespace: lodash.get(module, ['annotations', 'module.otterscale.io/namespace']),
 				install: {
 					createNamespace: true,
@@ -85,7 +99,7 @@
 					upgrade: { remediation: { retries: remediationRetries } }
 				}),
 				interval: '15m',
-				timeout: '1h',
+				timeout: '15m',
 				...(dependenciesOfSelectedModules.length > 0 && {
 					dependsOn: dependenciesOfSelectedModules
 				}),
@@ -102,6 +116,16 @@
 					}
 				},
 				values: {},
+				// Optional per-release values ConfigMap (`<release>-values` in the release
+				// namespace): FluxCD skips it when absent, so CE and EE share the manifest.
+				valuesFrom: [
+					{
+						kind: 'ConfigMap',
+						name: `${module.name}-values`,
+						valuesKey: 'values',
+						optional: true
+					}
+				],
 				...(lodash.get(module, ['annotations', 'module.otterscale.io/post-renderer'])
 					? (() => {
 							const postRenderers = lodash
