@@ -21,12 +21,12 @@
 	import { toast } from 'svelte-sonner';
 	import { parse, stringify } from 'yaml';
 
-	import type { ArtifactChartType, ChartType } from '$lib/components/artifact-viewer/types';
+	import type { ArtifactChartType, ChartType } from '$lib/components/chart-viewer/types';
 	import {
 		encodeHarborURIComponent,
 		parseHarborHost,
 		parseHarborProjectName
-	} from '$lib/components/artifact-viewer/utils.svelte';
+	} from '$lib/components/chart-viewer/utils.svelte';
 	import { MonacoDiff } from '$lib/components/custom/monaco-diff';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';

@@ -13,6 +13,11 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 	const first = parseInt(url.searchParams.get('first') || '0', 10);
 	const max = parseInt(url.searchParams.get('max') || '10', 10);
 
-	const users = await getUsers({ search, first, max });
-	return json(users);
+	try {
+		const users = await getUsers({ search, first, max });
+		return json(users);
+	} catch (e) {
+		console.error('GET /rest/users failed', e);
+		error(502, e instanceof Error ? e.message : 'Failed to fetch users');
+	}
 };

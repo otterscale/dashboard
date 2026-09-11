@@ -30,14 +30,30 @@
 
 	// Everything else (Pending, ContainerCreating, PodInitializing, Init:*,
 	// Terminating, NotReady) is a transitional state -> amber, never green.
-	function statusColorOf(status: string): string {
-		if (OK_STATUSES.has(status)) return 'bg-green-500';
-		if (status === 'Unknown') return 'bg-muted-foreground';
-		if (ERROR_HINTS.some((hint) => status.includes(hint))) return 'bg-red-500';
-		return 'bg-yellow-500';
+	function statusStateOf(status: string): 'ok' | 'unknown' | 'error' | 'transitional' {
+		if (OK_STATUSES.has(status)) return 'ok';
+		if (status === 'Unknown') return 'unknown';
+		if (ERROR_HINTS.some((hint) => status.includes(hint))) return 'error';
+		return 'transitional';
 	}
 
-	const statusColor = $derived(statusColorOf(String(data.status ?? 'Unknown')));
+	const status = $derived(String(data.status ?? 'Unknown'));
+
+	// Status is carried by the card's border rather than a status dot, so a healthy diagram
+	// has no decoration and a pod in trouble is marked without tinting its contents. The
+	// coloured borders also hold through hover, which the shared primary hover would eat.
+	const cardStateClass = $derived.by(() => {
+		switch (statusStateOf(status)) {
+			case 'ok':
+				return 'border-border hover:border-primary/50';
+			case 'error':
+				return 'border-destructive';
+			case 'transitional':
+				return 'border-amber-500';
+			case 'unknown':
+				return 'border-muted-foreground/50';
+		}
+	});
 
 	const roleLabelMap: Record<string, string> = {
 		decode: 'Decode',
@@ -77,9 +93,10 @@
 {/if}
 
 <div
-	class="w-64 rounded-lg border border-border bg-card text-card-foreground shadow-sm transition-all duration-200 hover:border-primary/50 hover:shadow-md {selected
+	class="w-64 rounded-lg border bg-card text-card-foreground shadow-sm transition-all duration-200 hover:shadow-md {cardStateClass} {selected
 		? 'ring-2 ring-primary ring-offset-2 ring-offset-background'
 		: ''}"
+	title={statusStateOf(status) === 'ok' ? undefined : status}
 >
 	<div class="flex items-center gap-2 border-b border-border px-3 py-2">
 		<div class="flex size-6 items-center justify-center rounded-md bg-chart-2/10">
@@ -114,12 +131,6 @@
 				KV Offload
 			</span>
 		{/if}
-		<span
-			class="inline-block size-2 shrink-0 rounded-full {statusColor} {roleLabel || isMig || usesSsd
-				? ''
-				: 'ml-auto'}"
-			title={String(data.status ?? 'Unknown')}
-		></span>
 	</div>
 	<div class="space-y-1.5 px-3 py-2">
 		<div class="truncate text-xs font-medium" title={String(data.name ?? '')}>{data.name}</div>

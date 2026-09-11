@@ -10,7 +10,6 @@
 
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { LinkService } from '@otterscale/api/link/v1';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { FormState, FormValue, Schema, UiSchemaRoot } from '@sjsf/form';
 	import { getValueSnapshot, setValue, SubmitButton } from '@sjsf/form';
@@ -26,6 +25,7 @@
 	import { page } from '$app/state';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import RoleComboboxWidget from '$lib/components/dynamic-form/widgets/role-combobox.svelte';
+	import UnitInputWidget from '$lib/components/dynamic-form/widgets/unit-input.svelte';
 	import UserComboboxWidget, {
 		getDisplayName,
 		type KeycloakUser
@@ -34,11 +34,8 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress/index.js';
-	import { Spinner } from '$lib/components/ui/spinner';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
-	import { m } from '$lib/messages';
 	import { bump } from '$lib/stores/pulse.svelte';
-	import { applyRancherProjectID, findRancherProjectID } from '$lib/utils/rancher-project';
 
 	let {
 		cluster,
@@ -72,51 +69,41 @@
 	} = $props();
 
 	const transport: Transport = getContext('transport');
-	const linkClient = createClient(LinkService, transport);
 	const resourceClient = createClient(ResourceService, transport);
 
-	const formCount = 5;
+	const formCount = 4;
 	const steps = Array.from({ length: formCount + 1 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 
 	let values = $state(getInitialValues());
 	let resourceLimitation = $state(getInitialResourceLimitation());
-	let licenseInjectionDraft = $state(getInitialLicenseInjectionDraft());
 	let currentStep = $state(firstStep);
 	let isSubmitting = $state(false);
 	let membersFormReference = $state(null);
-	let isLoadingClusterDefaults = $state(false);
-	let clusterDefaultsError = $state('');
-	let loadGeneration = 0;
-	let wasOpen = false;
 
 	let value = $derived(stringify(values));
 	const currentIndex = $derived(steps.indexOf(currentStep));
 
-	function getInitialValues(rancherProjectID = '') {
-		return applyRancherProjectID(
-			{
-				apiVersion: `${group}/${version}`,
-				kind: kind,
-				metadata: {},
-				spec: {
-					members: [
-						{
-							subject: page.data.user.sub,
-							role: 'admin',
-							name: page.data.user.name,
-							username: page.data.user.username,
-							serviceAccount: false
-						}
-					],
-					licenseInjection: false,
-					networkIsolation: {
-						enabled: false
+	function getInitialValues() {
+		return {
+			apiVersion: `${group}/${version}`,
+			kind: kind,
+			metadata: {},
+			spec: {
+				members: [
+					{
+						subject: page.data.user.sub,
+						role: 'admin',
+						name: page.data.user.name,
+						username: page.data.user.username,
+						serviceAccount: false
 					}
+				],
+				networkIsolation: {
+					enabled: false
 				}
-			},
-			rancherProjectID
-		);
+			}
+		};
 	}
 	function getInitialResourceLimitation() {
 		return {
@@ -124,60 +111,13 @@
 			ResourceQuota: {}
 		};
 	}
-	function getInitialLicenseInjectionDraft() {
-		return {
-			licenseInjection: false
-		};
-	}
 
 	function reset() {
-		loadGeneration += 1;
 		values = getInitialValues();
 		resourceLimitation = getInitialResourceLimitation();
-		licenseInjectionDraft = getInitialLicenseInjectionDraft();
 		currentStep = firstStep;
 		isSubmitting = false;
-		isLoadingClusterDefaults = false;
-		clusterDefaultsError = '';
 	}
-
-	async function loadClusterDefaults() {
-		const generation = ++loadGeneration;
-		values = getInitialValues();
-		resourceLimitation = getInitialResourceLimitation();
-		licenseInjectionDraft = getInitialLicenseInjectionDraft();
-		currentStep = firstStep;
-		isSubmitting = false;
-		isLoadingClusterDefaults = true;
-		clusterDefaultsError = '';
-
-		try {
-			const response = await linkClient.listLinks({});
-			if (generation !== loadGeneration) return;
-
-			const rancherProjectID = findRancherProjectID(response.links, cluster);
-			if (rancherProjectID === undefined) {
-				throw new Error(m.workspace_cluster_link_not_found({ cluster }));
-			}
-			values = getInitialValues(rancherProjectID);
-		} catch (error) {
-			if (generation !== loadGeneration) return;
-			clusterDefaultsError =
-				error instanceof Error ? error.message : m.workspace_cluster_defaults_error();
-		} finally {
-			if (generation === loadGeneration) isLoadingClusterDefaults = false;
-		}
-	}
-
-	$effect(() => {
-		if (open === wasOpen) return;
-		wasOpen = open;
-		if (open) {
-			loadClusterDefaults();
-		} else {
-			reset();
-		}
-	});
 
 	function handleNext() {
 		currentStep = steps[Math.min(currentIndex + 1, steps.length - 1)];
@@ -192,7 +132,14 @@
 	}
 </script>
 
-<Dialog.Root bind:open>
+<Dialog.Root
+	bind:open
+	onOpenChangeComplete={(isOpen) => {
+		if (isOpen) return;
+
+		reset();
+	}}
+>
 	{@render trigger?.({
 		get open() {
 			return open;
@@ -212,26 +159,7 @@
 				<Item.Description>{lodash.get(jsonSchema, 'description')}</Item.Description>
 			</Item.Content>
 		</Item.Root>
-		{#if isLoadingClusterDefaults}
-			<div class="flex min-h-40 items-center justify-center gap-2 text-muted-foreground">
-				<Spinner />
-				<span>{m.workspace_cluster_defaults_loading()}</span>
-			</div>
-		{:else if clusterDefaultsError}
-			<Item.Root variant="outline">
-				<Item.Content>
-					<Item.Title>{m.workspace_cluster_defaults_error()}</Item.Title>
-					<Item.Description>{clusterDefaultsError}</Item.Description>
-				</Item.Content>
-				<Item.Actions>
-					<Button onclick={loadClusterDefaults}>{m.workspace_cluster_defaults_retry()}</Button>
-				</Item.Actions>
-			</Item.Root>
-		{/if}
-		<Tabs.Root
-			value={currentStep}
-			class={isLoadingClusterDefaults || clusterDefaultsError ? 'hidden' : undefined}
-		>
+		<Tabs.Root value={currentStep}>
 			<Tabs.Content value={steps[0]}>
 				<Form
 					schema={{
@@ -449,64 +377,6 @@
 			<Tabs.Content value={steps[2]}>
 				<Form
 					schema={{
-						type: 'object',
-						title: 'License Injection',
-						properties: {
-							licenseInjection: {
-								...(lodash.get(
-									jsonSchema,
-									'properties.spec.properties.licenseInjection'
-								) as Schema),
-								title: 'Enable'
-							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						},
-						licenseInjection: {
-							'ui:options': {
-								shadcn4Checkbox: {
-									disabled: page.data.isRestricted
-								}
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{ licenseInjection: false } as FormValue}
-					handleSubmit={{
-						posthook: (form: FormState<FormValue>) => {
-							handleNext();
-
-							const formValue = getValueSnapshot(form);
-
-							lodash.set(
-								values,
-								['spec', 'licenseInjection'],
-								lodash.get(formValue, 'licenseInjection', false)
-							);
-						}
-					}}
-					bind:values={licenseInjectionDraft}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button
-								onclick={() => {
-									handlePrevious();
-								}}>Previous</Button
-							>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-
-			<Tabs.Content value={steps[3]}>
-				<Form
-					schema={{
 						...lodash.omit(
 							lodash.get(jsonSchema, 'properties.spec.properties.networkIsolation') as Schema,
 							['properties']
@@ -572,7 +442,7 @@
 				</Form>
 			</Tabs.Content>
 
-			<Tabs.Content value={steps[4]}>
+			<Tabs.Content value={steps[3]}>
 				{@const editable = role === 'Cluster Admin'}
 				<Form
 					schema={{
@@ -659,6 +529,17 @@
 										class:
 											'grid grid-cols-2 gap-3 [&_input]:read-only:bg-muted [&_input]:read-only:opacity-50 [&_input]:read-only:cursor-not-allowed [&_input]:read-only:focus-visible:ring-0 [&_input]:read-only:focus-visible:ring-offset-0 [&_input]:read-only:focus-visible:border-input'
 									}
+								}
+							},
+							// gpumem is counted in MiB and a suffix multiplies that base unit
+							// instead of replacing it (88888Gi is 88888 * 2^30 MiB), so show
+							// the unit on the input rather than letting anyone type one.
+							'limits.nvidia.com/gpumem': {
+								'ui:components': {
+									textWidget: UnitInputWidget
+								},
+								'ui:options': {
+									TailoredUnitInputUnit: 'Mi'
 								}
 							}
 						}

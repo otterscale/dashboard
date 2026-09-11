@@ -1,42 +1,49 @@
 <script lang="ts">
-	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
-	import CheckIcon from '@lucide/svelte/icons/check';
-	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
+	import {
+		Code as ConnectCode,
+		ConnectError,
+		createClient,
+		type Transport
+	} from '@connectrpc/connect';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
-	import FileCodeIcon from '@lucide/svelte/icons/file-code';
-	import PlusIcon from '@lucide/svelte/icons/plus';
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import TerminalIcon from '@lucide/svelte/icons/terminal';
-	import UserIcon from '@lucide/svelte/icons/user';
-	import XIcon from '@lucide/svelte/icons/x';
-	import { type Link, LinkService, type RancherProject } from '@otterscale/api/link/v1';
+	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
+	import { type Link, LinkService } from '@otterscale/api/link/v1';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { AppsV1Deployment } from '@otterscale/types';
+	import {
+		type FormState,
+		type FormValue,
+		getValueSnapshot,
+		type Schema,
+		type UiSchemaRoot
+	} from '@sjsf/form';
+	import Ajv from 'ajv';
+	import ajvErrors from 'ajv-errors';
 	import { getContext, onDestroy } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import * as Code from '$lib/components/custom/code';
-	import * as Avatar from '$lib/components/ui/avatar';
+	import Form from '$lib/components/dynamic-form/form.svelte';
+	import ImportClusterAdministrators, {
+		type KeycloakUser
+	} from '$lib/components/layout/import-cluster-administrators.svelte';
 	import { Button } from '$lib/components/ui/button';
-	import * as Collapsible from '$lib/components/ui/collapsible';
-	import * as Command from '$lib/components/ui/command';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Empty from '$lib/components/ui/empty';
 	import * as Field from '$lib/components/ui/field';
-	import { Input } from '$lib/components/ui/input';
 	import * as Item from '$lib/components/ui/item';
-	import * as Popover from '$lib/components/ui/popover';
 	import { Progress } from '$lib/components/ui/progress';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { m } from '$lib/messages';
 	import { bump } from '$lib/stores/pulse.svelte';
-	import { cn } from '$lib/utils';
 	import {
-		createRancherProjectLoader,
-		rancherProjectSecondaryText
-	} from '$lib/utils/rancher-project';
+		CLUSTER_INFO_REQUIRED_FIELDS,
+		clusterInfoFieldsSchema
+	} from '$lib/utils/cluster-info-schema';
 
 	let {
 		open = $bindable(false),
@@ -48,51 +55,33 @@
 
 	const POLL_INTERVAL = 3000;
 
-	interface KeycloakUser {
-		id: string;
-		username: string;
-		email?: string;
-		firstName?: string;
-		lastName?: string;
-	}
-
 	const transport: Transport = getContext('transport');
 	const linkClient = createClient(LinkService, transport);
 	const resourceClient = createClient(ResourceService, transport);
-	const loadRancherProjects = createRancherProjectLoader(() =>
-		linkClient.listRancherProjects({}).then((response) => response.projects)
-	);
 
 	let stepIndex = $state(1);
 	let clusterName = $state('');
-	let installUrl = $state('');
-	let manifestYaml = $state('');
+	let installCommand = $state('');
+	let robotName = $state('');
+	let robotRotated = $state(false);
 	let clusterStatus = $state<'pending' | 'installing' | 'done'>('pending');
 	let isCreating = $state(false);
 	let errorMessage = $state('');
-	let isYamlOpen = $state(false);
-	let rancherProjectID = $state('');
-	let rancherProjects = $state<RancherProject[]>([]);
-	let rancherProjectOpen = $state(false);
-	let rancherProjectLoading = $state(false);
-	let rancherProjectError = $state('');
+	// Set once the connection poll has failed enough times in a row that it's
+	// worth telling the user the check itself is broken (vs the agent just not
+	// having connected yet). Cleared on the next successful poll.
+	let pollError = $state('');
 
+	// Owned here so reset() can clear it and submitClusterInfo can read it; the
+	// picker UI and its user search live in <ImportClusterAdministrators>.
 	let selectedUsers = $state<KeycloakUser[]>([]);
-	let userSearchOpen = $state(false);
-	let userSearchQuery = $state('');
-	let userSearchResults = $state<KeycloakUser[]>([]);
-	let userSearchLoading = $state(false);
-	let userSearchInitialized = false;
-	let userDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 	let isPolling = false;
 	let abortController: AbortController | null = null;
-	let lifecycle = 0;
 	let wasOpen = open;
 
 	onDestroy(() => {
 		abortController?.abort();
-		if (userDebounceTimer) clearTimeout(userDebounceTimer);
 	});
 
 	$effect(() => {
@@ -100,146 +89,282 @@
 		wasOpen = open;
 	});
 
-	const installCommand = $derived(
-		installUrl ? `kubectl apply -f ${installUrl}` : m.import_cluster_generating_command()
-	);
+	// Mirrors core.ValidateClusterName on the server. The `-` is escaped (`\-`)
+	// so the string is also a valid regex under the `v` flag, which browsers now
+	// use to compile the HTML `pattern` attribute sjsf renders this into.
+	const CLUSTER_NAME_PATTERN = '^[a-z0-9]([a-z0-9\\-]*[a-z0-9])?$';
 
-	const canGoNext = $derived(stepIndex === 1 ? clusterName.trim().length > 0 : false);
+	function defaultClusterNameValues(): FormValue {
+		return { clusterName: '' };
+	}
+
+	function defaultClusterInfoValues(): FormValue {
+		return {
+			externalAddress: '',
+			nodePortRange: { min: 30000, max: 32767 },
+			inferenceURL: ''
+		};
+	}
+
+	// Step 1: just the name. Mirrors core.ValidateClusterName on the server.
+	// `errorMessage` is an ajv-errors extension sjsf's `Schema` type doesn't model — cast, same
+	// as clusterInfoSchema below.
+	const clusterNameSchema: Schema = {
+		type: 'object',
+		properties: {
+			clusterName: {
+				type: 'string',
+				title: m.import_cluster_name_label(),
+				pattern: CLUSTER_NAME_PATTERN,
+				maxLength: 63,
+				errorMessage: m.import_cluster_name_invalid()
+			}
+		},
+		required: ['clusterName']
+	} as unknown as Schema;
+
+	const clusterNameUiSchema: UiSchemaRoot = {
+		clusterName: {
+			'ui:options': {
+				shadcn4Text: { placeholder: m.import_cluster_name_placeholder() }
+			}
+		}
+	};
+
+	// Step 2: externalAddress and nodePortRange (an object of min/max) are required; inferenceURL
+	// is optional but format-checked when present. Cluster info is always enabled now, so this
+	// is a flat schema (no `if`/`then` toggle). The rules come from cluster-info-schema.ts, the
+	// same fragment /bff/cluster-import validates the request against, so the two can't drift
+	// apart; only title/errorMessage (display, not a rule) are added here.
+	const clusterInfoSchema: Schema = {
+		type: 'object',
+		required: [...CLUSTER_INFO_REQUIRED_FIELDS],
+		properties: {
+			externalAddress: {
+				...clusterInfoFieldsSchema.properties.externalAddress,
+				title: m.import_cluster_external_address_label(),
+				errorMessage: m.import_cluster_external_address_invalid()
+			},
+			// nodePortRange groups the two port inputs under one "NodePort Range" label +
+			// description. Both inputs carry the full keyword→message map: `type` catches a
+			// blank or non-numeric entry, `minimum`/`maximum` an out-of-range port, and the
+			// exclusive bound (via $data) the min/max ordering — flagged on whichever input
+			// the user can fix. The `required` errors belong to this object, not its
+			// properties, so ajv-errors takes them from here keyed by the missing field.
+			nodePortRange: {
+				...clusterInfoFieldsSchema.properties.nodePortRange,
+				title: m.import_cluster_node_port_range_label(),
+				errorMessage: {
+					required: {
+						min: m.import_cluster_node_port_range_required(),
+						max: m.import_cluster_node_port_range_required()
+					}
+				},
+				properties: {
+					min: {
+						...clusterInfoFieldsSchema.properties.nodePortRange.properties.min,
+						errorMessage: {
+							type: m.import_cluster_node_port_range_bounds_invalid(),
+							minimum: m.import_cluster_node_port_range_bounds_invalid(),
+							maximum: m.import_cluster_node_port_range_bounds_invalid(),
+							exclusiveMaximum: m.import_cluster_node_port_range_min_order_invalid()
+						}
+					},
+					max: {
+						...clusterInfoFieldsSchema.properties.nodePortRange.properties.max,
+						errorMessage: {
+							type: m.import_cluster_node_port_range_bounds_invalid(),
+							minimum: m.import_cluster_node_port_range_bounds_invalid(),
+							maximum: m.import_cluster_node_port_range_bounds_invalid(),
+							exclusiveMinimum: m.import_cluster_node_port_range_order_invalid()
+						}
+					}
+				}
+			},
+			inferenceURL: {
+				...clusterInfoFieldsSchema.properties.inferenceURL,
+				title: m.import_cluster_inference_url_label(),
+				errorMessage: m.import_cluster_inference_url_invalid()
+			}
+		}
+		// sjsf's Schema type predates ajv's `$data` extension (used above by nodePortRange.max's
+		// exclusiveMinimum), so the two shapes don't structurally overlap enough for a direct
+		// `as Schema` — routed through `unknown`, same as ajv itself treats it at runtime.
+	} as unknown as Schema;
+
+	const clusterInfoUiSchema: UiSchemaRoot = {
+		'ui:options': {
+			// Two-column grid: externalAddress/inferenceURL share the first row; the
+			// nodePortRange group spans the full width below them. `order` drives placement.
+			order: ['externalAddress', 'inferenceURL', 'nodePortRange'],
+			layouts: {
+				'object-properties': { class: 'grid grid-cols-2 gap-4' }
+			}
+		},
+		externalAddress: {
+			'ui:options': {
+				description: m.import_cluster_external_address_description(),
+				shadcn4Text: { placeholder: m.import_cluster_external_address_placeholder() }
+			}
+		},
+		inferenceURL: {
+			'ui:options': {
+				description: m.import_cluster_inference_url_description(),
+				shadcn4Text: { placeholder: m.import_cluster_inference_url_placeholder() }
+			}
+		},
+		nodePortRange: {
+			'ui:options': {
+				description: m.import_cluster_node_port_range_description(),
+				// Full-width row in the parent grid; its own two-column sub-grid puts min
+				// and max side by side under the shared "NodePort Range" label + description.
+				layouts: {
+					'object-property': { class: 'col-span-2' },
+					'object-properties': { class: 'grid grid-cols-2 gap-4' }
+				}
+			},
+			min: {
+				'ui:options': {
+					hideTitle: true,
+					shadcn4Number: { placeholder: '30000' }
+				}
+			},
+			max: {
+				'ui:options': {
+					hideTitle: true,
+					shadcn4Number: { placeholder: '32767' }
+				}
+			}
+		}
+	} as UiSchemaRoot;
+
+	let clusterNameFormReference: FormState<FormValue> | null = $state(null);
+	let clusterInfoFormReference: FormState<FormValue> | null = $state(null);
+
+	// Redundant with each sjsf form's own submit-time validation below; kept live so the
+	// "Next" / "Generate command" buttons reflect validity as the user types.
+	const validateClusterName = ajvErrors(new Ajv({ allErrors: true, strict: true })).compile(
+		clusterNameSchema
+	);
+	const validateClusterInfo = ajvErrors(
+		new Ajv({ allErrors: true, strict: true, $data: true })
+	).compile(clusterInfoSchema);
+	const canGoNext = $derived.by(() => {
+		if (stepIndex === 1) {
+			return (
+				clusterNameFormReference !== null &&
+				validateClusterName(getValueSnapshot(clusterNameFormReference))
+			);
+		}
+		if (stepIndex === 2) {
+			return (
+				clusterInfoFormReference !== null &&
+				validateClusterInfo(getValueSnapshot(clusterInfoFormReference))
+			);
+		}
+		return false;
+	});
 
 	function reset() {
-		lifecycle += 1;
 		abortController?.abort();
 		abortController = null;
 		isPolling = false;
-		if (userDebounceTimer) clearTimeout(userDebounceTimer);
-		userDebounceTimer = null;
 
 		stepIndex = 1;
 		clusterName = '';
-		installUrl = '';
-		manifestYaml = '';
+		installCommand = '';
+		robotName = '';
+		robotRotated = false;
 		clusterStatus = 'pending';
 		isCreating = false;
 		errorMessage = '';
-		isYamlOpen = false;
-		rancherProjectID = '';
-		rancherProjects = [];
-		rancherProjectOpen = false;
-		rancherProjectLoading = false;
-		rancherProjectError = '';
+		pollError = '';
+		clusterNameFormReference = null;
+		clusterInfoFormReference = null;
 		selectedUsers = [];
-		userSearchOpen = false;
-		userSearchQuery = '';
-		userSearchResults = [];
-		userSearchLoading = false;
-		userSearchInitialized = false;
 	}
 
-	async function fetchRancherProjects() {
-		if (rancherProjectLoading) return;
-		const requestLifecycle = lifecycle;
-		rancherProjectLoading = true;
-		rancherProjectError = '';
-
-		try {
-			const projects = await loadRancherProjects();
-			if (requestLifecycle !== lifecycle) return;
-			rancherProjects = projects;
-			if (!projects.some((project) => project.id === rancherProjectID)) {
-				rancherProjectID = '';
-			}
-		} catch (error) {
-			if (requestLifecycle !== lifecycle) return;
-			rancherProjects = [];
-			rancherProjectError =
-				error instanceof ConnectError || error instanceof Error
-					? error.message
-					: m.import_cluster_rancher_project_error();
-		} finally {
-			if (requestLifecycle === lifecycle) rancherProjectLoading = false;
-		}
+	// Each visible wizard button lives outside its sjsf `<form>`, so it triggers that form's
+	// own submit programmatically; the form's posthook only fires once its schema validation
+	// succeeds. Step 1 just advances; step 2 does the real work in submitClusterInfo.
+	function handleNext() {
+		if (!canGoNext || isCreating || !clusterNameFormReference) return;
+		clusterNameFormReference.submit(new SubmitEvent('submit', { cancelable: true }));
 	}
 
-	function handleRancherProjectOpenChange(isOpen: boolean) {
-		if (isOpen) fetchRancherProjects();
+	function goToClusterInfo() {
+		stepIndex = 2;
 	}
 
-	function displayName(u: KeycloakUser): string {
-		const full = `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim();
-		return full || u.username;
+	function handleGenerateCommand() {
+		if (!canGoNext || isCreating || !clusterInfoFormReference) return;
+		clusterInfoFormReference.submit(new SubmitEvent('submit', { cancelable: true }));
 	}
 
-	async function fetchUsers(q: string) {
-		userSearchLoading = true;
-		try {
-			const res = await fetch(`/rest/users?search=${encodeURIComponent(q)}&max=10`);
-			userSearchResults = res.ok ? ((await res.json()) as KeycloakUser[]) : [];
-		} catch (e) {
-			console.error('Failed to search users:', e);
-			userSearchResults = [];
-		} finally {
-			userSearchLoading = false;
-		}
-	}
-
-	function handleUserSearch(q: string) {
-		userSearchQuery = q;
-		if (userDebounceTimer) clearTimeout(userDebounceTimer);
-		userDebounceTimer = setTimeout(() => {
-			fetchUsers(q);
-		}, 300);
-	}
-
-	function handleUserPopoverOpenChange(open: boolean) {
-		if (open && !userSearchInitialized) {
-			userSearchInitialized = true;
-			fetchUsers('');
-		}
-	}
-
-	function toggleUser(u: KeycloakUser) {
-		const i = selectedUsers.findIndex((s) => s.id === u.id);
-		if (i >= 0) {
-			selectedUsers.splice(i, 1);
-		} else {
-			selectedUsers.push(u);
-		}
-	}
-
-	function removeUser(id: string) {
-		selectedUsers = selectedUsers.filter((s) => s.id !== id);
-	}
-
-	async function handleGenerateManifest() {
-		if (!clusterName.trim() || isCreating) return;
+	async function submitClusterInfo(form: FormState<FormValue>) {
+		if (isCreating) return;
 		isCreating = true;
 		errorMessage = '';
 
+		const nameValues = clusterNameFormReference
+			? (getValueSnapshot(clusterNameFormReference) as { clusterName: string })
+			: { clusterName: '' };
+		const values = getValueSnapshot(form) as {
+			externalAddress?: string;
+			nodePortRange?: { min?: number; max?: number };
+			inferenceURL?: string;
+		};
+		// Normalized once: polling and the final step both compare against this value.
+		clusterName = nameValues.clusterName.trim();
+
 		try {
-			const response = await linkClient.getAgentManifest({
-				cluster: clusterName,
-				extraUsers: selectedUsers.map((u) => u.id).filter((id) => id),
-				rancherProjectId: rancherProjectID
+			const response = await fetch('/bff/cluster-import', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					cluster: clusterName,
+					extraUsers: selectedUsers.map((u) => u.id).filter((id) => id),
+					clusterInfo: {
+						enabled: true,
+						externalAddress: (values.externalAddress ?? '').trim(),
+						nodePortRange: {
+							min: values.nodePortRange?.min,
+							max: values.nodePortRange?.max
+						},
+						inferenceURL: (values.inferenceURL ?? '').trim()
+					}
+				})
 			});
 
-			installUrl = response.url;
-			manifestYaml = response.manifest;
-			clusterStatus = 'pending';
-			stepIndex = 2;
+			if (!response.ok) {
+				throw new Error((await response.text()) || m.import_cluster_command_failed());
+			}
 
-			toast.success(m.import_cluster_manifest_generated({ name: clusterName }));
+			const result = (await response.json()) as {
+				installCommand: string;
+				robot: { name: string; rotated: boolean };
+			};
+
+			installCommand = result.installCommand;
+			robotName = result.robot.name;
+			robotRotated = result.robot.rotated;
+			clusterStatus = 'pending';
+			stepIndex = 3;
+
+			toast.success(m.import_cluster_command_generated({ name: clusterName }));
 			pollForConnection();
 		} catch (e) {
-			if (e instanceof ConnectError) {
-				errorMessage = e.message;
-			} else {
-				errorMessage = e instanceof Error ? e.message : m.import_cluster_manifest_failed();
-			}
+			errorMessage = e instanceof Error ? e.message : m.import_cluster_command_failed();
 			toast.error(errorMessage);
 		} finally {
 			isCreating = false;
 		}
 	}
+
+	// Consecutive poll failures to tolerate before showing `pollError`. A single
+	// dropped request during an otherwise-fine wait shouldn't flash a warning;
+	// three in a row (~9s) means the check itself is broken.
+	const POLL_ERROR_THRESHOLD = 3;
 
 	async function pollForConnection() {
 		if (isPolling) return;
@@ -249,23 +374,43 @@
 		abortController = new AbortController();
 		const signal = abortController.signal;
 
+		let failures = 0;
+		function notePollFailure(what: string, e: unknown) {
+			console.error(`import-cluster: ${what} failed while polling for the connection`, e);
+			failures += 1;
+			if (failures >= POLL_ERROR_THRESHOLD) {
+				pollError = e instanceof Error ? e.message : String(e);
+			}
+		}
+		function notePollSuccess() {
+			failures = 0;
+			pollError = '';
+		}
+
 		while (!signal.aborted && clusterStatus === 'pending') {
 			try {
 				const response = await linkClient.listLinks({});
 				if (signal.aborted) break;
+				notePollSuccess();
 
 				const found = response.links.some((link: Link) => link.cluster === clusterName);
 				if (found) {
 					clusterStatus = 'installing';
 					break;
 				}
-			} catch {
-				// retry silently
+			} catch (e) {
+				if (signal.aborted) break;
+				notePollFailure('listLinks', e);
 			}
 			if (!signal.aborted) {
 				await new Promise((r) => setTimeout(r, POLL_INTERVAL));
 			}
 		}
+
+		// New check, fresh slate: a stale failure from the pending phase shouldn't
+		// linger into the installing phase.
+		failures = 0;
+		pollError = '';
 
 		while (!signal.aborted && clusterStatus === 'installing') {
 			try {
@@ -275,20 +420,32 @@
 					group: 'apps',
 					version: 'v1',
 					resource: 'deployments',
-					name: 'tenant-operator-controller-manager'
+					// Matches the Deployment name in the otterscale-agent chart's
+					// files/tenant-operator/install.yaml (not the kubebuilder-default
+					// `<project>-controller-manager`).
+					name: 'tenant-operator'
 				});
 				if (signal.aborted) break;
+				notePollSuccess();
 
 				const obj = response.object as AppsV1Deployment;
 				const conditions = obj?.status?.conditions ?? [];
 				const available = conditions.find((c) => c.type === 'Available');
 				if (available?.status === 'True') {
 					clusterStatus = 'done';
-					stepIndex = 3;
+					stepIndex = 4;
 					break;
 				}
-			} catch {
-				// deployment may not exist yet, retry silently
+			} catch (e) {
+				if (signal.aborted) break;
+				// NotFound is expected here: the agent has registered but the
+				// tenant-operator manifests may not be applied yet. Anything else is
+				// a genuine failure of the check.
+				if (e instanceof ConnectError && e.code === ConnectCode.NotFound) {
+					notePollSuccess();
+				} else {
+					notePollFailure('tenant-operator lookup', e);
+				}
 			}
 			if (!signal.aborted) {
 				await new Promise((r) => setTimeout(r, POLL_INTERVAL));
@@ -310,22 +467,31 @@
 <Dialog.Root bind:open>
 	<Dialog.Content class="flex max-h-[95vh] min-w-[38vw] flex-col overflow-hidden">
 		<Dialog.Title class="sr-only">{m.import_cluster_dialog_title()}</Dialog.Title>
-		<Progress value={stepIndex} max={3} class="mt-1 mr-6 w-auto shrink-0" />
+		<Progress value={stepIndex} max={4} class="mt-1 mr-6 w-auto shrink-0" />
 
 		<div class="mt-4 flex min-h-0 flex-1 flex-col gap-6">
-			{#if stepIndex === 1}
-				{@render stepClusterInfo()}
-			{:else if stepIndex === 2}
-				{@render stepDeployAgent()}
+			{#if stepIndex <= 2}
+				<!-- Both step forms stay mounted so going Back from step 2 keeps what was typed. -->
+				<div class={stepIndex === 1 ? 'contents' : 'hidden'}>
+					{@render stepClusterName()}
+				</div>
+				<div class={stepIndex === 2 ? 'contents' : 'hidden'}>
+					{@render stepClusterInfo()}
+				</div>
 			{:else if stepIndex === 3}
+				{@render stepDeployAgent()}
+			{:else if stepIndex === 4}
 				{@render stepVerifyBinding()}
 			{/if}
 
-			{#if stepIndex === 1 || stepIndex === 3}
+			{#if stepIndex === 1 || stepIndex === 2 || stepIndex === 4}
 				<div class="mt-auto flex w-full items-center justify-between gap-3 pt-4">
 					{#if stepIndex === 1}
 						<Button variant="outline" onclick={() => (open = false)}>{m.cancel()}</Button>
-						<Button onclick={handleGenerateManifest} disabled={!canGoNext || isCreating}>
+						<Button onclick={handleNext} disabled={!canGoNext}>{m.next()}</Button>
+					{:else if stepIndex === 2}
+						<Button variant="outline" onclick={() => (stepIndex = 1)}>{m.back()}</Button>
+						<Button onclick={handleGenerateCommand} disabled={!canGoNext || isCreating}>
 							{#if isCreating}
 								<Spinner data-icon="inline-start" />
 								{m.import_cluster_generating()}
@@ -344,278 +510,50 @@
 	</Dialog.Content>
 </Dialog.Root>
 
-{#snippet stepClusterInfo()}
-	<form
-		class="flex flex-col gap-6"
-		onsubmit={(e) => {
-			e.preventDefault();
-			if (canGoNext) handleGenerateManifest();
-		}}
-	>
+{#snippet stepClusterName()}
+	<div class="flex flex-col gap-6">
 		<div class="flex flex-col gap-1">
 			<h3 class="text-xl font-bold">{m.import_cluster_info_title()}</h3>
 			<p class="text-sm text-muted-foreground">{m.import_cluster_info_description()}</p>
 		</div>
 
 		<Field.FieldGroup>
-			<Field.Field>
-				<Field.FieldLabel for="wizard-cluster-name"
-					>{m.import_cluster_name_label()}</Field.FieldLabel
-				>
-				<Input
-					id="wizard-cluster-name"
-					type="text"
-					placeholder={m.import_cluster_name_placeholder()}
-					bind:value={clusterName}
-					required
-				/>
-			</Field.Field>
+			<Form
+				schema={clusterNameSchema}
+				uiSchema={clusterNameUiSchema}
+				initialValue={defaultClusterNameValues()}
+				bind:reference={clusterNameFormReference}
+				handleSubmit={{ posthook: goToClusterInfo }}
+				class="**:data-[slot=dynamic-form-mode-controller]:hidden"
+			/>
 
-			<Field.Field>
-				<Field.FieldLabel>{m.import_cluster_rancher_project_label()}</Field.FieldLabel>
-				<Field.FieldDescription>
-					{m.import_cluster_rancher_project_description()}
-				</Field.FieldDescription>
-
-				<Popover.Root bind:open={rancherProjectOpen} onOpenChange={handleRancherProjectOpenChange}>
-					<Popover.Trigger class="w-full">
-						{#snippet child({ props })}
-							<Button
-								{...props}
-								variant="outline"
-								role="combobox"
-								aria-expanded={rancherProjectOpen}
-								class="w-full justify-between"
-							>
-								<span class={cn('truncate', !rancherProjectID && 'text-muted-foreground')}>
-									{rancherProjectID || m.import_cluster_rancher_project_placeholder()}
-								</span>
-								<ChevronDownIcon class="ml-2 size-4 shrink-0 opacity-50" />
-							</Button>
-						{/snippet}
-					</Popover.Trigger>
-					<Popover.Content class="w-[var(--bits-popover-anchor-width)] min-w-xs p-0" align="start">
-						<Command.Root>
-							<Command.Input placeholder={m.import_cluster_rancher_project_search()} />
-							<Command.List>
-								{#if rancherProjectLoading}
-									<Command.Loading>
-										{m.import_cluster_rancher_project_loading()}
-									</Command.Loading>
-								{:else if rancherProjectError}
-									<div class="flex flex-col items-start gap-2 p-3">
-										<p class="text-sm text-destructive">
-											{m.import_cluster_rancher_project_error()}
-										</p>
-										<p class="text-xs text-muted-foreground">{rancherProjectError}</p>
-										<Button size="sm" variant="outline" onclick={fetchRancherProjects}>
-											{m.import_cluster_rancher_project_retry()}
-										</Button>
-									</div>
-								{:else}
-									<Command.Empty>
-										{m.import_cluster_rancher_project_empty()}
-									</Command.Empty>
-									<Command.Group>
-										{#if rancherProjects.length > 0}
-											<Command.Item
-												value={m.import_cluster_rancher_project_none()}
-												onSelect={() => {
-													rancherProjectID = '';
-													rancherProjectOpen = false;
-												}}
-											>
-												<CheckIcon
-													class={cn('mr-2 size-4', rancherProjectID && 'text-transparent')}
-												/>
-												{m.import_cluster_rancher_project_none()}
-											</Command.Item>
-										{/if}
-										{#each rancherProjects as project (project.id)}
-											<Command.Item
-												value={project.id}
-												onSelect={() => {
-													rancherProjectID = project.id;
-													rancherProjectOpen = false;
-												}}
-											>
-												<CheckIcon
-													class={cn(
-														'mr-2 size-4',
-														rancherProjectID !== project.id && 'text-transparent'
-													)}
-												/>
-												<div class="flex min-w-0 flex-col">
-													<span class="truncate font-medium">{project.id}</span>
-													{#if rancherProjectSecondaryText(project)}
-														<span class="truncate text-xs text-muted-foreground">
-															{rancherProjectSecondaryText(project)}
-														</span>
-													{/if}
-												</div>
-											</Command.Item>
-										{/each}
-									</Command.Group>
-								{/if}
-							</Command.List>
-						</Command.Root>
-					</Popover.Content>
-				</Popover.Root>
-			</Field.Field>
-
-			<Field.Field>
-				<Field.FieldLabel>{m.import_cluster_administrators()}</Field.FieldLabel>
-				<Field.FieldDescription>
-					{m.import_cluster_administrators_description()}
-				</Field.FieldDescription>
-
-				{#if selectedUsers.length === 0}
-					<Empty.Root class="rounded-md border">
-						<Empty.Header>
-							<Empty.Media>
-								<Avatar.Group>
-									<Avatar.Root>
-										<Avatar.Fallback><UserIcon class="size-4" /></Avatar.Fallback>
-									</Avatar.Root>
-									<Avatar.Root>
-										<Avatar.Fallback><UserIcon class="size-4" /></Avatar.Fallback>
-									</Avatar.Root>
-									<Avatar.Root>
-										<Avatar.Fallback><UserIcon class="size-4" /></Avatar.Fallback>
-									</Avatar.Root>
-								</Avatar.Group>
-							</Empty.Media>
-							<Empty.Title>{m.import_cluster_no_administrators()}</Empty.Title>
-							<Empty.Description>
-								{m.import_cluster_no_administrators_description()}
-							</Empty.Description>
-						</Empty.Header>
-						<Empty.Content>
-							<Popover.Root bind:open={userSearchOpen} onOpenChange={handleUserPopoverOpenChange}>
-								<Popover.Trigger>
-									{#snippet child({ props })}
-										<Button {...props}>
-											<PlusIcon data-icon="inline-start" />
-											{m.import_cluster_add_administrator()}
-										</Button>
-									{/snippet}
-								</Popover.Trigger>
-								<Popover.Content class="w-80 p-0" align="center">
-									<Command.Root shouldFilter={false}>
-										<Command.Input
-											placeholder={m.import_cluster_search_users_placeholder()}
-											value={userSearchQuery}
-											oninput={(e) => handleUserSearch(e.currentTarget.value)}
-										/>
-										<Command.List>
-											{#if userSearchLoading}
-												<Command.Loading>{m.import_cluster_searching()}</Command.Loading>
-											{:else}
-												<Command.Empty>{m.import_cluster_no_users_found()}</Command.Empty>
-												<Command.Group>
-													{#each userSearchResults as user (user.id)}
-														{@const isSelected = selectedUsers.some((s) => s.id === user.id)}
-														<Command.Item value={user.id} onSelect={() => toggleUser(user)}>
-															<CheckIcon
-																class={cn('mr-2 size-4', !isSelected && 'text-transparent')}
-															/>
-															<div class="flex flex-col">
-																<span class="font-medium">{displayName(user)}</span>
-																<span class="text-xs text-muted-foreground">
-																	{user.email || user.username}
-																</span>
-															</div>
-														</Command.Item>
-													{/each}
-												</Command.Group>
-											{/if}
-										</Command.List>
-									</Command.Root>
-								</Popover.Content>
-							</Popover.Root>
-						</Empty.Content>
-					</Empty.Root>
-				{:else}
-					<div class="flex flex-col gap-2">
-						{#each selectedUsers as user (user.id)}
-							<Item.Root variant="outline">
-								<Item.Media>
-									<Avatar.Root>
-										<Avatar.Fallback>
-											{displayName(user).charAt(0).toUpperCase()}
-										</Avatar.Fallback>
-									</Avatar.Root>
-								</Item.Media>
-								<Item.Content>
-									<Item.Title>{displayName(user)}</Item.Title>
-									<Item.Description>{user.email || user.username}</Item.Description>
-								</Item.Content>
-								<Item.Actions>
-									<Button
-										variant="ghost"
-										size="icon"
-										onclick={() => removeUser(user.id)}
-										aria-label={m.import_cluster_remove_user({ name: displayName(user) })}
-									>
-										<XIcon />
-									</Button>
-								</Item.Actions>
-							</Item.Root>
-						{/each}
-
-						<Popover.Root bind:open={userSearchOpen} onOpenChange={handleUserPopoverOpenChange}>
-							<Popover.Trigger>
-								{#snippet child({ props })}
-									<Button {...props} variant="outline" class="w-full justify-start">
-										<PlusIcon data-icon="inline-start" />
-										{m.import_cluster_add_administrator()}
-									</Button>
-								{/snippet}
-							</Popover.Trigger>
-							<Popover.Content class="w-80 p-0" align="start">
-								<Command.Root shouldFilter={false}>
-									<Command.Input
-										placeholder={m.import_cluster_search_users_placeholder()}
-										value={userSearchQuery}
-										oninput={(e) => handleUserSearch(e.currentTarget.value)}
-									/>
-									<Command.List>
-										{#if userSearchLoading}
-											<Command.Loading>{m.import_cluster_searching()}</Command.Loading>
-										{:else}
-											<Command.Empty>{m.import_cluster_no_users_found()}</Command.Empty>
-											<Command.Group>
-												{#each userSearchResults as user (user.id)}
-													{@const isSelected = selectedUsers.some((s) => s.id === user.id)}
-													<Command.Item value={user.id} onSelect={() => toggleUser(user)}>
-														<CheckIcon
-															class={cn('mr-2 size-4', !isSelected && 'text-transparent')}
-														/>
-														<div class="flex flex-col">
-															<span class="font-medium">{displayName(user)}</span>
-															<span class="text-xs text-muted-foreground">
-																{user.email || user.username}
-															</span>
-														</div>
-													</Command.Item>
-												{/each}
-											</Command.Group>
-										{/if}
-									</Command.List>
-								</Command.Root>
-							</Popover.Content>
-						</Popover.Root>
-					</div>
-				{/if}
-			</Field.Field>
+			<ImportClusterAdministrators bind:users={selectedUsers} />
 		</Field.FieldGroup>
+	</div>
+{/snippet}
 
-		<button type="submit" class="hidden" disabled={!canGoNext || isCreating}>{m.submit()}</button>
-	</form>
+{#snippet stepClusterInfo()}
+	<div class="flex flex-col gap-6">
+		<div class="flex flex-col gap-1">
+			<h3 class="text-xl font-bold">{m.import_cluster_access_label()}</h3>
+			<p class="text-sm text-muted-foreground">{m.import_cluster_access_description()}</p>
+		</div>
+
+		<Field.FieldGroup>
+			<Form
+				schema={clusterInfoSchema}
+				uiSchema={clusterInfoUiSchema}
+				initialValue={defaultClusterInfoValues()}
+				bind:reference={clusterInfoFormReference}
+				handleSubmit={{ posthook: submitClusterInfo }}
+				class="**:data-[slot=dynamic-form-mode-controller]:hidden"
+			/>
+		</Field.FieldGroup>
+	</div>
 {/snippet}
 
 {#snippet stepDeployAgent()}
-	<div class="flex min-h-0 flex-1 flex-col gap-6">
+	<div class="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto">
 		<div class="flex flex-col gap-1">
 			<h3 class="text-xl font-bold">{m.import_cluster_deploy_agent_title()}</h3>
 			<p class="text-sm text-muted-foreground">
@@ -623,19 +561,28 @@
 			</p>
 		</div>
 
-		<div
-			class={cn(
-				'flex flex-col gap-3 rounded-lg border bg-card p-4',
-				isYamlOpen && 'min-h-0 flex-1'
-			)}
-		>
+		{#if robotRotated}
+			<Item.Root variant="outline" class="border-amber-500/50 bg-amber-500/5">
+				<Item.Media variant="icon" class="size-10 rounded-full bg-amber-500/10 text-amber-500">
+					<TriangleAlertIcon />
+				</Item.Media>
+				<Item.Content>
+					<Item.Title>{m.import_cluster_robot_rotated_title()}</Item.Title>
+					<Item.Description>
+						{m.import_cluster_robot_rotated_description({ name: robotName })}
+					</Item.Description>
+				</Item.Content>
+			</Item.Root>
+		{/if}
+
+		<div class="flex flex-col gap-3 rounded-lg border bg-card p-4">
 			<Field.FieldLabel class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
 				{m.import_cluster_install_command_label()}
 			</Field.FieldLabel>
 
 			<Code.Root
 				lang="bash"
-				class="w-full shrink-0 pr-12 text-sm [&_pre.shiki]:[scrollbar-width:none] [&_pre.shiki::-webkit-scrollbar]:hidden"
+				class="max-h-[40vh] w-full shrink-0 overflow-auto pr-12 text-sm [&_pre.shiki]:overflow-visible"
 				variant="secondary"
 				code={installCommand}
 				hideLines
@@ -646,32 +593,6 @@
 			<Field.FieldDescription>
 				{m.import_cluster_install_command_description()}
 			</Field.FieldDescription>
-
-			{#if manifestYaml}
-				<Collapsible.Root
-					bind:open={isYamlOpen}
-					class={cn('flex flex-col', isYamlOpen && 'min-h-0 flex-1')}
-				>
-					<Collapsible.Trigger
-						class="group flex w-full items-center justify-between border-t pt-3 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-					>
-						<span class="flex items-center gap-2">
-							<FileCodeIcon class="size-4" />
-							{m.import_cluster_preview_yaml()}
-						</span>
-						<ChevronDownIcon
-							class="size-4 transition-transform duration-200 group-data-[state=open]:rotate-180"
-						/>
-					</Collapsible.Trigger>
-					<Collapsible.Content class="flex min-h-0 flex-1 flex-col">
-						<div class="mt-2 min-h-0 flex-1 overflow-auto rounded-md border">
-							<Code.Root lang="yaml" class="w-full text-xs" code={manifestYaml}>
-								<Code.CopyButton />
-							</Code.Root>
-						</div>
-					</Collapsible.Content>
-				</Collapsible.Root>
-			{/if}
 		</div>
 
 		<Item.Root variant="outline">
@@ -682,9 +603,6 @@
 				<Item.Title>{clusterName}</Item.Title>
 				<Item.Description>
 					{m.import_cluster_target_cluster()}
-					{#if rancherProjectID}
-						· {m.import_cluster_rancher_project_confirmation({ id: rancherProjectID })}
-					{/if}
 				</Item.Description>
 			</Item.Content>
 			<Item.Actions>
@@ -711,6 +629,12 @@
 				{/if}
 			</Item.Actions>
 		</Item.Root>
+
+		{#if pollError && clusterStatus !== 'done'}
+			<p class="text-xs text-amber-500">
+				{m.import_cluster_connection_check_failed({ message: pollError })}
+			</p>
+		{/if}
 	</div>
 {/snippet}
 
@@ -739,12 +663,10 @@
 							{m.import_cluster_managed()}
 						</span>
 					</div>
-					{#if rancherProjectID}
+					{#if robotName}
 						<div class="flex justify-between gap-4">
-							<span class="text-muted-foreground">
-								{m.import_cluster_rancher_project_confirmation_label()}
-							</span>
-							<span class="truncate font-medium">{rancherProjectID}</span>
+							<span class="text-muted-foreground">{m.import_cluster_harbor_robot()}</span>
+							<span class="truncate font-medium">{robotName}</span>
 						</div>
 					{/if}
 					{#if selectedUsers.length > 0}

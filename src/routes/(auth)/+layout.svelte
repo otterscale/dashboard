@@ -4,14 +4,13 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import BotIcon from '@lucide/svelte/icons/bot';
 	import BoxIcon from '@lucide/svelte/icons/box';
+	import BoxesIcon from '@lucide/svelte/icons/boxes';
 	import BracesIcon from '@lucide/svelte/icons/braces';
 	import CircleQuestionMarkIcon from '@lucide/svelte/icons/circle-question-mark';
 	import CompassIcon from '@lucide/svelte/icons/compass';
-	import ContainerIcon from '@lucide/svelte/icons/container';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import GaugeIcon from '@lucide/svelte/icons/gauge';
-	import GitGraphIcon from '@lucide/svelte/icons/git-graph';
 	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
 	import LayersIcon from '@lucide/svelte/icons/layers';
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
@@ -31,6 +30,7 @@
 		NavMain,
 		NavSecondary,
 		NavUser,
+		NotificationTrigger,
 		startTour,
 		WorkspaceSwitcher
 	} from '$lib/components/layout';
@@ -46,7 +46,16 @@
 	import { m } from '$lib/messages';
 	import { breadcrumbs } from '$lib/stores';
 	import { pulse } from '$lib/stores/pulse.svelte';
-	import { getAdditionalItems } from '$lib/utils/features';
+	import {
+		type ClusterFeatures,
+		getAdditionalItems,
+		getAdditionalNavGroups,
+		probeClusterFeatures
+	} from '$lib/utils/features';
+	import {
+		ClusterReleaseLabelSelector,
+		WorkspaceReleaseLabelSelector
+	} from '$lib/utils/helm-release';
 	import { hasRookCephCRD } from '$lib/utils/rook-ceph';
 
 	import type { LayoutData } from './$types';
@@ -72,6 +81,7 @@
 	let sidebarOpen = $state(true);
 	let importOpen = $state(false);
 	let hasRookCeph = $state(false);
+	let clusterFeatures = $state<ClusterFeatures>({});
 
 	async function fetchClusters(signal?: AbortSignal): Promise<Link[]> {
 		try {
@@ -174,6 +184,24 @@
 		hasRookCephCRD(transport, activeCluster, abortController.signal)
 			.then((exists) => {
 				if (!abortController.signal.aborted) hasRookCeph = exists;
+			})
+			.catch((err) => {
+				if (!abortController.signal.aborted) console.error(err);
+			});
+
+		return () => abortController.abort();
+	});
+
+	$effect(() => {
+		if (!activeCluster) {
+			clusterFeatures = {};
+			return;
+		}
+
+		const abortController = new AbortController();
+		probeClusterFeatures(transport, activeCluster, abortController.signal)
+			.then((features) => {
+				if (!abortController.signal.aborted) clusterFeatures = features;
 			})
 			.catch((err) => {
 				if (!abortController.signal.aborted) console.error(err);
@@ -313,10 +341,11 @@
 					{
 						title: m.release(),
 						url: resourceUrl({
-							group: 'kro.run',
-							version: 'v1alpha1',
+							group: 'helm.toolkit.fluxcd.io',
+							version: 'v2',
 							kind: 'HelmRelease',
-							resource: 'helmreleases'
+							resource: 'helmreleases',
+							labelSelector: WorkspaceReleaseLabelSelector
 						})
 					},
 					{
@@ -326,64 +355,6 @@
 							version: 'v1',
 							kind: 'HelmRepository',
 							resource: 'helmrepositories'
-						})
-					}
-				]
-			},
-			{
-				title: m.git_ops(),
-				icon: GitGraphIcon,
-				isActive: true,
-				items: [
-					{
-						title: m.kustomize(),
-						url: resourceUrl({
-							group: 'kustomize.toolkit.fluxcd.io',
-							version: 'v1',
-							kind: 'Kustomization',
-							resource: 'kustomizations'
-						})
-					},
-					{
-						title: m.git_repository(),
-						url: resourceUrl({
-							group: 'source.toolkit.fluxcd.io',
-							version: 'v1',
-							kind: 'GitRepository',
-							resource: 'gitrepositories'
-						})
-					}
-				]
-			},
-			{
-				title: m.workload(),
-				icon: ContainerIcon,
-				items: [
-					{
-						title: m.application(),
-						url: resourceUrl({
-							group: 'kro.run',
-							version: 'v1alpha1',
-							kind: 'Application',
-							resource: 'applications'
-						})
-					},
-					{
-						title: m.schedule(),
-						url: resourceUrl({
-							group: 'kro.run',
-							version: 'v1alpha1',
-							kind: 'Schedule',
-							resource: 'schedules'
-						})
-					},
-					{
-						title: m.task(),
-						url: resourceUrl({
-							group: 'kro.run',
-							version: 'v1alpha1',
-							kind: 'Task',
-							resource: 'tasks'
 						})
 					}
 				]
@@ -413,20 +384,14 @@
 				]
 			},
 			...(data.isClusterAdmin
+				? getAdditionalNavGroups(clusterFeatures, resourceUrl, data.isClusterAdmin)
+				: []),
+			...(data.isClusterAdmin
 				? [
 						{
-							title: m.administration(),
-							icon: UserStarIcon,
+							title: m.platform_apps(),
+							icon: BoxesIcon,
 							items: [
-								{
-									title: m.workspace(),
-									url: resourceUrl({
-										group: 'tenant.otterscale.io',
-										version: 'v1alpha1',
-										kind: 'Workspace',
-										resource: 'workspaces'
-									})
-								},
 								{
 									title: m.module(),
 									url: page.params.workspace
@@ -452,7 +417,35 @@
 										version: 'v2',
 										kind: 'HelmRelease',
 										resource: 'helmreleases',
-										labelSelector: 'app.kubernetes.io/managed-by!=kro'
+										labelSelector: ClusterReleaseLabelSelector
+									})
+								}
+							]
+						}
+					]
+				: []),
+			...(data.isClusterAdmin
+				? [
+						{
+							title: m.administration(),
+							icon: UserStarIcon,
+							items: [
+								{
+									title: m.resource(),
+									url: page.params.workspace
+										? resolve('/(auth)/[cluster]/[workspace]/resources', {
+												cluster: activeCluster,
+												workspace: page.params.workspace
+											})
+										: ''
+								},
+								{
+									title: m.workspace(),
+									url: resourceUrl({
+										group: 'tenant.otterscale.io',
+										version: 'v1alpha1',
+										kind: 'Workspace',
+										resource: 'workspaces'
 									})
 								},
 								...(page.params.workspace
@@ -817,6 +810,7 @@
 					</Tooltip.Trigger>
 					<Tooltip.Content>Start Guide Tour</Tooltip.Content>
 				</Tooltip.Root>
+				<NotificationTrigger />
 				<Tooltip.Root>
 					<DropdownMenu.Root>
 						<Tooltip.Trigger>

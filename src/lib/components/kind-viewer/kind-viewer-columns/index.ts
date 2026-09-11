@@ -4,6 +4,7 @@ import type { ColumnDef } from '@tanstack/table-core';
 
 import type { DataSchemaType, UISchemaType } from '$lib/components/dynamic-table/utils.js';
 
+import { getKindExtension } from '../extensions.js';
 import {
 	getApplicationColumnDefinitions,
 	getApplicationData,
@@ -235,7 +236,13 @@ import {
 	getWorkspaceUISchemas
 } from './workspace.js';
 
-function getDataSchemas(kind: string): Record<string, DataSchemaType> {
+// `group` disambiguates kinds whose names collide across API groups; extension
+// kinds (see ../extensions) are dispatched on it before the built-in switch.
+function getDataSchemas(kind: string, group?: string): Record<string, DataSchemaType> {
+	const extension = getKindExtension(group, kind);
+	if (extension?.getDataSchemas) {
+		return extension.getDataSchemas();
+	}
 	switch (kind) {
 		case 'CronJob':
 			return getCronJobDataSchemas();
@@ -326,6 +333,10 @@ function getData(apiResource: APIResource, object: JsonObject): Record<string, J
 	// Each Kind handler accepts its own specific K8s type; cast through `never` to satisfy
 	// all of those signatures in a single dispatch without per-case casts.
 	const resource = object as never;
+	const extension = getKindExtension(apiResource.group, apiResource.kind);
+	if (extension?.getData) {
+		return extension.getData(object);
+	}
 	switch (apiResource.kind) {
 		case 'CronJob':
 			return getCronJobData(resource);
@@ -412,7 +423,11 @@ function getData(apiResource: APIResource, object: JsonObject): Record<string, J
 	}
 }
 
-function getUISchemas(kind: string): Record<string, UISchemaType> {
+function getUISchemas(kind: string, group?: string): Record<string, UISchemaType> {
+	const extension = getKindExtension(group, kind);
+	if (extension?.getUISchemas) {
+		return extension.getUISchemas();
+	}
 	switch (kind) {
 		case 'CronJob':
 			return getCronJobUISchemas();
@@ -505,6 +520,10 @@ function getColumnDefinitions(
 	dataSchemas: Record<string, DataSchemaType>,
 	cluster?: string
 ): ColumnDef<Record<string, JsonValue>>[] {
+	const extension = getKindExtension(apiResource.group, apiResource.kind);
+	if (extension?.getColumnDefinitions) {
+		return extension.getColumnDefinitions(apiResource, uiSchemas, dataSchemas, cluster);
+	}
 	switch (apiResource.kind) {
 		case 'CronJob':
 			return getCronJobColumnDefinitions(apiResource, uiSchemas, dataSchemas);
