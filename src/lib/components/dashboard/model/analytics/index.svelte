@@ -1,14 +1,16 @@
 <script lang="ts">
 	import { PrometheusDriver } from 'prometheus-query';
 
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	import ATopKvPressure from './a-top-kv-pressure.svelte';
 	import ATopP99Latency from './a-top-p99-latency.svelte';
+	import ATopRequests from './a-top-requests.svelte';
 	import ATopThroughput from './a-top-throughput.svelte';
+	import BEngineInfo from './b-engine-info.svelte';
 	import BGpuMemory from './b-gpu-memory.svelte';
 	import BMemoryUsage from './b-memory-usage.svelte';
-	import BStatusSnapshot from './b-status-snapshot.svelte';
+	import BPodHealth from './b-pod-health.svelte';
 	import CGenerationSizeHeatmap from './c-generation-size-heatmap.svelte';
 	import CPrefillDecode from './c-prefill-decode.svelte';
 	import CPrefixCacheHit from './c-prefix-cache-hit.svelte';
@@ -52,8 +54,16 @@
 <div class="flex flex-col gap-6 pt-4">
 	<section class="flex flex-col gap-3">
 		<h2 class="text-lg font-semibold">{m.section_model_comparison()}</h2>
-		<div class="grid w-full gap-4 lg:grid-cols-3">
+		<!-- Four columns only from xl: at lg a quarter-width card is too narrow for a bar list
+		     with a value column, so the row folds to 2×2 first. Section B mirrors this. -->
+		<div class="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-4">
 			<ATopThroughput
+				prometheusDriver={client}
+				{namespace}
+				isReloading={isReloading ?? false}
+				onModelClick={selectModel}
+			/>
+			<ATopRequests
 				prometheusDriver={client}
 				{namespace}
 				isReloading={isReloading ?? false}
@@ -83,8 +93,14 @@
 					message={m.select_model_to_view_details()}
 				/>
 			{:else}
-				<div class="grid w-full items-start gap-4 lg:grid-cols-3">
-					<BStatusSnapshot
+				<div class="grid w-full items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
+					<BEngineInfo
+						{namespace}
+						prometheusDriver={client}
+						selectedModel={modelFilter}
+						isReloading={isReloading ?? false}
+					/>
+					<BPodHealth
 						{namespace}
 						prometheusDriver={client}
 						selectedModel={modelFilter}
