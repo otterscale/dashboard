@@ -25,6 +25,7 @@
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { Toggle } from '$lib/components/ui/toggle';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { cn } from '$lib/utils';
 
 	import { ACTION_DIALOG_CONTENT_CLASS, ACTION_DIALOG_CONTENT_FULLSCREEN_CLASS } from './constants';
 	import LogViewer from './log-viewer.svelte';
@@ -53,6 +54,14 @@
 	let viewer = $state<ReturnType<typeof LogViewer>>();
 
 	const showsPodPicker = $derived(kind !== 'Pod' && resolver.associatedPods.length > 1);
+	const streamStatus = $derived(viewer?.getStreamStatus() ?? 'streaming');
+	const following = $derived(streamStatus === 'streaming');
+	const followLabel = $derived(following ? 'Pause streaming' : 'Resume streaming');
+	const followTooltip = $derived(
+		streamStatus === 'disconnected'
+			? `Disconnected: ${viewer?.getStreamError()} — click to resume`
+			: followLabel
+	);
 
 	async function handleOpenChange(isOpen: boolean) {
 		if (!isOpen) {
@@ -207,15 +216,21 @@
 					<Tooltip.Root ignoreNonKeyboardFocus>
 						<Tooltip.Trigger>
 							{#snippet child({ props })}
+								<!-- Doubles as the connection indicator: a stream the server dropped
+								     shows as a red play button, and resuming reopens it. Colour is
+								     overridden on purpose; Toggle has no destructive variant. -->
 								<Toggle
 									{...props}
 									size="sm"
-									class="size-8 p-0"
-									pressed={viewer?.isFollowing() ?? true}
+									class={cn(
+										'size-8 p-0',
+										streamStatus === 'disconnected' && 'text-destructive hover:text-destructive'
+									)}
+									pressed={following}
 									onPressedChange={(v) => viewer?.setFollowing(v)}
-									aria-label="Toggle follow"
+									aria-label={followLabel}
 								>
-									{#if viewer?.isFollowing() ?? true}
+									{#if following}
 										<PauseIcon />
 									{:else}
 										<PlayIcon />
@@ -223,9 +238,7 @@
 								</Toggle>
 							{/snippet}
 						</Tooltip.Trigger>
-						<Tooltip.Content>
-							{(viewer?.isFollowing() ?? true) ? 'Pause streaming' : 'Resume streaming'}
-						</Tooltip.Content>
+						<Tooltip.Content>{followTooltip}</Tooltip.Content>
 					</Tooltip.Root>
 					<Tooltip.Root ignoreNonKeyboardFocus>
 						<Tooltip.Trigger>

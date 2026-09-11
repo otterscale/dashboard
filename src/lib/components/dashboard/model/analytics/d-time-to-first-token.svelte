@@ -14,6 +14,7 @@
 	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { formatLatency } from '$lib/formatter';
 	import { m } from '$lib/messages';
 	import {
 		type ActivityState,
@@ -61,7 +62,16 @@
 			namespace,
 			selectedModel
 		);
+		// Σ latency / Σ requests: the mean. It keeps drawing under sparse traffic, where a
+		// quantile over a handful of buckets drops out, and reads against the tail: flat while
+		// p99 spikes = a few slow requests; all three rising = capacity.
+		const total = vllmMetricWithSelector(
+			'vllm:time_to_first_token_seconds_sum',
+			namespace,
+			selectedModel
+		);
 		return {
+			avg: `sum(rate(${total}[5m])) / sum(rate(${requests}[5m]))`,
 			p95: `histogram_quantile(0.95, ${inner})`,
 			p99: `histogram_quantile(0.99, ${inner})`,
 			traffic: `sum(rate(${requests}[5m]))`
@@ -70,7 +80,8 @@
 
 	const configuration = {
 		p95: { label: 'P95', color: 'var(--chart-1)' },
-		p99: { label: 'P99', color: 'var(--chart-2)' }
+		p99: { label: 'P99', color: 'var(--chart-2)' },
+		avg: { label: m.average(), color: 'var(--chart-3)' }
 	} satisfies Chart.ChartConfig;
 
 	const areaProps = {
@@ -94,8 +105,10 @@
 			);
 			activity = probeActivity(points, 'traffic');
 			// A flat `traffic: 0` is a finite value, so it would keep points alive and defeat the
-			// `length === 0` empty check below. Only quantile-bearing points are plottable.
-			times_to_first_token = points.filter((p) => p.p95 !== undefined || p.p99 !== undefined);
+			// `length === 0` empty check below. Only latency-bearing points are plottable.
+			times_to_first_token = points.filter(
+				(p) => p.avg !== undefined || p.p95 !== undefined || p.p99 !== undefined
+			);
 		} catch (error) {
 			times_to_first_token = [];
 			activity = 'absent';
@@ -161,7 +174,8 @@
 					yPadding={[0, 25]}
 					series={[
 						{ key: 'p95', label: configuration.p95.label, color: configuration.p95.color },
-						{ key: 'p99', label: configuration.p99.label, color: configuration.p99.color }
+						{ key: 'p99', label: configuration.p99.label, color: configuration.p99.color },
+						{ key: 'avg', label: configuration.avg.label, color: configuration.avg.color }
 					]}
 					props={{
 						area: areaProps,
@@ -185,6 +199,7 @@
 								})}
 						>
 							{#snippet formatter({ item, name, value })}
+								{@const latency = formatLatency(Number(value))}
 								<div
 									style="--color-bg: {item.color}; --color-border: {item.color};"
 									class="size-2.5 shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)"
@@ -194,8 +209,8 @@
 										<span class="text-muted-foreground">{name}</span>
 									</div>
 									<span class="font-mono font-medium text-foreground tabular-nums">
-										{(Number(value) * 1000).toFixed(0)}
-										{m.ms()}
+										{latency.value}
+										{latency.unit}
 									</span>
 								</div>
 							{/snippet}

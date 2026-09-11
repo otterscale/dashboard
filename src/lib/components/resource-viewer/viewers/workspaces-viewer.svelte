@@ -17,6 +17,7 @@
 
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { formatWithBinarySuffix, quantityToBytes } from '$lib/components/dynamic-table/utils';
 	import { typographyVariants } from '$lib/components/typography/index.ts';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import { Badge } from '$lib/components/ui/badge';
@@ -39,56 +40,31 @@
 	let resourceQuotaUsed: Record<string, string> = $state({});
 	let isLoaded = $state(false);
 
-	const K8S_QUANTITY_RE = /^(\d+(?:\.\d+)?)\s*(Ki|Mi|Gi|Ti|Pi|Ei|k|M|G|T|P|E|m)?$/;
-	const K8S_MULTIPLIERS: Record<string, number> = {
-		'': 1,
-		m: 0.001,
-		k: 1e3,
-		M: 1e6,
-		G: 1e9,
-		T: 1e12,
-		P: 1e15,
-		E: 1e18,
-		Ki: 1024,
-		Mi: 1024 ** 2,
-		Gi: 1024 ** 3,
-		Ti: 1024 ** 4,
-		Pi: 1024 ** 5,
-		Ei: 1024 ** 6
-	};
+	/** `nvidia.com/gpumem` counts MiB, so its scalar has to be scaled before formatting. */
+	const GPUMEM_BASE_UNIT = 'Mi';
 
-	function parseK8sQuantity(raw: string | number): number {
-		if (typeof raw === 'number') return raw;
-		const match = raw.match(K8S_QUANTITY_RE);
-		if (!match) return NaN;
-		return parseFloat(match[1]) * (K8S_MULTIPLIERS[match[2] ?? ''] ?? 1);
+	function formatBytes(bytes: number): string {
+		const { value, unit } = formatWithBinarySuffix(BigInt(Math.round(bytes)));
+		return `${Math.round(value * 10) / 10}${unit}`;
 	}
 
 	function formatResourceValue(key: string, value: number): string {
 		if (key.includes('cpu')) {
 			return value < 1 ? `${Math.round(value * 1000)}m` : `${value}`;
 		}
-		if (key.includes('memory')) {
-			const gi = value / 1024 ** 3;
-			if (gi >= 1) return `${Math.round(gi * 10) / 10}Gi`;
-			const mi = value / 1024 ** 2;
-			if (mi >= 1) return `${Math.round(mi)}Mi`;
-			return `${Math.round(value / 1024)}Ki`;
-		}
-		if (key.includes('gpumem')) {
-			const gi = value / 1024;
-			return `${Math.round(gi * 10) / 10}Gi`;
-		}
+		// gpumem is reported in MiB, every other memory series in bytes
+		if (key.includes('gpumem')) return formatBytes(value * 1024 ** 2);
+		if (key.includes('memory')) return formatBytes(value);
 		return String(Math.round(value));
 	}
 
 	function formatHardValue(key: string, raw: string | number): string {
 		if (!key.includes('gpumem')) return String(raw);
-		if (typeof raw === 'string' && !K8S_QUANTITY_RE.test(raw)) return raw;
-		const base = parseK8sQuantity(raw);
-		if (Number.isNaN(base)) return String(raw);
-		const gi = base / 1024;
-		return `${Math.round(gi * 10) / 10}Gi`;
+		try {
+			return formatBytes(Number(quantityToBytes(String(raw), GPUMEM_BASE_UNIT)));
+		} catch {
+			return String(raw);
+		}
 	}
 
 	async function fetchResourceQuotaMetrics() {
