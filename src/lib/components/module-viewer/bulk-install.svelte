@@ -116,6 +116,16 @@
 					}
 				},
 				values: {},
+				// Optional per-release values ConfigMap (`<release>-values` in the release
+				// namespace): FluxCD skips it when absent, so CE and EE share the manifest.
+				valuesFrom: [
+					{
+						kind: 'ConfigMap',
+						name: `${module.name}-values`,
+						valuesKey: 'values',
+						optional: true
+					}
+				],
 				...(lodash.get(module, ['annotations', 'module.otterscale.io/post-renderer'])
 					? (() => {
 							const postRenderers = lodash
