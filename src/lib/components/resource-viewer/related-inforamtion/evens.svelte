@@ -15,12 +15,14 @@
 		cluster,
 		namespace,
 		kind,
-		name
+		name,
+		filter = ''
 	}: {
 		cluster: string;
 		namespace: string;
 		kind: string;
 		name: string;
+		filter?: string;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -126,7 +128,7 @@
 	});
 </script>
 
-<RelatedInformationTable data={events} {columns}>
+<RelatedInformationTable data={events} {columns} {filter}>
 	{#snippet header()}
 		<Table.Row>
 			<Table.Head>Name</Table.Head>

@@ -8,7 +8,7 @@
 	import { formatTimestamp } from '../utils';
 	import RelatedInformationTable from './table.svelte';
 
-	let { object }: { object: Resource | undefined } = $props();
+	let { object, filter = '' }: { object: Resource | undefined; filter?: string } = $props();
 
 	type ConditionRow = {
 		id: string;
@@ -41,7 +41,7 @@
 	});
 </script>
 
-<RelatedInformationTable data={conditions} {columns}>
+<RelatedInformationTable data={conditions} {columns} {filter}>
 	{#snippet header()}
 		<Table.Row>
 			<Table.Head>Type</Table.Head>

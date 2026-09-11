@@ -1,8 +1,11 @@
 <script lang="ts">
+	import type { JsonObject } from '@bufbuild/protobuf';
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import { ListIcon } from '@lucide/svelte';
 	import Ban from '@lucide/svelte/icons/ban';
+	import EllipsisIcon from '@lucide/svelte/icons/ellipsis';
 	import Layers from '@lucide/svelte/icons/layers';
+	import SearchIcon from '@lucide/svelte/icons/search';
+	import XIcon from '@lucide/svelte/icons/x';
 	import {
 		type GetRequest,
 		ResourceService,
@@ -11,14 +14,19 @@
 		type WatchRequest
 	} from '@otterscale/api/resource/v1';
 	import type { Schema } from '@sjsf/form';
+	import type { ValidateFunction } from 'ajv';
 	import lodash from 'lodash';
 	import { getContext, onDestroy, onMount } from 'svelte';
 
+	import { page } from '$app/state';
+	import type { ActionsType } from '$lib/components/kind-viewer/kind-viewer-actions';
+	import { getActions } from '$lib/components/kind-viewer/kind-viewer-actions';
+	import { getValidator } from '$lib/components/kind-viewer/validator';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import { Button } from '$lib/components/ui/button';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Empty from '$lib/components/ui/empty/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
+	import * as InputGroup from '$lib/components/ui/input-group/index.js';
 	import * as Item from '$lib/components/ui/item';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
@@ -170,21 +178,30 @@
 
 	const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+	// Reuse the per-kind row actions from the list page so the detail header offers the same menu.
+	const isClusterAdmin = $derived(page.data.isClusterAdmin === true);
+	const Actions: ActionsType = $derived(getActions(kind, namespace, group));
+	// Only the Edit action needs this, and Ajv takes a while to compile a CRD schema, so it is
+	// built in the background after the page is shown; the actions menu is disabled until then.
+	let validate: ValidateFunction | undefined = $state.raw(undefined);
+
 	const hasConditions = $derived(!!lodash.get(schema, 'properties.status.properties.conditions'));
 	const hasEvents = $derived(!EVENT_UNSUPPORTED_KINDS.has(kind));
 
-	let selectedRelatedInformation = $state({
-		value: 'related-resource',
-		label: 'Related Resources'
-	});
-	const relatedInformations = $derived(
+	type Tab = { value: string; label: string; searchable: boolean };
+	let selectedTab = $state('related-resource');
+	const tabs = $derived(
 		[
-			{ value: 'data', label: 'Data' },
-			hasConditions ? { value: 'condition', label: 'Conditions' } : null,
-			hasEvents ? { value: 'event', label: 'Recent Events' } : null,
-			{ value: 'related-resource', label: 'Related Resources' }
-		].filter(Boolean)
+			{ value: 'related-resource', label: 'Related Resources', searchable: true },
+			hasConditions ? { value: 'condition', label: 'Conditions', searchable: true } : null,
+			hasEvents ? { value: 'event', label: 'Recent Events', searchable: true } : null,
+			{ value: 'data', label: 'Data', searchable: false }
+		].filter((tab): tab is Tab => tab !== null)
 	);
+	// One search box in the toolbar serves whichever tab is active; each tab keeps its own term.
+	let filters: Record<string, string> = $state({});
+	const activeFilter = $derived(filters[selectedTab] ?? '');
+	const isSearchable = $derived(tabs.find((tab) => tab.value === selectedTab)?.searchable ?? false);
 
 	let isMounted = $state(false);
 	onMount(async () => {
@@ -192,6 +209,12 @@
 		schema = fetchedSchema;
 		isMounted = true;
 		watchResource();
+		if (fetchedSchema) {
+			void getValidator(fetchedSchema).then((compiled) => {
+				if (isDestroyed) return;
+				validate = compiled;
+			});
+		}
 	});
 
 	let isDestroyed = $state(false);
@@ -288,30 +311,24 @@
 					</Item.Title>
 				</Item.Content>
 				<Item.Actions>
-					<DropdownMenu.Root>
-						<DropdownMenu.Trigger>
-							{#snippet child({ props })}
-								<Button {...props} variant="ghost">
-									<ListIcon />
-								</Button>
-							{/snippet}
-						</DropdownMenu.Trigger>
-						<DropdownMenu.Content align="end" class="w-fit">
-							<DropdownMenu.Group>
-								{#each relatedInformations as relatedInformation, index (index)}
-									{#if relatedInformation}
-										<DropdownMenu.Item
-											onSelect={() => {
-												selectedRelatedInformation = relatedInformation;
-											}}
-										>
-											{relatedInformation.label}
-										</DropdownMenu.Item>
-									{/if}
-								{/each}
-							</DropdownMenu.Group>
-						</DropdownMenu.Content>
-					</DropdownMenu.Root>
+					{#if schema && validate}
+						<Actions
+							role={isClusterAdmin ? 'Cluster Admin' : undefined}
+							object={object as JsonObject}
+							{schema}
+							{validate}
+							{cluster}
+							{namespace}
+							{group}
+							{version}
+							{kind}
+							{resource}
+						/>
+					{:else}
+						<Button size="icon" variant="ghost" class="shadow-none" aria-label="Actions" disabled>
+							<EllipsisIcon size={16} aria-hidden="true" />
+						</Button>
+					{/if}
 				</Item.Actions>
 			</Item.Root>
 			<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
@@ -360,18 +377,52 @@
 			</div>
 		</Field.Set>
 		<Field.Set>
-			<Tabs.Root value={selectedRelatedInformation.value} class="w-full">
+			<Tabs.Root bind:value={selectedTab} class="w-full gap-4">
+				<div class="flex flex-wrap items-center justify-between gap-2">
+					<Tabs.List>
+						{#each tabs as tab (tab.value)}
+							<Tabs.Trigger value={tab.value}>{tab.label}</Tabs.Trigger>
+						{/each}
+					</Tabs.List>
+					{#if isSearchable}
+						<InputGroup.Root class="w-full sm:max-w-sm">
+							<InputGroup.Addon>
+								<SearchIcon size={16} />
+							</InputGroup.Addon>
+							<InputGroup.Input
+								placeholder="e.g., searchPattern"
+								value={activeFilter}
+								oninput={(event) => {
+									filters[selectedTab] = (event.currentTarget as HTMLInputElement).value;
+								}}
+							/>
+							{#if activeFilter}
+								<InputGroup.Addon align="inline-end">
+									<InputGroup.Button
+										size="icon-xs"
+										onclick={() => {
+											filters[selectedTab] = '';
+										}}
+										aria-label="Clear filter"
+									>
+										<XIcon />
+									</InputGroup.Button>
+								</InputGroup.Addon>
+							{/if}
+						</InputGroup.Root>
+					{/if}
+				</div>
 				<Tabs.Content value="data">
 					<Yaml {object} />
 				</Tabs.Content>
 				{#if hasConditions}
 					<Tabs.Content value="condition">
-						<Conditions {object} />
+						<Conditions {object} filter={filters.condition ?? ''} />
 					</Tabs.Content>
 				{/if}
 				{#if hasEvents}
 					<Tabs.Content value="event">
-						<Events {cluster} {namespace} {kind} {name} />
+						<Events {cluster} {namespace} {kind} {name} filter={filters.event ?? ''} />
 					</Tabs.Content>
 				{/if}
 				<Tabs.Content value="related-resource">
@@ -384,6 +435,7 @@
 						{resource}
 						{name}
 						{object}
+						filter={filters['related-resource'] ?? ''}
 					/>
 				</Tabs.Content>
 			</Tabs.Root>
