@@ -4,15 +4,14 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import BotIcon from '@lucide/svelte/icons/bot';
 	import BoxIcon from '@lucide/svelte/icons/box';
+	import BoxesIcon from '@lucide/svelte/icons/boxes';
 	import BracesIcon from '@lucide/svelte/icons/braces';
 	import CircleQuestionMarkIcon from '@lucide/svelte/icons/circle-question-mark';
 	import CompassIcon from '@lucide/svelte/icons/compass';
-	import ContainerIcon from '@lucide/svelte/icons/container';
 	import CpuIcon from '@lucide/svelte/icons/cpu';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import GaugeIcon from '@lucide/svelte/icons/gauge';
 	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
-	import InfoIcon from '@lucide/svelte/icons/info';
 	import LayersIcon from '@lucide/svelte/icons/layers';
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
 	import NetworkIcon from '@lucide/svelte/icons/network';
@@ -28,14 +27,14 @@
 	import { page } from '$app/state';
 	import { env } from '$env/dynamic/public';
 	import {
-		DialogAbout,
 		NavMain,
 		NavSecondary,
 		NavUser,
+		NotificationTrigger,
 		startTour,
 		WorkspaceSwitcher
 	} from '$lib/components/layout';
-	import Registe from '$lib/components/layout/dialog-import-cluster.svelte';
+	import ImportCluster from '$lib/components/layout/import-cluster-external.svelte';
 	import RegisteClusterTrigger from '$lib/components/layout/registe-cluster-trigger.svelte';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 	import { Button } from '$lib/components/ui/button';
@@ -44,10 +43,20 @@
 	import * as Sidebar from '$lib/components/ui/sidebar';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { breadcrumbs } from '$lib/stores';
 	import { pulse } from '$lib/stores/pulse.svelte';
-	import { getAdditionalItems } from '$lib/utils/features';
+	import {
+		type ClusterFeatures,
+		getAdditionalItems,
+		getAdditionalNavGroups,
+		probeClusterFeatures
+	} from '$lib/utils/features';
+	import {
+		ClusterReleaseLabelSelector,
+		WorkspaceReleaseLabelSelector
+	} from '$lib/utils/helm-release';
+	import { hasRookCephCRD } from '$lib/utils/rook-ceph';
 
 	import type { LayoutData } from './$types';
 
@@ -70,8 +79,9 @@
 	let workspaces = $state<TenantOtterscaleIoV1Alpha1Workspace[]>([]);
 
 	let sidebarOpen = $state(true);
-	let aboutOpen = $state(false);
 	let importOpen = $state(false);
+	let hasRookCeph = $state(false);
+	let clusterFeatures = $state<ClusterFeatures>({});
 
 	async function fetchClusters(signal?: AbortSignal): Promise<Link[]> {
 		try {
@@ -164,6 +174,42 @@
 		return () => abortController.abort();
 	});
 
+	$effect(() => {
+		if (!activeCluster) {
+			hasRookCeph = false;
+			return;
+		}
+
+		const abortController = new AbortController();
+		hasRookCephCRD(transport, activeCluster, abortController.signal)
+			.then((exists) => {
+				if (!abortController.signal.aborted) hasRookCeph = exists;
+			})
+			.catch((err) => {
+				if (!abortController.signal.aborted) console.error(err);
+			});
+
+		return () => abortController.abort();
+	});
+
+	$effect(() => {
+		if (!activeCluster) {
+			clusterFeatures = {};
+			return;
+		}
+
+		const abortController = new AbortController();
+		probeClusterFeatures(transport, activeCluster, abortController.signal)
+			.then((features) => {
+				if (!abortController.signal.aborted) clusterFeatures = features;
+			})
+			.catch((err) => {
+				if (!abortController.signal.aborted) console.error(err);
+			});
+
+		return () => abortController.abort();
+	});
+
 	function resourceUrl(options: {
 		group: string;
 		version: string;
@@ -228,15 +274,19 @@
 								})
 							: ''
 					},
-					{
-						title: m.storage(),
-						url: page.params.workspace
-							? resolve('/(auth)/[cluster]/[workspace]/dashboard/storage', {
-									cluster: activeCluster,
-									workspace: page.params.workspace
-								})
-							: ''
-					}
+					...(hasRookCeph
+						? [
+								{
+									title: m.storage(),
+									url: page.params.workspace
+										? resolve('/(auth)/[cluster]/[workspace]/dashboard/storage', {
+												cluster: activeCluster,
+												workspace: page.params.workspace
+											})
+										: ''
+								}
+							]
+						: [])
 				]
 			},
 			{
@@ -294,7 +344,8 @@
 							group: 'helm.toolkit.fluxcd.io',
 							version: 'v2',
 							kind: 'HelmRelease',
-							resource: 'helmreleases'
+							resource: 'helmreleases',
+							labelSelector: WorkspaceReleaseLabelSelector
 						})
 					},
 					{
@@ -304,39 +355,6 @@
 							version: 'v1',
 							kind: 'HelmRepository',
 							resource: 'helmrepositories'
-						})
-					}
-				]
-			},
-			{
-				title: m.workload(),
-				icon: ContainerIcon,
-				items: [
-					{
-						title: m.application(),
-						url: resourceUrl({
-							group: 'kro.run',
-							version: 'v1alpha1',
-							kind: 'Application',
-							resource: 'applications'
-						})
-					},
-					{
-						title: m.schedule(),
-						url: resourceUrl({
-							group: 'kro.run',
-							version: 'v1alpha1',
-							kind: 'Schedule',
-							resource: 'schedules'
-						})
-					},
-					{
-						title: m.task(),
-						url: resourceUrl({
-							group: 'kro.run',
-							version: 'v1alpha1',
-							kind: 'Task',
-							resource: 'tasks'
 						})
 					}
 				]
@@ -362,48 +380,18 @@
 							kind: 'DataVolume',
 							resource: 'datavolumes'
 						})
-					},
-					{
-						title: m.instance_type(),
-						url: resourceUrl({
-							group: 'instancetype.kubevirt.io',
-							version: 'v1beta1',
-							kind: 'VirtualMachineInstancetype',
-							resource: 'virtualmachineinstancetypes'
-						})
-					}
-				]
-			},
-			{
-				title: m.storage(),
-				icon: HardDriveIcon,
-				items: [
-					{
-						title: m.object_storage(),
-						url: resourceUrl({
-							group: 'objectbucket.io',
-							version: 'v1alpha1',
-							kind: 'ObjectBucketClaim',
-							resource: 'objectbucketclaims'
-						})
 					}
 				]
 			},
 			...(data.isClusterAdmin
+				? getAdditionalNavGroups(clusterFeatures, resourceUrl, data.isClusterAdmin)
+				: []),
+			...(data.isClusterAdmin
 				? [
 						{
-							title: m.administration(),
-							icon: UserStarIcon,
+							title: m.platform_apps(),
+							icon: BoxesIcon,
 							items: [
-								{
-									title: m.workspace(),
-									url: resourceUrl({
-										group: 'tenant.otterscale.io',
-										version: 'v1alpha1',
-										kind: 'Workspace',
-										resource: 'workspaces'
-									})
-								},
 								{
 									title: m.module(),
 									url: page.params.workspace
@@ -412,6 +400,53 @@
 												workspace: page.params.workspace
 											})
 										: ''
+								},
+								{
+									title: m.operator(),
+									url: page.params.workspace
+										? resolve('/(auth)/[cluster]/[workspace]/operator', {
+												cluster: activeCluster,
+												workspace: page.params.workspace
+											})
+										: ''
+								},
+								{
+									title: m.helm_release(),
+									url: resourceUrl({
+										group: 'helm.toolkit.fluxcd.io',
+										version: 'v2',
+										kind: 'HelmRelease',
+										resource: 'helmreleases',
+										labelSelector: ClusterReleaseLabelSelector
+									})
+								}
+							]
+						}
+					]
+				: []),
+			...(data.isClusterAdmin
+				? [
+						{
+							title: m.administration(),
+							icon: UserStarIcon,
+							items: [
+								{
+									title: m.resource(),
+									url: page.params.workspace
+										? resolve('/(auth)/[cluster]/[workspace]/resources', {
+												cluster: activeCluster,
+												workspace: page.params.workspace
+											})
+										: ''
+								},
+								{
+									title: m.workspace(),
+									url: resourceUrl({
+										group: 'tenant.otterscale.io',
+										version: 'v1alpha1',
+										kind: 'Workspace',
+										resource: 'workspaces'
+									})
 								},
 								...(page.params.workspace
 									? getAdditionalItems(activeCluster, page.params.workspace!)
@@ -699,10 +734,9 @@
 </script>
 
 <svelte:head>
-	<title>{current ? `${current.title} - OtterScale` : 'OtterScale'}</title>
+	<title>{current ? `${current.title} - ${m.site_title()}` : m.site_title()}</title>
 </svelte:head>
 
-<DialogAbout bind:open={aboutOpen} />
 <Sidebar.Provider class="h-svh overflow-hidden" bind:open={sidebarOpen}>
 	<Sidebar.Root id="sidebar-guide-step" collapsible="icon" variant="inset" class="p-3">
 		{#if activeCluster && isMounted}
@@ -714,7 +748,7 @@
 					workspace={page.params.workspace}
 				/>
 			</Sidebar.Header>
-			<Sidebar.Content class="gap-2">
+			<Sidebar.Content class="gap-0">
 				{#if page.params.workspace}
 					<NavMain
 						platformLabel={m.platform()}
@@ -768,23 +802,6 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						{#snippet child({ props })}
-							<Button
-								{...props}
-								variant="ghost"
-								size="icon"
-								class="size-7"
-								onclick={() => (aboutOpen = true)}
-							>
-								<InfoIcon />
-								<span class="sr-only">About</span>
-							</Button>
-						{/snippet}
-					</Tooltip.Trigger>
-					<Tooltip.Content>About OtterScale</Tooltip.Content>
-				</Tooltip.Root>
-				<Tooltip.Root>
-					<Tooltip.Trigger>
-						{#snippet child({ props })}
 							<Button {...props} variant="ghost" size="icon" class="size-7" onclick={startTour}>
 								<CircleQuestionMarkIcon />
 								<span class="sr-only">Guide Tour</span>
@@ -793,6 +810,7 @@
 					</Tooltip.Trigger>
 					<Tooltip.Content>Start Guide Tour</Tooltip.Content>
 				</Tooltip.Root>
+				<NotificationTrigger />
 				<Tooltip.Root>
 					<DropdownMenu.Root>
 						<Tooltip.Trigger>
@@ -891,7 +909,7 @@
 	{/each}
 {/snippet}
 
-<Registe
+<ImportCluster
 	bind:open={importOpen}
 	onsuccess={async () => {
 		links = await fetchClusters();

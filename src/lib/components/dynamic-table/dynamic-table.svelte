@@ -1,6 +1,54 @@
+<script module lang="ts">
+	import type { UISchemaType } from './utils';
+
+	type Alignment = 'start' | 'center' | 'end';
+
+	// Module scope: built once for the whole app,
+	// not once per instance and certainly not once per cell.
+	const ALIGNMENTS = {
+		boolean: 'center',
+		number: 'end',
+		time: 'end',
+		text: 'start',
+		item: 'start',
+		array: 'center',
+		'array-of-object': 'center',
+		object: 'center',
+		link: 'start',
+		ratio: 'end',
+		quantity: 'end',
+		'array-of-enumeration': 'center',
+		'object-of-key-value': 'center'
+	} as const satisfies Record<NonNullable<UISchemaType>, Alignment>;
+
+	const HEADER_ALIGNMENT_CLASSES = {
+		start: 'justify-start',
+		center: 'justify-center',
+		end: 'justify-end'
+	} as const satisfies Record<Alignment, string>;
+
+	const CELL_ALIGNMENT_CLASSES = {
+		start: 'text-start',
+		center: 'text-center',
+		end: 'text-end'
+	} as const satisfies Record<Alignment, string>;
+
+	// `|| 'start'` rather than a plain lookup:
+	// the backend may grow a UI schema this build does not know about,
+	// and an unknown one should read as plain text rather than land on `undefined`.
+	function getAlignment(uiSchema: UISchemaType): Alignment {
+		return (uiSchema && ALIGNMENTS[uiSchema]) || 'start';
+	}
+	function getHeaderAlignment(uiSchema: UISchemaType): string {
+		return HEADER_ALIGNMENT_CLASSES[getAlignment(uiSchema)];
+	}
+	function getCellAlignment(uiSchema: UISchemaType): string {
+		return CELL_ALIGNMENT_CLASSES[getAlignment(uiSchema)];
+	}
+</script>
+
 <script lang="ts">
 	import type { JsonValue } from '@bufbuild/protobuf';
-	import BookIcon from '@lucide/svelte/icons/book';
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import ChevronDownIcon from '@lucide/svelte/icons/chevron-down';
 	import ChevronFirstIcon from '@lucide/svelte/icons/chevron-first';
@@ -25,17 +73,15 @@
 		type PaginationState,
 		type Row,
 		type RowSelectionState,
-		type SortingState,
-		type Table as TableType,
-		type Table as TanStackTabke,
+		type Table as TanStackTable,
 		type VisibilityState
 	} from '@tanstack/table-core';
-	import { compileExpression } from 'filtrex';
+	import { type LiqeQuery, parse, test } from 'liqe';
 	import lodash from 'lodash';
 	import { createRawSnippet, type Snippet } from 'svelte';
 
 	import { shortcut } from '$lib/actions/shortcut.svelte';
-	import { Button, buttonVariants } from '$lib/components/ui/button/index.js';
+	import { Button } from '$lib/components/ui/button/index.js';
 	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
 	import { Checkbox } from '$lib/components/ui/checkbox/index.js';
 	import {
@@ -51,17 +97,22 @@
 	import { Label } from '$lib/components/ui/label/index.js';
 	import * as Pagination from '$lib/components/ui/pagination/index.js';
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
-	import * as Sheet from '$lib/components/ui/sheet';
 	import * as Table from '$lib/components/ui/table';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { cn } from '$lib/utils';
 
-	import type { UISchemaType } from './utils';
+	import DynamicTableSearchDocument from './dynamic-table-search-document.svelte';
+	import type { TableMode, TableState } from './table-state.svelte';
+
+	// `UISchemaType` is already imported by the module script above,
+	// whose declarations are in scope here.
+	// A second import would be a duplicate identifier in the compiled module.
 
 	let {
 		data,
 		columnDefinitions,
 		uiSchemas,
+		tableState,
 		// dataSchemas,
 		accessReview,
 		create,
@@ -72,31 +123,164 @@
 		gridLayout
 	}: {
 		data: Record<string, JsonValue>[];
+		/**
+		 * Read once, when the table instance is built.
+		 * A later change does not add or remove columns,
+		 * so remount the table (via `{#key}`) if the shape of the data can change.
+		 */
 		columnDefinitions: ColumnDef<Record<string, JsonValue>>[];
 		uiSchemas: Record<string, UISchemaType>;
+		/**
+		 * Owns the state worth outliving this component:
+		 * sort, page, search, which columns are hidden, which view.
+		 * Required, because how that state is stored is a decision only the caller can make.
+		 * `SearchParametersTableState` puts it in the page URL,
+		 * at most one such table per page;
+		 * `MemoryTableState` keeps it local to the instance.
+		 */
+		tableState: TableState;
 		// dataSchemas: Record<string, DataSchemaType>;
 		accessReview?: Snippet;
 		create?: Snippet;
-		bulkCreate?: Snippet<[{ table: TanStackTabke<Record<string, JsonValue>> }]>;
-		bulkDelete?: Snippet<[{ table: TanStackTabke<Record<string, JsonValue>> }]>;
+		/**
+		 * `rows` is the selection intersected with the active filter.
+		 * Act on that, not on `table.getSelectedRowModel()`,
+		 * which can still name rows the viewer cannot currently see.
+		 */
+		bulkCreate?: Snippet<
+			[{ table: TanStackTable<Record<string, JsonValue>>; rows: Row<Record<string, JsonValue>>[] }]
+		>;
+		/**
+		 * See `bulkCreate`:
+		 * prefer `rows` over reaching into `table` for the selection.
+		 */
+		bulkDelete?: Snippet<
+			[{ table: TanStackTable<Record<string, JsonValue>>; rows: Row<Record<string, JsonValue>>[] }]
+		>;
+		/**
+		 * Read once alongside `columnDefinitions`;
+		 * a later change does not apply.
+		 */
 		rowActions?: Snippet<[{ row: Row<Record<string, JsonValue>> }]>;
 		reload?: Snippet;
 		gridLayout?: Snippet<
 			[
 				{
-					table: TableType<Record<string, JsonValue>>;
+					table: TanStackTable<Record<string, JsonValue>>;
 					handleClear: () => void;
 				}
 			]
 		>;
 	} = $props();
 
-	// gridsLayout is set once, capturing the initial value is intentional.
-	// svelte-ignore state_referenced_locally
-	const hasGridlayout = !!gridLayout;
-	let mode = $state<'table' | 'grid'>(hasGridlayout ? 'grid' : 'table');
+	/* Constants and Keys */
 
-	// columnDefinitions are set once, capturing the initial value is intentional.
+	// Filter
+	const GLOBAL_FILTER_IDENTIFIER = 'global_filter_identifier';
+	// Pagination
+	const PAGE_SIZE = 9;
+	const PAGE_SIZES = [9, 18, 45, 90];
+
+	/* Columns */
+
+	function getColumnId(columnDefinition: ColumnDef<Record<string, JsonValue>>): string | undefined {
+		return columnDefinition.id ?? (columnDefinition as { accessorKey?: string }).accessorKey;
+	}
+	const columnIds = $derived(
+		new Set(columnDefinitions.map(getColumnId).filter((id): id is string => id != null))
+	);
+	const defaultHiddenColumnIds = $derived(
+		columnDefinitions
+			.filter(
+				(columnDefinition) =>
+					(columnDefinition.meta as { defaultHidden?: boolean } | undefined)?.defaultHidden === true
+			)
+			.map(getColumnId)
+			.filter((columnId): columnId is string => columnId != null)
+	);
+
+	/* Table State */
+
+	// `tableState` reports what the viewer chose,
+	// or null where they chose nothing.
+	// The defaults are applied here,
+	// because this is what knows the columns
+	// and whether there is a grid layout to switch to.
+	const defaultMode = $derived<TableMode>(gridLayout ? 'grid' : 'table');
+	const mode = $derived.by<TableMode>(() => {
+		const derivedMode = tableState.mode ?? defaultMode;
+		// The grid view renders nothing without a snippet to render it with,
+		// so a persisted `grid` on a table that has none falls back instead of blanking.
+		if (derivedMode === 'grid' && !gridLayout) return 'table';
+		return derivedMode;
+	});
+	const globalFilter = $derived(tableState.globalFilter);
+	// A sort naming a column this table doesn't have is dropped rather than guessed at:
+	// an unknown column means a stale link.
+	const sorting = $derived(tableState.sorting?.filter((entry) => columnIds.has(entry.id)) ?? []);
+	const pagination = $derived<PaginationState>({
+		pageIndex: tableState.pageIndex ?? 0,
+		pageSize: tableState.pageSize ?? PAGE_SIZE
+	});
+	const columnVisibility = $derived.by<VisibilityState>(() => {
+		// `??` is doing real work here.
+		// `null` means the viewer never opened the column menu, so the defaults apply.
+		// `[]` means they opened it and unhid everything,
+		// an explicit choice that has to win over the defaults.
+		const hidden = tableState.hiddenColumnIds ?? defaultHiddenColumnIds;
+		return Object.fromEntries(hidden.map((id) => [id, false]));
+	});
+
+	// Transient, and deliberately lost when the component goes away.
+	// Row selection in particular has no meaning in a shared link:
+	// it names rows of one viewer's current result set.
+	let columnFilters = $state<ColumnFiltersState>([]);
+	let rowSelection = $state<RowSelectionState>({});
+	let columnSizing = $state<ColumnSizingState>({});
+
+	/* Logic */
+
+	// Filter
+
+	// A writable derived:
+	// the input is free to diverge from the committed query while the viewer types,
+	// but any change to the committed query — back button, a pasted link, a clear —
+	// pulls the box back into sync.
+	let globalFilterTerm = $derived(globalFilter);
+
+	// A writable derived:
+	// it recomputes to null whenever the committed query changes,
+	// but `handleGlobalFilter` can assign a parse failure into it,
+	// which then survives until the next query change.
+	// The `void` is what establishes that dependency;
+	// nothing else in the body reads `globalFilter`.
+	let submitGlobalFilterError = $derived.by<Error | null>(() => {
+		void globalFilter;
+		return null;
+	});
+
+	// Global Filter Query Parsing
+	const structuredGlobalFilter = $derived.by<{ query: LiqeQuery | null; error: Error | null }>(
+		() => {
+			if (!globalFilter) return { query: null, error: null };
+			try {
+				return { query: parse(globalFilter), error: null };
+			} catch (error) {
+				return { query: null, error: error as Error };
+			}
+		}
+	);
+
+	// Errors
+	// A query only becomes committed after `handleGlobalFilter` has parsed it,
+	// so this can only be non-null for a query that arrived from the caller's stored state:
+	// a hand-edited or stale link.
+	// That is the case it exists for.
+	const parseGlobalFilterError = $derived(structuredGlobalFilter.error);
+	const globalFilterError = $derived(submitGlobalFilterError ?? parseGlobalFilterError);
+
+	// columnDefinitions are set once,
+	// capturing the initial value is intentional.
 	// svelte-ignore state_referenced_locally
 	const columns: ColumnDef<Record<string, JsonValue>>[] = [
 		{
@@ -144,48 +328,35 @@
 		}
 	];
 
-	const GLOBAL_FILTER_IDENTIFIER = 'global_filter_identifier';
-	let globalFilter = $state('');
-	let globalFilterInput = $state('');
-	let globalFilterError: Error | null = $state(null);
-	const globalFilterExtraFunctions = {
-		Time: (time: string | number | Date) => new Date(time).getTime(),
-		now: () => Date.now(),
-		Seconds: (time: number) => time * 1000,
-		Minutes: (time: number) => time * 60 * 1000,
-		Hours: (time: number) => time * 60 * 60 * 1000,
-		Days: (time: number) => time * 24 * 60 * 60 * 1000,
-		Years: (time: number) => time * 365 * 24 * 60 * 60 * 1000,
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		size: (object: any) => {
-			return object ? Object.keys(object).length : undefined;
-		}
-	};
-	const globalFilterConstants = {
-		true: true,
-		false: false
-	};
-
-	let rowSelection = $state<RowSelectionState>({});
-	let columnFilters = $state<ColumnFiltersState>([]);
-	// svelte-ignore state_referenced_locally
-	const initialColumnVisibility: VisibilityState = Object.fromEntries(
-		columnDefinitions
-			.filter(
-				(col) => (col.meta as { defaultHidden?: boolean } | undefined)?.defaultHidden === true
-			)
-			.map((col) => [col.id ?? (col as { accessorKey?: string }).accessorKey, false])
-			.filter(([id]) => id != null)
-	);
-	let columnVisibility = $state<VisibilityState>(initialColumnVisibility);
-	let columnSizing = $state<ColumnSizingState>({});
-	let sorting = $state<SortingState>([]);
-	let pagination = $state<PaginationState>({ pageIndex: 0, pageSize: hasGridlayout ? 9 : 10 });
-
-	let table = createSvelteTable<Record<string, JsonValue>>({
+	/* Instance */
+	const table = createSvelteTable<Record<string, JsonValue>>({
 		columns,
 		get data() {
 			return data;
+		},
+		/**
+		 * Selection is keyed by row id,
+		 * and TanStack's default id is the index in `data`,
+		 * which points at a different resource after a reload,
+		 * so a bulk action could hit the wrong one.
+		 * Prefer something that identifies the resource itself;
+		 * fall back to the index only when nothing does,
+		 * because a duplicated id would make two rows indistinguishable to the row model.
+		 *
+		 * This assumes Kubernetes-shaped rows,
+		 * the same assumption `isTerminating` already makes.
+		 */
+		getRowId: (row, index) => {
+			const uid = lodash.get(row, 'raw.metadata.uid');
+			if (typeof uid === 'string' && uid) return uid;
+
+			const name = lodash.get(row, 'raw.metadata.name');
+			if (typeof name === 'string' && name) {
+				const namespace = lodash.get(row, 'raw.metadata.namespace');
+				return typeof namespace === 'string' && namespace ? `${namespace}/${name}` : name;
+			}
+
+			return String(index);
 		},
 		getCoreRowModel: getCoreRowModel(),
 		getFacetedUniqueValues: getFacetedUniqueValues(),
@@ -200,18 +371,21 @@
 			}
 		},
 		onGlobalFilterChange: (updater) => {
-			if (typeof updater === 'function') {
-				globalFilter = updater(globalFilter);
-			} else {
-				globalFilter = updater;
-			}
+			const next = typeof updater === 'function' ? updater(globalFilter) : updater;
+			tableState.setGlobalFilter((next ?? '') as string);
 		},
 		onColumnVisibilityChange: (updater) => {
-			if (typeof updater === 'function') {
-				columnVisibility = updater(columnVisibility);
-			} else {
-				columnVisibility = updater;
-			}
+			const next = typeof updater === 'function' ? updater(columnVisibility) : updater;
+			// Always an explicit list, never `null`:
+			// once the viewer has opened the column menu their choice stands,
+			// even where it happens to match the defaults.
+			// Nothing in the UI returns to "follow the defaults";
+			// add a reset item calling `setHiddenColumnIds(null)` if that is wanted.
+			tableState.setHiddenColumnIds(
+				Object.entries(next)
+					.filter(([, visible]) => visible === false)
+					.map(([columnId]) => columnId)
+			);
 		},
 		onColumnSizingChange: (updater) => {
 			if (typeof updater === 'function') {
@@ -221,11 +395,12 @@
 			}
 		},
 		onPaginationChange: (updater) => {
-			if (typeof updater === 'function') {
-				pagination = updater(pagination);
-			} else {
-				pagination = updater;
-			}
+			const next = typeof updater === 'function' ? updater(pagination) : updater;
+			// Only a departure from the default is worth persisting.
+			tableState.setPagination(
+				next.pageIndex > 0 ? next.pageIndex : null,
+				next.pageSize !== PAGE_SIZE ? next.pageSize : null
+			);
 		},
 		onRowSelectionChange: (updater) => {
 			if (typeof updater === 'function') {
@@ -235,11 +410,8 @@
 			}
 		},
 		onSortingChange: (updater) => {
-			if (typeof updater === 'function') {
-				sorting = updater(sorting);
-			} else {
-				sorting = updater;
-			}
+			const next = typeof updater === 'function' ? updater(sorting) : updater;
+			tableState.setSorting(next);
 		},
 		state: {
 			get globalFilter() {
@@ -266,13 +438,13 @@
 		},
 		globalFilterFn: (row) => {
 			if (!globalFilter) return true;
+			// An unparseable query keeps every row visible
+			// and reports itself through `globalFilterError`.
+			// Filtering everything out would read as "the data is gone"
+			// on top of the error message.
+			if (!structuredGlobalFilter.query) return true;
 			try {
-				const filter = compileExpression(globalFilter, {
-					extraFunctions: globalFilterExtraFunctions,
-					constants: globalFilterConstants
-				});
-				const result = filter(row.original);
-				return Boolean(result);
+				return test(structuredGlobalFilter.query, row.original);
 			} catch {
 				return false;
 			}
@@ -281,79 +453,68 @@
 		autoResetPageIndex: false
 	});
 
-	function getAlignment(uiSchema: UISchemaType): 'start' | 'center' | 'end' {
-		const map: Record<NonNullable<UISchemaType>, 'start' | 'center' | 'end'> = {
-			boolean: 'center',
-			number: 'end',
-			time: 'end',
-			text: 'start',
-			item: 'start',
-			array: 'center',
-			'array-of-object': 'center',
-			object: 'center',
-			link: 'start',
-			ratio: 'end',
-			quantity: 'end',
-			'array-of-enumeration': 'center',
-			'object-of-key-value': 'center'
-		};
-		return uiSchema ? map[uiSchema] : 'start';
-	}
-	function getHeaderAlignment(uiSchema: UISchemaType): string {
-		const alignment = getAlignment(uiSchema);
-		switch (alignment) {
-			case 'start':
-				return 'justify-start';
-			case 'center':
-				return 'justify-center';
-			case 'end':
-			default:
-				return 'justify-end';
-		}
-	}
-	function getCellAlignment(uiSchema: UISchemaType): string {
-		const alignment = getAlignment(uiSchema);
-		switch (alignment) {
-			case 'start':
-				return 'text-start';
-			case 'center':
-				return 'text-center';
-			case 'end':
-			default:
-				return 'text-end';
-		}
+	/* Derived from the instance */
+
+	// Bulk actions see the selection intersected with the active filter,
+	// so they cannot act on rows the viewer has filtered away.
+	const selectedRows = $derived(table.getFilteredSelectedRowModel().rows);
+
+	// Derived from the rows actually rendered rather than from pageIndex × pageSize,
+	// so the range stays truthful for an empty result set
+	// and for a stored page index beyond the last page.
+	// `autoResetPageIndex: false` lets both happen.
+	const rowCount = $derived(table.getRowCount());
+	const pageRowCount = $derived(table.getRowModel().rows.length);
+	const rangeStart = $derived(
+		pageRowCount === 0 ? 0 : pagination.pageIndex * pagination.pageSize + 1
+	);
+	const rangeEnd = $derived(pageRowCount === 0 ? 0 : rangeStart + pageRowCount - 1);
+
+	const visibleColumnCount = $derived(table.getVisibleLeafColumns().length);
+
+	/* helpers */
+	// Row
+	function isTerminating(row: Row<Record<string, JsonValue>>): boolean {
+		return lodash.get(row.original, 'raw.metadata.deletionTimestamp') != null;
 	}
 
-	function handleKeyDown(event: KeyboardEvent) {
-		if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
-			event.preventDefault();
-			handleSearch();
-		}
-
-		if (event.key === 'Escape') {
-			event.preventDefault();
-			handleClear();
-		}
+	/* Handlers */
+	// Mode
+	function handleMode(next: TableMode) {
+		// Only a departure from the default is worth persisting.
+		tableState.setMode(next === defaultMode ? null : next);
 	}
-	function handleSearch() {
+	// Filter
+	function handleGlobalFilter() {
 		try {
-			globalFilterError = null;
-			if (globalFilterInput) {
-				compileExpression(globalFilterInput, {
-					extraFunctions: globalFilterExtraFunctions,
-					constants: globalFilterConstants
-				});
+			// A validation pass:
+			// the result is discarded, but a throw here keeps the bad query
+			// out of the committed state and out of any shared link.
+			if (globalFilterTerm) {
+				parse(globalFilterTerm);
 			}
-			globalFilter = globalFilterInput;
-			table.setGlobalFilter(globalFilterInput);
+			submitGlobalFilterError = null;
+			table.setGlobalFilter(globalFilterTerm);
 		} catch (error) {
-			globalFilterError = error as Error;
+			submitGlobalFilterError = error as Error;
 		}
 	}
-	function handleClear() {
-		globalFilterInput = '';
-		globalFilter = '';
-		globalFilterError = null;
+	function handleGlobalFilterKeyDown(event: KeyboardEvent) {
+		// `isComposing` is true while an IME candidate window is open,
+		// where Enter commits the candidate rather than the query.
+		if (event.key === 'Enter' && !event.isComposing) {
+			event.preventDefault();
+			handleGlobalFilter();
+		}
+
+		if (event.key === 'Escape' && !event.isComposing) {
+			event.preventDefault();
+			handleGlobalFilterClear();
+		}
+	}
+	function handleGlobalFilterClear() {
+		globalFilterTerm = '';
+		submitGlobalFilterError = null;
 		table.setGlobalFilter('');
 	}
 </script>
@@ -381,7 +542,7 @@
 							{...props}
 							variant={mode === 'table' ? 'secondary' : 'outline'}
 							size="icon"
-							onclick={() => (mode = 'table')}
+							onclick={() => handleMode('table')}
 							aria-pressed={mode === 'table'}
 						>
 							<SheetIcon />
@@ -398,7 +559,7 @@
 							disabled={!gridLayout}
 							variant={mode === 'grid' ? 'secondary' : 'outline'}
 							size="icon"
-							onclick={() => (mode = 'grid')}
+							onclick={() => handleMode('grid')}
 							aria-pressed={mode === 'grid'}
 						>
 							<LayoutGridIcon />
@@ -446,10 +607,10 @@
 				</InputGroup.Addon>
 				<InputGroup.Input
 					id={GLOBAL_FILTER_IDENTIFIER}
-					placeholder="e.g.. Name ~= &quot;resourceName&quot; and Namespace == &quot;namespace&quot;"
-					bind:value={globalFilterInput}
+					placeholder="e.g. Name:resourceName AND Namespace:namespace"
+					bind:value={globalFilterTerm}
 					class="peer w-full"
-					onkeydown={handleKeyDown}
+					onkeydown={handleGlobalFilterKeyDown}
 				/>
 				<InputGroup.Addon align="inline-end" class="hidden peer-focus:flex">
 					<Kbd.Group>
@@ -464,102 +625,14 @@
 					</Kbd.Group>
 				</InputGroup.Addon>
 			</InputGroup.Root>
-			<Tooltip.Root>
-				<Tooltip.Trigger>
-					{#snippet child({ props })}
-						<Sheet.Root>
-							<Sheet.Trigger
-								{...props}
-								aria-label="Document"
-								class={buttonVariants({ variant: 'outline', size: 'icon' })}
-							>
-								<BookIcon size={16} />
-							</Sheet.Trigger>
-							<Sheet.Content side="right" class="min-w-[23vw]">
-								<Sheet.Header>
-									<Sheet.Title>Filtrex Query Language Documentation</Sheet.Title>
-									<Sheet.Description>
-										Filtrex is a simple, safe, and powerful expression language for filtering and
-										searching data. You can use Filtrex queries in the search box to filter table
-										rows using custom logic.
-									</Sheet.Description>
-								</Sheet.Header>
-								<div class="overflow-auto p-4 text-sm">
-									<h3 class="font-semibold">Basic Syntax</h3>
-									<div class="p-4 font-mono">
-										<p>Field comparison: age &gt; 18</p>
-										<p>String matching: name == "Alice"</p>
-										<p>Logical operators: status == "active" and score &gt; 80</p>
-										<p>Field names with spaces: 'full name' == "Alice Smith"</p>
-									</div>
-
-									<br />
-
-									<h3 class="font-semibold">Operators</h3>
-									<div class="p-4 font-mono">
-										<p>and, or, not</p>
-										<p>==, ~=, &gt;, &gt;=, &lt;, &lt;=</p>
-									</div>
-
-									<br />
-
-									<h3 class="font-semibold">Functions</h3>
-									<div class="p-4 font-mono">
-										<p>length(array) — Get array length</p>
-										<p>Time(date) — Convert date to timestamp</p>
-										<p>now() — Current timestamp</p>
-										<p>Seconds(n), Minutes(n), Hours(n), Days(n), Years(n)</p>
-									</div>
-
-									<br />
-
-									<h3 class="font-semibold">Constants</h3>
-									<div class="p-4 font-mono">
-										<p>true, false</p>
-									</div>
-
-									<br />
-
-									<h3 class="font-semibold">Tips</h3>
-									<div class="p-4 font-mono">
-										<p>Use <kbd>ctrl</kbd> + <kbd>⏎</kbd> to search.</p>
-										<p>Press <kbd>/</kbd> to focus the search box.</p>
-										<p>Press <kbd>esc</kbd> to clear the filter.</p>
-									</div>
-
-									<br />
-
-									<h3 class="font-semibold">Note</h3>
-									<div class="text-warning p-4 font-mono">
-										<p>
-											Operations between quantities with units (e.g., <code>Mi</code>,
-											<code>k</code>) are
-											<b>not supported yet</b>.
-										</p>
-									</div>
-								</div>
-								<Sheet.Footer>
-									<p class="mt-4 text-xs text-muted-foreground">
-										For advanced usage, refer to the <a
-											href="https://github.com/joewalnes/filtrex"
-											target="_blank"
-											class="underline">Filtrex documentation</a
-										>.
-									</p>
-								</Sheet.Footer>
-							</Sheet.Content>
-						</Sheet.Root>
-					{/snippet}
-				</Tooltip.Trigger>
-				<Tooltip.Content>Search Documentation</Tooltip.Content>
-			</Tooltip.Root>
+			<DynamicTableSearchDocument />
 		</ButtonGroup.Root>
 		<!-- Accessors -->
 		<div class="ml-auto flex items-center gap-2">
 			{@render accessReview?.()}
 			{@render create?.()}
-			{@render bulkCreate?.({ table })}
-			{@render bulkDelete?.({ table })}
+			{@render bulkCreate?.({ table, rows: selectedRows })}
+			{@render bulkDelete?.({ table, rows: selectedRows })}
 			{@render reload?.()}
 		</div>
 	</div>
@@ -573,7 +646,7 @@
 	{#if mode === 'table'}
 		{@render tableLayout()}
 	{:else if mode === 'grid'}
-		{@render gridLayout?.({ table, handleClear })}
+		{@render gridLayout?.({ table, handleClear: handleGlobalFilterClear })}
 	{/if}
 
 	<!-- Pagination -->
@@ -583,18 +656,18 @@
 			<Label class="max-sm:sr-only">Rows per page</Label>
 			<Select
 				type="single"
-				value={table.getState().pagination.pageSize.toString()}
+				value={pagination.pageSize.toString()}
 				onValueChange={(value) => {
 					table.setPageSize(Number(value));
 				}}
 			>
 				<SelectTrigger class="w-fit whitespace-nowrap">
-					{table.getState().pagination.pageSize.toString() ?? 'Select number of results'}
+					{pagination.pageSize}
 				</SelectTrigger>
 				<SelectContent
 					class="[&_*[role=option]]:ps-2 [&_*[role=option]]:pe-8 [&_*[role=option]>span]:inset-s-auto [&_*[role=option]>span]:inset-e-2"
 				>
-					{#each [5, 10, 20, 50, 100] as pageSize (pageSize)}
+					{#each PAGE_SIZES as pageSize (pageSize)}
 						<SelectItem value={pageSize.toString()}>
 							{pageSize}
 						</SelectItem>
@@ -606,27 +679,15 @@
 		<!-- Page -->
 		<div class="flex grow justify-end text-sm whitespace-nowrap text-muted-foreground">
 			<p class="text-sm whitespace-nowrap text-muted-foreground" aria-live="polite">
-				<span class="text-foreground">
-					{table.getState().pagination.pageIndex * table.getState().pagination.pageSize +
-						1}-{Math.min(
-						Math.max(
-							table.getState().pagination.pageIndex * table.getState().pagination.pageSize +
-								table.getState().pagination.pageSize,
-							0
-						),
-						table.getRowCount()
-					)}
-				</span>
+				<span class="text-foreground">{rangeStart}-{rangeEnd}</span>
 				of
-				<span class="text-foreground">
-					{table.getRowCount().toString()}
-				</span>
+				<span class="text-foreground">{rowCount}</span>
 			</p>
 		</div>
 
 		<!-- Controller -->
 		<div>
-			<Pagination.Root count={table.getRowCount()}>
+			<Pagination.Root count={rowCount}>
 				<Pagination.Content>
 					<!-- First page button -->
 					<Pagination.Item>
@@ -705,26 +766,23 @@
 								)}
 							>
 								{#if !header.isPlaceholder && header.column.getCanSort()}
+									<!-- Inside this branch `getCanSort()` is already true,
+									     so the attributes below need no further guard. -->
 									<div
 										class={cn(
-											header.column.getCanSort() &&
-												'flex h-full cursor-pointer items-center justify-between gap-2 select-none',
+											'flex h-full cursor-pointer items-center gap-2 select-none',
 											getHeaderAlignment(uiSchemas[header.column.id])
 										)}
+										tabindex={0}
+										role="button"
+										aria-pressed={header.column.getIsSorted() ? 'true' : 'false'}
 										onclick={header.column.getToggleSortingHandler()}
-										onkeydown={(e) => {
-											if (header.column.getCanSort() && (e.key === 'Enter' || e.key === ' ')) {
-												e.preventDefault();
-												header.column.getToggleSortingHandler()?.(e);
+										onkeydown={(event) => {
+											if (event.key === 'Enter' || event.key === ' ') {
+												event.preventDefault();
+												header.column.getToggleSortingHandler()?.(event);
 											}
 										}}
-										{...header.column.getCanSort()
-											? {
-													tabindex: 0,
-													role: 'button',
-													'aria-pressed': header.column.getIsSorted() ? 'true' : 'false'
-												}
-											: {}}
 									>
 										<FlexRender
 											content={header.column.columnDef.header}
@@ -736,7 +794,7 @@
 											<ChevronDownIcon class="shrink-0 opacity-60" size={16} aria-hidden="true" />
 										{/if}
 									</div>
-								{:else if !header.isPlaceholder && !header.column.getCanSort()}
+								{:else if !header.isPlaceholder}
 									<FlexRender
 										content={header.column.columnDef.header}
 										context={header.getContext()}
@@ -759,7 +817,10 @@
 			<Table.Body>
 				{#if table.getRowModel().rows?.length}
 					{#each table.getRowModel().rows as row (row.id)}
-						<Table.Row data-state={row.getIsSelected() && 'selected'}>
+						<Table.Row
+							data-state={row.getIsSelected() && 'selected'}
+							class={cn(isTerminating(row) && 'opacity-50 grayscale')}
+						>
 							{#each row.getVisibleCells() as cell (cell.id)}
 								<Table.Cell
 									class={cn(
@@ -774,7 +835,7 @@
 					{/each}
 				{:else}
 					<Table.Row>
-						<Table.Cell colspan={columns.length} class="h-full text-center">
+						<Table.Cell colspan={visibleColumnCount} class="h-full text-center">
 							<Empty.Root>
 								<Empty.Header>
 									<Empty.Media variant="icon">
@@ -787,7 +848,7 @@
 									</Empty.Description>
 								</Empty.Header>
 								<Empty.Content>
-									<Button onclick={handleClear}>
+									<Button onclick={handleGlobalFilterClear}>
 										<EraserIcon size={16} class="opacity-60" />
 										Reset
 									</Button>

@@ -1,4 +1,4 @@
-import { m } from '$lib/paraglide/messages';
+import { m } from '$lib/messages';
 
 export const siteConfig = {
 	title: m.site_title(),

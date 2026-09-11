@@ -1,11 +1,35 @@
 import { InstantVector, type PrometheusDriver, RangeVector } from 'prometheus-query';
 
 import type { ChartConfig } from '$lib/components/ui/chart/index.js';
-import { m } from '$lib/paraglide/messages';
+import { m } from '$lib/messages';
 
 /** Escape a value for use inside PromQL double-quoted string literals (e.g. `namespace="..."`). */
 export function escapePromqlStringLiteral(value: string): string {
 	return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+}
+
+/**
+ * Restrict a per-pod KSM selector to non-terminated pods — the set `kubectl describe node`
+ * counts. KSM keeps emitting requests/limits for Succeeded/Failed pods until the object is
+ * deleted, so finished Jobs otherwise pile up and inflate every sum.
+ *
+ * Append to a selector: `kube_pod_container_resource_limits{...} ${LIVE_PODS}`.
+ */
+export const LIVE_PODS =
+	'and on (namespace, pod) (kube_pod_status_phase{phase=~"Pending|Running"} == 1)';
+
+/**
+ * Drop the containers that *do* declare a limit for `resource`, leaving the uncapped ones.
+ * Counting what survives is the only way to tell a sum of limits from a ceiling: a container
+ * with no limit contributes nothing to the sum, so a mostly-uncapped scope reports a small
+ * number that reads like a tight bound.
+ *
+ * Matches on `container` as well as the pod, so a pod that caps some containers and not
+ * others keeps only the uncapped ones. Append to a per-container selector:
+ * `kube_pod_container_info ${LIVE_PODS} ${withoutLimit('memory')}`.
+ */
+export function withoutLimit(resource: string): string {
+	return `unless on (namespace, pod, container) kube_pod_container_resource_limits{resource="${resource}"}`;
 }
 
 /**
@@ -214,6 +238,32 @@ export function thresholdChartColor(level: ThresholdLevel): string {
 
 export type DataPoint = Record<string, Date | number>;
 
+/**
+ * Why a panel has nothing to draw. `absent` means the metric family produced no series
+ * at all (nothing deployed, or not being scraped); `idle` means the series exist but the
+ * workload saw no requests in the window. Collapsing both into "no data" hides a working
+ * deployment behind the same message as a broken one.
+ */
+export type ActivityState = 'absent' | 'idle' | 'active';
+
+/**
+ * Classify a panel from a probe series — typically `sum(rate(<histogram>_count[5m]))`,
+ * which yields no series when the metric is absent and a flat 0 when nothing is served.
+ * Ride the probe along in the same combined query so it costs no extra request, then keep
+ * it out of the chart data: a constant 0 is a valid data point and would defeat the
+ * caller's `length === 0` empty check.
+ */
+export function probeActivity(points: DataPoint[], key: string): ActivityState {
+	let present = false;
+	for (const point of points) {
+		const value = Number(point[key]);
+		if (!Number.isFinite(value)) continue;
+		present = true;
+		if (value > 0) return 'active';
+	}
+	return present ? 'idle' : 'absent';
+}
+
 const CHART_COLORS = ['chart-1', 'chart-2', 'chart-3', 'chart-4', 'chart-5'];
 
 function getLabelKey(vec: RangeVector): string {
@@ -234,6 +284,24 @@ function getLabelKey(vec: RangeVector): string {
 }
 
 /**
+ * Record one sample under `key` in the flattened per-timestamp map, dropping values that
+ * are not finite. `histogram_quantile` over an idle histogram returns NaN (0/0 during
+ * interpolation), and NaN is not plottable — keeping it renders an empty chart whose
+ * tooltips read "NaN". Dropping it lets callers fall back to their own empty state.
+ */
+function putSample(
+	dateMap: Map<number, DataPoint>,
+	key: string,
+	sample: RangeVector['values'][number]
+) {
+	const value = Number(sample.value);
+	if (!Number.isFinite(value)) return;
+	const time = (sample.time as Date).getTime();
+	if (!dateMap.has(time)) dateMap.set(time, { date: sample.time as Date });
+	dateMap.get(time)![key] = value;
+}
+
+/**
  * Run a single range query that may return multiple labelled series (e.g. `sum by (cpu) ...`).
  * Returns a flat array of DataPoints keyed by label value, sorted by time.
  */
@@ -249,11 +317,7 @@ export async function fetchFlattenedRange(
 	const dateMap = new Map<number, DataPoint>();
 	for (const vector of vectors) {
 		const key = getLabelKey(vector);
-		for (const sample of vector.values) {
-			const time = (sample.time as Date).getTime();
-			if (!dateMap.has(time)) dateMap.set(time, { date: sample.time as Date });
-			dateMap.get(time)![key] = Number(sample.value);
-		}
+		for (const sample of vector.values) putSample(dateMap, key, sample);
 	}
 	return Array.from(dateMap.values()).sort(
 		(a, b) => (a.date as Date).getTime() - (b.date as Date).getTime()
@@ -280,11 +344,7 @@ export async function fetchMultipleFlattenedRange(
 	const dateMap = new Map<number, DataPoint>();
 	for (const { name, vectors } of results) {
 		for (const vector of vectors) {
-			for (const sample of vector.values) {
-				const time = (sample.time as Date).getTime();
-				if (!dateMap.has(time)) dateMap.set(time, { date: sample.time as Date });
-				dateMap.get(time)![name] = Number(sample.value);
-			}
+			for (const sample of vector.values) putSample(dateMap, name, sample);
 		}
 	}
 	return Array.from(dateMap.values()).sort(
@@ -327,11 +387,7 @@ export async function fetchCombinedFlattenedRange(
 	for (const vector of vectors) {
 		const name = (vector.metric.labels as Record<string, string>)[COMBINED_TAG];
 		if (!name) continue;
-		for (const sample of vector.values) {
-			const time = (sample.time as Date).getTime();
-			if (!dateMap.has(time)) dateMap.set(time, { date: sample.time as Date });
-			dateMap.get(time)![name] = Number(sample.value);
-		}
+		for (const sample of vector.values) putSample(dateMap, name, sample);
 	}
 	return Array.from(dateMap.values()).sort(
 		(a, b) => (a.date as Date).getTime() - (b.date as Date).getTime()
@@ -406,6 +462,106 @@ export function vllmModelHostnamesSelector(
  */
 export function dcgmNodeSelector(nodeName: string): string {
 	return `Hostname="${escapePromqlStringLiteral(nodeName)}"`;
+}
+
+/**
+ * Physical frame buffer per GPU card, in bytes (DCGM reports MiB). The honest denominator:
+ * HAMi's `hami_gpu_memory_limit_bytes` is the scheduler's pool, which `deviceMemoryScaling`
+ * can inflate past the card.
+ */
+export const DCGM_GPU_MEMORY_TOTAL_BYTES =
+	'(DCGM_FI_DEV_FB_FREE + DCGM_FI_DEV_FB_RESERVED + DCGM_FI_DEV_FB_USED) * (1024 * 1024)';
+
+/**
+ * Frame buffer actually consumed by workloads, in bytes. Excludes `DCGM_FI_DEV_FB_RESERVED`,
+ * the driver's own allocation (~457 MiB on an RTX 4000 Ada). HAMi's
+ * `hami_host_gpu_memory_used_bytes` is total−free and includes it, so an idle card reads as a
+ * few percent used forever.
+ */
+export const DCGM_GPU_MEMORY_USED_BYTES = 'DCGM_FI_DEV_FB_USED * (1024 * 1024)';
+
+/**
+ * TopoLVM device class backing the AI100 drive. `lvmd.deviceClasses` is a list, so queries name
+ * the class explicitly rather than summing whatever else is configured.
+ */
+export const AI100_DEVICE_CLASS = 'aidaptiv';
+
+/** Device classes are wiring, not product names — spell out the ones we ship. */
+const DEVICE_CLASS_LABELS: Record<string, string> = { [AI100_DEVICE_CLASS]: 'AI100' };
+
+export function deviceClassLabel(deviceClass: string): string {
+	return DEVICE_CLASS_LABELS[deviceClass] ?? deviceClass;
+}
+
+/**
+ * The AI100's block device as node_exporter sees it, matched on the drive model rather than a
+ * device name: `nvme0n1` is not stable across machines, and the same node carries system SATA
+ * SSDs and Ceph RBDs whose traffic must not be counted. TopoLVM's own series carry no device
+ * label, so the model string is the only link to the hardware under the volume group.
+ */
+const AI100_DISK_INFO = 'node_disk_info{model=~"(?i).*ai100.*"}';
+
+/**
+ * Per-second rate of a node_exporter disk counter, restricted to AI100 drives. `and on(...)`
+ * filters rather than joins, so the result keeps the counter's labels and doesn't depend on what
+ * `node_disk_info` is worth.
+ */
+export function ai100DiskRate(counter: string, range = '5m'): string {
+	return `rate(${counter}[${range}]) and on(instance, device) ${AI100_DISK_INFO}`;
+}
+
+/**
+ * The same rate, summed per Kubernetes node and relabelled onto `node`. node_exporter keys its
+ * series by `instance` (an IP:port), so nothing it exports lines up with kube-state-metrics on
+ * its own; `node_uname_info` carries the only mapping between the two.
+ */
+export function ai100DiskRateByNode(counter: string, range = '5m'): string {
+	return (
+		`label_replace(sum by (nodename) (` +
+		`(${ai100DiskRate(counter, range)}) * on(instance) group_left(nodename) node_uname_info` +
+		`), "node", "$1", "nodename", "(.*)")`
+	);
+}
+
+/**
+ * Gap between what the HAMi scheduler booked on a card and what DCGM measures on it.
+ *
+ * - `unmanaged` — usage above the booking: something escaped HAMi's accounting, e.g. a pod
+ *   setting `NVIDIA_VISIBLE_DEVICES=all` or `CUDA_DISABLE_CONTROL=true`.
+ * - `idle` — booking far above usage: capacity reserved but unused.
+ *
+ * Per-card aggregates. DCGM carries no workload labels (its `pod`/`namespace` belong to the
+ * exporter), so an escape can be surfaced but never attributed to a pod — and a large idle
+ * booking on the same card can mask one. A signal, not an audit.
+ */
+export type GpuGovernance =
+	| { level: 'managed' }
+	| { level: 'idle'; bytes: number }
+	| { level: 'unmanaged'; bytes: number };
+
+/** Below this an excess is rounding noise: DCGM reports whole MiB, HAMi books whole MB. */
+const GPU_UNMANAGED_TOLERANCE_BYTES = 256 * 1024 * 1024;
+/** Idle bookings are only worth reporting once they cost about a GiB. */
+const GPU_IDLE_TOLERANCE_BYTES = 1024 * 1024 * 1024;
+
+/**
+ * Classify one card from its HAMi booking and DCGM usage, both in bytes. Either being absent
+ * means the comparison can't be made — no HAMi, or no DCGM — and yields `managed`, so callers
+ * render nothing rather than a false finding.
+ */
+export function classifyGpuGovernance(allocated?: number, used?: number): GpuGovernance {
+	if (
+		allocated === undefined ||
+		used === undefined ||
+		!Number.isFinite(allocated) ||
+		!Number.isFinite(used)
+	) {
+		return { level: 'managed' };
+	}
+	const excess = used - allocated;
+	if (excess > GPU_UNMANAGED_TOLERANCE_BYTES) return { level: 'unmanaged', bytes: excess };
+	if (-excess > GPU_IDLE_TOLERANCE_BYTES) return { level: 'idle', bytes: -excess };
+	return { level: 'managed' };
 }
 
 /**

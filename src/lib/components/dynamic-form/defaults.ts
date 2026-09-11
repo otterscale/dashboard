@@ -5,13 +5,18 @@ export { translation } from '@sjsf/form/translations/en';
 export { icons } from '@sjsf/lucide-icons';
 export { theme } from '@sjsf/shadcn4-theme';
 
-import { addFormComponents, createFormValidator } from '@sjsf/ajv8-validator';
+import { addFormComponents, createFormValidator, DEFAULT_AJV_CONFIG } from '@sjsf/ajv8-validator';
 import type { ValidatorFactoryOptions } from '@sjsf/form';
 import ajvErrors from 'ajv-errors';
 import addFormats from 'ajv-formats';
 export const validator = <T>(options: ValidatorFactoryOptions) =>
 	createFormValidator<T>({
 		...options,
+		// `$data` lets a schema cross-reference sibling fields at validate time
+		// (e.g. the import-cluster wizard's `nodePortRangeMax.exclusiveMinimum`
+		// pointing at `nodePortRangeMin`). Without it, Ajv rejects such a schema
+		// at compile time as invalid.
+		ajvOptions: { ...DEFAULT_AJV_CONFIG, $data: true },
 		ajvPlugins: (ajv) => addFormComponents(ajvErrors(addFormats(ajv)))
 	});
 

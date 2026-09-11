@@ -19,9 +19,16 @@ Thumbs.db
 !.env.example
 !.env.test
 
+# Local dev CA bundle (see .env.example)
+*.crt
+*.pem
+
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# pnpm
+.pnpm-store
 
 # Paraglide
 src/lib/paraglide

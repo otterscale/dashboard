@@ -5,17 +5,17 @@
 	import { getContext, onMount } from 'svelte';
 
 	import { page } from '$app/state';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	import NamespaceCommitment from './namespace/namespace-commitment.svelte';
 	import NamespaceRanking from './namespace/namespace-ranking.svelte';
-	import PodResourceTable from './namespace/pod-resource-table.svelte';
 	import PvcStorage from './namespace/pvc-storage.svelte';
 	import WorkloadSummary from './namespace/workload-summary.svelte';
 	import NodeDetail from './node/node-detail.svelte';
 	import NodePressure from './node/node-pressure.svelte';
 	import NodeRanking from './node/node-ranking.svelte';
 	import PlaceholderCard from './placeholder-card.svelte';
+	import PodResourceTable from './pod-resource-table.svelte';
 
 	let {
 		client,
@@ -179,6 +179,16 @@
 					{endIsNow}
 					isReloading={reloading}
 				/>
+				<!-- Keyed so picking another node remounts the table: its fetch runs on mount and on the
+				     reload timer, not on every prop change. -->
+				{#key selectedNodeName}
+					<PodResourceTable
+						{client}
+						node={selectedNodeName}
+						{namespaceToWorkspace}
+						isReloading={reloading}
+					/>
+				{/key}
 			{:else}
 				<PlaceholderCard
 					title={m.section_node_detail()}
@@ -213,10 +223,10 @@
 				/>
 				<NamespaceRanking
 					prometheusDriver={client}
-					kind="pods"
-					title={m.namespace_pod_count()}
-					description={m.namespace_pod_count_description()}
-					tooltip={m.namespace_pod_count_tooltip()}
+					kind="gpu"
+					title={m.namespace_gpu_usage()}
+					description={m.namespace_gpu_usage_description()}
+					tooltip={m.namespace_gpu_usage_tooltip()}
 					onNamespaceClick={handleNamespaceClick}
 					{namespaceToWorkspace}
 					isReloading={reloading}
