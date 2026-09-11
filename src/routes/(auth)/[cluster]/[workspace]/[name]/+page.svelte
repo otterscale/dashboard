@@ -26,7 +26,6 @@
 		]);
 	});
 
-	const isClusterAdmin = $derived(page.data.isClusterAdmin === true);
 	const cluster = $derived(page.params.cluster ?? '');
 	// Unlike other pages, namespace here is obtained from query params.
 	// This is because admins can query resources across different namespaces.
@@ -36,17 +35,10 @@
 	const version = $derived(page.url.searchParams.get('version') ?? '');
 	const kind = $derived(page.url.searchParams.get('kind') ?? '');
 	const resource = $derived(page.url.searchParams.get('resource') ?? '');
+	// What this kind relates to, injected rather than looked up by the viewer —
+	// so a page can hand in its own getter without the viewer knowing the kind.
 </script>
 
 {#key page.url.href}
-	<ResourceViewer
-		{isClusterAdmin}
-		{cluster}
-		{namespace}
-		{name}
-		{group}
-		{version}
-		{kind}
-		{resource}
-	/>
+	<ResourceViewer {cluster} {namespace} {name} {group} {version} {kind} {resource} />
 {/key}

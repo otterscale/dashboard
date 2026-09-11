@@ -2,7 +2,7 @@
 	import type { PrometheusDriver } from 'prometheus-query';
 
 	import { m } from '$lib/messages';
-	import { escapePromqlStringLiteral } from '$lib/prometheus';
+	import { escapePromqlStringLiteral, LIVE_PODS } from '$lib/prometheus';
 
 	import AreaTimeSeries from '../area-time-series.svelte';
 
@@ -29,8 +29,8 @@
 		const alloc = `sum(kube_node_status_allocatable{resource="cpu",unit="core",node="${n}"})`;
 		// Keyed largest-to-smallest so the (typically smaller) Usage area paints on top.
 		return {
-			[m.limit()]: `sum(kube_pod_container_resource_limits{resource="cpu",unit="core",node="${n}"}) / ${alloc} * 100`,
-			[m.request()]: `sum(kube_pod_container_resource_requests{resource="cpu",unit="core",node="${n}"}) / ${alloc} * 100`,
+			[m.limit()]: `sum(kube_pod_container_resource_limits{resource="cpu",unit="core",node="${n}"} ${LIVE_PODS}) / ${alloc} * 100`,
+			[m.request()]: `sum(kube_pod_container_resource_requests{resource="cpu",unit="core",node="${n}"} ${LIVE_PODS}) / ${alloc} * 100`,
 			[m.usage()]: `sum(rate(container_cpu_usage_seconds_total{container!="",node="${n}"}[2m])) / ${alloc} * 100`
 		};
 	};

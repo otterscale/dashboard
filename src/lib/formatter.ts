@@ -57,8 +57,14 @@ export function formatCapacity(capacity: number | bigint): { value: number; unit
 	const MB = KB / 1024;
 	const GB = MB / 1024;
 	const TB = GB / 1024;
+	const PB = TB / 1024;
+	const EB = PB / 1024;
 
-	if (TB >= 1) {
+	if (EB >= 1) {
+		return { value: Math.round(EB * 100) / 100, unit: 'EB' };
+	} else if (PB >= 1) {
+		return { value: Math.round(PB * 100) / 100, unit: 'PB' };
+	} else if (TB >= 1) {
 		return { value: Math.round(TB * 100) / 100, unit: 'TB' };
 	} else if (GB >= 1) {
 		return { value: Math.round(GB * 100) / 100, unit: 'GB' };

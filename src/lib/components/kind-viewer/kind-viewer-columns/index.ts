@@ -4,18 +4,13 @@ import type { ColumnDef } from '@tanstack/table-core';
 
 import type { DataSchemaType, UISchemaType } from '$lib/components/dynamic-table/utils.js';
 
+import { getKindExtension } from '../extensions.js';
 import {
 	getApplicationColumnDefinitions,
 	getApplicationData,
 	getApplicationDataSchemas,
 	getApplicationUISchemas
 } from './application.js';
-import {
-	getObjectBucketClaimColumnDefinitions,
-	getObjectBucketClaimData,
-	getObjectBucketClaimDataSchemas,
-	getObjectBucketClaimUISchemas
-} from './cephobjectbucketclaim.js';
 import {
 	getClusterRoleColumnDefinitions,
 	getClusterRoleData,
@@ -241,7 +236,13 @@ import {
 	getWorkspaceUISchemas
 } from './workspace.js';
 
-function getDataSchemas(kind: string): Record<string, DataSchemaType> {
+// `group` disambiguates kinds whose names collide across API groups; extension
+// kinds (see ../extensions) are dispatched on it before the built-in switch.
+function getDataSchemas(kind: string, group?: string): Record<string, DataSchemaType> {
+	const extension = getKindExtension(group, kind);
+	if (extension?.getDataSchemas) {
+		return extension.getDataSchemas();
+	}
 	switch (kind) {
 		case 'CronJob':
 			return getCronJobDataSchemas();
@@ -311,8 +312,6 @@ function getDataSchemas(kind: string): Record<string, DataSchemaType> {
 			return getDataVolumeDataSchemas();
 		// case 'VirtualMachineInstancetype':
 		// 	return getVirtualMachineInstancetypeDataSchemas();
-		case 'ObjectBucketClaim':
-			return getObjectBucketClaimDataSchemas();
 		case 'Application':
 			return getApplicationDataSchemas();
 		case 'Task':
@@ -334,6 +333,10 @@ function getData(apiResource: APIResource, object: JsonObject): Record<string, J
 	// Each Kind handler accepts its own specific K8s type; cast through `never` to satisfy
 	// all of those signatures in a single dispatch without per-case casts.
 	const resource = object as never;
+	const extension = getKindExtension(apiResource.group, apiResource.kind);
+	if (extension?.getData) {
+		return extension.getData(object);
+	}
 	switch (apiResource.kind) {
 		case 'CronJob':
 			return getCronJobData(resource);
@@ -403,8 +406,6 @@ function getData(apiResource: APIResource, object: JsonObject): Record<string, J
 			return getDataVolumeData(resource);
 		// case 'VirtualMachineInstancetype':
 		// 	return getVirtualMachineInstancetypeData(resource);
-		case 'ObjectBucketClaim':
-			return getObjectBucketClaimData(resource);
 		case 'Application':
 			return getApplicationData(resource);
 		case 'Task':
@@ -422,7 +423,11 @@ function getData(apiResource: APIResource, object: JsonObject): Record<string, J
 	}
 }
 
-function getUISchemas(kind: string): Record<string, UISchemaType> {
+function getUISchemas(kind: string, group?: string): Record<string, UISchemaType> {
+	const extension = getKindExtension(group, kind);
+	if (extension?.getUISchemas) {
+		return extension.getUISchemas();
+	}
 	switch (kind) {
 		case 'CronJob':
 			return getCronJobUISchemas();
@@ -492,8 +497,6 @@ function getUISchemas(kind: string): Record<string, UISchemaType> {
 			return getDataVolumeUISchemas();
 		// case 'VirtualMachineInstancetype':
 		// 	return getVirtualMachineInstancetypeUISchemas();
-		case 'ObjectBucketClaim':
-			return getObjectBucketClaimUISchemas();
 		case 'Application':
 			return getApplicationUISchemas();
 		case 'Task':
@@ -517,6 +520,10 @@ function getColumnDefinitions(
 	dataSchemas: Record<string, DataSchemaType>,
 	cluster?: string
 ): ColumnDef<Record<string, JsonValue>>[] {
+	const extension = getKindExtension(apiResource.group, apiResource.kind);
+	if (extension?.getColumnDefinitions) {
+		return extension.getColumnDefinitions(apiResource, uiSchemas, dataSchemas, cluster);
+	}
 	switch (apiResource.kind) {
 		case 'CronJob':
 			return getCronJobColumnDefinitions(apiResource, uiSchemas, dataSchemas);
@@ -584,8 +591,6 @@ function getColumnDefinitions(
 			return getVirtualMachineColumnDefinitions(apiResource, uiSchemas, dataSchemas, cluster);
 		case 'DataVolume':
 			return getDataVolumeColumnDefinitions(apiResource, uiSchemas, dataSchemas);
-		case 'ObjectBucketClaim':
-			return getObjectBucketClaimColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'Application':
 			return getApplicationColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'Task':

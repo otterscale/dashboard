@@ -1,6 +1,4 @@
 <script lang="ts">
-	import BellRingIcon from '@lucide/svelte/icons/bell-ring';
-	import ChevronUpIcon from '@lucide/svelte/icons/chevron-up';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
 	import GlobeIcon from '@lucide/svelte/icons/globe';
 	import LogOutIcon from '@lucide/svelte/icons/log-out';
@@ -10,7 +8,6 @@
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import { shortcut } from '$lib/actions/shortcut.svelte';
 	import * as Avatar from '$lib/components/ui/avatar/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
@@ -19,12 +16,9 @@
 	import { getLocale, type Locale, setLocale } from '$lib/paraglide/runtime';
 	import type { User } from '$lib/server/session';
 
-	import SheetNotification from './sheet-notification.svelte';
-
 	let { user }: { user: User } = $props();
 
 	let locale = $state(getLocale());
-	let open = $state(false);
 
 	const sidebar = useSidebar();
 
@@ -44,21 +38,7 @@
 		setLocale(newLocale);
 		locale = newLocale;
 	};
-
-	const toggleNotification = () => {
-		open = !open;
-	};
 </script>
-
-<svelte:window
-	use:shortcut={{
-		key: 'n',
-		ctrl: true,
-		callback: toggleNotification
-	}}
-/>
-
-<SheetNotification bind:open />
 
 <Sidebar.Menu>
 	<Sidebar.MenuItem>
@@ -100,25 +80,6 @@
 						</div>
 					</div>
 				</DropdownMenu.Label>
-				<DropdownMenu.Separator />
-				<DropdownMenu.Group>
-					<DropdownMenu.Item onclick={toggleNotification}>
-						<BellRingIcon />
-						{m.notifications()}
-						<span class="relative flex size-2.5">
-							<span
-								class="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"
-							></span>
-							<span class="relative inline-flex size-2.5 rounded-full bg-blue-500"></span>
-						</span>
-						<DropdownMenu.Shortcut>
-							<div class="flex items-center justify-center space-x-1">
-								<ChevronUpIcon />
-								<span>/</span>
-							</div>
-						</DropdownMenu.Shortcut>
-					</DropdownMenu.Item>
-				</DropdownMenu.Group>
 				<DropdownMenu.Separator />
 				<DropdownMenu.Group>
 					<DropdownMenu.Item onclick={toggleMode}>

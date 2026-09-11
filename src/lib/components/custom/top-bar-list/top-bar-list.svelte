@@ -4,6 +4,7 @@
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import Maximize2Icon from '@lucide/svelte/icons/maximize-2';
 	import MoonIcon from '@lucide/svelte/icons/moon';
+	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 
 	import * as Statistics from '$lib/components/custom/statistics/index';
 	import { Badge } from '$lib/components/ui/badge';
@@ -25,7 +26,8 @@
 		isLoaded,
 		onBarClick,
 		scrollable,
-		activity
+		activity,
+		legend
 	}: {
 		title: string;
 		description: string;
@@ -40,28 +42,74 @@
 		// cards sharing a row stay the same height regardless of how many bars each has.
 		// Leave false to let the list grow with its content.
 		scrollable?: boolean;
+		// Optional colour key for stacked bars (see `TopBar.segments`). Shown only in the
+		// maximized sheet: a legend row in the card would push its list down and break the
+		// shared baseline with the neighbouring cards, and the value column already names
+		// both numbers.
+		legend?: { label: string; class: string }[];
 	} = $props();
 
 	const maxValue = $derived(bars.reduce((m, b) => Math.max(m, b.value), 0));
 </script>
 
+<!-- The value shares the label's line instead of holding a column of its own, and the track spans
+     the full row beneath them. A value column is as wide as its longest string, so it used to take
+     bar width in proportion to how much a card had to say — the cards with the most to show got the
+     shortest bars, and no two cards' bars were drawn at the same scale. -->
 {#snippet barContent(bar: TopBar)}
 	{@const pct = maxValue > 0 ? Math.max(2, (bar.value / maxValue) * 100) : 0}
-	<span class="flex flex-col gap-1 overflow-hidden">
-		<span class="flex items-center gap-1.5 overflow-hidden">
+	<span class="flex items-baseline gap-2">
+		<span class="flex min-w-0 flex-1 items-center gap-1.5">
 			<span class="truncate text-xs font-medium" title={bar.label}>{bar.label}</span>
 			{#if bar.badge}
 				<Badge variant="secondary" class="shrink-0">{bar.badge}</Badge>
 			{/if}
 		</span>
-		<span class="relative h-2.5 w-full overflow-hidden rounded bg-muted">
+		<span class={cn('shrink-0 font-mono text-xs whitespace-nowrap tabular-nums', bar.textClass)}>
+			{#if bar.warning}
+				<Tooltip.Root>
+					<Tooltip.Trigger>
+						{#snippet child({ props })}
+							<span {...props} class="mr-1 cursor-help">
+								<TriangleAlertIcon class="inline size-3 shrink-0 align-[-1px] text-chart-1" />
+								<span class="sr-only">{bar.warning}</span>
+							</span>
+						{/snippet}
+					</Tooltip.Trigger>
+					<Tooltip.Content>
+						<span class="whitespace-nowrap">{bar.warning}</span>
+					</Tooltip.Content>
+				</Tooltip.Root>
+			{/if}{bar.displayValue}
+		</span>
+	</span>
+	<span class="relative h-2.5 w-full overflow-hidden rounded bg-muted">
+		{#if bar.segments}
+			<span class="absolute inset-y-0 left-0 flex overflow-hidden rounded" style="width: {pct}%">
+				{#each bar.segments as segment, i (i)}
+					<span class={cn('h-full', segment.class)} style="flex: {segment.value} 1 0"></span>
+				{/each}
+			</span>
+		{:else}
 			<span
 				class={cn('absolute inset-y-0 left-0 rounded bg-chart-1', bar.barClass)}
 				style="width: {pct}%"
 			></span>
-		</span>
+		{/if}
 	</span>
-	<span class={cn('font-mono text-sm tabular-nums', bar.textClass)}>{bar.displayValue}</span>
+{/snippet}
+
+{#snippet legendRow()}
+	{#if legend && legend.length > 0}
+		<ul class="flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-xs text-muted-foreground">
+			{#each legend as item (item.label)}
+				<li class="flex items-center gap-1.5">
+					<span class={cn('size-2.5 shrink-0 rounded-[2px]', item.class)}></span>
+					<span>{item.label}</span>
+				</li>
+			{/each}
+		</ul>
+	{/if}
 {/snippet}
 
 {#snippet list()}
@@ -71,13 +119,13 @@
 				{#if onBarClick}
 					<button
 						type="button"
-						class="group grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2 rounded px-1 py-1 text-left hover:bg-muted/60"
+						class="group flex w-full flex-col gap-1 rounded px-1 py-1 text-left hover:bg-muted/60"
 						onclick={() => onBarClick?.(bar.id ?? bar.label)}
 					>
 						{@render barContent(bar)}
 					</button>
 				{:else}
-					<div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-1 py-1">
+					<div class="flex flex-col gap-1 px-1 py-1">
 						{@render barContent(bar)}
 					</div>
 				{/if}
@@ -88,32 +136,36 @@
 
 <Statistics.Root type="count" class="overflow-visible">
 	<Statistics.Header class="flex flex-row items-center gap-2 space-y-0">
-		<div class="grid flex-1 gap-1">
-			<Statistics.Title class="text-base leading-normal text-foreground">
+		<!-- Both lines are clamped to one line rather than merely kept short by convention: a header
+		     that wraps pushes its own bar list down while its neighbours stay put, and the row of
+		     cards loses the shared baseline that makes their bars comparable. `min-w-0` is what lets
+		     the truncation happen at all — this is a flex item, and its default `min-width: auto`
+		     would size it to the text instead. Anything cut off stays readable on hover, and the
+		     tooltip button beside it carries the full explanation either way. -->
+		<div class="grid min-w-0 flex-1 gap-1">
+			<Statistics.Title class="truncate text-base leading-normal text-foreground" {title}>
 				{title}
 			</Statistics.Title>
-			<!-- Keep descriptions short (one line) so cards sharing a row keep identical header
-			heights and their bar lists stay vertically aligned; the full explanation lives in the
-			tooltip. -->
-			<p class="text-sm text-muted-foreground">{description}</p>
+			<p class="truncate text-sm text-muted-foreground" title={description}>{description}</p>
 		</div>
 		{#if scrollable}
 			<Sheet.Root>
-				<Sheet.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-					<Maximize2Icon class="size-5 text-muted-foreground" />
+				<Sheet.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}>
+					<Maximize2Icon class="size-4 text-muted-foreground" />
 				</Sheet.Trigger>
 				<Sheet.Content class="flex min-w-[38vw] flex-col gap-4 overflow-auto p-8">
 					<Sheet.Header class="p-0">
 						<Sheet.Title>{title}</Sheet.Title>
 						<Sheet.Description>{description}</Sheet.Description>
 					</Sheet.Header>
+					{@render legendRow()}
 					{@render list()}
 				</Sheet.Content>
 			</Sheet.Root>
 		{/if}
 		<Tooltip.Root>
-			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-				<InfoIcon class="size-5 text-muted-foreground" />
+			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}>
+				<InfoIcon class="size-4 text-muted-foreground" />
 			</Tooltip.Trigger>
 			<Tooltip.Content>
 				<p>{tooltip}</p>
