@@ -4,6 +4,7 @@
 	import type { Schema } from '@sjsf/form';
 	import type { ValidateFunction } from 'ajv';
 
+	import { page } from '$app/state';
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Edit from '$lib/components/kind-viewer/kind-viewer-actions/default/edit.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
@@ -34,7 +35,10 @@
 		validate: ValidateFunction;
 		object: ServingKserveIoV1Alpha2LLMInferenceServiceConfig;
 	} = $props();
+
 	let actionsOpen = $state(false);
+
+	const targetNamespace = page.data.namespace;
 </script>
 
 <DropdownMenu.Root bind:open={actionsOpen}>
@@ -48,6 +52,10 @@
 		{/snippet}
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content align="end" class="w-full">
+		{@const containers = object?.spec?.template?.containers}
+		{@const isMiddleware =
+			Array.isArray(containers) &&
+			containers.some((container) => container?.image?.includes('/ai-mw/'))}
 		<DropdownMenu.Group>
 			<DropdownMenu.Label>Inspect</DropdownMenu.Label>
 			<DropdownMenu.Item
@@ -63,10 +71,11 @@
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
+				disabled={isMiddleware}
 			>
 				<Deploy
 					{cluster}
-					{namespace}
+					namespace={targetNamespace}
 					{schema}
 					{object}
 					onOpenChangeComplete={() => {
@@ -98,10 +107,11 @@
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
+				disabled={isMiddleware}
 			>
 				<Copy
 					{cluster}
-					{namespace}
+					namespace={targetNamespace}
 					{group}
 					{version}
 					{kind}

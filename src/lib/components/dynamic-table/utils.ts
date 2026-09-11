@@ -118,6 +118,20 @@ const binarySuffixFactors: Record<string, bigint> = {
 	Ei: BigInt(2) ** BigInt(60)
 };
 
+/**
+ * Convert a Kubernetes quantity to a byte count.
+ *
+ * `baseUnit` is the unit the scalar counts in, for resources not measured in
+ * bytes: `nvidia.com/gpumem` counts `Mi`, so `2048` is 2048 MiB. Kubernetes
+ * resolves any suffix into the scalar first, so a suffixed quantity counts that
+ * many base units — `88888Gi` is 88888 * 2^30 MiB, which is what the quota
+ * controller enforces, not 88888 GiB.
+ */
+function quantityToBytes(quantity: string, baseUnit?: string): bigint {
+	const scalar = BigInt(quantityToScalar(quantity));
+	return baseUnit ? scalar * (binarySuffixFactors[baseUnit] ?? BigInt(1)) : scalar;
+}
+
 function formatWithBinarySuffix(value: bigint): { value: number; unit: string } {
 	const units = [
 		{ value: BigInt(2) ** BigInt(60), symbol: 'Ei' },
@@ -216,11 +230,7 @@ function jsonValueToDate(value: JsonValue | undefined): Date | null {
 	return date;
 }
 
-function getRelativeTime(now: number, timestamp: number) {
-	const milliseconds = Math.max(timestamp, 0);
-
-	const seconds = Math.floor((now - milliseconds) / 1000);
-	if (seconds < 5) return { value: 'Just', unit: 'now' };
+function getTimeSpan(seconds: number) {
 	if (seconds < 60) return { value: seconds, unit: 'second' };
 
 	const minutes = Math.floor(seconds / 60);
@@ -240,6 +250,20 @@ function getRelativeTime(now: number, timestamp: number) {
 
 	const years = Math.floor(days / 365);
 	return { value: years, unit: 'year' };
+}
+
+function getRelativeTime(now: number, timestamp: number) {
+	const milliseconds = Math.max(timestamp, 0);
+
+	const elapsedSeconds = Math.floor((now - milliseconds) / 1000);
+	if (Math.abs(elapsedSeconds) < 5) return { value: 'Just', unit: 'now' };
+
+	const { value, unit } = getTimeSpan(Math.abs(elapsedSeconds));
+
+	// Future timestamps (e.g. a backup's expiration) read as "in 29 day".
+	if (elapsedSeconds < 0) return { value: `in ${value}`, unit };
+
+	return { value, unit };
 }
 
 type UISchemaType =
@@ -320,6 +344,7 @@ export {
 	getRatio,
 	getRelativeTime,
 	jsonValueToDate,
+	quantityToBytes,
 	quantityToScalar
 };
 export type { DataSchemaType, UISchemaType };

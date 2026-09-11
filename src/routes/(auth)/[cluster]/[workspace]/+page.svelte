@@ -28,10 +28,15 @@
 		]);
 	});
 
+	// Cluster info is published by the otterscale-agent chart into kube-public so that
+	// every workspace can read it, regardless of its own namespace.
+	const CLUSTER_INFO_NAMESPACE = 'kube-public';
+	const CLUSTER_INFO_NAME = 'otterscale-info';
+
 	const endpointMap: Record<string, string> = {
-		LLMInferenceService: 'ModelGatewayEndpoint',
-		ObjectBucketClaim: 'ObjectGatewayEndpoint',
-		Service: 'ServiceEndpoint'
+		Application: 'externalAddress',
+		LLMInferenceService: 'inferenceURL',
+		Service: 'externalAddress'
 	};
 
 	const isClusterAdmin = $derived(page.data.isClusterAdmin === true);
@@ -63,8 +68,8 @@
 
 		const response = await client.get({
 			cluster,
-			namespace,
-			name: 'workspace-config',
+			namespace: CLUSTER_INFO_NAMESPACE,
+			name: CLUSTER_INFO_NAME,
 			group: '',
 			version: 'v1',
 			resource: 'configmaps'
@@ -75,10 +80,11 @@
 		if (!endpoint) return 'Unavailable';
 
 		const ns = namespace || '<Namespace>';
+		const nodePort = config?.nodePortRange ? `<NodePort ${config.nodePortRange}>` : '<NodePort>';
 		const suffixMap: Record<string, string> = {
-			Service: ':<NodePort>',
-			LLMInferenceService: `/${ns}/<Name>`,
-			ObjectBucketClaim: `/${ns}-<Name>`
+			Application: `:${nodePort}`,
+			Service: `:${nodePort}`,
+			LLMInferenceService: `/${ns}/<Name>`
 		};
 		return `Available at ${endpoint}${suffixMap[kind] ?? ''}`;
 	}
