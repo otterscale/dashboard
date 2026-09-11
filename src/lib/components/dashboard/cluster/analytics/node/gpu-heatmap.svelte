@@ -21,7 +21,7 @@
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { formatChartTimeRange, formatChartXAxisDate } from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import {
 		computeStep,
 		type DataPoint,
@@ -273,8 +273,8 @@
 			<p class="text-sm text-muted-foreground">{config.description}</p>
 		</div>
 		<Tooltip.Root>
-			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-				<InfoIcon class="size-5 text-muted-foreground" />
+			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}>
+				<InfoIcon class="size-4 text-muted-foreground" />
 			</Tooltip.Trigger>
 			<Tooltip.Content class="max-w-xs">
 				<p>{config.tooltip}</p>

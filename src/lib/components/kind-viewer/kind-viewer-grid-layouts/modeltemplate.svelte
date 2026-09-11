@@ -110,14 +110,14 @@
 				.map((container) => container?.image ?? '')
 				.find((image) => image.includes('/ai-mw/'))}
 		{#if mode}
-			<Badge>
+			<Badge variant="secondary">
 				{mode}
 			</Badge>
 		{/if}
 		{#if isMiddleWare}
 			<Tooltip.Root>
 				<Tooltip.Trigger>
-					<Badge>KV-Cache Management</Badge>
+					<Badge variant="secondary">KV-Cache Management</Badge>
 				</Tooltip.Trigger>
 				<Tooltip.Content>
 					Offload KV cache beyond accelerator memory (CPU/disk) to hold a larger working set for
@@ -127,7 +127,7 @@
 		{:else}
 			<Tooltip.Root>
 				<Tooltip.Trigger>
-					<Badge>Intelligent Routing</Badge>
+					<Badge variant="secondary">Intelligent Routing</Badge>
 				</Tooltip.Trigger>
 				<Tooltip.Content>
 					vLLM with prefix-cache + EPP load-aware routing. EPP routes by live XGBoost latency

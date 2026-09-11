@@ -5,10 +5,13 @@ import {
 	ANNOTATION_DEVICES_ALLOCATED,
 	ANNOTATION_NODE_REGISTER,
 	getPodNodeName,
+	getPodStatus,
+	isPodMigMode,
+	isPodTerminated,
 	parseNodeGpuDevices,
 	parsePodGpuAllocations
 } from './hami';
-import type { GpuInfo, NodeInfo, PodInfo, TopologyData } from './types';
+import type { GpuInfo, NodeInfo, PodInfo, PodPvc, TopologyData } from './types';
 
 type ResourceClient = Client<typeof ResourceService>;
 
@@ -27,6 +30,125 @@ function getAnnotations(obj: any): Record<string, string> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function getLabels(obj: any): Record<string, string> {
 	return obj?.metadata?.labels ?? {};
+}
+
+// KV-cache offload volumes injected by kserve's LLMInferenceService controller
+// (attachKVCacheSecondaryTiers): one `kv-cache-secondary-<i>` volume per
+// secondary tier in the spec.
+const KV_CACHE_VOLUME_NAME = /^kv-cache-secondary-\d+$/;
+
+/**
+ * PVCs backing a pod's SSD KV-cache offload tiers. Only `kv-cache-secondary-*`
+ * volumes count — other PVC mounts (e.g. kserve's model-store) are not offload
+ * storage. A tier is either a generic ephemeral volume (the PVC is created as
+ * `<pod>-<volume>`, size from the claim template) or a direct PVC reference
+ * (size resolved later). emptyDir tiers have no PVC and are skipped.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getPodKvCachePvcs(pod: any): PodPvc[] {
+	const podName: string = pod?.metadata?.name ?? '';
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const volumes: any[] = pod?.spec?.volumes ?? [];
+	const pvcs: PodPvc[] = [];
+	for (const volume of volumes) {
+		if (!KV_CACHE_VOLUME_NAME.test(String(volume?.name ?? ''))) continue;
+
+		const claimName = volume?.persistentVolumeClaim?.claimName;
+		if (typeof claimName === 'string' && claimName.length > 0) {
+			pvcs.push({ name: claimName, size: '' });
+			continue;
+		}
+
+		const template = volume?.ephemeral?.volumeClaimTemplate;
+		if (template) {
+			pvcs.push({
+				name: `${podName}-${volume.name}`,
+				size: String(template?.spec?.resources?.requests?.storage ?? '')
+			});
+		}
+	}
+	return pvcs;
+}
+
+/**
+ * Fill in each pod PVC's size by listing PersistentVolumeClaims in the
+ * involved namespaces. Prefers the bound capacity over the requested size.
+ */
+async function attachPvcSizes(
+	client: ResourceClient,
+	cluster: string,
+	pods: PodInfo[]
+): Promise<void> {
+	const namespaces = new Set(pods.filter((p) => p.pvcs.length > 0).map((p) => p.namespace));
+	if (namespaces.size === 0) return;
+
+	const sizeByKey = new Map<string, string>();
+	await Promise.all(
+		[...namespaces].map(async (namespace) => {
+			try {
+				const res = await client.list({
+					cluster,
+					group: '',
+					version: 'v1',
+					resource: 'persistentvolumeclaims',
+					namespace
+				});
+				for (const item of res.items) {
+					const obj = item.object as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+					const size =
+						obj?.status?.capacity?.storage ?? obj?.spec?.resources?.requests?.storage ?? '';
+					sizeByKey.set(`${namespace}/${obj?.metadata?.name ?? ''}`, String(size));
+				}
+			} catch {
+				console.warn(`Failed to list PVCs in namespace ${namespace}`);
+			}
+		})
+	);
+
+	for (const pod of pods) {
+		for (const pvc of pod.pvcs) {
+			// Keep the claim-template size when the PVC lookup finds nothing
+			// (e.g. an ephemeral PVC not yet created, or the listing failed).
+			pvc.size = sizeByKey.get(`${pod.namespace}/${pvc.name}`) || pvc.size;
+		}
+	}
+}
+
+/**
+ * Attach the OtterScale workspace name to each pod by matching the pod's
+ * namespace against Workspace resources (spec.namespace). Listing workspaces
+ * may be forbidden for non-admin users; pods then simply show no workspace.
+ * Returns the namespace → workspace map for reuse by callers.
+ */
+async function attachWorkspaces(
+	client: ResourceClient,
+	cluster: string,
+	pods: PodInfo[]
+): Promise<Map<string, string>> {
+	const workspaceByNamespace = new Map<string, string>();
+	try {
+		const res = await client.list({
+			cluster,
+			group: 'tenant.otterscale.io',
+			version: 'v1alpha1',
+			resource: 'workspaces',
+			namespace: ''
+		});
+		for (const item of res.items) {
+			const obj = item.object as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+			const name = obj?.metadata?.name;
+			const namespace = obj?.spec?.namespace;
+			if (typeof name === 'string' && typeof namespace === 'string' && name && namespace) {
+				workspaceByNamespace.set(namespace, name);
+			}
+		}
+		for (const pod of pods) {
+			pod.workspace = workspaceByNamespace.get(pod.namespace) ?? '';
+		}
+	} catch {
+		console.warn('Failed to list workspaces');
+	}
+	return workspaceByNamespace;
 }
 
 export async function fetchLLMInferenceServiceTopology(
@@ -50,6 +172,11 @@ export async function fetchLLMInferenceServiceTopology(
 	// 2. Parse pod allocations and collect unique node names
 	const nodeNames = new Set<string>();
 	const pods: PodInfo[] = [];
+	// Service pods still holding their GPU allocations. Terminated pods
+	// (Succeeded/Failed) keep the allocation annotation but HAMi has already
+	// released their devices, so they render in the diagram (with status) but
+	// must not count toward GPU usage or MIG slices.
+	const activeServicePods: PodInfo[] = [];
 
 	for (const pod of rawPods) {
 		const annotations = getAnnotations(pod);
@@ -58,14 +185,18 @@ export async function fetchLLMInferenceServiceTopology(
 		const allocations = parsePodGpuAllocations(annotations[ANNOTATION_DEVICES_ALLOCATED]);
 		if (nodeName && allocations.length > 0) nodeNames.add(nodeName);
 
-		pods.push({
+		const podInfo: PodInfo = {
 			name: (pod as Record<string, any>)?.metadata?.name ?? '', // eslint-disable-line @typescript-eslint/no-explicit-any
 			namespace: (pod as Record<string, any>)?.metadata?.namespace ?? '', // eslint-disable-line @typescript-eslint/no-explicit-any
 			nodeName,
 			allocations,
-			status: (pod as Record<string, any>)?.status?.phase ?? 'Unknown', // eslint-disable-line @typescript-eslint/no-explicit-any
-			role: labels[LABEL_ROLE]
-		});
+			status: getPodStatus(pod),
+			role: labels[LABEL_ROLE],
+			isMig: isPodMigMode(pod),
+			pvcs: getPodKvCachePvcs(pod)
+		};
+		pods.push(podInfo);
+		if (!isPodTerminated(pod)) activeServicePods.push(podInfo);
 	}
 
 	// 3. Fetch nodes in parallel (fresh GET to ensure full annotations)
@@ -107,11 +238,69 @@ export async function fetchLLMInferenceServiceTopology(
 		}
 	}
 
-	// 5. Cross-reference: find which pods use which GPUs
-	crossReferencePodGpus(pods, gpus);
+	// 5. List every GPU pod on the involved nodes (all namespaces), so GPU/node
+	// usage reflects all workloads — not just this service's pods. The diagram
+	// still only renders this service's pods; other pods only contribute usage.
+	const nodePodLists = await Promise.all(
+		[...nodeNames].map(async (name) => {
+			try {
+				const res = await client.list({
+					cluster,
+					group: '',
+					version: 'v1',
+					resource: 'pods',
+					namespace: '',
+					fieldSelector: `spec.nodeName=${name}`
+				});
+				return res.items.map((item) => item.object);
+			} catch {
+				console.warn(`Failed to list pods on node ${name}`);
+				return [];
+			}
+		})
+	);
+
+	// Start from this service's active pods so their allocations survive a failed
+	// node listing, then add the other running GPU pods (dedup by namespace/name).
+	const seen = new Set(pods.map((p) => `${p.namespace}/${p.name}`));
+	const allocationPods: PodInfo[] = [...activeServicePods];
+	for (const pod of nodePodLists.flat()) {
+		const podAnnotations = getAnnotations(pod);
+		if (!podAnnotations[ANNOTATION_DEVICES_ALLOCATED]) continue;
+		if (isPodTerminated(pod)) continue;
+
+		const meta = (pod as Record<string, any>)?.metadata; // eslint-disable-line @typescript-eslint/no-explicit-any
+		const key = `${meta?.namespace ?? ''}/${meta?.name ?? ''}`;
+		if (seen.has(key)) continue;
+		seen.add(key);
+
+		allocationPods.push({
+			name: meta?.name ?? '',
+			namespace: meta?.namespace ?? '',
+			nodeName: getPodNodeName(pod),
+			allocations: parsePodGpuAllocations(podAnnotations[ANNOTATION_DEVICES_ALLOCATED]),
+			status: getPodStatus(pod),
+			role: getLabels(pod)[LABEL_ROLE],
+			isMig: isPodMigMode(pod),
+			pvcs: getPodKvCachePvcs(pod)
+		});
+	}
+
+	// 6. Cross-reference: find which pods use which GPUs
+	crossReferencePodGpus(allocationPods, gpus);
+
+	// 7. Resolve PVC sizes and workspaces for the pods rendered in the diagram
+	const [, workspaceByNamespace] = await Promise.all([
+		attachPvcSizes(client, cluster, pods),
+		attachWorkspaces(client, cluster, pods)
+	]);
 
 	return {
-		llmInferenceService: { name: serviceName, namespace },
+		llmInferenceService: {
+			name: serviceName,
+			namespace,
+			workspace: workspaceByNamespace.get(namespace) ?? ''
+		},
 		pods,
 		gpus,
 		nodes
@@ -163,12 +352,15 @@ export async function fetchNodeTopology(
 		fieldSelector: `spec.nodeName=${nodeName}`
 	});
 
-	// 3. Filter to pods with GPU allocations
+	// 3. Filter to pods still holding GPU allocations. Terminated pods keep the
+	// annotation but no longer occupy devices, so they are excluded entirely
+	// from the node view.
 	const pods: PodInfo[] = [];
 	for (const item of podResponse.items) {
 		const pod = item.object;
 		const podAnnotations = getAnnotations(pod);
 		if (!podAnnotations[ANNOTATION_DEVICES_ALLOCATED]) continue;
+		if (isPodTerminated(pod)) continue;
 
 		const labels = getLabels(pod);
 		pods.push({
@@ -176,13 +368,21 @@ export async function fetchNodeTopology(
 			namespace: (pod as Record<string, any>)?.metadata?.namespace ?? '', // eslint-disable-line @typescript-eslint/no-explicit-any
 			nodeName,
 			allocations: parsePodGpuAllocations(podAnnotations[ANNOTATION_DEVICES_ALLOCATED]),
-			status: (pod as Record<string, any>)?.status?.phase ?? 'Unknown', // eslint-disable-line @typescript-eslint/no-explicit-any
-			role: labels[LABEL_ROLE]
+			status: getPodStatus(pod),
+			role: labels[LABEL_ROLE],
+			isMig: isPodMigMode(pod),
+			pvcs: getPodKvCachePvcs(pod)
 		});
 	}
 
 	// 4. Cross-reference
 	crossReferencePodGpus(pods, gpus);
+
+	// 5. Resolve PVC sizes and workspaces for the pods rendered in the diagram
+	await Promise.all([
+		attachPvcSizes(client, cluster, pods),
+		attachWorkspaces(client, cluster, pods)
+	]);
 
 	return { pods, gpus, nodes };
 }

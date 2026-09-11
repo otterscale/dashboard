@@ -6,7 +6,7 @@ ARG VERSION=unknown
 WORKDIR /src
 
 # Install pnpm
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.33.0
 
 # Copy dependency files first for better caching
 COPY package.json pnpm-lock.yaml ./
