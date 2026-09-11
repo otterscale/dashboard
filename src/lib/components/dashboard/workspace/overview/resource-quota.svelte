@@ -93,6 +93,16 @@
 	}
 
 	/**
+	 * Liveness probe for kube-state-metrics: the namespace collector emits exactly one series per
+	 * namespace, from the same scrape that produces `kube_resourcequota`. Empty means KSM is not
+	 * being scraped right now (or the namespace does not exist yet).
+	 */
+	function nsCount() {
+		const ns = escapePromqlStringLiteral(namespace);
+		return `count(kube_namespace_created{namespace="${ns}"})`;
+	}
+
+	/**
 	 * Pod-level stand-in for ResourceQuota's `used` counter, for namespaces that have no
 	 * ResourceQuota at all. Restricted to non-terminated pods, the same set the quota counts.
 	 */
@@ -194,12 +204,47 @@
 	}
 
 	/**
-	 * Whether the namespace has a ResourceQuota, per Prometheus. Throws on query failure so a
-	 * Prometheus outage shows as an error instead of being mistaken for an unlimited workspace.
+	 * Whether the KSM resourcequota collector is enabled. Prometheus records a metric's metadata
+	 * from the `# HELP` / `# TYPE` lines of a scrape regardless of whether any sample followed,
+	 * and KSM writes those headers for every enabled collector even with zero objects — so an
+	 * absent entry means the collector is off (or KSM was never scraped), not "no quotas".
+	 */
+	async function resourceQuotaCollectorEnabled(): Promise<boolean> {
+		const meta = (await prometheusDriver.metadata('kube_resourcequota')) as
+			| Record<string, unknown[]>
+			| null
+			| undefined;
+		const entries = meta?.kube_resourcequota;
+		return Array.isArray(entries) && entries.length > 0;
+	}
+
+	async function countScalar(q: string): Promise<number> {
+		const r = await prometheusDriver.instantQuery(q, new Date());
+		return instantScalar(r) ?? 0;
+	}
+
+	/**
+	 * Whether the namespace has a ResourceQuota, per Prometheus. Three signals, all required, so
+	 * that "no quota" is only concluded when KSM is demonstrably exporting quotas right now:
+	 *  1. metadata lists `kube_resourcequota`  → the collector is enabled
+	 *  2. `kube_namespace_created` has a series → KSM is live and sees this namespace
+	 *  3. `kube_resourcequota` has a series     → a ResourceQuota object exists
+	 * 1 or 2 failing throws, so the tile shows an error rather than a misleading `used / ∞`.
+	 * Any query failure also throws for the same reason.
 	 */
 	async function hasResourceQuota(): Promise<boolean> {
-		const r = await prometheusDriver.instantQuery(rqCount(), new Date());
-		return (instantScalar(r) ?? 0) > 0;
+		const [collectorEnabled, nsSeen, rqSeries] = await Promise.all([
+			resourceQuotaCollectorEnabled(),
+			countScalar(nsCount()),
+			countScalar(rqCount())
+		]);
+		if (!collectorEnabled) {
+			throw new Error('kube-state-metrics is not exporting kube_resourcequota');
+		}
+		if (nsSeen === 0) {
+			throw new Error(`kube-state-metrics has no series for namespace "${namespace}"`);
+		}
+		return rqSeries > 0;
 	}
 
 	async function fetch() {
