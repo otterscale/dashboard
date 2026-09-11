@@ -41,7 +41,7 @@
 		getUISchemas
 	} from './kind-viewer-columns';
 	import { getGridLayout, type GridLayoutType } from './kind-viewer-grid-layouts';
-	import { getValidator, validatorKey } from './validator';
+	import { getValidator } from './validator';
 
 	let {
 		isClusterAdmin,
@@ -279,13 +279,12 @@
 		// For Dynamic Table
 		columnDefinitions = getColumnDefinitions(apiResource, uiSchemas, dataSchemas, cluster);
 		// For Dynamic Form; not awaited, so actions become available before the list finishes.
-		void fetchSchema().then((fetched) => {
+		void fetchSchema().then(async (fetched) => {
 			if (isDestroyed || !fetched) return;
+			const compiled = await getValidator(fetched);
+			if (isDestroyed) return;
+			validate = compiled;
 			schema = fetched;
-			validate = getValidator(
-				validatorKey(cluster, apiResource.group, apiResource.version, apiResource.kind),
-				fetched
-			);
 		});
 		await listResources();
 		watchResources();
