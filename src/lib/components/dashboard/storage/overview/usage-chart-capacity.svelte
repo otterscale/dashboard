@@ -1,6 +1,7 @@
 <script lang="ts">
 	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import ScaleIcon from '@lucide/svelte/icons/scale';
 	import { ArcChart, Text } from 'layerchart';
 	import { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
@@ -9,7 +10,8 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import { formatCapacity } from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
+	import { cn } from '$lib/utils';
 
 	// Props
 	let { client, isReloading = $bindable() }: { client: PrometheusDriver; isReloading: boolean } =
@@ -20,10 +22,15 @@
 	const CHART_DESCRIPTION = m.remaining_capacity();
 	const chartConfig = { data: { color: 'var(--chart-2)' } } satisfies Chart.ChartConfig;
 
+	// Thin provisioning lets total PVC requests exceed the physical pool; past
+	// this ratio the number is highlighted as a warning.
+	const WARN_RATIO = 3;
+
 	// Queries
 	const queries = $derived({
 		used: `ceph_cluster_total_used_bytes{}`,
-		total: `ceph_cluster_total_bytes{}`
+		total: `ceph_cluster_total_bytes{}`,
+		overcommit: `sum(kube_persistentvolumeclaim_resource_requests_storage_bytes) / sum(ceph_cluster_total_bytes)`
 	});
 
 	// Auto Update
@@ -38,15 +45,20 @@
 			availablePercentage: { value: number }[];
 		}
 	);
+	let overcommitRatio = $state<number>();
 	let isLoading = $state(true);
 	const reloadManager = new ReloadManager(fetch);
 
 	// Data fetching function
 	async function fetch() {
-		const [usedResponse, totalResponse] = await Promise.all([
+		const [usedResponse, totalResponse, overcommitResponse] = await Promise.all([
 			client.instantQuery(queries.used),
-			client.instantQuery(queries.total)
+			client.instantQuery(queries.total),
+			client.instantQuery(queries.overcommit)
 		]);
+
+		const overcommitValue = parseFloat(overcommitResponse.result[0]?.value?.value);
+		overcommitRatio = Number.isFinite(overcommitValue) ? overcommitValue : undefined;
 
 		const usedValue = usedResponse.result[0]?.value?.value;
 		const totalValue = totalResponse.result[0]?.value?.value;
@@ -151,6 +163,23 @@
 					{/snippet}
 				</ArcChart>
 			</Chart.Container>
+			{#if overcommitRatio !== undefined}
+				<div
+					class="flex items-center justify-center gap-1.5 text-sm text-muted-foreground"
+					title={m.storage_overcommit_description()}
+				>
+					<ScaleIcon class="size-4" aria-hidden="true" />
+					<span>{m.storage_overcommit_title()}</span>
+					<span
+						class={cn(
+							'font-semibold text-foreground tabular-nums',
+							overcommitRatio >= WARN_RATIO && 'text-amber-700 dark:text-amber-400'
+						)}
+					>
+						{overcommitRatio.toFixed(1)}x
+					</span>
+				</div>
+			{/if}
 		</Card.Content>
 	{/if}
 </Card.Root>

@@ -2,7 +2,7 @@
 	import type { PrometheusDriver } from 'prometheus-query';
 
 	import { formatIO } from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	import AreaTimeSeries from '../area-time-series.svelte';
 

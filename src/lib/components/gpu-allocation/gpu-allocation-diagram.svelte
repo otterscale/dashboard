@@ -38,16 +38,36 @@
 		k8sNode: K8sNodeNode as any // eslint-disable-line @typescript-eslint/no-explicit-any
 	};
 
-	// Aggregate GPU memory usage per k8s node (used for the node cards).
+	// Aggregate GPU usage per k8s node (used for the node cards): the memory HAMi booked,
+	// plus what DCGM measures on the same cards. `measuredCards` counts only the cards that
+	// reported, so a node with one unmeasured card still averages honestly over the rest.
 	const gpuUsageByNode = $derived.by(() => {
-		const map = new SvelteMap<string, { usedMem: number }>();
+		const map = new SvelteMap<
+			string,
+			{ usedMem: number; computeSum: number; measuredCards: number }
+		>();
 		for (const gpu of topologyData.gpus) {
-			const agg = map.get(gpu.nodeName) ?? { usedMem: 0 };
+			const agg = map.get(gpu.nodeName) ?? { usedMem: 0, computeSum: 0, measuredCards: 0 };
 			agg.usedMem += gpu.allocatedBy.reduce((sum, a) => sum + a.usedMem, 0);
+			const compute = gpu.utilization?.compute;
+			if (compute !== undefined) {
+				agg.computeSum += compute;
+				agg.measuredCards += 1;
+			}
 			map.set(gpu.nodeName, agg);
 		}
 		return map;
 	});
+
+	/** Whether any card reported measurements — gates the legend entries for them. */
+	const hasUtilization = $derived(topologyData.gpus.some((gpu) => gpu.utilization !== undefined));
+
+	/** Mean measured compute utilization of a node's cards, or undefined if none reported. */
+	function nodeCompute(nodeName: string): number | undefined {
+		const agg = gpuUsageByNode.get(nodeName);
+		if (!agg || agg.measuredCards === 0) return undefined;
+		return agg.computeSum / agg.measuredCards;
+	}
 
 	// GPU device IDs running in MIG mode. Reported per-device by HAMi via the
 	// `mode` field in node-nvidia-register, so idle MIG GPUs (no pods yet) are
@@ -72,7 +92,8 @@
 				position: { x: 0, y: 0 },
 				data: {
 					name: topologyData.llmInferenceService.name,
-					namespace: topologyData.llmInferenceService.namespace
+					namespace: topologyData.llmInferenceService.namespace,
+					workspace: topologyData.llmInferenceService.workspace ?? ''
 				}
 			});
 
@@ -89,11 +110,13 @@
 					data: {
 						name: pod.name,
 						namespace: pod.namespace,
+						workspace: pod.workspace ?? '',
 						status: pod.status,
 						gpuCount: pod.allocations.length,
 						role: pod.role ?? '',
 						usedMem: pod.allocations.reduce((sum, a) => sum + a.usedMem, 0),
-						isMig: pod.isMig
+						isMig: pod.isMig,
+						pvcs: pod.pvcs
 					}
 				});
 
@@ -142,7 +165,8 @@
 						usedMem: totalUsedMem,
 						shareCount: gpu.allocatedBy.length,
 						isMig: migGpuIds.has(gpu.device.id),
-						slices: isGpuMigMode(gpu.device) ? buildMigSlices(gpu.allocatedBy) : []
+						slices: isGpuMigMode(gpu.device) ? buildMigSlices(gpu.allocatedBy) : [],
+						utilization: gpu.utilization
 					}
 				});
 			}
@@ -162,6 +186,7 @@
 						gpuType,
 						totalMem: node.devices.reduce((sum, d) => sum + d.devmem, 0),
 						usedMem: gpuUsageByNode.get(node.name)?.usedMem ?? 0,
+						compute: nodeCompute(node.name),
 						healthyCount: node.devices.filter((d) => d.health).length,
 						isMig: node.devices.some((d) => migGpuIds.has(d.id))
 					}
@@ -192,11 +217,13 @@
 					data: {
 						name: pod.name,
 						namespace: pod.namespace,
+						workspace: pod.workspace ?? '',
 						status: pod.status,
 						gpuCount: pod.allocations.length,
 						role: pod.role ?? '',
 						usedMem: pod.allocations.reduce((sum, a) => sum + a.usedMem, 0),
-						isMig: pod.isMig
+						isMig: pod.isMig,
+						pvcs: pod.pvcs
 					}
 				});
 
@@ -231,7 +258,8 @@
 						usedMem: totalUsedMem,
 						shareCount: gpu.allocatedBy.length,
 						isMig: migGpuIds.has(gpu.device.id),
-						slices: isGpuMigMode(gpu.device) ? buildMigSlices(gpu.allocatedBy) : []
+						slices: isGpuMigMode(gpu.device) ? buildMigSlices(gpu.allocatedBy) : [],
+						utilization: gpu.utilization
 					}
 				});
 			}
@@ -251,6 +279,7 @@
 						gpuType,
 						totalMem: node.devices.reduce((sum, d) => sum + d.devmem, 0),
 						usedMem: gpuUsageByNode.get(node.name)?.usedMem ?? 0,
+						compute: nodeCompute(node.name),
 						healthyCount: node.devices.filter((d) => d.health).length,
 						isMig: node.devices.some((d) => migGpuIds.has(d.id))
 					}
@@ -352,6 +381,30 @@
 						>
 						<span>MIG partition</span>
 					</div>
+					<div class="flex items-center gap-2">
+						<span class="rounded-sm bg-chart-5/10 px-1 text-[9px] font-medium text-chart-5"
+							>KV Offload</span
+						>
+						<span>KV cache offload to SSD</span>
+					</div>
+					<div class="flex items-center gap-2">
+						<span class="size-2.5 rounded-sm border border-destructive bg-card"></span>
+						<span>Red border: unhealthy or failing</span>
+					</div>
+					{#if hasUtilization}
+						<div class="flex items-center gap-2">
+							<span class="rounded-full bg-chart-2/10 px-1 text-[9px] font-medium text-chart-2"
+								>42%</span
+							>
+							<span>Compute utilization (measured)</span>
+						</div>
+						<div class="flex items-center gap-2">
+							<span class="relative block h-1.5 w-4 overflow-hidden rounded-full bg-chart-4/30">
+								<span class="absolute inset-y-0 left-0 w-1.5 rounded-full bg-chart-4"></span>
+							</span>
+							<span>Memory in use / allocated</span>
+						</div>
+					{/if}
 					<div class="mt-1 flex items-center gap-2 border-t border-border pt-1.5">
 						<span class="h-0.5 w-4 rounded-full bg-primary"></span>
 						<span>Active allocation</span>

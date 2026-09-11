@@ -1,7 +1,7 @@
 import { error, json, type RequestHandler } from '@sveltejs/kit';
 import { load } from 'js-yaml';
 
-import type { ChartType } from '$lib/components/artifact-viewer/types';
+import type { ChartType } from '$lib/components/chart-viewer/types';
 
 function getIndexUrl(repositoryUrl: string): URL {
 	const url = new URL(repositoryUrl);
