@@ -13,8 +13,14 @@
 	import { Toaster } from '$lib/components/ui/sonner';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { toastRecorder } from '$lib/stores/toast-recorder';
 
 	let { children } = $props();
+
+	// Files error/warning toasts into the notification centre.
+	$effect(() => {
+		toastRecorder.sync();
+	});
 
 	const proxyHeaderInterceptor: Interceptor = (next) => async (req) => {
 		req.header.set('x-proxy-target', 'api');
@@ -48,7 +54,14 @@
 {/snippet}
 
 <ModeWatcher />
-<Toaster toastOptions={{ class: '!pointer-events-auto' }} richColors {loadingIcon} />
+<Toaster
+	toastOptions={{
+		class: '!pointer-events-auto',
+		classes: { title: 'line-clamp-5' }
+	}}
+	richColors
+	{loadingIcon}
+/>
 
 <Tooltip.Provider>
 	<div class="app">

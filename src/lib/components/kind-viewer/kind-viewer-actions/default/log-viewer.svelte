@@ -1,19 +1,29 @@
 <script lang="ts">
+	import { timestampFromDate } from '@bufbuild/protobuf/wkt';
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import ArrowDownIcon from '@lucide/svelte/icons/arrow-down';
 	import ContainerIcon from '@lucide/svelte/icons/container';
+	import PauseIcon from '@lucide/svelte/icons/pause';
 	import SearchIcon from '@lucide/svelte/icons/search';
+	import UnplugIcon from '@lucide/svelte/icons/unplug';
 	import { RuntimeService } from '@otterscale/api/runtime/v1';
 	import { getContext, onDestroy, type Snippet, tick } from 'svelte';
+	import { SvelteMap } from 'svelte/reactivity';
 
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Empty from '$lib/components/ui/empty';
+	import { Separator } from '$lib/components/ui/separator';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { UseClipboard } from '$lib/hooks/use-clipboard.svelte';
 	import { cn } from '$lib/utils';
 
 	const MAX_LINES = 1000;
+	const decoder = new TextDecoder();
+
+	// streaming: following live output. paused: stopped by the user, screen kept.
+	// disconnected: stopped by the server or an error, screen kept.
+	type StreamStatus = 'streaming' | 'paused' | 'disconnected';
 
 	let {
 		cluster,
@@ -36,7 +46,6 @@
 	const transport: Transport = getContext('transport');
 	const client = createClient(RuntimeService, transport);
 
-	let follow = $state(true);
 	let previous = $state(false);
 	// Reassigned wholesale on every chunk — $state.raw skips deep-proxying 1000 lines.
 	let logLines = $state.raw<string[]>([]);
@@ -49,6 +58,15 @@
 	let filter = $state('');
 	let debouncedFilter = $state('');
 	let filterTimer: ReturnType<typeof setTimeout> | undefined;
+	let streamStatus = $state<StreamStatus>('streaming');
+	// Why the stream stopped; shown in the status area, never in the log itself
+	// so copied output stays clean.
+	let streamError = $state('');
+	// Wall-clock time of the last log chunk; resuming continues from here.
+	let lastDataAt: Date | undefined;
+	// Line number → label. A divider is drawn after that line to mark where the
+	// stream was resumed, since output around it may be missing or repeated.
+	const resumeMarkers = new SvelteMap<number, string>();
 
 	const clipboard = new UseClipboard({ delay: 1000 });
 
@@ -85,12 +103,12 @@
 	const streamParams = $derived({
 		name: podName,
 		container,
-		follow,
 		previous
 	});
 
 	// Single restart source: reading streamParams registers every stream input as a
-	// dependency, so changing pod, container, follow or previous restarts exactly once.
+	// dependency, so changing pod, container or previous restarts exactly once.
+	// Switching source always starts streaming, even from paused.
 	$effect(() => {
 		if (!active) return;
 		startStreaming(streamParams);
@@ -129,51 +147,27 @@
 		return new Promise((resolve) => setTimeout(resolve, ms));
 	}
 
-	async function startStreaming(params: typeof streamParams) {
+	/** Fresh start: clears the screen and fetches the tail. */
+	function startStreaming(params: typeof streamParams) {
 		stopStreaming();
 		logLines = [];
 		droppedLines = 0;
+		lastDataAt = undefined;
+		resumeMarkers.clear();
+		openStream(params);
+	}
 
-		if (!params.name) {
-			logLines = ['[Error] No pod name available.'];
-			return;
-		}
-
-		abortController = new AbortController();
-
-		try {
-			const stream = client.podLog(
-				{
-					cluster,
-					namespace,
-					name: params.name,
-					container: params.container,
-					follow: params.follow,
-					previous: params.previous,
-					tailLines: BigInt(MAX_LINES)
-				},
-				{ signal: abortController.signal }
-			);
-
-			for await (const response of stream) {
-				if (response.data && response.data.length > 0) {
-					const text = new TextDecoder().decode(response.data);
-					const lines = text.split('\n').filter((l) => l.length > 0);
-
-					const newLogLines = [...logLines, ...lines];
-					if (newLogLines.length > MAX_LINES) {
-						droppedLines += newLogLines.length - MAX_LINES;
-					}
-					logLines = newLogLines.slice(-MAX_LINES);
-
-					autoScrollToBottom();
-					await delay(10);
-				}
-			}
-		} catch (error) {
-			if (abortController?.signal.aborted) return;
-			logLines = [...logLines, `[Error] Failed to stream logs: ${error}`];
-		}
+	/**
+	 * Keeps the screen and continues from the last line seen. This is also how
+	 * a disconnected stream is reopened.
+	 */
+	function resumeStreaming() {
+		stopStreaming();
+		markResumed();
+		// sinceTime has second precision, so a line from the same second as the
+		// last one seen may appear twice after a resume. tailLines is kept as a
+		// cap so resuming after a long pause cannot flood the buffer.
+		openStream(streamParams, lastDataAt);
 	}
 
 	function stopStreaming() {
@@ -183,8 +177,86 @@
 		}
 	}
 
+	async function openStream(params: typeof streamParams, since?: Date) {
+		if (!params.name) {
+			streamStatus = 'disconnected';
+			streamError = 'No pod name available.';
+			return;
+		}
+
+		const controller = new AbortController();
+		abortController = controller;
+		streamStatus = 'streaming';
+		streamError = '';
+
+		try {
+			const stream = client.podLog(
+				{
+					cluster,
+					namespace,
+					name: params.name,
+					container: params.container,
+					follow: true,
+					previous: params.previous,
+					tailLines: BigInt(MAX_LINES),
+					...(since ? { sinceTime: timestampFromDate(since) } : {})
+				},
+				{ signal: controller.signal }
+			);
+
+			for await (const response of stream) {
+				if (controller.signal.aborted) return;
+				if (response.data && response.data.length > 0) {
+					lastDataAt = new Date();
+					appendLines(decoder.decode(response.data));
+					autoScrollToBottom();
+					await delay(10);
+				}
+			}
+		} catch (error) {
+			// The server closes every stream after a few minutes, like it does for
+			// the terminal. There is no automatic reconnect; the user resumes.
+			if (controller.signal.aborted) return;
+			streamStatus = 'disconnected';
+			streamError = `${error}`;
+			return;
+		}
+
+		// A clean end while following means kubelet closed the stream: the
+		// container exited or restarted. Retrying blindly would just loop, so
+		// leave it to the user to resume once the container is back.
+		if (controller.signal.aborted) return;
+		streamStatus = 'disconnected';
+		streamError = 'Log stream ended. The container may have stopped.';
+	}
+
+	function markResumed() {
+		const afterLine = droppedLines + logLines.length;
+		if (afterLine === 0) return;
+		const label = streamStatus === 'paused' ? 'resumed' : 'reconnected';
+		resumeMarkers.set(afterLine, `${label} ${new Date().toLocaleTimeString()}`);
+	}
+
+	function appendLines(text: string) {
+		const lines = text.split('\n').filter((l) => l.length > 0);
+		const newLogLines = [...logLines, ...lines];
+		if (newLogLines.length > MAX_LINES) {
+			droppedLines += newLogLines.length - MAX_LINES;
+		}
+		logLines = newLogLines.slice(-MAX_LINES);
+	}
+
+	/** Start over: clears the screen and fetches the tail again. */
 	export function restart() {
 		if (active) startStreaming(streamParams);
+	}
+
+	export function getStreamStatus(): StreamStatus {
+		return streamStatus;
+	}
+
+	export function getStreamError() {
+		return streamError;
 	}
 
 	export function isEmpty() {
@@ -218,12 +290,16 @@
 		filterTimer = setTimeout(() => (debouncedFilter = value), 150);
 	}
 
-	export function isFollowing() {
-		return follow;
-	}
-
+	/** Pause keeps the screen and closes the stream; resume continues from the last line seen. */
 	export function setFollowing(value: boolean) {
-		follow = value;
+		if (!active) return;
+		if (value) {
+			resumeStreaming();
+			return;
+		}
+		stopStreaming();
+		streamStatus = 'paused';
+		streamError = '';
 	}
 
 	export function isPrevious() {
@@ -315,14 +391,28 @@
 				{#if previous}
 					<Badge variant="secondary" class="shrink-0 font-normal">Previous container</Badge>
 				{/if}
-				<span class="flex shrink-0 items-center gap-1.5">
+				<span
+					class={cn(
+						'flex shrink-0 items-center gap-1.5',
+						streamStatus === 'disconnected' && 'text-destructive'
+					)}
+					title={streamError || undefined}
+				>
 					<span
 						class={cn(
 							'size-1.5 rounded-full',
-							follow && active ? 'animate-pulse bg-primary' : 'bg-muted-foreground'
+							streamStatus === 'streaming' && active
+								? 'animate-pulse bg-primary'
+								: streamStatus === 'disconnected'
+									? 'bg-destructive'
+									: 'bg-muted-foreground'
 						)}
 					></span>
-					{follow ? 'Streaming' : 'Paused'}
+					{streamStatus === 'streaming'
+						? 'Streaming'
+						: streamStatus === 'paused'
+							? 'Paused'
+							: 'Disconnected'}
 				</span>
 				<span aria-hidden="true">·</span>
 				<span class="shrink-0">
@@ -345,13 +435,27 @@
 			{#if logLines.length === 0}
 				<Empty.Root class="h-full">
 					<Empty.Header>
-						<Empty.Media variant="icon">
-							<Spinner />
-						</Empty.Media>
-						<Empty.Title>Waiting for logs</Empty.Title>
-						<Empty.Description>
-							Log data will appear here as soon as the container produces output.
-						</Empty.Description>
+						{#if streamStatus === 'disconnected'}
+							<Empty.Media variant="icon">
+								<UnplugIcon />
+							</Empty.Media>
+							<Empty.Title>Log stream disconnected</Empty.Title>
+							<Empty.Description>{streamError}</Empty.Description>
+						{:else if streamStatus === 'paused'}
+							<Empty.Media variant="icon">
+								<PauseIcon />
+							</Empty.Media>
+							<Empty.Title>Streaming paused</Empty.Title>
+							<Empty.Description>Resume streaming to receive log output.</Empty.Description>
+						{:else}
+							<Empty.Media variant="icon">
+								<Spinner />
+							</Empty.Media>
+							<Empty.Title>Waiting for logs</Empty.Title>
+							<Empty.Description>
+								Log data will appear here as soon as the container produces output.
+							</Empty.Description>
+						{/if}
 					</Empty.Header>
 				</Empty.Root>
 			{:else if filteredLines.length === 0}
@@ -383,6 +487,16 @@
 							{entry.text}
 						{/if}
 					</div>
+					{#if resumeMarkers.has(entry.no)}
+						<div
+							class="my-1 flex items-center gap-2 px-3 text-[10px] text-muted-foreground select-none"
+							role="separator"
+						>
+							<Separator decorative class="flex-1" />
+							{resumeMarkers.get(entry.no)}
+							<Separator decorative class="flex-1" />
+						</div>
+					{/if}
 				{/each}
 			{/if}
 		</div>

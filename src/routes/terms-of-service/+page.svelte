@@ -1,5 +1,5 @@
 <script>
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 </script>
 
 <svelte:head>

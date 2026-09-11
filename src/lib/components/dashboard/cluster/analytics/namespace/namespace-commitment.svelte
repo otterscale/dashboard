@@ -2,8 +2,8 @@
 	import type { PrometheusDriver } from 'prometheus-query';
 
 	import { formatCapacity } from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
-	import { escapePromqlStringLiteral } from '$lib/prometheus';
+	import { m } from '$lib/messages';
+	import { escapePromqlStringLiteral, LIVE_PODS } from '$lib/prometheus';
 
 	import AreaTimeSeries from '../area-time-series.svelte';
 
@@ -27,13 +27,13 @@
 	const ns = $derived(escapePromqlStringLiteral((namespace ?? '').trim()));
 
 	const cpuQuery = () => ({
-		[m.limit()]: `sum(kube_pod_container_resource_limits{namespace="${ns}",resource="cpu",unit="core"})`,
-		[m.request()]: `sum(kube_pod_container_resource_requests{namespace="${ns}",resource="cpu",unit="core"})`,
+		[m.limit()]: `sum(kube_pod_container_resource_limits{namespace="${ns}",resource="cpu",unit="core"} ${LIVE_PODS})`,
+		[m.request()]: `sum(kube_pod_container_resource_requests{namespace="${ns}",resource="cpu",unit="core"} ${LIVE_PODS})`,
 		[m.usage()]: `sum(rate(container_cpu_usage_seconds_total{namespace="${ns}",container!=""}[2m]))`
 	});
 	const memQuery = () => ({
-		[m.limit()]: `sum(kube_pod_container_resource_limits{namespace="${ns}",resource="memory",unit="byte"})`,
-		[m.request()]: `sum(kube_pod_container_resource_requests{namespace="${ns}",resource="memory",unit="byte"})`,
+		[m.limit()]: `sum(kube_pod_container_resource_limits{namespace="${ns}",resource="memory",unit="byte"} ${LIVE_PODS})`,
+		[m.request()]: `sum(kube_pod_container_resource_requests{namespace="${ns}",resource="memory",unit="byte"} ${LIVE_PODS})`,
 		[m.usage()]: `sum(container_memory_working_set_bytes{namespace="${ns}",container!=""})`
 	});
 

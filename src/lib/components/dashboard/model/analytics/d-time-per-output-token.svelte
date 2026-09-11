@@ -2,6 +2,7 @@
 	import ChartLine from '@lucide/svelte/icons/chart-line';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+	import MoonIcon from '@lucide/svelte/icons/moon';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
@@ -13,11 +14,14 @@
 	import { buttonVariants } from '$lib/components/ui/button';
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { m } from '$lib/paraglide/messages';
+	import { formatLatency } from '$lib/formatter';
+	import { m } from '$lib/messages';
 	import {
+		type ActivityState,
 		computeStep,
 		type DataPoint,
 		fetchCombinedFlattenedRange,
+		probeActivity,
 		vllmMetricWithSelector
 	} from '$lib/prometheus';
 
@@ -42,6 +46,7 @@
 	} = $props();
 
 	let times_per_output_token = $state<DataPoint[]>([]);
+	let activity = $state<ActivityState>('absent');
 
 	function tpotQueries(): Record<string, string> {
 		const bucket = vllmMetricWithSelector(
@@ -50,15 +55,33 @@
 			selectedModel
 		);
 		const inner = `sum by(le) (rate(${bucket}[5m]))`;
+		// `traffic` rides along in the same combined query at no extra request. It tells an
+		// idle model (series present, flat 0) apart from one that was never scraped (no series).
+		const requests = vllmMetricWithSelector(
+			'vllm:request_time_per_output_token_seconds_count',
+			namespace,
+			selectedModel
+		);
+		// Σ latency / Σ requests: the mean. It keeps drawing under sparse traffic, where a
+		// quantile over a handful of buckets drops out, and reads against the tail: flat while
+		// p99 spikes = a few slow requests; all three rising = capacity.
+		const total = vllmMetricWithSelector(
+			'vllm:request_time_per_output_token_seconds_sum',
+			namespace,
+			selectedModel
+		);
 		return {
+			avg: `sum(rate(${total}[5m])) / sum(rate(${requests}[5m]))`,
 			p95: `histogram_quantile(0.95, ${inner})`,
-			p99: `histogram_quantile(0.99, ${inner})`
+			p99: `histogram_quantile(0.99, ${inner})`,
+			traffic: `sum(rate(${requests}[5m]))`
 		};
 	}
 
 	const configuration = {
 		p95: { label: 'P95', color: 'var(--chart-1)' },
-		p99: { label: 'P99', color: 'var(--chart-2)' }
+		p99: { label: 'P99', color: 'var(--chart-2)' },
+		avg: { label: m.average(), color: 'var(--chart-3)' }
 	} satisfies Chart.ChartConfig;
 
 	const areaProps = {
@@ -73,15 +96,22 @@
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const step = computeStep(startMs, endMs);
-			times_per_output_token = await fetchCombinedFlattenedRange(
+			const points = await fetchCombinedFlattenedRange(
 				prometheusDriver,
 				tpotQueries(),
 				new Date(startMs),
 				new Date(endMs),
 				step
 			);
+			activity = probeActivity(points, 'traffic');
+			// A flat `traffic: 0` is a finite value, so it would keep points alive and defeat the
+			// `length === 0` empty check below. Only latency-bearing points are plottable.
+			times_per_output_token = points.filter(
+				(p) => p.avg !== undefined || p.p95 !== undefined || p.p99 !== undefined
+			);
 		} catch (error) {
 			times_per_output_token = [];
+			activity = 'absent';
 			console.error(`Fail to fetch time per output token data in cluster ${cluster}:`, error);
 		}
 	}
@@ -111,8 +141,8 @@
 			</p>
 		</div>
 		<Tooltip.Root>
-			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-				<InfoIcon class="size-5 text-muted-foreground" />
+			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}>
+				<InfoIcon class="size-4 text-muted-foreground" />
 			</Tooltip.Trigger>
 			<Tooltip.Content>
 				<p>{m.llm_dashboard_time_per_output_token_tooltip()}</p>
@@ -125,9 +155,15 @@
 				<LoaderCircle class="size-12 animate-spin" />
 			</div>
 		{:else if times_per_output_token.length === 0}
-			<div class="flex h-[200px] w-full flex-col items-center justify-center">
-				<ChartLine class="size-12 animate-pulse text-muted-foreground" />
-				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
+			<div class="flex h-[200px] w-full flex-col items-center justify-center gap-1">
+				{#if activity === 'idle'}
+					<MoonIcon class="size-12 text-muted-foreground" />
+					<p class="text-base text-muted-foreground">{m.no_traffic_display()}</p>
+					<p class="text-xs text-muted-foreground">{m.no_traffic_hint()}</p>
+				{:else}
+					<ChartLine class="size-12 animate-pulse text-muted-foreground" />
+					<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
+				{/if}
 			</div>
 		{:else}
 			<Chart.Container config={configuration} class="h-[200px] w-full">
@@ -138,7 +174,8 @@
 					yPadding={[0, 25]}
 					series={[
 						{ key: 'p95', label: configuration.p95.label, color: configuration.p95.color },
-						{ key: 'p99', label: configuration.p99.label, color: configuration.p99.color }
+						{ key: 'p99', label: configuration.p99.label, color: configuration.p99.color },
+						{ key: 'avg', label: configuration.avg.label, color: configuration.avg.color }
 					]}
 					props={{
 						area: areaProps,
@@ -162,6 +199,7 @@
 								})}
 						>
 							{#snippet formatter({ item, name, value })}
+								{@const latency = formatLatency(Number(value))}
 								<div
 									style="--color-bg: {item.color}; --color-border: {item.color};"
 									class="size-2.5 shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)"
@@ -171,8 +209,8 @@
 										<span class="text-muted-foreground">{name}</span>
 									</div>
 									<span class="font-mono font-medium text-foreground tabular-nums">
-										{Number(value).toFixed(3)}
-										{m.sec()}
+										{latency.value}
+										{latency.unit}
 									</span>
 								</div>
 							{/snippet}

@@ -17,7 +17,7 @@
 		formatIO,
 		getChartXAxisTicks
 	} from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import {
 		type DataPoint,
 		fetchMultipleFlattenedRange,

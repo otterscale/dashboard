@@ -4,7 +4,7 @@
 	import type { ComponentProps } from 'svelte';
 
 	import * as Sidebar from '$lib/components/ui/sidebar';
-	import { m } from '$lib/paraglide/messages.js';
+	import { m } from '$lib/messages';
 
 	import DialogAbout from './dialog-about.svelte';
 
