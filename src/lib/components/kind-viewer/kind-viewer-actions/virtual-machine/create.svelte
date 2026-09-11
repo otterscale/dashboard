@@ -65,7 +65,9 @@
 			metadata: { name: '' },
 			spec: {
 				instancetype: {
-					kind: 'VirtualMachineInstancetype' as string,
+					// Namespaced InstanceType is disabled — most users use ClusterInstanceType directly.
+					// kind: 'VirtualMachineInstancetype' as string,
+					kind: 'VirtualMachineClusterInstancetype' as string,
 					name: null as string | null
 				}
 			},
@@ -237,7 +239,9 @@
 	let value = $derived(stringify(submissionValues));
 
 	// Steps Manager
-	const steps = Array.from({ length: 9 }, (_, index) => String(index + 1));
+	// 9 steps when the Instance Type Kind step is enabled.
+	// const steps = Array.from({ length: 9 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 8 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -277,17 +281,19 @@
 		search: string
 	): Promise<{ label: string; value: string }[]> {
 		try {
-			const itKind = values.spec.instancetype.kind;
-			if (!itKind) return [];
-			const isClusterScoped = itKind === 'VirtualMachineClusterInstancetype';
+			// Namespaced InstanceType is disabled — always list cluster-scoped instance types.
+			// const itKind = values.spec.instancetype.kind;
+			// if (!itKind) return [];
+			// const isClusterScoped = itKind === 'VirtualMachineClusterInstancetype';
 			const response = await resourceClient.list({
 				cluster,
 				group: 'instancetype.kubevirt.io',
 				version: 'v1beta1',
-				resource: isClusterScoped
-					? 'virtualmachineclusterinstancetypes'
-					: 'virtualmachineinstancetypes',
-				...(isClusterScoped ? {} : { namespace })
+				// resource: isClusterScoped
+				// 	? 'virtualmachineclusterinstancetypes'
+				// 	: 'virtualmachineinstancetypes',
+				// ...(isClusterScoped ? {} : { namespace })
+				resource: 'virtualmachineclusterinstancetypes'
 			});
 			return response.items
 				.map((item) => {
@@ -370,7 +376,7 @@
 		try {
 			let gpuResourcesList: string[];
 
-			// If a node is selected in step 6, fetch GPU resources only for that node
+			// If a node is selected in step 5, fetch GPU resources only for that node
 			if (nodeSelector.node) {
 				gpuResourcesList = await fetchGpuResourcesForNode(nodeSelector.node);
 			} else {
@@ -541,7 +547,8 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 2: Instance Type Kind -->
+			<!-- Step (removed): Instance Type Kind — namespaced InstanceType is disabled.
+				Re-enable by restoring this block, bumping `steps` back to 9, and shifting later step indices.
 			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
@@ -583,8 +590,9 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 3: Instance Type -->
-			<Tabs.Content value={steps[2]}>
+			-->
+			<!-- Step 2: Instance Type -->
+			<Tabs.Content value={steps[1]}>
 				<Form
 					schema={{
 						...(lodash.get(jsonSchema, 'properties.spec.properties.instancetype.properties.name', {
@@ -632,8 +640,8 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 4: Disk Source Type -->
-			<Tabs.Content value={steps[3]}>
+			<!-- Step 3: Disk Source Type -->
+			<Tabs.Content value={steps[2]}>
 				<Form
 					schema={{
 						type: 'string',
@@ -673,8 +681,8 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 5: Disks -->
-			<Tabs.Content value={steps[4]}>
+			<!-- Step 4: Disks -->
+			<Tabs.Content value={steps[3]}>
 				{#if values.diskSourceType === 'containerDisk'}
 					<Form
 						schema={{
@@ -844,8 +852,8 @@
 					</Form>
 				{/if}
 			</Tabs.Content>
-			<!-- Step 6: Node Selector -->
-			<Tabs.Content value={steps[5]}>
+			<!-- Step 5: Node Selector -->
+			<Tabs.Content value={steps[4]}>
 				<Form
 					schema={{
 						type: 'object',
@@ -902,8 +910,8 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 7: GPU Passthrough -->
-			<Tabs.Content value={steps[6]}>
+			<!-- Step 6: GPU Passthrough -->
+			<Tabs.Content value={steps[5]}>
 				<Form
 					schema={{
 						type: 'object',
@@ -988,8 +996,8 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 8: Cloud-Init -->
-			<Tabs.Content value={steps[7]}>
+			<!-- Step 7: Cloud-Init -->
+			<Tabs.Content value={steps[6]}>
 				<Form
 					schema={{
 						type: 'string',
@@ -1027,8 +1035,8 @@
 					{/snippet}
 				</Form>
 			</Tabs.Content>
-			<!-- Step 9: Review & Create -->
-			<Tabs.Content value={steps[8]} class="min-h-[77vh]">
+			<!-- Step 8: Review & Create -->
+			<Tabs.Content value={steps[7]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{

@@ -48,7 +48,7 @@ function getHelmReleaseData(
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.metadata?.namespace ?? null,
 		Repository: object?.spec?.chart?.spec?.sourceRef?.name ?? null,
-		'Helm Chart': object?.status?.helmChart ?? null,
+		'Helm Chart': object?.spec?.chart?.spec?.chart ?? null,
 		Version: object?.spec?.chart?.spec?.version ?? null,
 		Ready: readyCondition?.status ?? 'Unknown',
 		Reason: readyCondition?.reason ?? null,

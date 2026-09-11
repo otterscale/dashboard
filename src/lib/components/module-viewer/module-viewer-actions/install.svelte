@@ -15,6 +15,11 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
+	import {
+		ClusterReleaseScope,
+		PlatformReleaseServiceAccountName,
+		ReleaseScopeLabel
+	} from '$lib/utils/helm-release';
 
 	import type { ModuleAttribute } from '../table-layout';
 	import { type ModuleType } from '../types';
@@ -60,20 +65,39 @@
 					name,
 					namespace
 				}));
+				const remediationRetries = Number(
+					lodash.get(module, ['annotations', 'module.otterscale.io/remediation'], NaN)
+				);
+				const hasRemediation = Number.isInteger(remediationRetries);
 
 				const manifest = {
 					apiVersion: `${group}/${version}`,
 					kind,
 					metadata: {
 						name: module.name,
-						namespace
+						namespace,
+						labels: {
+							[ReleaseScopeLabel]: ClusterReleaseScope
+						}
 					},
 					spec: {
 						releaseName: module.name,
+						serviceAccountName: PlatformReleaseServiceAccountName,
+						commonMetadata: {
+							labels: {
+								[ReleaseScopeLabel]: ClusterReleaseScope
+							}
+						},
 						targetNamespace: lodash.get(module, ['annotations', 'module.otterscale.io/namespace']),
-						install: { createNamespace: true },
+						install: {
+							createNamespace: true,
+							...(hasRemediation && { remediation: { retries: remediationRetries } })
+						},
+						...(hasRemediation && {
+							upgrade: { remediation: { retries: remediationRetries } }
+						}),
 						interval: '15m',
-						timeout: '1h',
+						timeout: '15m',
 						...(dependenciesOfSelectedModule.length > 0 && {
 							dependsOn: dependenciesOfSelectedModule
 						}),
@@ -88,7 +112,42 @@
 									namespace: helmRepository?.metadata?.namespace
 								}
 							}
-						}
+						},
+						// Optional per-release values ConfigMap (`<release>-values` in the release
+						// namespace): FluxCD skips it when absent, so CE and EE share the manifest.
+						valuesFrom: [
+							{
+								kind: 'ConfigMap',
+								name: `${module.name}-values`,
+								valuesKey: 'values',
+								optional: true
+							}
+						],
+						...(lodash.get(module, ['annotations', 'module.otterscale.io/post-renderer'])
+							? (() => {
+									const postRenderers = lodash
+										.get(module, ['annotations', 'module.otterscale.io/post-renderer'], '')
+										.split(',')
+										.map((script) => script.trim())
+										.filter(Boolean)
+										.reduce((jsonPatch, script) => {
+											const setOperant = script.indexOf('=');
+											if (setOperant === -1) return jsonPatch;
+											const path = script.slice(0, setOperant);
+											const value = script.slice(setOperant + 1);
+											return lodash.set(jsonPatch, path, value);
+										}, {});
+									for (const postRenderer of lodash.get(postRenderers, 'postRenderers', [])) {
+										for (const patch of lodash.get(postRenderer, ['kustomize', 'patches'], [])) {
+											const patchOperation = lodash.get(patch, 'patch');
+											if (patchOperation && typeof patchOperation !== 'string') {
+												lodash.set(patch, 'patch', JSON.stringify(patchOperation).trimEnd());
+											}
+										}
+									}
+									return postRenderers;
+								})()
+							: {})
 					}
 				};
 

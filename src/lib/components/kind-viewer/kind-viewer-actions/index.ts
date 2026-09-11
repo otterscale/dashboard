@@ -4,10 +4,11 @@ import type { Row } from '@tanstack/table-core';
 import { type ValidateFunction } from 'ajv';
 import type { Component, Snippet } from 'svelte';
 
+import type { ResourceRuleVerbs } from '$lib/components/resources/types';
+
+import { getKindExtension } from '../extensions';
 import ApplicationActions from './applications/actions.svelte';
 import ApplicationCreate from './applications/create.svelte';
-import ObjectBucketClaimActions from './ceph-object-bucket-claim/actions.svelte';
-import ObjectBucketClaimCreate from './ceph-object-bucket-claim/create.svelte';
 import ClusterRoleBindingActions from './cluster-role-binding/actions.svelte';
 import ClusterRoleBindingCreate from './cluster-role-binding/create.svelte';
 import CronJobActions from './cronjob/actions.svelte';
@@ -17,12 +18,12 @@ import DataVolumeCreate from './data-volume/create.svelte';
 import DefaultActions from './default/actions.svelte';
 import DefaultCreate from './default/create.svelte';
 import DeploymentActions from './deployment/actions.svelte';
+import GitRepositoryCreate from './git-repository/create.svelte';
 import HelmReleaseActions from './helm-release/actions.svelte';
 import HelmRepositoryActions from './helm-repository/actions.svelte';
 import HelmRepositoryCreate from './helm-repository/create.svelte';
-import InstanceTypeActions from './instance-type/actions.svelte';
-import InstanceTypeCreate from './instance-type/create.svelte';
 import JobActions from './job/actions.svelte';
+import LicenseCreate from './license/create.svelte';
 import LLMInferenceServiceActions from './llm-inference-service/actions.svelte';
 import LLMInferenceServiceConfigActions from './llm-inference-service-config/actions.svelte';
 import ModelTemplateActions from './modeltemplate/actions.svelte';
@@ -73,10 +74,20 @@ type ActionsType = Component<{
 	version?: string;
 	kind?: string;
 	resource?: string;
+	resourceRuleVerbs?: ResourceRuleVerbs;
 	onsuccess?: () => void;
 }> | null;
 
-function getCreate(kind: string, namespace?: string): CreateType {
+// `group` disambiguates kinds whose names collide across API groups; extension
+// kinds (see ../extensions) are dispatched on it before the built-in switch.
+function getCreate(kind: string, namespace?: string, group?: string): CreateType {
+	const extension = getKindExtension(group, kind);
+	if (extension?.readOnly) {
+		return DisabledCreate as CreateType;
+	}
+	if (extension?.Create) {
+		return extension.Create;
+	}
 	switch (kind) {
 		case 'Application':
 			return ApplicationCreate as CreateType;
@@ -84,20 +95,22 @@ function getCreate(kind: string, namespace?: string): CreateType {
 			return ClusterRoleBindingCreate as CreateType;
 		case 'DataVolume':
 			return DataVolumeCreate as CreateType;
+		case 'GitRepository':
+			return GitRepositoryCreate as CreateType;
 		case 'HelmRepository':
 			return HelmRepositoryCreate as CreateType;
+		case 'License':
+			return LicenseCreate as CreateType;
 		case 'Node':
 			return DisabledCreate as CreateType;
-		case 'ObjectBucketClaim':
-			return ObjectBucketClaimCreate as CreateType;
 		case 'Schedule':
 			return ScheduleCreate as CreateType;
 		case 'Task':
 			return TaskCreate as CreateType;
 		case 'VirtualMachine':
 			return VirtualMachineCreate as CreateType;
-		case 'VirtualMachineInstancetype':
-			return InstanceTypeCreate as CreateType;
+		// case 'VirtualMachineInstancetype':
+		// 	return InstanceTypeCreate as CreateType;
 		case 'Workspace':
 			return WorkspaceCreate as CreateType;
 		case 'LLMInferenceServiceConfig':
@@ -110,7 +123,11 @@ function getCreate(kind: string, namespace?: string): CreateType {
 	}
 }
 
-function getActions(kind: string, namespace?: string): ActionsType {
+function getActions(kind: string, namespace?: string, group?: string): ActionsType {
+	const extension = getKindExtension(group, kind);
+	if (extension?.Actions) {
+		return extension.Actions;
+	}
 	switch (kind) {
 		case 'Application':
 			return ApplicationActions as ActionsType;
@@ -139,8 +156,6 @@ function getActions(kind: string, namespace?: string): ActionsType {
 			return LLMInferenceServiceConfigActions as ActionsType;
 		case 'Node':
 			return NodeActions as ActionsType;
-		case 'ObjectBucketClaim':
-			return ObjectBucketClaimActions as ActionsType;
 		case 'Pod':
 			return PodActions as ActionsType;
 		case 'ResourceQuota':
@@ -153,8 +168,8 @@ function getActions(kind: string, namespace?: string): ActionsType {
 			return TaskActions as ActionsType;
 		case 'VirtualMachine':
 			return VirtualMachineActions as ActionsType;
-		case 'VirtualMachineInstancetype':
-			return InstanceTypeActions as ActionsType;
+		// case 'VirtualMachineInstancetype':
+		// 	return InstanceTypeActions as ActionsType;
 		case 'Workspace':
 			return WorkspaceActions as ActionsType;
 		default:
