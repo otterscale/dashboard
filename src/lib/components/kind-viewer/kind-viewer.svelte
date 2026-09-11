@@ -17,7 +17,7 @@
 	} from '@otterscale/api/resource/v1';
 	import type { Schema } from '@sjsf/form';
 	import type { ColumnDef, Table as TableType } from '@tanstack/table-core';
-	import Ajv, { type ValidateFunction } from 'ajv';
+	import { type ValidateFunction } from 'ajv';
 	import { getContext, onDestroy, onMount } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 	import { toast } from 'svelte-sonner';
@@ -41,6 +41,7 @@
 		getUISchemas
 	} from './kind-viewer-columns';
 	import { getGridLayout, type GridLayoutType } from './kind-viewer-grid-layouts';
+	import { getValidator } from './validator';
 
 	let {
 		isClusterAdmin,
@@ -64,8 +65,9 @@
 
 	const kindExtension = $derived(getKindExtension(apiResource.group, apiResource.kind));
 
-	let schema: Schema | undefined = $state(undefined);
-	let validate: ValidateFunction | undefined = $state(undefined);
+	// Only ever reassigned; a Pod schema is too large to proxy for nothing.
+	let schema: Schema | undefined = $state.raw(undefined);
+	let validate: ValidateFunction | undefined = $state.raw(undefined);
 
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
@@ -96,11 +98,6 @@
 		}
 	}
 
-	const jsonSchemaValidator = new Ajv({ allErrors: true, strict: false, logger: false });
-	function getValidate(schema: Schema) {
-		return jsonSchemaValidator.compile($state.snapshot(schema));
-	}
-
 	let fetchError: Error | null = $state(null);
 	const dataset = new SvelteMap<string, Record<string, JsonValue>>();
 	const data = $derived(Array.from(dataset.values()));
@@ -112,11 +109,15 @@
 	let listAbortController: AbortController | null = null;
 	let watchAbortController: AbortController | null = null;
 
+	// The first page covers the largest "rows per page" option; the rest uses kubectl's default.
+	const FIRST_LIST_LIMIT = 100;
+	const LIST_LIMIT = 500;
+
 	let resourceVersion: string | undefined = $state(undefined);
 
 	let isListing = $state(false);
 	let isMounted = $state(false);
-	async function listResources() {
+	async function listResources(into: Map<string, Record<string, JsonValue>> = dataset) {
 		if (isListing || isWatching || isDestroyed) return;
 
 		isListing = true;
@@ -133,7 +134,7 @@
 						resource: apiResource.resource,
 						labelSelector,
 						fieldSelector,
-						limit: BigInt(10),
+						limit: BigInt(continueToken ? LIST_LIMIT : FIRST_LIST_LIMIT),
 						continue: continueToken
 					} as ListRequest,
 					{ signal: listAbortController.signal }
@@ -145,7 +146,7 @@
 				for (const item of response.items) {
 					if (item.object) {
 						const data = getData(apiResource, item.object);
-						dataset.set(getKey(data), data);
+						into.set(getKey(data), data);
 					}
 				}
 
@@ -169,6 +170,8 @@
 	}
 
 	let isWatching = $state(false);
+	// An ERROR event (typically 410 Gone) means `resourceVersion` is no longer usable.
+	let watchExpired = false;
 	async function watchResources() {
 		if (isListing || isWatching || isDestroyed) return;
 
@@ -194,6 +197,8 @@
 				const response: any = watchResourcesResponse;
 
 				if (response.type === WatchEvent_Type.ERROR) {
+					console.warn('Watch stream reported an error event:', response.resource?.object);
+					watchExpired = true;
 					continue;
 				}
 
@@ -231,6 +236,22 @@
 		}
 	}
 
+	// Lists into a scratch map and swaps it in as one commit, so the table never flashes empty.
+	async function relistFromScratch() {
+		const fresh = new Map<string, Record<string, JsonValue>>();
+		resourceVersion = undefined;
+		watchExpired = false;
+		await listResources(fresh);
+		if (fetchError || isDestroyed) return;
+
+		for (const key of dataset.keys()) {
+			if (!fresh.has(key)) dataset.delete(key);
+		}
+		for (const [key, datum] of fresh) {
+			dataset.set(key, datum);
+		}
+	}
+
 	const sleep = (ms: number = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 	async function resetAndReload() {
@@ -243,6 +264,7 @@
 
 		dataset.clear();
 		resourceVersion = undefined;
+		watchExpired = false;
 		fetchError = null;
 		isListing = false;
 		isWatching = false;
@@ -256,13 +278,16 @@
 	onMount(async () => {
 		// For Dynamic Table
 		columnDefinitions = getColumnDefinitions(apiResource, uiSchemas, dataSchemas, cluster);
+		// For Dynamic Form; not awaited, so actions become available before the list finishes.
+		void fetchSchema().then(async (fetched) => {
+			if (isDestroyed || !fetched) return;
+			const compiled = await getValidator(fetched);
+			if (isDestroyed) return;
+			validate = compiled;
+			schema = fetched;
+		});
 		await listResources();
 		watchResources();
-		// For Dynamic Form
-		schema = await fetchSchema();
-		if (schema) {
-			validate = getValidate(schema);
-		}
 	});
 
 	let isDestroyed = false;
@@ -277,14 +302,16 @@
 		}
 	});
 
-	function handleReload() {
-		if (!isWatching) {
-			watchResources();
+	async function handleReload() {
+		if (isWatching) {
+			watchAbortController?.abort();
 			return;
 		}
-		if (watchAbortController) {
-			watchAbortController.abort();
+		if (watchExpired) {
+			await relistFromScratch();
+			if (fetchError || isDestroyed) return;
 		}
+		watchResources();
 	}
 
 	const Create: CreateType = $derived(getCreate(apiResource.kind, namespace, apiResource.group));

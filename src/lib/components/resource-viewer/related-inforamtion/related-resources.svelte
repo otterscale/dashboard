@@ -21,7 +21,8 @@
 		kind,
 		resource,
 		name,
-		object
+		object,
+		filter = ''
 	}: {
 		cluster: string;
 		namespace: string;
@@ -31,6 +32,7 @@
 		resource: string;
 		name: string;
 		object?: Resource;
+		filter?: string;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -115,7 +117,7 @@
 	);
 </script>
 
-<RelatedInformationTable data={rows} {columns}>
+<RelatedInformationTable data={rows} {columns} {filter}>
 	{#snippet header()}
 		<Table.Row>
 			<Table.Head>Resource</Table.Head>
