@@ -159,7 +159,7 @@
 			parsed = load(stringify(manifest, { schema: 'yaml-1.1' }), { schema: JSON_SCHEMA });
 		} catch (error) {
 			console.error(`Failed to parse HelmRelease manifest for ${module.name}:`, error);
-			throw new Error(`Invalid YAML for ${module.name}.`);
+			throw new Error(`Invalid YAML for ${module.name}.`, { cause: error });
 		}
 
 		const isValid = validate(parsed);
