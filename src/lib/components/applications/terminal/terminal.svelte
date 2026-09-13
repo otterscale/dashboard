@@ -1,20 +1,13 @@
 <script lang="ts">
 	import '@xterm/xterm/css/xterm.css';
 
-	import { createClient, type Transport } from '@connectrpc/connect';
-	import {
-		type ExecuteTTYRequest,
-		type ExecuteTTYResponse,
-		RuntimeService
-	} from '@otterscale/api/runtime/v1';
-	import type { ClipboardAddon } from '@xterm/addon-clipboard';
+	import { type Transport } from '@connectrpc/connect';
 	import type { FitAddon } from '@xterm/addon-fit';
-	import type { SearchAddon } from '@xterm/addon-search';
-	import type { Unicode11Addon } from '@xterm/addon-unicode11';
-	import type { WebLinksAddon } from '@xterm/addon-web-links';
-	import type { WebglAddon } from '@xterm/addon-webgl';
 	import type { ITerminalInitOnlyOptions, ITerminalOptions, Terminal } from '@xterm/xterm';
 	import { getContext, onMount } from 'svelte';
+
+	import { TERMINAL_BACKGROUND, TERMINAL_THEME } from './terminal-theme';
+	import { TTYSession } from './tty-session';
 
 	let {
 		cluster,
@@ -30,309 +23,234 @@
 		command: string[];
 	} = $props();
 
-	// Types
-	interface TerminalState {
-		terminal?: Terminal;
-		sessionId: string;
-		isConnected: boolean;
-	}
-
-	interface TerminalAddons {
-		clipboard: ClipboardAddon;
-		fit: FitAddon;
-		search: SearchAddon;
-		unicode11: Unicode11Addon;
-		webLinks: WebLinksAddon;
-		webgl: WebglAddon;
-	}
-
-	// Configuration
-	const CONTROL_SEQUENCES = {
-		CTRL_C: '\x03',
-		CTRL_D: '\x04',
-		CTRL_Z: '\x1a',
-		CTRL_L: '\x0c',
-		CTRL_A: '\x01',
-		CTRL_E: '\x05',
-		CTRL_K: '\x0b',
-		CTRL_U: '\x15',
-		CTRL_W: '\x17',
-		CTRL_R: '\x12',
-		ALT_B: '\x1bb',
-		ALT_F: '\x1bf',
-		ALT_D: '\x1bd',
-		ALT_BACKSPACE: '\x1b\x7f'
-	} as const;
-
 	const TERMINAL_OPTIONS: ITerminalOptions & ITerminalInitOnlyOptions = {
 		allowProposedApi: true,
 		fontFamily: 'Consolas, Monaco, "Lucida Console", monospace',
 		fontSize: 14,
 		cursorBlink: true,
-		theme: {
-			background: '#1e1e1e',
-			foreground: '#d4d4d4'
-		}
+		scrollback: 10000
 	};
 
-	const KEYBOARD_MAPPINGS = {
-		ctrl: {
-			c: CONTROL_SEQUENCES.CTRL_C,
-			d: CONTROL_SEQUENCES.CTRL_D,
-			z: CONTROL_SEQUENCES.CTRL_Z,
-			l: CONTROL_SEQUENCES.CTRL_L,
-			a: CONTROL_SEQUENCES.CTRL_A,
-			e: CONTROL_SEQUENCES.CTRL_E,
-			k: CONTROL_SEQUENCES.CTRL_K,
-			u: CONTROL_SEQUENCES.CTRL_U,
-			w: CONTROL_SEQUENCES.CTRL_W,
-			r: CONTROL_SEQUENCES.CTRL_R
-		},
-		alt: {
-			b: CONTROL_SEQUENCES.ALT_B,
-			f: CONTROL_SEQUENCES.ALT_F,
-			d: CONTROL_SEQUENCES.ALT_D,
-			Backspace: CONTROL_SEQUENCES.ALT_BACKSPACE
-		}
-	} as const;
+	const RESIZE_DEBOUNCE_MS = 100;
 
-	// State
 	const transport: Transport = getContext('transport');
-	const client = createClient(RuntimeService, transport);
 
-	let container = $state<HTMLElement>();
-	let handleResize = $state<() => void>();
-	let abortController: AbortController | null = null;
-	let terminalState = $state<TerminalState>({
-		sessionId: '',
-		isConnected: false
-	});
+	let container: HTMLElement | undefined;
+	let terminal: Terminal | undefined;
+	let fitAddon: FitAddon | undefined;
 
-	// Terminal utilities
-	function writeToTerminal(message: string, isError = false): void {
-		if (!terminalState.terminal) return;
+	let session: TTYSession | null = null;
+	let disposed = false;
 
+	// True once the session has ended; input is ignored until Enter starts a new one.
+	let awaitingRestart = false;
+	let resizeTimer: ReturnType<typeof setTimeout> | undefined;
+
+	function notify(message: string, isError = false): void {
 		const color = isError ? '\x1b[31m' : '\x1b[33m';
-		const formattedMessage = `\r\n${color}${message}\x1b[0m\r\n`;
-		terminalState.terminal.write(formattedMessage);
+		terminal?.write(`\r\n${color}${message}\x1b[0m\r\n`);
+	}
+
+	function awaitRestart(message: string, isError = false): void {
+		notify(`${message} Press Enter to continue.`, isError);
+		awaitingRestart = true;
 	}
 
 	// Terminal setup
-	async function initializeTerminal(): Promise<void> {
+
+	async function initialize(): Promise<void> {
 		const { Terminal } = await import('@xterm/xterm');
+		if (disposed || !container) return;
 
-		terminalState.terminal = new Terminal(TERMINAL_OPTIONS);
-		terminalState.terminal.onData(handleTerminalData);
-		terminalState.terminal.onKey(handleTerminalKey);
-		// Keep the backend PTY's window size in sync with xterm, so line-editing
-		// shells (bash/readline) wrap and position the cursor correctly.
-		terminalState.terminal.onResize(({ cols, rows }) => resizeTTY(cols, rows));
+		const term = new Terminal({
+			...TERMINAL_OPTIONS,
+			theme: TERMINAL_THEME
+		});
+		terminal = term;
 
-		if (container) {
-			terminalState.terminal.open(container);
-			await loadTerminalAddons();
-		}
-	}
+		term.onData(handleData);
+		// Keep the remote PTY size in sync with xterm.
+		term.onResize(({ cols, rows }) => scheduleRemoteResize(cols, rows));
+		// Copy on select; Ctrl+Shift+C would collide with the browser's inspect-element shortcut.
+		term.onSelectionChange(() => {
+			const selection = term.getSelection();
+			if (selection) void navigator.clipboard.writeText(selection).catch(() => {});
+		});
 
-	async function loadTerminalAddons(): Promise<void> {
-		if (!terminalState.terminal) return;
+		term.open(container);
+		await loadAddons(term);
+		if (disposed) return;
 
-		try {
-			const addons = await loadAddons();
-			setupAddons(addons);
-		} catch (error) {
-			writeToTerminal(`Failed to load terminal addons: ${error}`, true);
-		}
-	}
-
-	async function loadAddons(): Promise<TerminalAddons> {
-		const [clipboard, fit, search, unicode11, webLinks, webgl] = await Promise.all([
-			import('@xterm/addon-clipboard').then((m) => new m.ClipboardAddon()),
-			import('@xterm/addon-fit').then((m) => new m.FitAddon()),
-			import('@xterm/addon-search').then((m) => new m.SearchAddon()),
-			import('@xterm/addon-unicode11').then((m) => new m.Unicode11Addon()),
-			import('@xterm/addon-web-links').then((m) => new m.WebLinksAddon()),
-			import('@xterm/addon-webgl').then((m) => new m.WebglAddon())
-		]);
-
-		return { clipboard, fit, search, unicode11, webLinks, webgl };
-	}
-
-	function setupAddons(addons: TerminalAddons): void {
-		if (!terminalState.terminal) return;
-
-		const { terminal } = terminalState;
-
-		// Load addons
-		terminal.loadAddon(addons.clipboard);
-		terminal.loadAddon(addons.fit);
-		terminal.loadAddon(addons.search);
-		terminal.loadAddon(addons.unicode11);
-		terminal.loadAddon(addons.webLinks);
-
-		// Custom fit: FitAddon always reserves ~14px on the right for a scrollbar/
-		// overview ruler, but we hide the scrollbar (overflow-y: hidden), so that
-		// gutter becomes unreachable dead space. Measure the container ourselves to
-		// use the full width, falling back to FitAddon if the private cell metrics
-		// are ever unavailable.
-		handleResize = () => {
-			const term = terminalState.terminal;
-			// Skip while the container is hidden/transitioning (zero-sized): resizing
-			// to a tiny 2x1 grid here would corrupt the backend PTY's layout/scrollback.
-			if (!term || !container || container.clientWidth === 0 || container.clientHeight === 0)
-				return;
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const cell = (term as any)._core?._renderService?.dimensions?.css?.cell;
-			if (container && cell?.width && cell?.height) {
-				const cols = Math.max(2, Math.floor(container.clientWidth / cell.width));
-				const rows = Math.max(1, Math.floor(container.clientHeight / cell.height));
-				if (cols !== term.cols || rows !== term.rows) term.resize(cols, rows);
-			} else {
-				addons.fit.fit();
-			}
-		};
 		handleResize();
-
-		// Configure unicode
-		terminal.unicode.activeVersion = '11';
-
-		// Configure WebGL with error handling
-		addons.webgl.onContextLoss(() => addons.webgl.dispose());
-		terminal.loadAddon(addons.webgl);
+		await connect();
 	}
 
-	// TTY communication
-	async function startTTYSession(): Promise<void> {
-		abortController?.abort();
-		abortController = new AbortController();
-		const signal = abortController.signal;
+	async function loadAddons(term: Terminal): Promise<void> {
+		try {
+			const [clipboard, fit, search, unicode11, webLinks, webgl] = await Promise.all([
+				import('@xterm/addon-clipboard').then((m) => new m.ClipboardAddon()),
+				import('@xterm/addon-fit').then((m) => new m.FitAddon()),
+				import('@xterm/addon-search').then((m) => new m.SearchAddon()),
+				import('@xterm/addon-unicode11').then((m) => new m.Unicode11Addon()),
+				import('@xterm/addon-web-links').then((m) => new m.WebLinksAddon()),
+				import('@xterm/addon-webgl').then((m) => new m.WebglAddon())
+			]);
+			if (disposed) return;
+
+			term.loadAddon(clipboard);
+			term.loadAddon(fit);
+			term.loadAddon(search);
+			term.loadAddon(unicode11);
+			term.loadAddon(webLinks);
+			fitAddon = fit;
+
+			term.unicode.activeVersion = '11';
+
+			webgl.onContextLoss(() => webgl.dispose());
+			term.loadAddon(webgl);
+		} catch (error) {
+			notify(`Failed to load terminal addons: ${error}`, true);
+		}
+	}
+
+	// FitAddon reserves space for a scrollbar we hide, wasting width; measure the
+	// container directly and fall back to FitAddon if cell metrics are unavailable.
+	function handleResize(): void {
+		const term = terminal;
+		// Skip while hidden/transitioning to avoid resizing the PTY to a bogus 2x1 grid.
+		if (!term || !container || container.clientWidth === 0 || container.clientHeight === 0) return;
+
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
+		const cell = (term as any)._core?._renderService?.dimensions?.css?.cell;
+		if (cell?.width && cell?.height) {
+			const cols = Math.max(2, Math.floor(container.clientWidth / cell.width));
+			const rows = Math.max(1, Math.floor(container.clientHeight / cell.height));
+			if (cols !== term.cols || rows !== term.rows) term.resize(cols, rows);
+		} else {
+			fitAddon?.fit();
+		}
+	}
+
+	// Debounce: dragging to fullscreen fires a burst of sizes; only the final one matters.
+	function scheduleRemoteResize(cols: number, rows: number): void {
+		clearTimeout(resizeTimer);
+		resizeTimer = setTimeout(() => session?.resize(cols, rows), RESIZE_DEBOUNCE_MS);
+	}
+
+	// Session lifecycle
+
+	async function connect(): Promise<void> {
+		const term = terminal;
+		if (disposed || !term) return;
+
+		const next = new TTYSession(transport);
+		// Assign before opening so input typed during the handshake buffers instead of dropping.
+		session = next;
 
 		try {
-			const stream = client.executeTTY(
+			await next.open(
 				{
-					cluster: cluster,
-					namespace: namespace,
-					name: podName,
-					container: containerName,
-					command: command,
-					tty: true,
-					rows: terminalState.terminal?.rows || 24,
-					cols: terminalState.terminal?.cols || 80
-				} as ExecuteTTYRequest,
-				{ signal }
+					cluster,
+					namespace,
+					podName,
+					containerName,
+					command,
+					cols: term.cols,
+					rows: term.rows
+				},
+				{ output: writeOutput, closed: (info) => handleClosed(next, info) }
 			);
-			terminalState.isConnected = true;
+		} catch (error) {
+			next.close();
+			if (disposed || session !== next) return;
+			session = null;
+			awaitRestart(`Connection failed: ${error}`, true);
+			return;
+		}
 
-			for await (const response of stream) {
-				handleTTYResponse(response);
+		if (disposed || session !== next) {
+			next.close();
+			return;
+		}
+
+		// The grid may have changed while the session was being established.
+		next.resize(term.cols, term.rows);
+	}
+
+	// Every way a session can end lands here. None retry automatically -- Enter starts a new one.
+	function handleClosed(
+		source: TTYSession,
+		info: { graceful: boolean; message?: string; hadOutput: boolean }
+	): void {
+		if (disposed || session !== source) return;
+
+		source.close();
+		session = null;
+
+		// Zero output means every retry would fail the same way -- don't offer one.
+		if (info.graceful && !info.hadOutput) {
+			notify(
+				"Shell exited with no output -- this container doesn't support an interactive session.",
+				true
+			);
+			return;
+		}
+
+		const message = info.graceful
+			? (info.message ?? 'Session ended.')
+			: `Connection lost: ${info.message ?? 'unknown error'}`;
+		awaitRestart(message, !info.graceful);
+	}
+
+	// Data flow
+
+	// Undecoded: xterm's UTF-8 decoder carries state across writes, so split multi-byte chars still render.
+	function writeOutput(data: Uint8Array): void {
+		terminal?.write(data);
+	}
+
+	function handleData(data: string): void {
+		if (awaitingRestart) {
+			if (data === '\r' || data === '\n') {
+				awaitingRestart = false;
+				void connect();
 			}
-
-			if (!signal.aborted) {
-				terminalState.isConnected = false;
-				writeToTerminal('Session terminated. Connection closed.');
-			}
-		} catch (error) {
-			if (signal.aborted) return;
-			terminalState.isConnected = false;
-			writeToTerminal(`Connection failed: ${error}`, true);
+			return;
 		}
-	}
-
-	function cleanup(): void {
-		abortController?.abort();
-		abortController = null;
-		terminalState.terminal?.dispose();
-		terminalState.isConnected = false;
-	}
-
-	function handleTTYResponse(response: ExecuteTTYResponse): void {
-		if (!terminalState.sessionId && response.sessionId) {
-			terminalState.sessionId = response.sessionId;
-			// Re-sync size once the session id is known, covering any resize that
-			// happened between opening the stream and the first response.
-			const term = terminalState.terminal;
-			if (term) resizeTTY(term.cols, term.rows);
-		}
-
-		if (response.stdout) {
-			const data = new TextDecoder().decode(response.stdout);
-			terminalState.terminal?.write(data);
-		}
-	}
-
-	function sendToTTY(data: string): void {
-		if (!terminalState.sessionId || !terminalState.isConnected) return;
-
-		try {
-			client.writeTTY({
-				sessionId: terminalState.sessionId,
-				stdin: new TextEncoder().encode(data)
-			});
-		} catch (error) {
-			writeToTerminal(`Failed to send data: ${error}`, true);
-		}
-	}
-
-	function resizeTTY(cols: number, rows: number): void {
-		if (!terminalState.sessionId || !terminalState.isConnected) return;
-
-		try {
-			client.resizeTTY({ sessionId: terminalState.sessionId, cols, rows });
-		} catch (error) {
-			writeToTerminal(`Failed to resize terminal: ${error}`, true);
-		}
-	}
-
-	// Event handlers
-	function handleTerminalData(data: string): void {
-		sendToTTY(data);
-	}
-
-	function handleTerminalKey(event: { key: string; domEvent: KeyboardEvent }): void {
-		const { domEvent } = event;
-
-		if (domEvent.ctrlKey) {
-			handleModifierKey(KEYBOARD_MAPPINGS.ctrl, domEvent);
-		} else if (domEvent.altKey) {
-			handleModifierKey(KEYBOARD_MAPPINGS.alt, domEvent);
-		}
-	}
-
-	function handleModifierKey(mapping: Record<string, string>, event: KeyboardEvent): void {
-		const sequence = mapping[event.key as keyof typeof mapping];
-
-		if (sequence) {
-			sendToTTY(sequence);
-			event.preventDefault();
-		}
+		session?.write(data);
 	}
 
 	// Lifecycle
+
 	onMount(() => {
-		let active = true;
-		initializeTerminal().then(() => {
-			if (active) startTTYSession();
-		});
+		void initialize();
 
 		// Refit whenever the container itself resizes (e.g. toggling the dialog's
 		// fullscreen), not just on window resize.
 		let observer: ResizeObserver | undefined;
 		if (container) {
-			observer = new ResizeObserver(() => handleResize?.());
+			observer = new ResizeObserver(() => handleResize());
 			observer.observe(container);
 		}
 
 		return () => {
-			active = false;
+			disposed = true;
 			observer?.disconnect();
-			cleanup();
+			clearTimeout(resizeTimer);
+			session?.close();
+			session = null;
+			terminal?.dispose();
 		};
 	});
 </script>
 
 <svelte:window onresize={handleResize} />
 
-<div class="h-full w-full" bind:this={container}></div>
+<div
+	class="h-full w-full"
+	bind:this={container}
+	style:--xterm-viewport-background={TERMINAL_BACKGROUND}
+></div>
 
 <style>
 	:global(.xterm) {
@@ -341,5 +259,8 @@
 
 	:global(.xterm-viewport) {
 		overflow-y: hidden !important;
+		/* xterm.css hardcodes a black viewport background; repaint it in the theme's
+		   background so unfilled rows read as padding, not a black band. */
+		background-color: var(--xterm-viewport-background) !important;
 	}
 </style>

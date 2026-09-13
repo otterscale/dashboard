@@ -46,7 +46,31 @@ export default defineConfig(
 			'svelte/require-each-key': 'warn',
 			'@typescript-eslint/no-explicit-any': 'warn',
 			'simple-import-sort/imports': 'error',
-			'simple-import-sort/exports': 'error'
+			'simple-import-sort/exports': 'error',
+			'no-restricted-imports': [
+				'error',
+				{
+					paths: [
+						{
+							name: '$lib/paraglide/messages',
+							message:
+								"Import { m } from '$lib/messages' instead — it swaps branded strings per edition."
+						},
+						{
+							name: '$lib/paraglide/messages.js',
+							message:
+								"Import { m } from '$lib/messages' instead — it swaps branded strings per edition."
+						}
+					]
+				}
+			]
+		}
+	},
+	{
+		// The edition wrappers are the only modules allowed to touch paraglide directly.
+		files: ['src/lib/messages.ts', 'ee/src/lib/messages.ts'],
+		rules: {
+			'no-restricted-imports': 'off'
 		}
 	},
 	{

@@ -22,12 +22,12 @@
 	import { version } from '$app/environment';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import type { ChartType } from '$lib/components/artifact-viewer/types';
+	import type { ChartType } from '$lib/components/chart-viewer/types';
 	import {
 		encodeHarborURIComponent,
 		parseHarborHost,
 		parseHarborProjectName
-	} from '$lib/components/artifact-viewer/utils.svelte';
+	} from '$lib/components/chart-viewer/utils.svelte';
 	import { ModuleViewer } from '$lib/components/module-viewer';
 	import { getChartData, type ModuleAttribute } from '$lib/components/module-viewer/table-layout';
 	import type {
@@ -39,7 +39,7 @@
 	import { ModulesHelmRepositoryName } from '$lib/components/module-viewer/utils';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { breadcrumbs } from '$lib/stores';
 
 	// Set breadcrumbs navigation
@@ -52,6 +52,8 @@
 			})
 		}
 	]);
+
+	const dashboardVersion = semver.valid(version) ? version : '1.0.0';
 
 	// Parameters
 	const cluster = $derived(page.params.cluster ?? '');
@@ -87,19 +89,17 @@
 			});
 
 			if (!response.object) {
-				toast.info('There is no OtterScale Charts Helm Repository.');
+				toast.info('There is no Modules Helm Repository.');
 				return;
 			}
 
 			return response.object as SourceToolkitFluxcdIoV1HelmRepository;
 		} catch (error) {
 			console.error(
-				'OtterScale Charts Helm Repository was not found in namespace otterscale-system.:',
+				'Modules Helm Repository was not found in namespace otterscale-system.:',
 				error
 			);
-			toast.error(
-				'OtterScale Charts Helm Repository was not found in namespace otterscale-system.'
-			);
+			toast.error('Modules Helm Repository was not found in namespace otterscale-system.');
 		} finally {
 			isHelmRepositoryFetching = false;
 		}
@@ -111,7 +111,6 @@
 			: false
 	);
 
-	const dashboardVersion = semver.valid(version) ? version : '1.0.0';
 	let modules = $state<ModuleType[]>([]);
 	let isModuleFetching = $state(false);
 	async function fetchModules(
@@ -126,15 +125,7 @@
 				? await fetchEntireModulesFromHarbor(helmRepository)
 				: await fetchEntireModulesFromIndex(helmRepository);
 
-			return entireModules
-				.filter((module: ModuleType) => {
-					const moduleVersion = module.version;
-					return (
-						semver.major(moduleVersion) === semver.major(dashboardVersion) &&
-						semver.minor(moduleVersion) === semver.minor(dashboardVersion)
-					);
-				})
-				.filter((module: ModuleType) => module.name.startsWith('otterscale-'));
+			return entireModules;
 		} catch (error) {
 			const helmRepositoryName = helmRepository.metadata?.name ?? '';
 			console.error(`HelmRepository "${helmRepositoryName}": error fetching modules:`, error);
@@ -146,15 +137,17 @@
 	async function fetchEntireModulesFromHarbor(
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
 	): Promise<ModuleType[]> {
+		const pageSize = 50;
+		const versionPrefix = `${semver.major(dashboardVersion)}.${semver.minor(dashboardVersion)}.`;
+
 		const harborHost = parseHarborHost(helmRepository);
 		const harborProjectName = parseHarborProjectName(helmRepository);
-		const pageSize = 50;
 
 		let currentPage = 1;
-		let entireModules: ModuleType[] = [];
+		let harborModules: HarborModule[] = [];
 
 		while (true) {
-			const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')}&latest_in_repository=true&page=${currentPage}&page_size=${pageSize}`;
+			const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')},tags=~${encodeHarborURIComponent(versionPrefix)}&page=${currentPage}&page_size=${pageSize}`;
 			const response = await fetch('/bff/helm/repository/harbor', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -165,36 +158,55 @@
 			});
 
 			if (!response.ok) {
+				throw new Error(
+					`Harbor artifacts request failed on page ${currentPage}: ${response.status} ${response.statusText}`
+				);
+			}
+
+			const pageModules: HarborModule[] = await response.json();
+			if (pageModules.length === 0) {
 				break;
 			}
 
-			const harborModules: HarborModule[] = await response.json();
-			if (harborModules.length === 0) {
+			harborModules = [...harborModules, ...pageModules];
+
+			if (pageModules.length < pageSize) {
 				break;
 			}
-
-			entireModules = [
-				...entireModules,
-				...harborModules.map((module: HarborModule) => {
-					return {
-						apiVersion: module.extra_attrs.apiVersion,
-						appVersion: module.extra_attrs.appVersion,
-						annotations: module.extra_attrs.annotations,
-						name: module.extra_attrs.name,
-						description: module.extra_attrs.description,
-						version: module.extra_attrs.version,
-						digest: module.digest,
-						icon: module.icon,
-						keywords: module.labels ?? [],
-						type: module.type
-					} as ModuleType;
-				})
-			];
 
 			currentPage = currentPage + 1;
 		}
 
-		return entireModules;
+		const modulesByName = lodash.groupBy(
+			harborModules.map((module: HarborModule) => {
+				return {
+					apiVersion: module.extra_attrs.apiVersion,
+					appVersion: module.extra_attrs.appVersion,
+					annotations: module.extra_attrs.annotations,
+					name: module.extra_attrs.name,
+					description: module.extra_attrs.description,
+					version: module.extra_attrs.version,
+					digest: module.digest,
+					icon: module.icon,
+					keywords: module.labels ?? [],
+					type: module.type
+				} as ModuleType;
+			}),
+			(module) => module.name
+		);
+
+		return Object.values(modulesByName)
+			.map((versions) => {
+				const validVersions = versions.sort((p, n) => semver.rcompare(p.version, n.version));
+				const [latestValidVersion] = validVersions;
+				if (latestValidVersion) {
+					return {
+						...latestValidVersion,
+						versions: validVersions
+					};
+				}
+			})
+			.filter(Boolean) as ModuleType[];
 	}
 	async function fetchEntireModulesFromIndex(
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
@@ -208,21 +220,13 @@
 		});
 
 		if (!response.ok) {
-			return [];
+			throw new Error(`Charts request failed on index: ${response.status} ${response.statusText}`);
 		}
 
 		const indexModules: Record<string, ChartType[]> = await response.json();
 		return Object.values(indexModules)
 			.map((versions) => {
-				const validVersions = versions.filter((version) => {
-					const validVersion = semver.valid(version.version);
-
-					return (
-						validVersion !== null &&
-						semver.major(validVersion) === semver.major(dashboardVersion) &&
-						semver.minor(validVersion) === semver.minor(dashboardVersion)
-					);
-				});
+				const validVersions = versions.sort((p, n) => semver.rcompare(p.version, n.version));
 				const [latestValidVersion] = validVersions;
 				if (latestValidVersion) {
 					return {
@@ -256,11 +260,8 @@
 
 			releases = response.items.map((item) => item.object as HelmToolkitFluxcdIoV2HelmRelease);
 		} catch (error) {
-			console.error(
-				'OtterScale Charts Helm Releases was not found in namespace otterscale-system.:',
-				error
-			);
-			toast.error('OtterScale Charts Helm Releases was not found in namespace otterscale-system.');
+			console.error('Modules Helm Releases was not found in namespace otterscale-system.:', error);
+			toast.error('Modules Helm Releases was not found in namespace otterscale-system.');
 		} finally {
 			isReleaseFetching = false;
 		}
@@ -366,7 +367,6 @@
 		if (!helmRepository) return;
 
 		modules = (await fetchModules(helmRepository)) ?? [];
-		if (!modules.length) return;
 
 		await listReleases();
 		watchReleases();

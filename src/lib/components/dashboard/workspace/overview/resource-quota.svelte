@@ -13,8 +13,8 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import { formatCapacity, formatPercentage } from '$lib/formatter';
-	import { m } from '$lib/paraglide/messages';
-	import { escapePromqlStringLiteral } from '$lib/prometheus';
+	import { m } from '$lib/messages';
+	import { escapePromqlStringLiteral, LIVE_PODS } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -25,6 +25,16 @@
 		namespace: string;
 		isReloading: boolean;
 	} = $props();
+
+	const UNLIMITED = '∞';
+
+	/**
+	 * No ResourceQuota exists for the namespace (the workspace was created without
+	 * `spec.resourceQuota.hard`), so `kube_resourcequota` reports nothing at all — neither `hard`
+	 * nor `used`. Detected from Prometheus on every fetch; the tile then renders `used / ∞` from
+	 * pod-level requests/limits instead of a ratio.
+	 */
+	let quotaUnlimited = $state(false);
 
 	/** Which ResourceQuota resource keys to visualize (requests.* vs limits.*). */
 	let quotaView = $state<'requests' | 'limits'>('requests');
@@ -76,6 +86,35 @@
 		return `sum(${base}, type="${t}", resource="${resource}"})`;
 	}
 
+	/** Number of ResourceQuota series KSM exports for the namespace; empty when none exists. */
+	function rqCount() {
+		const ns = escapePromqlStringLiteral(namespace);
+		return `count(kube_resourcequota{namespace="${ns}", type="hard"})`;
+	}
+
+	/**
+	 * Liveness probe for kube-state-metrics: the namespace collector emits exactly one series per
+	 * namespace, from the same scrape that produces `kube_resourcequota`. Empty means KSM is not
+	 * being scraped right now (or the namespace does not exist yet).
+	 */
+	function nsCount() {
+		const ns = escapePromqlStringLiteral(namespace);
+		return `count(kube_namespace_created{namespace="${ns}"})`;
+	}
+
+	/**
+	 * Pod-level stand-in for ResourceQuota's `used` counter, for namespaces that have no
+	 * ResourceQuota at all. Restricted to non-terminated pods, the same set the quota counts.
+	 */
+	function podResourceSum(kind: 'requests' | 'limits', resource: 'cpu' | 'memory'): string {
+		const nsLit = escapePromqlStringLiteral(namespace);
+		const unit = resource === 'cpu' ? 'core' : 'byte';
+		return (
+			`sum(kube_pod_container_resource_${kind}` +
+			`{namespace="${nsLit}",resource="${resource}",unit="${unit}"} ${LIVE_PODS}) or vector(0)`
+		);
+	}
+
 	/** KSM `resource` label on `kube_pod_container_resource_limits` (dots → underscores). */
 	const KSM_POD_RES_NVIDIA_GPU = 'nvidia_com_gpu';
 	const KSM_POD_RES_NVIDIA_GPUMEM = 'nvidia_com_gpumem';
@@ -101,6 +140,24 @@
 		} catch {
 			return null;
 		}
+	}
+
+	/** No ResourceQuota to read: only the numerators exist, and they come from the pods. */
+	async function fetchUnlimitedUsage() {
+		const [cpuReqU, cpuLimU, memReqU, memLimU, gpuMemUsedFromPods] = await Promise.all([
+			queryScalar(podResourceSum('requests', 'cpu')),
+			queryScalar(podResourceSum('limits', 'cpu')),
+			queryScalar(podResourceSum('requests', 'memory')),
+			queryScalar(podResourceSum('limits', 'memory')),
+			queryScalar(podContainerReadyGpuMemTotalSum(namespace))
+		]);
+
+		cpuUsedReq = cpuReqU;
+		cpuUsedLim = cpuLimU;
+		memUsedReq = memReqU;
+		memUsedLim = memLimU;
+		gpuMemUsed = gpuMemUsedFromPods ?? 0;
+		cpuHardReq = cpuHardLim = memHardReq = memHardLim = gpuMemHard = null;
 	}
 
 	async function fetchQuota() {
@@ -146,11 +203,56 @@
 		gpuMemUsed = gpuMemHard = null;
 	}
 
+	/**
+	 * Whether the KSM resourcequota collector is enabled. Prometheus records a metric's metadata
+	 * from the `# HELP` / `# TYPE` lines of a scrape regardless of whether any sample followed,
+	 * and KSM writes those headers for every enabled collector even with zero objects — so an
+	 * absent entry means the collector is off (or KSM was never scraped), not "no quotas".
+	 */
+	async function resourceQuotaCollectorEnabled(): Promise<boolean> {
+		const meta = (await prometheusDriver.metadata('kube_resourcequota')) as
+			| Record<string, unknown[]>
+			| null
+			| undefined;
+		const entries = meta?.kube_resourcequota;
+		return Array.isArray(entries) && entries.length > 0;
+	}
+
+	async function countScalar(q: string): Promise<number> {
+		const r = await prometheusDriver.instantQuery(q, new Date());
+		return instantScalar(r) ?? 0;
+	}
+
+	/**
+	 * Whether the namespace has a ResourceQuota, per Prometheus. Three signals, all required, so
+	 * that "no quota" is only concluded when KSM is demonstrably exporting quotas right now:
+	 *  1. metadata lists `kube_resourcequota`  → the collector is enabled
+	 *  2. `kube_namespace_created` has a series → KSM is live and sees this namespace
+	 *  3. `kube_resourcequota` has a series     → a ResourceQuota object exists
+	 * 1 or 2 failing throws, so the tile shows an error rather than a misleading `used / ∞`.
+	 * Any query failure also throws for the same reason.
+	 */
+	async function hasResourceQuota(): Promise<boolean> {
+		const [collectorEnabled, nsSeen, rqSeries] = await Promise.all([
+			resourceQuotaCollectorEnabled(),
+			countScalar(nsCount()),
+			countScalar(rqCount())
+		]);
+		if (!collectorEnabled) {
+			throw new Error('kube-state-metrics is not exporting kube_resourcequota');
+		}
+		if (nsSeen === 0) {
+			throw new Error(`kube-state-metrics has no series for namespace "${namespace}"`);
+		}
+		return rqSeries > 0;
+	}
+
 	async function fetch() {
 		try {
 			hasError = false;
 			if (!namespace) return;
-			await fetchQuota();
+			quotaUnlimited = !(await hasResourceQuota());
+			await (quotaUnlimited ? fetchUnlimitedUsage() : fetchQuota());
 		} catch (error) {
 			hasError = true;
 			resetQuotaState();
@@ -187,6 +289,51 @@
 		return formatCapacity(nMb * 1024 * 1024);
 	}
 </script>
+
+<!-- No hard limit to divide by: keep the gauge shape but leave the track empty, and report the
+	 raw usage against ∞. `used === null` means the usage query itself failed. -->
+{#snippet unlimitedGauge(used: string | null)}
+	{#if used === null}
+		<div class="flex h-[168px] w-full flex-col items-center justify-center">
+			<ChartBar class="size-16 animate-pulse text-muted-foreground" />
+			<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
+		</div>
+	{:else}
+		{@const chartConfig = { data: { color: 'var(--chart-3)' } } satisfies Chart.ChartConfig}
+		<Chart.Container
+			config={chartConfig}
+			class="mx-auto my-auto aspect-square h-[168px] w-full max-w-[220px]"
+		>
+			<ArcChart
+				data={[{ value: 0 }]}
+				innerRadius={-15}
+				cornerRadius={15}
+				range={[-120, 120]}
+				maxValue={1}
+				series={[{ key: 'data', color: chartConfig.data.color }]}
+				props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
+				tooltipContext={false}
+			>
+				{#snippet aboveMarks()}
+					<Text
+						value={UNLIMITED}
+						textAnchor="middle"
+						verticalAnchor="middle"
+						class="fill-foreground text-3xl! font-bold"
+						dy={-15}
+					/>
+					<Text
+						value={`${used} / ${UNLIMITED}`}
+						textAnchor="middle"
+						verticalAnchor="middle"
+						class="text-md! text-muted-foreground"
+						dy={15}
+					/>
+				{/snippet}
+			</ArcChart>
+		</Chart.Container>
+	{/if}
+{/snippet}
 
 <Card.Root class="group relative h-full min-h-[160px] gap-2 overflow-hidden">
 	<Gauge
@@ -244,7 +391,11 @@
 				<Statistics.Header>
 					<div class="flex justify-between gap-4">
 						<Statistics.Title>{m.cpu()}</Statistics.Title>
-						{#if cpuHard !== null}
+						{#if quotaUnlimited}
+							<div class="flex items-center gap-1 text-xl">
+								<p class="font-bold">{UNLIMITED}</p>
+							</div>
+						{:else if cpuHard !== null}
 							<div class="flex items-center gap-1 text-xl">
 								<p class="font-bold">{formatCpuCores(cpuHard)}</p>
 							</div>
@@ -252,7 +403,9 @@
 					</div>
 				</Statistics.Header>
 				<Statistics.Content class="min-h-20">
-					{#if hasError || cpuUsed === null || cpuHard === null || cpuHard === 0 || formatPercentage(cpuUsed, cpuHard, 1) === null}
+					{#if quotaUnlimited}
+						{@render unlimitedGauge(hasError || cpuUsed === null ? null : formatCpuCores(cpuUsed))}
+					{:else if hasError || cpuUsed === null || cpuHard === null || cpuHard === 0 || formatPercentage(cpuUsed, cpuHard, 1) === null}
 						<div class="flex h-[168px] w-full flex-col items-center justify-center">
 							<ChartBar class="size-16 animate-pulse text-muted-foreground" />
 							<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
@@ -306,7 +459,11 @@
 				<Statistics.Header>
 					<div class="flex justify-between gap-4">
 						<Statistics.Title>{m.ram()}</Statistics.Title>
-						{#if memHard !== null}
+						{#if quotaUnlimited}
+							<div class="flex items-center gap-1 text-xl">
+								<p class="font-bold">{UNLIMITED}</p>
+							</div>
+						{:else if memHard !== null}
 							{@const { value, unit } = formatCapacity(memHard)}
 							<div class="flex items-center gap-1 text-xl">
 								<p class="font-bold">{value} {unit}</p>
@@ -315,7 +472,12 @@
 					</div>
 				</Statistics.Header>
 				<Statistics.Content class="min-h-20">
-					{#if hasError || memUsed === null || memHard === null || memHard === 0 || formatPercentage(memUsed, memHard, 1) === null}
+					{#if quotaUnlimited}
+						{@const used = memUsed === null ? null : formatCapacity(memUsed)}
+						{@render unlimitedGauge(
+							hasError || used === null ? null : `${used.value} ${used.unit}`
+						)}
+					{:else if hasError || memUsed === null || memHard === null || memHard === 0 || formatPercentage(memUsed, memHard, 1) === null}
 						<div class="flex h-[168px] w-full flex-col items-center justify-center">
 							<ChartBar class="size-16 animate-pulse text-muted-foreground" />
 							<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
@@ -371,7 +533,11 @@
 				<Statistics.Header>
 					<div class="flex justify-between gap-4">
 						<Statistics.Title>GPU Memory</Statistics.Title>
-						{#if gpuMemHard !== null}
+						{#if quotaUnlimited}
+							<div class="flex items-center gap-1 text-xl">
+								<p class="font-bold">{UNLIMITED}</p>
+							</div>
+						{:else if gpuMemHard !== null}
 							{@const { value, unit } = formatGpuMem(gpuMemHard)}
 							<div class="flex items-center gap-1 text-xl">
 								<p class="font-bold">{value} {unit}</p>
@@ -380,7 +546,12 @@
 					</div>
 				</Statistics.Header>
 				<Statistics.Content class="min-h-20">
-					{#if hasError || gpuMemUsed === null || gpuMemHard === null}
+					{#if quotaUnlimited}
+						{@const used = gpuMemUsed === null ? null : formatGpuMem(gpuMemUsed)}
+						{@render unlimitedGauge(
+							hasError || used === null ? null : `${used.value} ${used.unit}`
+						)}
+					{:else if hasError || gpuMemUsed === null || gpuMemHard === null}
 						<div class="flex h-[168px] w-full flex-col items-center justify-center">
 							<ChartBar class="size-16 animate-pulse text-muted-foreground" />
 							<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>

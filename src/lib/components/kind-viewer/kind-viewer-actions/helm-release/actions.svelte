@@ -11,7 +11,7 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
-	// import Update from './update.svelte';
+	import Upgrade from './upgrade.svelte';
 
 	let {
 		schema,
@@ -84,21 +84,25 @@
 					}}
 				/>
 			</DropdownMenu.Item>
-			<!-- <DropdownMenu.Item
+			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
 			>
-				<Update
+				<Upgrade
 					{cluster}
 					{namespace}
-					{schema}
+					{group}
+					{version}
+					{kind}
+					{resource}
+					{validate}
 					{object}
 					onOpenChangeComplete={() => {
 						actionsOpen = false;
 					}}
 				/>
-			</DropdownMenu.Item> -->
+			</DropdownMenu.Item>
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();

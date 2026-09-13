@@ -6,7 +6,7 @@
 	import TerminalSquareIcon from '@lucide/svelte/icons/terminal-square';
 	import { getContext, type Snippet } from 'svelte';
 
-	import { Terminal } from '$lib/components/applications/terminal';
+	import { Terminal, TERMINAL_BACKGROUND } from '$lib/components/applications/terminal';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import * as Dialog from '$lib/components/ui/dialog';
@@ -211,7 +211,8 @@
 				</div>
 			</div>
 
-			<div class="min-h-0 flex-1 bg-[#1e1e1e] p-3">
+			<!-- Padding must match the xterm palette's background, or it reads as a border. -->
+			<div class="min-h-0 flex-1 p-3" style:background-color={TERMINAL_BACKGROUND}>
 				{#if showTerminal && resolver.selectedContainer && resolver.effectivePodName}
 					{#key `${resolver.effectivePodName}-${resolver.selectedContainer}`}
 						<Terminal

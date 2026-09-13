@@ -7,7 +7,7 @@
 	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import { getLocale } from '$lib/paraglide/runtime';
 
 	import Calendar from './calendar.svelte';

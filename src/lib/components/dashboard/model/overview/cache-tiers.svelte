@@ -2,6 +2,7 @@
 	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
+	import MoonIcon from '@lucide/svelte/icons/moon';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient } from 'layerchart';
@@ -13,10 +14,12 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 	import {
+		type ActivityState,
 		computeStep,
 		fetchMultipleFlattenedRange,
+		probeActivity,
 		vllmMetricWithSelector
 	} from '$lib/prometheus';
 
@@ -38,20 +41,19 @@
 		isReloading: boolean;
 	} = $props();
 
-	type Row = { date: Date; l1: number; l2?: number; l3?: number };
+	type Row = { date: Date; vllm: number; middleware?: number };
 
 	let data = $state<Row[]>([]);
-	// L2 LMCache / L3 Mooncake tiers only exist when KV Cache Offload is enabled (AI100).
-	// Render each series only when its metric actually returns data, so clusters without
-	// an offload tier show just the L1 line instead of misleading flat-0% L2/L3 lines.
-	let hasL2 = $state(false);
-	let hasL3 = $state(false);
+	// The middleware tier only exists when KV Cache Offload is enabled (AI100). Render its
+	// series only when the metric actually returns data, so clusters without an offload tier
+	// show just the vLLM line instead of a misleading flat-0% middleware line.
+	let hasMiddleware = $state(false);
 	let isLoaded = $state(false);
+	let activity = $state<ActivityState>('absent');
 
 	const configuration = {
-		l1: { label: m.cache_l1_vllm(), color: 'var(--chart-2)' },
-		l2: { label: m.cache_l2_lmcache(), color: 'var(--chart-1)' },
-		l3: { label: m.cache_l3_mooncake(), color: 'var(--chart-3)' }
+		vllm: { label: m.cache_hit_vllm(), color: 'var(--chart-2)' },
+		middleware: { label: m.cache_hit_middleware(), color: 'var(--chart-3)' }
 	} satisfies Chart.ChartConfig;
 
 	const areaProps = {
@@ -63,32 +65,34 @@
 
 	function queries(): Record<string, string> {
 		// Namespace-scoped (overview has no single model selected).
-		const l1Hits = vllmMetricWithSelector('vllm:prefix_cache_hits_total', namespace, undefined);
-		const l1Queries = vllmMetricWithSelector(
+		const vllmHits = vllmMetricWithSelector('vllm:prefix_cache_hits_total', namespace, undefined);
+		const vllmQueries = vllmMetricWithSelector(
 			'vllm:prefix_cache_queries_total',
 			namespace,
 			undefined
 		);
-		const l2Hits = vllmMetricWithSelector('lmcache:num_hit_tokens_total', namespace, undefined);
-		const l2Requested = vllmMetricWithSelector(
-			'lmcache:num_requested_tokens_total',
-			namespace,
-			undefined
-		);
-		const l3Hits = vllmMetricWithSelector(
+		// The middleware is the KV store behind vLLM, which manages DRAM and SSD behind one lookup.
+		// Counted from vLLM's own connector rather than from LMCache: LMCache serves no hits of its
+		// own — its local DRAM is a staging buffer and everything found below vLLM comes from the
+		// middleware — so vLLM's external counters cover the same events, and both lines then come
+		// from one exporter in one unit instead of mixing tokens with LMCache's chunks.
+		const middlewareHits = vllmMetricWithSelector(
 			'vllm:external_prefix_cache_hits_total',
 			namespace,
 			undefined
 		);
-		const l3Queries = vllmMetricWithSelector(
+		const middlewareQueries = vllmMetricWithSelector(
 			'vllm:external_prefix_cache_queries_total',
 			namespace,
 			undefined
 		);
 		return {
-			l1: `sum(rate(${l1Hits}[5m])) / sum(rate(${l1Queries}[5m])) * 100`,
-			l2: `sum(rate(${l2Hits}[5m])) / sum(rate(${l2Requested}[5m])) * 100`,
-			l3: `sum(rate(${l3Hits}[5m])) / sum(rate(${l3Queries}[5m])) * 100`
+			vllm: `sum(rate(${vllmHits}[5m])) / sum(rate(${vllmQueries}[5m])) * 100`,
+			middleware: `sum(rate(${middlewareHits}[5m])) / sum(rate(${middlewareQueries}[5m])) * 100`,
+			// Both lines are hit/query ratios, so an idle model divides 0 by 0 and yields NaN for
+			// both. The vLLM denominator alone survives that: flat 0 when nothing is served,
+			// no series at all when vLLM is not scraped.
+			traffic: `sum(rate(${vllmQueries}[5m]))`
 		};
 	}
 
@@ -96,25 +100,29 @@
 		try {
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
-			const points = await fetchMultipleFlattenedRange(
+			const raw = await fetchMultipleFlattenedRange(
 				prometheusDriver,
 				queries(),
 				new Date(startMs),
 				new Date(endMs),
 				computeStep(startMs, endMs)
 			);
-			hasL2 = points.some((p) => Number.isFinite(Number(p.l2)));
-			hasL3 = points.some((p) => Number.isFinite(Number(p.l3)));
+			activity = probeActivity(raw, 'traffic');
+			// A flat `traffic: 0` is finite and would keep points alive, defeating the
+			// `length === 0` empty check and drawing a 0% line that reads as a measured miss rate.
+			const points = raw.filter((p) => p.vllm !== undefined || p.middleware !== undefined);
+			hasMiddleware = points.some((p) => Number.isFinite(Number(p.middleware)));
 			data = points.map((p) => ({
 				date: p.date as Date,
-				l1: Number.isFinite(Number(p.l1)) ? Number(p.l1) : 0,
-				...(hasL2 ? { l2: Number.isFinite(Number(p.l2)) ? Number(p.l2) : 0 } : {}),
-				...(hasL3 ? { l3: Number.isFinite(Number(p.l3)) ? Number(p.l3) : 0 } : {})
+				vllm: Number.isFinite(Number(p.vllm)) ? Number(p.vllm) : 0,
+				...(hasMiddleware
+					? { middleware: Number.isFinite(Number(p.middleware)) ? Number(p.middleware) : 0 }
+					: {})
 			}));
 		} catch (error) {
 			data = [];
-			hasL2 = false;
-			hasL3 = false;
+			activity = 'absent';
+			hasMiddleware = false;
 			console.error(`Fail to fetch cache tiers in cluster ${cluster}:`, error);
 		}
 	}
@@ -134,12 +142,15 @@
 
 	const series = $derived(
 		[
-			{ key: 'l1', label: configuration.l1.label, color: configuration.l1.color },
-			...(hasL2
-				? [{ key: 'l2', label: configuration.l2.label, color: configuration.l2.color }]
-				: []),
-			...(hasL3
-				? [{ key: 'l3', label: configuration.l3.label, color: configuration.l3.color }]
+			{ key: 'vllm', label: configuration.vllm.label, color: configuration.vllm.color },
+			...(hasMiddleware
+				? [
+						{
+							key: 'middleware',
+							label: configuration.middleware.label,
+							color: configuration.middleware.color
+						}
+					]
 				: [])
 		].map((s) => ({ ...s }))
 	);
@@ -152,8 +163,8 @@
 			<Card.Description>{m.llm_dashboard_cache_tiers_description()}</Card.Description>
 		</div>
 		<Tooltip.Root>
-			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-				<InfoIcon class="size-5 text-muted-foreground" />
+			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}>
+				<InfoIcon class="size-4 text-muted-foreground" />
 			</Tooltip.Trigger>
 			<Tooltip.Content class="max-w-xs">
 				<p>{m.llm_dashboard_cache_tiers_tooltip()}</p>
@@ -168,9 +179,15 @@
 		</Card.Content>
 	{:else if data.length === 0}
 		<Card.Content>
-			<div class="flex h-45 w-full flex-col items-center justify-center gap-2">
-				<ChartLineIcon class="size-12 animate-pulse text-muted-foreground" />
-				<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
+			<div class="flex h-45 w-full flex-col items-center justify-center gap-1">
+				{#if activity === 'idle'}
+					<MoonIcon class="size-12 text-muted-foreground" />
+					<p class="text-sm text-muted-foreground">{m.no_traffic_display()}</p>
+					<p class="text-xs text-muted-foreground">{m.no_traffic_hint()}</p>
+				{:else}
+					<ChartLineIcon class="size-12 animate-pulse text-muted-foreground" />
+					<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
+				{/if}
 			</div>
 		</Card.Content>
 	{:else}

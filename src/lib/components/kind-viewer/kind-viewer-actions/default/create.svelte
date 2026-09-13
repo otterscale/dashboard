@@ -13,12 +13,13 @@
 	import { parseDocument, stringify } from 'yaml';
 
 	import { filterRequiredSchema, getInitialValues } from '$lib/components/dynamic-form/utils';
+	import { formatValidationErrors } from '$lib/components/kind-viewer/schema';
 	import SchemaViewer from '$lib/components/schema-viewer/schema-viewer.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-	import { m } from '$lib/paraglide/messages';
+	import { m } from '$lib/messages';
 
 	let {
 		cluster,
@@ -86,8 +87,8 @@
 		const valid = validate(representation);
 		if (!valid && validate.errors) {
 			validate.errors.forEach((error) => {
-				let targetPath: string[] = [];
-				let errorMessage = '';
+				let targetPath: string[];
+				let errorMessage: string;
 
 				// Classify Errors
 				if (error.keyword === 'required') {
@@ -169,18 +170,25 @@
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const parsed = document.toJS() as Record<string, any>;
 		if (!validate(parsed)) {
-			toast.error(`Validation errors: ${JSON.stringify(validate.errors)}`);
+			toast.error('Validation errors found. Please fix them before submitting.', {
+				description: formatValidationErrors(validate.errors)
+			});
 			return;
 		}
 
 		isSubmitting = true;
-		const name = (parsed.metadata as { name: string })?.name || kind;
+		const metadata = parsed.metadata as { name?: string; namespace?: string } | undefined;
+		const name = metadata?.name || kind;
+		// The manifest wins over the namespace this viewer was opened in, so a cluster-wide
+		// listing (the resources page) can create into any workspace by editing the YAML.
+		const targetNamespace = metadata?.namespace || namespace;
+		const target = targetNamespace ? `${targetNamespace}/${name}` : name;
 
 		toast.promise(
 			async () => {
 				await resourceClient.create({
 					cluster,
-					namespace,
+					namespace: targetNamespace,
 					group,
 					version,
 					resource,
@@ -188,11 +196,11 @@
 				});
 			},
 			{
-				loading: `Creating ${kind} ${name}...`,
-				success: `Successfully created ${kind} ${name}`,
+				loading: `Creating ${kind} ${target}...`,
+				success: `Successfully created ${kind} ${target}`,
 				error: (error) => {
-					console.error(`Failed to create ${kind} ${name}:`, error);
-					return `Failed to create ${kind} ${name}: ${(error as ConnectError).message}`;
+					console.error(`Failed to create ${kind} ${target}:`, error);
+					return `Failed to create ${kind} ${target}: ${(error as ConnectError).message}`;
 				},
 				finally: () => {
 					isSubmitting = false;
