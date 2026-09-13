@@ -40,6 +40,7 @@
 	import { cn } from '$lib/utils';
 
 	let {
+		// eslint-disable-next-line no-useless-assignment -- write-only bindable, read by the parent via bind:reference
 		reference = $bindable<FormState<FormValue> | null>(null),
 		schema,
 		initialValue,
@@ -47,6 +48,7 @@
 		transformer,
 		handleSubmit,
 		actions,
+		// eslint-disable-next-line no-useless-assignment -- write-only bindable, read by the parent via bind:values
 		values = $bindable(),
 		onFormChange,
 		class: className,
@@ -168,6 +170,7 @@
 		onSubmitError,
 		disabled
 	});
+	// eslint-disable-next-line no-useless-assignment -- write-only bindable, read by the parent via bind:reference
 	reference = form;
 	// YAML
 	// Reorder attributes in YAML editor to match the form schema, making it more intuitive for users to find and edit values.
