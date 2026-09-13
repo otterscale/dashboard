@@ -148,8 +148,8 @@
 		const valid = nullTolerantValidate(representation);
 		if (!valid && nullTolerantValidate.errors) {
 			nullTolerantValidate.errors.forEach((error) => {
-				let targetPath: string[] = [];
-				let errorMessage = '';
+				let targetPath: string[];
+				let errorMessage: string;
 
 				// Classify Errors
 				if (error.keyword === 'required') {

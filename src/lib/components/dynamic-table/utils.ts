@@ -215,7 +215,7 @@ function jsonValueToDate(value: JsonValue | undefined): Date | null {
 	if (typeof value === 'string' && value.trim() === '') return null;
 
 	// Transfer
-	let date: Date | null = null;
+	let date: Date;
 	if (typeof value === 'number') {
 		date = new Date(value);
 	} else if (typeof value === 'string') {

@@ -162,12 +162,12 @@
 							lodash.set(helmRelease, ['spec', 'chart', 'spec', 'version'], targetVersion);
 							const manifest = stringify(helmRelease, { schema: 'yaml-1.1' });
 
-							let isValid: boolean | undefined = undefined;
+							let isValid: boolean;
 							try {
 								isValid = validate(load(manifest, { schema: JSON_SCHEMA }));
 							} catch (error) {
 								console.error(`Failed to parse HelmRelease manifest for ${name}:`, error);
-								throw new Error(`Invalid YAML for ${name}.`);
+								throw new Error(`Invalid YAML for ${name}.`, { cause: error });
 							}
 							if (!isValid) {
 								console.error(`Validation errors for ${name}:`, validate.errors);
