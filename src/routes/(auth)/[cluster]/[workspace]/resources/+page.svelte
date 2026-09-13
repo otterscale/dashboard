@@ -150,6 +150,9 @@
 	}
 
 	const cluster = $derived(page.params.cluster ?? '');
+	// Namespace of the workspace this page was entered from. Listing stays cluster-wide; this only
+	// seeds the create editor and row actions, and the manifest can point at any other workspace.
+	const namespace = $derived(page.data.namespace ?? '');
 
 	const transport: Transport = getContext('transport');
 	const client = createClient(ResourceService, transport);
@@ -372,6 +375,7 @@
 					isClusterAdmin={true}
 					resourceRuleVerbs={selectedResourceRuleVerbs}
 					{cluster}
+					{namespace}
 					apiResource={selectedAPIResource}
 				/>
 			{/key}
