@@ -87,8 +87,8 @@
 		const valid = validate(representation);
 		if (!valid && validate.errors) {
 			validate.errors.forEach((error) => {
-				let targetPath: string[] = [];
-				let errorMessage = '';
+				let targetPath: string[];
+				let errorMessage: string;
 
 				// Classify Errors
 				if (error.keyword === 'required') {

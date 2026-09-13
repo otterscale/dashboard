@@ -22,7 +22,7 @@
 	const dataSchema = $derived(dataSchemas[column.id]);
 </script>
 
-<div class={className}>
+<div bind:this={ref} class={className}>
 	<Tooltip.Root>
 		<Tooltip.Trigger>
 			{#if children}

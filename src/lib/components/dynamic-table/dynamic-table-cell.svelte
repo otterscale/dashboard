@@ -25,7 +25,6 @@
 	import type { UISchemaType } from './utils';
 
 	let {
-		ref = $bindable(null),
 		uiSchemas,
 		row,
 		column,
