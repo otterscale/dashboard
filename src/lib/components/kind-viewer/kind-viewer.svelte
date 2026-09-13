@@ -16,7 +16,7 @@
 		type WatchRequest
 	} from '@otterscale/api/resource/v1';
 	import type { Schema } from '@sjsf/form';
-	import type { ColumnDef, Table as TableType } from '@tanstack/table-core';
+	import type { ColumnDef, Row, Table as TableType } from '@tanstack/table-core';
 	import { type ValidateFunction } from 'ajv';
 	import { getContext, onDestroy, onMount } from 'svelte';
 	import { SvelteMap } from 'svelte/reactivity';
@@ -103,6 +103,16 @@
 	const data = $derived(Array.from(dataset.values()));
 	function getKey(datum: Record<string, JsonValue>): string {
 		return apiResource.namespaced ? `${datum['Namespace']}/${datum['Name']}` : `${datum['Name']}`;
+	}
+	// A row carries its own namespace, which is the only correct one once the listing spans
+	// namespaces (cluster-wide view, or the resources page). `namespace` is just the fallback
+	// for rows whose manifest omits it. Mirrors getNamespace in ./bulk-delete.svelte.
+	function getRowNamespace(row: Row<Record<string, JsonValue>>): string | undefined {
+		if (!apiResource.namespaced) return undefined;
+
+		return (
+			(row.original.raw as Record<string, Record<string, string>>)?.metadata?.namespace || namespace
+		);
 	}
 	let columnDefinitions: ColumnDef<Record<string, JsonValue>>[] | undefined = $state(undefined);
 
@@ -478,10 +488,7 @@
 							{schema}
 							{validate}
 							{cluster}
-							namespace={namespace
-								? (row.original.raw as Record<string, Record<string, string>>)?.metadata
-										?.namespace || namespace
-								: namespace}
+							namespace={getRowNamespace(row)}
 							group={apiResource.group}
 							version={apiResource.version}
 							kind={apiResource.kind}

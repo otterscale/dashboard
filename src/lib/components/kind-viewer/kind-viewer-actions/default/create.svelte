@@ -87,8 +87,8 @@
 		const valid = validate(representation);
 		if (!valid && validate.errors) {
 			validate.errors.forEach((error) => {
-				let targetPath: string[] = [];
-				let errorMessage = '';
+				let targetPath: string[];
+				let errorMessage: string;
 
 				// Classify Errors
 				if (error.keyword === 'required') {
@@ -177,13 +177,18 @@
 		}
 
 		isSubmitting = true;
-		const name = (parsed.metadata as { name: string })?.name || kind;
+		const metadata = parsed.metadata as { name?: string; namespace?: string } | undefined;
+		const name = metadata?.name || kind;
+		// The manifest wins over the namespace this viewer was opened in, so a cluster-wide
+		// listing (the resources page) can create into any workspace by editing the YAML.
+		const targetNamespace = metadata?.namespace || namespace;
+		const target = targetNamespace ? `${targetNamespace}/${name}` : name;
 
 		toast.promise(
 			async () => {
 				await resourceClient.create({
 					cluster,
-					namespace,
+					namespace: targetNamespace,
 					group,
 					version,
 					resource,
@@ -191,11 +196,11 @@
 				});
 			},
 			{
-				loading: `Creating ${kind} ${name}...`,
-				success: `Successfully created ${kind} ${name}`,
+				loading: `Creating ${kind} ${target}...`,
+				success: `Successfully created ${kind} ${target}`,
 				error: (error) => {
-					console.error(`Failed to create ${kind} ${name}:`, error);
-					return `Failed to create ${kind} ${name}: ${(error as ConnectError).message}`;
+					console.error(`Failed to create ${kind} ${target}:`, error);
+					return `Failed to create ${kind} ${target}: ${(error as ConnectError).message}`;
 				},
 				finally: () => {
 					isSubmitting = false;
