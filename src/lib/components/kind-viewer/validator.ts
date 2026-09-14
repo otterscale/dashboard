@@ -1,3 +1,5 @@
+import { sha256 } from '@oslojs/crypto/sha2';
+import { encodeHexLowerCase } from '@oslojs/encoding';
 import type { Schema } from '@sjsf/form';
 import Ajv, { type ValidateFunction } from 'ajv';
 
@@ -9,16 +11,15 @@ const ajv = new Ajv({ allErrors: true, strict: false, logger: false });
 
 const validators = new Map<string, ValidateFunction>();
 
-// `crypto.subtle` exists only in secure contexts (https and localhost), which is how
-// the dashboard is served.
-async function fingerprint(schema: Schema): Promise<string> {
-	const bytes = new TextEncoder().encode(JSON.stringify(schema));
-	const digest = await crypto.subtle.digest('SHA-256', bytes);
-	return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+// Oslo's SHA-256 rather than `crypto.subtle`: it is synchronous and needs no secure
+// context. Hashing keeps the cache from retaining a copy of every schema it has seen —
+// Pod's dereferenced schema alone is ~380KB.
+function fingerprint(schema: Schema): string {
+	return encodeHexLowerCase(sha256(new TextEncoder().encode(JSON.stringify(schema))));
 }
 
-export async function getValidator(schema: Schema): Promise<ValidateFunction> {
-	const key = await fingerprint(schema);
+export function getValidator(schema: Schema): ValidateFunction {
+	const key = fingerprint(schema);
 
 	const cached = validators.get(key);
 	if (cached) return cached;

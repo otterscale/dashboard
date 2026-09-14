@@ -211,12 +211,11 @@
 		isMounted = true;
 		watchResource();
 		if (fetchedSchema) {
-			getValidator(fetchedSchema)
-				.then((compiled) => {
-					if (isDestroyed) return;
-					validate = compiled;
-				})
-				.catch((e) => console.error('Failed to compile schema validator:', e));
+			try {
+				validate = getValidator(fetchedSchema);
+			} catch (e) {
+				console.error('Failed to compile schema validator:', e);
+			}
 		}
 	});
 
