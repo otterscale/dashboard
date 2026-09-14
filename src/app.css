@@ -199,3 +199,15 @@
 		display: none;
 	}
 }
+
+/* Monaco positions button tooltips as one line; a wrapped one covers its button
+   (microsoft/monaco-editor#5177, #5208). Plain-text tooltips carry inline pre-wrap. */
+.workbench-hover .hover-contents[style*='pre-wrap'] {
+	white-space: nowrap !important;
+}
+
+/* Monaco positions tooltips relative to the editor container, which svelte-monaco leaves
+   unpositioned (microsoft/monaco-editor#5177). */
+.monaco-container {
+	position: relative;
+}
