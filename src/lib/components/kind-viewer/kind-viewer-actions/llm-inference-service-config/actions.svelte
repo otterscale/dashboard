@@ -52,10 +52,6 @@
 		{/snippet}
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content align="end" class="w-full">
-		{@const containers = object?.spec?.template?.containers}
-		{@const isMiddleware =
-			Array.isArray(containers) &&
-			containers.some((container) => container?.image?.includes('/ai-mw/'))}
 		<DropdownMenu.Group>
 			<DropdownMenu.Label>Inspect</DropdownMenu.Label>
 			<DropdownMenu.Item
@@ -71,7 +67,6 @@
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
-				disabled={isMiddleware}
 			>
 				<Deploy
 					{cluster}
@@ -107,7 +102,6 @@
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
-				disabled={isMiddleware}
 			>
 				<Copy
 					{cluster}
