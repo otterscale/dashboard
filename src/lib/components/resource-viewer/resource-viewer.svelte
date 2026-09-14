@@ -206,14 +206,17 @@
 	let isMounted = $state(false);
 	onMount(async () => {
 		const [, fetchedSchema] = await Promise.all([GetResource(), fetchSchema()]);
+		if (isDestroyed) return;
 		schema = fetchedSchema;
 		isMounted = true;
 		watchResource();
 		if (fetchedSchema) {
-			void getValidator(fetchedSchema).then((compiled) => {
-				if (isDestroyed) return;
-				validate = compiled;
-			});
+			getValidator(fetchedSchema)
+				.then((compiled) => {
+					if (isDestroyed) return;
+					validate = compiled;
+				})
+				.catch((e) => console.error('Failed to compile schema validator:', e));
 		}
 	});
 

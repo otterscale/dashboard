@@ -289,13 +289,15 @@
 		// For Dynamic Table
 		columnDefinitions = getColumnDefinitions(apiResource, uiSchemas, dataSchemas, cluster);
 		// For Dynamic Form; not awaited, so actions become available before the list finishes.
-		void fetchSchema().then(async (fetched) => {
-			if (isDestroyed || !fetched) return;
-			const compiled = await getValidator(fetched);
-			if (isDestroyed) return;
-			validate = compiled;
-			schema = fetched;
-		});
+		fetchSchema()
+			.then(async (fetched) => {
+				if (isDestroyed || !fetched) return;
+				const compiled = await getValidator(fetched);
+				if (isDestroyed) return;
+				validate = compiled;
+				schema = fetched;
+			})
+			.catch((e) => console.error('Failed to compile schema validator:', e));
 		await listResources();
 		watchResources();
 	});
