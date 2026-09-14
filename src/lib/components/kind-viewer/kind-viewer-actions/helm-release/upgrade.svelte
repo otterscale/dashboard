@@ -495,8 +495,10 @@
 						</div>
 					</div>
 					<!-- Monaco needs a definite height; percentage heights do not resolve
-					     through the flex chain, so pin it with an absolute layer. -->
-					<div class="relative min-h-0 flex-1 overflow-hidden rounded-b-md border">
+					     through the flex chain, so pin it with an absolute layer. No
+					     overflow-hidden: Monaco's tooltips (e.g. the find widget's) render
+					     above the editor and would be clipped. -->
+					<div class="relative min-h-0 flex-1 rounded-b-md border">
 						<div class="absolute inset-0">
 							<MonacoDiff
 								original={documents.defaultsText}

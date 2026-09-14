@@ -119,7 +119,10 @@
 				</Item.Content>
 			</Item.Root>
 		{/if}
-		<Resizable.PaneGroup direction="horizontal" class="min-h-0 flex-1">
+		<!-- paneforge sets inline overflow: hidden on the group and panes, which clips Monaco's
+		     tooltips (e.g. the find widget's) that render above the editor. Let the group and the
+		     editor pane overflow; min-w-0 keeps the pane from being sized by the editor's content. -->
+		<Resizable.PaneGroup direction="horizontal" class="min-h-0 flex-1 overflow-visible!">
 			<Resizable.Pane defaultSize={documentRatio}>
 				{#if document}
 					<ScrollArea class="h-full w-full" orientation="both">
@@ -140,7 +143,7 @@
 				{/if}
 			</Resizable.Pane>
 			<Resizable.Handle withHandle />
-			<Resizable.Pane defaultSize={100 - documentRatio}>
+			<Resizable.Pane defaultSize={100 - documentRatio} class="min-w-0 overflow-visible!">
 				<Monaco
 					options={{
 						language: 'yaml',
