@@ -41,6 +41,7 @@
 			renderSideBySide,
 			hideUnchangedRegions: { enabled: hideUnchanged },
 			scrollBeyondLastLine: false,
+			links: false,
 			...options
 		});
 		diffEditor.setModel({ original: createdOriginal, modified: createdModified });
