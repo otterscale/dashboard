@@ -85,7 +85,7 @@ function getChartData(
 		Description: module.description as JsonValue,
 		Digest: module.digest ?? null,
 		'Latest Version': module.version as JsonValue,
-		'Installed Version': installedVersion as JsonValue,
+		'Installed Version': installedVersion ?? null,
 		Type: module.type ?? null,
 		Labels: (module.keywords ?? []) as JsonValue,
 		Installed: installedModuleNames.has(module.name ?? ''),
