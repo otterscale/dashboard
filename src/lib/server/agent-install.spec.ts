@@ -75,41 +75,18 @@ describe('buildAgentInstallCommands', () => {
 		expect(fluxCommand).not.toContain('--set');
 	});
 
-	it('puts the credentials in a Secret, not in the HelmRelease', () => {
+	it('carries the join token and Harbor robot secret inline in the HelmRelease values', () => {
 		const { agentCommand } = buildAgentInstallCommands(input);
+		const values = parse(heredocBody(agentCommand, 'VALUES')).agent.values;
 
-		const secret = parse(heredocBody(agentCommand, 'MANIFEST'));
-		expect(secret.kind).toBe('Secret');
-		expect(secret.metadata).toEqual({
-			name: 'otterscale-agent-secrets',
-			namespace: 'otterscale-system'
+		expect(values.agent.joinToken).toBe('join-token-value');
+		expect(values.tenantOperator.harbor.robot).toEqual({
+			name: 'robot$devel',
+			secret: 'robot-secret-value'
 		});
-
-		const credentials = parse(secret.stringData['values.yaml']);
-		expect(credentials).toEqual({
-			agent: { joinToken: 'join-token-value' },
-			tenantOperator: {
-				harbor: { robot: { name: 'robot$devel', secret: 'robot-secret-value' } }
-			}
-		});
-
-		// The point of the split: neither credential appears in the values the
-		// wrapper renders into the HelmRelease object, only in the Secret above.
-		const wrapperValues = heredocBody(agentCommand, 'VALUES');
-		expect(wrapperValues).not.toContain('join-token-value');
-		expect(wrapperValues).not.toContain('robot-secret-value');
 	});
 
-	it('applies the Secret before installing the wrapper that references it', () => {
-		const { agentCommand } = buildAgentInstallCommands(input);
-		// Also the order the namespace requires: the Flux bootstrap creates it, this
-		// applies into it, and only then does anything read it.
-		expect(agentCommand.indexOf('kubectl apply')).toBeLessThan(
-			agentCommand.indexOf('helm upgrade --install otterscale-agent-flux')
-		);
-	});
-
-	it('references that Secret from the agent release and leaves its version to the wrapper', () => {
+	it('references the optional override ConfigMap and leaves its version to the wrapper', () => {
 		const { agentCommand } = buildAgentInstallCommands(input);
 		expect(agentCommand).toContain('helm upgrade --install otterscale-agent-flux');
 		expect(agentCommand).toContain('--namespace otterscale-system');
@@ -117,17 +94,9 @@ describe('buildAgentInstallCommands', () => {
 		expect(agentCommand).not.toContain('--version');
 
 		const values = parse(heredocBody(agentCommand, 'VALUES'));
-		// Same HelmRepository the Modules page builds its catalog from, so the
-		// versions it offers are versions these releases can resolve. An index, not
-		// an oci:// reference: the page's index path is what reads the per-chart
-		// annotations it filters on, and `oci://` would switch the repository to a
-		// type that path cannot read.
-		expect(values.repository).toEqual({
-			name: 'modules',
-			url: 'https://otterscale.github.io/helm-charts'
-		});
+		// No repository: absent, the chart's own default wins.
+		expect(values.repository).toBeUndefined();
 		expect(values.agent.valuesFrom).toEqual([
-			{ kind: 'Secret', name: 'otterscale-agent-secrets', valuesKey: 'values.yaml' },
 			{
 				kind: 'ConfigMap',
 				name: 'otterscale-agent-values',
@@ -158,7 +127,8 @@ describe('buildAgentInstallCommands', () => {
 			// Trailing slash: the HTTPRoute's PathPrefix /api/ rule needs it.
 			serverURL: 'https://otterscale.example.com/api/',
 			tunnelServerURL: 'https://192.0.2.1:30300',
-			cluster: 'devel'
+			cluster: 'devel',
+			joinToken: 'join-token-value'
 		});
 		expect(values.clusterAdmin).toEqual({ enabled: true, users: ['sub-1', 'sub-2'] });
 		expect(values.clusterInfo).toEqual({
@@ -171,7 +141,10 @@ describe('buildAgentInstallCommands', () => {
 		});
 		expect(values.tenantOperator).toEqual({
 			enabled: true,
-			harbor: { url: 'https://harbor.example.com' }
+			harbor: {
+				url: 'https://harbor.example.com',
+				robot: { name: 'robot$devel', secret: 'robot-secret-value' }
+			}
 		});
 		expect(values.trustedCA).toBeUndefined();
 	});
