@@ -51,7 +51,7 @@ const TRUSTED_CA_SECRET = 'otterscale-ca';
 const TRUSTED_CA_KEY = 'ca.crt';
 
 /** Not EOF: the generated values document below can't plausibly contain this line. */
-const VALUES_DELIMITER = 'EOF';
+const VALUES_DELIMITER = 'VALUES';
 
 export interface ClusterInfoInput {
 	enabled: boolean;
