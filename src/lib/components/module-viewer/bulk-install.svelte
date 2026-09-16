@@ -122,7 +122,7 @@
 					{
 						kind: 'ConfigMap',
 						name: `${module.name}-values`,
-						valuesKey: 'values',
+						valuesKey: 'values.yaml',
 						optional: true
 					}
 				],

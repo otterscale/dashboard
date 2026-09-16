@@ -140,7 +140,9 @@
 					const isValid = validate(values);
 					if (!isValid) return;
 
-					const name = values.name as string;
+					// The form exists to confirm intent — its schema pins what has to be
+					// typed — so the object to delete is the release, not the input.
+					const name = module.name;
 
 					toast.promise(
 						async () => {

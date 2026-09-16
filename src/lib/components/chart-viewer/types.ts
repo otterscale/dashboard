@@ -3,6 +3,8 @@ import type { ArtifactType } from '$lib/server/harbor';
 interface ChartType {
 	apiVersion: string;
 	appVersion: string;
+	/** Chart.yaml's annotations, carried through the repository index as-is. */
+	annotations?: Record<string, string>;
 	created: string;
 	description: string;
 	digest: string;

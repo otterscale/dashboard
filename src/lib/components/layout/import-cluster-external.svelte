@@ -5,6 +5,7 @@
 		createClient,
 		type Transport
 	} from '@connectrpc/connect';
+	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import TerminalIcon from '@lucide/svelte/icons/terminal';
@@ -61,7 +62,9 @@
 
 	let stepIndex = $state(1);
 	let clusterName = $state('');
-	let installCommand = $state('');
+	// The two blocks of step 3, in the order they have to be run.
+	let fluxCommand = $state('');
+	let agentCommand = $state('');
 	let robotName = $state('');
 	let robotRotated = $state(false);
 	let clusterStatus = $state<'pending' | 'installing' | 'done'>('pending');
@@ -272,7 +275,8 @@
 
 		stepIndex = 1;
 		clusterName = '';
-		installCommand = '';
+		fluxCommand = '';
+		agentCommand = '';
 		robotName = '';
 		robotRotated = false;
 		clusterStatus = 'pending';
@@ -341,11 +345,13 @@
 			}
 
 			const result = (await response.json()) as {
-				installCommand: string;
+				fluxCommand: string;
+				agentCommand: string;
 				robot: { name: string; rotated: boolean };
 			};
 
-			installCommand = result.installCommand;
+			fluxCommand = result.fluxCommand;
+			agentCommand = result.agentCommand;
 			robotName = result.robot.name;
 			robotRotated = result.robot.rotated;
 			clusterStatus = 'pending';
@@ -552,6 +558,33 @@
 	</div>
 {/snippet}
 
+{#snippet commandStep(index: number, label: string, description: string, code: string)}
+	<div class="flex flex-col gap-3 rounded-lg border bg-card p-4">
+		<div class="flex items-center gap-2">
+			<span
+				class="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground"
+			>
+				{index}
+			</span>
+			<Field.FieldLabel class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+				{label}
+			</Field.FieldLabel>
+		</div>
+
+		<Code.Root
+			lang="bash"
+			class="max-h-[40vh] w-full shrink-0 overflow-auto pr-12 text-sm [&_pre.shiki]:overflow-visible"
+			variant="secondary"
+			{code}
+			hideLines
+		>
+			<Code.CopyButton />
+		</Code.Root>
+
+		<Field.FieldDescription>{description}</Field.FieldDescription>
+	</div>
+{/snippet}
+
 {#snippet stepDeployAgent()}
 	<div class="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto">
 		<div class="flex flex-col gap-1">
@@ -575,25 +608,30 @@
 			</Item.Root>
 		{/if}
 
-		<div class="flex flex-col gap-3 rounded-lg border bg-card p-4">
-			<Field.FieldLabel class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-				{m.import_cluster_install_command_label()}
-			</Field.FieldLabel>
+		<Item.Root variant="outline">
+			<Item.Media variant="icon" class="size-10 rounded-full bg-muted text-muted-foreground">
+				<CircleAlertIcon />
+			</Item.Media>
+			<Item.Content>
+				<Item.Title>{m.import_cluster_prerequisites_title()}</Item.Title>
+				<Item.Description>
+					{m.import_cluster_prerequisite_cert_manager()}
+				</Item.Description>
+			</Item.Content>
+		</Item.Root>
 
-			<Code.Root
-				lang="bash"
-				class="max-h-[40vh] w-full shrink-0 overflow-auto pr-12 text-sm [&_pre.shiki]:overflow-visible"
-				variant="secondary"
-				code={installCommand}
-				hideLines
-			>
-				<Code.CopyButton />
-			</Code.Root>
-
-			<Field.FieldDescription>
-				{m.import_cluster_install_command_description()}
-			</Field.FieldDescription>
-		</div>
+		{@render commandStep(
+			1,
+			m.import_cluster_step_flux_label(),
+			m.import_cluster_step_flux_description(),
+			fluxCommand
+		)}
+		{@render commandStep(
+			2,
+			m.import_cluster_step_agent_label(),
+			m.import_cluster_step_agent_description(),
+			agentCommand
+		)}
 
 		<Item.Root variant="outline">
 			<Item.Media variant="icon" class="size-10 rounded-full bg-muted text-muted-foreground">
