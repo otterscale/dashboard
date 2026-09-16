@@ -81,7 +81,7 @@ describe('buildAgentInstallCommands', () => {
 		const secret = parse(heredocBody(agentCommand, 'MANIFEST'));
 		expect(secret.kind).toBe('Secret');
 		expect(secret.metadata).toEqual({
-			name: 'otterscale-agent-values',
+			name: 'otterscale-agent-secrets',
 			namespace: 'otterscale-system'
 		});
 
@@ -127,10 +127,27 @@ describe('buildAgentInstallCommands', () => {
 			url: 'https://otterscale.github.io/helm-charts'
 		});
 		expect(values.agent.valuesFrom).toEqual([
-			{ kind: 'Secret', name: 'otterscale-agent-values', valuesKey: 'values.yaml' }
+			{ kind: 'Secret', name: 'otterscale-agent-secrets', valuesKey: 'values.yaml' },
+			{
+				kind: 'ConfigMap',
+				name: 'otterscale-agent-values',
+				valuesKey: 'values.yaml',
+				optional: true
+			}
 		]);
 		// Empty pins the agent chart version the wrapper was released for.
 		expect(values.agent.version).toBeUndefined();
+	});
+
+	it('gives Flux the same optional override ConfigMap every module HelmRelease gets', () => {
+		const { agentCommand } = buildAgentInstallCommands(input);
+		const values = parse(heredocBody(agentCommand, 'VALUES'));
+
+		expect(values.flux.valuesFrom).toEqual([
+			{ kind: 'ConfigMap', name: 'flux-values', valuesKey: 'values.yaml', optional: true }
+		]);
+		// Empty pins the Flux chart version the wrapper was released for.
+		expect(values.flux.version).toBeUndefined();
 	});
 
 	it('carries the cluster settings as plain values, with the port range joined', () => {

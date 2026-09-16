@@ -50,9 +50,26 @@ const MODULES_REPOSITORY_URL = 'https://otterscale.github.io/helm-charts';
  * `spec.values`: inline values are readable by anyone who can get helmreleases
  * in this namespace, and they travel into Flux's logs and into backups. The
  * wrapper chart's own values.yaml recommends the same split.
+ *
+ * The same name also carries an optional operator-managed ConfigMap (same key,
+ * `values.yaml`) for non-secret overrides — e.g. pointing `image.repository`/
+ * `tag` and `tenantOperator.images.*` at a mirror registry. `kind` is what
+ * keeps the two apart; nothing here creates that ConfigMap, it's provisioned
+ * out of band the same way the private-CA Secret is.
  */
-const AGENT_VALUES_SECRET = 'otterscale-agent-values';
-const AGENT_VALUES_SECRET_KEY = 'values.yaml';
+const AGENT_SECRETS_NAME = 'otterscale-agent-secrets';
+const AGENT_SECRETS_KEY = 'values.yaml';
+const AGENT_VALUES_NAME = 'otterscale-agent-values';
+const AGENT_VALUES_KEY = 'values.yaml';
+
+/**
+ * Same optional-override ConfigMap convention as every module HelmRelease
+ * (module-viewer install.svelte / bulk-install.svelte): FluxCD skips it when
+ * absent, so a cluster that never creates `flux-values` installs on the
+ * chart's defaults untouched.
+ */
+const FLUX_VALUES_NAME = `${FLUX_RELEASE}-values`;
+const FLUX_VALUES_KEY = 'values.yaml';
 
 /**
  * Toggle for whether agent.serverURL is served by a private CA the agent must be
@@ -221,15 +238,15 @@ function buildAgentValues(input: AgentInstallInput): Record<string, unknown> {
 }
 
 /**
- * The wrapper's own values: which repository its HelmReleases pull from, plus the
+ * The wrapper's own values: which repository its HelmReleases pull from, the
  * agent's values split into the configuration half and a reference to the
- * credentials Secret.
+ * credentials Secret, and an optional override ConfigMap for Flux itself.
  *
  * `agent.version` is deliberately left out. Empty pins the agent chart version
  * the wrapper was released for (its appVersion), which is what makes bumping the
- * wrapper the way to roll the agent forward. `flux` is left alone entirely: the
- * wrapper pins its version, and the bootstrap above passes no values, so
- * `flux.values` has nothing to repeat.
+ * wrapper the way to roll the agent forward. Same for `flux.version`: the
+ * bootstrap above passes no version either, so both sides stay on the chart's
+ * pinned default with nothing to keep in sync.
  */
 function buildWrapperValues(input: AgentInstallInput): Record<string, unknown> {
 	return {
@@ -245,8 +262,24 @@ function buildWrapperValues(input: AgentInstallInput): Record<string, unknown> {
 			valuesFrom: [
 				{
 					kind: 'Secret',
-					name: AGENT_VALUES_SECRET,
-					valuesKey: AGENT_VALUES_SECRET_KEY
+					name: AGENT_SECRETS_NAME,
+					valuesKey: AGENT_SECRETS_KEY
+				},
+				{
+					kind: 'ConfigMap',
+					name: AGENT_VALUES_NAME,
+					valuesKey: AGENT_VALUES_KEY,
+					optional: true
+				}
+			]
+		},
+		flux: {
+			valuesFrom: [
+				{
+					kind: 'ConfigMap',
+					name: FLUX_VALUES_NAME,
+					valuesKey: FLUX_VALUES_KEY,
+					optional: true
 				}
 			]
 		}
@@ -291,10 +324,10 @@ export function buildAgentInstallCommands(input: AgentInstallInput): AgentInstal
 		{
 			apiVersion: 'v1',
 			kind: 'Secret',
-			metadata: { name: AGENT_VALUES_SECRET, namespace: AGENT_NAMESPACE },
+			metadata: { name: AGENT_SECRETS_NAME, namespace: AGENT_NAMESPACE },
 			type: 'Opaque',
 			stringData: {
-				[AGENT_VALUES_SECRET_KEY]: stringify(buildCredentialValues(input), { lineWidth: 0 })
+				[AGENT_SECRETS_KEY]: stringify(buildCredentialValues(input), { lineWidth: 0 })
 			}
 		},
 		{ lineWidth: 0 }
