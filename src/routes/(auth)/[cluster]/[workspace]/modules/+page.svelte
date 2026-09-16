@@ -19,7 +19,6 @@
 	import { getContext, onDestroy, onMount } from 'svelte';
 	import { toast } from 'svelte-sonner';
 
-	import { version } from '$app/environment';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import type { ChartType } from '$lib/components/chart-viewer/types';
@@ -36,7 +35,7 @@
 		InstalledModule,
 		ModuleType
 	} from '$lib/components/module-viewer/types';
-	import { ModulesHelmRepositoryName } from '$lib/components/module-viewer/utils';
+	import { isModuleChart, ModulesHelmRepositoryName } from '$lib/components/module-viewer/utils';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/messages';
@@ -52,8 +51,6 @@
 			})
 		}
 	]);
-
-	const dashboardVersion = semver.valid(version) ? version : '1.0.0';
 
 	// Parameters
 	const cluster = $derived(page.params.cluster ?? '');
@@ -125,7 +122,9 @@
 				? await fetchEntireModulesFromHarbor(helmRepository)
 				: await fetchEntireModulesFromIndex(helmRepository);
 
-			return entireModules;
+			// Both paths read the whole repository, so the module filter belongs here
+			// rather than in each of them.
+			return entireModules.filter(isModuleChart);
 		} catch (error) {
 			const helmRepositoryName = helmRepository.metadata?.name ?? '';
 			console.error(`HelmRepository "${helmRepositoryName}": error fetching modules:`, error);
@@ -137,8 +136,8 @@
 	async function fetchEntireModulesFromHarbor(
 		helmRepository: SourceToolkitFluxcdIoV1HelmRepository
 	): Promise<ModuleType[]> {
-		const pageSize = 50;
-		const versionPrefix = `${semver.major(dashboardVersion)}.${semver.minor(dashboardVersion)}.`;
+		// Harbor's own maximum; the loop below pages through the rest.
+		const pageSize = 100;
 
 		const harborHost = parseHarborHost(helmRepository);
 		const harborProjectName = parseHarborProjectName(helmRepository);
@@ -147,7 +146,7 @@
 		let harborModules: HarborModule[] = [];
 
 		while (true) {
-			const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')},tags=~${encodeHarborURIComponent(versionPrefix)}&page=${currentPage}&page_size=${pageSize}`;
+			const artifactsUrl = `/api/v2.0/projects/${encodeHarborURIComponent(harborProjectName)}/artifacts?q=media_type=${encodeHarborURIComponent('application/vnd.cncf.helm.config.v1+json')}&page=${currentPage}&page_size=${pageSize}`;
 			const response = await fetch('/bff/helm/repository/harbor', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -197,7 +196,13 @@
 
 		return Object.values(modulesByName)
 			.map((versions) => {
-				const validVersions = versions.sort((p, n) => semver.rcompare(p.version, n.version));
+				// Helm requires chart versions to be SemVer 2, but a registry can hold
+				// artifacts tagged with anything (a moving `latest`, a commit sha), and
+				// rcompare throws on those — which would take the whole catalog down
+				// with it. Drop them instead of trying to rank them.
+				const validVersions = versions
+					.filter((moduleVersion) => semver.valid(moduleVersion.version))
+					.sort((p, n) => semver.rcompare(p.version, n.version));
 				const [latestValidVersion] = validVersions;
 				if (latestValidVersion) {
 					return {
@@ -226,7 +231,10 @@
 		const indexModules: Record<string, ChartType[]> = await response.json();
 		return Object.values(indexModules)
 			.map((versions) => {
-				const validVersions = versions.sort((p, n) => semver.rcompare(p.version, n.version));
+				// Same guard as the Harbor path above.
+				const validVersions = versions
+					.filter((chartVersion) => semver.valid(chartVersion.version))
+					.sort((p, n) => semver.rcompare(p.version, n.version));
 				const [latestValidVersion] = validVersions;
 				if (latestValidVersion) {
 					return {
@@ -378,8 +386,14 @@
 	});
 	$effect(() => {
 		const installedModules: InstalledModule[] = releases
-			.map((release) => release.spec?.chart?.spec as InstalledModule)
-			.filter(Boolean);
+			.map((release) => {
+				// A release with no chart name can't be matched against the catalog, and
+				// a chartRef-based one carries no chart name here at all.
+				const chart = release.spec?.chart?.spec?.chart;
+				if (!chart) return undefined;
+				return { chart, version: release.spec?.chart?.spec?.version } satisfies InstalledModule;
+			})
+			.filter((installedModule) => installedModule !== undefined);
 
 		data = modules.map((module) => getChartData(module, installedModules, helmRepository!));
 	});

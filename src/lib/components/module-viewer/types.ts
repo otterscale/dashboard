@@ -1,6 +1,12 @@
+/**
+ * A HelmRelease in the platform namespace, reduced to what marks a catalog entry
+ * as installed. Upgrade and Uninstall address the release by its chart name: the
+ * wrapper chart that brings the agent's and Flux's releases keeps their
+ * `metadata.name` equal to the chart they install, same as this page does.
+ */
 interface InstalledModule {
 	chart: string;
-	version: string;
+	version?: string;
 }
 
 interface ModuleMetadataType {
