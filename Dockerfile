@@ -18,6 +18,12 @@ COPY . .
 # Set version environment variable
 ENV VERSION=${VERSION}
 
+# Flatten the EE overlay onto src and static (no-op in CE where ee/ doesn't exist),
+# then drop ee/ so libResolver becomes inert during the production build.
+RUN if [ -d ee/src ]; then cp -a ee/src/. src/; fi && \
+    if [ -d ee/static ]; then cp -a ee/static/. static/; fi && \
+    rm -rf ee
+
 # Build the application
 RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm build
 
