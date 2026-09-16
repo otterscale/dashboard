@@ -618,7 +618,7 @@
 	"import_cluster_step_flux_label": "安裝 Flux",
 	"import_cluster_step_flux_description": "在 Flux 的控制器與 CRD 就緒之前，沒有任何東西會處理 HelmRelease。第 2 步會把這個 release 交給 Flux 自己管理，之後請不要再手動升級它。",
 	"import_cluster_step_agent_label": "安裝代理程式",
-	"import_cluster_step_agent_description": "先套用憑證 Secret，再建立代理程式與 Flux 的 HelmRelease。裡面的 join token 和 Harbor robot 都是憑證，請將整塊視為機密。Chart 來自 otterscale-system 的 modules HelmRepository。",
+	"import_cluster_step_agent_description": "建立代理程式與 Flux 的 HelmRelease。裡面內嵌了 join token 和 Harbor robot secret，請將整塊視為機密。Chart 來自 otterscale-system 的 modules HelmRepository。",
 	"import_cluster_harbor_robot": "Harbor Robot",
 	"import_cluster_robot_rotated_title": "Harbor robot 密鑰已輪替",
 	"import_cluster_robot_rotated_description": "{name} 原本就存在。Harbor 只在建立帳號時吐出一次密鑰，因此已重新建立。仍持有舊密鑰的元件會一直失效，直到這條指令執行完成。",
