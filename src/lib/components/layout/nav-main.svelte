@@ -33,10 +33,20 @@
 		kubernetesItems: NavItem[];
 	} = $props();
 
+	const currentUrl = $derived(page.url.pathname + page.url.search);
+
+	// Items without a query string point at a dedicated page, so match on the
+	// pathname alone: such pages may append their own search parameters after
+	// loading. Items with a query string all share a single pathname, so only a
+	// full match tells them apart.
+	function matchesUrl(url: string | undefined): boolean {
+		if (!url) return false;
+		return url.includes('?') ? url === currentUrl : url === page.url.pathname;
+	}
+
 	function matchesCurrentUrl(items: NavItem[]): boolean {
-		const current = page.url.pathname + page.url.search;
 		return items.some(
-			(item) => item.url === current || item.items?.some((subItem) => subItem.url === current)
+			(item) => matchesUrl(item.url) || item.items?.some((subItem) => matchesUrl(subItem.url))
 		);
 	}
 
@@ -55,7 +65,6 @@
 		{ label: kubernetesLabel, icon: SquareTerminalIcon, items: kubernetesItems }
 	]);
 	const currentView = $derived(views[activeIndex]);
-	const currentUrl = $derived(page.url.pathname + page.url.search);
 </script>
 
 <Sidebar.Group>
@@ -79,7 +88,7 @@
 		{#each currentView.items as item (item.title)}
 			{#if item.items && item.items.length > 0}
 				<Collapsible.Root
-					open={item.isActive || item.items.some((subItem) => subItem.url === currentUrl)}
+					open={item.isActive || item.items.some((subItem) => matchesUrl(subItem.url))}
 					class="group/collapsible"
 				>
 					{#snippet child({ props })}
@@ -102,7 +111,7 @@
 									{#each item.items as subItem (subItem.title)}
 										<Sidebar.MenuSubItem>
 											<Sidebar.MenuSubButton
-												isActive={subItem.url === currentUrl}
+												isActive={matchesUrl(subItem.url)}
 												aria-disabled={subItem.disabled}
 											>
 												{#snippet child({ props })}
@@ -122,7 +131,7 @@
 				</Collapsible.Root>
 			{:else}
 				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={item.url === currentUrl} tooltipContent={item.title}>
+					<Sidebar.MenuButton isActive={matchesUrl(item.url)} tooltipContent={item.title}>
 						{#snippet child({ props })}
 							<!-- eslint-disable svelte/no-navigation-without-resolve -->
 							<a href={item.url} {...props}>
