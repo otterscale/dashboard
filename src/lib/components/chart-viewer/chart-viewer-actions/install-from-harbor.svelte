@@ -26,7 +26,7 @@
 	import { ReleaseScopeLabel } from '$lib/utils/helm-release';
 	import { computeValuesDelta } from '$lib/utils/helm-values';
 
-	import { type ChartAttribute, isInstallable } from '../table-layout';
+	import { type ChartAttribute, getIncompatibility } from '../table-layout';
 	import { type ArtifactChartType } from '../types';
 	import { encodeHarborURIComponent, parseHarborHost } from '../utils.svelte';
 	import type { ChartVariant } from '../variants';
@@ -146,7 +146,9 @@
 				return;
 			}
 			// The listing only checked the latest version.
-			charts = ((await response.json()) as ArtifactChartType[]).filter(isInstallable);
+			charts = ((await response.json()) as ArtifactChartType[]).filter(
+				(chart) => !getIncompatibility(chart)
+			);
 		} catch (error) {
 			console.error('Error fetching repository artifacts:', error);
 		}

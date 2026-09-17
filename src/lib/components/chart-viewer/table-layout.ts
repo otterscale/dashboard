@@ -18,7 +18,8 @@ type ChartAttribute =
 	| 'Digest'
 	| 'Version'
 	| 'Type'
-	| 'Compatible'
+	| 'Tier'
+	| 'Incompatibility'
 	| 'Labels'
 	| 'icon'
 	| 'helmRepository'
@@ -27,18 +28,22 @@ type ChartAttribute =
 const ChartTierAnnotation = 'aidp.phison.com/tier';
 const ChartValidatedAgainstAnnotation = 'aidp.phison.com/validated-against';
 
-/** Tiered charts must be validated against the platform's major.minor. UI guard only. */
-function isInstallable(artifactChart: ArtifactChartType): boolean {
-	const annotations = artifactChart.extra_attrs?.annotations as Record<string, string> | undefined;
-	if (!annotations?.[ChartTierAnnotation]) return true;
+function getAnnotation(artifactChart: ArtifactChartType, key: string): string | undefined {
+	return (artifactChart.extra_attrs?.annotations as Record<string, string> | undefined)?.[key];
+}
+
+/** Validated tiered charts must match the platform's major.minor. UI guard only. */
+function getIncompatibility(artifactChart: ArtifactChartType): string | null {
+	if (!getAnnotation(artifactChart, ChartTierAnnotation)) return null;
 
 	const platform = semver.coerce(env.PUBLIC_APP_VERSION);
-	if (!platform) return true;
+	if (!platform) return null;
 
-	const validated = semver.coerce(annotations[ChartValidatedAgainstAnnotation]);
-	if (!validated) return false;
+	const validated = semver.coerce(getAnnotation(artifactChart, ChartValidatedAgainstAnnotation));
+	if (!validated) return null;
 
-	return validated.major === platform.major && validated.minor === platform.minor;
+	if (validated.major === platform.major && validated.minor === platform.minor) return null;
+	return `Validated for ${validated.major}.${validated.minor}, but current platform version is ${platform.major}.${platform.minor}`;
 }
 
 function getChartDataSchemas(): Record<ChartAttribute, DataSchemaType> {
@@ -49,7 +54,8 @@ function getChartDataSchemas(): Record<ChartAttribute, DataSchemaType> {
 		Digest: 'text',
 		Version: 'text',
 		Type: 'text',
-		Compatible: 'boolean',
+		Tier: 'text',
+		Incompatibility: 'text',
 		Labels: 'array',
 		icon: 'text',
 		helmRepository: 'object',
@@ -65,7 +71,8 @@ function getChartUISchemas(): Record<ChartAttribute, UISchemaType> {
 		Digest: 'text',
 		Version: 'text',
 		Type: 'text',
-		Compatible: 'boolean',
+		Tier: 'text',
+		Incompatibility: 'text',
 		Labels: 'array',
 		icon: 'text',
 		helmRepository: 'object',
@@ -84,7 +91,8 @@ function getChartDataFromHarbor(
 		Digest: artifactChart.digest ?? null,
 		Version: artifactChart.extra_attrs?.version as JsonValue,
 		Type: artifactChart.type ?? null,
-		Compatible: isInstallable(artifactChart),
+		Tier: getAnnotation(artifactChart, ChartTierAnnotation) ?? null,
+		Incompatibility: getIncompatibility(artifactChart),
 		Labels: (artifactChart.labels ?? []) as JsonValue,
 		icon: artifactChart.extra_attrs?.icon as JsonValue,
 		helmRepository: helmRepository as JsonValue,
@@ -137,5 +145,5 @@ export {
 	getChartDataFromHarbor,
 	getChartDataSchemas,
 	getChartUISchemas,
-	isInstallable
+	getIncompatibility
 };

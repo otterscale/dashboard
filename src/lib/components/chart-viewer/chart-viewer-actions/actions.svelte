@@ -46,7 +46,7 @@
 				<View {row} />
 			</DropdownMenu.Item>
 			<DropdownMenu.Item
-				disabled={row.original.Compatible === false}
+				disabled={!!row.original.Incompatibility}
 				onSelect={(e) => {
 					e.preventDefault();
 				}}
