@@ -2,7 +2,9 @@ import { type JsonValue } from '@bufbuild/protobuf';
 import type { SourceToolkitFluxcdIoV1HelmRepository } from '@otterscale/types';
 import type { Column, ColumnDef } from '@tanstack/table-core';
 import { type Row } from '@tanstack/table-core';
+import semver from 'semver';
 
+import { env } from '$env/dynamic/public';
 import { DynamicTableCell, DynamicTableHeader } from '$lib/components/dynamic-table';
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
@@ -16,10 +18,28 @@ type ChartAttribute =
 	| 'Digest'
 	| 'Version'
 	| 'Type'
+	| 'Compatible'
 	| 'Labels'
 	| 'icon'
 	| 'helmRepository'
 	| 'chart';
+
+const ChartTierAnnotation = 'aidp.phison.com/tier';
+const ChartValidatedAgainstAnnotation = 'aidp.phison.com/validated-against';
+
+/** Tiered charts must be validated against the platform's major.minor. UI guard only. */
+function isInstallable(artifactChart: ArtifactChartType): boolean {
+	const annotations = artifactChart.extra_attrs?.annotations as Record<string, string> | undefined;
+	if (!annotations?.[ChartTierAnnotation]) return true;
+
+	const platform = semver.coerce(env.PUBLIC_APP_VERSION);
+	if (!platform) return true;
+
+	const validated = semver.coerce(annotations[ChartValidatedAgainstAnnotation]);
+	if (!validated) return false;
+
+	return validated.major === platform.major && validated.minor === platform.minor;
+}
 
 function getChartDataSchemas(): Record<ChartAttribute, DataSchemaType> {
 	return {
@@ -29,6 +49,7 @@ function getChartDataSchemas(): Record<ChartAttribute, DataSchemaType> {
 		Digest: 'text',
 		Version: 'text',
 		Type: 'text',
+		Compatible: 'boolean',
 		Labels: 'array',
 		icon: 'text',
 		helmRepository: 'object',
@@ -44,6 +65,7 @@ function getChartUISchemas(): Record<ChartAttribute, UISchemaType> {
 		Digest: 'text',
 		Version: 'text',
 		Type: 'text',
+		Compatible: 'boolean',
 		Labels: 'array',
 		icon: 'text',
 		helmRepository: 'object',
@@ -62,6 +84,7 @@ function getChartDataFromHarbor(
 		Digest: artifactChart.digest ?? null,
 		Version: artifactChart.extra_attrs?.version as JsonValue,
 		Type: artifactChart.type ?? null,
+		Compatible: isInstallable(artifactChart),
 		Labels: (artifactChart.labels ?? []) as JsonValue,
 		icon: artifactChart.extra_attrs?.icon as JsonValue,
 		helmRepository: helmRepository as JsonValue,
@@ -113,5 +136,6 @@ export {
 	getChartColumnDefinitions,
 	getChartDataFromHarbor,
 	getChartDataSchemas,
-	getChartUISchemas
+	getChartUISchemas,
+	isInstallable
 };

@@ -85,5 +85,8 @@
 				{type}
 			</span>
 		{/if}
+		{#if row.original.Compatible === false}
+			<Badge variant="outline" class="ml-auto text-destructive">Incompatible</Badge>
+		{/if}
 	</Card.Footer>
 </Card.Root>
