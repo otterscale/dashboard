@@ -7,7 +7,6 @@
 	} from '@connectrpc/connect';
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
-	import ServerIcon from '@lucide/svelte/icons/server';
 	import TerminalIcon from '@lucide/svelte/icons/terminal';
 	import { type Link, LinkService } from '@otterscale/api/link/v1';
 	import { ResourceService } from '@otterscale/api/resource/v1';
@@ -27,7 +26,6 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { env } from '$env/dynamic/public';
 	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import ImportClusterAdministrators, {
@@ -37,7 +35,6 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Empty from '$lib/components/ui/empty';
 	import * as Field from '$lib/components/ui/field';
-	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { m } from '$lib/messages';
@@ -121,22 +118,17 @@
 	 */
 	const curlFlags = $derived(page.data.agentValuesInsecureTLS ? '-kfsSL' : '-fsSL');
 
-	/**
-	 * Pinning the chart is the deployment's call: unset, Helm takes the newest
-	 * published tag, which is right for a rolling install and wrong for a fleet
-	 * that has to stay on one version.
-	 */
-	const agentVersionFlag = env.PUBLIC_AGENT_CHART_VERSION
-		? ` --version ${env.PUBLIC_AGENT_CHART_VERSION}`
-		: '';
-
+	// No --version, as with Flux above: whatever the registry currently publishes is
+	// what a joining cluster gets, so the chart repo stays the one place a version
+	// is decided rather than something this dialog can disagree with.
+	//
 	// `helm install`, not `upgrade --install`: this release is handed to Flux, so a
 	// second run of it by hand is a mistake worth failing on rather than applying.
 	const agentCommand = $derived(
 		valuesURL
 			? [
 					`curl ${curlFlags} ${valuesURL} | helm install ${AGENT_RELEASE} \\`,
-					`    ${CHART_REGISTRY}/${AGENT_RELEASE}${agentVersionFlag} -n ${AGENT_NAMESPACE} -f -`
+					`    ${CHART_REGISTRY}/${AGENT_RELEASE} -n ${AGENT_NAMESPACE} -f -`
 				].join('\n')
 			: ''
 	);
@@ -452,6 +444,9 @@
 				const found = response.links.some((link: Link) => link.cluster === clusterName);
 				if (found) {
 					clusterStatus = 'installing';
+					// The agent is up, so the commands on step 3 have served their
+					// purpose; step 4 owns the rest of the wait.
+					stepIndex = 4;
 					break;
 				}
 			} catch (e) {
@@ -489,6 +484,8 @@
 				const available = conditions.find((c) => c.type === 'Available');
 				if (available?.status === 'True') {
 					clusterStatus = 'done';
+					// Idempotent: the pending loop above normally moved here already, but
+					// a cluster that was already registered skips straight to this one.
 					stepIndex = 4;
 					break;
 				}
@@ -537,31 +534,41 @@
 			{:else if stepIndex === 3}
 				{@render stepDeployAgent()}
 			{:else if stepIndex === 4}
-				{@render stepVerifyBinding()}
+				{@render stepClusterStatus()}
 			{/if}
 
-			{#if stepIndex === 1 || stepIndex === 2 || stepIndex === 4}
-				<div class="mt-auto flex w-full items-center justify-between gap-3 pt-4">
-					{#if stepIndex === 1}
-						<Button variant="outline" onclick={() => (open = false)}>{m.cancel()}</Button>
-						<Button onclick={handleNext} disabled={!canGoNext}>{m.next()}</Button>
-					{:else if stepIndex === 2}
-						<Button variant="outline" onclick={() => (stepIndex = 1)}>{m.back()}</Button>
-						<Button onclick={handleGenerateCommand} disabled={!canGoNext || isCreating}>
-							{#if isCreating}
-								<Spinner data-icon="inline-start" />
-								{m.import_cluster_generating()}
-							{:else}
-								<TerminalIcon data-icon="inline-start" />
-								{m.import_cluster_generate_install_command()}
-							{/if}
-						</Button>
-					{:else}
-						<div></div>
-						<Button onclick={handleFinish}>{m.done()}</Button>
-					{/if}
-				</div>
-			{/if}
+			<div class="mt-auto flex w-full items-center justify-between gap-3 pt-4">
+				{#if stepIndex === 1}
+					<Button variant="outline" onclick={() => (open = false)}>{m.cancel()}</Button>
+					<Button onclick={handleNext} disabled={!canGoNext}>{m.next()}</Button>
+				{:else if stepIndex === 2}
+					<Button variant="outline" onclick={() => (stepIndex = 1)}>{m.back()}</Button>
+					<Button onclick={handleGenerateCommand} disabled={!canGoNext || isCreating}>
+						{#if isCreating}
+							<Spinner data-icon="inline-start" />
+							{m.import_cluster_generating()}
+						{:else}
+							<TerminalIcon data-icon="inline-start" />
+							{m.import_cluster_generate_install_command()}
+						{/if}
+					</Button>
+				{:else if stepIndex === 3}
+					<!-- The poll moves to step 4 on its own the moment the agent registers;
+					     this is for an operator who wants to watch it before then. -->
+					<div></div>
+					<Button variant="outline" onclick={() => (stepIndex = 4)}>{m.next()}</Button>
+				{:else if clusterStatus !== 'done'}
+					<!-- Still working, so the commands may still be needed: an operator who
+					     came here early has to be able to get back to them. -->
+					<Button variant="outline" onclick={() => (stepIndex = 3)}>{m.back()}</Button>
+					<Button onclick={handleFinish} disabled>{m.done()}</Button>
+				{:else}
+					<div></div>
+					<!-- Finishing navigates to the cluster's console, which only exists once
+					     the agent is actually serving it. -->
+					<Button onclick={handleFinish}>{m.done()}</Button>
+				{/if}
+			</div>
 		</div>
 	</Dialog.Content>
 </Dialog.Root>
@@ -684,59 +691,42 @@
 				{m.import_cluster_values_url_expires({ time: valuesExpiresAt.toLocaleString() })}
 			</p>
 		{/if}
-
-		<Item.Root variant="outline">
-			<Item.Media variant="icon" class="size-10 rounded-full bg-muted text-muted-foreground">
-				<ServerIcon />
-			</Item.Media>
-			<Item.Content>
-				<Item.Title>{clusterName}</Item.Title>
-				<Item.Description>
-					{m.import_cluster_target_cluster()}
-				</Item.Description>
-			</Item.Content>
-			<Item.Actions>
-				{#if clusterStatus === 'pending'}
-					<span class="flex items-center gap-2 text-muted-foreground">
-						<span class="relative flex size-2">
-							<span
-								class="absolute inline-flex size-full animate-ping rounded-full bg-primary/75 opacity-75"
-							></span>
-							<span class="relative inline-flex size-2 rounded-full bg-primary"></span>
-						</span>
-						{m.import_cluster_waiting_connection()}
-					</span>
-				{:else if clusterStatus === 'installing'}
-					<span class="flex items-center gap-2 text-amber-500">
-						<Spinner />
-						<span class="font-medium">{m.import_cluster_installing()}</span>
-					</span>
-				{:else}
-					<span class="flex items-center gap-2 text-primary">
-						<CircleCheckIcon />
-						<span class="font-medium">{m.import_cluster_managed_status()}</span>
-					</span>
-				{/if}
-			</Item.Actions>
-		</Item.Root>
-
-		{#if pollError && clusterStatus !== 'done'}
-			<p class="text-xs text-amber-500">
-				{m.import_cluster_connection_check_failed({ message: pollError })}
-			</p>
-		{/if}
 	</div>
 {/snippet}
 
-{#snippet stepVerifyBinding()}
+<!--
+	The wait and its result are one page: the same summary card is on screen from
+	the moment the agent registers, and only the status line in it changes. Landing
+	on a finished-looking page that is still working, or being moved to a different
+	page once it finishes, both make the check look like it belongs to something
+	else.
+-->
+{#snippet stepClusterStatus()}
 	<Empty.Root>
 		<Empty.Header>
-			<Empty.Media variant="icon" class="size-14 bg-primary/10 ring-4 ring-primary/5">
-				<CircleCheckIcon class="size-8 text-primary" />
+			<Empty.Media
+				variant="icon"
+				class={clusterStatus === 'done'
+					? 'size-14 bg-primary/10 ring-4 ring-primary/5'
+					: 'size-14 bg-muted ring-4 ring-muted/40'}
+			>
+				{#if clusterStatus === 'done'}
+					<CircleCheckIcon class="size-8 text-primary" />
+				{:else}
+					<Spinner class="size-8 text-muted-foreground" />
+				{/if}
 			</Empty.Media>
-			<Empty.Title>{m.import_cluster_managed_successfully_title()}</Empty.Title>
+			<Empty.Title>
+				{clusterStatus === 'done'
+					? m.import_cluster_managed_successfully_title()
+					: m.import_cluster_verifying_title()}
+			</Empty.Title>
 			<Empty.Description>
-				<strong>{clusterName}</strong>{m.import_cluster_managed_ready_suffix()}
+				{#if clusterStatus === 'done'}
+					<strong>{clusterName}</strong>{m.import_cluster_managed_ready_suffix()}
+				{:else}
+					{m.import_cluster_verifying_description()}
+				{/if}
 			</Empty.Description>
 		</Empty.Header>
 		<Empty.Content>
@@ -748,10 +738,27 @@
 					</div>
 					<div class="flex justify-between">
 						<span class="text-muted-foreground">{m.status()}</span>
-						<span class="flex items-center gap-1.5 font-medium text-primary">
-							<span class="size-1.5 rounded-full bg-primary"></span>
-							{m.import_cluster_managed()}
-						</span>
+						{#if clusterStatus === 'pending'}
+							<span class="flex items-center gap-1.5 font-medium text-muted-foreground">
+								<span class="relative flex size-1.5">
+									<span
+										class="absolute inline-flex size-full animate-ping rounded-full bg-primary/75 opacity-75"
+									></span>
+									<span class="relative inline-flex size-1.5 rounded-full bg-primary"></span>
+								</span>
+								{m.import_cluster_waiting_connection()}
+							</span>
+						{:else if clusterStatus === 'installing'}
+							<span class="flex items-center gap-1.5 font-medium text-amber-500">
+								<Spinner class="size-3.5" />
+								{m.import_cluster_installing()}
+							</span>
+						{:else}
+							<span class="flex items-center gap-1.5 font-medium text-primary">
+								<span class="size-1.5 rounded-full bg-primary"></span>
+								{m.import_cluster_managed()}
+							</span>
+						{/if}
 					</div>
 					{#if selectedUsers.length > 0}
 						<div class="flex justify-between">
@@ -764,6 +771,12 @@
 					{/if}
 				</div>
 			</div>
+
+			{#if pollError && clusterStatus !== 'done'}
+				<p class="max-w-sm text-xs text-amber-500">
+					{m.import_cluster_connection_check_failed({ message: pollError })}
+				</p>
+			{/if}
 		</Empty.Content>
 	</Empty.Root>
 {/snippet}
