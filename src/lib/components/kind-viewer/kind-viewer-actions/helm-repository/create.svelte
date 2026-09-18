@@ -14,7 +14,6 @@
 	import { stringify } from 'yaml';
 
 	import Form from '$lib/components/dynamic-form/form.svelte';
-	import RadioWidget from '$lib/components/dynamic-form/widgets/radio.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
@@ -193,10 +192,6 @@
 						schema={{
 							...lodash.omit(lodash.get(jsonSchema, 'properties.spec') as Schema, 'properties'),
 							properties: {
-								type: {
-									...(lodash.get(jsonSchema, 'properties.spec.properties.type') as Schema),
-									title: 'Type'
-								},
 								insecure: {
 									...(lodash.get(jsonSchema, 'properties.spec.properties.insecure') as Schema),
 									title: 'Insecure'
@@ -211,19 +206,6 @@
 							'ui:options': {
 								translations: {
 									submit: 'Next'
-								}
-							},
-							type: {
-								'ui:components': {
-									stringField: 'enumField',
-									selectWidget: RadioWidget
-								},
-								'ui:options': {
-									TailoredRadioLabelGetter: (label: string) => {
-										if (label === 'default') return 'index';
-
-										return label;
-									}
 								}
 							},
 							secretRef: {
