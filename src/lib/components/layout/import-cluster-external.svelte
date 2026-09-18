@@ -7,7 +7,9 @@
 	} from '@connectrpc/connect';
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
+	import ServerIcon from '@lucide/svelte/icons/server';
 	import TerminalIcon from '@lucide/svelte/icons/terminal';
+	import UserIcon from '@lucide/svelte/icons/user';
 	import { type Link, LinkService } from '@otterscale/api/link/v1';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { AppsV1Deployment } from '@otterscale/types';
@@ -35,6 +37,7 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Empty from '$lib/components/ui/empty';
 	import * as Field from '$lib/components/ui/field';
+	import * as Item from '$lib/components/ui/item';
 	import { Progress } from '$lib/components/ui/progress';
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { m } from '$lib/messages';
@@ -719,30 +722,47 @@
 			</Empty.Description>
 		</Empty.Header>
 		<Empty.Content>
-			<div class="w-full max-w-sm rounded-lg border bg-card p-3 text-sm shadow-sm">
-				<div class="flex flex-col gap-2">
-					<div class="flex justify-between">
-						<span class="text-muted-foreground">{m.cluster()}</span>
-						<span class="font-medium">{clusterName}</span>
-					</div>
-					<div class="flex justify-between">
-						<span class="text-muted-foreground">{m.status()}</span>
-						<span class="flex items-center gap-1.5 font-medium text-primary">
-							<span class="size-1.5 rounded-full bg-primary"></span>
-							{m.import_cluster_managed()}
-						</span>
-					</div>
-					{#if selectedUsers.length > 0}
-						<div class="flex justify-between">
-							<span class="text-muted-foreground">{m.import_cluster_permissions()}</span>
-							<span class="flex items-center gap-1.5 font-medium text-primary">
-								<CircleCheckIcon class="size-3.5" />
-								{m.import_cluster_admin_count({ count: selectedUsers.length })}
-							</span>
-						</div>
-					{/if}
-				</div>
-			</div>
+			<!-- Label left, value right, one row each: the same Item shape the rest of the
+			     app summarizes a resource with, rather than a card built only for here. -->
+			<Item.Group>
+				<Item.Root variant="outline" size="sm">
+					<Item.Media variant="icon">
+						<ServerIcon class="text-muted-foreground" />
+					</Item.Media>
+					<Item.Content>
+						<Item.Title class="font-normal text-muted-foreground">{m.cluster()}</Item.Title>
+					</Item.Content>
+					<Item.Actions class="text-sm font-medium">{clusterName}</Item.Actions>
+				</Item.Root>
+
+				<Item.Root variant="outline" size="sm">
+					<Item.Media variant="icon">
+						<CircleCheckIcon class="text-primary" />
+					</Item.Media>
+					<Item.Content>
+						<Item.Title class="font-normal text-muted-foreground">{m.status()}</Item.Title>
+					</Item.Content>
+					<Item.Actions class="text-sm font-medium text-primary">
+						{m.import_cluster_managed()}
+					</Item.Actions>
+				</Item.Root>
+
+				{#if selectedUsers.length > 0}
+					<Item.Root variant="outline" size="sm">
+						<Item.Media variant="icon">
+							<UserIcon class="text-muted-foreground" />
+						</Item.Media>
+						<Item.Content>
+							<Item.Title class="font-normal text-muted-foreground">
+								{m.import_cluster_permissions()}
+							</Item.Title>
+						</Item.Content>
+						<Item.Actions class="text-sm font-medium">
+							{m.import_cluster_admin_count({ count: selectedUsers.length })}
+						</Item.Actions>
+					</Item.Root>
+				{/if}
+			</Item.Group>
 		</Empty.Content>
 	</Empty.Root>
 {/snippet}
