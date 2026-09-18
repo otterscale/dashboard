@@ -8,7 +8,7 @@
 
 	import type { ChartAttribute } from '../table-layout';
 	import type { ChartVariant } from '../variants';
-	import InstallFromHarbor from './install-from-harbor.svelte';
+	import InstallFromHarbor from './install.svelte';
 	import View from './view.svelte';
 
 	let {

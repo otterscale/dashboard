@@ -13,7 +13,6 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	import Actions from './chart-viewer-actions/actions.svelte';
-	import Upload from './chart-viewer-actions/upload.svelte';
 	import Grid from './grid-layout.svelte';
 	import {
 		type ChartAttribute,
@@ -102,9 +101,6 @@
 					</Empty.Content>
 				</Empty.Root>
 			{/if}
-		{/snippet}
-		{#snippet create()}
-			<Upload {chartVariant} {namespace} />
 		{/snippet}
 		{#snippet rowActions({ row })}
 			<Actions {row} {chartVariant} {cluster} {namespace} />
