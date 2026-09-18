@@ -5,11 +5,12 @@
 		createClient,
 		type Transport
 	} from '@connectrpc/connect';
+	import { ShieldAlertIcon } from '@lucide/svelte';
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import ServerIcon from '@lucide/svelte/icons/server';
 	import TerminalIcon from '@lucide/svelte/icons/terminal';
-	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
+	import UserIcon from '@lucide/svelte/icons/user';
 	import { type Link, LinkService } from '@otterscale/api/link/v1';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { AppsV1Deployment } from '@otterscale/types';
@@ -27,6 +28,7 @@
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import * as Code from '$lib/components/custom/code';
 	import Form from '$lib/components/dynamic-form/form.svelte';
 	import ImportClusterAdministrators, {
@@ -41,6 +43,7 @@
 	import { Spinner } from '$lib/components/ui/spinner';
 	import { m } from '$lib/messages';
 	import { bump } from '$lib/stores/pulse.svelte';
+	import { AgentValuesError, issueAgentValues } from '$lib/utils/agent-values';
 	import {
 		CLUSTER_INFO_REQUIRED_FIELDS,
 		clusterInfoFieldsSchema
@@ -56,17 +59,37 @@
 
 	const POLL_INTERVAL = 3000;
 
+	/**
+	 * Where the otterscale charts are published. The public registry, not the
+	 * deployment's Harbor: a cluster being imported has no pull credentials for
+	 * Harbor yet — the values file this installs is what hands them over.
+	 */
+	const CHART_REGISTRY = 'oci://ghcr.io/otterscale/helm-charts';
+
+	/** Namespace both releases land in, and where the agent expects to find them. */
+	const AGENT_NAMESPACE = 'otterscale-system';
+
+	/**
+	 * Release names, pinned rather than derived: the wrapper chart creates Flux's
+	 * HelmRelease under exactly `flux` in AGENT_NAMESPACE, and helm-controller only
+	 * adopts an existing release under its exact name and storage namespace. A
+	 * different name here makes the handover a second install of the same
+	 * resources, which fails.
+	 */
+	const FLUX_RELEASE = 'flux';
+	const AGENT_RELEASE = 'otterscale-agent-flux';
+
 	const transport: Transport = getContext('transport');
 	const linkClient = createClient(LinkService, transport);
 	const resourceClient = createClient(ResourceService, transport);
 
 	let stepIndex = $state(1);
 	let clusterName = $state('');
-	// The two blocks of step 3, in the order they have to be run.
-	let fluxCommand = $state('');
-	let agentCommand = $state('');
-	let robotName = $state('');
-	let robotRotated = $state(false);
+	// From IssueAgentValues: the URL serving the rendered values, and when it
+	// stops being served. The URL is itself the credential authorizing the fetch,
+	// so it's only ever shown inside the command block the operator copies.
+	let valuesURL = $state('');
+	let valuesExpiresAt = $state<Date | null>(null);
 	let clusterStatus = $state<'pending' | 'installing' | 'done'>('pending');
 	let isCreating = $state(false);
 	let errorMessage = $state('');
@@ -78,6 +101,41 @@
 	// Owned here so reset() can clear it and submitClusterInfo can read it; the
 	// picker UI and its user search live in <ImportClusterAdministrators>.
 	let selectedUsers = $state<KeycloakUser[]>([]);
+
+	// No --values and no --version: helm-controller doesn't inherit either once the
+	// agent release below hands Flux over to Flux itself, so anything set here is
+	// rolled back on the first reconcile. Overrides belong in the wrapper chart's
+	// own `flux.values`.
+	const fluxCommand = [
+		`helm upgrade --install ${FLUX_RELEASE} ${CHART_REGISTRY}/${FLUX_RELEASE} \\`,
+		`  --namespace ${AGENT_NAMESPACE} \\`,
+		`  --create-namespace`
+	].join('\n');
+
+	/**
+	 * `-k` only when the dashboard itself needed NODE_EXTRA_CA_CERTS to trust the
+	 * otterscale API, which serves valuesURL too — see the comment on
+	 * agentValuesInsecureTLS in (auth)/+layout.server.ts. It has to be curl's
+	 * problem rather than Helm's: `helm install -f <url>` fetches a values URL with
+	 * no TLS options at all, and --ca-file / --insecure-skip-tls-verify apply to
+	 * pulling the chart, not to reading values. Piping covers both with one command.
+	 */
+	const curlFlags = $derived(page.data.agentValuesInsecureTLS ? '-kfsSL' : '-fsSL');
+
+	// No --version, as with Flux above: whatever the registry currently publishes is
+	// what a joining cluster gets, so the chart repo stays the one place a version
+	// is decided rather than something this dialog can disagree with.
+	//
+	// `helm install`, not `upgrade --install`: this release is handed to Flux, so a
+	// second run of it by hand is a mistake worth failing on rather than applying.
+	const agentCommand = $derived(
+		valuesURL
+			? [
+					`curl ${curlFlags} ${valuesURL} | helm install ${AGENT_RELEASE} \\`,
+					`    ${CHART_REGISTRY}/${AGENT_RELEASE} -n ${AGENT_NAMESPACE} -f -`
+				].join('\n')
+			: ''
+	);
 
 	let isPolling = false;
 	let abortController: AbortController | null = null;
@@ -135,10 +193,10 @@
 	};
 
 	// Step 2: externalAddress and nodePortRange (an object of min/max) are required; inferenceURL
-	// is optional but format-checked when present. Cluster info is always enabled now, so this
-	// is a flat schema (no `if`/`then` toggle). The rules come from cluster-info-schema.ts, the
-	// same fragment /bff/cluster-import validates the request against, so the two can't drift
-	// apart; only title/errorMessage (display, not a rule) are added here.
+	// is optional but format-checked when present. Cluster info is always required now, so this
+	// is a flat schema (no `if`/`then` toggle). The rules come from cluster-info-schema.ts, which
+	// mirrors what the API re-checks on IssueAgentValues, so the two can't drift apart; only
+	// title/errorMessage (display, not a rule) are added here.
 	const clusterInfoSchema: Schema = {
 		type: 'object',
 		required: [...CLUSTER_INFO_REQUIRED_FIELDS],
@@ -275,10 +333,8 @@
 
 		stepIndex = 1;
 		clusterName = '';
-		fluxCommand = '';
-		agentCommand = '';
-		robotName = '';
-		robotRotated = false;
+		valuesURL = '';
+		valuesExpiresAt = null;
 		clusterStatus = 'pending';
 		isCreating = false;
 		errorMessage = '';
@@ -322,45 +378,35 @@
 		clusterName = nameValues.clusterName.trim();
 
 		try {
-			const response = await fetch('/bff/cluster-import', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					cluster: clusterName,
-					extraUsers: selectedUsers.map((u) => u.id).filter((id) => id),
-					clusterInfo: {
-						enabled: true,
-						externalAddress: (values.externalAddress ?? '').trim(),
-						nodePortRange: {
-							min: values.nodePortRange?.min,
-							max: values.nodePortRange?.max
-						},
-						inferenceURL: (values.inferenceURL ?? '').trim()
-					}
-				})
+			// Straight to the API: it is the only side that can mint a join token, and
+			// it owns provisioning the Harbor robot the rendered values name. The
+			// procedure is admin-only there, so nothing is re-checked here.
+			const result = await issueAgentValues({
+				cluster: clusterName,
+				extraUsers: selectedUsers.map((u) => u.id).filter((id) => id),
+				clusterInfo: {
+					externalAddress: (values.externalAddress ?? '').trim(),
+					// The API and the chart both want one "min-max" string; the form keeps
+					// the bounds apart only so "min < max" can be a schema rule.
+					nodePortRange: `${values.nodePortRange?.min}-${values.nodePortRange?.max}`,
+					inferenceUrl: (values.inferenceURL ?? '').trim()
+				}
 			});
 
-			if (!response.ok) {
-				throw new Error((await response.text()) || m.import_cluster_command_failed());
-			}
-
-			const result = (await response.json()) as {
-				fluxCommand: string;
-				agentCommand: string;
-				robot: { name: string; rotated: boolean };
-			};
-
-			fluxCommand = result.fluxCommand;
-			agentCommand = result.agentCommand;
-			robotName = result.robot.name;
-			robotRotated = result.robot.rotated;
+			valuesURL = result.url;
+			valuesExpiresAt = result.expiresAt;
 			clusterStatus = 'pending';
 			stepIndex = 3;
 
 			toast.success(m.import_cluster_command_generated({ name: clusterName }));
 			pollForConnection();
 		} catch (e) {
-			errorMessage = e instanceof Error ? e.message : m.import_cluster_command_failed();
+			// AgentValuesError already carries the API's own wording, which says more
+			// than "failed to generate" ever can.
+			errorMessage =
+				e instanceof AgentValuesError || e instanceof Error
+					? e.message
+					: m.import_cluster_command_failed();
 			toast.error(errorMessage);
 		} finally {
 			isCreating = false;
@@ -402,6 +448,8 @@
 				const found = response.links.some((link: Link) => link.cluster === clusterName);
 				if (found) {
 					clusterStatus = 'installing';
+					// Still step 3: the commands stay on screen next to the status for as
+					// long as the check can still turn out to need them.
 					break;
 				}
 			} catch (e) {
@@ -439,6 +487,9 @@
 				const available = conditions.find((c) => c.type === 'Available');
 				if (available?.status === 'True') {
 					clusterStatus = 'done';
+					// The only way to step 4: it is purely the result page, so nothing
+					// reaches it while the check could still fail or still need the
+					// commands from step 3.
 					stepIndex = 4;
 					break;
 				}
@@ -487,31 +538,73 @@
 			{:else if stepIndex === 3}
 				{@render stepDeployAgent()}
 			{:else if stepIndex === 4}
-				{@render stepVerifyBinding()}
+				{@render stepClusterStatus()}
 			{/if}
 
-			{#if stepIndex === 1 || stepIndex === 2 || stepIndex === 4}
-				<div class="mt-auto flex w-full items-center justify-between gap-3 pt-4">
-					{#if stepIndex === 1}
-						<Button variant="outline" onclick={() => (open = false)}>{m.cancel()}</Button>
-						<Button onclick={handleNext} disabled={!canGoNext}>{m.next()}</Button>
-					{:else if stepIndex === 2}
-						<Button variant="outline" onclick={() => (stepIndex = 1)}>{m.back()}</Button>
-						<Button onclick={handleGenerateCommand} disabled={!canGoNext || isCreating}>
-							{#if isCreating}
-								<Spinner data-icon="inline-start" />
-								{m.import_cluster_generating()}
-							{:else}
-								<TerminalIcon data-icon="inline-start" />
-								{m.import_cluster_generate_install_command()}
-							{/if}
-						</Button>
-					{:else}
-						<div></div>
-						<Button onclick={handleFinish}>{m.done()}</Button>
-					{/if}
-				</div>
-			{/if}
+			<div class="mt-auto flex w-full items-center justify-between gap-3 pt-4">
+				{#if stepIndex === 1}
+					<Button variant="outline" onclick={() => (open = false)}>{m.cancel()}</Button>
+					<Button onclick={handleNext} disabled={!canGoNext}>{m.next()}</Button>
+				{:else if stepIndex === 2}
+					<Button variant="outline" onclick={() => (stepIndex = 1)}>{m.back()}</Button>
+					<Button onclick={handleGenerateCommand} disabled={!canGoNext || isCreating}>
+						{#if isCreating}
+							<Spinner data-icon="inline-start" />
+							{m.import_cluster_generating()}
+						{:else}
+							<TerminalIcon data-icon="inline-start" />
+							{m.import_cluster_generate_install_command()}
+						{/if}
+					</Button>
+				{:else if stepIndex === 3}
+					<!-- The wait sits beside the button it is disabling rather than under the
+					     commands: nothing here is for the operator to act on, and the result
+					     itself arrives as its own page the moment the cluster is up. -->
+					<div class="flex min-w-0 flex-col gap-0.5">
+						{#if clusterStatus === 'pending'}
+							<Item.Root>
+								<Item.Media>
+									<Spinner />
+								</Item.Media>
+								<Item.Content>
+									<Item.Description>
+										{m.import_cluster_waiting_connection()}
+									</Item.Description>
+								</Item.Content>
+							</Item.Root>
+						{:else}
+							<Item.Root>
+								<Item.Media>
+									<Spinner />
+								</Item.Media>
+								<Item.Content>
+									<Item.Description>
+										{m.import_cluster_installing()}
+									</Item.Description>
+								</Item.Content>
+							</Item.Root>
+						{/if}
+						{#if pollError}
+							<Item.Root>
+								<Item.Media>
+									<ShieldAlertIcon class="text-destructive" />
+								</Item.Media>
+								<Item.Content>
+									<Item.Description class="text-destructive">
+										{m.import_cluster_connection_check_failed({ message: pollError })}
+									</Item.Description>
+								</Item.Content>
+							</Item.Root>
+						{/if}
+					</div>
+					<Button disabled>{m.done()}</Button>
+				{:else}
+					<div></div>
+					<!-- Finishing navigates to the cluster's console, which only exists once
+					     the agent is actually serving it. -->
+					<Button onclick={handleFinish}>{m.done()}</Button>
+				{/if}
+			</div>
 		</div>
 	</Dialog.Content>
 </Dialog.Root>
@@ -558,18 +651,35 @@
 	</div>
 {/snippet}
 
-{#snippet commandStep(index: number, label: string, description: string, code: string)}
-	<div class="flex flex-col gap-3 rounded-lg border bg-card p-4">
-		<div class="flex items-center gap-2">
-			<span
-				class="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground"
-			>
-				{index}
-			</span>
-			<Field.FieldLabel class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-				{label}
-			</Field.FieldLabel>
+{#snippet stepHeading(index: number, label: string)}
+	<div class="flex items-center gap-2">
+		<span
+			class="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground"
+		>
+			{index}
+		</span>
+		<Field.FieldLabel class="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+			{label}
+		</Field.FieldLabel>
+	</div>
+{/snippet}
+
+<!-- A step the operator satisfies outside this wizard, so it carries no command -->
+<!-- to copy. Amber-tinted to read as a precondition rather than a thing to run. -->
+{#snippet noteStep(index: number, label: string, description: string)}
+	<div class="flex flex-col gap-3 rounded-lg border border-amber-500/50 bg-amber-500/5 p-4">
+		{@render stepHeading(index, label)}
+
+		<div class="flex items-start gap-2">
+			<CircleAlertIcon class="mt-0.5 size-4 shrink-0 text-amber-500" />
+			<Field.FieldDescription>{description}</Field.FieldDescription>
 		</div>
+	</div>
+{/snippet}
+
+{#snippet commandStep(index: number, label: string, code: string, note?: string)}
+	<div class="flex flex-col gap-3 rounded-lg border bg-card p-4">
+		{@render stepHeading(index, label)}
 
 		<Code.Root
 			lang="bash"
@@ -581,7 +691,9 @@
 			<Code.CopyButton />
 		</Code.Root>
 
-		<Field.FieldDescription>{description}</Field.FieldDescription>
+		{#if note}
+			<Field.FieldDescription>{note}</Field.FieldDescription>
+		{/if}
 	</div>
 {/snippet}
 
@@ -594,89 +706,26 @@
 			</p>
 		</div>
 
-		{#if robotRotated}
-			<Item.Root variant="outline" class="border-amber-500/50 bg-amber-500/5">
-				<Item.Media variant="icon" class="size-10 rounded-full bg-amber-500/10 text-amber-500">
-					<TriangleAlertIcon />
-				</Item.Media>
-				<Item.Content>
-					<Item.Title>{m.import_cluster_robot_rotated_title()}</Item.Title>
-					<Item.Description>
-						{m.import_cluster_robot_rotated_description({ name: robotName })}
-					</Item.Description>
-				</Item.Content>
-			</Item.Root>
-		{/if}
-
-		<Item.Root variant="outline">
-			<Item.Media variant="icon" class="size-10 rounded-full bg-muted text-muted-foreground">
-				<CircleAlertIcon />
-			</Item.Media>
-			<Item.Content>
-				<Item.Title>{m.import_cluster_prerequisites_title()}</Item.Title>
-				<Item.Description>
-					{m.import_cluster_prerequisite_cert_manager()}
-				</Item.Description>
-			</Item.Content>
-		</Item.Root>
-
-		{@render commandStep(
+		{@render noteStep(
 			1,
-			m.import_cluster_step_flux_label(),
-			m.import_cluster_step_flux_description(),
-			fluxCommand
+			m.import_cluster_step_cert_manager_label(),
+			m.import_cluster_prerequisite_cert_manager()
 		)}
+		{@render commandStep(2, m.import_cluster_step_flux_label(), fluxCommand)}
 		{@render commandStep(
-			2,
+			3,
 			m.import_cluster_step_agent_label(),
-			m.import_cluster_step_agent_description(),
-			agentCommand
+			agentCommand,
+			valuesExpiresAt
+				? m.import_cluster_values_url_expires({ time: valuesExpiresAt.toLocaleString() })
+				: undefined
 		)}
-
-		<Item.Root variant="outline">
-			<Item.Media variant="icon" class="size-10 rounded-full bg-muted text-muted-foreground">
-				<ServerIcon />
-			</Item.Media>
-			<Item.Content>
-				<Item.Title>{clusterName}</Item.Title>
-				<Item.Description>
-					{m.import_cluster_target_cluster()}
-				</Item.Description>
-			</Item.Content>
-			<Item.Actions>
-				{#if clusterStatus === 'pending'}
-					<span class="flex items-center gap-2 text-muted-foreground">
-						<span class="relative flex size-2">
-							<span
-								class="absolute inline-flex size-full animate-ping rounded-full bg-primary/75 opacity-75"
-							></span>
-							<span class="relative inline-flex size-2 rounded-full bg-primary"></span>
-						</span>
-						{m.import_cluster_waiting_connection()}
-					</span>
-				{:else if clusterStatus === 'installing'}
-					<span class="flex items-center gap-2 text-amber-500">
-						<Spinner />
-						<span class="font-medium">{m.import_cluster_installing()}</span>
-					</span>
-				{:else}
-					<span class="flex items-center gap-2 text-primary">
-						<CircleCheckIcon />
-						<span class="font-medium">{m.import_cluster_managed_status()}</span>
-					</span>
-				{/if}
-			</Item.Actions>
-		</Item.Root>
-
-		{#if pollError && clusterStatus !== 'done'}
-			<p class="text-xs text-amber-500">
-				{m.import_cluster_connection_check_failed({ message: pollError })}
-			</p>
-		{/if}
 	</div>
 {/snippet}
 
-{#snippet stepVerifyBinding()}
+<!-- Only ever reached with clusterStatus === 'done', so it states the result
+     outright rather than conditioning on a status that cannot be anything else. -->
+{#snippet stepClusterStatus()}
 	<Empty.Root>
 		<Empty.Header>
 			<Empty.Media variant="icon" class="size-14 bg-primary/10 ring-4 ring-primary/5">
@@ -688,36 +737,47 @@
 			</Empty.Description>
 		</Empty.Header>
 		<Empty.Content>
-			<div class="w-full max-w-sm rounded-lg border bg-card p-3 text-sm shadow-sm">
-				<div class="flex flex-col gap-2">
-					<div class="flex justify-between">
-						<span class="text-muted-foreground">{m.cluster()}</span>
-						<span class="font-medium">{clusterName}</span>
-					</div>
-					<div class="flex justify-between">
-						<span class="text-muted-foreground">{m.status()}</span>
-						<span class="flex items-center gap-1.5 font-medium text-primary">
-							<span class="size-1.5 rounded-full bg-primary"></span>
-							{m.import_cluster_managed()}
-						</span>
-					</div>
-					{#if robotName}
-						<div class="flex justify-between gap-4">
-							<span class="text-muted-foreground">{m.import_cluster_harbor_robot()}</span>
-							<span class="truncate font-medium">{robotName}</span>
-						</div>
-					{/if}
-					{#if selectedUsers.length > 0}
-						<div class="flex justify-between">
-							<span class="text-muted-foreground">{m.import_cluster_permissions()}</span>
-							<span class="flex items-center gap-1.5 font-medium text-primary">
-								<CircleCheckIcon class="size-3.5" />
-								{m.import_cluster_admin_count({ count: selectedUsers.length })}
-							</span>
-						</div>
-					{/if}
-				</div>
-			</div>
+			<!-- Label left, value right, one row each: the same Item shape the rest of the
+			     app summarizes a resource with, rather than a card built only for here. -->
+			<Item.Group>
+				<Item.Root variant="outline" size="sm">
+					<Item.Media variant="icon">
+						<ServerIcon class="text-muted-foreground" />
+					</Item.Media>
+					<Item.Content>
+						<Item.Title class="font-normal text-muted-foreground">{m.cluster()}</Item.Title>
+					</Item.Content>
+					<Item.Actions class="text-sm font-medium">{clusterName}</Item.Actions>
+				</Item.Root>
+
+				<Item.Root variant="outline" size="sm">
+					<Item.Media variant="icon">
+						<CircleCheckIcon class="text-primary" />
+					</Item.Media>
+					<Item.Content>
+						<Item.Title class="font-normal text-muted-foreground">{m.status()}</Item.Title>
+					</Item.Content>
+					<Item.Actions class="text-sm font-medium text-primary">
+						{m.import_cluster_managed()}
+					</Item.Actions>
+				</Item.Root>
+
+				{#if selectedUsers.length > 0}
+					<Item.Root variant="outline" size="sm">
+						<Item.Media variant="icon">
+							<UserIcon class="text-muted-foreground" />
+						</Item.Media>
+						<Item.Content>
+							<Item.Title class="font-normal text-muted-foreground">
+								{m.import_cluster_permissions()}
+							</Item.Title>
+						</Item.Content>
+						<Item.Actions class="text-sm font-medium">
+							{m.import_cluster_admin_count({ count: selectedUsers.length })}
+						</Item.Actions>
+					</Item.Root>
+				{/if}
+			</Item.Group>
 		</Empty.Content>
 	</Empty.Root>
 {/snippet}
