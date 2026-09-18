@@ -26,7 +26,7 @@
 	import { ReleaseScopeLabel } from '$lib/utils/helm-release';
 	import { computeValuesDelta } from '$lib/utils/helm-values';
 
-	import { type ChartAttribute, getIncompatibility } from '../table-layout';
+	import { type ChartAttribute, isInstallable } from '../table-layout';
 	import { type ArtifactChartType } from '../types';
 	import { encodeHarborURIComponent, parseHarborHost } from '../utils.svelte';
 	import type { ChartVariant } from '../variants';
@@ -125,30 +125,35 @@
 		const [project, ...latestChartNameParts] = chart.repository_name.split('/');
 		const repository = latestChartNameParts.join('/');
 		const harborHost = parseHarborHost(helmRepository);
+		const pageSize = 100;
 
 		try {
 			const projectPath = encodeHarborURIComponent(project);
 			const repositoryPath = encodeHarborURIComponent(repository);
-			const artifactsUrl = `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts?with_label=true`;
+			const artifacts: ArtifactChartType[] = [];
 
-			const response = await fetch('/bff/helm/repository/harbor', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					harborHost,
-					apiPath: artifactsUrl
-				})
-			});
-			if (!response.ok) {
-				console.error('Failed to fetch repository artifacts:', response.statusText);
-				return;
+			for (let page = 1; ; page++) {
+				const response = await fetch('/bff/helm/repository/harbor', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({
+						harborHost,
+						apiPath: `/api/v2.0/projects/${projectPath}/repositories/${repositoryPath}/artifacts?with_label=true&page=${page}&page_size=${pageSize}`
+					})
+				});
+				if (!response.ok) {
+					console.error('Failed to fetch repository artifacts:', response.statusText);
+					return;
+				}
+				const batch = (await response.json()) as ArtifactChartType[];
+				artifacts.push(...batch);
+				if (batch.length < pageSize) break;
 			}
+
 			// The listing only checked the latest version.
-			charts = ((await response.json()) as ArtifactChartType[]).filter(
-				(chart) => !getIncompatibility(chart)
-			);
+			charts = artifacts.filter((chart) => isInstallable(chart));
 		} catch (error) {
 			console.error('Error fetching repository artifacts:', error);
 		}
@@ -385,7 +390,8 @@
 						},
 						version: {
 							'ui:components': {
-								stringField: 'enumField'
+								stringField: 'enumField',
+								selectWidget: 'comboboxWidget'
 							}
 						}
 					} as UiSchemaRoot}

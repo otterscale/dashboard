@@ -55,7 +55,7 @@
 		<ChartViewer
 			chartVariant={OperatorChartVariant}
 			{cluster}
-			{namespace}
+			namespace="otterscale-system"
 			{charts}
 			{isFetching}
 			onReload={fetchCharts}
