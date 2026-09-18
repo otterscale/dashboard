@@ -618,7 +618,6 @@
 	"import_cluster_step_flux_label": "Install Flux",
 	"import_cluster_step_agent_label": "Install the agent",
 	"import_cluster_values_url_expires": "The URL in step 3 stops working at {time}. Generating it again costs nothing and yields the same values.",
-	"import_cluster_verifying_description": "Once you have run the commands above, this updates on its own as the agent registers and its operator comes up.",
 	"import_cluster_waiting_connection": "Waiting for connection",
 	"import_cluster_connection_check_failed": "Can't reach the API to check for the connection — still retrying. {message}",
 	"import_cluster_installing": "Installing...",

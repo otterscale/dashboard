@@ -618,7 +618,6 @@
 	"import_cluster_step_flux_label": "安裝 Flux",
 	"import_cluster_step_agent_label": "安裝代理程式",
 	"import_cluster_values_url_expires": "第 3 步的 URL 會在 {time} 失效。重新產生不花任何代價，而且 values 完全相同。",
-	"import_cluster_verifying_description": "執行完上面的指令後，代理程式完成註冊、operator 就緒時，這裡會自動更新。",
 	"import_cluster_waiting_connection": "等待連線",
 	"import_cluster_connection_check_failed": "無法連到 API 確認連線狀態，仍在重試。{message}",
 	"import_cluster_installing": "安裝中...",
