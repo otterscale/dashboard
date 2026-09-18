@@ -641,7 +641,7 @@
 	</div>
 {/snippet}
 
-{#snippet commandStep(index: number, label: string, description: string, code: string)}
+{#snippet commandStep(index: number, label: string, code: string, note?: string)}
 	<div class="flex flex-col gap-3 rounded-lg border bg-card p-4">
 		{@render stepHeading(index, label)}
 
@@ -655,7 +655,9 @@
 			<Code.CopyButton />
 		</Code.Root>
 
-		<Field.FieldDescription>{description}</Field.FieldDescription>
+		{#if note}
+			<Field.FieldDescription>{note}</Field.FieldDescription>
+		{/if}
 	</div>
 {/snippet}
 
@@ -673,24 +675,15 @@
 			m.import_cluster_step_cert_manager_label(),
 			m.import_cluster_prerequisite_cert_manager()
 		)}
-		{@render commandStep(
-			2,
-			m.import_cluster_step_flux_label(),
-			m.import_cluster_step_flux_description(),
-			fluxCommand
-		)}
+		{@render commandStep(2, m.import_cluster_step_flux_label(), fluxCommand)}
 		{@render commandStep(
 			3,
 			m.import_cluster_step_agent_label(),
-			m.import_cluster_step_agent_description(),
-			agentCommand
+			agentCommand,
+			valuesExpiresAt
+				? m.import_cluster_values_url_expires({ time: valuesExpiresAt.toLocaleString() })
+				: undefined
 		)}
-
-		{#if valuesExpiresAt}
-			<p class="text-xs text-muted-foreground">
-				{m.import_cluster_values_url_expires({ time: valuesExpiresAt.toLocaleString() })}
-			</p>
-		{/if}
 	</div>
 {/snippet}
 
