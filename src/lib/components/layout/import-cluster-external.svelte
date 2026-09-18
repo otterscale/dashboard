@@ -444,9 +444,8 @@
 				const found = response.links.some((link: Link) => link.cluster === clusterName);
 				if (found) {
 					clusterStatus = 'installing';
-					// The agent is up, so the commands on step 3 have served their
-					// purpose; step 4 owns the rest of the wait.
-					stepIndex = 4;
+					// Still step 3: the commands stay on screen next to the status for as
+					// long as the check can still turn out to need them.
 					break;
 				}
 			} catch (e) {
@@ -484,8 +483,9 @@
 				const available = conditions.find((c) => c.type === 'Available');
 				if (available?.status === 'True') {
 					clusterStatus = 'done';
-					// Idempotent: the pending loop above normally moved here already, but
-					// a cluster that was already registered skips straight to this one.
+					// The only way to step 4: it is purely the result page, so nothing
+					// reaches it while the check could still fail or still need the
+					// commands from step 3.
 					stepIndex = 4;
 					break;
 				}
@@ -553,15 +553,13 @@
 						{/if}
 					</Button>
 				{:else if stepIndex === 3}
-					<!-- The poll moves to step 4 on its own the moment the agent registers;
-					     this is for an operator who wants to watch it before then. -->
+					<!-- No way forward by hand: the check on this step moves to step 4 itself
+					     once the cluster is actually up, so the button only ever reports. -->
 					<div></div>
-					<Button variant="outline" onclick={() => (stepIndex = 4)}>{m.next()}</Button>
-				{:else if clusterStatus !== 'done'}
-					<!-- Still working, so the commands may still be needed: an operator who
-					     came here early has to be able to get back to them. -->
-					<Button variant="outline" onclick={() => (stepIndex = 3)}>{m.back()}</Button>
-					<Button onclick={handleFinish} disabled>{m.done()}</Button>
+					<Button disabled>
+						<Spinner data-icon="inline-start" />
+						{m.done()}
+					</Button>
 				{:else}
 					<div></div>
 					<!-- Finishing navigates to the cluster's console, which only exists once
@@ -684,92 +682,84 @@
 				? m.import_cluster_values_url_expires({ time: valuesExpiresAt.toLocaleString() })
 				: undefined
 		)}
+
+		<!-- The check belongs next to the commands it is checking on: it is what tells
+		     the operator whether the lines above have landed yet, and it is the only
+		     thing that moves this dialog on. -->
+		<div class="flex flex-col items-center gap-3">
+			<p class="text-sm text-muted-foreground">{m.import_cluster_verifying_description()}</p>
+			{@render clusterStatusCard()}
+		</div>
 	</div>
 {/snippet}
 
-<!--
-	The wait and its result are one page: the same summary card is on screen from
-	the moment the agent registers, and only the status line in it changes. Landing
-	on a finished-looking page that is still working, or being moved to a different
-	page once it finishes, both make the check look like it belongs to something
-	else.
--->
+<!-- Shared by the wait on step 3 and the result on step 4, so the same card the
+     operator watched fill in is the one still on screen once it is done. -->
+{#snippet clusterStatusCard()}
+	<div class="w-full max-w-sm rounded-lg border bg-card p-3 text-sm shadow-sm">
+		<div class="flex flex-col gap-2">
+			<div class="flex justify-between">
+				<span class="text-muted-foreground">{m.cluster()}</span>
+				<span class="font-medium">{clusterName}</span>
+			</div>
+			<div class="flex justify-between">
+				<span class="text-muted-foreground">{m.status()}</span>
+				{#if clusterStatus === 'pending'}
+					<span class="flex items-center gap-1.5 font-medium text-muted-foreground">
+						<span class="relative flex size-1.5">
+							<span
+								class="absolute inline-flex size-full animate-ping rounded-full bg-primary/75 opacity-75"
+							></span>
+							<span class="relative inline-flex size-1.5 rounded-full bg-primary"></span>
+						</span>
+						{m.import_cluster_waiting_connection()}
+					</span>
+				{:else if clusterStatus === 'installing'}
+					<span class="flex items-center gap-1.5 font-medium text-amber-500">
+						<Spinner class="size-3.5" />
+						{m.import_cluster_installing()}
+					</span>
+				{:else}
+					<span class="flex items-center gap-1.5 font-medium text-primary">
+						<span class="size-1.5 rounded-full bg-primary"></span>
+						{m.import_cluster_managed()}
+					</span>
+				{/if}
+			</div>
+			{#if selectedUsers.length > 0}
+				<div class="flex justify-between">
+					<span class="text-muted-foreground">{m.import_cluster_permissions()}</span>
+					<span class="flex items-center gap-1.5 font-medium text-primary">
+						<CircleCheckIcon class="size-3.5" />
+						{m.import_cluster_admin_count({ count: selectedUsers.length })}
+					</span>
+				</div>
+			{/if}
+		</div>
+	</div>
+
+	{#if pollError && clusterStatus !== 'done'}
+		<p class="max-w-sm text-xs text-amber-500">
+			{m.import_cluster_connection_check_failed({ message: pollError })}
+		</p>
+	{/if}
+{/snippet}
+
+<!-- Only ever reached with clusterStatus === 'done', so it states the result
+     outright rather than conditioning on a status that cannot be anything else. -->
 {#snippet stepClusterStatus()}
 	<Empty.Root>
 		<Empty.Header>
-			<Empty.Media
-				variant="icon"
-				class={clusterStatus === 'done'
-					? 'size-14 bg-primary/10 ring-4 ring-primary/5'
-					: 'size-14 bg-muted ring-4 ring-muted/40'}
-			>
-				{#if clusterStatus === 'done'}
-					<CircleCheckIcon class="size-8 text-primary" />
-				{:else}
-					<Spinner class="size-8 text-muted-foreground" />
-				{/if}
+			<Empty.Media variant="icon" class="size-14 bg-primary/10 ring-4 ring-primary/5">
+				<CircleCheckIcon class="size-8 text-primary" />
 			</Empty.Media>
-			<Empty.Title>
-				{clusterStatus === 'done'
-					? m.import_cluster_managed_successfully_title()
-					: m.import_cluster_verifying_title()}
-			</Empty.Title>
+			<Empty.Title>{m.import_cluster_managed_successfully_title()}</Empty.Title>
 			<Empty.Description>
-				{#if clusterStatus === 'done'}
-					<strong>{clusterName}</strong>{m.import_cluster_managed_ready_suffix()}
-				{:else}
-					{m.import_cluster_verifying_description()}
-				{/if}
+				<strong>{clusterName}</strong>{m.import_cluster_managed_ready_suffix()}
 			</Empty.Description>
 		</Empty.Header>
 		<Empty.Content>
-			<div class="w-full max-w-sm rounded-lg border bg-card p-3 text-sm shadow-sm">
-				<div class="flex flex-col gap-2">
-					<div class="flex justify-between">
-						<span class="text-muted-foreground">{m.cluster()}</span>
-						<span class="font-medium">{clusterName}</span>
-					</div>
-					<div class="flex justify-between">
-						<span class="text-muted-foreground">{m.status()}</span>
-						{#if clusterStatus === 'pending'}
-							<span class="flex items-center gap-1.5 font-medium text-muted-foreground">
-								<span class="relative flex size-1.5">
-									<span
-										class="absolute inline-flex size-full animate-ping rounded-full bg-primary/75 opacity-75"
-									></span>
-									<span class="relative inline-flex size-1.5 rounded-full bg-primary"></span>
-								</span>
-								{m.import_cluster_waiting_connection()}
-							</span>
-						{:else if clusterStatus === 'installing'}
-							<span class="flex items-center gap-1.5 font-medium text-amber-500">
-								<Spinner class="size-3.5" />
-								{m.import_cluster_installing()}
-							</span>
-						{:else}
-							<span class="flex items-center gap-1.5 font-medium text-primary">
-								<span class="size-1.5 rounded-full bg-primary"></span>
-								{m.import_cluster_managed()}
-							</span>
-						{/if}
-					</div>
-					{#if selectedUsers.length > 0}
-						<div class="flex justify-between">
-							<span class="text-muted-foreground">{m.import_cluster_permissions()}</span>
-							<span class="flex items-center gap-1.5 font-medium text-primary">
-								<CircleCheckIcon class="size-3.5" />
-								{m.import_cluster_admin_count({ count: selectedUsers.length })}
-							</span>
-						</div>
-					{/if}
-				</div>
-			</div>
-
-			{#if pollError && clusterStatus !== 'done'}
-				<p class="max-w-sm text-xs text-amber-500">
-					{m.import_cluster_connection_check_failed({ message: pollError })}
-				</p>
-			{/if}
+			{@render clusterStatusCard()}
 		</Empty.Content>
 	</Empty.Root>
 {/snippet}
