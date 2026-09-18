@@ -5,6 +5,7 @@
 		createClient,
 		type Transport
 	} from '@connectrpc/connect';
+	import { ShieldAlertIcon } from '@lucide/svelte';
 	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import ServerIcon from '@lucide/svelte/icons/server';
@@ -561,25 +562,39 @@
 					     itself arrives as its own page the moment the cluster is up. -->
 					<div class="flex min-w-0 flex-col gap-0.5">
 						{#if clusterStatus === 'pending'}
-							<span class="flex items-center gap-1.5 text-sm text-muted-foreground">
-								<span class="relative flex size-1.5 shrink-0">
-									<span
-										class="absolute inline-flex size-full animate-ping rounded-full bg-primary/75 opacity-75"
-									></span>
-									<span class="relative inline-flex size-1.5 rounded-full bg-primary"></span>
-								</span>
-								{m.import_cluster_waiting_connection()}
-							</span>
+							<Item.Root>
+								<Item.Media>
+									<Spinner />
+								</Item.Media>
+								<Item.Content>
+									<Item.Description>
+										{m.import_cluster_waiting_connection()}
+									</Item.Description>
+								</Item.Content>
+							</Item.Root>
 						{:else}
-							<span class="flex items-center gap-1.5 text-sm text-amber-500">
-								<Spinner class="size-3.5 shrink-0" />
-								{m.import_cluster_installing()}
-							</span>
+							<Item.Root>
+								<Item.Media>
+									<Spinner />
+								</Item.Media>
+								<Item.Content>
+									<Item.Description>
+										{m.import_cluster_installing()}
+									</Item.Description>
+								</Item.Content>
+							</Item.Root>
 						{/if}
 						{#if pollError}
-							<span class="truncate text-xs text-amber-500">
-								{m.import_cluster_connection_check_failed({ message: pollError })}
-							</span>
+							<Item.Root>
+								<Item.Media>
+									<ShieldAlertIcon class="text-destructive" />
+								</Item.Media>
+								<Item.Content>
+									<Item.Description class="text-destructive">
+										{m.import_cluster_connection_check_failed({ message: pollError })}
+									</Item.Description>
+								</Item.Content>
+							</Item.Root>
 						{/if}
 					</div>
 					<Button disabled>{m.done()}</Button>
