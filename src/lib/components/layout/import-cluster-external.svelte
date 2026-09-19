@@ -90,6 +90,7 @@
 	// so it's only ever shown inside the command block the operator copies.
 	let valuesURL = $state('');
 	let valuesExpiresAt = $state<Date | null>(null);
+	let chartVersion = $state('');
 	let clusterStatus = $state<'pending' | 'installing' | 'done'>('pending');
 	let isCreating = $state(false);
 	let errorMessage = $state('');
@@ -122,9 +123,8 @@
 	 */
 	const curlFlags = $derived(page.data.agentValuesInsecureTLS ? '-kfsSL' : '-fsSL');
 
-	// No --version, as with Flux above: whatever the registry currently publishes is
-	// what a joining cluster gets, so the chart repo stays the one place a version
-	// is decided rather than something this dialog can disagree with.
+	// Pins the otterscale-agent-flux version returned by IssueAgentValues, so the
+	// install matches the chart schema the values were rendered against.
 	//
 	// `helm install`, not `upgrade --install`: this release is handed to Flux, so a
 	// second run of it by hand is a mistake worth failing on rather than applying.
@@ -132,7 +132,9 @@
 		valuesURL
 			? [
 					`curl ${curlFlags} ${valuesURL} | helm install ${AGENT_RELEASE} \\`,
-					`    ${CHART_REGISTRY}/${AGENT_RELEASE} -n ${AGENT_NAMESPACE} -f -`
+					`    ${CHART_REGISTRY}/${AGENT_RELEASE} -n ${AGENT_NAMESPACE} \\`,
+					...(chartVersion ? [`    --version ${chartVersion} \\`] : []),
+					`    -f -`
 				].join('\n')
 			: ''
 	);
@@ -335,6 +337,7 @@
 		clusterName = '';
 		valuesURL = '';
 		valuesExpiresAt = null;
+		chartVersion = '';
 		clusterStatus = 'pending';
 		isCreating = false;
 		errorMessage = '';
@@ -395,6 +398,7 @@
 
 			valuesURL = result.url;
 			valuesExpiresAt = result.expiresAt;
+			chartVersion = result.version;
 			clusterStatus = 'pending';
 			stepIndex = 3;
 
