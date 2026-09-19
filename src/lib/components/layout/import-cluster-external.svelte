@@ -90,6 +90,10 @@
 	// so it's only ever shown inside the command block the operator copies.
 	let valuesURL = $state('');
 	let valuesExpiresAt = $state<Date | null>(null);
+	// The otterscale-agent-flux version IssueAgentValues rendered the values for,
+	// so the install pins the chart the file was written against. Empty when the
+	// API sends none, and then the command carries no --version.
+	let chartVersion = $state('');
 	let clusterStatus = $state<'pending' | 'installing' | 'done'>('pending');
 	let isCreating = $state(false);
 	let errorMessage = $state('');
@@ -122,17 +126,19 @@
 	 */
 	const curlFlags = $derived(page.data.agentValuesInsecureTLS ? '-kfsSL' : '-fsSL');
 
-	// No --version, as with Flux above: whatever the registry currently publishes is
-	// what a joining cluster gets, so the chart repo stays the one place a version
-	// is decided rather than something this dialog can disagree with.
-	//
+	// --version, unlike Flux above: the values file is rendered for one chart version
+	// and cannot pin the chart that consumes it, so the API reports that version and
+	// the install repeats it. Whatever the registry publishes later can then move on
+	// without the file and the chart disagreeing.
+	const agentVersionFlag = $derived(chartVersion ? ` --version ${chartVersion}` : '');
+
 	// `helm install`, not `upgrade --install`: this release is handed to Flux, so a
 	// second run of it by hand is a mistake worth failing on rather than applying.
 	const agentCommand = $derived(
 		valuesURL
 			? [
 					`curl ${curlFlags} ${valuesURL} | helm install ${AGENT_RELEASE} \\`,
-					`    ${CHART_REGISTRY}/${AGENT_RELEASE} -n ${AGENT_NAMESPACE} -f -`
+					`    ${CHART_REGISTRY}/${AGENT_RELEASE}${agentVersionFlag} -n ${AGENT_NAMESPACE} -f -`
 				].join('\n')
 			: ''
 	);
@@ -335,6 +341,7 @@
 		clusterName = '';
 		valuesURL = '';
 		valuesExpiresAt = null;
+		chartVersion = '';
 		clusterStatus = 'pending';
 		isCreating = false;
 		errorMessage = '';
@@ -395,6 +402,7 @@
 
 			valuesURL = result.url;
 			valuesExpiresAt = result.expiresAt;
+			chartVersion = result.version;
 			clusterStatus = 'pending';
 			stepIndex = 3;
 

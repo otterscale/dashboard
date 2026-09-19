@@ -46,6 +46,12 @@ export interface IssueAgentValuesRequest {
 }
 
 export interface IssuedAgentValues {
+	/**
+	 * The otterscale-agent-flux chart version the values were rendered for, for
+	 * `helm install --version`. Empty if the API sent none: the chart consumes
+	 * the file, so the file itself cannot pin it.
+	 */
+	version: string;
 	/** The rendered values file. */
 	values: string;
 	/** The same bytes behind a URL. The URL is itself the credential authorizing the fetch. */
@@ -56,6 +62,7 @@ export interface IssuedAgentValues {
 
 /** The proto3 JSON shape of IssueAgentValuesResponse. */
 interface AgentValuesResponseBody {
+	version?: string;
 	values?: string;
 	url?: string;
 	/** Timestamp, so RFC 3339 over JSON. */
@@ -95,6 +102,7 @@ export async function issueAgentValues(
 	const expiresAt = body.urlExpiresAt ? new Date(body.urlExpiresAt) : null;
 
 	return {
+		version: body.version ?? '',
 		values: body.values ?? '',
 		url: body.url,
 		expiresAt: expiresAt && !Number.isNaN(expiresAt.getTime()) ? expiresAt : null
