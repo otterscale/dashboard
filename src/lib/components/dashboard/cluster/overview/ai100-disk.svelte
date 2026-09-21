@@ -14,7 +14,7 @@
 	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/messages';
 	import {
-		AI100_DEVICE_CLASS,
+		AIDAPTIV_CACHE_DEVICE_CLASS,
 		ai100DiskRate,
 		classifyThreshold,
 		deviceClassLabel,
@@ -42,7 +42,7 @@
 	// no used series of its own. Scoped to the AI100's device class rather than summing whatever
 	// else a node exposes. Absent unless the phison-topolvm module sets
 	// `topolvm.node.prometheus.podMonitor.enabled`, in which case the card renders empty.
-	const SELECTOR = `{device_class="${AI100_DEVICE_CLASS}"}`;
+	const SELECTOR = `{device_class="${AIDAPTIV_CACHE_DEVICE_CLASS}"}`;
 	const TOTAL = `sum(topolvm_volumegroup_size_bytes${SELECTOR})`;
 	const FREE = `sum(topolvm_volumegroup_available_bytes${SELECTOR})`;
 
@@ -97,7 +97,7 @@
 <Card.Root class="relative h-full min-h-[140px] gap-2 overflow-hidden">
 	<Card.Header class="flex flex-row items-center gap-2 space-y-0">
 		<div class="grid min-w-0 flex-1 gap-1">
-			<Card.Title>{deviceClassLabel(AI100_DEVICE_CLASS)} {m.disk()}</Card.Title>
+			<Card.Title>{deviceClassLabel(AIDAPTIV_CACHE_DEVICE_CLASS)}</Card.Title>
 			<Card.Description class="line-clamp-2">
 				{m.cluster_dashboard_ai100_description()}
 			</Card.Description>

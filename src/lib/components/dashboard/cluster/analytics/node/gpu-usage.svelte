@@ -10,7 +10,7 @@
 	// resolves it asynchronously, so a mount-only probe could miss the correction.
 	let {
 		client,
-		// k8s node name == DCGM `Hostname` (see dcgmNodeSelector in prometheus.ts).
+		// k8s node name == DCGM `hostname` (see dcgmNodeSelector in prometheus.ts).
 		nodeName,
 		start,
 		end,
