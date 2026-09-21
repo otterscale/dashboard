@@ -11,11 +11,11 @@ const ModulesHelmRepositoryName = 'modules';
  * matching chart tags against the dashboard's own minor version, which tied
  * every chart's version line to the dashboard's.
  */
-const ModuleTypeAnnotation = 'otterscale.io/type';
-const ModuleTypeAnnotationValue = 'module';
+const ChartTypeAnnotation = 'otterscale.io/type';
+const CoreTypeAnnotationValue = 'core';
 
 function isModuleChart(chart: { annotations?: Record<string, string> }): boolean {
-	return chart.annotations?.[ModuleTypeAnnotation] === ModuleTypeAnnotationValue;
+	return chart.annotations?.[ChartTypeAnnotation] !== CoreTypeAnnotationValue;
 }
 
 export { isModuleChart, ModulesHelmRepositoryName };
