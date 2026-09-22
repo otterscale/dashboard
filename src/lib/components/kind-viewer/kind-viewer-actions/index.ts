@@ -4,7 +4,7 @@ import type { Row } from '@tanstack/table-core';
 import { type ValidateFunction } from 'ajv';
 import type { Component, Snippet } from 'svelte';
 
-import type { ResourceRuleVerbs } from '$lib/components/resources/types';
+import type { ResourceRuleVerbs } from '$lib/components/api-resources-viewer/types';
 
 import { getKindExtension } from '../extensions';
 import ApplicationActions from './applications/actions.svelte';
