@@ -29,7 +29,7 @@
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
 	import type { DataSchemaType, UISchemaType } from '../dynamic-table/utils';
-	import type { ResourceRuleVerbs } from '../resources/types';
+	import type { ResourceRuleVerbs } from '../api-resources-viewer/types';
 	import BulkDelete from './bulk-delete.svelte';
 	import { getKindExtension } from './extensions';
 	import type { ActionsType, CreateType } from './kind-viewer-actions';

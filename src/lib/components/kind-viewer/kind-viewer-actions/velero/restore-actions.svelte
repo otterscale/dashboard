@@ -2,7 +2,7 @@
 	// Placeholder — the enterprise edition overlays this file (ee/src).
 	import type { Schema } from '@sjsf/form';
 
-	import type { ResourceRuleVerbs } from '$lib/components/resources/types';
+	import type { ResourceRuleVerbs } from '$lib/components/api-resources-viewer/types';
 
 	let {
 		schema,

@@ -18,7 +18,7 @@
 		ResourceRule,
 		ResourceRuleVerbs,
 		ResourceRuleVerbsByGroupResource
-	} from '$lib/components/resources/types';
+	} from '$lib/components/api-resources-viewer/types';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Command from '$lib/components/ui/command/index.js';
