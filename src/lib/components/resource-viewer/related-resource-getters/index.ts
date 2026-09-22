@@ -4,9 +4,9 @@ import {
 	getDefaultRelatedResources,
 	getOwnerReferenceRelatedResources
 } from './default';
-import { getDeploymentRelatedResources } from './deployment';
 import { getHelmReleaseRelatedResources } from './helm-release';
 import { getLLMInferenceServiceRelatedResources } from './llm-inference-service';
+import { ownedChildrenRelatedResourceGetters } from './owned-children';
 import { getWorkspaceRelatedResources } from './workspace';
 
 /**
@@ -59,7 +59,12 @@ function getRelatedResourcesGetter(resource: string): GetRelatedResources {
 		return withDefaultRelatedResources(getLLMInferenceServiceRelatedResources);
 	if (resource === 'helmreleases')
 		return withDefaultRelatedResources(getHelmReleaseRelatedResources);
-	if (resource === 'deployments') return withDefaultRelatedResources(getDeploymentRelatedResources);
+
+	// The workload kinds whose relations are only what their controller owns all
+	// share one getter, differing just in the child kinds it lists.
+	const ownedChildren = ownedChildrenRelatedResourceGetters[resource];
+	if (ownedChildren) return withDefaultRelatedResources(ownedChildren);
+
 	return getDefaultRelatedResources;
 }
 
