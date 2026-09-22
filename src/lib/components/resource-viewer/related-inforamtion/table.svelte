@@ -54,11 +54,11 @@
 
 <div class="space-y-4">
 	<div class="overflow-hidden rounded-md border bg-background">
-		<Table.Root class="[&_td]:p-4 [&_th]:p-4">
+		<Table.Root class="[&_td]:p-3 [&_th]:p-3">
 			<Table.Header class="bg-muted">
 				{@render header()}
 			</Table.Header>
-			<Table.Body class="[&_tr]:border-none">
+			<Table.Body>
 				{#each table.getRowModel().rows as tableRow (tableRow.id)}
 					{@render row(tableRow.original)}
 				{:else}
