@@ -23,8 +23,8 @@
 	import { formatIO } from '$lib/formatter';
 	import { m } from '$lib/messages';
 	import {
-		AIDAPTIV_CACHE_DEVICE_CLASS,
 		ai100DiskRateByNode,
+		AIDAPTIV_CACHE_DEVICE_CLASS,
 		classifyGpuGovernance,
 		classifyThreshold,
 		DCGM_GPU_MEMORY_TOTAL_BYTES,

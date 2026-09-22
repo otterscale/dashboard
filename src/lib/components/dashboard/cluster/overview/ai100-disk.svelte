@@ -14,8 +14,8 @@
 	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/messages';
 	import {
-		AIDAPTIV_CACHE_DEVICE_CLASS,
 		ai100DiskRate,
+		AIDAPTIV_CACHE_DEVICE_CLASS,
 		classifyThreshold,
 		deviceClassLabel,
 		fetchCombinedInstant,
