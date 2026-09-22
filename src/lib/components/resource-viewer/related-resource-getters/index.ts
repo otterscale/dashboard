@@ -4,6 +4,7 @@ import {
 	getDefaultRelatedResources,
 	getOwnerReferenceRelatedResources
 } from './default';
+import { getDeploymentRelatedResources } from './deployment';
 import { getHelmReleaseRelatedResources } from './helm-release';
 import { getLLMInferenceServiceRelatedResources } from './llm-inference-service';
 import { getWorkspaceRelatedResources } from './workspace';
@@ -58,6 +59,7 @@ function getRelatedResourcesGetter(resource: string): GetRelatedResources {
 		return withDefaultRelatedResources(getLLMInferenceServiceRelatedResources);
 	if (resource === 'helmreleases')
 		return withDefaultRelatedResources(getHelmReleaseRelatedResources);
+	if (resource === 'deployments') return withDefaultRelatedResources(getDeploymentRelatedResources);
 	return getDefaultRelatedResources;
 }
 
