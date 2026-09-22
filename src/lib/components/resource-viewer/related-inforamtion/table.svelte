@@ -26,7 +26,9 @@
 	} = $props();
 
 	const table = createSvelteTable<TData>({
-		columns,
+		get columns() {
+			return columns;
+		},
 		get data() {
 			return data;
 		},
