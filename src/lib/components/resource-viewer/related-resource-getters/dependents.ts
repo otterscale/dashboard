@@ -7,8 +7,6 @@ import type { GetRelatedResources, RelatedResource, RelatedResourceClass } from 
 
 type OwnerReference = { uid?: string };
 
-type DependentIdentifier = RelatedResourceClass & { matchesOwnerSelector: boolean };
-
 const podIdentifier: RelatedResourceClass = {
 	group: '',
 	version: 'v1',
@@ -30,33 +28,13 @@ const jobIdentifier: RelatedResourceClass = {
 	resource: 'jobs'
 };
 
-const controllerRevisionIdentifier: RelatedResourceClass = {
-	group: 'apps',
-	version: 'v1',
-	kind: 'ControllerRevision',
-	resource: 'controllerrevisions'
-};
-
-/**
- * Direct dependents only: each level of the chain lists its own. Nothing below
- * is particular to these kinds, so any owner whose controller writes owner
- * references belongs here as one more row.
- */
-const directDependentsByOwnerResource: Record<string, DependentIdentifier[]> = {
-	deployments: [{ ...replicaSetIdentifier, matchesOwnerSelector: true }],
-	replicasets: [{ ...podIdentifier, matchesOwnerSelector: true }],
-	daemonsets: [
-		{ ...controllerRevisionIdentifier, matchesOwnerSelector: false },
-		{ ...podIdentifier, matchesOwnerSelector: true }
-	],
-	statefulsets: [
-		{ ...controllerRevisionIdentifier, matchesOwnerSelector: false },
-		{ ...podIdentifier, matchesOwnerSelector: true }
-	],
-	// A CronJob has no `spec.selector`, and its `spec.jobTemplate` labels are the
-	// user's to leave empty.
-	cronjobs: [{ ...jobIdentifier, matchesOwnerSelector: false }],
-	jobs: [{ ...podIdentifier, matchesOwnerSelector: true }]
+const directDependentsByOwnerResource: Record<string, RelatedResourceClass[]> = {
+	deployments: [replicaSetIdentifier],
+	replicasets: [podIdentifier],
+	daemonsets: [podIdentifier],
+	statefulsets: [podIdentifier],
+	cronjobs: [jobIdentifier],
+	jobs: [podIdentifier]
 };
 
 function isOwnedBy(object: JsonObject | undefined, ownerUID: string): boolean {
@@ -65,44 +43,19 @@ function isOwnedBy(object: JsonObject | undefined, ownerUID: string): boolean {
 	return ownerReferences.some((ownerReference) => ownerReference?.uid === ownerUID);
 }
 
-/**
- * Only shrinks what the server sends — ownership still decides what is kept — so
- * this may be wider than the truth but never narrower. Hence `matchExpressions`
- * is dropped rather than translated, and an owner with no selector at all
- * narrows nothing.
- */
-function buildNarrowingLabelSelector(owner: JsonObject): string {
-	const matchLabels = (lodash.get(owner, ['spec', 'selector', 'matchLabels']) ?? {}) as Record<
-		string,
-		string
-	>;
-	return Object.entries(matchLabels)
-		.map(([key, value]) => `${key}=${value}`)
-		.join(',');
-}
-
-/**
- * An owner names none of its dependents and their labels are the user's to
- * choose, so the relation is read the way the garbage collector reads it: each
- * dependent kind is listed in the owner's namespace and kept only when it
- * carries the owner's uid. A dependent in another namespace cannot exist — the
- * API rejects an owner reference that crosses one.
- */
 function createDependentsRelatedResourcesGetter(
-	dependentIdentifiers: DependentIdentifier[]
+	dependentIdentifiers: RelatedResourceClass[]
 ): GetRelatedResources {
 	return async ({ cluster, namespace, object, transport, signal }) => {
 		const uid = lodash.get(object, ['metadata', 'uid']) as string | undefined;
 		if (!uid) return [];
 
-		const narrowingLabelSelector = buildNarrowingLabelSelector(object);
 		const resourceClient = createClient(ResourceService, transport);
 
 		async function list(
-			dependent: DependentIdentifier,
+			identifier: RelatedResourceClass,
 			ownerUID: string
 		): Promise<RelatedResource[]> {
-			const { matchesOwnerSelector, ...identifier } = dependent;
 			try {
 				const response = await resourceClient.list(
 					{
@@ -110,8 +63,7 @@ function createDependentsRelatedResourcesGetter(
 						namespace,
 						group: identifier.group,
 						version: identifier.version,
-						resource: identifier.resource,
-						labelSelector: matchesOwnerSelector ? narrowingLabelSelector : ''
+						resource: identifier.resource
 					} as ListRequest,
 					{ signal }
 				);
@@ -140,7 +92,9 @@ function createDependentsRelatedResourcesGetter(
 			}
 		}
 
-		const listed = await Promise.all(dependentIdentifiers.map((dependent) => list(dependent, uid)));
+		const listed = await Promise.all(
+			dependentIdentifiers.map((identifier) => list(identifier, uid))
+		);
 		return listed.flat();
 	};
 }
