@@ -53,8 +53,8 @@
 </script>
 
 <div class="space-y-4">
-	<div class="overflow-hidden rounded-md border bg-background">
-		<Table.Root class="[&_td]:p-3 [&_th]:p-3">
+	<div class="max-w-full overflow-x-auto overflow-y-hidden rounded-md border bg-background">
+		<Table.Root class="[&_td]:p-4 [&_th]:p-4 [&_th]:py-3">
 			<Table.Header class="bg-muted">
 				{@render header()}
 			</Table.Header>

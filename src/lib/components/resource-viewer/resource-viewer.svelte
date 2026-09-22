@@ -32,8 +32,8 @@
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
 	import Conditions from './related-inforamtion/conditions.svelte';
-	import Manifest from './related-inforamtion/manifest.svelte';
 	import Events from './related-inforamtion/evens.svelte';
+	import Manifest from './related-inforamtion/manifest.svelte';
 	import RelatedResources from './related-inforamtion/related-resources.svelte';
 	import type { Resource } from './types';
 
@@ -378,8 +378,8 @@
 				{/if}
 			</div>
 		</Field.Set>
-		<Field.Set>
-			<Tabs.Root bind:value={selectedTab} class="w-full gap-4">
+		<Field.Set class="min-w-0">
+			<Tabs.Root bind:value={selectedTab} class="w-full min-w-0 gap-4">
 				<div class="flex flex-wrap items-center justify-between gap-2">
 					<Tabs.List>
 						{#each tabs as tab (tab.value)}
