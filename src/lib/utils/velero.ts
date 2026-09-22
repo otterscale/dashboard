@@ -25,6 +25,29 @@ export async function requestVeleroDownloadURL(...args: any[]): Promise<string> 
 	return '';
 }
 
+export const OBJECT_BUCKET_GROUP = '';
+export const OBJECT_BUCKET_VERSION = '';
+export const INTERNAL_BUCKET_CLAIM: any = {};
+export type InternalBucketStatus = any;
+export type InternalBucket = any;
+
+export async function hasInternalObjectStore(...args: any[]): Promise<boolean> {
+	void args;
+	return false;
+}
+
+export async function getInternalBucketStatus(
+	...args: any[]
+): Promise<InternalBucketStatus | null> {
+	void args;
+	return null;
+}
+
+export async function ensureInternalBucket(...args: any[]): Promise<InternalBucket> {
+	void args;
+	return null;
+}
+
 export const WORKSPACE_CLUSTER_SCOPED_RESOURCE = '';
 export const WORKSPACE_NAMESPACE_LABEL = '';
 export type WorkspaceNamespace = any;
