@@ -1,12 +1,8 @@
 import type { GetRelatedResources, RelatedResource } from '../types';
-import {
-	// buildSelfRelatedResource,
-	getDefaultRelatedResources,
-	getOwnerReferenceRelatedResources
-} from './default';
+import { getDefaultRelatedResources, getOwnerReferenceRelatedResources } from './default';
+import { dependentsRelatedResourceGetters } from './dependents';
 import { getHelmReleaseRelatedResources } from './helm-release';
 import { getLLMInferenceServiceRelatedResources } from './llm-inference-service';
-import { ownedChildrenRelatedResourceGetters } from './owned-children';
 import { getWorkspaceRelatedResources } from './workspace';
 
 /**
@@ -53,19 +49,16 @@ function withDefaultRelatedResources(getSpecific: GetRelatedResources): GetRelat
 	};
 }
 
+const specificRelatedResourcesGetters: Record<string, GetRelatedResources> = {
+	...dependentsRelatedResourceGetters,
+	helmreleases: getHelmReleaseRelatedResources,
+	llminferenceservices: getLLMInferenceServiceRelatedResources,
+	workspaces: getWorkspaceRelatedResources
+};
+
 function getRelatedResourcesGetter(resource: string): GetRelatedResources {
-	if (resource === 'workspaces') return withDefaultRelatedResources(getWorkspaceRelatedResources);
-	if (resource === 'llminferenceservices')
-		return withDefaultRelatedResources(getLLMInferenceServiceRelatedResources);
-	if (resource === 'helmreleases')
-		return withDefaultRelatedResources(getHelmReleaseRelatedResources);
-
-	// The workload kinds whose relations are only what their controller owns all
-	// share one getter, differing just in the child kinds it lists.
-	const ownedChildren = ownedChildrenRelatedResourceGetters[resource];
-	if (ownedChildren) return withDefaultRelatedResources(ownedChildren);
-
-	return getDefaultRelatedResources;
+	const specific = specificRelatedResourcesGetters[resource];
+	return specific ? withDefaultRelatedResources(specific) : getDefaultRelatedResources;
 }
 
 export { getRelatedResourcesGetter };
