@@ -70,9 +70,9 @@
 			// Inline the node filter so Prometheus does the model→host join itself —
 			// avoids a serial `fetchModelNodes` round-trip before these queries fire.
 			const hostFilter = vllmModelHostnamesSelector(namespace, selectedModel);
-			const usedQuery = `sum by(Hostname) (DCGM_FI_DEV_FB_USED and on(Hostname) (${hostFilter}))`;
-			const totalQuery = `sum by(Hostname) ((DCGM_FI_DEV_FB_USED + DCGM_FI_DEV_FB_FREE) and on(Hostname) (${hostFilter}))`;
-			const countQuery = `count by(Hostname) (DCGM_FI_DEV_FB_USED and on(Hostname) (${hostFilter}))`;
+			const usedQuery = `sum by(hostname) (DCGM_FI_DEV_FB_USED and on(hostname) (${hostFilter}))`;
+			const totalQuery = `sum by(hostname) ((DCGM_FI_DEV_FB_USED + DCGM_FI_DEV_FB_FREE) and on(hostname) (${hostFilter}))`;
+			const countQuery = `count by(hostname) (DCGM_FI_DEV_FB_USED and on(hostname) (${hostFilter}))`;
 
 			const [usedResp, totalResp, countResp] = await Promise.all([
 				prometheusDriver.rangeQuery(usedQuery, new Date(startMs), new Date(endMs), `${step}s`),
@@ -82,7 +82,7 @@
 
 			const gpuCountByHost: Record<string, number> = {};
 			for (const v of countResp.result) {
-				const host = (v.metric.labels as Record<string, string>).Hostname ?? '?';
+				const host = (v.metric.labels as Record<string, string>).hostname ?? '?';
 				gpuCountByHost[host] = Math.round(Number(v.value?.value));
 			}
 			nodeCount = Object.keys(gpuCountByHost).length;
@@ -96,7 +96,7 @@
 			const totalMiBByHost: Record<string, number> = {};
 			const latestTotalGiBByHost: Record<string, number> = {};
 			for (const v of totalResp.result) {
-				const host = (v.metric.labels as Record<string, string>).Hostname ?? '?';
+				const host = (v.metric.labels as Record<string, string>).hostname ?? '?';
 				const total = Number(v.value?.value);
 				if (!Number.isFinite(total) || total <= 0) continue;
 				totalMiBByHost[host] = total;
@@ -109,7 +109,7 @@
 			const maxPctByHost: Record<string, number> = {};
 
 			for (const v of usedResp.result as RangeVector[]) {
-				const host = (v.metric.labels as Record<string, string>).Hostname ?? '?';
+				const host = (v.metric.labels as Record<string, string>).hostname ?? '?';
 				const totalMiB = totalMiBByHost[host];
 				if (!totalMiB) continue;
 				seenHosts[host] = true;

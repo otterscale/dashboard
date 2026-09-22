@@ -431,8 +431,8 @@ export async function fetchCombinedInstant(
 
 /**
  * Build a sub-expression that yields one synthetic row per K8s node a given vLLM
- * model's pods occupy, with the `node` label renamed to `Hostname` so the result
- * can be intersected against DCGM / host-level metrics via `and on(Hostname)`.
+ * model's pods occupy, with the `node` label renamed to `hostname` so the result
+ * can be intersected against DCGM / host-level metrics via `and on(hostname)`.
  *
  * Lets DCGM queries scope to the model's hosts in a SINGLE PromQL request — no
  * preceding round-trip is needed to enumerate node names client-side.
@@ -446,22 +446,22 @@ export function vllmModelHostnamesSelector(
 	const podInfoSelector = nsSel ? `{${nsSel}}` : '';
 	const vllmSelector = vllmMetricWithSelector('vllm:kv_cache_usage_perc', namespace, selectedModel);
 	return (
-		`group by(Hostname) (` +
+		`group by(hostname) (` +
 		`label_replace(` +
 		`kube_pod_info${podInfoSelector}` +
 		` * on(namespace, pod) group_left() ` +
 		`group by(namespace, pod) (${vllmSelector}),` +
-		` "Hostname", "$1", "node", "(.+)"))`
+		` "hostname", "$1", "node", "(.+)"))`
 	);
 }
 
 /**
  * Label selector scoping DCGM (GPU exporter) series to one Kubernetes node. DCGM's
- * `Hostname` label equals the K8s node name (as vllmModelHostnamesSelector also assumes).
+ * `hostname` label equals the K8s node name (as vllmModelHostnamesSelector also assumes).
  * Exact match, not regex: node names can contain dots and would otherwise cross-match.
  */
 export function dcgmNodeSelector(nodeName: string): string {
-	return `Hostname="${escapePromqlStringLiteral(nodeName)}"`;
+	return `hostname="${escapePromqlStringLiteral(nodeName)}"`;
 }
 
 /**
@@ -484,10 +484,12 @@ export const DCGM_GPU_MEMORY_USED_BYTES = 'DCGM_FI_DEV_FB_USED * (1024 * 1024)';
  * TopoLVM device class backing the AI100 drive. `lvmd.deviceClasses` is a list, so queries name
  * the class explicitly rather than summing whatever else is configured.
  */
-export const AI100_DEVICE_CLASS = 'aidaptiv';
+export const AIDAPTIV_CACHE_DEVICE_CLASS = 'aidaptiv';
 
 /** Device classes are wiring, not product names — spell out the ones we ship. */
-const DEVICE_CLASS_LABELS: Record<string, string> = { [AI100_DEVICE_CLASS]: 'AI100' };
+const DEVICE_CLASS_LABELS: Record<string, string> = {
+	[AIDAPTIV_CACHE_DEVICE_CLASS]: 'aiDAPTIVCache'
+};
 
 export function deviceClassLabel(deviceClass: string): string {
 	return DEVICE_CLASS_LABELS[deviceClass] ?? deviceClass;
