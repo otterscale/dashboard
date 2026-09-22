@@ -433,7 +433,7 @@
 								{
 									title: m.resource(),
 									url: page.params.workspace
-										? resolve('/(auth)/[cluster]/[workspace]/resources', {
+										? resolve('/(auth)/[cluster]/[workspace]/api-resources', {
 												cluster: activeCluster,
 												workspace: page.params.workspace
 											})
