@@ -28,8 +28,8 @@
 	import { Toggle } from '$lib/components/ui/toggle';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 
-	import type { DataSchemaType, UISchemaType } from '../dynamic-table/utils';
 	import type { ResourceRuleVerbs } from '../api-resources-viewer/types';
+	import type { DataSchemaType, UISchemaType } from '../dynamic-table/utils';
 	import BulkDelete from './bulk-delete.svelte';
 	import { getKindExtension } from './extensions';
 	import type { ActionsType, CreateType } from './kind-viewer-actions';
