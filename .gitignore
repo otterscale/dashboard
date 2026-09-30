@@ -43,3 +43,10 @@ coverage
 
 # AI
 .claude
+
+# Vitest browser mode artifacts of failed tests
+__screenshots__/
+.vitest-attachments/
+
+# Manifests written by `pnpm test:deploy:yaml`
+.generated/
