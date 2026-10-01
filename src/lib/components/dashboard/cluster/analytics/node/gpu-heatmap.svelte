@@ -33,7 +33,7 @@
 	// Like c-token-size-distribution.svelte's band×band grid, but cells on a Canvas layer.
 	let {
 		client,
-		// k8s node name == DCGM `Hostname` (see dcgmNodeSelector in prometheus.ts).
+		// k8s node name == DCGM `hostname` (see dcgmNodeSelector in prometheus.ts).
 		nodeName,
 		metric,
 		start,

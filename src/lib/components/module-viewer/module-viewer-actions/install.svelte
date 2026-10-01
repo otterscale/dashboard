@@ -91,11 +91,13 @@
 						targetNamespace: lodash.get(module, ['annotations', 'module.otterscale.io/namespace']),
 						install: {
 							createNamespace: true,
+							crds: 'CreateReplace',
 							...(hasRemediation && { remediation: { retries: remediationRetries } })
 						},
-						...(hasRemediation && {
-							upgrade: { remediation: { retries: remediationRetries } }
-						}),
+						upgrade: {
+							crds: 'CreateReplace',
+							...(hasRemediation && { remediation: { retries: remediationRetries } })
+						},
 						interval: '15m',
 						timeout: '15m',
 						...(dependenciesOfSelectedModule.length > 0 && {
