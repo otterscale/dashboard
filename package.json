@@ -127,17 +127,18 @@
 	},
 	"pnpm": {
 		"overrides": {
-			"axios@<1.18.0": "1.18.0",
+			"axios@<1.20.0": "1.20.0",
 			"form-data@<4.0.6": "4.0.6",
-			"fast-uri@<3.1.7": "3.1.7",
+			"fast-uri@<3.1.8": "3.1.8",
 			"vite@<7.3.5": "7.3.5",
 			"undici@<7.29.1": "7.29.1",
-			"dompurify@<3.4.15": "3.4.15",
+			"dompurify@<3.4.16": "3.4.16",
 			"esbuild@<0.28.1": "0.28.1",
 			"cookie@<0.7.0": "0.7.0",
 			"minimatch@<10.2.3": "10.2.3",
-			"brace-expansion@<5.0.9": "5.0.9",
+			"brace-expansion@<5.0.12": "5.0.12",
 			"marked": "^18.0.7",
+			"devalue@<5.9.2": "5.9.2",
 			"postcss@<8.5.28": "8.5.28"
 		},
 		"onlyBuiltDependencies": [
