@@ -268,6 +268,7 @@
 					response.object ?? {}
 				);
 				lodash.set(helmRelease, ['spec', 'chart', 'spec', 'version'], targetVersion);
+				lodash.set(helmRelease, ['spec', 'upgrade', 'crds'], 'CreateReplace');
 				lodash.set(helmRelease, ['spec', 'values'], valuesDelta);
 				const manifest = stringify(helmRelease, { schema: 'yaml-1.1' });
 
