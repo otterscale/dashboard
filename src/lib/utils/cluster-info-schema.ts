@@ -1,22 +1,22 @@
 /**
  * Structural validation rules for the import-cluster wizard's "cluster info"
- * fields (externalAddress / nodePortRange / inferenceURL), shared between the
- * client form (import-cluster-external.svelte) and the server route
- * (bff/cluster-import/+server.ts) so the two can't drift apart. They also mirror
- * the otterscale-agent chart's own `templates/validate.yaml`: externalAddress is
- * a bare host (the chart rejects both a scheme and a trailing `:port`),
- * inferenceURL is an absolute http(s):// URL (the chart requires one).
+ * fields (externalAddress / nodePortRange / inferenceURL), used by the client
+ * form (import-cluster-external.svelte) to fail fast before the request goes
+ * out. They mirror core.validateClusterInfo in the otterscale API
+ * (internal/core/agent_values.go), which is the authority — it re-checks every
+ * field on LinkService.IssueAgentValues — and in turn the otterscale-agent
+ * chart's own `templates/validate.yaml`: externalAddress is a bare host (both a
+ * scheme and a trailing `:port` are rejected), inferenceURL is an absolute
+ * http(s):// URL.
  *
  * Deliberately free of `title`/`errorMessage`: those are i18n'd display
- * concerns the client layers on top per field. This file only owns the rules
- * that must stay identical on both sides.
+ * concerns the client layers on top per field. This file only owns the rules.
  *
  * nodePortRange is a `{ min, max }` object (rather than one "min-max" string)
  * specifically so "min < max" is expressible as a JSON Schema rule via ajv's
- * `$data` cross-field reference, instead of a hand-written check. The
- * otterscale-agent chart still wants a single "min-max" string — that join
- * happens once, in lib/server/agent-install.ts#buildValues, right before the
- * value enters the chart's own contract.
+ * `$data` cross-field reference, instead of a hand-written check. The API and
+ * the chart both want a single "min-max" string — that join happens once, in
+ * import-cluster-external.svelte, right before the value is sent.
  */
 
 /**

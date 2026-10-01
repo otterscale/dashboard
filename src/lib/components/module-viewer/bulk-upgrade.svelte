@@ -72,6 +72,7 @@
 		// Revise version
 		const helmRelease: HelmToolkitFluxcdIoV2HelmRelease = lodash.cloneDeep(response.object ?? {});
 		lodash.set(helmRelease, ['spec', 'chart', 'spec', 'version'], latestVersion);
+		lodash.set(helmRelease, ['spec', 'upgrade', 'crds'], 'CreateReplace');
 
 		const manifest = stringify(helmRelease, { schema: 'yaml-1.1' });
 

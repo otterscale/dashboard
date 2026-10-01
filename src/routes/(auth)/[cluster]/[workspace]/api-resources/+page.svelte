@@ -12,13 +12,13 @@
 
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import KindViewer from '$lib/components/kind-viewer/kind-viewer.svelte';
 	import type {
 		ResourceIdentifier,
 		ResourceRule,
 		ResourceRuleVerbs,
 		ResourceRuleVerbsByGroupResource
-	} from '$lib/components/resources/types';
+	} from '$lib/components/api-resources-viewer/types';
+	import KindViewer from '$lib/components/kind-viewer/kind-viewer.svelte';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Command from '$lib/components/ui/command/index.js';
