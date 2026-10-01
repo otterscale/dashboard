@@ -65,7 +65,7 @@
 			usage: lodash.sumBy(value, 'usage'),
 			total: lodash.sumBy(value, 'total')
 		}));
-		gpusByHostName = Object.entries(lodash.groupBy(gpus, (gpu) => lodash.get(gpu, 'Hostname'))).map(
+		gpusByHostName = Object.entries(lodash.groupBy(gpus, (gpu) => lodash.get(gpu, 'hostname'))).map(
 			([key, value]) => ({
 				identifier: key,
 				limit: lodash.sumBy(value, 'limit'),
@@ -222,7 +222,7 @@
 				{#each gpus as gpu, index (index)}
 					<Table.Row class="border-none">
 						<Table.Cell>{gpu.modelName}</Table.Cell>
-						<Table.Cell>{gpu.Hostname}</Table.Cell>
+						<Table.Cell>{gpu.hostname}</Table.Cell>
 						<Table.Cell>{gpu.device}</Table.Cell>
 						<Table.Cell>{gpu.UUID}</Table.Cell>
 						<Table.Cell class="text-end">

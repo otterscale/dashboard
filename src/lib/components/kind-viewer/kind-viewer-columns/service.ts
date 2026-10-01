@@ -45,11 +45,12 @@ function getServiceDataSchemas(): Record<ServiceAttribute, DataSchemaType> {
 function getServiceData(object: CoreV1Service): Record<ServiceAttribute, JsonValue> {
 	// Determine External-IP: LoadBalancer ingress IP/hostname, or externalIPs[0], or '<none>'
 	const lbIngress = object?.status?.loadBalancer?.ingress ?? [];
+	const externalIPs = object?.spec?.externalIPs ?? [];
 	let externalIP = '<none>';
 	if (lbIngress.length > 0) {
 		externalIP = lbIngress[0]?.ip ?? lbIngress[0]?.hostname ?? '<none>';
-	} else if ((object?.spec?.externalIPs ?? []).length > 0) {
-		externalIP = object.spec!.externalIPs![0];
+	} else if (externalIPs.length > 0) {
+		externalIP = externalIPs[0];
 	}
 
 	return {

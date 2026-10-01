@@ -160,6 +160,7 @@
 								response.object ?? {}
 							);
 							lodash.set(helmRelease, ['spec', 'chart', 'spec', 'version'], targetVersion);
+							lodash.set(helmRelease, ['spec', 'upgrade', 'crds'], 'CreateReplace');
 							const manifest = stringify(helmRelease, { schema: 'yaml-1.1' });
 
 							let isValid: boolean;
