@@ -99,13 +99,13 @@
 						}
 					}
 				: {}),
-			...(chartVariant.release.createNamespace
-				? {
-						install: {
-							createNamespace: true
-						}
-					}
-				: {}),
+			install: {
+				crds: 'CreateReplace',
+				...(chartVariant.release.createNamespace && { createNamespace: true })
+			},
+			upgrade: {
+				crds: 'CreateReplace'
+			},
 			chart: {
 				spec: {}
 			},

@@ -166,7 +166,7 @@
 	"gpu_memory": "GPU 記憶體",
 	"gpu_allocated": "已預訂",
 	"gpu_cards": "張數",
-	"ai100_disk": "AI100 磁碟",
+	"ai100_disk": "aiDAPTIVCache",
 	"gpu_peak": "峰值",
 	"gpu_unattributed_pods": "{amount} 由 HAMi 看不到的工作負載佔用。它們繞過了排程器，因此無法指出對應的 workspace 或 Pod。",
 	"gpu_utilization": "GPU 使用率",

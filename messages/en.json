@@ -166,7 +166,7 @@
 	"gpu_memory": "GPU Memory",
 	"gpu_allocated": "Allocated",
 	"gpu_cards": "Cards",
-	"ai100_disk": "AI100 Disk",
+	"ai100_disk": "aiDAPTIVCache",
 	"gpu_peak": "Peak",
 	"gpu_unattributed_pods": "{amount} is in use by workloads HAMi cannot see. They bypassed the scheduler, so no workspace or pod can be named for it.",
 	"gpu_utilization": "GPU Utilization",
