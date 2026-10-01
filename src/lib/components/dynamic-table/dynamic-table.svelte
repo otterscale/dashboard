@@ -61,6 +61,7 @@
 	import Columns3Icon from '@lucide/svelte/icons/columns-3';
 	import EraserIcon from '@lucide/svelte/icons/eraser';
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
+	import ListIcon from '@lucide/svelte/icons/list';
 	import SheetIcon from '@lucide/svelte/icons/sheet';
 	import {
 		type ColumnDef,
@@ -100,10 +101,12 @@
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
 	import * as Table from '$lib/components/ui/table';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { m } from '$lib/messages';
 	import { viewMode } from '$lib/stores';
 	import { cn } from '$lib/utils';
 
 	import { getColumnLabel, isTechnicalColumn } from './column-labels';
+	import DynamicTableList from './dynamic-table-list.svelte';
 	import DynamicTableSearchDocument from './dynamic-table-search-document.svelte';
 	import type { TableMode, TableState } from './table-state.svelte';
 
@@ -213,12 +216,18 @@
 	// The defaults are applied here,
 	// because this is what knows the columns
 	// and whether there is a grid layout to switch to.
-	const defaultMode = $derived<TableMode>(gridLayout ? 'grid' : 'table');
+	// The list view hangs each row off its name, so it needs a `Name` column to exist.
+	const canList = $derived(columnIds.has('Name'));
+	// Simple mode opens on the status-grouped list: what needs attention, first.
+	const defaultMode = $derived<TableMode>(
+		gridLayout ? 'grid' : canList && $viewMode === 'simple' ? 'list' : 'table'
+	);
 	const mode = $derived.by<TableMode>(() => {
 		const derivedMode = tableState.mode ?? defaultMode;
 		// The grid view renders nothing without a snippet to render it with,
 		// so a persisted `grid` on a table that has none falls back instead of blanking.
 		if (derivedMode === 'grid' && !gridLayout) return 'table';
+		if (derivedMode === 'list' && !canList) return 'table';
 		return derivedMode;
 	});
 	const globalFilter = $derived(tableState.globalFilter);
@@ -547,6 +556,23 @@
 					{#snippet child({ props })}
 						<Button
 							{...props}
+							disabled={!canList}
+							variant={mode === 'list' ? 'secondary' : 'outline'}
+							size="icon"
+							onclick={() => handleMode('list')}
+							aria-pressed={mode === 'list'}
+						>
+							<ListIcon />
+						</Button>
+					{/snippet}
+				</Tooltip.Trigger>
+				<Tooltip.Content>{m.list_view()}</Tooltip.Content>
+			</Tooltip.Root>
+			<Tooltip.Root>
+				<Tooltip.Trigger>
+					{#snippet child({ props })}
+						<Button
+							{...props}
 							variant={mode === 'table' ? 'secondary' : 'outline'}
 							size="icon"
 							onclick={() => handleMode('table')}
@@ -556,7 +582,7 @@
 						</Button>
 					{/snippet}
 				</Tooltip.Trigger>
-				<Tooltip.Content>Table View</Tooltip.Content>
+				<Tooltip.Content>{m.table_view()}</Tooltip.Content>
 			</Tooltip.Root>
 			<Tooltip.Root>
 				<Tooltip.Trigger>
@@ -573,7 +599,7 @@
 						</Button>
 					{/snippet}
 				</Tooltip.Trigger>
-				<Tooltip.Content>Grid View</Tooltip.Content>
+				<Tooltip.Content>{m.grid_view()}</Tooltip.Content>
 			</Tooltip.Root>
 		</ButtonGroup.Root>
 		<Tooltip.Root>
@@ -654,105 +680,127 @@
 		{@render tableLayout()}
 	{:else if mode === 'grid'}
 		{@render gridLayout?.({ table, handleClear: handleGlobalFilterClear })}
+	{:else if mode === 'list'}
+		<DynamicTableList {table} {uiSchemas} empty={emptyState} />
 	{/if}
 
-	<!-- Pagination -->
-	<div class="flex items-center justify-between gap-8">
-		<!-- Results -->
-		<div class="flex items-center gap-3">
-			<Label class="max-sm:sr-only">Rows per page</Label>
-			<Select
-				type="single"
-				value={pagination.pageSize.toString()}
-				onValueChange={(value) => {
-					table.setPageSize(Number(value));
-				}}
-			>
-				<SelectTrigger class="w-fit whitespace-nowrap">
-					{pagination.pageSize}
-				</SelectTrigger>
-				<SelectContent
-					class="[&_*[role=option]]:ps-2 [&_*[role=option]]:pe-8 [&_*[role=option]>span]:inset-s-auto [&_*[role=option]>span]:inset-e-2"
+	<!-- Pagination: the list shows every match, grouped, so it has no pages to step through. -->
+	{#if mode !== 'list'}
+		<div class="flex items-center justify-between gap-8">
+			<!-- Results -->
+			<div class="flex items-center gap-3">
+				<Label class="max-sm:sr-only">Rows per page</Label>
+				<Select
+					type="single"
+					value={pagination.pageSize.toString()}
+					onValueChange={(value) => {
+						table.setPageSize(Number(value));
+					}}
 				>
-					{#each PAGE_SIZES as pageSize (pageSize)}
-						<SelectItem value={pageSize.toString()}>
-							{pageSize}
-						</SelectItem>
-					{/each}
-				</SelectContent>
-			</Select>
-		</div>
+					<SelectTrigger class="w-fit whitespace-nowrap">
+						{pagination.pageSize}
+					</SelectTrigger>
+					<SelectContent
+						class="[&_*[role=option]]:ps-2 [&_*[role=option]]:pe-8 [&_*[role=option]>span]:inset-s-auto [&_*[role=option]>span]:inset-e-2"
+					>
+						{#each PAGE_SIZES as pageSize (pageSize)}
+							<SelectItem value={pageSize.toString()}>
+								{pageSize}
+							</SelectItem>
+						{/each}
+					</SelectContent>
+				</Select>
+			</div>
 
-		<!-- Page -->
-		<div class="flex grow justify-end text-sm whitespace-nowrap text-muted-foreground">
-			<p class="text-sm whitespace-nowrap text-muted-foreground" aria-live="polite">
-				<span class="text-foreground">{rangeStart}-{rangeEnd}</span>
-				of
-				<span class="text-foreground">{rowCount}</span>
-			</p>
-		</div>
+			<!-- Page -->
+			<div class="flex grow justify-end text-sm whitespace-nowrap text-muted-foreground">
+				<p class="text-sm whitespace-nowrap text-muted-foreground" aria-live="polite">
+					<span class="text-foreground">{rangeStart}-{rangeEnd}</span>
+					of
+					<span class="text-foreground">{rowCount}</span>
+				</p>
+			</div>
 
-		<!-- Controller -->
-		<div>
-			<Pagination.Root count={rowCount}>
-				<Pagination.Content>
-					<!-- First page button -->
-					<Pagination.Item>
-						<Button
-							size="icon"
-							variant="outline"
-							class="disabled:pointer-events-none disabled:opacity-50"
-							onclick={() => table.firstPage()}
-							disabled={!table.getCanPreviousPage()}
-							aria-label="Go to first page"
-						>
-							<ChevronFirstIcon size={16} aria-hidden="true" />
-						</Button>
-					</Pagination.Item>
-					<!-- Previous page button -->
-					<Pagination.Item>
-						<Button
-							size="icon"
-							variant="outline"
-							class="disabled:pointer-events-none disabled:opacity-50"
-							onclick={() => table.previousPage()}
-							disabled={!table.getCanPreviousPage()}
-							aria-label="Go to previous page"
-						>
-							<ChevronLeftIcon size={16} aria-hidden="true" />
-						</Button>
-					</Pagination.Item>
-					<!-- Next page button -->
-					<Pagination.Item>
-						<Button
-							size="icon"
-							variant="outline"
-							class="disabled:pointer-events-none disabled:opacity-50"
-							onclick={() => table.nextPage()}
-							disabled={!table.getCanNextPage()}
-							aria-label="Go to next page"
-						>
-							<ChevronRightIcon size={16} aria-hidden="true" />
-						</Button>
-					</Pagination.Item>
-					<!-- Last page button -->
-					<Pagination.Item>
-						<Button
-							size="icon"
-							variant="outline"
-							class="disabled:pointer-events-none disabled:opacity-50"
-							onclick={() => table.lastPage()}
-							disabled={!table.getCanNextPage()}
-							aria-label="Go to last page"
-						>
-							<ChevronLastIcon size={16} aria-hidden="true" />
-						</Button>
-					</Pagination.Item>
-				</Pagination.Content>
-			</Pagination.Root>
+			<!-- Controller -->
+			<div>
+				<Pagination.Root count={rowCount}>
+					<Pagination.Content>
+						<!-- First page button -->
+						<Pagination.Item>
+							<Button
+								size="icon"
+								variant="outline"
+								class="disabled:pointer-events-none disabled:opacity-50"
+								onclick={() => table.firstPage()}
+								disabled={!table.getCanPreviousPage()}
+								aria-label="Go to first page"
+							>
+								<ChevronFirstIcon size={16} aria-hidden="true" />
+							</Button>
+						</Pagination.Item>
+						<!-- Previous page button -->
+						<Pagination.Item>
+							<Button
+								size="icon"
+								variant="outline"
+								class="disabled:pointer-events-none disabled:opacity-50"
+								onclick={() => table.previousPage()}
+								disabled={!table.getCanPreviousPage()}
+								aria-label="Go to previous page"
+							>
+								<ChevronLeftIcon size={16} aria-hidden="true" />
+							</Button>
+						</Pagination.Item>
+						<!-- Next page button -->
+						<Pagination.Item>
+							<Button
+								size="icon"
+								variant="outline"
+								class="disabled:pointer-events-none disabled:opacity-50"
+								onclick={() => table.nextPage()}
+								disabled={!table.getCanNextPage()}
+								aria-label="Go to next page"
+							>
+								<ChevronRightIcon size={16} aria-hidden="true" />
+							</Button>
+						</Pagination.Item>
+						<!-- Last page button -->
+						<Pagination.Item>
+							<Button
+								size="icon"
+								variant="outline"
+								class="disabled:pointer-events-none disabled:opacity-50"
+								onclick={() => table.lastPage()}
+								disabled={!table.getCanNextPage()}
+								aria-label="Go to last page"
+							>
+								<ChevronLastIcon size={16} aria-hidden="true" />
+							</Button>
+						</Pagination.Item>
+					</Pagination.Content>
+				</Pagination.Root>
+			</div>
 		</div>
-	</div>
+	{/if}
 </div>
+
+{#snippet emptyState()}
+	<Empty.Root>
+		<Empty.Header>
+			<Empty.Media variant="icon">
+				<Columns3Icon size={32} class="opacity-60" aria-hidden="true" />
+			</Empty.Media>
+			<Empty.Title>{m.list_empty_title()}</Empty.Title>
+			<Empty.Description>{m.list_empty_description()}</Empty.Description>
+		</Empty.Header>
+		<Empty.Content>
+			<Button onclick={handleGlobalFilterClear}>
+				<EraserIcon size={16} class="opacity-60" />
+				{m.list_empty_reset()}
+			</Button>
+		</Empty.Content>
+	</Empty.Root>
+{/snippet}
 
 {#snippet tableLayout()}
 	<div class="overflow-hidden rounded-md border bg-background">
@@ -843,24 +891,7 @@
 				{:else}
 					<Table.Row>
 						<Table.Cell colspan={visibleColumnCount} class="h-full text-center">
-							<Empty.Root>
-								<Empty.Header>
-									<Empty.Media variant="icon">
-										<Columns3Icon size={32} class="opacity-60" aria-hidden="true" />
-									</Empty.Media>
-									<Empty.Title>No Resources Found</Empty.Title>
-									<Empty.Description>
-										No resources found. Please adjust your filters or initiate a new resource to
-										populate this table.
-									</Empty.Description>
-								</Empty.Header>
-								<Empty.Content>
-									<Button onclick={handleGlobalFilterClear}>
-										<EraserIcon size={16} class="opacity-60" />
-										Reset
-									</Button>
-								</Empty.Content>
-							</Empty.Root>
+							{@render emptyState()}
 						</Table.Cell>
 					</Table.Row>
 				{/if}

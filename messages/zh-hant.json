@@ -853,5 +853,18 @@
 	"column_class": "類別",
 	"column_mode": "模式",
 	"column_time_zone": "時區",
-	"column_volumes": "儲存卷"
+	"column_volumes": "儲存卷",
+	"list_view": "清單檢視",
+	"table_view": "表格檢視",
+	"grid_view": "格狀檢視",
+	"list_group_failed": "需要處理",
+	"list_group_degraded": "需要注意",
+	"list_group_progressing": "處理中",
+	"list_group_unknown": "其他",
+	"list_group_stopped": "已停止",
+	"list_group_healthy": "正常運作",
+	"list_group_toggle": "展開或收合「{group}」",
+	"list_empty_title": "目前沒有項目",
+	"list_empty_description": "沒有符合的項目。清除搜尋條件，或建立新項目後就會出現在這裡。",
+	"list_empty_reset": "清除搜尋"
 }

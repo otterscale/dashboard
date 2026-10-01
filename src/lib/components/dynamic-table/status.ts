@@ -87,4 +87,29 @@ function readStatus(value: JsonValue): StatusReading {
 	return { tone: 'unknown' };
 }
 
-export { readStatus, type StatusReading, type StatusTone };
+// Most urgent first: the order groups appear in, and the order `worstStatus` ranks by.
+const STATUS_TONES: readonly StatusTone[] = [
+	'failed',
+	'degraded',
+	'progressing',
+	'unknown',
+	'stopped',
+	'healthy'
+];
+
+/**
+ * The reading that should speak for a row with several status columns (a pod's
+ * `Ready` and `Status`, say): the most urgent one. `unknown` only wins when nothing
+ * else is known, so an unrecognised word never hides a clear `Healthy` or `Failed`.
+ * Ties keep the earlier entry, so callers list columns in order of preference.
+ */
+function worstStatus<T extends { tone: StatusTone }>(readings: T[]): T | undefined {
+	const rank = (tone: StatusTone) =>
+		tone === 'unknown' ? STATUS_TONES.length : STATUS_TONES.indexOf(tone);
+	return readings.reduce<T | undefined>(
+		(worst, reading) => (!worst || rank(reading.tone) < rank(worst.tone) ? reading : worst),
+		undefined
+	);
+}
+
+export { readStatus, STATUS_TONES, type StatusReading, type StatusTone, worstStatus };

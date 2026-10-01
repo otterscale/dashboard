@@ -853,5 +853,18 @@
 	"column_class": "Class",
 	"column_mode": "Mode",
 	"column_time_zone": "Time zone",
-	"column_volumes": "Volumes"
+	"column_volumes": "Volumes",
+	"list_view": "List view",
+	"table_view": "Table view",
+	"grid_view": "Grid view",
+	"list_group_failed": "Needs action",
+	"list_group_degraded": "Needs attention",
+	"list_group_progressing": "In progress",
+	"list_group_unknown": "Other",
+	"list_group_stopped": "Stopped",
+	"list_group_healthy": "Running normally",
+	"list_group_toggle": "Show or hide {group}",
+	"list_empty_title": "Nothing here yet",
+	"list_empty_description": "No items match. Clear the search, or create a new one to see it here.",
+	"list_empty_reset": "Clear search"
 }

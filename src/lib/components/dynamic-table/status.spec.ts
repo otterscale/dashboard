@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { readStatus } from './status';
+import { readStatus, worstStatus } from './status';
 
 describe('readStatus', () => {
 	it('reads ready counts', () => {
@@ -30,5 +30,31 @@ describe('readStatus', () => {
 		expect(readStatus(null).tone).toBe('unknown');
 		expect(readStatus('').tone).toBe('unknown');
 		expect(readStatus('Somewhere in between').tone).toBe('unknown');
+	});
+});
+
+describe('worstStatus', () => {
+	it('lets the most urgent reading speak for the row', () => {
+		// A pod reported Running whose container is not ready needs attention.
+		const ready = { id: 'Ready', tone: 'failed' as const };
+		const status = { id: 'Status', tone: 'healthy' as const };
+		expect(worstStatus([status, ready])).toBe(ready);
+	});
+
+	it('does not let an unrecognised word hide a known state', () => {
+		const state = { id: 'State', tone: 'unknown' as const };
+		const ready = { id: 'Ready', tone: 'healthy' as const };
+		expect(worstStatus([state, ready])).toBe(ready);
+		expect(worstStatus([state])).toBe(state);
+	});
+
+	it('keeps the preferred column on a tie', () => {
+		const status = { id: 'Status', tone: 'healthy' as const };
+		const ready = { id: 'Ready', tone: 'healthy' as const };
+		expect(worstStatus([status, ready])).toBe(status);
+	});
+
+	it('returns nothing for a row without status', () => {
+		expect(worstStatus([])).toBeUndefined();
 	});
 });

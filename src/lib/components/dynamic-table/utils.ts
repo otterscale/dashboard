@@ -252,18 +252,16 @@ function getTimeSpan(seconds: number) {
 	return { value: years, unit: 'year' };
 }
 
-function getRelativeTime(now: number, timestamp: number) {
+// Locale-aware, so it reads "2 hours ago" / "2 小時前" rather than a bare "2 hour".
+// Future timestamps (e.g. a backup's expiration) read as "in 29 days".
+function formatRelativeTime(now: number, timestamp: number, locale: string): string {
 	const milliseconds = Math.max(timestamp, 0);
-
 	const elapsedSeconds = Math.floor((now - milliseconds) / 1000);
-	if (Math.abs(elapsedSeconds) < 5) return { value: 'Just', unit: 'now' };
+	const formatter = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+	if (Math.abs(elapsedSeconds) < 5) return formatter.format(0, 'second');
 
 	const { value, unit } = getTimeSpan(Math.abs(elapsedSeconds));
-
-	// Future timestamps (e.g. a backup's expiration) read as "in 29 day".
-	if (elapsedSeconds < 0) return { value: `in ${value}`, unit };
-
-	return { value, unit };
+	return formatter.format(elapsedSeconds < 0 ? value : -value, unit as Intl.RelativeTimeFormatUnit);
 }
 
 type UISchemaType =
@@ -338,12 +336,12 @@ function getDefaultDataSchema(type: JsonValue | undefined, format?: JsonValue): 
 export {
 	binarySuffixFactors,
 	format,
+	formatRelativeTime,
 	formatWithBinarySuffix,
 	formatWithDecimalSuffix,
 	getDefaultDataSchema,
 	getDefaultUISchema,
 	getRatio,
-	getRelativeTime,
 	jsonValueToDate,
 	quantityToBytes,
 	quantityToScalar

@@ -4,7 +4,7 @@ import { SvelteURL } from 'svelte/reactivity';
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
 
-type TableMode = 'table' | 'grid';
+type TableMode = 'table' | 'grid' | 'list';
 
 /**
  * Table State Keys
@@ -218,7 +218,7 @@ class SearchParametersTableState extends TableStateBase implements TableState {
 		// Whitelist rather than cast:
 		// the URL is user-editable input,
 		// so anything the encoder would not have produced falls back to unset.
-		return value === 'grid' || value === 'table' ? value : null;
+		return value === 'grid' || value === 'table' || value === 'list' ? value : null;
 	});
 
 	globalFilter = $derived(page.url.searchParams.get(TABLE_STATES.QUERY) ?? '');

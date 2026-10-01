@@ -29,6 +29,8 @@ When building or changing a view, decide what each mode shows:
 
 Table helpers: column labels and technical-column list in `dynamic-table/column-labels.ts`; status reading in `dynamic-table/status.ts`; use UI schema `'status'` for Ready/Status/State/Phase columns.
 
+Resource lists have three views: list (default in simple mode, `dynamic-table-list.svelte` — rows grouped by status, most urgent first, unpaginated), table (default in advanced mode), and an optional per-kind grid. The list is generic: it reuses each column's cell renderer, so a new kind gets it for free as long as it has a `Name` column and marks its status columns `'status'`.
+
 All user-facing strings go through Paraglide in both locales.
 
 ## Checks

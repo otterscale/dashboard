@@ -3,9 +3,10 @@
 	import { type Column, type Row } from '@tanstack/table-core';
 
 	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
+	import { getLocale } from '$lib/paraglide/runtime';
 	import { now } from '$lib/stores/now';
 
-	import { getRelativeTime, jsonValueToDate } from '../utils';
+	import { formatRelativeTime, jsonValueToDate } from '../utils';
 
 	let {
 		row,
@@ -19,11 +20,9 @@
 </script>
 
 {#if data}
-	{@const { value, unit } = getRelativeTime($now, data.getTime())}
 	<Tooltip.Root>
 		<Tooltip.Trigger>
-			{value}
-			{unit}
+			{formatRelativeTime($now, data.getTime(), getLocale())}
 		</Tooltip.Trigger>
 		<Tooltip.Content>
 			{new Intl.DateTimeFormat('en-CA', {

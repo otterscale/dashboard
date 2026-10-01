@@ -155,11 +155,12 @@
 	}
 	html {
 		@apply font-sans;
-		/* Inter's alternate digits and disambiguated glyphs read calmer in dense data views. */
+		/* Inter's alternate digits and disambiguated glyphs read calmer in dense data views.
+		   No global `tnum`: Inter widens punctuation with it too (`vector - db`); use `tabular-nums`
+		   where figures must line up. */
 		font-feature-settings:
 			'cv11' 1,
-			'ss01' 1,
-			'tnum' 1;
+			'ss01' 1;
 	}
 	h1,
 	h2,
