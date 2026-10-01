@@ -4,11 +4,11 @@
 	import type { ValidateFunction } from 'ajv';
 	import lodash from 'lodash';
 
+	import type { ResourceRuleVerbs } from '$lib/components/api-resources-viewer/types';
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import Edit from '$lib/components/kind-viewer/kind-viewer-actions/default/edit.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
-	import type { ResourceRuleVerbs } from '$lib/components/resources/types';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 

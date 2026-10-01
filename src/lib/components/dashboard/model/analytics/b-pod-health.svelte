@@ -139,10 +139,10 @@
 		const xidPromise = nodesPromise.then(async (nodes) => {
 			if (nodes.length === 0) return { total: 0, byGpu: [] as GpuEntry[] };
 			const regex = escapePromqlStringLiteral(nodes.map(regexEscape).join('|'));
-			const selector = `{Hostname=~"${regex}"}`;
+			const selector = `{hostname=~"${regex}"}`;
 			const xid = await fetchCombinedInstant(prometheusDriver, {
 				total: `sum(increase(DCGM_FI_DEV_XID_ERRORS${selector}[24h]))`,
-				perGpu: `sum by(Hostname, gpu) (increase(DCGM_FI_DEV_XID_ERRORS${selector}[24h])) > 0`
+				perGpu: `sum by(hostname, gpu) (increase(DCGM_FI_DEV_XID_ERRORS${selector}[24h])) > 0`
 			});
 			const total = Math.round(scalarFromVectors(xid.total));
 			const byGpu = xid.perGpu
@@ -151,7 +151,7 @@
 					const value = Number(v.value?.value);
 					if (!Number.isFinite(value)) return null;
 					return {
-						hostname: labels.Hostname ?? '(unknown)',
+						hostname: labels.hostname ?? '(unknown)',
 						gpu: labels.gpu ?? '?',
 						value
 					};

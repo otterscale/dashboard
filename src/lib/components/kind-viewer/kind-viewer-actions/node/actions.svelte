@@ -7,7 +7,6 @@
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
 
-	import GPU from './gpu.svelte';
 	import GpuAllocation from './gpu-allocation.svelte';
 	import MIG from './mig.svelte';
 
@@ -74,7 +73,6 @@
 			>
 				<Describe {cluster} {namespace} {group} {version} {resource} {object} />
 			</DropdownMenu.Item>
-			<GPU {cluster} {group} {version} {kind} {resource} {object} />
 			<MIG {cluster} {group} {version} {kind} {resource} {object} />
 		</DropdownMenu.Group>
 	</DropdownMenu.Content>

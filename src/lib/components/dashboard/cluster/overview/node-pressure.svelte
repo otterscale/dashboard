@@ -23,8 +23,8 @@
 	import { formatIO } from '$lib/formatter';
 	import { m } from '$lib/messages';
 	import {
-		AI100_DEVICE_CLASS,
 		ai100DiskRateByNode,
+		AIDAPTIV_CACHE_DEVICE_CLASS,
 		classifyGpuGovernance,
 		classifyThreshold,
 		DCGM_GPU_MEMORY_TOTAL_BYTES,
@@ -170,7 +170,7 @@
 	// buffer and never reads zero. HAMi's per-container series are unusable too: HAMi-core only
 	// emits them while a vGPU container runs.
 	const GPU_QUERIES = {
-		// Labelled Hostname/UUID/modelName/device — the anchor every other DCGM series joins to.
+		// Labelled hostname/UUID/modelName/device — the anchor every other DCGM series joins to.
 		total: DCGM_GPU_MEMORY_TOTAL_BYTES,
 		used: DCGM_GPU_MEMORY_USED_BYTES,
 		util: 'DCGM_FI_DEV_GPU_UTIL',
@@ -246,7 +246,7 @@
 		return out;
 	}
 
-	// Fetch GPU devices, grouped by node name (DCGM's `Hostname` label == the K8s node name).
+	// Fetch GPU devices, grouped by node name (DCGM's `hostname` label == the K8s node name).
 	async function fetchGpusByNode(): Promise<Record<string, GpuDevice[]>> {
 		try {
 			const r = await fetchCombinedInstant(prometheusDriver, GPU_QUERIES);
@@ -288,7 +288,7 @@
 			const byNode: Record<string, GpuDevice[]> = {};
 			for (const series of r.total) {
 				const labels = series.metric.labels as Record<string, string>;
-				const host = labels.Hostname;
+				const host = labels.hostname;
 				if (!host) continue;
 				const uuid = labels.UUID ?? '';
 				const total = Number(series.value?.value);
@@ -450,7 +450,7 @@
 	// Throughput is only resolvable for AI100 drives, so every other device class keeps the
 	// capacity column alone.
 	function diskColumns(deviceClass: string): number {
-		return deviceClass === AI100_DEVICE_CLASS ? 3 : 1;
+		return deviceClass === AIDAPTIV_CACHE_DEVICE_CLASS ? 3 : 1;
 	}
 
 	// Throughput shares a row with four-character percentages, so it is compressed to eight:
@@ -689,7 +689,7 @@
 					<Table.Head class="text-right whitespace-nowrap">{m.utilization()}</Table.Head>
 				{/if}
 				{#each diskClasses as deviceClass (deviceClass)}
-					{#if deviceClass === AI100_DEVICE_CLASS}
+					{#if deviceClass === AIDAPTIV_CACHE_DEVICE_CLASS}
 						<Table.Head class="border-l text-right whitespace-nowrap">
 							{m.disk_write()}
 						</Table.Head>
@@ -743,7 +743,7 @@
 						{@render pctCell(row.gpuUtil, false)}
 					{/if}
 					{#each diskClasses as deviceClass (deviceClass)}
-						{#if deviceClass === AI100_DEVICE_CLASS}
+						{#if deviceClass === AIDAPTIV_CACHE_DEVICE_CLASS}
 							{@render rateCell(row.diskWrite)}
 							{@render rateCell(row.diskRead)}
 						{/if}
