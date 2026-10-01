@@ -212,8 +212,8 @@ function getPodUISchemas(): Record<PodAttribute, UISchemaType> {
 	return {
 		Name: 'link',
 		Namespace: 'text',
-		Ready: 'text',
-		Status: 'text',
+		Ready: 'status',
+		Status: 'status',
 		Restarts: 'text',
 		Age: 'time',
 		IP: 'text',

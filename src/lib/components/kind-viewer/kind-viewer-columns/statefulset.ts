@@ -59,7 +59,7 @@ function getStatefulSetUISchemas(): Record<StatefulSetAttribute, UISchemaType> {
 	return {
 		Name: 'link',
 		Namespace: 'text',
-		Ready: 'text',
+		Ready: 'status',
 		Age: 'time',
 		Containers: 'array-of-object',
 		Images: 'array-of-object',

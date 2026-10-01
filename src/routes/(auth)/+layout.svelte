@@ -32,6 +32,7 @@
 		NavUser,
 		NotificationTrigger,
 		startTour,
+		ViewModeToggle,
 		WorkspaceSwitcher
 	} from '$lib/components/layout';
 	import ImportCluster from '$lib/components/layout/import-cluster-external.svelte';
@@ -44,7 +45,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/messages';
-	import { breadcrumbs } from '$lib/stores';
+	import { breadcrumbs, viewMode } from '$lib/stores';
 	import { pulse } from '$lib/stores/pulse.svelte';
 	import {
 		type ClusterFeatures,
@@ -232,6 +233,8 @@
 	}
 
 	const navData = $derived({
+		// Groups marked `advancedOnly` are platform plumbing; simple mode leaves them out,
+		// as it does the whole Kubernetes view.
 		platform: [
 			{
 				title: m.overview(),
@@ -391,6 +394,7 @@
 						{
 							title: m.platform_apps(),
 							icon: BoxesIcon,
+							advancedOnly: true,
 							items: [
 								{
 									title: m.module(),
@@ -429,6 +433,7 @@
 						{
 							title: m.administration(),
 							icon: UserStarIcon,
+							advancedOnly: true,
 							items: [
 								{
 									title: m.resource(),
@@ -752,9 +757,11 @@
 				{#if page.params.workspace}
 					<NavMain
 						platformLabel={m.platform()}
-						platformItems={navData.platform}
+						platformItems={$viewMode === 'simple'
+							? navData.platform.filter((item) => !('advancedOnly' in item && item.advancedOnly))
+							: navData.platform}
 						kubernetesLabel={m.kubernetes()}
-						kubernetesItems={navData.kubernetes}
+						kubernetesItems={$viewMode === 'simple' ? [] : navData.kubernetes}
 					/>
 				{:else}
 					{@render contentSkeleton(sidebarOpen)}
@@ -799,6 +806,8 @@
 				</Breadcrumb.Root>
 			</div>
 			<div class="flex items-center gap-2 px-4">
+				<ViewModeToggle />
+				<Separator orientation="vertical" class="mx-1 data-[orientation=vertical]:h-4" />
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						{#snippet child({ props })}
@@ -829,9 +838,9 @@
 									{#if !activeCluster}
 										<span class="absolute top-3.5 right-3.5 flex size-2.5 transition-all">
 											<span
-												class="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"
+												class="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60"
 											></span>
-											<span class="relative inline-flex size-2.5 rounded-full bg-blue-500"></span>
+											<span class="relative inline-flex size-2.5 rounded-full bg-primary"></span>
 										</span>
 									{/if}
 								{/snippet}

@@ -79,7 +79,7 @@ function getDaemonSetUISchemas(): Record<DaemonSetAttribute, UISchemaType> {
 		Namespace: 'text',
 		Desired: 'text',
 		Current: 'text',
-		Ready: 'text',
+		Ready: 'status',
 		'Up-To-Date': 'text',
 		Available: 'text',
 		'Node Selector': 'array-of-object',

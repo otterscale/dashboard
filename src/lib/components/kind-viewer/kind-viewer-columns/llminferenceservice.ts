@@ -94,7 +94,7 @@ function getLLMInferenceServiceUISchemas(): Record<LLMInferenceServiceAttribute,
 		'Model URI': 'text',
 		Templates: 'array-of-object',
 		Mode: 'text',
-		Status: 'text',
+		Status: 'status',
 		Age: 'time',
 		raw: 'object'
 	};

@@ -34,20 +34,28 @@ function persistentWritable<T>(key: string, initialValue: T): Writable<T> {
 	return store;
 }
 
+// `simple` speaks the user's language and hides Kubernetes internals;
+// `advanced` shows the system as-is for operators who want to work close to it.
+export type ViewMode = 'simple' | 'advanced';
+
 interface AppStores {
 	// Navigation
 	breadcrumbs: Writable<Path[]>;
 
 	// Role
 	role: Writable<string>;
+
+	// Presentation
+	viewMode: Writable<ViewMode>;
 }
 
 // Create stores
 const createStores = (): AppStores => ({
 	breadcrumbs: writable<Path[]>([{ title: m.home(), url: resolve('/') }]),
 	// Persistent role store
-	role: persistentWritable<string>('otterscale:role', '')
+	role: persistentWritable<string>('otterscale:role', ''),
+	viewMode: persistentWritable<ViewMode>('otterscale:view-mode', 'simple')
 });
 
 // Export individual stores
-export const { breadcrumbs, role } = createStores();
+export const { breadcrumbs, role, viewMode } = createStores();

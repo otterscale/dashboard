@@ -99,7 +99,7 @@ function getDataVolumeUISchemas(): Record<DataVolumeAttribute, UISchemaType> {
 	return {
 		Name: 'link',
 		Namespace: 'text',
-		Phase: 'text',
+		Phase: 'status',
 		Progress: 'text',
 		Storage: 'text',
 		Source: 'text',

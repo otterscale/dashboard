@@ -65,7 +65,7 @@ function getHelmReleaseUISchemas(): Record<HelmReleaseAttribute, UISchemaType> {
 		Repository: 'text',
 		'Helm Chart': 'text',
 		Version: 'text',
-		Ready: 'text',
+		Ready: 'status',
 		Reason: 'text',
 		Message: 'text',
 		Age: 'time',

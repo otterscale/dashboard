@@ -73,8 +73,8 @@ function getVirtualMachineUISchemas(): Record<VirtualMachineAttribute, UISchemaT
 	return {
 		Name: 'link',
 		Namespace: 'text',
-		Status: 'text',
-		Ready: 'text',
+		Status: 'status',
+		Ready: 'status',
 		Running: 'text',
 		'Instance Type': 'text',
 		Age: 'time',

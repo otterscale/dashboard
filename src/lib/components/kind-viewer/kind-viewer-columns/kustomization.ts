@@ -72,7 +72,7 @@ function getKustomizationUISchemas(): Record<KustomizationAttribute, UISchemaTyp
 		Path: 'text',
 		Revision: 'text',
 		Interval: 'text',
-		Status: 'text',
+		Status: 'status',
 		Reason: 'text',
 		Age: 'time',
 		raw: 'object'

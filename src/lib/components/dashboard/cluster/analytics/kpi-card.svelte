@@ -33,7 +33,7 @@
 
 <Card.Root class="relative h-full min-h-[140px] gap-2 overflow-hidden">
 	<Icon
-		class="pointer-events-none absolute -right-10 bottom-0 size-36 text-primary/5"
+		class="pointer-events-none absolute -right-10 bottom-0 size-36 text-foreground/[0.04]"
 		aria-hidden="true"
 	/>
 	<Card.Header class="flex flex-row items-center gap-2 space-y-0">

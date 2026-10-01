@@ -66,7 +66,7 @@ function getPVUISchemas(): Record<PVAttribute, UISchemaType> {
 		Capacity: 'text',
 		'Access Modes': 'text',
 		'Reclaim Policy': 'text',
-		Status: 'text',
+		Status: 'status',
 		Claim: 'text',
 		'Storage Class': 'text',
 		Age: 'time',

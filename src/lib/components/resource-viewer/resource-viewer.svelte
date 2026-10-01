@@ -30,6 +30,8 @@
 	import * as Item from '$lib/components/ui/item';
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
+	import { m } from '$lib/messages';
+	import { viewMode } from '$lib/stores';
 
 	import Conditions from './related-inforamtion/conditions.svelte';
 	import Events from './related-inforamtion/evens.svelte';
@@ -190,14 +192,23 @@
 
 	type Tab = { value: string; label: string; searchable: boolean };
 	let selectedTab = $state('related-resource');
+	// The raw manifest is for operators; simple mode leaves it to advanced mode.
 	const tabs = $derived(
-		[
-			{ value: 'related-resource', label: 'Related Resources', searchable: true },
-			hasConditions ? { value: 'condition', label: 'Conditions', searchable: true } : null,
-			hasEvents ? { value: 'event', label: 'Recent Events', searchable: true } : null,
-			{ value: 'manifest', label: 'Manifest', searchable: false }
-		].filter((tab): tab is Tab => tab !== null)
+		(
+			[
+				{ value: 'related-resource', label: m.tab_related_resources(), searchable: true },
+				hasConditions ? { value: 'condition', label: m.tab_conditions(), searchable: true } : null,
+				hasEvents ? { value: 'event', label: m.tab_recent_events(), searchable: true } : null,
+				$viewMode === 'advanced'
+					? { value: 'manifest', label: m.tab_manifest(), searchable: false }
+					: null
+			] as (Tab | null)[]
+		).filter((tab): tab is Tab => tab !== null)
 	);
+	// Switching to simple mode while on a tab it hides would leave nothing selected.
+	$effect(() => {
+		if (!tabs.some((tab) => tab.value === selectedTab)) selectedTab = tabs[0].value;
+	});
 	// One search box in the toolbar serves whichever tab is active; each tab keeps its own term.
 	let filters: Record<string, string> = $state({});
 	const activeFilter = $derived(filters[selectedTab] ?? '');
@@ -335,35 +346,38 @@
 			</Item.Root>
 			<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
 				{#if object?.metadata}
-					{@const Metadatacluster = { key: 'Cluster', value: cluster, data: cluster }}
+					{@const Metadatacluster = { key: m.field_cluster(), value: cluster, data: cluster }}
 					{@const MetadataNamespace = {
-						key: 'Namespace',
+						key: m.field_namespace(),
 						value: namespace,
 						data: namespace
 					}}
 					{@const MetadataCreationTimestamp = {
-						key: 'Creation Timestamp',
+						key: m.field_created_at(),
 						value: object.metadata?.creationTimestamp
 							? new Date(object.metadata?.creationTimestamp).toLocaleString('sv-SE')
 							: '',
 						data: object.metadata?.creationTimestamp
 					}}
 					{@const MetadataGeneration = {
-						key: 'Generation',
+						key: m.field_generation(),
 						value: object.metadata?.generation,
+						advanced: true,
 						data: object.metadata?.generation
 					}}
 					{@const MetadataLabels = {
-						key: 'Labels' as const,
+						key: m.field_labels(),
 						value: Object.keys(object.metadata?.labels ?? {}).length,
+						advanced: true,
 						data: object.metadata?.labels
 					}}
 					{@const MetadataAnnotations = {
-						key: 'Annotations' as const,
+						key: m.field_annotations(),
 						value: Object.keys(object.metadata?.annotations ?? {}).length,
+						advanced: true,
 						data: object.metadata?.annotations
 					}}
-					{#each [Metadatacluster, MetadataNamespace, MetadataCreationTimestamp, MetadataGeneration, MetadataLabels, MetadataAnnotations].filter((metadata) => metadata.value) as metadata, index (index)}
+					{#each [Metadatacluster, MetadataNamespace, MetadataCreationTimestamp, MetadataGeneration, MetadataLabels, MetadataAnnotations].filter((metadata) => metadata.value && ($viewMode === 'advanced' || !('advanced' in metadata))) as metadata, index (index)}
 						<Item.Root class="p-0">
 							<Item.Content>
 								<Item.Description>
@@ -414,9 +428,11 @@
 						</InputGroup.Root>
 					{/if}
 				</div>
-				<Tabs.Content value="manifest">
-					<Manifest {object} />
-				</Tabs.Content>
+				{#if $viewMode === 'advanced'}
+					<Tabs.Content value="manifest">
+						<Manifest {object} />
+					</Tabs.Content>
+				{/if}
 				{#if hasConditions}
 					<Tabs.Content value="condition">
 						<Conditions {object} filter={filters.condition ?? ''} />

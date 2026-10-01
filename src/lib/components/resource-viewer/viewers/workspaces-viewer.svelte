@@ -575,7 +575,7 @@
 													</Item.Title>
 													<Item.Description>
 														{#each Object.entries(values) as [key, value], index (index)}
-															<p class="font-mono text-primary">{key}:{value}</p>
+															<p class="font-mono text-foreground">{key}:{value}</p>
 														{/each}
 													</Item.Description>
 												</Item.Content>

@@ -20,6 +20,7 @@
 	} from './dynamic-table-cells/object-of-key-value-cell.svelte';
 	import QuantityCell, { type QuantityMetadata } from './dynamic-table-cells/quantity-cell.svelte';
 	import RatioCell, { type RatioMetadata } from './dynamic-table-cells/ratio-cell.svelte';
+	import StatusCell from './dynamic-table-cells/status-cell.svelte';
 	import TextCell from './dynamic-table-cells/text-cell.svelte';
 	import TimeCell from './dynamic-table-cells/time-cell.svelte';
 	import type { UISchemaType } from './utils';
@@ -67,6 +68,8 @@
 	<ObjectOfKeyValueCell {row} {column} metadata={metadata as ObjectOfKeyValueMetadata} />
 {:else if uiSchema === 'ratio'}
 	<RatioCell {row} {column} metadata={metadata as RatioMetadata} />
+{:else if uiSchema === 'status'}
+	<StatusCell {row} {column} />
 {:else if uiSchema === 'text'}
 	<TextCell {row} {column} />
 {:else if uiSchema === 'time'}

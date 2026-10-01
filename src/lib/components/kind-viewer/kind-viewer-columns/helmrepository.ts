@@ -67,7 +67,7 @@ function getHelmRepositoryUISchemas(): Record<HelmRepositoryAttribute, UISchemaT
 		Type: 'text',
 		URL: 'text',
 		Interval: 'text',
-		Status: 'text',
+		Status: 'status',
 		Reason: 'text',
 		Age: 'time',
 		raw: 'object'

@@ -64,24 +64,29 @@
 		{ label: platformLabel, icon: LayersIcon, items: platformItems },
 		{ label: kubernetesLabel, icon: SquareTerminalIcon, items: kubernetesItems }
 	]);
-	const currentView = $derived(views[activeIndex]);
+	// Simple mode hands in no Kubernetes items: there is nothing to switch to,
+	// so the switcher goes and the platform view stays put.
+	const hasKubernetesView = $derived(kubernetesItems.length > 0);
+	const currentView = $derived(hasKubernetesView ? views[activeIndex] : views[0]);
 </script>
 
-<Sidebar.Group>
-	<Tabs.Root
-		value={String(activeIndex)}
-		onValueChange={(value) => (activeIndex = Number(value))}
-		class="group-data-[collapsible=icon]:hidden"
-	>
-		<Tabs.List class="w-full">
-			{#each views as view, index (index)}
-				<Tabs.Trigger value={String(index)}>
-					{view.label}
-				</Tabs.Trigger>
-			{/each}
-		</Tabs.List>
-	</Tabs.Root>
-</Sidebar.Group>
+{#if hasKubernetesView}
+	<Sidebar.Group>
+		<Tabs.Root
+			value={String(activeIndex)}
+			onValueChange={(value) => (activeIndex = Number(value))}
+			class="group-data-[collapsible=icon]:hidden"
+		>
+			<Tabs.List class="w-full">
+				{#each views as view, index (index)}
+					<Tabs.Trigger value={String(index)}>
+						{view.label}
+					</Tabs.Trigger>
+				{/each}
+			</Tabs.List>
+		</Tabs.Root>
+	</Sidebar.Group>
+{/if}
 
 <Sidebar.Group>
 	<Sidebar.Menu>

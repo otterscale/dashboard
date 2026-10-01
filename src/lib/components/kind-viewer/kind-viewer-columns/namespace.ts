@@ -36,7 +36,7 @@ function getNamespaceData(object: CoreV1Namespace): Record<NamespaceAttribute, J
 function getNamespaceUISchemas(): Record<NamespaceAttribute, UISchemaType> {
 	return {
 		Name: 'link',
-		Status: 'text',
+		Status: 'status',
 		Age: 'time',
 		raw: 'object'
 	};

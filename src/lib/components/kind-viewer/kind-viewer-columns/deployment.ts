@@ -69,7 +69,7 @@ function getDeploymentUISchemas(): Record<DeploymentAttribute, UISchemaType> {
 	return {
 		Name: 'link',
 		Namespace: 'text',
-		Ready: 'text',
+		Ready: 'status',
 		'Up-To-Date': 'text',
 		Available: 'text',
 		Age: 'time',

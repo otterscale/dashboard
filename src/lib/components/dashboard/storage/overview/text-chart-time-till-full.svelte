@@ -93,7 +93,7 @@
 
 <Card.Root class="relative h-full min-h-[140px] gap-2 overflow-hidden">
 	<ClockIcon
-		class="absolute -right-10 bottom-0 size-36 text-8xl tracking-tight text-nowrap text-primary/5 uppercase group-hover:hidden"
+		class="absolute -right-10 bottom-0 size-36 text-8xl tracking-tight text-nowrap text-foreground/[0.04] uppercase group-hover:hidden"
 	/>
 	<Card.Header class="items-center">
 		<Card.Title>{CHART_TITLE}</Card.Title>

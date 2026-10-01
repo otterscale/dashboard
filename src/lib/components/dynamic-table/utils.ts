@@ -280,6 +280,7 @@ type UISchemaType =
 	| 'object-of-key-value'
 	| 'link'
 	| 'ratio'
+	| 'status'
 	| undefined;
 function getDefaultUISchema(type: JsonValue, format?: JsonValue): UISchemaType {
 	if (type === 'boolean') {

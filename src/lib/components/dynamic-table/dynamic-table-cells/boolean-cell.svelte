@@ -16,7 +16,7 @@
 </script>
 
 {#if data === true}
-	<CircleIcon class="inline-block size-4 text-primary" />
+	<CircleIcon class="inline-block size-4 text-foreground" />
 {:else if data === false}
 	<XIcon class="inline-block size-4 text-destructive" />
 {/if}

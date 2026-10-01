@@ -62,7 +62,7 @@ function getPVCUISchemas(): Record<PVCAttribute, UISchemaType> {
 	return {
 		Name: 'link',
 		Namespace: 'text',
-		Status: 'text',
+		Status: 'status',
 		Volume: 'text',
 		Capacity: 'text',
 		'Access Modes': 'text',

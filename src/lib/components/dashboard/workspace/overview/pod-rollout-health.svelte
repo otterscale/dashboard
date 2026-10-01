@@ -174,7 +174,7 @@
 	class="group relative overflow-hidden border-border/80 bg-card/50 shadow-sm ring-1 ring-border/40"
 >
 	<BriefcaseMedical
-		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"
+		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-foreground/[0.04] transition-opacity group-hover:text-primary/[0.09] md:size-40"
 		aria-hidden="true"
 	/>
 	<Card.Header class="relative space-y-2 pb-2">

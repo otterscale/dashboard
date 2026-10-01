@@ -16,6 +16,7 @@
 		object: 'center',
 		link: 'start',
 		ratio: 'end',
+		status: 'start',
 		quantity: 'end',
 		'array-of-enumeration': 'center',
 		'object-of-key-value': 'center'
@@ -99,8 +100,10 @@
 	import { Select, SelectContent, SelectItem, SelectTrigger } from '$lib/components/ui/select';
 	import * as Table from '$lib/components/ui/table';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { viewMode } from '$lib/stores';
 	import { cn } from '$lib/utils';
 
+	import { getColumnLabel, isTechnicalColumn } from './column-labels';
 	import DynamicTableSearchDocument from './dynamic-table-search-document.svelte';
 	import type { TableMode, TableState } from './table-state.svelte';
 
@@ -189,11 +192,15 @@
 	const columnIds = $derived(
 		new Set(columnDefinitions.map(getColumnId).filter((id): id is string => id != null))
 	);
+	// Simple mode starts from a quieter table by also hiding Kubernetes plumbing;
+	// it only moves the default, so a viewer's own column choice still wins.
 	const defaultHiddenColumnIds = $derived(
 		columnDefinitions
 			.filter(
 				(columnDefinition) =>
-					(columnDefinition.meta as { defaultHidden?: boolean } | undefined)?.defaultHidden === true
+					(columnDefinition.meta as { defaultHidden?: boolean } | undefined)?.defaultHidden ===
+						true ||
+					($viewMode === 'simple' && isTechnicalColumn(getColumnId(columnDefinition) ?? ''))
 			)
 			.map(getColumnId)
 			.filter((columnId): columnId is string => columnId != null)
@@ -587,13 +594,13 @@
 						.filter((column) => column.getCanHide()) as column (column.id)}
 						<DropdownMenu.Item
 							class={column.getIsVisible()
-								? 'text-primary **:text-primary'
+								? 'text-foreground'
 								: 'text-muted-foreground/50 **:text-muted-foreground/50'}
 							closeOnSelect={false}
 							onSelect={() => column.toggleVisibility(!column.getIsVisible())}
 						>
 							<CheckIcon class={column.getIsVisible() ? 'visible' : 'invisible'} />
-							{column.id}
+							{$viewMode === 'simple' ? getColumnLabel(column.id) : column.id}
 						</DropdownMenu.Item>
 					{/each}
 				</DropdownMenu.Content>
@@ -750,7 +757,7 @@
 {#snippet tableLayout()}
 	<div class="overflow-hidden rounded-md border bg-background">
 		<Table.Root class="table-fixed">
-			<Table.Header class="bg-muted">
+			<Table.Header class="bg-muted/50 text-xs text-muted-foreground">
 				{#each table.getHeaderGroups() as headerGroup (headerGroup.id)}
 					{@const totalSize = headerGroup.headers.reduce(
 						(accumulation, head) => accumulation + head.getSize(),

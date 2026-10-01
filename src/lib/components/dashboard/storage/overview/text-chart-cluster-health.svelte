@@ -119,7 +119,7 @@
 		{@const healthStatus = HEALTH_STATUS[response as keyof typeof HEALTH_STATUS]}
 		{@const HealthIcon = healthStatus.icon}
 		<HealthIcon
-			class="absolute size-36 text-8xl tracking-tight text-nowrap text-primary/5 uppercase group-hover:hidden {healthStatus.iconClass}"
+			class="absolute size-36 text-8xl tracking-tight text-nowrap text-foreground/[0.04] uppercase group-hover:hidden {healthStatus.iconClass}"
 		/>
 		<Card.Header class="items-center">
 			<Card.Title>{CHART_TITLE}</Card.Title>

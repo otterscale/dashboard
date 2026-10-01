@@ -69,8 +69,8 @@ function getApplicationUISchemas(): Record<ApplicationAttribute, UISchemaType> {
 	return {
 		Name: 'link',
 		Namespace: 'text',
-		State: 'text',
-		Ready: 'text',
+		State: 'status',
+		Ready: 'status',
 		ServiceType: 'text',
 		ServicePort: 'text',
 		Age: 'time',

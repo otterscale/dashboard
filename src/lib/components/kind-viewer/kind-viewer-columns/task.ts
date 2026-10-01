@@ -73,9 +73,9 @@ function getTaskUISchemas(): Record<TaskAttribute, UISchemaType> {
 	return {
 		Name: 'link',
 		Namespace: 'text',
-		State: 'text',
-		Ready: 'text',
-		Status: 'text',
+		State: 'status',
+		Ready: 'status',
+		Status: 'status',
 		Suspend: 'text',
 		Completions: 'text',
 		Age: 'time',

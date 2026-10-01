@@ -165,7 +165,7 @@
 
 <Card.Root class="group relative h-full min-h-[280px] gap-2 overflow-hidden">
 	<HeartPulse
-		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"
+		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-foreground/[0.04] transition-opacity group-hover:text-primary/[0.09] md:size-40"
 		aria-hidden="true"
 	/>
 	<Card.Header>

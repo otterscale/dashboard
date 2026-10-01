@@ -4,4 +4,5 @@ export { default as NavSecondary } from './nav-secondary.svelte';
 export { default as NavUser } from './nav-user.svelte';
 export { default as NotificationTrigger } from './notification-trigger.svelte';
 export * from './start-tour';
+export { default as ViewModeToggle } from './view-mode-toggle.svelte';
 export { default as WorkspaceSwitcher } from './workspace-switcher.svelte';

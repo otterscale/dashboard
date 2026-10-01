@@ -86,7 +86,7 @@ function getNodeData(object: CoreV1Node): Record<NodeAttribute, JsonValue> {
 function getNodeUISchemas(): Record<NodeAttribute, UISchemaType> {
 	return {
 		Name: 'link',
-		Status: 'text',
+		Status: 'status',
 		Roles: 'text',
 		Age: 'time',
 		Version: 'text',

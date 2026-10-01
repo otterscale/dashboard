@@ -75,7 +75,7 @@ function getGitRepositoryUISchemas(): Record<GitRepositoryAttribute, UISchemaTyp
 		URL: 'text',
 		Reference: 'text',
 		Interval: 'text',
-		Status: 'text',
+		Status: 'status',
 		Reason: 'text',
 		Age: 'time',
 		raw: 'object'
