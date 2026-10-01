@@ -3,7 +3,7 @@
 	import type { Schema } from '@sjsf/form';
 	import { type ValidateFunction } from 'ajv';
 
-	import type { ResourceRuleVerbs } from '$lib/components/resources/types';
+	import type { ResourceRuleVerbs } from '$lib/components/api-resources-viewer/types';
 
 	let {
 		schema,

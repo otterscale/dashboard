@@ -1,6 +1,20 @@
 import { redirect } from '@sveltejs/kit';
 
+import { env } from '$env/dynamic/private';
+
 import type { LayoutServerLoad } from './$types';
+
+/**
+ * Whether the import-cluster wizard's `curl` needs `-k`.
+ *
+ * NODE_EXTRA_CA_CERTS is set exactly when this dashboard had to be told about a
+ * private CA to reach the otterscale API at all. The values URL the wizard hands
+ * out is served by that same API, so the operator's `curl` meets the same
+ * certificate — without a bundle to point at, since `helm install -f <url>`
+ * accepts no TLS options. It is a real process env var read at Node startup, so
+ * it can only be observed here, not from the browser.
+ */
+const agentValuesInsecureTLS = Boolean(env.NODE_EXTRA_CA_CERTS);
 
 export const load: LayoutServerLoad = async ({ locals, params, fetch }) => {
 	const user = locals.session?.user;
@@ -17,7 +31,7 @@ export const load: LayoutServerLoad = async ({ locals, params, fetch }) => {
 		console.error('Failed to verify admin status:', error);
 	}
 
-	return { user, isClusterAdmin };
+	return { user, isClusterAdmin, agentValuesInsecureTLS };
 };
 
 async function verifyClusterAdminStatus(

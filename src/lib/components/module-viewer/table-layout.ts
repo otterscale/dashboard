@@ -89,7 +89,7 @@ function getChartData(
 		Type: module.type ?? null,
 		Labels: (module.keywords ?? []) as JsonValue,
 		Installed: installedModuleNames.has(module.name ?? ''),
-		annotations: module?.annotations as JsonValue,
+		annotations: (module.annotations ?? {}) as JsonValue,
 		icon: module.icon as JsonValue,
 		helmRepository: helmRepository as JsonValue,
 		chart: module as unknown as JsonValue,

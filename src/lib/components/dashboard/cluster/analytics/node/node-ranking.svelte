@@ -8,7 +8,7 @@
 
 	// Single-value node rankings complementing the CPU/Memory pressure cards. `pods` and
 	// `restart` are kube-state-metrics joined to `kube_pod_info` for the `node` label;
-	// `gpu` ranks by avg GPU utilisation, keyed by DCGM `Hostname` (== node name). All three
+	// `gpu` ranks by avg GPU utilisation, keyed by DCGM `hostname` (== node name). All three
 	// label values feed the same node drill-in click.
 	let {
 		prometheusDriver,
@@ -36,10 +36,10 @@
 				// `> 0` keeps the chart to nodes that actually had restarts — empty is the healthy state.
 				return `sum(increase(kube_pod_container_status_restarts_total[1h]) * on(namespace,pod) group_left(node) kube_pod_info) by (node) > 0`;
 			case 'gpu':
-				return `avg by(Hostname) (DCGM_FI_DEV_GPU_UTIL)`;
+				return `avg by(hostname) (DCGM_FI_DEV_GPU_UTIL)`;
 		}
 	});
-	const labelKey = $derived(kind === 'gpu' ? 'Hostname' : 'node');
+	const labelKey = $derived(kind === 'gpu' ? 'hostname' : 'node');
 
 	let bars = $state<TopBar[]>([]);
 	let isLoaded = $state(false);

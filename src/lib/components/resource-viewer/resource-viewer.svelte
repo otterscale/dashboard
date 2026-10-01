@@ -32,8 +32,8 @@
 	import * as Tabs from '$lib/components/ui/tabs/index.js';
 
 	import Conditions from './related-inforamtion/conditions.svelte';
-	import Yaml from './related-inforamtion/data.svelte';
 	import Events from './related-inforamtion/evens.svelte';
+	import Manifest from './related-inforamtion/manifest.svelte';
 	import RelatedResources from './related-inforamtion/related-resources.svelte';
 	import type { Resource } from './types';
 
@@ -195,7 +195,7 @@
 			{ value: 'related-resource', label: 'Related Resources', searchable: true },
 			hasConditions ? { value: 'condition', label: 'Conditions', searchable: true } : null,
 			hasEvents ? { value: 'event', label: 'Recent Events', searchable: true } : null,
-			{ value: 'data', label: 'Data', searchable: false }
+			{ value: 'manifest', label: 'Manifest', searchable: false }
 		].filter((tab): tab is Tab => tab !== null)
 	);
 	// One search box in the toolbar serves whichever tab is active; each tab keeps its own term.
@@ -378,8 +378,8 @@
 				{/if}
 			</div>
 		</Field.Set>
-		<Field.Set>
-			<Tabs.Root bind:value={selectedTab} class="w-full gap-4">
+		<Field.Set class="min-w-0">
+			<Tabs.Root bind:value={selectedTab} class="w-full min-w-0 gap-4">
 				<div class="flex flex-wrap items-center justify-between gap-2">
 					<Tabs.List>
 						{#each tabs as tab (tab.value)}
@@ -414,8 +414,8 @@
 						</InputGroup.Root>
 					{/if}
 				</div>
-				<Tabs.Content value="data">
-					<Yaml {object} />
+				<Tabs.Content value="manifest">
+					<Manifest {object} />
 				</Tabs.Content>
 				{#if hasConditions}
 					<Tabs.Content value="condition">
