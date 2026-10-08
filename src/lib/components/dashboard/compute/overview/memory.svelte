@@ -46,7 +46,7 @@
 		const rangeEnd = new Date(endMs);
 		const step = computeStep(start.getTime(), endMs);
 		const response = await prometheusDriver.rangeQuery(
-			`avg(kubevirt_vmi_memory_resident_bytes{exported_namespace="${namespace}"}) / avg(kubevirt_vmi_memory_domain_bytes{exported_namespace="${namespace}"})`,
+			`avg(kubevirt_vmi_memory_resident_bytes{namespace="${namespace}"}) / avg(kubevirt_vmi_memory_domain_bytes{namespace="${namespace}"})`,
 			start,
 			rangeEnd,
 			step

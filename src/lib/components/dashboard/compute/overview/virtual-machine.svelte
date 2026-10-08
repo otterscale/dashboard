@@ -19,7 +19,7 @@
 	let virtualMachines: SampleValue | undefined = $state(undefined);
 	async function fetchVirtualMachines() {
 		const response = await prometheusDriver.instantQuery(
-			`count(kubevirt_vm_starting_status_last_transition_timestamp_seconds{exported_namespace="${namespace}"})`
+			`count(kubevirt_vm_starting_status_last_transition_timestamp_seconds{namespace="${namespace}"})`
 		);
 		virtualMachines = response.result[0]?.value ?? undefined;
 	}

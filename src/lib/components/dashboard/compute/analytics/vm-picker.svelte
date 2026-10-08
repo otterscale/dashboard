@@ -74,7 +74,7 @@
 			isLoaded = false;
 			try {
 				const response = await prometheusDriver.instantQuery(
-					`kubevirt_vmi_info{` + (ns ? `exported_namespace="${ns}"` : '') + `}`
+					`kubevirt_vmi_info{` + (ns ? `namespace="${ns}"` : '') + `}`
 				);
 				if (cancelled) return;
 				const series = (response.result ?? []) as {
