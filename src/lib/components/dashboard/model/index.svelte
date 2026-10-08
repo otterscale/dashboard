@@ -1,6 +1,6 @@
 <script lang="ts">
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
-	import { PrometheusDriver } from 'prometheus-query';
+	import type { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import {
@@ -18,12 +18,14 @@
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/messages';
+	import { workspacePrometheusDriver } from '$lib/prometheus';
 
 	let {
 		cluster,
 		currentWorkspace = '',
 		defaultNamespace = '',
-		isClusterAdmin = false
+		isClusterAdmin = false,
+		canViewClusterMetrics = false
 	}: {
 		cluster: string;
 		/** Name of the currently active workspace (for default picker selection) */
@@ -31,6 +33,7 @@
 		/** Workspace namespace used as initial namespace state */
 		defaultNamespace?: string;
 		isClusterAdmin?: boolean;
+		canViewClusterMetrics?: boolean;
 	} = $props();
 
 	let isReloading = $state(true);
@@ -60,13 +63,11 @@
 
 	onMount(async () => {
 		try {
-			prometheusDriver = new PrometheusDriver({
-				endpoint: `/proxy/${cluster}/prometheus`,
-				baseURL: '/api/v1',
-				headers: {
-					'x-proxy-target': 'api'
-				}
-			});
+			prometheusDriver = workspacePrometheusDriver(
+				cluster,
+				defaultNamespace,
+				canViewClusterMetrics
+			);
 		} catch (error) {
 			console.error('Failed to initialize Prometheus driver:', error);
 		}
@@ -153,6 +154,7 @@
 								{start}
 								{end}
 								endIsNow={pickerToIsNow}
+								{canViewClusterMetrics}
 								bind:isReloading
 							/>
 						{/key}

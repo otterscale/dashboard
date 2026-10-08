@@ -23,11 +23,14 @@
 		prometheusDriver,
 		namespace,
 		selectedModel,
+		canViewClusterMetrics = false,
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		namespace: string | undefined;
 		selectedModel: string;
+		/** XID comes from DCGM, which carries the exporter's namespace: cluster scope only. */
+		canViewClusterMetrics?: boolean;
 		isReloading: boolean;
 	} = $props();
 
@@ -111,6 +114,32 @@
 		return exitcode === 135;
 	}
 
+	/** XID errors on the GPUs of the nodes the model runs on, from DCGM. */
+	async function fetchXid(nodes: string[]): Promise<{ total: number; byGpu: GpuEntry[] }> {
+		if (nodes.length === 0) return { total: 0, byGpu: [] };
+		const regex = escapePromqlStringLiteral(nodes.map(regexEscape).join('|'));
+		const selector = `{hostname=~"${regex}"}`;
+		const xid = await fetchCombinedInstant(prometheusDriver, {
+			total: `sum(increase(DCGM_FI_DEV_XID_ERRORS${selector}[24h]))`,
+			perGpu: `sum by(hostname, gpu) (increase(DCGM_FI_DEV_XID_ERRORS${selector}[24h])) > 0`
+		});
+		const total = Math.round(scalarFromVectors(xid.total));
+		const byGpu = xid.perGpu
+			.map((v) => {
+				const labels = v.metric.labels as Record<string, string>;
+				const value = Number(v.value?.value);
+				if (!Number.isFinite(value)) return null;
+				return {
+					hostname: labels.hostname ?? '(unknown)',
+					gpu: labels.gpu ?? '?',
+					value
+				};
+			})
+			.filter((x): x is GpuEntry => x !== null)
+			.sort((a, b) => b.value - a.value);
+		return { total, byGpu };
+	}
+
 	async function fetch() {
 		const cs = containerSelector();
 		const join = modelJoin();
@@ -135,31 +164,11 @@
 		const nodesPromise = fetchModelNodes(prometheusDriver, namespace, selectedModel);
 
 		// Kick off XID as soon as nodes resolves, in parallel with the main batch —
-		// it only needs `nodes`, not the full set of cluster-wide queries.
-		const xidPromise = nodesPromise.then(async (nodes) => {
-			if (nodes.length === 0) return { total: 0, byGpu: [] as GpuEntry[] };
-			const regex = escapePromqlStringLiteral(nodes.map(regexEscape).join('|'));
-			const selector = `{hostname=~"${regex}"}`;
-			const xid = await fetchCombinedInstant(prometheusDriver, {
-				total: `sum(increase(DCGM_FI_DEV_XID_ERRORS${selector}[24h]))`,
-				perGpu: `sum by(hostname, gpu) (increase(DCGM_FI_DEV_XID_ERRORS${selector}[24h])) > 0`
-			});
-			const total = Math.round(scalarFromVectors(xid.total));
-			const byGpu = xid.perGpu
-				.map((v) => {
-					const labels = v.metric.labels as Record<string, string>;
-					const value = Number(v.value?.value);
-					if (!Number.isFinite(value)) return null;
-					return {
-						hostname: labels.hostname ?? '(unknown)',
-						gpu: labels.gpu ?? '?',
-						value
-					};
-				})
-				.filter((x): x is GpuEntry => x !== null)
-				.sort((a, b) => b.value - a.value);
-			return { total, byGpu };
-		});
+		// it only needs `nodes`, not the full set of cluster-wide queries. Viewers without
+		// cluster metrics access never see the tile, so they never send the DCGM query.
+		const xidPromise = canViewClusterMetrics
+			? nodesPromise.then(fetchXid)
+			: Promise.resolve({ total: 0, byGpu: [] as GpuEntry[] });
 
 		const [main, nodes, xid] = await Promise.all([
 			fetchCombinedInstant(prometheusDriver, mainQueries),
@@ -251,7 +260,8 @@
 			</div>
 		{:else}
 			<!-- Six tiles, two per row: the card sits in a quarter-width column, so three abreast
-			     would squeeze the labels. Each tile's colour is its own status; there is no roll-up. -->
+			     would squeeze the labels. Each tile's colour is its own status; there is no roll-up.
+			     Without cluster metrics access there are five: XID is DCGM, cluster scope only. -->
 			<div class="grid h-65 grid-cols-2 place-content-center gap-x-2 gap-y-5">
 				<Tooltip.Root>
 					<Tooltip.Trigger>
@@ -303,35 +313,37 @@
 					{/if}
 				</Tooltip.Root>
 
-				<Tooltip.Root>
-					<Tooltip.Trigger>
-						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-2xl font-bold tabular-nums', valueColorClass(xidLevel))}>
-								{nodeCount === 0 ? '—' : xidTotal}
-							</p>
-							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-								{m.metric_xid()}
-							</p>
-						</div>
-					</Tooltip.Trigger>
-					{#if nodeCount === 0}
-						<Tooltip.Content side="bottom">
-							<p class="text-xs">{m.no_gpu_for_model()}</p>
-						</Tooltip.Content>
-					{:else if xidByGpu.length > 0}
-						<Tooltip.Content side="bottom">
-							<ul class="flex max-h-40 flex-col gap-1 overflow-y-auto text-xs">
-								{#each xidByGpu as g (g.hostname + g.gpu)}
-									<li class="flex items-center gap-2">
-										<span class="truncate" title={g.hostname}>{g.hostname}</span>
-										<span class="text-muted-foreground">GPU{g.gpu}</span>
-										<span class="ml-auto font-mono tabular-nums">{Math.round(g.value)}</span>
-									</li>
-								{/each}
-							</ul>
-						</Tooltip.Content>
-					{/if}
-				</Tooltip.Root>
+				{#if canViewClusterMetrics}
+					<Tooltip.Root>
+						<Tooltip.Trigger>
+							<div class="flex flex-col items-center gap-1">
+								<p class={cn('text-2xl font-bold tabular-nums', valueColorClass(xidLevel))}>
+									{nodeCount === 0 ? '—' : xidTotal}
+								</p>
+								<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
+									{m.metric_xid()}
+								</p>
+							</div>
+						</Tooltip.Trigger>
+						{#if nodeCount === 0}
+							<Tooltip.Content side="bottom">
+								<p class="text-xs">{m.no_gpu_for_model()}</p>
+							</Tooltip.Content>
+						{:else if xidByGpu.length > 0}
+							<Tooltip.Content side="bottom">
+								<ul class="flex max-h-40 flex-col gap-1 overflow-y-auto text-xs">
+									{#each xidByGpu as g (g.hostname + g.gpu)}
+										<li class="flex items-center gap-2">
+											<span class="truncate" title={g.hostname}>{g.hostname}</span>
+											<span class="text-muted-foreground">GPU{g.gpu}</span>
+											<span class="ml-auto font-mono tabular-nums">{Math.round(g.value)}</span>
+										</li>
+									{/each}
+								</ul>
+							</Tooltip.Content>
+						{/if}
+					</Tooltip.Root>
+				{/if}
 
 				<Tooltip.Root>
 					<Tooltip.Trigger>

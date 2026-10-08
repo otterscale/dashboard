@@ -31,6 +31,7 @@
 		start,
 		end,
 		endIsNow,
+		canViewClusterMetrics = false,
 		isReloading = $bindable()
 	}: {
 		cluster: string;
@@ -40,6 +41,8 @@
 		start: Date;
 		end: Date;
 		endIsNow: boolean;
+		/** GPU (DCGM) panels are cluster scope: the exporter's namespace, not the tenant's. */
+		canViewClusterMetrics?: boolean;
 		isReloading?: boolean;
 	} = $props();
 
@@ -105,6 +108,7 @@
 						prometheusDriver={client}
 						selectedModel={modelFilter}
 						isReloading={isReloading ?? false}
+						{canViewClusterMetrics}
 					/>
 					<BMemoryUsage
 						{namespace}
@@ -115,15 +119,17 @@
 						{endIsNow}
 						isReloading={isReloading ?? false}
 					/>
-					<BGpuMemory
-						{namespace}
-						prometheusDriver={client}
-						selectedModel={modelFilter}
-						{start}
-						{end}
-						{endIsNow}
-						isReloading={isReloading ?? false}
-					/>
+					{#if canViewClusterMetrics}
+						<BGpuMemory
+							{namespace}
+							prometheusDriver={client}
+							selectedModel={modelFilter}
+							{start}
+							{end}
+							{endIsNow}
+							isReloading={isReloading ?? false}
+						/>
+					{/if}
 				</div>
 			{/if}
 		</section>
