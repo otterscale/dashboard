@@ -19,3 +19,12 @@ export const widgets = [
 	{ key: 'network-traffic', class: 'col-span-6', component: NetworkTraffic, needsNamespace: true },
 	{ key: 'throughput', class: 'col-span-6', component: Throughtput, needsNamespace: true }
 ] satisfies WidgetDefinition[];
+
+/** KubeVirt's own components: cluster-scope numbers a tenant's namespace view cannot show. */
+const clusterScopeWidgetKeys = new Set(['controller', 'worker']);
+
+export function computeOverviewWidgets(canViewClusterMetrics: boolean): WidgetDefinition[] {
+	return canViewClusterMetrics
+		? widgets
+		: widgets.filter((w) => !clusterScopeWidgetKeys.has(w.key));
+}

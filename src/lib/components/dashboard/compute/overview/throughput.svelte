@@ -53,8 +53,8 @@
 			const points = await fetchMultipleFlattenedRange(
 				prometheusDriver,
 				{
-					read: `avg(rate(kubevirt_vmi_storage_read_traffic_bytes_total{exported_namespace="${namespace}"}[5m]))`,
-					write: `avg(rate(kubevirt_vmi_storage_write_traffic_bytes_total{exported_namespace="${namespace}"}[5m]))`
+					read: `avg(rate(kubevirt_vmi_storage_read_traffic_bytes_total{namespace="${namespace}"}[5m]))`,
+					write: `avg(rate(kubevirt_vmi_storage_write_traffic_bytes_total{namespace="${namespace}"}[5m]))`
 				},
 				start,
 				rangeEnd,

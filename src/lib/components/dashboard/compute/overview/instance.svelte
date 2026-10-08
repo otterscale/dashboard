@@ -19,7 +19,7 @@
 	let instances: SampleValue | undefined = $state(undefined);
 	async function fetchInstances() {
 		const response = await prometheusDriver.instantQuery(
-			`count(kubevirt_vmi_info{exported_namespace="${namespace}"})`
+			`count(kubevirt_vmi_info{namespace="${namespace}"})`
 		);
 		instances = response.result[0]?.value ?? undefined;
 	}
