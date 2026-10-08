@@ -19,10 +19,12 @@
 	let {
 		prometheusDriver,
 		namespace,
+		canViewClusterMetrics = false,
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		namespace: string;
+		canViewClusterMetrics?: boolean;
 		isReloading: boolean;
 	} = $props();
 
@@ -51,7 +53,9 @@
 				`sum(kubelet_volume_stats_used_bytes{namespace="${ns}"}) or vector(0)`,
 				evalAt
 			),
-			prometheusDriver.instantQuery(`sum(ceph_cluster_total_bytes) or vector(0)`, evalAt),
+			canViewClusterMetrics
+				? prometheusDriver.instantQuery(`sum(ceph_cluster_total_bytes) or vector(0)`, evalAt)
+				: Promise.resolve(undefined),
 			prometheusDriver.instantQuery(
 				`count(kube_persistentvolumeclaim_info{namespace="${ns}"}) or vector(0)`,
 				evalAt
@@ -67,7 +71,7 @@
 		]);
 		requestedBytes = reqRes.result[0]?.value;
 		usedBytes = usedRes.result[0]?.value;
-		clusterTotalBytes = clusterTotalRes.result[0]?.value;
+		clusterTotalBytes = clusterTotalRes?.result[0]?.value;
 		totalCount = totalRes.result[0]?.value;
 		boundCount = boundRes.result[0]?.value;
 		pendingCount = pendingRes.result[0]?.value;

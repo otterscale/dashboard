@@ -21,5 +21,9 @@
 </script>
 
 {#key cluster + workspace + namespace}
-	<WorkspaceDashboard {cluster} {namespace} />
+	<WorkspaceDashboard
+		{cluster}
+		{namespace}
+		canViewClusterMetrics={page.data.canViewClusterMetrics === true}
+	/>
 {/key}
