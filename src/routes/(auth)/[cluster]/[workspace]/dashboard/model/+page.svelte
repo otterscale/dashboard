@@ -22,6 +22,14 @@
 	const isClusterAdmin = $derived(page.data.isClusterAdmin === true);
 </script>
 
-{#key cluster}
-	<Dashboard {cluster} {defaultNamespace} {isClusterAdmin} {currentWorkspace} />
+<!-- The dashboard reads the Workspace's namespace once, on mount (a regular user's driver is bound
+     to it), so remount it when the Workspace changes instead of querying the previous one. -->
+{#key cluster + currentWorkspace + defaultNamespace}
+	<Dashboard
+		{cluster}
+		{defaultNamespace}
+		{isClusterAdmin}
+		{currentWorkspace}
+		canViewClusterMetrics={page.data.canViewClusterMetrics === true}
+	/>
 {/key}
