@@ -4,6 +4,7 @@
 	import type { Schema } from '@sjsf/form';
 	import type { ValidateFunction } from 'ajv';
 
+	import { page } from '$app/state';
 	import Delete from '$lib/components/kind-viewer/kind-viewer-actions/default/delete.svelte';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import Edit from '$lib/components/kind-viewer/kind-viewer-actions/default/edit.svelte';
@@ -52,20 +53,23 @@
 	<DropdownMenu.Content align="end" class="w-full">
 		<DropdownMenu.Group>
 			<DropdownMenu.Label>Inspect</DropdownMenu.Label>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<GpuAllocation
-					{cluster}
-					{namespace}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
+			<!-- The dialog renders nothing without cluster metrics access; drop its row with it. -->
+			{#if page.data.canViewClusterMetrics === true}
+				<DropdownMenu.Item
+					onSelect={(e) => {
+						e.preventDefault();
 					}}
-				/>
-			</DropdownMenu.Item>
+				>
+					<GpuAllocation
+						{cluster}
+						{namespace}
+						{object}
+						onOpenChangeComplete={() => {
+							actionsOpen = false;
+						}}
+					/>
+				</DropdownMenu.Item>
+			{/if}
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();

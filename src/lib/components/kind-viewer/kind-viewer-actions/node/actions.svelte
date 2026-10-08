@@ -2,6 +2,7 @@
 	import Ellipsis from '@lucide/svelte/icons/ellipsis';
 	import type { Schema } from '@sjsf/form';
 
+	import { page } from '$app/state';
 	import Describe from '$lib/components/kind-viewer/kind-viewer-actions/default/describe.svelte';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Button from '$lib/components/ui/button/button.svelte';
@@ -46,19 +47,22 @@
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Content align="end" class="w-full">
 		<DropdownMenu.Group>
-			<DropdownMenu.Item
-				onSelect={(e) => {
-					e.preventDefault();
-				}}
-			>
-				<GpuAllocation
-					{cluster}
-					{object}
-					onOpenChangeComplete={() => {
-						actionsOpen = false;
+			<!-- The dialog renders nothing without cluster metrics access; drop its row with it. -->
+			{#if page.data.canViewClusterMetrics === true}
+				<DropdownMenu.Item
+					onSelect={(e) => {
+						e.preventDefault();
 					}}
-				/>
-			</DropdownMenu.Item>
+				>
+					<GpuAllocation
+						{cluster}
+						{object}
+						onOpenChangeComplete={() => {
+							actionsOpen = false;
+						}}
+					/>
+				</DropdownMenu.Item>
+			{/if}
 			<DropdownMenu.Item
 				onSelect={(e) => {
 					e.preventDefault();

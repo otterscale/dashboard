@@ -2,12 +2,13 @@
 	import { ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import GpuIcon from '@lucide/svelte/icons/gpu';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import { PrometheusDriver } from 'prometheus-query';
 	import { getContext, type Snippet } from 'svelte';
 
+	import { page } from '$app/state';
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { m } from '$lib/messages';
+	import { clusterPrometheusDriver } from '$lib/prometheus';
 
 	import { fetchLLMInferenceServiceTopology, fetchNodeTopology } from './fetch-topology';
 	import { fetchGpuUtilization } from './fetch-utilization';
@@ -37,6 +38,12 @@
 
 	const name: string = $derived(object?.metadata?.name ?? '');
 
+	/**
+	 * GPU inventory is cluster scope (nodes, DCGM, HAMi): only viewers with cluster metrics
+	 * access get the dialog at all, everyone else gets no trigger and sends no query.
+	 */
+	const canViewClusterMetrics = $derived(page.data.canViewClusterMetrics === true);
+
 	let open = $state(false);
 	let isLoading = $state(false);
 	let error = $state<string | null>(null);
@@ -51,14 +58,10 @@
 	 * only costs the utilization bars — never the allocation view itself.
 	 */
 	async function attachUtilization(data: TopologyData, id: number) {
-		if (data.gpus.length === 0) return;
+		if (!canViewClusterMetrics || data.gpus.length === 0) return;
 
 		try {
-			const prometheus = new PrometheusDriver({
-				endpoint: `/proxy/${cluster}/prometheus`,
-				baseURL: '/api/v1',
-				headers: { 'x-proxy-target': 'api' }
-			});
+			const prometheus = clusterPrometheusDriver(cluster);
 			const utilization = await fetchGpuUtilization(
 				prometheus,
 				data.gpus.map((gpu) => gpu.device.id)
@@ -75,6 +78,7 @@
 	}
 
 	async function fetchData() {
+		if (!canViewClusterMetrics) return;
 		const id = ++requestId;
 		isLoading = true;
 		error = null;
@@ -107,61 +111,63 @@
 	);
 </script>
 
-<Dialog.Root bind:open {onOpenChangeComplete} onOpenChange={handleOpenChange}>
-	<Dialog.Trigger class={trigger ? undefined : 'w-full'}>
-		{#if trigger}
-			{@render trigger()}
-		{:else}
-			<Item.Root class="flex-nowrap p-0 text-xs" size="sm">
-				<Item.Media>
-					<GpuIcon />
-				</Item.Media>
-				<Item.Content>
-					<Item.Title>{m.gpu_allocation()}</Item.Title>
-				</Item.Content>
-			</Item.Root>
-		{/if}
-	</Dialog.Trigger>
-	<Dialog.Content class="flex h-[85vh] max-h-[85vh] max-w-[90vw] min-w-[70vw] flex-col gap-3">
-		<Dialog.Header>
-			<Dialog.Title>
-				{m.gpu_allocation_title({ name })}
-			</Dialog.Title>
-			<Dialog.Description>
-				{#if view === 'llm-inference-service'}
-					{m.gpu_allocation_model_description()}
-				{:else}
-					{m.gpu_allocation_node_description()}
-				{/if}
-			</Dialog.Description>
-		</Dialog.Header>
-
-		<div class="flex-1 overflow-hidden">
-			{#if isLoading}
-				<div
-					class="flex h-full items-center justify-center rounded-md border bg-muted text-xs text-muted-foreground"
-				>
-					{m.gpu_allocation_loading()}
-				</div>
-			{:else if error}
-				<div
-					class="flex h-full items-center justify-center rounded-md border bg-muted text-xs text-destructive"
-				>
-					{error}
-				</div>
-			{:else if isEmpty}
-				<div
-					class="flex h-full items-center justify-center rounded-md border bg-muted text-xs text-muted-foreground"
-				>
-					{#if view === 'llm-inference-service'}
-						{m.gpu_allocation_empty_model()}
-					{:else}
-						{m.gpu_allocation_empty_node()}
-					{/if}
-				</div>
-			{:else if topologyData}
-				<GpuAllocationDiagram {topologyData} {view} />
+{#if canViewClusterMetrics}
+	<Dialog.Root bind:open {onOpenChangeComplete} onOpenChange={handleOpenChange}>
+		<Dialog.Trigger class={trigger ? undefined : 'w-full'}>
+			{#if trigger}
+				{@render trigger()}
+			{:else}
+				<Item.Root class="flex-nowrap p-0 text-xs" size="sm">
+					<Item.Media>
+						<GpuIcon />
+					</Item.Media>
+					<Item.Content>
+						<Item.Title>{m.gpu_allocation()}</Item.Title>
+					</Item.Content>
+				</Item.Root>
 			{/if}
-		</div>
-	</Dialog.Content>
-</Dialog.Root>
+		</Dialog.Trigger>
+		<Dialog.Content class="flex h-[85vh] max-h-[85vh] max-w-[90vw] min-w-[70vw] flex-col gap-3">
+			<Dialog.Header>
+				<Dialog.Title>
+					{m.gpu_allocation_title({ name })}
+				</Dialog.Title>
+				<Dialog.Description>
+					{#if view === 'llm-inference-service'}
+						{m.gpu_allocation_model_description()}
+					{:else}
+						{m.gpu_allocation_node_description()}
+					{/if}
+				</Dialog.Description>
+			</Dialog.Header>
+
+			<div class="flex-1 overflow-hidden">
+				{#if isLoading}
+					<div
+						class="flex h-full items-center justify-center rounded-md border bg-muted text-xs text-muted-foreground"
+					>
+						{m.gpu_allocation_loading()}
+					</div>
+				{:else if error}
+					<div
+						class="flex h-full items-center justify-center rounded-md border bg-muted text-xs text-destructive"
+					>
+						{error}
+					</div>
+				{:else if isEmpty}
+					<div
+						class="flex h-full items-center justify-center rounded-md border bg-muted text-xs text-muted-foreground"
+					>
+						{#if view === 'llm-inference-service'}
+							{m.gpu_allocation_empty_model()}
+						{:else}
+							{m.gpu_allocation_empty_node()}
+						{/if}
+					</div>
+				{:else if topologyData}
+					<GpuAllocationDiagram {topologyData} {view} />
+				{/if}
+			</div>
+		</Dialog.Content>
+	</Dialog.Root>
+{/if}
