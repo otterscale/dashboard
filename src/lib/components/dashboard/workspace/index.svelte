@@ -1,6 +1,6 @@
 <script lang="ts">
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
-	import { PrometheusDriver } from 'prometheus-query';
+	import type { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import {
@@ -14,15 +14,18 @@
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/messages';
+	import { workspacePrometheusDriver } from '$lib/prometheus';
 
 	import { workspaceOverviewWidgets } from './overview/widgets';
 
 	let {
 		cluster,
-		namespace
+		namespace,
+		canViewClusterMetrics = false
 	}: {
 		cluster: string;
 		namespace: string;
+		canViewClusterMetrics?: boolean;
 	} = $props();
 
 	let isReloading = $state(true);
@@ -35,19 +38,13 @@
 	const widgets = $derived(
 		workspaceOverviewWidgets.map((w) => ({
 			...w,
-			props: { namespace }
+			props: w.key === 'storage' ? { namespace, canViewClusterMetrics } : { namespace }
 		}))
 	);
 
 	onMount(async () => {
 		try {
-			prometheusDriver = new PrometheusDriver({
-				endpoint: `/proxy/${cluster}/prometheus`,
-				baseURL: '/api/v1',
-				headers: {
-					'x-proxy-target': 'api'
-				}
-			});
+			prometheusDriver = workspacePrometheusDriver(cluster, namespace, canViewClusterMetrics);
 		} catch (error) {
 			console.error('Failed to initialize Prometheus driver:', error);
 		}

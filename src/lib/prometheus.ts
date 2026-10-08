@@ -1,7 +1,72 @@
-import { InstantVector, type PrometheusDriver, RangeVector } from 'prometheus-query';
+import { InstantVector, PrometheusDriver, RangeVector } from 'prometheus-query';
 
 import type { ChartConfig } from '$lib/components/ui/chart/index.js';
 import { m } from '$lib/messages';
+
+/*
+ * The OtterScale server answers PromQL at two scopes.
+ *
+ * Cluster scope (`/proxy/<cluster>/prometheus`) takes any query, but only from
+ * viewers with cluster metrics access (cluster-admin, or a binding to
+ * otterscale:metrics-cluster-view); everyone else gets 403 whatever they ask.
+ *
+ * Namespace scope (`/proxy/<cluster>/prometheus-tenancy?namespace=<ns>`) takes
+ * any query too, from anyone who may get pods in <ns>, with namespace="<ns>"
+ * forced into every selector. A namespace-scoped page therefore only works
+ * with metrics whose `namespace` label is the tenant's — see docs/metrics.md.
+ */
+
+const PROXY_HEADERS = { 'x-proxy-target': 'api' };
+
+/** `origin` is for tests; the browser uses same-origin paths. */
+export function clusterPrometheusDriver(cluster: string, origin = ''): PrometheusDriver {
+	return new PrometheusDriver({
+		endpoint: `${origin}/proxy/${cluster}/prometheus`,
+		baseURL: '/api/v1',
+		headers: PROXY_HEADERS
+	});
+}
+
+export function namespacePrometheusDriver(
+	cluster: string,
+	namespace: string,
+	origin = ''
+): PrometheusDriver {
+	return new PrometheusDriver({
+		endpoint: `${origin}/proxy/${cluster}/prometheus-tenancy`,
+		baseURL: '/api/v1',
+		headers: PROXY_HEADERS,
+		// prometheus-query has no option for extra query parameters. It always
+		// hands axios `params` as URLSearchParams, so the namespace is added there
+		// — in the URL, where the server reads it, even when a body is sent.
+		requestInterceptor: {
+			onFulfilled: (config) => {
+				const params =
+					config.params instanceof URLSearchParams
+						? config.params
+						: new URLSearchParams(config.params ?? {});
+				params.set('namespace', namespace);
+				config.params = params;
+				return config;
+			}
+		}
+	});
+}
+
+/**
+ * For pages that show one Workspace's namespace. Viewers with cluster metrics
+ * access keep cluster scope, and with it the admin-only "all namespaces"
+ * choice; everyone else gets namespace scope, or nothing when the Workspace
+ * has no namespace to show.
+ */
+export function workspacePrometheusDriver(
+	cluster: string,
+	namespace: string,
+	canViewClusterMetrics: boolean
+): PrometheusDriver | null {
+	if (canViewClusterMetrics) return clusterPrometheusDriver(cluster);
+	return namespace ? namespacePrometheusDriver(cluster, namespace) : null;
+}
 
 /** Escape a value for use inside PromQL double-quoted string literals (e.g. `namespace="..."`). */
 export function escapePromqlStringLiteral(value: string): string {

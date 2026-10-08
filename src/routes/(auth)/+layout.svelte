@@ -247,15 +247,19 @@
 				title: m.dashboard(),
 				icon: GaugeIcon,
 				items: [
-					{
-						title: m.cluster(),
-						url: page.params.workspace
-							? resolve('/(auth)/[cluster]/[workspace]/dashboard/cluster', {
-									cluster: activeCluster,
-									workspace: page.params.workspace
-								})
-							: ''
-					},
+					...(data.canViewClusterMetrics
+						? [
+								{
+									title: m.cluster(),
+									url: page.params.workspace
+										? resolve('/(auth)/[cluster]/[workspace]/dashboard/cluster', {
+												cluster: activeCluster,
+												workspace: page.params.workspace
+											})
+										: ''
+								}
+							]
+						: []),
 					{
 						title: m.model(),
 						url: page.params.workspace
@@ -274,7 +278,7 @@
 								})
 							: ''
 					},
-					...(hasRookCeph
+					...(hasRookCeph && data.canViewClusterMetrics
 						? [
 								{
 									title: m.storage(),
