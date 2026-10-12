@@ -19,7 +19,9 @@ type AccessReviewResponse = { object?: { status?: { allowed?: boolean } } };
  * Whether the signed-in user may read cluster-scope metrics on `cluster`,
  * asked of that cluster as them (a SelfSubjectAccessReview through the hub).
  * Any failure reads as "no": the page then shows the namespace view, which
- * the server serves to cluster viewers too, so nothing breaks for them.
+ * the server serves to cluster viewers too, so nothing breaks for them. A
+ * failure is logged, so a hub error hiding Cluster and Storage from an admin
+ * leaves a trace; a denial is not.
  */
 export async function canViewClusterMetrics(
 	svelteFetch: typeof fetch,
@@ -43,11 +45,16 @@ export async function canViewClusterMetrics(
 				)
 			})
 		});
-		if (!response.ok) return false;
+		if (!response.ok) {
+			console.error(
+				`Failed to check cluster metrics access on ${cluster}: HTTP ${response.status}`
+			);
+			return false;
+		}
 		const data = (await response.json()) as AccessReviewResponse;
 		return data.object?.status?.allowed === true;
 	} catch (error) {
-		console.error('Failed to check cluster metrics access:', error);
+		console.error(`Failed to check cluster metrics access on ${cluster}:`, error);
 		return false;
 	}
 }
