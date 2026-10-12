@@ -123,9 +123,10 @@ test.beforeEach(async ({ page }) => {
 test('the sidebar has no cluster or storage dashboard', async ({ page }) => {
 	await page.goto(dashboard('overview'));
 	await page.waitForLoadState('networkidle');
-	// The sidebar has rendered once the model link shows; only then does a
-	// missing link mean anything.
-	await expect(page.locator(`a[href$="/dashboard/model"]`).first()).toBeVisible();
+	// The sidebar has rendered once the model link is in the DOM; only then does a
+	// missing link mean anything. Attached, not visible: on the overview its group
+	// is collapsed, and sub-items of a closed group are in the DOM but hidden.
+	await expect(page.locator(`a[href$="/dashboard/model"]`).first()).toBeAttached();
 	await expect(page.locator(`a[href$="/dashboard/cluster"]`)).toHaveCount(0);
 	await expect(page.locator(`a[href$="/dashboard/storage"]`)).toHaveCount(0);
 });
