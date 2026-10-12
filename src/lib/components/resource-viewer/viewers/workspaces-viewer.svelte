@@ -12,7 +12,7 @@
 	import Users from '@lucide/svelte/icons/users';
 	import Zap from '@lucide/svelte/icons/zap';
 	import type { TenantOtterscaleIoV1Alpha1Workspace } from '@otterscale/types';
-	import { InstantVector, PrometheusDriver } from 'prometheus-query';
+	import { InstantVector } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { resolve } from '$app/paths';
@@ -31,6 +31,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton/index.js';
 	import { Toggle } from '$lib/components/ui/toggle/index.js';
 	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { clusterPrometheusDriver } from '$lib/prometheus';
 	import { cn } from '$lib/utils';
 
 	let { object }: { object: TenantOtterscaleIoV1Alpha1Workspace } = $props();
@@ -71,11 +72,7 @@
 		const namespace = object.status?.resourceQuotaRef?.namespace ?? '';
 		if (!namespace) return;
 
-		const prometheusDriver = new PrometheusDriver({
-			endpoint: `/proxy/${page.params.cluster}/prometheus`,
-			baseURL: '/api/v1',
-			headers: { 'x-proxy-target': 'api' }
-		});
+		const prometheusDriver = clusterPrometheusDriver(page.params.cluster!);
 
 		try {
 			const gpuResourceMap: Record<string, string> = {
