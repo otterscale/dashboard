@@ -97,11 +97,12 @@ async function login(page: Page) {
 	await page.locator('#kc-login').click();
 	await page.locator('#password').fill(env.password);
 	await page.locator('#kc-login').click();
-	// Back on the dashboard (not still on Keycloak or its /login/callback).
+	// Back on the dashboard: not on another origin's Keycloak, nor on one mounted under /auth/,
+	// nor still on /login/callback.
 	await page.waitForURL(
 		(url) =>
 			url.origin === new URL(process.env.E2E_BASE_URL ?? '').origin &&
-			!url.pathname.startsWith('/login')
+			!/^\/(auth|login)(\/|$)/.test(url.pathname)
 	);
 }
 
