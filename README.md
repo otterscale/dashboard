@@ -57,11 +57,11 @@ kubectl get secret -n otterscale-system otterscale-ca \
 NODE_EXTRA_CA_CERTS=$PWD/otterscale-ca.crt pnpm dev --host
 ```
 
-- [Metrics in the dashboard](docs/metrics.md): which metrics a page may use, and why regular users see less.
-
 ## Documentation
 
 Setup, configuration, and deployment guides will be published in the project documentation. See `.env.example` for the environment variables the app expects.
+
+- [Metrics in the dashboard](docs/metrics.md): which metrics a page may use, and why regular users see less.
 
 ## Ecosystem
 
