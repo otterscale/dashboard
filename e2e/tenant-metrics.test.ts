@@ -58,7 +58,7 @@ function watchMetrics(page: Page) {
 			const body = await res.json();
 			result = Array.isArray(body?.data?.result) ? body.data.result : [];
 		} catch {
-			// metadata and label answers are not vectors
+			// label answers are not vectors
 		}
 		tenancy.push({ url, status: res.status(), result });
 	});
