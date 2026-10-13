@@ -410,7 +410,7 @@
 	"wait": "Wait",
 	"delay": "Delay",
 	"no_data_display": "No data to display",
-	"cluster_metrics_access_unknown": "Couldn't confirm your cluster metrics access, so the Cluster and Storage dashboards are hidden for now. Refresh the page to try again.",
+	"cluster_metrics_access_unknown": "Couldn't confirm your cluster metrics access, so the Cluster and Storage dashboards are hidden from the menu for now. Refresh the page to try again.",
 	"cluster_metrics_required": "The Cluster and Storage dashboards need cluster metrics access. Ask your administrator for it.",
 	"workspace_namespace_unknown": "Couldn't find this workspace's namespace, so there are no metrics to show. Refresh the page, or ask your administrator to check the workspace.",
 	"no_traffic_display": "No requests in this range",

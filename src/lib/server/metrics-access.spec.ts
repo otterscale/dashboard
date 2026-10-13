@@ -72,6 +72,10 @@ describe('checkClusterMetricsAccess', () => {
 			const f = fakeFetch(status(503), allowed(true));
 			await expect(checkClusterMetricsAccess(f, 'c1')).resolves.toBe('allowed');
 			expect(f).toHaveBeenCalledTimes(2);
+
+			const thrown = fakeFetch(() => new Error('blip'), allowed(true));
+			await expect(checkClusterMetricsAccess(thrown, 'c1')).resolves.toBe('allowed');
+			expect(thrown).toHaveBeenCalledTimes(2);
 			expect(log).not.toHaveBeenCalled();
 		} finally {
 			log.mockRestore();
