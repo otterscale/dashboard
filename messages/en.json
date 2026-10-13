@@ -410,6 +410,7 @@
 	"wait": "Wait",
 	"delay": "Delay",
 	"no_data_display": "No data to display",
+	"cluster_metrics_access_unknown": "Couldn't confirm your cluster metrics access, so the Cluster and Storage dashboards are hidden for now. Refresh the page to try again.",
 	"no_traffic_display": "No requests in this range",
 	"no_traffic_hint": "The model is running but received no traffic.",
 	"no_data_available": "No data available",

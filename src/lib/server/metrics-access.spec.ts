@@ -1,21 +1,32 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { canViewClusterMetrics, CLUSTER_METRICS_ACCESS } from './metrics-access';
+import { checkClusterMetricsAccess, CLUSTER_METRICS_ACCESS } from './metrics-access';
 
-function fakeFetch(response: Response | Error) {
+type Step = () => Response | Error;
+
+/** A fetch that answers with each step in turn; the last one repeats. */
+function fakeFetch(...steps: Step[]) {
+	let call = 0;
 	return vi.fn(async () => {
-		if (response instanceof Error) throw response;
-		return response;
+		const answer = steps[Math.min(call++, steps.length - 1)]();
+		if (answer instanceof Error) throw answer;
+		return answer;
 	}) as unknown as typeof fetch & ReturnType<typeof vi.fn>;
 }
 
-const allowed = (value: boolean) =>
-	new Response(JSON.stringify({ object: { status: { allowed: value } } }), { status: 200 });
+const allowed =
+	(value: boolean): Step =>
+	() =>
+		new Response(JSON.stringify({ object: { status: { allowed: value } } }), { status: 200 });
+const status =
+	(code: number): Step =>
+	() =>
+		new Response('', { status: code });
 
-describe('canViewClusterMetrics', () => {
+describe('checkClusterMetricsAccess', () => {
 	it('asks the hub for the exact attribute the server checks', async () => {
 		const f = fakeFetch(allowed(true));
-		await expect(canViewClusterMetrics(f, 'c1')).resolves.toBe(true);
+		await expect(checkClusterMetricsAccess(f, 'c1')).resolves.toBe('allowed');
 
 		const [url, init] = f.mock.calls[0] as [string, RequestInit];
 		expect(url).toBe('/otterscale.resource.v1.ResourceService/Create');
@@ -39,36 +50,59 @@ describe('canViewClusterMetrics', () => {
 		});
 	});
 
-	it('is false when denied, on errors and on odd answers', async () => {
-		await expect(canViewClusterMetrics(fakeFetch(allowed(false)), 'c1')).resolves.toBe(false);
-		await expect(
-			canViewClusterMetrics(fakeFetch(new Response('', { status: 500 })), 'c1')
-		).resolves.toBe(false);
-		await expect(canViewClusterMetrics(fakeFetch(new Error('down')), 'c1')).resolves.toBe(false);
-		await expect(
-			canViewClusterMetrics(fakeFetch(new Response('{}', { status: 200 })), 'c1')
-		).resolves.toBe(false);
-	});
-
-	it('logs why a failure read as no, but not a denial', async () => {
+	it('takes a denial at its word: no retry, no log', async () => {
 		const log = vi.spyOn(console, 'error').mockImplementation(() => {});
 		try {
-			await expect(
-				canViewClusterMetrics(fakeFetch(new Response('', { status: 503 })), 'c1')
-			).resolves.toBe(false);
+			const f = fakeFetch(allowed(false));
+			await expect(checkClusterMetricsAccess(f, 'c1')).resolves.toBe('denied');
+			expect(f).toHaveBeenCalledTimes(1);
+
+			const odd = fakeFetch(() => new Response('{}', { status: 200 }));
+			await expect(checkClusterMetricsAccess(odd, 'c1')).resolves.toBe('denied');
+			expect(odd).toHaveBeenCalledTimes(1);
+			expect(log).not.toHaveBeenCalled();
+		} finally {
+			log.mockRestore();
+		}
+	});
+
+	it('asks once more after a failure', async () => {
+		const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const f = fakeFetch(status(503), allowed(true));
+			await expect(checkClusterMetricsAccess(f, 'c1')).resolves.toBe('allowed');
+			expect(f).toHaveBeenCalledTimes(2);
+			expect(log).not.toHaveBeenCalled();
+		} finally {
+			log.mockRestore();
+		}
+	});
+
+	it('is unknown after two failures, and logs why once', async () => {
+		const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const f = fakeFetch(status(503));
+			await expect(checkClusterMetricsAccess(f, 'c1')).resolves.toBe('unknown');
+			expect(f).toHaveBeenCalledTimes(2);
 			expect(log).toHaveBeenCalledTimes(1);
-			expect(String(log.mock.calls[0][0])).toMatch(/c1.*503/);
+			expect(String(log.mock.calls[0][0])).toContain('c1');
+			expect(log.mock.calls[0][1]).toBe('HTTP 503');
 
 			log.mockClear();
 			const down = new Error('down');
-			await expect(canViewClusterMetrics(fakeFetch(down), 'c1')).resolves.toBe(false);
+			await expect(
+				checkClusterMetricsAccess(
+					fakeFetch(() => down),
+					'c1'
+				)
+			).resolves.toBe('unknown');
 			expect(log).toHaveBeenCalledTimes(1);
-			expect(String(log.mock.calls[0][0])).toContain('c1');
-			expect(log.mock.calls[0]).toContain(down);
+			expect(log.mock.calls[0][1]).toBe(down);
 
 			log.mockClear();
-			await expect(canViewClusterMetrics(fakeFetch(allowed(false)), 'c1')).resolves.toBe(false);
-			expect(log).not.toHaveBeenCalled();
+			const garbled = fakeFetch(() => new Response('not json', { status: 200 }));
+			await expect(checkClusterMetricsAccess(garbled, 'c1')).resolves.toBe('unknown');
+			expect(log).toHaveBeenCalledTimes(1);
 		} finally {
 			log.mockRestore();
 		}
