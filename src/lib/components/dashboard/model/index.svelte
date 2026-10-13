@@ -18,7 +18,7 @@
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/messages';
-	import { workspacePrometheusDriver } from '$lib/prometheus';
+	import { dashboardBody, workspacePrometheusDriver } from '$lib/prometheus';
 
 	let {
 		cluster,
@@ -38,6 +38,15 @@
 
 	let isReloading = $state(true);
 	let prometheusDriver = $state<PrometheusDriver | null>(null);
+	let initialized = $state(false);
+	const body = $derived(
+		dashboardBody({
+			hasDriver: prometheusDriver !== null,
+			initialized,
+			cluster,
+			namespace: defaultNamespace
+		})
+	);
 	let selectedTab = $state('overview');
 	/** Currently selected namespace; empty string means "all namespaces" */
 	let selectedNamespace = $state<string | undefined>(getInitialNamespace());
@@ -71,6 +80,7 @@
 		} catch (error) {
 			console.error('Failed to initialize Prometheus driver:', error);
 		}
+		initialized = true;
 	});
 
 	onDestroy(() => {
@@ -162,9 +172,13 @@
 				</Tabs.Content>
 			</Tabs.Root>
 		</div>
-	{:else if cluster}
+	{:else if body === 'loading'}
 		<div class="flex min-h-[400px] w-full items-center justify-center">
 			<LoaderCircle class="size-12 animate-spin text-muted-foreground" />
+		</div>
+	{:else if body === 'no-namespace'}
+		<div class="flex min-h-[400px] w-full items-center justify-center text-muted-foreground">
+			<p>{m.workspace_namespace_unknown()}</p>
 		</div>
 	{:else}
 		<div class="flex min-h-[400px] w-full items-center justify-center text-muted-foreground">

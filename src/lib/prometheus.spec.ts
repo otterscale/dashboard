@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
 	classifyGpuGovernance,
 	clusterPrometheusDriver,
+	dashboardBody,
 	namespacePrometheusDriver,
 	workspacePrometheusDriver
 } from './prometheus';
@@ -107,5 +108,27 @@ describe('prometheus drivers', () => {
 		expect(workspacePrometheusDriver('c1', 'ws-a', false)).not.toBeNull();
 		expect(workspacePrometheusDriver('c1', '', false)).toBeNull();
 		expect(workspacePrometheusDriver('c1', '', true)).not.toBeNull();
+	});
+});
+
+describe('dashboardBody', () => {
+	const base = { hasDriver: false, initialized: true, cluster: 'c1', namespace: 'ws-a' };
+
+	it('shows charts whenever there is a driver', () => {
+		// An admin keeps cluster scope even when the Workspace's namespace is unknown.
+		expect(dashboardBody({ ...base, hasDriver: true, namespace: '' })).toBe('charts');
+	});
+
+	it('spins only until the driver has been made', () => {
+		expect(dashboardBody({ ...base, initialized: false })).toBe('loading');
+	});
+
+	it('explains a missing namespace instead of spinning', () => {
+		expect(dashboardBody({ ...base, namespace: '' })).toBe('no-namespace');
+	});
+
+	it('says there is no data otherwise', () => {
+		expect(dashboardBody({ ...base, cluster: '' })).toBe('empty');
+		expect(dashboardBody(base)).toBe('empty');
 	});
 });

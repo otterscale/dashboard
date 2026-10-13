@@ -68,6 +68,26 @@ export function workspacePrometheusDriver(
 	return namespace ? namespacePrometheusDriver(cluster, namespace) : null;
 }
 
+export type DashboardBody = 'charts' | 'loading' | 'no-namespace' | 'empty';
+
+/**
+ * What a Workspace dashboard shows where its charts go. The driver is made on
+ * mount, so until then the page is loading. A viewer without cluster scope
+ * gets no driver when the Workspace's namespace is unknown — usually because
+ * the Workspace could not be read — which is a state to explain, not to spin on.
+ */
+export function dashboardBody(state: {
+	hasDriver: boolean;
+	initialized: boolean;
+	cluster: string;
+	namespace: string;
+}): DashboardBody {
+	if (state.hasDriver) return 'charts';
+	if (!state.cluster) return 'empty';
+	if (!state.initialized) return 'loading';
+	return state.namespace ? 'empty' : 'no-namespace';
+}
+
 /** Escape a value for use inside PromQL double-quoted string literals (e.g. `namespace="..."`). */
 export function escapePromqlStringLiteral(value: string): string {
 	return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
