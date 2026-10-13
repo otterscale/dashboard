@@ -1,7 +1,8 @@
 import { redirect } from '@sveltejs/kit';
 
 import { env } from '$env/dynamic/private';
-import { canViewClusterMetrics } from '$lib/server/metrics-access';
+import type { ClusterMetricsAccess } from '$lib/cluster-metrics-access';
+import { checkClusterMetricsAccess } from '$lib/server/metrics-access';
 
 import type { LayoutServerLoad } from './$types';
 
@@ -24,18 +25,25 @@ export const load: LayoutServerLoad = async ({ locals, params, fetch }) => {
 	}
 
 	let isClusterAdmin = false;
-	let canViewMetrics = false;
+	let clusterMetricsAccess: ClusterMetricsAccess = 'denied';
 	if (params.cluster && user.sub) {
-		[isClusterAdmin, canViewMetrics] = await Promise.all([
+		[isClusterAdmin, clusterMetricsAccess] = await Promise.all([
 			verifyClusterAdminStatus(fetch, params.cluster, user.sub).catch((error) => {
 				console.error('Failed to verify admin status:', error);
 				return false;
 			}),
-			canViewClusterMetrics(fetch, params.cluster)
+			checkClusterMetricsAccess(fetch, params.cluster)
 		]);
 	}
 
-	return { user, isClusterAdmin, canViewClusterMetrics: canViewMetrics, agentValuesInsecureTLS };
+	return {
+		user,
+		isClusterAdmin,
+		clusterMetricsAccess,
+		// What pages draw from: only a yes counts, so unknown draws the regular view.
+		canViewClusterMetrics: clusterMetricsAccess === 'allowed',
+		agentValuesInsecureTLS
+	};
 };
 
 async function verifyClusterAdminStatus(
