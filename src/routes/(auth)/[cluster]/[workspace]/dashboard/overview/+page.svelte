@@ -1,6 +1,10 @@
 <script lang="ts">
+	import { toast } from 'svelte-sonner';
+
+	import { afterNavigate, replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
+	import { withoutClusterMetricsNotice } from '$lib/cluster-metrics-access';
 	import WorkspaceDashboard from '$lib/components/dashboard/workspace/index.svelte';
 	import { m } from '$lib/messages';
 	import { breadcrumbs } from '$lib/stores';
@@ -14,6 +18,16 @@
 			})
 		}
 	]);
+
+	// Sent here from a bookmarked Cluster or Storage dashboard: say why, once.
+	afterNavigate(() => {
+		const cleaned = withoutClusterMetricsNotice(page.url);
+		if (!cleaned) return;
+		toast.info(m.cluster_metrics_required());
+		// The current URL minus a query parameter, not a new route to resolve.
+		// eslint-disable-next-line svelte/no-navigation-without-resolve
+		replaceState(cleaned, page.state);
+	});
 
 	const cluster = $derived(page.params.cluster ?? '');
 	const workspace = $derived(page.params.workspace ?? '');

@@ -411,6 +411,7 @@
 	"delay": "延遲",
 	"no_data_display": "尚無資料可顯示",
 	"cluster_metrics_access_unknown": "暫時無法確認叢集指標權限，叢集與儲存儀表板先隱藏。請重新整理頁面再試一次。",
+	"cluster_metrics_required": "叢集與儲存儀表板需要叢集指標權限，請洽管理員。",
 	"no_traffic_display": "此區間內沒有請求",
 	"no_traffic_hint": "模型運行中,但沒有收到流量。",
 	"no_data_available": "目前無可用資料",

@@ -132,9 +132,14 @@ test('the sidebar has no cluster or storage dashboard', async ({ page }) => {
 });
 
 for (const name of ['cluster', 'storage']) {
-	test(`opening the ${name} dashboard directly lands on the overview`, async ({ page }) => {
+	test(`opening the ${name} dashboard directly lands on the overview and says why`, async ({
+		page
+	}) => {
 		await page.goto(dashboard(name));
-		await page.waitForURL((url) => url.pathname.endsWith('/dashboard/overview'));
+		await page.waitForURL(
+			(url) => url.pathname.endsWith('/dashboard/overview') && !url.searchParams.has('notice')
+		);
+		await expect(page.getByText(/cluster metrics access|叢集指標權限/)).toBeVisible();
 	});
 }
 
