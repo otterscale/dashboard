@@ -11,9 +11,10 @@ import { m } from '$lib/messages';
  * otterscale:metrics-cluster-view); everyone else gets 403 whatever they ask.
  *
  * Namespace scope (`/proxy/<cluster>/prometheus-tenancy?namespace=<ns>`) takes
- * any query too, from anyone who may get pods in <ns>, with namespace="<ns>"
- * forced into every selector. A namespace-scoped page therefore only works
- * with metrics whose `namespace` label is the tenant's — see docs/metrics.md.
+ * any query too, from anyone who may get pods in <ns>, rewritten by the server
+ * to namespace="<ns>" the way prom-label-proxy does it. A namespace-scoped page
+ * therefore only works with metrics whose `namespace` label is the tenant's —
+ * see docs/metrics.md.
  */
 
 const PROXY_HEADERS = { 'x-proxy-target': 'api' };
