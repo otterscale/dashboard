@@ -16,6 +16,7 @@
 		type ComboboxEnumeration
 	} from '$lib/components/dynamic-form/widgets/combobox.svelte';
 	import { m } from '$lib/messages';
+	import { namespaceSelector } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -74,7 +75,7 @@
 			isLoaded = false;
 			try {
 				const response = await prometheusDriver.instantQuery(
-					`kubevirt_vmi_info{` + (ns ? `namespace="${ns}"` : '') + `}`
+					`kubevirt_vmi_info${namespaceSelector(ns ?? '')}`
 				);
 				if (cancelled) return;
 				const series = (response.result ?? []) as {

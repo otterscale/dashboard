@@ -11,7 +11,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import { m } from '$lib/messages';
-	import { computeStep } from '$lib/prometheus';
+	import { computeStep, namespaceSelector } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -46,7 +46,7 @@
 		const rangeEnd = new Date(endMs);
 		const step = computeStep(start.getTime(), endMs);
 		const response = await prometheusDriver.rangeQuery(
-			`avg(rate(kubevirt_vmi_cpu_usage_seconds_total{namespace="${namespace}"}[5m]))`,
+			`avg(rate(kubevirt_vmi_cpu_usage_seconds_total${namespaceSelector(namespace)}[5m]))`,
 			start,
 			rangeEnd,
 			step
@@ -57,7 +57,7 @@
 	let cpuWait: SampleValue | undefined = $state(undefined);
 	async function fetchCPUWait() {
 		const response = await prometheusDriver.instantQuery(
-			`avg(rate(kubevirt_vmi_vcpu_wait_seconds_total{namespace="${namespace}"}[5m]))`
+			`avg(rate(kubevirt_vmi_vcpu_wait_seconds_total${namespaceSelector(namespace)}[5m]))`
 		);
 		cpuWait = response.result[0]?.value ?? undefined;
 	}
@@ -65,7 +65,7 @@
 	let cpuDelay: SampleValue | undefined = $state(undefined);
 	async function fetchCPUDelay() {
 		const response = await prometheusDriver.instantQuery(
-			`avg(rate(kubevirt_vmi_vcpu_delay_seconds_total{namespace="${namespace}"}[5m]))`
+			`avg(rate(kubevirt_vmi_vcpu_delay_seconds_total${namespaceSelector(namespace)}[5m]))`
 		);
 		cpuDelay = response.result[0]?.value ?? undefined;
 	}
