@@ -8,6 +8,7 @@ import {
 	clusterPrometheusDriver,
 	dashboardBody,
 	namespacePrometheusDriver,
+	namespaceSelector,
 	workspacePrometheusDriver
 } from './prometheus';
 
@@ -130,5 +131,16 @@ describe('dashboardBody', () => {
 	it('says there is no data otherwise', () => {
 		expect(dashboardBody({ ...base, cluster: '' })).toBe('empty');
 		expect(dashboardBody(base)).toBe('empty');
+	});
+});
+
+describe('namespaceSelector', () => {
+	it('selects one namespace, escaped', () => {
+		expect(namespaceSelector('ws-a')).toBe('{namespace="ws-a"}');
+		expect(namespaceSelector('a"b')).toBe('{namespace="a\\"b"}');
+	});
+
+	it('selects every namespace for the empty choice', () => {
+		expect(namespaceSelector('')).toBe('');
 	});
 });

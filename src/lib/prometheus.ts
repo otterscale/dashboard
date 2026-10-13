@@ -94,6 +94,15 @@ export function escapePromqlStringLiteral(value: string): string {
 }
 
 /**
+ * `{namespace="<ns>"}`, or nothing for an admin's "all namespaces" (the empty
+ * choice): namespace="" would match only series without the label. At
+ * namespace scope the server pins the tenant's namespace either way.
+ */
+export function namespaceSelector(namespace: string): string {
+	return namespace ? `{namespace="${escapePromqlStringLiteral(namespace)}"}` : '';
+}
+
+/**
  * Restrict a per-pod KSM selector to non-terminated pods — the set `kubectl describe node`
  * counts. KSM keeps emitting requests/limits for Succeeded/Failed pods until the object is
  * deleted, so finished Jobs otherwise pile up and inflate every sum.

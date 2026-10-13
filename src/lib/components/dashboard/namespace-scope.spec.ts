@@ -21,4 +21,10 @@ describe('compute dashboard', () => {
 		);
 		expect(offenders).toEqual([]);
 	});
+
+	it('builds namespace matchers with namespaceSelector, so "all namespaces" selects all', () => {
+		const dir = join(process.cwd(), 'src/lib/components/dashboard/compute');
+		const offenders = files(dir).filter((f) => /namespace="\$\{/.test(readFileSync(f, 'utf8')));
+		expect(offenders).toEqual([]);
+	});
 });

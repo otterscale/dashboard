@@ -12,7 +12,7 @@
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import { formatIO } from '$lib/formatter';
 	import { m } from '$lib/messages';
-	import { computeStep, fetchMultipleFlattenedRange } from '$lib/prometheus';
+	import { computeStep, fetchMultipleFlattenedRange, namespaceSelector } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -53,8 +53,8 @@
 			const points = await fetchMultipleFlattenedRange(
 				prometheusDriver,
 				{
-					receive: `avg(rate(kubevirt_vmi_network_receive_bytes_total{namespace="${namespace}"}[5m]))`,
-					transmit: `avg(rate(kubevirt_vmi_network_transmit_bytes_total{namespace="${namespace}"}[5m]))`
+					receive: `avg(rate(kubevirt_vmi_network_receive_bytes_total${namespaceSelector(namespace)}[5m]))`,
+					transmit: `avg(rate(kubevirt_vmi_network_transmit_bytes_total${namespaceSelector(namespace)}[5m]))`
 				},
 				start,
 				rangeEnd,
