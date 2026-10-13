@@ -27,6 +27,9 @@ test.skip(
 	!process.env.E2E_BASE_URL || Object.values(env).some((v) => !v),
 	'needs E2E_BASE_URL and the E2E_TENANT_* / E2E_CLUSTER / E2E_WORKSPACE / E2E_NAMESPACE variables'
 );
+// Two-step Keycloak login plus a dashboard that queries after mount: the
+// 30 s default has timed out once in beforeEach alone.
+test.describe.configure({ timeout: 120_000 });
 
 type Sample = {
 	metric?: Record<string, string>;
@@ -102,7 +105,8 @@ async function login(page: Page) {
 	await page.waitForURL(
 		(url) =>
 			url.origin === new URL(process.env.E2E_BASE_URL ?? '').origin &&
-			!/^\/(auth|login)(\/|$)/.test(url.pathname)
+			!/^\/(auth|login)(\/|$)/.test(url.pathname),
+		{ timeout: 60_000 }
 	);
 }
 
