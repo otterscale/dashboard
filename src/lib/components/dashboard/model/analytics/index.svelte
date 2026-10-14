@@ -2,6 +2,7 @@
 	import { PrometheusDriver } from 'prometheus-query';
 
 	import { m } from '$lib/messages';
+	import type { SharedMetrics } from '$lib/prometheus';
 
 	import ATopKvPressure from './a-top-kv-pressure.svelte';
 	import ATopP99Latency from './a-top-p99-latency.svelte';
@@ -31,7 +32,7 @@
 		start,
 		end,
 		endIsNow,
-		canViewClusterMetrics = false,
+		shared,
 		isReloading = $bindable()
 	}: {
 		cluster: string;
@@ -41,8 +42,8 @@
 		start: Date;
 		end: Date;
 		endIsNow: boolean;
-		/** GPU (DCGM) panels are cluster scope: the exporter's namespace, not the tenant's. */
-		canViewClusterMetrics?: boolean;
+		/** The shared scope the GPU panels ask, as the Workspace's member. */
+		shared: SharedMetrics;
 		isReloading?: boolean;
 	} = $props();
 
@@ -108,7 +109,7 @@
 						prometheusDriver={client}
 						selectedModel={modelFilter}
 						isReloading={isReloading ?? false}
-						{canViewClusterMetrics}
+						{shared}
 					/>
 					<BMemoryUsage
 						{namespace}
@@ -119,17 +120,16 @@
 						{endIsNow}
 						isReloading={isReloading ?? false}
 					/>
-					{#if canViewClusterMetrics}
-						<BGpuMemory
-							{namespace}
-							prometheusDriver={client}
-							selectedModel={modelFilter}
-							{start}
-							{end}
-							{endIsNow}
-							isReloading={isReloading ?? false}
-						/>
-					{/if}
+					<BGpuMemory
+						{namespace}
+						prometheusDriver={client}
+						{shared}
+						selectedModel={modelFilter}
+						{start}
+						{end}
+						{endIsNow}
+						isReloading={isReloading ?? false}
+					/>
 				</div>
 			{/if}
 		</section>

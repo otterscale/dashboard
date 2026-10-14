@@ -615,34 +615,8 @@ export async function fetchCombinedInstant(
 }
 
 /**
- * Build a sub-expression that yields one synthetic row per K8s node a given vLLM
- * model's pods occupy, with the `node` label renamed to `hostname` so the result
- * can be intersected against DCGM / host-level metrics via `and on(hostname)`.
- *
- * Lets DCGM queries scope to the model's hosts in a SINGLE PromQL request — no
- * preceding round-trip is needed to enumerate node names client-side.
- */
-export function vllmModelHostnamesSelector(
-	namespace: string | undefined,
-	selectedModel: string
-): string {
-	const ns = (namespace ?? '').trim();
-	const nsSel = ns ? `namespace="${escapePromqlStringLiteral(ns)}"` : '';
-	const podInfoSelector = nsSel ? `{${nsSel}}` : '';
-	const vllmSelector = vllmMetricWithSelector('vllm:kv_cache_usage_perc', namespace, selectedModel);
-	return (
-		`group by(hostname) (` +
-		`label_replace(` +
-		`kube_pod_info${podInfoSelector}` +
-		` * on(namespace, pod) group_left() ` +
-		`group by(namespace, pod) (${vllmSelector}),` +
-		` "hostname", "$1", "node", "(.+)"))`
-	);
-}
-
-/**
  * Label selector scoping DCGM (GPU exporter) series to one Kubernetes node. DCGM's
- * `hostname` label equals the K8s node name (as vllmModelHostnamesSelector also assumes).
+ * `hostname` label equals the K8s node name (as the model dashboard's GPU panels also assume).
  * Exact match, not regex: node names can contain dots and would otherwise cross-match.
  */
 export function dcgmNodeSelector(nodeName: string): string {

@@ -18,7 +18,7 @@
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/messages';
-	import { dashboardBody, workspacePrometheusDriver } from '$lib/prometheus';
+	import { dashboardBody, sharedMetrics, workspacePrometheusDriver } from '$lib/prometheus';
 
 	let {
 		cluster,
@@ -38,6 +38,9 @@
 
 	let isReloading = $state(true);
 	let prometheusDriver = $state<PrometheusDriver | null>(null);
+	// GPU panels ask the shared scope as the Workspace's member, whichever
+	// namespace an admin picks for the charts.
+	const shared = $derived(sharedMetrics(cluster, defaultNamespace));
 	let initialized = $state(false);
 	const body = $derived(
 		dashboardBody({
@@ -164,7 +167,7 @@
 								{start}
 								{end}
 								endIsNow={pickerToIsNow}
-								{canViewClusterMetrics}
+								{shared}
 								bind:isReloading
 							/>
 						{/key}

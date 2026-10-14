@@ -641,6 +641,7 @@
 	"metric_restart": "Restart",
 	"metric_oom": "OOM",
 	"metric_xid": "XID",
+	"xid_unavailable": "Couldn't load XID errors right now. Refresh to try again.",
 	"metric_cpu_throttle": "Throttle",
 	"metric_shm_crash": "Shm",
 	"metric_preempt": "Preempt",

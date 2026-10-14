@@ -641,6 +641,7 @@
 	"metric_restart": "重啟",
 	"metric_oom": "OOM",
 	"metric_xid": "XID",
+	"xid_unavailable": "暫時無法取得 XID 錯誤，請重新整理再試一次。",
 	"metric_cpu_throttle": "節流",
 	"metric_shm_crash": "Shm",
 	"metric_preempt": "搶占",
