@@ -9,6 +9,8 @@ import {
 	dashboardBody,
 	namespacePrometheusDriver,
 	namespaceSelector,
+	sharedMetrics,
+	type SharedQueryName,
 	workspacePrometheusDriver
 } from './prometheus';
 
@@ -67,6 +69,18 @@ describe('prometheus drivers', () => {
 		server = createServer((req: IncomingMessage, res) => {
 			const url = new URL(req.url ?? '/', 'http://x');
 			seen.push(url);
+			if (url.pathname.endsWith('/prometheus-shared/broken')) {
+				res.statusCode = 503;
+				res.setHeader('Content-Type', 'application/json');
+				res.end(
+					JSON.stringify({
+						status: 'error',
+						errorType: 'unavailable',
+						error: 'cannot check metrics access on this cluster; retry shortly'
+					})
+				);
+				return;
+			}
 			// series and label endpoints answer with a bare array, query endpoints with a result.
 			const data = /\/(series|label\/)/.test(url.pathname)
 				? []
@@ -109,6 +123,51 @@ describe('prometheus drivers', () => {
 		expect(workspacePrometheusDriver('c1', 'ws-a', false)).not.toBeNull();
 		expect(workspacePrometheusDriver('c1', '', false)).toBeNull();
 		expect(workspacePrometheusDriver('c1', '', true)).not.toBeNull();
+	});
+
+	it('shared scope sends a name and parameters, never PromQL', async () => {
+		seen.length = 0;
+		const shared = sharedMetrics('c1', 'ws-a', origin);
+		const result = await shared.instant(
+			'gpu-util',
+			{ uuid: ['GPU-a', 'GPU-b'] },
+			new Date(1_700_000_000_000)
+		);
+		await shared.range(
+			'host-gpu-fb-used',
+			{ hostname: ['hci'] },
+			new Date(0),
+			new Date(60_000),
+			120
+		);
+
+		expect(result.resultType).toBe('vector');
+		expect(seen.map((u) => u.pathname)).toEqual([
+			'/proxy/c1/prometheus-shared/gpu-util',
+			'/proxy/c1/prometheus-shared/host-gpu-fb-used'
+		]);
+		expect(seen[0].searchParams.getAll('uuid')).toEqual(['GPU-a', 'GPU-b']);
+		expect(seen[0].searchParams.get('time')).toBe('1700000000');
+		expect(seen[1].searchParams.getAll('hostname')).toEqual(['hci']);
+		expect(seen[1].searchParams.get('start')).toBe('0');
+		expect(seen[1].searchParams.get('end')).toBe('60');
+		expect(seen[1].searchParams.get('step')).toBe('120');
+		for (const u of seen) {
+			expect(u.searchParams.getAll('namespace')).toEqual(['ws-a']);
+			expect(u.searchParams.has('query')).toBe(false);
+		}
+	});
+
+	it('shared scope leaves namespace out when the Workspace has none', async () => {
+		seen.length = 0;
+		await sharedMetrics('c1', '', origin).instant('kubevirt-handlers');
+		expect([...seen[0].searchParams.keys()]).toEqual([]);
+	});
+
+	it("shared scope rejects with the server's message", async () => {
+		await expect(
+			sharedMetrics('c1', 'ws-a', origin).instant('broken' as SharedQueryName)
+		).rejects.toThrow('cannot check metrics access');
 	});
 });
 
