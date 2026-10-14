@@ -39,11 +39,14 @@
 	const name: string = $derived(object?.metadata?.name ?? '');
 
 	/**
-	 * Cluster viewers see every pod on the involved nodes. Everyone else may open a
-	 * model's view: its own pods, with per-card totals from the shared scope that
-	 * count other tenants' bookings without naming them. The node view lists every
-	 * pod on a node, so it stays with cluster viewers.
+	 * A model's view is open to everyone. Only a cluster admin, who may list pods
+	 * in every namespace, counts each card from the pods on its node; everyone else
+	 * gets per-card totals from the shared scope, which count other tenants'
+	 * bookings without naming them. A cluster metrics viewer may still be refused
+	 * the pod listing, so that permission alone is not enough. The node view lists
+	 * every pod on a node, so it stays with cluster metrics viewers.
 	 */
+	const isClusterAdmin = $derived(page.data.isClusterAdmin === true);
 	const canViewClusterMetrics = $derived(page.data.canViewClusterMetrics === true);
 	const available = $derived(view === 'llm-inference-service' || canViewClusterMetrics);
 	const shared = $derived(sharedMetrics(cluster, namespace));
@@ -57,7 +60,7 @@
 	let requestId = 0;
 
 	/**
-	 * Attach measured per-card usage, and for viewers who could not list every pod
+	 * Attach measured per-card usage, and for viewers other than a cluster admin
 	 * the scheduler's per-card totals, to the topology already on screen. Runs after
 	 * the diagram renders rather than as part of `fetchData`, so a failing query
 	 * only costs these numbers — never the allocation view itself.
@@ -71,7 +74,7 @@
 					shared,
 					data.gpus.map((gpu) => gpu.device.id)
 				),
-				canViewClusterMetrics
+				isClusterAdmin
 					? Promise.resolve(new Map<string, GpuAllocatedTotal>())
 					: fetchGpuAllocatedTotals(shared)
 			]);
@@ -100,13 +103,7 @@
 		try {
 			const data =
 				view === 'llm-inference-service'
-					? await fetchLLMInferenceServiceTopology(
-							client,
-							cluster,
-							namespace,
-							name,
-							canViewClusterMetrics
-						)
+					? await fetchLLMInferenceServiceTopology(client, cluster, namespace, name, isClusterAdmin)
 					: await fetchNodeTopology(client, cluster, object);
 			if (id !== requestId) return;
 			topologyData = data;
