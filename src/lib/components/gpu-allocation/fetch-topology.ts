@@ -153,8 +153,8 @@ async function attachWorkspaces(
 
 /**
  * `listNodePods` lists every GPU pod on the service's nodes, so a card's usage
- * counts every workload on it. Viewers without cluster metrics access skip it —
- * every such request would be refused — and get per-card totals from the shared
+ * counts every workload on it. Only a cluster admin may list pods in every
+ * namespace; everyone else skips it and gets per-card totals from the shared
  * scope instead (gpu-allocation-dialog.svelte).
  */
 export async function fetchLLMInferenceServiceTopology(
