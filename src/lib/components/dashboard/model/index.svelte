@@ -127,12 +127,16 @@
 								bind:selectedModel
 							/>
 						</div>
-						<NamespacePicker
-							{cluster}
-							{isClusterAdmin}
-							{currentWorkspace}
-							bind:namespace={selectedNamespace}
-						/>
+						<!-- Another Workspace is reachable only at cluster scope: an admin whose
+						cluster metrics access is denied or unknown queries this one alone. -->
+						{#if isClusterAdmin && canViewClusterMetrics}
+							<NamespacePicker
+								{cluster}
+								{isClusterAdmin}
+								{currentWorkspace}
+								bind:namespace={selectedNamespace}
+							/>
+						{/if}
 						<DatetimePicker
 							bind:from={pickerFrom}
 							bind:to={pickerTo}
