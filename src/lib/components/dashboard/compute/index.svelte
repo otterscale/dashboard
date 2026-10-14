@@ -16,7 +16,7 @@
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/messages';
-	import { dashboardBody, workspacePrometheusDriver } from '$lib/prometheus';
+	import { dashboardBody, sharedMetrics, workspacePrometheusDriver } from '$lib/prometheus';
 
 	import { Dashboard as AnalyticsDashboard } from './analytics/index';
 	import VmPicker from './analytics/vm-picker.svelte';
@@ -49,6 +49,9 @@
 
 	let isReloading = $state(true);
 	let prometheusDriver = $state<PrometheusDriver | null>(null);
+	// KubeVirt component tiles ask the shared scope as the Workspace's member,
+	// whichever namespace an admin picks for the charts.
+	const shared = $derived(sharedMetrics(cluster, defaultNamespace));
 	let initialized = $state(false);
 	const body = $derived(
 		dashboardBody({
@@ -145,7 +148,7 @@
 						{#key `${selectedNamespace ?? ''}-${dashboardTimeRangeKey}`}
 							<WidgetGrid
 								{cluster}
-								widgets={computeOverviewWidgets(canViewClusterMetrics)}
+								widgets={computeOverviewWidgets(shared)}
 								{prometheusDriver}
 								namespace={selectedNamespace ?? ''}
 								{start}

@@ -2,31 +2,26 @@
 	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
 	import CompassIcon from '@lucide/svelte/icons/compass';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
-	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
+	import type { SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Card from '$lib/components/ui/card';
 	import { m } from '$lib/messages';
+	import type { SharedMetrics } from '$lib/prometheus';
 
-	let {
-		prometheusDriver,
-		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; isReloading: boolean } = $props();
+	let { shared, isReloading = $bindable() }: { shared: SharedMetrics; isReloading: boolean } =
+		$props();
 
 	let readyControllers: SampleValue | undefined = $state(undefined);
 	async function fetchReadyControllers() {
-		const response = await prometheusDriver.instantQuery(
-			`count(kubevirt_virt_controller_ready_status{})`
-		);
+		const response = await shared.instant('kubevirt-controllers');
 		readyControllers = response.result[0]?.value ?? undefined;
 	}
 
 	let healthControllers: SampleValue | undefined = $state(undefined);
 	async function fetchHealthControllers() {
-		const response = await prometheusDriver.instantQuery(
-			`sum(kubevirt_virt_controller_ready_status{})`
-		);
+		const response = await shared.instant('kubevirt-controllers-ready');
 		healthControllers = response.result[0]?.value ?? undefined;
 	}
 

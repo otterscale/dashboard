@@ -1,4 +1,5 @@
 import type { WidgetDefinition } from '$lib/components/custom/widget-grid';
+import type { SharedMetrics } from '$lib/prometheus';
 
 import Controller from './controller.svelte';
 import CPU from './cpu.svelte';
@@ -20,11 +21,9 @@ export const widgets = [
 	{ key: 'throughput', class: 'col-span-6', component: Throughtput, needsNamespace: true }
 ] satisfies WidgetDefinition[];
 
-/** KubeVirt's own components: cluster-scope numbers a tenant's namespace view cannot show. */
-const clusterScopeWidgetKeys = new Set(['controller', 'worker']);
+/** KubeVirt's own components: cluster-wide numbers the server answers as shared queries. */
+const sharedWidgetKeys = new Set(['controller', 'worker']);
 
-export function computeOverviewWidgets(canViewClusterMetrics: boolean): WidgetDefinition[] {
-	return canViewClusterMetrics
-		? widgets
-		: widgets.filter((w) => !clusterScopeWidgetKeys.has(w.key));
+export function computeOverviewWidgets(shared: SharedMetrics): WidgetDefinition[] {
+	return widgets.map((w) => (sharedWidgetKeys.has(w.key) ? { ...w, props: { shared } } : w));
 }
