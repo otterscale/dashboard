@@ -14,7 +14,7 @@
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/messages';
-	import { dashboardBody, workspacePrometheusDriver } from '$lib/prometheus';
+	import { dashboardBody, sharedMetrics, workspacePrometheusDriver } from '$lib/prometheus';
 
 	import { workspaceOverviewWidgets } from './overview/widgets';
 
@@ -44,10 +44,11 @@
 	let pickerTo = $state<CalendarDateTime>(nowCDT());
 	let pickerToIsNow = $state(true);
 
+	const shared = $derived(sharedMetrics(cluster, namespace));
 	const widgets = $derived(
 		workspaceOverviewWidgets.map((w) => ({
 			...w,
-			props: w.key === 'storage' ? { namespace, canViewClusterMetrics } : { namespace }
+			props: w.key === 'storage' ? { namespace, shared } : { namespace }
 		}))
 	);
 

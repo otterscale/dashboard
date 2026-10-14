@@ -2,21 +2,20 @@
 	import BoxIcon from '@lucide/svelte/icons/box';
 	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
 	import Loader2Icon from '@lucide/svelte/icons/loader-2';
-	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
+	import type { SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Card from '$lib/components/ui/card';
 	import { m } from '$lib/messages';
+	import type { SharedMetrics } from '$lib/prometheus';
 
-	let {
-		prometheusDriver,
-		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; isReloading: boolean } = $props();
+	let { shared, isReloading = $bindable() }: { shared: SharedMetrics; isReloading: boolean } =
+		$props();
 
 	let workers: SampleValue | undefined = $state(undefined);
 	async function fetchWorkers() {
-		const response = await prometheusDriver.instantQuery(`count(kubevirt_info{})`);
+		const response = await shared.instant('kubevirt-handlers');
 		workers = response.result[0]?.value ?? undefined;
 	}
 

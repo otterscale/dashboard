@@ -1,17 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
+import type { SharedMetrics } from '$lib/prometheus';
+
 import { computeOverviewWidgets } from './widgets';
 
-describe('computeOverviewWidgets', () => {
-	it('keeps the KubeVirt component tiles for cluster viewers', () => {
-		expect(computeOverviewWidgets(true).map((w) => w.key)).toContain('controller');
-		expect(computeOverviewWidgets(true).map((w) => w.key)).toContain('worker');
-	});
+const shared = {} as SharedMetrics;
 
-	it('drops them for everyone else', () => {
-		const keys = computeOverviewWidgets(false).map((w) => w.key);
-		expect(keys).not.toContain('controller');
-		expect(keys).not.toContain('worker');
-		expect(keys).toContain('cpu');
+describe('computeOverviewWidgets', () => {
+	it('keeps the KubeVirt component tiles for everyone, fed by the shared scope', () => {
+		const widgets = computeOverviewWidgets(shared);
+		for (const key of ['controller', 'worker']) {
+			expect(widgets.find((w) => w.key === key)?.props).toEqual({ shared });
+		}
+		expect(widgets.map((w) => w.key)).toContain('cpu');
+		expect(widgets.find((w) => w.key === 'cpu')?.props).toBeUndefined();
 	});
 });

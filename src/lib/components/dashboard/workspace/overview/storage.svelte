@@ -13,18 +13,18 @@
 	import { Progress } from '$lib/components/ui/progress';
 	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/messages';
-	import { escapePromqlStringLiteral } from '$lib/prometheus';
+	import { escapePromqlStringLiteral, type SharedMetrics } from '$lib/prometheus';
 	import { cn } from '$lib/utils';
 
 	let {
 		prometheusDriver,
 		namespace,
-		canViewClusterMetrics = false,
+		shared,
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		namespace: string;
-		canViewClusterMetrics?: boolean;
+		shared: SharedMetrics;
 		isReloading: boolean;
 	} = $props();
 
@@ -53,9 +53,12 @@
 				`sum(kubelet_volume_stats_used_bytes{namespace="${ns}"}) or vector(0)`,
 				evalAt
 			),
-			canViewClusterMetrics
-				? prometheusDriver.instantQuery(`sum(ceph_cluster_total_bytes) or vector(0)`, evalAt)
-				: Promise.resolve(undefined),
+			// The cluster's capacity, to say when requests exceed it. Best effort:
+			// without it the card still shows the Workspace's own numbers.
+			shared.instant('ceph-total-bytes', undefined, evalAt).catch((error) => {
+				console.warn('Failed to fetch cluster storage capacity:', error);
+				return undefined;
+			}),
 			prometheusDriver.instantQuery(
 				`count(kube_persistentvolumeclaim_info{namespace="${ns}"}) or vector(0)`,
 				evalAt
