@@ -8,12 +8,12 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import { m } from '$lib/messages';
-	import { clusterPrometheusDriver } from '$lib/prometheus';
+	import { sharedMetrics } from '$lib/prometheus';
 
 	import { fetchLLMInferenceServiceTopology, fetchNodeTopology } from './fetch-topology';
-	import { fetchGpuUtilization } from './fetch-utilization';
+	import { fetchGpuAllocatedTotals, fetchGpuUtilization } from './fetch-utilization';
 	import GpuAllocationDiagram from './gpu-allocation-diagram.svelte';
-	import type { TopologyData, TopologyView } from './types';
+	import type { GpuAllocatedTotal, TopologyData, TopologyView } from './types';
 
 	let {
 		cluster,
@@ -39,10 +39,14 @@
 	const name: string = $derived(object?.metadata?.name ?? '');
 
 	/**
-	 * GPU inventory is cluster scope (nodes, DCGM, HAMi): only viewers with cluster metrics
-	 * access get the dialog at all, everyone else gets no trigger and sends no query.
+	 * Cluster viewers see every pod on the involved nodes. Everyone else may open a
+	 * model's view: its own pods, with per-card totals from the shared scope that
+	 * count other tenants' bookings without naming them. The node view lists every
+	 * pod on a node, so it stays with cluster viewers.
 	 */
 	const canViewClusterMetrics = $derived(page.data.canViewClusterMetrics === true);
+	const available = $derived(view === 'llm-inference-service' || canViewClusterMetrics);
+	const shared = $derived(sharedMetrics(cluster, namespace));
 
 	let open = $state(false);
 	let isLoading = $state(false);
@@ -53,32 +57,41 @@
 	let requestId = 0;
 
 	/**
-	 * Attach measured per-card usage to the topology already on screen. Runs after the
-	 * diagram renders rather than as part of `fetchData`, so an unreachable Prometheus
-	 * only costs the utilization bars — never the allocation view itself.
+	 * Attach measured per-card usage, and for viewers who could not list every pod
+	 * the scheduler's per-card totals, to the topology already on screen. Runs after
+	 * the diagram renders rather than as part of `fetchData`, so a failing query
+	 * only costs these numbers — never the allocation view itself.
 	 */
-	async function attachUtilization(data: TopologyData, id: number) {
-		if (!canViewClusterMetrics || data.gpus.length === 0) return;
+	async function attachMetrics(data: TopologyData, id: number) {
+		if (data.gpus.length === 0) return;
 
 		try {
-			const prometheus = clusterPrometheusDriver(cluster);
-			const utilization = await fetchGpuUtilization(
-				prometheus,
-				data.gpus.map((gpu) => gpu.device.id)
-			);
-			if (id !== requestId || utilization.size === 0) return;
+			const [utilization, totals] = await Promise.all([
+				fetchGpuUtilization(
+					shared,
+					data.gpus.map((gpu) => gpu.device.id)
+				),
+				canViewClusterMetrics
+					? Promise.resolve(new Map<string, GpuAllocatedTotal>())
+					: fetchGpuAllocatedTotals(shared)
+			]);
+			if (id !== requestId || (utilization.size === 0 && totals.size === 0)) return;
 
 			topologyData = {
 				...data,
-				gpus: data.gpus.map((gpu) => ({ ...gpu, utilization: utilization.get(gpu.device.id) }))
+				gpus: data.gpus.map((gpu) => ({
+					...gpu,
+					utilization: utilization.get(gpu.device.id),
+					allocatedTotal: totals.get(gpu.device.id)
+				}))
 			};
 		} catch (err) {
-			console.warn('Failed to fetch GPU utilization:', err);
+			console.warn('Failed to fetch GPU metrics:', err);
 		}
 	}
 
 	async function fetchData() {
-		if (!canViewClusterMetrics) return;
+		if (!available) return;
 		const id = ++requestId;
 		isLoading = true;
 		error = null;
@@ -87,11 +100,17 @@
 		try {
 			const data =
 				view === 'llm-inference-service'
-					? await fetchLLMInferenceServiceTopology(client, cluster, namespace, name)
+					? await fetchLLMInferenceServiceTopology(
+							client,
+							cluster,
+							namespace,
+							name,
+							canViewClusterMetrics
+						)
 					: await fetchNodeTopology(client, cluster, object);
 			if (id !== requestId) return;
 			topologyData = data;
-			void attachUtilization(data, id);
+			void attachMetrics(data, id);
 		} catch (err) {
 			console.error('Failed to fetch GPU allocation:', err);
 			error = m.gpu_allocation_fetch_error({ message: (err as ConnectError).message });
@@ -111,7 +130,7 @@
 	);
 </script>
 
-{#if canViewClusterMetrics}
+{#if available}
 	<Dialog.Root bind:open {onOpenChangeComplete} onOpenChange={handleOpenChange}>
 		<Dialog.Trigger class={trigger ? undefined : 'w-full'}>
 			{#if trigger}
