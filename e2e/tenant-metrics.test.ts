@@ -5,13 +5,16 @@
  *   E2E_BASE_URL=https://<dashboard> E2E_IGNORE_HTTPS_ERRORS=1 \
  *   E2E_TENANT_USERNAME=... E2E_TENANT_PASSWORD=... \
  *   E2E_CLUSTER=<cluster> E2E_WORKSPACE=<workspace name> E2E_NAMESPACE=<its namespace> \
+ *   [E2E_MODEL=<an LLMInferenceService in that namespace>] \
  *   pnpm exec playwright test e2e/tenant-metrics.test.ts
  *
  * The user must be a plain Workspace member (view is enough): not cluster-admin,
  * not bound to otterscale:metrics-cluster-view, in no Keycloak group that
  * grants either. An admin account proves nothing here — admins keep cluster
  * scope. E2E_EXPECT_VM_DATA / E2E_EXPECT_MODEL_DATA=1 also require data on the
- * compute / model pages (set them when the namespace runs a VM / a model).
+ * compute / model pages (set them when the namespace runs a VM / a model);
+ * E2E_MODEL names the model for the analytics and model-service tests, which
+ * are skipped without it.
  */
 import { expect, type Page, test } from '@playwright/test';
 
@@ -22,6 +25,31 @@ const env = {
 	workspace: process.env.E2E_WORKSPACE ?? '',
 	namespace: process.env.E2E_NAMESPACE ?? ''
 };
+
+/** Optional: the model whose analytics and actions are checked. */
+const model = process.env.E2E_MODEL ?? '';
+
+/** The server's named queries (otterscale internal/handler/proxy_shared_catalog.go). */
+const SHARED_NAMES = new Set([
+	'gpu-util',
+	'gpu-fb-used',
+	'gpu-fb-total',
+	'gpu-inventory',
+	'vgpu-memory-limit',
+	'vgpu-memory-used',
+	'host-gpu-fb-used',
+	'host-gpu-fb-total',
+	'host-gpu-count',
+	'gpu-xid-total',
+	'gpu-xid-by-gpu',
+	'kubevirt-handlers',
+	'kubevirt-controllers',
+	'kubevirt-controllers-ready',
+	'ceph-total-bytes',
+	'gpu-allocated-memory',
+	'gpu-allocated-cores',
+	'gpu-shared-count'
+]);
 
 test.skip(
 	!process.env.E2E_BASE_URL || Object.values(env).some((v) => !v),
@@ -37,8 +65,9 @@ type Sample = {
 	values?: [number, string][];
 };
 type Captured = { url: URL; status: number; result: Sample[] };
+type SharedCall = { name: string; status: number; params: URLSearchParams };
 
-/** Infrastructure metrics a namespace-scoped page must not even ask for. */
+/** Infrastructure metrics: never in a namespace-scoped query; the shared scope serves them by name. */
 const INFRASTRUCTURE = [
 	'ceph_cluster_total_bytes',
 	'kubevirt_info',
@@ -49,12 +78,22 @@ const INFRASTRUCTURE = [
 
 function watchMetrics(page: Page) {
 	const tenancy: Captured[] = [];
+	const shared: SharedCall[] = [];
 	const clusterScope: string[] = [];
+	const sharedPrefix = `/proxy/${env.cluster}/prometheus-shared/`;
 	page.on('request', (req) => {
 		if (req.url().includes(`/proxy/${env.cluster}/prometheus/`)) clusterScope.push(req.url());
 	});
 	page.on('response', async (res) => {
 		const url = new URL(res.url());
+		if (url.pathname.startsWith(sharedPrefix)) {
+			shared.push({
+				name: url.pathname.slice(sharedPrefix.length),
+				status: res.status(),
+				params: url.searchParams
+			});
+			return;
+		}
 		if (!url.pathname.startsWith(`/proxy/${env.cluster}/prometheus-tenancy/`)) return;
 		let result: Sample[] = [];
 		try {
@@ -65,7 +104,18 @@ function watchMetrics(page: Page) {
 		}
 		tenancy.push({ url, status: res.status(), result });
 	});
-	return { tenancy, clusterScope };
+	return { tenancy, shared, clusterScope };
+}
+
+/** Every shared call is a known name, answered, asked as this Workspace; `names` were all asked. */
+function expectShared(calls: SharedCall[], names: string[]) {
+	for (const c of calls) {
+		expect(SHARED_NAMES.has(c.name), `unknown shared query ${c.name}`).toBe(true);
+		expect(c.status, `${c.name} answered ${c.status}`).toBeLessThan(400);
+		expect(c.params.getAll('namespace')).toEqual([env.namespace]);
+	}
+	const asked = new Set(calls.map((c) => c.name));
+	for (const name of names) expect(asked.has(name), `${name} was not asked`).toBe(true);
 }
 
 const sentQueries = (captured: Captured[]) =>
@@ -147,31 +197,96 @@ for (const name of ['cluster', 'storage']) {
 	});
 }
 
-test('overview shows their namespace, with data, and nothing cluster-wide', async ({ page }) => {
-	const { tenancy, clusterScope } = await visit(page, 'overview');
+test('overview shows their namespace, and the cluster capacity through the shared scope', async ({
+	page
+}) => {
+	const { tenancy, shared, clusterScope } = await visit(page, 'overview');
 	expectOwnNamespaceOnly(tenancy);
 	expect(hasData(tenancy), 'overview charts are empty').toBe(true);
 	expect(clusterScope).toEqual([]);
 	for (const q of sentQueries(tenancy)) for (const m of INFRASTRUCTURE) expect(q).not.toContain(m);
+	expectShared(shared, ['ceph-total-bytes']);
 });
 
-test('compute stays in their namespace and hides KubeVirt components', async ({ page }) => {
-	const { tenancy, clusterScope } = await visit(page, 'compute');
+test('compute stays in their namespace and shows KubeVirt components', async ({ page }) => {
+	const { tenancy, shared, clusterScope } = await visit(page, 'compute');
 	expectOwnNamespaceOnly(tenancy);
 	expect(clusterScope).toEqual([]);
 	for (const q of sentQueries(tenancy)) {
 		for (const m of INFRASTRUCTURE) expect(q).not.toContain(m);
 		expect(q).not.toContain('exported_namespace');
 	}
+	expectShared(shared, ['kubevirt-handlers', 'kubevirt-controllers', 'kubevirt-controllers-ready']);
 	if (process.env.E2E_EXPECT_VM_DATA === '1')
 		expect(hasData(tenancy), 'compute charts are empty').toBe(true);
 });
 
-test('model stays in their namespace and hides GPU memory and XID', async ({ page }) => {
-	const { tenancy, clusterScope } = await visit(page, 'model');
+test('model overview stays in their namespace', async ({ page }) => {
+	const { tenancy, shared, clusterScope } = await visit(page, 'model');
 	expectOwnNamespaceOnly(tenancy);
 	expect(clusterScope).toEqual([]);
 	for (const q of sentQueries(tenancy)) for (const m of INFRASTRUCTURE) expect(q).not.toContain(m);
+	expectShared(shared, []);
 	if (process.env.E2E_EXPECT_MODEL_DATA === '1')
 		expect(hasData(tenancy), 'model charts are empty').toBe(true);
+});
+
+test('model analytics shows GPU memory and XID through the shared scope', async ({ page }) => {
+	test.skip(!model, 'needs E2E_MODEL');
+	const watched = watchMetrics(page);
+	await page.goto(dashboard('model'));
+	await page.getByRole('tab', { name: /^(Analytics|分析)$/ }).click();
+	await page.getByRole('combobox').first().click();
+	await page.getByRole('option', { name: model, exact: true }).click();
+	await page.waitForLoadState('networkidle');
+	await page.waitForTimeout(3_000); // panels query after the model is picked
+
+	await expect(
+		page.getByText(/GPU Memory: Allocated vs Used|GPU 記憶體：已分配 vs 已使用/)
+	).toBeVisible();
+	await expect(page.getByText('XID', { exact: true })).toBeVisible();
+	expectOwnNamespaceOnly(watched.tenancy);
+	expect(watched.clusterScope).toEqual([]);
+	expectShared(watched.shared, [
+		'host-gpu-fb-used',
+		'host-gpu-fb-total',
+		'host-gpu-count',
+		'gpu-xid-total',
+		'gpu-xid-by-gpu'
+	]);
+});
+
+test('a model service shows its GPU allocation and the GPU resources', async ({ page }) => {
+	test.skip(!model, 'needs E2E_MODEL');
+	const watched = watchMetrics(page);
+	const list = `/${env.cluster}/${env.workspace}?group=serving.kserve.io&version=v1alpha2&kind=LLMInferenceService&resource=llminferenceservices`;
+	const openActions = async () => {
+		await page
+			.getByRole('row', { name: new RegExp(model) })
+			.getByRole('button')
+			.last()
+			.click();
+	};
+
+	await page.goto(list);
+	await openActions();
+	await page.getByRole('menuitem', { name: /^(GPU Allocation|GPU 分配)$/ }).click();
+	await expect(page.getByRole('dialog')).toBeVisible();
+	await page.waitForLoadState('networkidle');
+	expectShared(watched.shared, [
+		'gpu-util',
+		'gpu-fb-used',
+		'gpu-fb-total',
+		'gpu-allocated-memory',
+		'gpu-shared-count'
+	]);
+	await page.keyboard.press('Escape');
+
+	await openActions();
+	await page.getByRole('menuitem', { name: /^Update$/ }).click();
+	await page.locator('button:has(svg.lucide-gpu)').first().click();
+	await expect(page.getByText('GPU Resources', { exact: true })).toBeVisible();
+	await page.waitForLoadState('networkidle');
+	expectShared(watched.shared, ['gpu-inventory', 'vgpu-memory-limit', 'vgpu-memory-used']);
+	expect(watched.clusterScope).toEqual([]);
 });
