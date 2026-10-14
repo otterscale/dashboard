@@ -4,7 +4,7 @@ import type { ChartConfig } from '$lib/components/ui/chart/index.js';
 import { m } from '$lib/messages';
 
 /*
- * The OtterScale server answers PromQL at two scopes.
+ * The OtterScale server answers metrics at three scopes.
  *
  * Cluster scope (`/proxy/<cluster>/prometheus`) takes any query, but only from
  * viewers with cluster metrics access (cluster-admin, or a binding to

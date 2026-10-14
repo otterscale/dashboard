@@ -1,6 +1,6 @@
 # Metrics in the dashboard
 
-The OtterScale server answers PromQL at two scopes:
+The OtterScale server answers metrics at three scopes; the shared one takes no PromQL:
 
 | Scope     | Path                                                 | Who                                                          | What                                                                             |
 | --------- | ---------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------- |
