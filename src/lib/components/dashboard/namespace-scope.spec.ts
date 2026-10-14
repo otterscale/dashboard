@@ -28,3 +28,30 @@ describe('compute dashboard', () => {
 		expect(offenders).toEqual([]);
 	});
 });
+
+// GPU, KubeVirt and Ceph numbers on Workspace pages come from the server's
+// named queries (shared scope), for admins and members alike: these files pick
+// no cluster-scope driver and carry no infrastructure PromQL of their own.
+describe('shared-scope components', () => {
+	const sharedFiles = [
+		'src/lib/components/gpu-allocation/gpu-allocation-dialog.svelte',
+		'src/lib/components/gpu-allocation/fetch-utilization.ts',
+		'src/lib/components/kind-viewer/kind-viewer-actions/utils/gpu-resources.svelte',
+		'src/lib/components/dashboard/model/analytics/b-gpu-memory.svelte',
+		'src/lib/components/dashboard/model/analytics/b-pod-health.svelte',
+		'src/lib/components/dashboard/compute/overview/controller.svelte',
+		'src/lib/components/dashboard/compute/overview/worker.svelte',
+		'src/lib/components/dashboard/workspace/overview/storage.svelte'
+	];
+	const infrastructure =
+		/DCGM_FI_|hami_|kubevirt_info|kubevirt_virt_controller|ceph_cluster_total_bytes/;
+
+	for (const file of sharedFiles) {
+		it(`${file} uses the shared scope`, () => {
+			const source = readFileSync(join(process.cwd(), file), 'utf8');
+			expect(source).not.toContain('clusterPrometheusDriver');
+			expect(source).not.toMatch(infrastructure);
+			expect(source).toMatch(/\bshared\b/);
+		});
+	}
+});
