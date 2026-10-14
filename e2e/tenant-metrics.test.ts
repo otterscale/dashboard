@@ -284,7 +284,8 @@ test('a model service shows its GPU allocation and the GPU resources', async ({ 
 
 	await openActions();
 	await page.getByRole('menuitem', { name: /^Update$/ }).click();
-	await page.locator('button:has(svg.lucide-gpu)').first().click();
+	// The row behind the dialog has GPU icons too; the overlay would take the click.
+	await page.getByRole('dialog').last().locator('button:has(svg.lucide-gpu)').first().click();
 	await expect(page.getByText('GPU Resources', { exact: true })).toBeVisible();
 	await page.waitForLoadState('networkidle');
 	expectShared(watched.shared, ['gpu-inventory', 'vgpu-memory-limit', 'vgpu-memory-used']);
