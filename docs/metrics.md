@@ -8,7 +8,7 @@ The OtterScale server answers metrics at three scopes; the shared one takes no P
 | Namespace | `/proxy/<cluster>/prometheus-tenancy?namespace=<ns>` | anyone who may `get pods` in `<ns>`                          | any query, rewritten to `namespace="<ns>"` the way prom-label-proxy does it      |
 | Shared    | `/proxy/<cluster>/prometheus-shared/<name>`          | the namespace scope's callers, and cluster scope             | one of the server's named queries: per GPU card, per host, or a total; no PromQL |
 
-Everyone else gets 403 at cluster scope, whatever the query. Create drivers with `clusterPrometheusDriver`, `namespacePrometheusDriver` or `workspacePrometheusDriver` (`src/lib/prometheus.ts`), never `new PrometheusDriver` with a hand-written endpoint. `page.data.canViewClusterMetrics` says which scope the viewer has. Use `sharedMetrics(cluster, namespace)` for the shared scope; `namespace` is always the Workspace's.
+Everyone else gets 403 at cluster scope, whatever the query. Create drivers with `clusterPrometheusDriver`, `namespacePrometheusDriver` or `workspacePrometheusDriver` (`src/lib/prometheus.ts`), never `new PrometheusDriver` with a hand-written endpoint. `page.data.canViewClusterMetrics` says which scope the viewer has. Use `sharedMetrics(cluster, namespace)` for the shared scope; `namespace` is the Workspace's when there is one, never an admin's namespace choice, and is left out otherwise, which only cluster viewers may do.
 
 ## Rules for namespace-scoped pages
 
