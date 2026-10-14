@@ -14,7 +14,8 @@
  * scope. E2E_EXPECT_VM_DATA / E2E_EXPECT_MODEL_DATA=1 also require data on the
  * compute / model pages (set them when the namespace runs a VM / a model);
  * E2E_MODEL names the model for the analytics and model-service tests, which
- * are skipped without it.
+ * are skipped without it. E2E_OTHER_NAMESPACE (default kube-system) is a
+ * namespace the user has no access to, for the server's own refusals.
  */
 import { expect, type Page, test } from '@playwright/test';
 
@@ -28,6 +29,9 @@ const env = {
 
 /** Optional: the model whose analytics and actions are checked. */
 const model = process.env.E2E_MODEL ?? '';
+
+/** A namespace the user may not see, for asking the server what the dashboard never asks. */
+const otherNamespace = process.env.E2E_OTHER_NAMESPACE ?? 'kube-system';
 
 /** The server's named queries (otterscale internal/handler/proxy_shared_catalog.go). */
 const SHARED_NAMES = new Set([
@@ -107,6 +111,17 @@ function watchMetrics(page: Page) {
 	return { tenancy, shared, clusterScope };
 }
 
+/**
+ * Wait for an answer to each named shared query. Start it before the action
+ * that sends them, so the answers it waits for come after that action.
+ */
+function sharedAnswers(page: Page, names: string[]) {
+	const path = (name: string) => `/proxy/${env.cluster}/prometheus-shared/${name}`;
+	return Promise.all(
+		names.map((name) => page.waitForResponse((res) => new URL(res.url()).pathname === path(name)))
+	);
+}
+
 /** Every shared call is a known name, answered, asked as this Workspace; `names` were all asked. */
 function expectShared(calls: SharedCall[], names: string[]) {
 	for (const c of calls) {
@@ -162,11 +177,19 @@ async function login(page: Page) {
 
 const dashboard = (name: string) => `/${env.cluster}/${env.workspace}/dashboard/${name}`;
 
-async function visit(page: Page, name: string) {
+/**
+ * Open a dashboard and wait until its widgets, which query after mount, have
+ * been answered: at least one namespace-scoped query, and each of `sharedNames`.
+ */
+async function visit(page: Page, name: string, sharedNames: string[] = []) {
 	const watched = watchMetrics(page);
+	const answered = sharedAnswers(page, sharedNames);
 	await page.goto(dashboard(name));
+	await answered;
+	await expect
+		.poll(() => watched.tenancy.length, { message: 'no namespace-scoped query' })
+		.toBeGreaterThan(0);
 	await page.waitForLoadState('networkidle');
-	await page.waitForTimeout(3_000); // widgets query after mount
 	return watched;
 }
 
@@ -197,28 +220,54 @@ for (const name of ['cluster', 'storage']) {
 	});
 }
 
+test('the server refuses cluster scope, another namespace, and shared without a namespace', async ({
+	page
+}) => {
+	expect(otherNamespace).not.toBe(env.namespace);
+	// Straight to the server through the dashboard's proxy, as the page's own requests go.
+	const ask = (path: string, params: Record<string, string> = {}) =>
+		page.request.get(`/proxy/${env.cluster}/${path}`, {
+			headers: { 'x-proxy-target': 'api' },
+			params
+		});
+
+	const cluster = await ask('prometheus/api/v1/query', { query: 'up' });
+	expect(cluster.status(), 'cluster scope').toBe(403);
+	const tenancy = await ask('prometheus-tenancy/api/v1/query', {
+		query: 'up',
+		namespace: otherNamespace
+	});
+	expect(tenancy.status(), `namespace scope in ${otherNamespace}`).toBe(403);
+	const shared = await ask('prometheus-shared/ceph-total-bytes');
+	expect(shared.status(), 'shared scope without a namespace').toBe(403);
+	// The same shared query as this Workspace is answered: the 403 above is the namespace's doing.
+	const own = await ask('prometheus-shared/ceph-total-bytes', { namespace: env.namespace });
+	expect(own.status(), 'shared scope as this Workspace').toBe(200);
+});
+
 test('overview shows their namespace, and the cluster capacity through the shared scope', async ({
 	page
 }) => {
-	const { tenancy, shared, clusterScope } = await visit(page, 'overview');
+	const { tenancy, shared, clusterScope } = await visit(page, 'overview', ['ceph-total-bytes']);
 	expectOwnNamespaceOnly(tenancy);
-	expect(hasData(tenancy), 'overview charts are empty').toBe(true);
+	await expect.poll(() => hasData(tenancy), { message: 'overview charts are empty' }).toBe(true);
 	expect(clusterScope).toEqual([]);
 	for (const q of sentQueries(tenancy)) for (const m of INFRASTRUCTURE) expect(q).not.toContain(m);
 	expectShared(shared, ['ceph-total-bytes']);
 });
 
 test('compute stays in their namespace and shows KubeVirt components', async ({ page }) => {
-	const { tenancy, shared, clusterScope } = await visit(page, 'compute');
+	const kubevirt = ['kubevirt-handlers', 'kubevirt-controllers', 'kubevirt-controllers-ready'];
+	const { tenancy, shared, clusterScope } = await visit(page, 'compute', kubevirt);
 	expectOwnNamespaceOnly(tenancy);
 	expect(clusterScope).toEqual([]);
 	for (const q of sentQueries(tenancy)) {
 		for (const m of INFRASTRUCTURE) expect(q).not.toContain(m);
 		expect(q).not.toContain('exported_namespace');
 	}
-	expectShared(shared, ['kubevirt-handlers', 'kubevirt-controllers', 'kubevirt-controllers-ready']);
+	expectShared(shared, kubevirt);
 	if (process.env.E2E_EXPECT_VM_DATA === '1')
-		expect(hasData(tenancy), 'compute charts are empty').toBe(true);
+		await expect.poll(() => hasData(tenancy), { message: 'compute charts are empty' }).toBe(true);
 });
 
 test('model overview stays in their namespace', async ({ page }) => {
@@ -228,18 +277,27 @@ test('model overview stays in their namespace', async ({ page }) => {
 	for (const q of sentQueries(tenancy)) for (const m of INFRASTRUCTURE) expect(q).not.toContain(m);
 	expectShared(shared, []);
 	if (process.env.E2E_EXPECT_MODEL_DATA === '1')
-		expect(hasData(tenancy), 'model charts are empty').toBe(true);
+		await expect.poll(() => hasData(tenancy), { message: 'model charts are empty' }).toBe(true);
 });
 
 test('model analytics shows GPU memory and XID through the shared scope', async ({ page }) => {
 	test.skip(!model, 'needs E2E_MODEL');
 	const watched = watchMetrics(page);
+	const gpuNames = [
+		'host-gpu-fb-used',
+		'host-gpu-fb-total',
+		'host-gpu-count',
+		'gpu-xid-total',
+		'gpu-xid-by-gpu'
+	];
+	// The panels query once a model is picked; started before any click, this
+	// also catches answers for a model the page picked on its own.
+	const answered = sharedAnswers(page, gpuNames);
 	await page.goto(dashboard('model'));
 	await page.getByRole('tab', { name: /^(Analytics|分析)$/ }).click();
 	await page.getByRole('combobox').first().click();
 	await page.getByRole('option', { name: model, exact: true }).click();
-	await page.waitForLoadState('networkidle');
-	await page.waitForTimeout(3_000); // panels query after the model is picked
+	await answered;
 
 	await expect(
 		page.getByText(/GPU Memory: Allocated vs Used|GPU 記憶體：已分配 vs 已使用/)
@@ -247,13 +305,7 @@ test('model analytics shows GPU memory and XID through the shared scope', async 
 	await expect(page.getByText('XID', { exact: true })).toBeVisible();
 	expectOwnNamespaceOnly(watched.tenancy);
 	expect(watched.clusterScope).toEqual([]);
-	expectShared(watched.shared, [
-		'host-gpu-fb-used',
-		'host-gpu-fb-total',
-		'host-gpu-count',
-		'gpu-xid-total',
-		'gpu-xid-by-gpu'
-	]);
+	expectShared(watched.shared, gpuNames);
 });
 
 test('a model service shows its GPU allocation and the GPU resources', async ({ page }) => {
@@ -270,24 +322,29 @@ test('a model service shows its GPU allocation and the GPU resources', async ({ 
 
 	await page.goto(list);
 	await openActions();
-	await page.getByRole('menuitem', { name: /^(GPU Allocation|GPU 分配)$/ }).click();
-	await expect(page.getByRole('dialog')).toBeVisible();
-	await page.waitForLoadState('networkidle');
-	expectShared(watched.shared, [
+	const allocationNames = [
 		'gpu-util',
 		'gpu-fb-used',
 		'gpu-fb-total',
 		'gpu-allocated-memory',
 		'gpu-shared-count'
-	]);
+	];
+	const allocationAnswered = sharedAnswers(page, allocationNames);
+	await page.getByRole('menuitem', { name: /^(GPU Allocation|GPU 分配)$/ }).click();
+	await expect(page.getByRole('dialog')).toBeVisible();
+	await allocationAnswered;
+	expectShared(watched.shared, allocationNames);
 	await page.keyboard.press('Escape');
 
 	await openActions();
+	// The GPU resources ask as the Update dialog opens, before their button is clicked.
+	const resourceNames = ['gpu-inventory', 'vgpu-memory-limit', 'vgpu-memory-used'];
+	const resourcesAnswered = sharedAnswers(page, resourceNames);
 	await page.getByRole('menuitem', { name: /^Update$/ }).click();
 	// The row behind the dialog has GPU icons too; the overlay would take the click.
 	await page.getByRole('dialog').last().locator('button:has(svg.lucide-gpu)').first().click();
 	await expect(page.getByText('GPU Resources', { exact: true })).toBeVisible();
-	await page.waitForLoadState('networkidle');
-	expectShared(watched.shared, ['gpu-inventory', 'vgpu-memory-limit', 'vgpu-memory-used']);
+	await resourcesAnswered;
+	expectShared(watched.shared, resourceNames);
 	expect(watched.clusterScope).toEqual([]);
 });
