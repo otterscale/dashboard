@@ -1,4 +1,4 @@
-import { InstantVector, PrometheusDriver, RangeVector } from 'prometheus-query';
+import { InstantVector, PrometheusDriver, QueryResult, RangeVector } from 'prometheus-query';
 
 import type { ChartConfig } from '$lib/components/ui/chart/index.js';
 import { m } from '$lib/messages';
@@ -15,6 +15,11 @@ import { m } from '$lib/messages';
  * to namespace="<ns>" the way prom-label-proxy does it. A namespace-scoped page
  * therefore only works with metrics whose `namespace` label is the tenant's —
  * see docs/metrics.md.
+ *
+ * Shared scope (`/proxy/<cluster>/prometheus-shared/<name>`) takes no PromQL:
+ * the server runs one of its own named queries — cluster-wide numbers that
+ * name no workload, per GPU card, per host, or a total — for the namespace
+ * scope's callers as well as cluster viewers. See sharedMetrics.
  */
 
 const PROXY_HEADERS = { 'x-proxy-target': 'api' };
@@ -87,6 +92,91 @@ export function dashboardBody(state: {
 	if (!state.cluster) return 'empty';
 	if (!state.initialized) return 'loading';
 	return state.namespace ? 'empty' : 'no-namespace';
+}
+
+/** The server's named cluster-wide queries (otterscale internal/handler/proxy_shared_catalog.go). */
+export type SharedQueryName =
+	| 'gpu-util'
+	| 'gpu-fb-used'
+	| 'gpu-fb-total'
+	| 'gpu-inventory'
+	| 'vgpu-memory-limit'
+	| 'vgpu-memory-used'
+	| 'host-gpu-fb-used'
+	| 'host-gpu-fb-total'
+	| 'host-gpu-count'
+	| 'gpu-xid-total'
+	| 'gpu-xid-by-gpu'
+	| 'kubevirt-handlers'
+	| 'kubevirt-controllers'
+	| 'kubevirt-controllers-ready'
+	| 'ceph-total-bytes'
+	| 'gpu-allocated-memory'
+	| 'gpu-allocated-cores'
+	| 'gpu-shared-count';
+
+/** Values for the one repeatable parameter a shared query takes, if any. */
+export type SharedParams = { uuid?: string[]; hostname?: string[] };
+
+export interface SharedMetrics {
+	instant(name: SharedQueryName, params?: SharedParams, time?: Date): Promise<QueryResult>;
+	range(
+		name: SharedQueryName,
+		params: SharedParams,
+		start: Date,
+		end: Date,
+		step: number
+	): Promise<QueryResult>;
+}
+
+/**
+ * Shared scope: cluster-wide numbers that name no workload — per GPU card, per
+ * host, or a total — for Workspace members and cluster viewers alike. The
+ * server holds the PromQL; this sends a name and parameters. `namespace` is the
+ * Workspace's and only proves membership, so an admin's "all namespaces" choice
+ * does not change it; it is left out when the Workspace has none, and then only
+ * cluster viewers get an answer. Failures reject with the server's message.
+ */
+export function sharedMetrics(cluster: string, namespace: string, origin = ''): SharedMetrics {
+	async function get(name: SharedQueryName, search: URLSearchParams): Promise<QueryResult> {
+		if (namespace) search.set('namespace', namespace);
+		const response = await fetch(`${origin}/proxy/${cluster}/prometheus-shared/${name}?${search}`, {
+			headers: PROXY_HEADERS
+		});
+		const body = (await response.json().catch(() => null)) as {
+			status?: string;
+			data?: object;
+			error?: string;
+		} | null;
+		if (!response.ok || body?.status !== 'success' || !body.data) {
+			throw new Error(`${name}: ${body?.error ?? `HTTP ${response.status}`}`);
+		}
+		return QueryResult.fromJSON(body.data);
+	}
+
+	function searchFor(params: SharedParams = {}): URLSearchParams {
+		const search = new URLSearchParams();
+		for (const uuid of params.uuid ?? []) search.append('uuid', uuid);
+		for (const hostname of params.hostname ?? []) search.append('hostname', hostname);
+		return search;
+	}
+
+	const seconds = (date: Date) => String(date.getTime() / 1000);
+
+	return {
+		instant(name, params, time) {
+			const search = searchFor(params);
+			if (time) search.set('time', seconds(time));
+			return get(name, search);
+		},
+		range(name, params, start, end, step) {
+			const search = searchFor(params);
+			search.set('start', seconds(start));
+			search.set('end', seconds(end));
+			search.set('step', String(step));
+			return get(name, search);
+		}
+	};
 }
 
 /** Escape a value for use inside PromQL double-quoted string literals (e.g. `namespace="..."`). */
