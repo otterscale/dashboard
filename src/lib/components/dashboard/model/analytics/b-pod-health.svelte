@@ -12,7 +12,7 @@
 	import {
 		classifyThreshold,
 		escapePromqlStringLiteral,
-		fetchCombinedInstant,
+		fetchCombinedInstantOrNull,
 		fetchModelNodes,
 		type SharedMetrics,
 		type ThresholdLevel,
@@ -49,6 +49,8 @@
 	let terminatedByPod = $state<Record<string, TerminatedInfo>>({});
 	let xidByGpu = $state<GpuEntry[]>([]);
 	let xidUnavailable = $state(false);
+	/** The namespace-scope query failed: restart, OOM, throttle, SHM and preempt are unknown. */
+	let mainUnavailable = $state(false);
 	let nodeCount = $state(0);
 	let isLoaded = $state(false);
 
@@ -174,20 +176,24 @@
 		const xidPromise = nodesPromise.then(fetchXid);
 
 		const [main, nodes, xid] = await Promise.all([
-			fetchCombinedInstant(prometheusDriver, mainQueries),
+			fetchCombinedInstantOrNull(prometheusDriver, mainQueries),
 			nodesPromise,
 			xidPromise
 		]);
 
-		restartTotal = Math.round(scalarFromVectors(main.restartTotal));
-		restartByPod = perPodFromVectors(main.restartPerPod);
-		oomTotal = Math.round(scalarFromVectors(main.oomTotal));
-		oomByPod = perPodFromVectors(main.oomPerPod);
-		terminatedByPod = terminatedFromVectors(main.lastTermExit);
-		const throttleV = scalarFromVectors(main.throttle);
+		// A failed query clears the last numbers rather than keeping them, and the
+		// tiles show unknown, like XID, not a healthy 0.
+		mainUnavailable = main === null;
+		const slot = (name: keyof typeof mainQueries) => main?.[name] ?? [];
+		restartTotal = Math.round(scalarFromVectors(slot('restartTotal')));
+		restartByPod = perPodFromVectors(slot('restartPerPod'));
+		oomTotal = Math.round(scalarFromVectors(slot('oomTotal')));
+		oomByPod = perPodFromVectors(slot('oomPerPod'));
+		terminatedByPod = terminatedFromVectors(slot('lastTermExit'));
+		const throttleV = scalarFromVectors(slot('throttle'));
 		throttlePct = Number.isFinite(throttleV) ? throttleV : 0;
-		preemptTotal = Math.round(scalarFromVectors(main.preemptTotal));
-		preemptByPod = perPodFromVectors(main.preemptPerPod);
+		preemptTotal = Math.round(scalarFromVectors(slot('preemptTotal')));
+		preemptByPod = perPodFromVectors(slot('preemptPerPod'));
 		nodeCount = nodes?.length ?? 0;
 		xidUnavailable = xid === null;
 		xidTotal = xid?.total ?? 0;
@@ -236,6 +242,11 @@
 		if (level === 'orange') return 'text-chart-1';
 		return 'text-chart-2';
 	}
+
+	/** Colour of a tile fed by the namespace-scope query: grey while it is unknown. */
+	function mainColorClass(level: ThresholdLevel): string {
+		return mainUnavailable ? 'text-muted-foreground' : valueColorClass(level);
+	}
 </script>
 
 <Statistics.Root type="count" class="overflow-visible">
@@ -269,15 +280,19 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-2xl font-bold tabular-nums', valueColorClass(restartLevel))}>
-								{restartTotal}
+							<p class={cn('text-2xl font-bold tabular-nums', mainColorClass(restartLevel))}>
+								{mainUnavailable ? '—' : restartTotal}
 							</p>
 							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
 								{m.metric_restart()}
 							</p>
 						</div>
 					</Tooltip.Trigger>
-					{#if restartByPod.length > 0}
+					{#if mainUnavailable}
+						<Tooltip.Content side="bottom">
+							<p class="text-xs">{m.pod_health_unavailable()}</p>
+						</Tooltip.Content>
+					{:else if restartByPod.length > 0}
 						<Tooltip.Content side="bottom">
 							<ul class="flex flex-col gap-1 text-xs">
 								{#each restartByPod as p (p.pod)}
@@ -294,15 +309,19 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-2xl font-bold tabular-nums', valueColorClass(oomLevel))}>
-								{oomTotal}
+							<p class={cn('text-2xl font-bold tabular-nums', mainColorClass(oomLevel))}>
+								{mainUnavailable ? '—' : oomTotal}
 							</p>
 							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
 								{m.metric_oom()}
 							</p>
 						</div>
 					</Tooltip.Trigger>
-					{#if oomByPod.length > 0}
+					{#if mainUnavailable}
+						<Tooltip.Content side="bottom">
+							<p class="text-xs">{m.pod_health_unavailable()}</p>
+						</Tooltip.Content>
+					{:else if oomByPod.length > 0}
 						<Tooltip.Content side="bottom">
 							<ul class="flex flex-col gap-1 text-xs">
 								{#each oomByPod as p (p.pod)}
@@ -358,8 +377,8 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-2xl font-bold tabular-nums', valueColorClass(throttleLevel))}>
-								{throttlePct.toFixed(1)}%
+							<p class={cn('text-2xl font-bold tabular-nums', mainColorClass(throttleLevel))}>
+								{mainUnavailable ? '—' : `${throttlePct.toFixed(1)}%`}
 							</p>
 							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
 								{m.metric_cpu_throttle()}
@@ -367,15 +386,17 @@
 						</div>
 					</Tooltip.Trigger>
 					<Tooltip.Content side="bottom" class="max-w-xs">
-						<p class="text-xs">{m.llm_dashboard_cpu_throttle_hint()}</p>
+						<p class="text-xs">
+							{mainUnavailable ? m.pod_health_unavailable() : m.llm_dashboard_cpu_throttle_hint()}
+						</p>
 					</Tooltip.Content>
 				</Tooltip.Root>
 
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-2xl font-bold tabular-nums', valueColorClass(shmLevel))}>
-								{shmCrashCount}
+							<p class={cn('text-2xl font-bold tabular-nums', mainColorClass(shmLevel))}>
+								{mainUnavailable ? '—' : shmCrashCount}
 							</p>
 							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
 								{m.metric_shm_crash()}
@@ -383,7 +404,9 @@
 						</div>
 					</Tooltip.Trigger>
 					<Tooltip.Content side="bottom" class="max-w-sm">
-						{#if shmCrashPods.length === 0}
+						{#if mainUnavailable}
+							<p class="text-xs">{m.pod_health_unavailable()}</p>
+						{:else if shmCrashPods.length === 0}
 							<p class="text-xs">{m.llm_dashboard_shm_crash_hint()}</p>
 						{:else}
 							<div class="flex flex-col gap-1">
@@ -406,8 +429,8 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-2xl font-bold tabular-nums', valueColorClass(preemptLevel))}>
-								{preemptTotal}
+							<p class={cn('text-2xl font-bold tabular-nums', mainColorClass(preemptLevel))}>
+								{mainUnavailable ? '—' : preemptTotal}
 							</p>
 							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
 								{m.metric_preempt()}
@@ -415,7 +438,9 @@
 						</div>
 					</Tooltip.Trigger>
 					<Tooltip.Content side="bottom" class="max-w-xs">
-						{#if preemptByPod.length === 0}
+						{#if mainUnavailable}
+							<p class="text-xs">{m.pod_health_unavailable()}</p>
+						{:else if preemptByPod.length === 0}
 							<p class="text-xs">{m.llm_dashboard_preempt_hint()}</p>
 						{:else}
 							<div class="flex flex-col gap-1">
