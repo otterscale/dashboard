@@ -11,7 +11,7 @@ function files(dir: string): string[] {
 }
 
 // Namespace scope forces namespace="<ns>". KubeVirt's PodMonitor keeps the
-// VMI's own namespace label (helm-charts kubevirt 1.1.2), so a selector on
+// VMI's own namespace label (helm-charts kubevirt 1.2.0), so a selector on
 // exported_namespace would only ever match nothing for a tenant.
 describe('compute dashboard', () => {
 	it('selects VM metrics on namespace, not exported_namespace', () => {
