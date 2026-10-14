@@ -151,11 +151,18 @@ async function attachWorkspaces(
 	return workspaceByNamespace;
 }
 
+/**
+ * `listNodePods` lists every GPU pod on the service's nodes, so a card's usage
+ * counts every workload on it. Viewers without cluster metrics access skip it —
+ * every such request would be refused — and get per-card totals from the shared
+ * scope instead (gpu-allocation-dialog.svelte).
+ */
 export async function fetchLLMInferenceServiceTopology(
 	client: ResourceClient,
 	cluster: string,
 	namespace: string,
-	serviceName: string
+	serviceName: string,
+	listNodePods = true
 ): Promise<TopologyData> {
 	// 1. List pods belonging to this LLMInferenceService (covers both decode and prefill workloads)
 	const podResponse = await client.list({
@@ -241,24 +248,23 @@ export async function fetchLLMInferenceServiceTopology(
 	// 5. List every GPU pod on the involved nodes (all namespaces), so GPU/node
 	// usage reflects all workloads — not just this service's pods. The diagram
 	// still only renders this service's pods; other pods only contribute usage.
-	const nodePodLists = await Promise.all(
-		[...nodeNames].map(async (name) => {
-			try {
-				const res = await client.list({
-					cluster,
-					group: '',
-					version: 'v1',
-					resource: 'pods',
-					namespace: '',
-					fieldSelector: `spec.nodeName=${name}`
-				});
-				return res.items.map((item) => item.object);
-			} catch {
-				console.warn(`Failed to list pods on node ${name}`);
-				return [];
-			}
-		})
-	);
+	const listGpuPodsOnNode = async (name: string) => {
+		try {
+			const res = await client.list({
+				cluster,
+				group: '',
+				version: 'v1',
+				resource: 'pods',
+				namespace: '',
+				fieldSelector: `spec.nodeName=${name}`
+			});
+			return res.items.map((item) => item.object);
+		} catch {
+			console.warn(`Failed to list pods on node ${name}`);
+			return [];
+		}
+	};
+	const nodePodLists = listNodePods ? await Promise.all([...nodeNames].map(listGpuPodsOnNode)) : [];
 
 	// Start from this service's active pods so their allocations survive a failed
 	// node listing, then add the other running GPU pods (dedup by namespace/name).

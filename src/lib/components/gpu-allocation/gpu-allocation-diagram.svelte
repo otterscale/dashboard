@@ -15,6 +15,7 @@
 	} from '@xyflow/svelte';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
+	import { cardUsage } from './card-usage';
 	import { buildMigSlices, isGpuMigMode } from './hami';
 	import { computeLayout } from './layout';
 	import GpuNode from './nodes/gpu-node.svelte';
@@ -48,7 +49,7 @@
 		>();
 		for (const gpu of topologyData.gpus) {
 			const agg = map.get(gpu.nodeName) ?? { usedMem: 0, computeSum: 0, measuredCards: 0 };
-			agg.usedMem += gpu.allocatedBy.reduce((sum, a) => sum + a.usedMem, 0);
+			agg.usedMem += cardUsage(gpu).usedMem;
 			const compute = gpu.utilization?.compute;
 			if (compute !== undefined) {
 				agg.computeSum += compute;
@@ -150,7 +151,7 @@
 				if (!allocatedGpuIds.has(gpu.device.id)) continue;
 
 				const gpuId = `gpu-${gpu.device.id}`;
-				const totalUsedMem = gpu.allocatedBy.reduce((sum, a) => sum + a.usedMem, 0);
+				const usage = cardUsage(gpu);
 
 				rawNodes.push({
 					id: gpuId,
@@ -162,8 +163,8 @@
 						type: gpu.device.type,
 						health: gpu.device.health,
 						totalMem: gpu.device.devmem,
-						usedMem: totalUsedMem,
-						shareCount: gpu.allocatedBy.length,
+						usedMem: usage.usedMem,
+						shareCount: usage.shareCount,
 						isMig: migGpuIds.has(gpu.device.id),
 						slices: isGpuMigMode(gpu.device) ? buildMigSlices(gpu.allocatedBy) : [],
 						utilization: gpu.utilization
@@ -243,7 +244,7 @@
 			// Layer 2: GPUs
 			for (const gpu of topologyData.gpus) {
 				const gpuId = `gpu-${gpu.device.id}`;
-				const totalUsedMem = gpu.allocatedBy.reduce((sum, a) => sum + a.usedMem, 0);
+				const usage = cardUsage(gpu);
 
 				rawNodes.push({
 					id: gpuId,
@@ -255,8 +256,8 @@
 						type: gpu.device.type,
 						health: gpu.device.health,
 						totalMem: gpu.device.devmem,
-						usedMem: totalUsedMem,
-						shareCount: gpu.allocatedBy.length,
+						usedMem: usage.usedMem,
+						shareCount: usage.shareCount,
 						isMig: migGpuIds.has(gpu.device.id),
 						slices: isGpuMigMode(gpu.device) ? buildMigSlices(gpu.allocatedBy) : [],
 						utilization: gpu.utilization
