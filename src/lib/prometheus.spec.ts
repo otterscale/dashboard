@@ -1,12 +1,14 @@
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
+import type { PrometheusDriver } from 'prometheus-query';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
 	classifyGpuGovernance,
 	clusterPrometheusDriver,
 	dashboardBody,
+	fetchModelNodes,
 	namespacePrometheusDriver,
 	namespaceSelector,
 	sharedMetrics,
@@ -201,5 +203,27 @@ describe('namespaceSelector', () => {
 
 	it('selects every namespace for the empty choice', () => {
 		expect(namespaceSelector('')).toBe('');
+	});
+});
+
+describe('fetchModelNodes', () => {
+	const driver = (instantQuery: () => Promise<unknown>) =>
+		({ instantQuery }) as unknown as PrometheusDriver;
+
+	it('resolves null when the lookup fails, not "no nodes"', async () => {
+		const failing = driver(async () => {
+			throw new Error('cannot check metrics access on this cluster; retry shortly');
+		});
+		await expect(fetchModelNodes(failing, 'ws-a', 'm1')).resolves.toBeNull();
+	});
+
+	it('returns each node once', async () => {
+		const series = (node: string) => ({ metric: { labels: { node } } });
+		const answering = driver(async () => ({
+			resultType: 'vector',
+			result: [series('n1'), series('n1'), series('n2')]
+		}));
+		const nodes = await fetchModelNodes(answering, 'ws-a', 'm1');
+		expect(nodes?.slice().sort()).toEqual(['n1', 'n2']);
 	});
 });

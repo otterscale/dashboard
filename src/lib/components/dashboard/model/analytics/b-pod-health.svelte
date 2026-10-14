@@ -115,7 +115,10 @@
 	 * XID errors on the GPUs of the nodes the model runs on, from the shared scope;
 	 * null when they could not be asked, which the tile shows as unknown, not as 0.
 	 */
-	async function fetchXid(nodes: string[]): Promise<{ total: number; byGpu: GpuEntry[] } | null> {
+	async function fetchXid(
+		nodes: string[] | null
+	): Promise<{ total: number; byGpu: GpuEntry[] } | null> {
+		if (nodes === null) return null;
 		if (nodes.length === 0) return { total: 0, byGpu: [] };
 		const params = { hostname: nodes };
 		try {
@@ -185,7 +188,7 @@
 		throttlePct = Number.isFinite(throttleV) ? throttleV : 0;
 		preemptTotal = Math.round(scalarFromVectors(main.preemptTotal));
 		preemptByPod = perPodFromVectors(main.preemptPerPod);
-		nodeCount = nodes.length;
+		nodeCount = nodes?.length ?? 0;
 		xidUnavailable = xid === null;
 		xidTotal = xid?.total ?? 0;
 		xidByGpu = xid?.byGpu ?? [];
