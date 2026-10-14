@@ -582,16 +582,13 @@ export async function fetchCombinedFlattenedRange(
 /**
  * Run multiple named instant queries as a SINGLE HTTP request.
  * Returns a record mapping each query name to its InstantVector list (after the
- * `__series__` tag has been stripped, so callers see the original label sets).
- *
- * On error, every named slot is set to `[]` so callers can deconstruct without
- * needing a try/catch per query — matching the lenient `instantNumber` /
- * `instantPerPod` pattern used in the dashboard.
+ * `__series__` tag has been stripped, so callers see the original label sets),
+ * or null when the request failed, so callers can show "unknown" rather than 0.
  */
-export async function fetchCombinedInstant(
+export async function fetchCombinedInstantOrNull(
 	client: PrometheusDriver,
 	queries: Record<string, string>
-): Promise<Record<string, InstantVector[]>> {
+): Promise<Record<string, InstantVector[]> | null> {
 	const result: Record<string, InstantVector[]> = {};
 	for (const name of Object.keys(queries)) result[name] = [];
 	const combined = Object.entries(queries)
@@ -608,10 +605,25 @@ export async function fetchCombinedInstant(
 			vector.metric.labels = rest;
 			result[name].push(vector);
 		}
-	} catch {
-		// leave all slots empty
+	} catch (error) {
+		console.warn('Failed to run combined instant query:', error);
+		return null;
 	}
 	return result;
+}
+
+/**
+ * {@link fetchCombinedInstantOrNull}, with every named slot set to `[]` on
+ * error so callers can deconstruct without needing a try/catch per query —
+ * matching the lenient `instantNumber` / `instantPerPod` pattern used in the
+ * dashboard.
+ */
+export async function fetchCombinedInstant(
+	client: PrometheusDriver,
+	queries: Record<string, string>
+): Promise<Record<string, InstantVector[]>> {
+	const result = await fetchCombinedInstantOrNull(client, queries);
+	return result ?? Object.fromEntries(Object.keys(queries).map((name) => [name, []]));
 }
 
 /**

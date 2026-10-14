@@ -23,7 +23,9 @@
 		try {
 			await fetchWorkers();
 		} catch (error) {
-			console.error('Failed to fetch worker data:', error);
+			// Show no data rather than the last number, which may no longer hold.
+			console.warn('Failed to fetch worker data:', error);
+			workers = undefined;
 		}
 	}
 

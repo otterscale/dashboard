@@ -2,12 +2,14 @@ import { createServer, type IncomingMessage, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
 import type { PrometheusDriver } from 'prometheus-query';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 import {
 	classifyGpuGovernance,
 	clusterPrometheusDriver,
 	dashboardBody,
+	fetchCombinedInstant,
+	fetchCombinedInstantOrNull,
 	fetchModelNodes,
 	namespacePrometheusDriver,
 	namespaceSelector,
@@ -225,5 +227,35 @@ describe('fetchModelNodes', () => {
 		}));
 		const nodes = await fetchModelNodes(answering, 'ws-a', 'm1');
 		expect(nodes?.slice().sort()).toEqual(['n1', 'n2']);
+	});
+});
+
+describe('fetchCombinedInstantOrNull', () => {
+	const driver = (instantQuery: () => Promise<unknown>) =>
+		({ instantQuery }) as unknown as PrometheusDriver;
+	const queries = { restarts: 'a', ooms: 'b' };
+
+	it('resolves null when the query fails, so callers can show unknown rather than 0', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const failing = driver(async () => {
+			throw new Error('HTTP 403');
+		});
+		await expect(fetchCombinedInstantOrNull(failing, queries)).resolves.toBeNull();
+		expect(warn).toHaveBeenCalled();
+		await expect(fetchCombinedInstant(failing, queries)).resolves.toEqual({
+			restarts: [],
+			ooms: []
+		});
+		warn.mockRestore();
+	});
+
+	it('splits the combined answer by name, without the tag', async () => {
+		const answering = driver(async () => ({
+			resultType: 'vector',
+			result: [{ metric: { labels: { __series__: 'ooms', pod: 'p1' } } }]
+		}));
+		const result = await fetchCombinedInstantOrNull(answering, queries);
+		expect(result?.restarts).toEqual([]);
+		expect(result?.ooms.map((v) => v.metric.labels)).toEqual([{ pod: 'p1' }]);
 	});
 });

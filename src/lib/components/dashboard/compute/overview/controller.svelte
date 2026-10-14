@@ -30,7 +30,10 @@
 		try {
 			await Promise.all([fetchReadyControllers(), fetchHealthControllers()]);
 		} catch (error) {
-			console.error('Failed to fetch controller data:', error);
+			// Show no data rather than the last numbers, which may no longer hold.
+			console.warn('Failed to fetch controller data:', error);
+			readyControllers = undefined;
+			healthControllers = undefined;
 		}
 	}
 

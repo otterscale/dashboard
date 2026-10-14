@@ -166,7 +166,8 @@
 			data = Object.values(dateMap).sort(
 				(a, b) => (a.date as Date).getTime() - (b.date as Date).getTime()
 			);
-		} catch {
+		} catch (error) {
+			console.warn('Failed to fetch GPU memory:', error);
 			failed = true;
 			data = [];
 			hosts = [];
