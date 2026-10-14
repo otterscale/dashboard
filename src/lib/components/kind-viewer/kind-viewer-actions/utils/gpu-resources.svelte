@@ -10,24 +10,22 @@
 	import * as Modal from '$lib/components/ui/dialog';
 	import * as Item from '$lib/components/ui/item';
 	import * as Table from '$lib/components/ui/table';
-	import { clusterPrometheusDriver } from '$lib/prometheus';
+	import { sharedMetrics } from '$lib/prometheus';
 
 	let gpus: Record<string, JsonValue>[] = [];
 	let gpusByModelName: Record<string, JsonValue>[] = [];
 	let gpusByHostName: Record<string, JsonValue>[] = [];
 
 	onMount(async () => {
-		// DCGM and HAMi are cluster scope: a regular user would only get 403s.
-		if (page.data.canViewClusterMetrics !== true) return;
-		const driver = clusterPrometheusDriver(page.params.cluster!);
+		// Per-card inventory and vGPU totals: cluster-wide, naming no workload,
+		// from the shared scope for every viewer.
+		const shared = sharedMetrics(page.params.cluster!, page.data.namespace ?? '');
 
 		try {
 			const [fieldBufferResponse, vgpuLimitResponse, vgpuUsageResponse] = await Promise.all([
-				driver.instantQuery(
-					'(DCGM_FI_DEV_FB_FREE + DCGM_FI_DEV_FB_RESERVED + DCGM_FI_DEV_FB_USED) * (1024 * 1024)' // DCGM return in Mi
-				),
-				driver.instantQuery('sum by (device_uuid) (hami_vgpu_memory_limit_bytes)'),
-				driver.instantQuery('sum by (device_uuid) (hami_vgpu_memory_used_bytes)')
+				shared.instant('gpu-inventory'),
+				shared.instant('vgpu-memory-limit'),
+				shared.instant('vgpu-memory-used')
 			]);
 
 			const vgpuLimits = vgpuLimitResponse.result.map((series) => {
@@ -79,187 +77,185 @@
 	});
 </script>
 
-{#if page.data.canViewClusterMetrics === true}
-	<Modal.Root>
-		<Modal.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-			<GpuIcon />
-		</Modal.Trigger>
-		<Modal.Content
-			class="max-h-[95vh] min-w-[77vw] overflow-auto"
-			onInteractOutside={(e) => e.preventDefault()}
-		>
-			<Item.Root class="w-full px-2">
-				<Item.Content class="*:font-bold">
-					<Item.Title>GPU Resources</Item.Title>
-					<Item.Description>Amount of limits, usage, and total field buffers.</Item.Description>
-				</Item.Content>
-				<Item.Actions>{gpus.length} devices</Item.Actions>
-			</Item.Root>
+<Modal.Root>
+	<Modal.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
+		<GpuIcon />
+	</Modal.Trigger>
+	<Modal.Content
+		class="max-h-[95vh] min-w-[77vw] overflow-auto"
+		onInteractOutside={(e) => e.preventDefault()}
+	>
+		<Item.Root class="w-full px-2">
+			<Item.Content class="*:font-bold">
+				<Item.Title>GPU Resources</Item.Title>
+				<Item.Description>Amount of limits, usage, and total field buffers.</Item.Description>
+			</Item.Content>
+			<Item.Actions>{gpus.length} devices</Item.Actions>
+		</Item.Root>
 
-			<Item.Root class="w-full px-2 py-0">
-				<Item.Content>
-					<Item.Title>Summary</Item.Title>
-					<Item.Description>
-						{gpusByModelName.length} types
-					</Item.Description>
-				</Item.Content>
-			</Item.Root>
-			<Table.Root class="rounded-lg bg-muted/30">
-				<Table.Header>
-					<Table.Row class="hover:bg-transparent">
-						<Table.Head>Identifier</Table.Head>
-						<Table.Head class="text-end">usage</Table.Head>
-						<Table.Head class="text-end">limit</Table.Head>
-						<Table.Head class="text-end">total</Table.Head>
+		<Item.Root class="w-full px-2 py-0">
+			<Item.Content>
+				<Item.Title>Summary</Item.Title>
+				<Item.Description>
+					{gpusByModelName.length} types
+				</Item.Description>
+			</Item.Content>
+		</Item.Root>
+		<Table.Root class="rounded-lg bg-muted/30">
+			<Table.Header>
+				<Table.Row class="hover:bg-transparent">
+					<Table.Head>Identifier</Table.Head>
+					<Table.Head class="text-end">usage</Table.Head>
+					<Table.Head class="text-end">limit</Table.Head>
+					<Table.Head class="text-end">total</Table.Head>
+				</Table.Row>
+			</Table.Header>
+			<Table.Body class="[&_td:first-child]:rounded-l-lg [&_td:last-child]:rounded-r-lg">
+				{#each gpusByModelName as gpuByIdetifier, index (index)}
+					<Table.Row class="border-none">
+						<Table.Cell>{gpuByIdetifier.identifier}</Table.Cell>
+						<Table.Cell class="text-end">
+							{@const { value, unit } =
+								gpuByIdetifier.usage && typeof gpuByIdetifier.usage === 'number'
+									? formatWithBinarySuffix(BigInt(gpuByIdetifier.usage))
+									: { value: undefined, unit: undefined }}
+							{#if value !== undefined && unit !== undefined}
+								{value.toFixed(2)} {unit}
+							{/if}
+						</Table.Cell>
+						<Table.Cell class="text-end">
+							{@const { value, unit } =
+								gpuByIdetifier.limit && typeof gpuByIdetifier.limit === 'number'
+									? formatWithBinarySuffix(BigInt(gpuByIdetifier.limit))
+									: { value: undefined, unit: undefined }}
+							{#if value !== undefined && unit !== undefined}
+								{value.toFixed(2)} {unit}
+							{/if}
+						</Table.Cell>
+						<Table.Cell class="text-end">
+							{@const { value, unit } =
+								gpuByIdetifier.total && typeof gpuByIdetifier.total === 'number'
+									? formatWithBinarySuffix(BigInt(gpuByIdetifier.total))
+									: { value: undefined, unit: undefined }}
+							{#if value !== undefined && unit !== undefined}
+								{value.toFixed(2)} {unit}
+							{/if}
+						</Table.Cell>
 					</Table.Row>
-				</Table.Header>
-				<Table.Body class="[&_td:first-child]:rounded-l-lg [&_td:last-child]:rounded-r-lg">
-					{#each gpusByModelName as gpuByIdetifier, index (index)}
-						<Table.Row class="border-none">
-							<Table.Cell>{gpuByIdetifier.identifier}</Table.Cell>
-							<Table.Cell class="text-end">
-								{@const { value, unit } =
-									gpuByIdetifier.usage && typeof gpuByIdetifier.usage === 'number'
-										? formatWithBinarySuffix(BigInt(gpuByIdetifier.usage))
-										: { value: undefined, unit: undefined }}
-								{#if value !== undefined && unit !== undefined}
-									{value.toFixed(2)} {unit}
-								{/if}
-							</Table.Cell>
-							<Table.Cell class="text-end">
-								{@const { value, unit } =
-									gpuByIdetifier.limit && typeof gpuByIdetifier.limit === 'number'
-										? formatWithBinarySuffix(BigInt(gpuByIdetifier.limit))
-										: { value: undefined, unit: undefined }}
-								{#if value !== undefined && unit !== undefined}
-									{value.toFixed(2)} {unit}
-								{/if}
-							</Table.Cell>
-							<Table.Cell class="text-end">
-								{@const { value, unit } =
-									gpuByIdetifier.total && typeof gpuByIdetifier.total === 'number'
-										? formatWithBinarySuffix(BigInt(gpuByIdetifier.total))
-										: { value: undefined, unit: undefined }}
-								{#if value !== undefined && unit !== undefined}
-									{value.toFixed(2)} {unit}
-								{/if}
-							</Table.Cell>
-						</Table.Row>
-					{/each}
-				</Table.Body>
-			</Table.Root>
+				{/each}
+			</Table.Body>
+		</Table.Root>
 
-			<Item.Root class="w-full px-2 py-0">
-				<Item.Content>
-					<Item.Title>Summary</Item.Title>
-					<Item.Description>
-						{gpusByHostName.length} hosts
-					</Item.Description>
-				</Item.Content>
-			</Item.Root>
-			<Table.Root class="rounded-lg bg-muted/30">
-				<Table.Header>
-					<Table.Row class="hover:bg-transparent">
-						<Table.Head>Identifier</Table.Head>
-						<Table.Head class="text-end">usage</Table.Head>
-						<Table.Head class="text-end">limit</Table.Head>
-						<Table.Head class="text-end">total</Table.Head>
+		<Item.Root class="w-full px-2 py-0">
+			<Item.Content>
+				<Item.Title>Summary</Item.Title>
+				<Item.Description>
+					{gpusByHostName.length} hosts
+				</Item.Description>
+			</Item.Content>
+		</Item.Root>
+		<Table.Root class="rounded-lg bg-muted/30">
+			<Table.Header>
+				<Table.Row class="hover:bg-transparent">
+					<Table.Head>Identifier</Table.Head>
+					<Table.Head class="text-end">usage</Table.Head>
+					<Table.Head class="text-end">limit</Table.Head>
+					<Table.Head class="text-end">total</Table.Head>
+				</Table.Row>
+			</Table.Header>
+			<Table.Body class="[&_td:first-child]:rounded-l-lg [&_td:last-child]:rounded-r-lg">
+				{#each gpusByHostName as gpuByIdetifier, index (index)}
+					<Table.Row class="border-none">
+						<Table.Cell>{gpuByIdetifier.identifier}</Table.Cell>
+						<Table.Cell class="text-end">
+							{@const { value, unit } =
+								gpuByIdetifier.usage && typeof gpuByIdetifier.usage === 'number'
+									? formatWithBinarySuffix(BigInt(gpuByIdetifier.usage))
+									: { value: undefined, unit: undefined }}
+							{#if value !== undefined && unit !== undefined}
+								{value.toFixed(2)} {unit}
+							{/if}
+						</Table.Cell>
+						<Table.Cell class="text-end">
+							{@const { value, unit } =
+								gpuByIdetifier.limit && typeof gpuByIdetifier.limit === 'number'
+									? formatWithBinarySuffix(BigInt(gpuByIdetifier.limit))
+									: { value: undefined, unit: undefined }}
+							{#if value !== undefined && unit !== undefined}
+								{value.toFixed(2)} {unit}
+							{/if}
+						</Table.Cell>
+						<Table.Cell class="text-end">
+							{@const { value, unit } =
+								gpuByIdetifier.total && typeof gpuByIdetifier.total === 'number'
+									? formatWithBinarySuffix(BigInt(gpuByIdetifier.total))
+									: { value: undefined, unit: undefined }}
+							{#if value !== undefined && unit !== undefined}
+								{value.toFixed(2)} {unit}
+							{/if}
+						</Table.Cell>
 					</Table.Row>
-				</Table.Header>
-				<Table.Body class="[&_td:first-child]:rounded-l-lg [&_td:last-child]:rounded-r-lg">
-					{#each gpusByHostName as gpuByIdetifier, index (index)}
-						<Table.Row class="border-none">
-							<Table.Cell>{gpuByIdetifier.identifier}</Table.Cell>
-							<Table.Cell class="text-end">
-								{@const { value, unit } =
-									gpuByIdetifier.usage && typeof gpuByIdetifier.usage === 'number'
-										? formatWithBinarySuffix(BigInt(gpuByIdetifier.usage))
-										: { value: undefined, unit: undefined }}
-								{#if value !== undefined && unit !== undefined}
-									{value.toFixed(2)} {unit}
-								{/if}
-							</Table.Cell>
-							<Table.Cell class="text-end">
-								{@const { value, unit } =
-									gpuByIdetifier.limit && typeof gpuByIdetifier.limit === 'number'
-										? formatWithBinarySuffix(BigInt(gpuByIdetifier.limit))
-										: { value: undefined, unit: undefined }}
-								{#if value !== undefined && unit !== undefined}
-									{value.toFixed(2)} {unit}
-								{/if}
-							</Table.Cell>
-							<Table.Cell class="text-end">
-								{@const { value, unit } =
-									gpuByIdetifier.total && typeof gpuByIdetifier.total === 'number'
-										? formatWithBinarySuffix(BigInt(gpuByIdetifier.total))
-										: { value: undefined, unit: undefined }}
-								{#if value !== undefined && unit !== undefined}
-									{value.toFixed(2)} {unit}
-								{/if}
-							</Table.Cell>
-						</Table.Row>
-					{/each}
-				</Table.Body>
-			</Table.Root>
+				{/each}
+			</Table.Body>
+		</Table.Root>
 
-			<Item.Root class="w-full px-2 py-0">
-				<Item.Content>
-					<Item.Title>Details</Item.Title>
-					<Item.Description>
-						{gpus.length} devices
-					</Item.Description>
-				</Item.Content>
-			</Item.Root>
-			<Table.Root class="rounded-lg bg-muted/30">
-				<Table.Header>
-					<Table.Row class="hover:bg-transparent">
-						<Table.Head>Model Name</Table.Head>
-						<Table.Head>Host Name</Table.Head>
-						<Table.Head>Device</Table.Head>
-						<Table.Head>UUID</Table.Head>
-						<Table.Head class="text-end">usage</Table.Head>
-						<Table.Head class="text-end">limit</Table.Head>
-						<Table.Head class="text-end">total</Table.Head>
+		<Item.Root class="w-full px-2 py-0">
+			<Item.Content>
+				<Item.Title>Details</Item.Title>
+				<Item.Description>
+					{gpus.length} devices
+				</Item.Description>
+			</Item.Content>
+		</Item.Root>
+		<Table.Root class="rounded-lg bg-muted/30">
+			<Table.Header>
+				<Table.Row class="hover:bg-transparent">
+					<Table.Head>Model Name</Table.Head>
+					<Table.Head>Host Name</Table.Head>
+					<Table.Head>Device</Table.Head>
+					<Table.Head>UUID</Table.Head>
+					<Table.Head class="text-end">usage</Table.Head>
+					<Table.Head class="text-end">limit</Table.Head>
+					<Table.Head class="text-end">total</Table.Head>
+				</Table.Row>
+			</Table.Header>
+			<Table.Body class="[&_td:first-child]:rounded-l-lg [&_td:last-child]:rounded-r-lg">
+				{#each gpus as gpu, index (index)}
+					<Table.Row class="border-none">
+						<Table.Cell>{gpu.modelName}</Table.Cell>
+						<Table.Cell>{gpu.hostname}</Table.Cell>
+						<Table.Cell>{gpu.device}</Table.Cell>
+						<Table.Cell>{gpu.UUID}</Table.Cell>
+						<Table.Cell class="text-end">
+							{@const { value, unit } =
+								gpu.usage && typeof gpu.usage === 'number'
+									? formatWithBinarySuffix(BigInt(gpu.usage))
+									: { value: undefined, unit: undefined }}
+							{#if value !== undefined && unit !== undefined}
+								{value.toFixed(2)} {unit}
+							{/if}
+						</Table.Cell>
+						<Table.Cell class="text-end">
+							{@const { value, unit } =
+								gpu.limit && typeof gpu.limit === 'number'
+									? formatWithBinarySuffix(BigInt(gpu.limit))
+									: { value: undefined, unit: undefined }}
+							{#if value !== undefined && unit !== undefined}
+								{value.toFixed(2)} {unit}
+							{/if}
+						</Table.Cell>
+						<Table.Cell class="text-end">
+							{@const { value, unit } =
+								gpu.total && typeof gpu.total === 'number'
+									? formatWithBinarySuffix(BigInt(gpu.total))
+									: { value: undefined, unit: undefined }}
+							{#if value !== undefined && unit !== undefined}
+								{value.toFixed(2)} {unit}
+							{/if}
+						</Table.Cell>
 					</Table.Row>
-				</Table.Header>
-				<Table.Body class="[&_td:first-child]:rounded-l-lg [&_td:last-child]:rounded-r-lg">
-					{#each gpus as gpu, index (index)}
-						<Table.Row class="border-none">
-							<Table.Cell>{gpu.modelName}</Table.Cell>
-							<Table.Cell>{gpu.hostname}</Table.Cell>
-							<Table.Cell>{gpu.device}</Table.Cell>
-							<Table.Cell>{gpu.UUID}</Table.Cell>
-							<Table.Cell class="text-end">
-								{@const { value, unit } =
-									gpu.usage && typeof gpu.usage === 'number'
-										? formatWithBinarySuffix(BigInt(gpu.usage))
-										: { value: undefined, unit: undefined }}
-								{#if value !== undefined && unit !== undefined}
-									{value.toFixed(2)} {unit}
-								{/if}
-							</Table.Cell>
-							<Table.Cell class="text-end">
-								{@const { value, unit } =
-									gpu.limit && typeof gpu.limit === 'number'
-										? formatWithBinarySuffix(BigInt(gpu.limit))
-										: { value: undefined, unit: undefined }}
-								{#if value !== undefined && unit !== undefined}
-									{value.toFixed(2)} {unit}
-								{/if}
-							</Table.Cell>
-							<Table.Cell class="text-end">
-								{@const { value, unit } =
-									gpu.total && typeof gpu.total === 'number'
-										? formatWithBinarySuffix(BigInt(gpu.total))
-										: { value: undefined, unit: undefined }}
-								{#if value !== undefined && unit !== undefined}
-									{value.toFixed(2)} {unit}
-								{/if}
-							</Table.Cell>
-						</Table.Row>
-					{/each}
-				</Table.Body>
-			</Table.Root>
-		</Modal.Content>
-	</Modal.Root>
-{/if}
+				{/each}
+			</Table.Body>
+		</Table.Root>
+	</Modal.Content>
+</Modal.Root>
