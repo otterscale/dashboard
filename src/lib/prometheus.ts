@@ -731,13 +731,14 @@ export function classifyGpuGovernance(allocated?: number, used?: number): GpuGov
  * Joins `kube_pod_info` against `vllm:kv_cache_usage_perc` so we only keep pods
  * that belong to `selectedModel`, then returns the distinct `node` label values.
  * Used to scope DCGM/GPU queries (which lack pod-level labels) to the nodes the
- * model actually occupies.
+ * model actually occupies. Resolves null when the lookup failed, so callers can
+ * tell 'unknown' from 'no GPU'.
  */
 export async function fetchModelNodes(
 	client: PrometheusDriver,
 	namespace: string | undefined,
 	selectedModel: string
-): Promise<string[]> {
+): Promise<string[] | null> {
 	const ns = (namespace ?? '').trim();
 	const nsSel = ns ? `namespace="${escapePromqlStringLiteral(ns)}"` : '';
 	const podInfoSelector = nsSel ? `{${nsSel}}` : '';
@@ -756,7 +757,7 @@ export async function fetchModelNodes(
 		}
 		return Array.from(nodes);
 	} catch {
-		return [];
+		return null;
 	}
 }
 
