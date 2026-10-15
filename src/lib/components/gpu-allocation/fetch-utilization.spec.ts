@@ -132,6 +132,11 @@ describe('batchUuids', () => {
 		expect(encodedMatcherValueBytes('GPU-a_b')).toBe(7);
 		expect(encodedMatcherValueBytes('.')).toBe(7);
 		expect(encodedMatcherValueBytes(':')).toBe(3);
+		// QuoteMeta then PromQL quoting: a backslash becomes four, a quote \" and
+		// a metacharacter \\ before it; each backslash, quote and + is %XX.
+		expect(encodedMatcherValueBytes('\\')).toBe(12);
+		expect(encodedMatcherValueBytes('"')).toBe(6);
+		expect(encodedMatcherValueBytes('a+b')).toBe(11);
 	});
 
 	it('keeps a typical NVIDIA UUID batch under the server limit', () => {
