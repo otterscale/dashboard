@@ -23,7 +23,6 @@ type VirtualMachineAttribute =
 	| 'Namespace'
 	| 'Status'
 	| 'Ready'
-	| 'Running'
 	| 'Instance Type'
 	| 'Age'
 	| 'Volumes'
@@ -36,7 +35,6 @@ function getVirtualMachineDataSchemas(): Record<VirtualMachineAttribute, DataSch
 		Namespace: 'text',
 		Status: 'text',
 		Ready: 'text',
-		Running: 'text',
 		'Instance Type': 'text',
 		Age: 'time',
 		Volumes: 'number',
@@ -60,7 +58,6 @@ function getVirtualMachineData(
 		Namespace: object?.metadata?.namespace ?? null,
 		Status: object?.status?.printableStatus ?? null,
 		Ready: object?.status?.ready != null ? String(object.status.ready) : null,
-		Running: object?.spec?.running != null ? String(object.spec.running) : null,
 		'Instance Type': instanceTypeDisplay,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		Volumes: object?.spec?.template?.spec?.volumes?.length ?? null,
@@ -75,7 +72,6 @@ function getVirtualMachineUISchemas(): Record<VirtualMachineAttribute, UISchemaT
 		Namespace: 'text',
 		Status: 'text',
 		Ready: 'text',
-		Running: 'text',
 		'Instance Type': 'text',
 		Age: 'time',
 		Volumes: 'array-of-object',
@@ -155,7 +151,6 @@ function getVirtualMachineColumnDefinitions(
 		},
 		simpleColumn('Status'),
 		simpleColumn('Ready'),
-		simpleColumn('Running'),
 		simpleColumn('Instance Type'),
 		simpleColumn('Age'),
 		{
