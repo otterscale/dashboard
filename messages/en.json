@@ -792,5 +792,7 @@
 	"license_adjust_nodes_fifo_hint": "FIFO mode: nodes are authorized in the order they joined the cluster.",
 	"license_adjust_nodes_readonly": "This license has expired or is invalid. Node adjustments are not allowed.",
 	"license_adjust_nodes_last_accepted": "Last accepted: ",
+	"alerting": "Alerting",
+	"alerting_description": "Email platform alerts through an SMTP server.",
 	"containers_without_limit": "{uncapped} of {containers} containers declare no limit"
 }
