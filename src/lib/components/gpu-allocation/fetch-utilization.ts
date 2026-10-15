@@ -46,15 +46,26 @@ const MATCHER_BUDGET = Math.floor(
 /** The `|` that joins two values, as %7C. */
 const SEPARATOR_BYTES = 3;
 
+/** The characters regexp.QuoteMeta puts a backslash before. */
+const REGEXP_META = /[\\.+*?()|[\]{}^$]/;
+
 /**
  * Bytes one value adds to a matcher once the server has escaped it the way
  * sharedMatcher does — regexp.QuoteMeta, then a quoted PromQL string — and
  * the query string is URL-encoded: `.` turns into `%5C%5C.`, `:` into `%3A`.
+ * Only the length is computed, character by character; nothing is escaped.
  */
 export function encodedMatcherValueBytes(value: string): number {
-	const quoted = value.replace(/[\\.+*?()|[\]{}^$]/g, '\\$&').replace(/[\\"]/g, '\\$&');
 	let bytes = 0;
-	for (const ch of quoted) bytes += /[A-Za-z0-9\-_.~]/.test(ch) ? 1 : 3;
+	for (const ch of value) {
+		// QuoteMeta adds one backslash before a metacharacter (a backslash
+		// becomes two); the PromQL string then doubles every backslash and
+		// puts one before a double quote.
+		let escaped = ch;
+		if (REGEXP_META.test(ch)) escaped = ch === '\\' ? '\\\\\\\\' : '\\\\' + ch;
+		else if (ch === '"') escaped = '\\"';
+		for (const c of escaped) bytes += /[A-Za-z0-9\-_.~]/.test(c) ? 1 : 3;
+	}
 	return bytes;
 }
 
