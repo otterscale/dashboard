@@ -112,12 +112,11 @@
 		objectTemplate: ObjectTemplate
 	});
 
-	let validationResult: ValidationResult<FormValue> | null = $state(null);
 	function validator(options: ValidatorFactoryOptions) {
 		const validator = defaults.validator<FormValue>(options);
 		return {
 			...validator,
-			validateFormValue(schema: Schema, formValue: FormValue) {
+			validateFormValue(schema: Schema, formValue: FormValue): ValidationResult<FormValue> {
 				let value = {} as FormValue;
 				switch (mode) {
 					case 'yaml':
@@ -127,18 +126,7 @@
 						value = formValue;
 						break;
 				}
-				const transferredValue = transfer(value);
-				validationResult = validator.validateFormValue(schema, transferredValue);
-				if (validationResult && validationResult.errors && validationResult.errors.length > 0) {
-					validationResult.errors.forEach((error) => {
-						toast.error(error.message, {
-							description: `[${error.path.join('.')}]`,
-							duration: Number.POSITIVE_INFINITY,
-							closeButton: true
-						});
-					});
-				}
-				return validationResult;
+				return validator.validateFormValue(schema, transfer(value));
 			}
 		} satisfies FormValueValidator<FormValue>;
 	}

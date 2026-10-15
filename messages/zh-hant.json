@@ -792,5 +792,7 @@
 	"license_adjust_nodes_fifo_hint": "FIFO 模式：節點依加入叢集的順序自動授權。",
 	"license_adjust_nodes_readonly": "此授權已過期或無效，無法調整節點設定。",
 	"license_adjust_nodes_last_accepted": "上次接受：",
+	"alerting": "告警",
+	"alerting_description": "透過 SMTP 郵件伺服器寄送平台告警。",
 	"containers_without_limit": "{containers} 個容器中有 {uncapped} 個未宣告 Limit"
 }
