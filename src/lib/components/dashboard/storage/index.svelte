@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { PrometheusDriver } from 'prometheus-query';
+	import type { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import {
@@ -14,6 +14,7 @@
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/messages';
+	import { clusterPrometheusDriver } from '$lib/prometheus';
 
 	let { cluster }: { cluster: string } = $props();
 
@@ -35,13 +36,7 @@
 
 	onMount(async () => {
 		try {
-			prometheusDriver = new PrometheusDriver({
-				endpoint: `/proxy/${cluster}/prometheus`,
-				baseURL: '/api/v1',
-				headers: {
-					'x-proxy-target': 'api'
-				}
-			});
+			prometheusDriver = clusterPrometheusDriver(cluster);
 		} catch (error) {
 			console.error('Failed to initialize Prometheus driver:', error);
 		}

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import InfoIcon from '@lucide/svelte/icons/info';
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
-	import { PrometheusDriver } from 'prometheus-query';
+	import { type InstantVector, PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
@@ -12,8 +12,9 @@
 	import {
 		classifyThreshold,
 		escapePromqlStringLiteral,
-		fetchCombinedInstant,
+		fetchCombinedInstantOrNull,
 		fetchModelNodes,
+		type SharedMetrics,
 		type ThresholdLevel,
 		vllmMetricWithSelector
 	} from '$lib/prometheus';
@@ -23,11 +24,13 @@
 		prometheusDriver,
 		namespace,
 		selectedModel,
+		shared,
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		namespace: string | undefined;
 		selectedModel: string;
+		shared: SharedMetrics;
 		isReloading: boolean;
 	} = $props();
 
@@ -45,6 +48,9 @@
 	let preemptByPod = $state<PodEntry[]>([]);
 	let terminatedByPod = $state<Record<string, TerminatedInfo>>({});
 	let xidByGpu = $state<GpuEntry[]>([]);
+	let xidUnavailable = $state(false);
+	/** The namespace-scope query failed: restart, OOM, throttle, SHM and preempt are unknown. */
+	let mainUnavailable = $state(false);
 	let nodeCount = $state(0);
 	let isLoaded = $state(false);
 
@@ -62,10 +68,6 @@
 	function containerSelector(): string {
 		const ns = (namespace ?? '').trim();
 		return ns ? `{namespace="${escapePromqlStringLiteral(ns)}"}` : '{}';
-	}
-
-	function regexEscape(node: string): string {
-		return node.replace(/[.+*?^$()[\]{}|\\]/g, '\\$&');
 	}
 
 	function scalarFromVectors(vectors: { value?: { value: unknown } }[]): number {
@@ -111,6 +113,42 @@
 		return exitcode === 135;
 	}
 
+	/**
+	 * XID errors on the GPUs of the nodes the model runs on, from the shared scope;
+	 * null when they could not be asked, which the tile shows as unknown, not as 0.
+	 */
+	async function fetchXid(
+		nodes: string[] | null
+	): Promise<{ total: number; byGpu: GpuEntry[] } | null> {
+		if (nodes === null) return null;
+		if (nodes.length === 0) return { total: 0, byGpu: [] };
+		const params = { hostname: nodes };
+		try {
+			const [totalRes, perGpuRes] = await Promise.all([
+				shared.instant('gpu-xid-total', params),
+				shared.instant('gpu-xid-by-gpu', params)
+			]);
+			const total = Math.round(scalarFromVectors(totalRes.result as InstantVector[]));
+			const byGpu = (perGpuRes.result as InstantVector[])
+				.map((v) => {
+					const labels = v.metric.labels as Record<string, string>;
+					const value = Number(v.value?.value);
+					if (!Number.isFinite(value)) return null;
+					return {
+						hostname: labels.hostname ?? '(unknown)',
+						gpu: labels.gpu ?? '?',
+						value
+					};
+				})
+				.filter((x): x is GpuEntry => x !== null)
+				.sort((a, b) => b.value - a.value);
+			return { total, byGpu };
+		} catch (error) {
+			console.warn('Failed to fetch XID errors:', error);
+			return null;
+		}
+	}
+
 	async function fetch() {
 		const cs = containerSelector();
 		const join = modelJoin();
@@ -134,51 +172,32 @@
 
 		const nodesPromise = fetchModelNodes(prometheusDriver, namespace, selectedModel);
 
-		// Kick off XID as soon as nodes resolves, in parallel with the main batch —
-		// it only needs `nodes`, not the full set of cluster-wide queries.
-		const xidPromise = nodesPromise.then(async (nodes) => {
-			if (nodes.length === 0) return { total: 0, byGpu: [] as GpuEntry[] };
-			const regex = escapePromqlStringLiteral(nodes.map(regexEscape).join('|'));
-			const selector = `{hostname=~"${regex}"}`;
-			const xid = await fetchCombinedInstant(prometheusDriver, {
-				total: `sum(increase(DCGM_FI_DEV_XID_ERRORS${selector}[24h]))`,
-				perGpu: `sum by(hostname, gpu) (increase(DCGM_FI_DEV_XID_ERRORS${selector}[24h])) > 0`
-			});
-			const total = Math.round(scalarFromVectors(xid.total));
-			const byGpu = xid.perGpu
-				.map((v) => {
-					const labels = v.metric.labels as Record<string, string>;
-					const value = Number(v.value?.value);
-					if (!Number.isFinite(value)) return null;
-					return {
-						hostname: labels.hostname ?? '(unknown)',
-						gpu: labels.gpu ?? '?',
-						value
-					};
-				})
-				.filter((x): x is GpuEntry => x !== null)
-				.sort((a, b) => b.value - a.value);
-			return { total, byGpu };
-		});
+		// Kick off XID as soon as nodes resolves, in parallel with the main batch — it only needs `nodes`.
+		const xidPromise = nodesPromise.then(fetchXid);
 
 		const [main, nodes, xid] = await Promise.all([
-			fetchCombinedInstant(prometheusDriver, mainQueries),
+			fetchCombinedInstantOrNull(prometheusDriver, mainQueries),
 			nodesPromise,
 			xidPromise
 		]);
 
-		restartTotal = Math.round(scalarFromVectors(main.restartTotal));
-		restartByPod = perPodFromVectors(main.restartPerPod);
-		oomTotal = Math.round(scalarFromVectors(main.oomTotal));
-		oomByPod = perPodFromVectors(main.oomPerPod);
-		terminatedByPod = terminatedFromVectors(main.lastTermExit);
-		const throttleV = scalarFromVectors(main.throttle);
+		// A failed query clears the last numbers rather than keeping them, and the
+		// tiles show unknown, like XID, not a healthy 0.
+		mainUnavailable = main === null;
+		const slot = (name: keyof typeof mainQueries) => main?.[name] ?? [];
+		restartTotal = Math.round(scalarFromVectors(slot('restartTotal')));
+		restartByPod = perPodFromVectors(slot('restartPerPod'));
+		oomTotal = Math.round(scalarFromVectors(slot('oomTotal')));
+		oomByPod = perPodFromVectors(slot('oomPerPod'));
+		terminatedByPod = terminatedFromVectors(slot('lastTermExit'));
+		const throttleV = scalarFromVectors(slot('throttle'));
 		throttlePct = Number.isFinite(throttleV) ? throttleV : 0;
-		preemptTotal = Math.round(scalarFromVectors(main.preemptTotal));
-		preemptByPod = perPodFromVectors(main.preemptPerPod);
-		nodeCount = nodes.length;
-		xidTotal = xid.total;
-		xidByGpu = xid.byGpu;
+		preemptTotal = Math.round(scalarFromVectors(slot('preemptTotal')));
+		preemptByPod = perPodFromVectors(slot('preemptPerPod'));
+		nodeCount = nodes?.length ?? 0;
+		xidUnavailable = xid === null;
+		xidTotal = xid?.total ?? 0;
+		xidByGpu = xid?.byGpu ?? [];
 	}
 
 	const reloadManager = new ReloadManager(fetch);
@@ -223,6 +242,11 @@
 		if (level === 'orange') return 'text-chart-1';
 		return 'text-chart-2';
 	}
+
+	/** Colour of a tile fed by the namespace-scope query: grey while it is unknown. */
+	function mainColorClass(level: ThresholdLevel): string {
+		return mainUnavailable ? 'text-muted-foreground' : valueColorClass(level);
+	}
 </script>
 
 <Statistics.Root type="count" class="overflow-visible">
@@ -256,15 +280,19 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-2xl font-bold tabular-nums', valueColorClass(restartLevel))}>
-								{restartTotal}
+							<p class={cn('text-2xl font-bold tabular-nums', mainColorClass(restartLevel))}>
+								{mainUnavailable ? '—' : restartTotal}
 							</p>
 							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
 								{m.metric_restart()}
 							</p>
 						</div>
 					</Tooltip.Trigger>
-					{#if restartByPod.length > 0}
+					{#if mainUnavailable}
+						<Tooltip.Content side="bottom">
+							<p class="text-xs">{m.pod_health_unavailable()}</p>
+						</Tooltip.Content>
+					{:else if restartByPod.length > 0}
 						<Tooltip.Content side="bottom">
 							<ul class="flex flex-col gap-1 text-xs">
 								{#each restartByPod as p (p.pod)}
@@ -281,15 +309,19 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-2xl font-bold tabular-nums', valueColorClass(oomLevel))}>
-								{oomTotal}
+							<p class={cn('text-2xl font-bold tabular-nums', mainColorClass(oomLevel))}>
+								{mainUnavailable ? '—' : oomTotal}
 							</p>
 							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
 								{m.metric_oom()}
 							</p>
 						</div>
 					</Tooltip.Trigger>
-					{#if oomByPod.length > 0}
+					{#if mainUnavailable}
+						<Tooltip.Content side="bottom">
+							<p class="text-xs">{m.pod_health_unavailable()}</p>
+						</Tooltip.Content>
+					{:else if oomByPod.length > 0}
 						<Tooltip.Content side="bottom">
 							<ul class="flex flex-col gap-1 text-xs">
 								{#each oomByPod as p (p.pod)}
@@ -306,15 +338,24 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-2xl font-bold tabular-nums', valueColorClass(xidLevel))}>
-								{nodeCount === 0 ? '—' : xidTotal}
+							<p
+								class={cn(
+									'text-2xl font-bold tabular-nums',
+									xidUnavailable ? 'text-muted-foreground' : valueColorClass(xidLevel)
+								)}
+							>
+								{nodeCount === 0 || xidUnavailable ? '—' : xidTotal}
 							</p>
 							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
 								{m.metric_xid()}
 							</p>
 						</div>
 					</Tooltip.Trigger>
-					{#if nodeCount === 0}
+					{#if xidUnavailable}
+						<Tooltip.Content side="bottom">
+							<p class="text-xs">{m.xid_unavailable()}</p>
+						</Tooltip.Content>
+					{:else if nodeCount === 0}
 						<Tooltip.Content side="bottom">
 							<p class="text-xs">{m.no_gpu_for_model()}</p>
 						</Tooltip.Content>
@@ -336,8 +377,8 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-2xl font-bold tabular-nums', valueColorClass(throttleLevel))}>
-								{throttlePct.toFixed(1)}%
+							<p class={cn('text-2xl font-bold tabular-nums', mainColorClass(throttleLevel))}>
+								{mainUnavailable ? '—' : `${throttlePct.toFixed(1)}%`}
 							</p>
 							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
 								{m.metric_cpu_throttle()}
@@ -345,15 +386,17 @@
 						</div>
 					</Tooltip.Trigger>
 					<Tooltip.Content side="bottom" class="max-w-xs">
-						<p class="text-xs">{m.llm_dashboard_cpu_throttle_hint()}</p>
+						<p class="text-xs">
+							{mainUnavailable ? m.pod_health_unavailable() : m.llm_dashboard_cpu_throttle_hint()}
+						</p>
 					</Tooltip.Content>
 				</Tooltip.Root>
 
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-2xl font-bold tabular-nums', valueColorClass(shmLevel))}>
-								{shmCrashCount}
+							<p class={cn('text-2xl font-bold tabular-nums', mainColorClass(shmLevel))}>
+								{mainUnavailable ? '—' : shmCrashCount}
 							</p>
 							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
 								{m.metric_shm_crash()}
@@ -361,7 +404,9 @@
 						</div>
 					</Tooltip.Trigger>
 					<Tooltip.Content side="bottom" class="max-w-sm">
-						{#if shmCrashPods.length === 0}
+						{#if mainUnavailable}
+							<p class="text-xs">{m.pod_health_unavailable()}</p>
+						{:else if shmCrashPods.length === 0}
 							<p class="text-xs">{m.llm_dashboard_shm_crash_hint()}</p>
 						{:else}
 							<div class="flex flex-col gap-1">
@@ -384,8 +429,8 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger>
 						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-2xl font-bold tabular-nums', valueColorClass(preemptLevel))}>
-								{preemptTotal}
+							<p class={cn('text-2xl font-bold tabular-nums', mainColorClass(preemptLevel))}>
+								{mainUnavailable ? '—' : preemptTotal}
 							</p>
 							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
 								{m.metric_preempt()}
@@ -393,7 +438,9 @@
 						</div>
 					</Tooltip.Trigger>
 					<Tooltip.Content side="bottom" class="max-w-xs">
-						{#if preemptByPod.length === 0}
+						{#if mainUnavailable}
+							<p class="text-xs">{m.pod_health_unavailable()}</p>
+						{:else if preemptByPod.length === 0}
 							<p class="text-xs">{m.llm_dashboard_preempt_hint()}</p>
 						{:else}
 							<div class="flex flex-col gap-1">

@@ -14,10 +14,16 @@
 	import * as Chart from '$lib/components/ui/chart';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/messages';
-	import { computeStep, type DataPoint, vllmModelHostnamesSelector } from '$lib/prometheus';
+	import {
+		computeStep,
+		type DataPoint,
+		fetchModelNodes,
+		type SharedMetrics
+	} from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
+		shared,
 		namespace,
 		selectedModel,
 		start,
@@ -26,6 +32,7 @@
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
+		shared: SharedMetrics;
 		namespace: string | undefined;
 		selectedModel: string;
 		start: Date;
@@ -54,6 +61,9 @@
 	let hostInfo = $state<Record<string, NodeInfo>>({});
 	let lookup = $state<Record<number, Record<string, NodeSample>>>({});
 	let nodeCount = $state(0);
+	// The model's nodes or their GPUs could not be read: show "no data", not "no GPU".
+	// Reset only when a fetch succeeds, so a reload after a failure does not flash "no GPU".
+	let failed = $state(false);
 	let isLoaded = $state(false);
 
 	// Captured during labelFormatter so the value formatter can find the matching sample.
@@ -67,18 +77,33 @@
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const step = computeStep(startMs, endMs);
 
-			// Inline the node filter so Prometheus does the model→host join itself —
-			// avoids a serial `fetchModelNodes` round-trip before these queries fire.
-			const hostFilter = vllmModelHostnamesSelector(namespace, selectedModel);
-			const usedQuery = `sum by(hostname) (DCGM_FI_DEV_FB_USED and on(hostname) (${hostFilter}))`;
-			const totalQuery = `sum by(hostname) ((DCGM_FI_DEV_FB_USED + DCGM_FI_DEV_FB_FREE) and on(hostname) (${hostFilter}))`;
-			const countQuery = `count by(hostname) (DCGM_FI_DEV_FB_USED and on(hostname) (${hostFilter}))`;
-
+			// The model's nodes come from its own namespace; their GPUs' memory is
+			// cluster-wide and comes from the shared scope, per host.
+			const nodes = await fetchModelNodes(prometheusDriver, namespace, selectedModel);
+			if (nodes === null) {
+				failed = true;
+				data = [];
+				hosts = [];
+				hostInfo = {};
+				lookup = {};
+				return;
+			}
+			if (nodes.length === 0) {
+				failed = false;
+				nodeCount = 0;
+				data = [];
+				hosts = [];
+				hostInfo = {};
+				lookup = {};
+				return;
+			}
+			const params = { hostname: nodes };
 			const [usedResp, totalResp, countResp] = await Promise.all([
-				prometheusDriver.rangeQuery(usedQuery, new Date(startMs), new Date(endMs), `${step}s`),
-				prometheusDriver.instantQuery(totalQuery),
-				prometheusDriver.instantQuery(countQuery)
+				shared.range('host-gpu-fb-used', params, new Date(startMs), new Date(endMs), step),
+				shared.instant('host-gpu-fb-total', params),
+				shared.instant('host-gpu-count', params)
 			]);
+			failed = false;
 
 			const gpuCountByHost: Record<string, number> = {};
 			for (const v of countResp.result) {
@@ -141,7 +166,9 @@
 			data = Object.values(dateMap).sort(
 				(a, b) => (a.date as Date).getTime() - (b.date as Date).getTime()
 			);
-		} catch {
+		} catch (error) {
+			console.warn('Failed to fetch GPU memory:', error);
+			failed = true;
 			data = [];
 			hosts = [];
 			hostInfo = {};
@@ -216,6 +243,11 @@
 		{#if !isLoaded}
 			<div class="flex h-65 w-full items-center justify-center">
 				<LoaderCircle class="size-12 animate-spin" />
+			</div>
+		{:else if failed}
+			<div class="flex h-65 w-full flex-col items-center justify-center">
+				<ChartLine class="size-12 animate-pulse text-muted-foreground" />
+				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
 			</div>
 		{:else if nodeCount === 0}
 			<div class="flex h-65 w-full flex-col items-center justify-center gap-2">

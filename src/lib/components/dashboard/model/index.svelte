@@ -1,6 +1,6 @@
 <script lang="ts">
 	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
-	import { PrometheusDriver } from 'prometheus-query';
+	import type { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import {
@@ -18,12 +18,14 @@
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/messages';
+	import { dashboardBody, sharedMetrics, workspacePrometheusDriver } from '$lib/prometheus';
 
 	let {
 		cluster,
 		currentWorkspace = '',
 		defaultNamespace = '',
-		isClusterAdmin = false
+		isClusterAdmin = false,
+		canViewClusterMetrics = false
 	}: {
 		cluster: string;
 		/** Name of the currently active workspace (for default picker selection) */
@@ -31,10 +33,23 @@
 		/** Workspace namespace used as initial namespace state */
 		defaultNamespace?: string;
 		isClusterAdmin?: boolean;
+		canViewClusterMetrics?: boolean;
 	} = $props();
 
 	let isReloading = $state(true);
 	let prometheusDriver = $state<PrometheusDriver | null>(null);
+	// GPU panels ask the shared scope as the Workspace's member, whichever
+	// namespace an admin picks for the charts.
+	const shared = $derived(sharedMetrics(cluster, defaultNamespace));
+	let initialized = $state(false);
+	const body = $derived(
+		dashboardBody({
+			hasDriver: prometheusDriver !== null,
+			initialized,
+			cluster,
+			namespace: defaultNamespace
+		})
+	);
 	let selectedTab = $state('overview');
 	/** Currently selected namespace; empty string means "all namespaces" */
 	let selectedNamespace = $state<string | undefined>(getInitialNamespace());
@@ -60,16 +75,15 @@
 
 	onMount(async () => {
 		try {
-			prometheusDriver = new PrometheusDriver({
-				endpoint: `/proxy/${cluster}/prometheus`,
-				baseURL: '/api/v1',
-				headers: {
-					'x-proxy-target': 'api'
-				}
-			});
+			prometheusDriver = workspacePrometheusDriver(
+				cluster,
+				defaultNamespace,
+				canViewClusterMetrics
+			);
 		} catch (error) {
 			console.error('Failed to initialize Prometheus driver:', error);
 		}
+		initialized = true;
 	});
 
 	onDestroy(() => {
@@ -113,12 +127,16 @@
 								bind:selectedModel
 							/>
 						</div>
-						<NamespacePicker
-							{cluster}
-							{isClusterAdmin}
-							{currentWorkspace}
-							bind:namespace={selectedNamespace}
-						/>
+						<!-- Another Workspace is reachable only at cluster scope: an admin whose
+						cluster metrics access is denied or unknown queries this one alone. -->
+						{#if isClusterAdmin && canViewClusterMetrics}
+							<NamespacePicker
+								{cluster}
+								{isClusterAdmin}
+								{currentWorkspace}
+								bind:namespace={selectedNamespace}
+							/>
+						{/if}
 						<DatetimePicker
 							bind:from={pickerFrom}
 							bind:to={pickerTo}
@@ -153,6 +171,7 @@
 								{start}
 								{end}
 								endIsNow={pickerToIsNow}
+								{shared}
 								bind:isReloading
 							/>
 						{/key}
@@ -160,9 +179,13 @@
 				</Tabs.Content>
 			</Tabs.Root>
 		</div>
-	{:else if cluster}
+	{:else if body === 'loading'}
 		<div class="flex min-h-[400px] w-full items-center justify-center">
 			<LoaderCircle class="size-12 animate-spin text-muted-foreground" />
+		</div>
+	{:else if body === 'no-namespace'}
+		<div class="flex min-h-[400px] w-full items-center justify-center text-muted-foreground">
+			<p>{m.workspace_namespace_unknown()}</p>
 		</div>
 	{:else}
 		<div class="flex min-h-[400px] w-full items-center justify-center text-muted-foreground">

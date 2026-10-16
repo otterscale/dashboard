@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { PrometheusDriver } from 'prometheus-query';
+	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+	import type { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import {
@@ -15,16 +16,18 @@
 	import * as Item from '$lib/components/ui/item';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/messages';
+	import { dashboardBody, sharedMetrics, workspacePrometheusDriver } from '$lib/prometheus';
 
 	import { Dashboard as AnalyticsDashboard } from './analytics/index';
 	import VmPicker from './analytics/vm-picker.svelte';
-	import { widgets } from './overview/widgets';
+	import { computeOverviewWidgets } from './overview/widgets';
 
 	let {
 		cluster,
 		currentWorkspace = '',
 		defaultNamespace = '',
-		isClusterAdmin = false
+		isClusterAdmin = false,
+		canViewClusterMetrics = false
 	}: {
 		cluster: string;
 		/** Name of the currently active workspace (for default picker selection) */
@@ -32,6 +35,7 @@
 		/** Workspace namespace used as initial namespace state */
 		defaultNamespace?: string;
 		isClusterAdmin?: boolean;
+		canViewClusterMetrics?: boolean;
 	} = $props();
 
 	/** Currently selected namespace; empty string means "all namespaces" */
@@ -45,6 +49,18 @@
 
 	let isReloading = $state(true);
 	let prometheusDriver = $state<PrometheusDriver | null>(null);
+	// KubeVirt component tiles ask the shared scope as the Workspace's member,
+	// whichever namespace an admin picks for the charts.
+	const shared = $derived(sharedMetrics(cluster, defaultNamespace));
+	let initialized = $state(false);
+	const body = $derived(
+		dashboardBody({
+			hasDriver: prometheusDriver !== null,
+			initialized,
+			cluster,
+			namespace: defaultNamespace
+		})
+	);
 
 	let pickerFrom = $state<CalendarDateTime>(minutesAgoCDT(60));
 	let pickerTo = $state<CalendarDateTime>(nowCDT());
@@ -61,16 +77,15 @@
 
 	onMount(async () => {
 		try {
-			prometheusDriver = new PrometheusDriver({
-				endpoint: `/proxy/${cluster}/prometheus`,
-				baseURL: '/api/v1',
-				headers: {
-					'x-proxy-target': 'api'
-				}
-			});
+			prometheusDriver = workspacePrometheusDriver(
+				cluster,
+				defaultNamespace,
+				canViewClusterMetrics
+			);
 		} catch (error) {
 			console.error('Failed to initialize Prometheus driver:', error);
 		}
+		initialized = true;
 	});
 
 	onDestroy(() => {
@@ -111,12 +126,16 @@
 								<VmPicker {prometheusDriver} namespace={selectedNamespace} bind:selectedVM />
 							{/if}
 						</div>
-						<NamespacePicker
-							{cluster}
-							{isClusterAdmin}
-							{currentWorkspace}
-							bind:namespace={selectedNamespace}
-						/>
+						<!-- Another Workspace is reachable only at cluster scope: an admin whose
+						cluster metrics access is denied or unknown queries this one alone. -->
+						{#if isClusterAdmin && canViewClusterMetrics}
+							<NamespacePicker
+								{cluster}
+								{isClusterAdmin}
+								{currentWorkspace}
+								bind:namespace={selectedNamespace}
+							/>
+						{/if}
 						<DatetimePicker
 							bind:from={pickerFrom}
 							bind:to={pickerTo}
@@ -133,7 +152,7 @@
 						{#key `${selectedNamespace ?? ''}-${dashboardTimeRangeKey}`}
 							<WidgetGrid
 								{cluster}
-								{widgets}
+								widgets={computeOverviewWidgets(shared)}
 								{prometheusDriver}
 								namespace={selectedNamespace ?? ''}
 								{start}
@@ -156,6 +175,18 @@
 					{/if}
 				</Tabs.Content>
 			</Tabs.Root>
+		</div>
+	{:else if body === 'loading'}
+		<div class="flex min-h-[400px] w-full items-center justify-center">
+			<LoaderCircle class="size-12 animate-spin text-muted-foreground" />
+		</div>
+	{:else if body === 'no-namespace'}
+		<div class="flex min-h-[400px] w-full items-center justify-center text-muted-foreground">
+			<p>{m.workspace_namespace_unknown()}</p>
+		</div>
+	{:else}
+		<div class="flex min-h-[400px] w-full items-center justify-center text-muted-foreground">
+			<p>{m.no_data_display()}</p>
 		</div>
 	{/if}
 </div>

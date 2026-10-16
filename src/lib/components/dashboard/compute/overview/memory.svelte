@@ -11,7 +11,7 @@
 	import * as Card from '$lib/components/ui/card';
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import { m } from '$lib/messages';
-	import { computeStep } from '$lib/prometheus';
+	import { computeStep, namespaceSelector } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -46,7 +46,7 @@
 		const rangeEnd = new Date(endMs);
 		const step = computeStep(start.getTime(), endMs);
 		const response = await prometheusDriver.rangeQuery(
-			`avg(kubevirt_vmi_memory_resident_bytes{exported_namespace="${namespace}"}) / avg(kubevirt_vmi_memory_domain_bytes{exported_namespace="${namespace}"})`,
+			`avg(kubevirt_vmi_memory_resident_bytes${namespaceSelector(namespace)}) / avg(kubevirt_vmi_memory_domain_bytes${namespaceSelector(namespace)})`,
 			start,
 			rangeEnd,
 			step

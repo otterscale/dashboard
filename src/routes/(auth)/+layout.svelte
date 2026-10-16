@@ -15,6 +15,7 @@
 	import LayersIcon from '@lucide/svelte/icons/layers';
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
 	import NetworkIcon from '@lucide/svelte/icons/network';
+	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import UserStarIcon from '@lucide/svelte/icons/user-star';
 	import { type Link, LinkService } from '@otterscale/api/link/v1';
 	import { ResourceService } from '@otterscale/api/resource/v1';
@@ -36,6 +37,7 @@
 	} from '$lib/components/layout';
 	import ImportCluster from '$lib/components/layout/import-cluster-external.svelte';
 	import RegisteClusterTrigger from '$lib/components/layout/registe-cluster-trigger.svelte';
+	import * as Alert from '$lib/components/ui/alert';
 	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
 	import { Button } from '$lib/components/ui/button';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
@@ -247,15 +249,19 @@
 				title: m.dashboard(),
 				icon: GaugeIcon,
 				items: [
-					{
-						title: m.cluster(),
-						url: page.params.workspace
-							? resolve('/(auth)/[cluster]/[workspace]/dashboard/cluster', {
-									cluster: activeCluster,
-									workspace: page.params.workspace
-								})
-							: ''
-					},
+					...(data.canViewClusterMetrics
+						? [
+								{
+									title: m.cluster(),
+									url: page.params.workspace
+										? resolve('/(auth)/[cluster]/[workspace]/dashboard/cluster', {
+												cluster: activeCluster,
+												workspace: page.params.workspace
+											})
+										: ''
+								}
+							]
+						: []),
 					{
 						title: m.model(),
 						url: page.params.workspace
@@ -274,7 +280,7 @@
 								})
 							: ''
 					},
-					...(hasRookCeph
+					...(hasRookCeph && data.canViewClusterMetrics
 						? [
 								{
 									title: m.storage(),
@@ -864,6 +870,12 @@
 			</div>
 		</header>
 		<main class="flex min-w-0 flex-1 flex-col overflow-auto px-2 md:px-4 lg:px-8">
+			{#if data.clusterMetricsAccess === 'unknown'}
+				<Alert.Root class="mt-4">
+					<TriangleAlertIcon />
+					<Alert.Description>{m.cluster_metrics_access_unknown()}</Alert.Description>
+				</Alert.Root>
+			{/if}
 			{@render children()}
 		</main>
 	</Sidebar.Inset>
