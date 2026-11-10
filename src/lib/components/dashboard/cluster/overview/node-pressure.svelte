@@ -579,27 +579,40 @@
 						</span>
 					{/snippet}
 				</Tooltip.Trigger>
-				<Tooltip.Content class="max-w-sm">
-					<div class="grid gap-1.5 text-xs">
+				<Tooltip.Content class={consumers.length ? 'max-w-[calc(100vw-2rem)]' : 'max-w-sm'}>
+					<div class="text-xs">
 						{#if consumers.length}
-							<ul class="grid gap-1">
-								{#each consumers as consumer (consumer.namespace + '/' + consumer.pod)}
-									<li class="flex items-baseline gap-2 whitespace-nowrap">
-										<!-- Tooltips render on `bg-foreground`, so the muted tone comes from opacity —
-										     `text-muted-foreground` is tuned for the opposite ground. -->
-										<span class="text-background/70">{workspaceOf(consumer.namespace)}</span>
-										<span class="font-mono">{consumer.pod || '—'}</span>
-										{#if consumer.allocated !== undefined}
-											<span class="ml-auto font-mono tabular-nums">
-												{formatBytes(consumer.allocated)}
-											</span>
-										{/if}
-									</li>
-								{/each}
-							</ul>
+							<table class="text-left whitespace-nowrap">
+								<thead>
+									<tr class="border-b border-background/20 text-background/70">
+										<th class="pr-4 pb-1 font-medium">{m.workspace()}</th>
+										<th class="pr-4 pb-1 font-medium">{m.pod()}</th>
+										<th class="pb-1 text-right font-medium">{m.gpu_allocated()}</th>
+									</tr>
+								</thead>
+								<tbody>
+									{#each consumers as consumer (consumer.namespace + '/' + consumer.pod)}
+										<tr class="align-baseline">
+											<td class="pt-1 pr-4">{workspaceOf(consumer.namespace)}</td>
+											<td class="pt-1 pr-4 font-mono break-all whitespace-normal">
+												{consumer.pod || '—'}
+											</td>
+											<td class="pt-1 text-right font-mono tabular-nums">
+												{consumer.allocated === undefined ? '—' : formatBytes(consumer.allocated)}
+											</td>
+										</tr>
+									{/each}
+								</tbody>
+							</table>
 						{/if}
 						{#if note}
-							<p class={cn(consumers.length && 'border-t border-background/20 pt-1.5')}>{note}</p>
+							<p
+								class={cn(
+									consumers.length && 'mt-1.5 w-0 min-w-full border-t border-background/20 pt-1.5'
+								)}
+							>
+								{note}
+							</p>
 						{/if}
 					</div>
 				</Tooltip.Content>
