@@ -536,6 +536,7 @@
 	"config_map": "組態映射",
 	"secret": "密碼",
 	"http_route": "HTTP 路由",
+	"listener_set": "監聽器集合",
 	"network_policy": "網路原則",
 	"persistent_volume_claim": "永久性磁碟宣告",
 	"persistent_volume": "永久性磁碟",

@@ -536,6 +536,7 @@
 	"config_map": "ConfigMap",
 	"secret": "Secret",
 	"http_route": "HTTP Route",
+	"listener_set": "ListenerSet",
 	"network_policy": "Network Policy",
 	"persistent_volume_claim": "Persistent Volume Claim",
 	"persistent_volume": "Persistent Volume",

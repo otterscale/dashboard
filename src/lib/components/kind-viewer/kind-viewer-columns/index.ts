@@ -121,6 +121,12 @@ import {
 	getLimitRangeUISchemas
 } from './limitrange.js';
 import {
+	getListenerSetColumnDefinitions,
+	getListenerSetData,
+	getListenerSetDataSchemas,
+	getListenerSetUISchemas
+} from './listenerset.js';
+import {
 	getLLMInferenceServiceColumnDefinitions,
 	getLLMInferenceServiceData,
 	getLLMInferenceServiceDataSchemas,
@@ -302,6 +308,8 @@ function getDataSchemas(kind: string, group?: string): Record<string, DataSchema
 			return getKustomizationDataSchemas();
 		case 'HTTPRoute':
 			return getHTTPRouteDataSchemas();
+		case 'ListenerSet':
+			return getListenerSetDataSchemas();
 		case 'Gateway':
 			return getGatewayDataSchemas();
 		case 'HelmRelease':
@@ -396,6 +404,8 @@ function getData(apiResource: APIResource, object: JsonObject): Record<string, J
 			return getKustomizationData(resource);
 		case 'HTTPRoute':
 			return getHTTPRouteData(resource);
+		case 'ListenerSet':
+			return getListenerSetData(resource);
 		case 'Gateway':
 			return getGatewayData(resource);
 		case 'HelmRelease':
@@ -487,6 +497,8 @@ function getUISchemas(kind: string, group?: string): Record<string, UISchemaType
 			return getKustomizationUISchemas();
 		case 'HTTPRoute':
 			return getHTTPRouteUISchemas();
+		case 'ListenerSet':
+			return getListenerSetUISchemas();
 		case 'Gateway':
 			return getGatewayUISchemas();
 		case 'HelmRelease':
@@ -583,6 +595,8 @@ function getColumnDefinitions(
 			return getKustomizationColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'HTTPRoute':
 			return getHTTPRouteColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+		case 'ListenerSet':
+			return getListenerSetColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'Gateway':
 			return getGatewayColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'HelmRelease':
