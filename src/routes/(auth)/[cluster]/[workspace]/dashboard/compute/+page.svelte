@@ -20,6 +20,7 @@
 	const currentWorkspace = $derived(page.params.workspace!);
 	const defaultNamespace = $derived(page.data.namespace ?? '');
 	const isClusterAdmin = $derived(page.data.isClusterAdmin === true);
+	const canViewClusterMetrics = $derived(page.data.canViewClusterMetrics === true);
 </script>
 
 <!-- The dashboard reads the Workspace's namespace once, on mount (a regular user's driver is bound
@@ -30,6 +31,6 @@
 		{defaultNamespace}
 		{isClusterAdmin}
 		{currentWorkspace}
-		canViewClusterMetrics={page.data.canViewClusterMetrics === true}
+		{canViewClusterMetrics}
 	/>
 {/key}

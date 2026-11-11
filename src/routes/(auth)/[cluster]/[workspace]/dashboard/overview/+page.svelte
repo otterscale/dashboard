@@ -36,12 +36,9 @@
 	const cluster = $derived(page.params.cluster ?? '');
 	const workspace = $derived(page.params.workspace ?? '');
 	const namespace = $derived(page.data.namespace ?? '');
+	const canViewClusterMetrics = $derived(page.data.canViewClusterMetrics === true);
 </script>
 
 {#key cluster + workspace + namespace}
-	<WorkspaceDashboard
-		{cluster}
-		{namespace}
-		canViewClusterMetrics={page.data.canViewClusterMetrics === true}
-	/>
+	<WorkspaceDashboard {cluster} {namespace} {canViewClusterMetrics} />
 {/key}
