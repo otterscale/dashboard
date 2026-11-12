@@ -1,0 +1,16 @@
+{
+	"mcpServers": {
+		"svelte": {
+			"type": "http",
+			"url": "https://mcp.svelte.dev/mcp"
+		},
+		"shadcn-svelte": {
+			"command": "npx",
+			"args": ["-y", "@jpisnice/shadcn-ui-mcp-server", "--framework", "svelte"]
+		},
+		"chrome-devtools": {
+			"command": "npx",
+			"args": ["-y", "chrome-devtools-mcp@latest"]
+		}
+	}
+}
