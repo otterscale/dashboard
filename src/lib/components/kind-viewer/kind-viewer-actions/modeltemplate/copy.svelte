@@ -31,7 +31,9 @@
 		schema: jsonSchema,
 		validate,
 		object,
-		onOpenChangeComplete
+		onOpenChangeComplete,
+		open = $bindable(false),
+		hideTrigger = false
 	}: {
 		cluster: string;
 		namespace: string;
@@ -42,7 +44,11 @@
 		schema: Schema;
 		validate: ValidateFunction;
 		object: ServingKserveIoV1Alpha2LLMInferenceServiceConfig;
-		onOpenChangeComplete: () => void;
+		onOpenChangeComplete: (isOpen: boolean) => void;
+		/** Bindable, so a parent (the model picker) can open the wizard itself. */
+		open?: boolean;
+		/** Omit the dropdown "Copy" item when a parent drives `open`. */
+		hideTrigger?: boolean;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -53,7 +59,6 @@
 	let values = $state(getInitialValues());
 	let currentStep = $state(firstStep);
 	let isSubmitting = $state(false);
-	let open = $state(false);
 
 	let value = $derived(stringify(values));
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -85,25 +90,27 @@
 <Dialog.Root
 	bind:open
 	onOpenChangeComplete={(isOpen) => {
-		onOpenChangeComplete?.();
+		onOpenChangeComplete?.(isOpen);
 
 		if (isOpen) return;
 
 		initiate();
 	}}
 >
-	<Dialog.Trigger>
-		{#snippet child({ props })}
-			<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
-				<Item.Media>
-					<Plus />
-				</Item.Media>
-				<Item.Content>
-					<Item.Title>Copy</Item.Title>
-				</Item.Content>
-			</Item.Root>
-		{/snippet}
-	</Dialog.Trigger>
+	{#if !hideTrigger}
+		<Dialog.Trigger>
+			{#snippet child({ props })}
+				<Item.Root {...props} class="w-full p-0 text-xs" size="sm">
+					<Item.Media>
+						<Plus />
+					</Item.Media>
+					<Item.Content>
+						<Item.Title>Copy</Item.Title>
+					</Item.Content>
+				</Item.Root>
+			{/snippet}
+		</Dialog.Trigger>
+	{/if}
 	<Dialog.Content
 		class="max-h-[95vh] min-w-[38vw] overflow-auto"
 		onInteractOutside={(e) => e.preventDefault()}

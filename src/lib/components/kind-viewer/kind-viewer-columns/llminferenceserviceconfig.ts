@@ -8,6 +8,7 @@ import type { LinkMetadata } from '$lib/components/dynamic-table/dynamic-table-c
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
 
+import { TEMPLATE_ANNOTATIONS } from '../kind-viewer-grid-layouts/modeltemplate/catalog';
 import { buildResourceDetailUrl } from '../utils';
 
 type LLMInferenceServiceConfigObject = {
@@ -15,14 +16,13 @@ type LLMInferenceServiceConfigObject = {
 		name?: string;
 		namespace?: string;
 		creationTimestamp?: string;
+		annotations?: Record<string, string>;
 	};
 	spec?: {
 		model?: {
 			name?: string;
 			uri?: string;
 		};
-		template?: unknown;
-		prefill?: unknown;
 	};
 };
 
@@ -31,7 +31,7 @@ type LLMInferenceServiceConfigAttribute =
 	| 'Namespace'
 	| 'Model Name'
 	| 'Model URI'
-	| 'Mode'
+	| 'Description'
 	| 'Age'
 	| 'raw';
 
@@ -44,7 +44,7 @@ function getLLMInferenceServiceConfigDataSchemas(): Record<
 		Namespace: 'text',
 		'Model Name': 'text',
 		'Model URI': 'text',
-		Mode: 'text',
+		Description: 'text',
 		Age: 'time',
 		raw: 'object'
 	};
@@ -58,7 +58,7 @@ function getLLMInferenceServiceConfigData(
 		Namespace: object?.metadata?.namespace ?? null,
 		'Model Name': object?.spec?.model?.name ?? null,
 		'Model URI': object?.spec?.model?.uri ?? null,
-		Mode: object?.spec?.prefill ? 'Prefill/Decode' : object?.spec?.template ? 'Single' : '',
+		Description: object?.metadata?.annotations?.[TEMPLATE_ANNOTATIONS.description]?.trim() || null,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
 	};
@@ -73,7 +73,7 @@ function getLLMInferenceServiceConfigUISchemas(): Record<
 		Namespace: 'text',
 		'Model Name': 'text',
 		'Model URI': 'text',
-		Mode: 'text',
+		Description: 'text',
 		Age: 'time',
 		raw: 'object'
 	};
@@ -194,7 +194,7 @@ function getLLMInferenceServiceConfigColumnDefinitions(
 			accessorKey: 'Model URI'
 		},
 		{
-			id: 'Mode',
+			id: 'Description',
 			header: ({
 				column
 			}: {
@@ -216,7 +216,7 @@ function getLLMInferenceServiceConfigColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas
 				}),
-			accessorKey: 'Mode'
+			accessorKey: 'Description'
 		},
 		{
 			id: 'Age',
