@@ -35,8 +35,7 @@
 
 	const endpointMap: Record<string, string> = {
 		Application: 'externalAddress',
-		LLMInferenceService: 'inferenceURL',
-		Service: 'externalAddress'
+		LLMInferenceService: 'inferenceURL'
 	};
 
 	const isClusterAdmin = $derived(page.data.isClusterAdmin === true);
@@ -61,6 +60,10 @@
 	}
 
 	async function getDescription(kind: string) {
+		// A NodePort Service is reachable on every node, not just the cluster's
+		// external address, so show the generic form.
+		if (kind === 'Service') return 'Available at <NodeIP>:<NodePort>';
+
 		const endpointKey = endpointMap[kind];
 		if (!endpointKey) {
 			return `${group || 'core'}/${version}`;
@@ -83,7 +86,6 @@
 		const nodePort = config?.nodePortRange ? `<NodePort ${config.nodePortRange}>` : '<NodePort>';
 		const suffixMap: Record<string, string> = {
 			Application: `:${nodePort}`,
-			Service: `:${nodePort}`,
 			LLMInferenceService: `/${ns}/<Name>`
 		};
 		return `Available at ${endpoint}${suffixMap[kind] ?? ''}`;
