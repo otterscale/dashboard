@@ -9,6 +9,7 @@
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import * as Card from '$lib/components/ui/card';
 	import { m } from '$lib/messages';
+	import { namespaceSelector } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -19,7 +20,7 @@
 	let virtualMachines: SampleValue | undefined = $state(undefined);
 	async function fetchVirtualMachines() {
 		const response = await prometheusDriver.instantQuery(
-			`count(kubevirt_vm_starting_status_last_transition_timestamp_seconds{exported_namespace="${namespace}"})`
+			`count(kubevirt_vm_starting_status_last_transition_timestamp_seconds${namespaceSelector(namespace)})`
 		);
 		virtualMachines = response.result[0]?.value ?? undefined;
 	}
