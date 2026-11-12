@@ -1,11 +1,196 @@
-import { InstantVector, type PrometheusDriver, RangeVector } from 'prometheus-query';
+import { InstantVector, PrometheusDriver, QueryResult, RangeVector } from 'prometheus-query';
 
 import type { ChartConfig } from '$lib/components/ui/chart/index.js';
 import { m } from '$lib/messages';
 
+/*
+ * The OtterScale server answers metrics at three scopes.
+ *
+ * Cluster scope (`/proxy/<cluster>/prometheus`) takes any query, but only from
+ * viewers with cluster metrics access (cluster-admin, or a binding to
+ * otterscale:metrics-cluster-view); everyone else gets 403 whatever they ask.
+ *
+ * Namespace scope (`/proxy/<cluster>/prometheus-tenancy?namespace=<ns>`) takes
+ * any query too, from anyone who may get pods in <ns>, rewritten by the server
+ * to namespace="<ns>" the way prom-label-proxy does it. A namespace-scoped page
+ * therefore only works with metrics whose `namespace` label is the tenant's —
+ * see docs/metrics.md.
+ *
+ * Shared scope (`/proxy/<cluster>/prometheus-shared/<name>`) takes no PromQL:
+ * the server runs one of its own named queries — cluster-wide numbers that
+ * name no workload, per GPU card, per host, or a total — for the namespace
+ * scope's callers as well as cluster viewers. See sharedMetrics.
+ */
+
+const PROXY_HEADERS = { 'x-proxy-target': 'api' };
+
+/** `origin` is for tests; the browser uses same-origin paths. */
+export function clusterPrometheusDriver(cluster: string, origin = ''): PrometheusDriver {
+	return new PrometheusDriver({
+		endpoint: `${origin}/proxy/${cluster}/prometheus`,
+		baseURL: '/api/v1',
+		headers: PROXY_HEADERS
+	});
+}
+
+export function namespacePrometheusDriver(
+	cluster: string,
+	namespace: string,
+	origin = ''
+): PrometheusDriver {
+	return new PrometheusDriver({
+		endpoint: `${origin}/proxy/${cluster}/prometheus-tenancy`,
+		baseURL: '/api/v1',
+		headers: PROXY_HEADERS,
+		// prometheus-query has no option for extra query parameters. It always
+		// hands axios `params` as URLSearchParams, so the namespace is added there
+		// — in the URL, where the server reads it, even when a body is sent.
+		requestInterceptor: {
+			onFulfilled: (config) => {
+				const params =
+					config.params instanceof URLSearchParams
+						? config.params
+						: new URLSearchParams(config.params ?? {});
+				params.set('namespace', namespace);
+				config.params = params;
+				return config;
+			}
+		}
+	});
+}
+
+/**
+ * For pages that show one Workspace's namespace. Viewers with cluster metrics
+ * access keep cluster scope, and with it the admin-only "all namespaces"
+ * choice; everyone else gets namespace scope, or nothing when the Workspace
+ * has no namespace to show.
+ */
+export function workspacePrometheusDriver(
+	cluster: string,
+	namespace: string,
+	canViewClusterMetrics: boolean
+): PrometheusDriver | null {
+	if (canViewClusterMetrics) return clusterPrometheusDriver(cluster);
+	return namespace ? namespacePrometheusDriver(cluster, namespace) : null;
+}
+
+export type DashboardBody = 'charts' | 'loading' | 'no-namespace' | 'empty';
+
+/**
+ * What a Workspace dashboard shows where its charts go. The driver is made on
+ * mount, so until then the page is loading. A viewer without cluster scope
+ * gets no driver when the Workspace's namespace is unknown — usually because
+ * the Workspace could not be read — which is a state to explain, not to spin on.
+ */
+export function dashboardBody(state: {
+	hasDriver: boolean;
+	initialized: boolean;
+	cluster: string;
+	namespace: string;
+}): DashboardBody {
+	if (state.hasDriver) return 'charts';
+	if (!state.cluster) return 'empty';
+	if (!state.initialized) return 'loading';
+	return state.namespace ? 'empty' : 'no-namespace';
+}
+
+/** The server's named cluster-wide queries (otterscale internal/handler/proxy_shared_catalog.go). */
+export type SharedQueryName =
+	| 'gpu-util'
+	| 'gpu-fb-used'
+	| 'gpu-fb-total'
+	| 'gpu-inventory'
+	| 'vgpu-memory-limit'
+	| 'vgpu-memory-used'
+	| 'host-gpu-fb-used'
+	| 'host-gpu-fb-total'
+	| 'host-gpu-count'
+	| 'gpu-xid-total'
+	| 'gpu-xid-by-gpu'
+	| 'kubevirt-handlers'
+	| 'kubevirt-controllers'
+	| 'kubevirt-controllers-ready'
+	| 'ceph-total-bytes'
+	| 'gpu-allocated-memory'
+	| 'gpu-allocated-cores'
+	| 'gpu-shared-count';
+
+/** Values for the one repeatable parameter a shared query takes, if any. */
+export type SharedParams = { uuid?: string[]; hostname?: string[] };
+
+export interface SharedMetrics {
+	instant(name: SharedQueryName, params?: SharedParams, time?: Date): Promise<QueryResult>;
+	range(
+		name: SharedQueryName,
+		params: SharedParams,
+		start: Date,
+		end: Date,
+		step: number
+	): Promise<QueryResult>;
+}
+
+/**
+ * Shared scope: cluster-wide numbers that name no workload — per GPU card, per
+ * host, or a total — for Workspace members and cluster viewers alike. The
+ * server holds the PromQL; this sends a name and parameters. `namespace` is the
+ * Workspace's and only proves membership, so an admin's "all namespaces" choice
+ * does not change it; it is left out when the Workspace has none, and then only
+ * cluster viewers get an answer. Failures reject with the server's message.
+ */
+export function sharedMetrics(cluster: string, namespace: string, origin = ''): SharedMetrics {
+	async function get(name: SharedQueryName, search: URLSearchParams): Promise<QueryResult> {
+		if (namespace) search.set('namespace', namespace);
+		const response = await fetch(`${origin}/proxy/${cluster}/prometheus-shared/${name}?${search}`, {
+			headers: PROXY_HEADERS
+		});
+		const body = (await response.json().catch(() => null)) as {
+			status?: string;
+			data?: object;
+			error?: string;
+		} | null;
+		if (!response.ok || body?.status !== 'success' || !body.data) {
+			throw new Error(`${name}: ${body?.error ?? `HTTP ${response.status}`}`);
+		}
+		return QueryResult.fromJSON(body.data);
+	}
+
+	function searchFor(params: SharedParams = {}): URLSearchParams {
+		const search = new URLSearchParams();
+		for (const uuid of params.uuid ?? []) search.append('uuid', uuid);
+		for (const hostname of params.hostname ?? []) search.append('hostname', hostname);
+		return search;
+	}
+
+	const seconds = (date: Date) => String(date.getTime() / 1000);
+
+	return {
+		instant(name, params, time) {
+			const search = searchFor(params);
+			if (time) search.set('time', seconds(time));
+			return get(name, search);
+		},
+		range(name, params, start, end, step) {
+			const search = searchFor(params);
+			search.set('start', seconds(start));
+			search.set('end', seconds(end));
+			search.set('step', String(step));
+			return get(name, search);
+		}
+	};
+}
+
 /** Escape a value for use inside PromQL double-quoted string literals (e.g. `namespace="..."`). */
 export function escapePromqlStringLiteral(value: string): string {
 	return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+}
+
+/**
+ * `{namespace="<ns>"}`, or nothing for an admin's "all namespaces" (the empty
+ * choice): namespace="" would match only series without the label. At
+ * namespace scope the server pins the tenant's namespace either way.
+ */
+export function namespaceSelector(namespace: string): string {
+	return namespace ? `{namespace="${escapePromqlStringLiteral(namespace)}"}` : '';
 }
 
 /**
@@ -397,16 +582,13 @@ export async function fetchCombinedFlattenedRange(
 /**
  * Run multiple named instant queries as a SINGLE HTTP request.
  * Returns a record mapping each query name to its InstantVector list (after the
- * `__series__` tag has been stripped, so callers see the original label sets).
- *
- * On error, every named slot is set to `[]` so callers can deconstruct without
- * needing a try/catch per query — matching the lenient `instantNumber` /
- * `instantPerPod` pattern used in the dashboard.
+ * `__series__` tag has been stripped, so callers see the original label sets),
+ * or null when the request failed, so callers can show "unknown" rather than 0.
  */
-export async function fetchCombinedInstant(
+export async function fetchCombinedInstantOrNull(
 	client: PrometheusDriver,
 	queries: Record<string, string>
-): Promise<Record<string, InstantVector[]>> {
+): Promise<Record<string, InstantVector[]> | null> {
 	const result: Record<string, InstantVector[]> = {};
 	for (const name of Object.keys(queries)) result[name] = [];
 	const combined = Object.entries(queries)
@@ -423,41 +605,30 @@ export async function fetchCombinedInstant(
 			vector.metric.labels = rest;
 			result[name].push(vector);
 		}
-	} catch {
-		// leave all slots empty
+	} catch (error) {
+		console.warn('Failed to run combined instant query:', error);
+		return null;
 	}
 	return result;
 }
 
 /**
- * Build a sub-expression that yields one synthetic row per K8s node a given vLLM
- * model's pods occupy, with the `node` label renamed to `hostname` so the result
- * can be intersected against DCGM / host-level metrics via `and on(hostname)`.
- *
- * Lets DCGM queries scope to the model's hosts in a SINGLE PromQL request — no
- * preceding round-trip is needed to enumerate node names client-side.
+ * {@link fetchCombinedInstantOrNull}, with every named slot set to `[]` on
+ * error so callers can deconstruct without needing a try/catch per query —
+ * matching the lenient `instantNumber` / `instantPerPod` pattern used in the
+ * dashboard.
  */
-export function vllmModelHostnamesSelector(
-	namespace: string | undefined,
-	selectedModel: string
-): string {
-	const ns = (namespace ?? '').trim();
-	const nsSel = ns ? `namespace="${escapePromqlStringLiteral(ns)}"` : '';
-	const podInfoSelector = nsSel ? `{${nsSel}}` : '';
-	const vllmSelector = vllmMetricWithSelector('vllm:kv_cache_usage_perc', namespace, selectedModel);
-	return (
-		`group by(hostname) (` +
-		`label_replace(` +
-		`kube_pod_info${podInfoSelector}` +
-		` * on(namespace, pod) group_left() ` +
-		`group by(namespace, pod) (${vllmSelector}),` +
-		` "hostname", "$1", "node", "(.+)"))`
-	);
+export async function fetchCombinedInstant(
+	client: PrometheusDriver,
+	queries: Record<string, string>
+): Promise<Record<string, InstantVector[]>> {
+	const result = await fetchCombinedInstantOrNull(client, queries);
+	return result ?? Object.fromEntries(Object.keys(queries).map((name) => [name, []]));
 }
 
 /**
  * Label selector scoping DCGM (GPU exporter) series to one Kubernetes node. DCGM's
- * `hostname` label equals the K8s node name (as vllmModelHostnamesSelector also assumes).
+ * `hostname` label equals the K8s node name (as the model dashboard's GPU panels also assume).
  * Exact match, not regex: node names can contain dots and would otherwise cross-match.
  */
 export function dcgmNodeSelector(nodeName: string): string {
@@ -572,13 +743,14 @@ export function classifyGpuGovernance(allocated?: number, used?: number): GpuGov
  * Joins `kube_pod_info` against `vllm:kv_cache_usage_perc` so we only keep pods
  * that belong to `selectedModel`, then returns the distinct `node` label values.
  * Used to scope DCGM/GPU queries (which lack pod-level labels) to the nodes the
- * model actually occupies.
+ * model actually occupies. Resolves null when the lookup failed, so callers can
+ * tell 'unknown' from 'no GPU'.
  */
 export async function fetchModelNodes(
 	client: PrometheusDriver,
 	namespace: string | undefined,
 	selectedModel: string
-): Promise<string[]> {
+): Promise<string[] | null> {
 	const ns = (namespace ?? '').trim();
 	const nsSel = ns ? `namespace="${escapePromqlStringLiteral(ns)}"` : '';
 	const podInfoSelector = nsSel ? `{${nsSel}}` : '';
@@ -597,7 +769,7 @@ export async function fetchModelNodes(
 		}
 		return Array.from(nodes);
 	} catch {
-		return [];
+		return null;
 	}
 }
 

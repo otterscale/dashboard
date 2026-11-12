@@ -58,12 +58,24 @@ export interface GpuUtilization {
 	totalMem?: number;
 }
 
+/**
+ * What hami-scheduler has booked on a card across every workload: memory in MiB
+ * (the unit GpuDevice speaks) and how many containers share it. Names no pod —
+ * it is what a viewer who may not list other tenants' pods sees instead.
+ */
+export interface GpuAllocatedTotal {
+	usedMem: number;
+	shareCount: number;
+}
+
 export interface GpuInfo {
 	device: GpuDevice;
 	nodeName: string;
 	allocatedBy: { podName: string; podNamespace: string; usedCores: number; usedMem: number }[];
 	/** Measured usage of the card; absent when DCGM reports nothing for it. */
 	utilization?: GpuUtilization;
+	/** Per-card totals for viewers who may not list every pod on the node. */
+	allocatedTotal?: GpuAllocatedTotal;
 }
 
 export interface NodeInfo {
