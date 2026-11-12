@@ -13,16 +13,18 @@
 	import { Progress } from '$lib/components/ui/progress';
 	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/messages';
-	import { escapePromqlStringLiteral } from '$lib/prometheus';
+	import { escapePromqlStringLiteral, type SharedMetrics } from '$lib/prometheus';
 	import { cn } from '$lib/utils';
 
 	let {
 		prometheusDriver,
 		namespace,
+		shared,
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
 		namespace: string;
+		shared: SharedMetrics;
 		isReloading: boolean;
 	} = $props();
 
@@ -51,7 +53,12 @@
 				`sum(kubelet_volume_stats_used_bytes{namespace="${ns}"}) or vector(0)`,
 				evalAt
 			),
-			prometheusDriver.instantQuery(`sum(ceph_cluster_total_bytes) or vector(0)`, evalAt),
+			// The cluster's capacity, to say when requests exceed it. Best effort:
+			// without it the card still shows the Workspace's own numbers.
+			shared.instant('ceph-total-bytes', undefined, evalAt).catch((error) => {
+				console.warn('Failed to fetch cluster storage capacity:', error);
+				return undefined;
+			}),
 			prometheusDriver.instantQuery(
 				`count(kube_persistentvolumeclaim_info{namespace="${ns}"}) or vector(0)`,
 				evalAt
@@ -67,7 +74,7 @@
 		]);
 		requestedBytes = reqRes.result[0]?.value;
 		usedBytes = usedRes.result[0]?.value;
-		clusterTotalBytes = clusterTotalRes.result[0]?.value;
+		clusterTotalBytes = clusterTotalRes?.result[0]?.value;
 		totalCount = totalRes.result[0]?.value;
 		boundCount = boundRes.result[0]?.value;
 		pendingCount = pendingRes.result[0]?.value;
