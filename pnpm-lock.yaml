@@ -21,6 +21,7 @@ overrides:
   postcss@<8.5.28: 8.5.28
   source-map-js@<1.2.2: 1.2.2
   postcss-selector-parser@<7.1.6: 7.1.6
+  '@vitest/mocker@<4.1.12': 4.1.12
   vite-plugin-static-copy>chokidar: ^4.0.3
 
 importers:
@@ -326,7 +327,7 @@ importers:
         specifier: ^8.62.0
         version: 8.62.0(eslint@10.5.0(jiti@2.7.0))(typescript@5.9.3)
       vite:
-        specifier: 7.3.7
+        specifier: ^7.3.7
         version: 7.3.7(@types/node@24.13.4)(jiti@2.7.0)(lightningcss@1.32.0)(yaml@2.9.0)
       vite-plugin-devtools-json:
         specifier: ^1.0.0
