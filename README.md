@@ -3,7 +3,7 @@
 [![Build](https://github.com/otterscale/dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/otterscale/dashboard/actions)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 
-**The web UI for OtterScale — manage multi-cluster Kubernetes, storage, virtual machines, and AI workloads from one place.**
+**The web UI for OtterScale — manage multi-cluster Kubernetes, storage, and AI workloads from one place.**
 
 OtterScale Dashboard is a SvelteKit application that talks to the [OtterScale API](https://github.com/otterscale/api) over Connect RPC. It handles authentication against Keycloak, proxies requests to the gateway, and renders a unified operations console for every connected cluster.
 
@@ -30,13 +30,12 @@ graph LR
 
 - **Multi-cluster Kubernetes management** — scopes, resources, and RBAC.
 - **Storage orchestration** — Ceph pools, OSD, NFS, SMB, and object gateways.
-- **VM lifecycle** — create, manage, and access consoles via xterm.js and VNC.
 - **AI/ML model serving** — LLM deployment and an inference proxy.
 - **Monitoring** — built-in metrics and dashboards backed by Prometheus.
 
 ## Tech Stack
 
-Built with SvelteKit, TypeScript, Tailwind CSS, and Vite. UI building blocks include Monaco Editor, xterm.js, NoVNC, and LayerChart, with internationalization powered by Inlang Paraglide.
+Built with SvelteKit, TypeScript, Tailwind CSS, and Vite. UI building blocks include Monaco Editor, xterm.js, and LayerChart, with internationalization powered by Inlang Paraglide.
 
 ## Local development
 

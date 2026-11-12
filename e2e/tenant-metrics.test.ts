@@ -11,8 +11,8 @@
  * The user must be a plain Workspace member (view is enough): not cluster-admin,
  * not bound to otterscale:metrics-cluster-view, in no Keycloak group that
  * grants either. An admin account proves nothing here — admins keep cluster
- * scope. E2E_EXPECT_VM_DATA / E2E_EXPECT_MODEL_DATA=1 also require data on the
- * compute / model pages (set them when the namespace runs a VM / a model);
+ * scope. E2E_EXPECT_MODEL_DATA=1 also requires data on the model pages (set it
+ * when the namespace runs a model);
  * E2E_MODEL names the model for the analytics and model-service tests, which
  * are skipped without it. E2E_OTHER_NAMESPACE (default kube-system) is a
  * namespace the user has no access to, for the server's own refusals.
@@ -46,9 +46,6 @@ const SHARED_NAMES = new Set([
 	'host-gpu-count',
 	'gpu-xid-total',
 	'gpu-xid-by-gpu',
-	'kubevirt-handlers',
-	'kubevirt-controllers',
-	'kubevirt-controllers-ready',
 	'ceph-total-bytes',
 	'gpu-allocated-memory',
 	'gpu-allocated-cores',
@@ -74,8 +71,6 @@ type SharedCall = { name: string; status: number; params: URLSearchParams };
 /** Infrastructure metrics: never in a namespace-scoped query; the shared scope serves them by name. */
 const INFRASTRUCTURE = [
 	'ceph_cluster_total_bytes',
-	'kubevirt_info',
-	'kubevirt_virt_controller_ready_status',
 	'DCGM_FI_DEV_FB_USED',
 	'DCGM_FI_DEV_XID_ERRORS'
 ];
@@ -254,20 +249,6 @@ test('overview shows their namespace, and the cluster capacity through the share
 	expect(clusterScope).toEqual([]);
 	for (const q of sentQueries(tenancy)) for (const m of INFRASTRUCTURE) expect(q).not.toContain(m);
 	expectShared(shared, ['ceph-total-bytes']);
-});
-
-test('compute stays in their namespace and shows KubeVirt components', async ({ page }) => {
-	const kubevirt = ['kubevirt-handlers', 'kubevirt-controllers', 'kubevirt-controllers-ready'];
-	const { tenancy, shared, clusterScope } = await visit(page, 'compute', kubevirt);
-	expectOwnNamespaceOnly(tenancy);
-	expect(clusterScope).toEqual([]);
-	for (const q of sentQueries(tenancy)) {
-		for (const m of INFRASTRUCTURE) expect(q).not.toContain(m);
-		expect(q).not.toContain('exported_namespace');
-	}
-	expectShared(shared, kubevirt);
-	if (process.env.E2E_EXPECT_VM_DATA === '1')
-		await expect.poll(() => hasData(tenancy), { message: 'compute charts are empty' }).toBe(true);
 });
 
 test('model overview stays in their namespace', async ({ page }) => {

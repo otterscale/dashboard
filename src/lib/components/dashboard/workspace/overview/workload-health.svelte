@@ -27,8 +27,7 @@
 	const WORKLOAD_SPECS: WorkloadListSpec[] = [
 		{ group: 'serving.kserve.io', version: 'v1alpha2', resource: 'llminferenceservices' },
 		{ group: 'kro.run', version: 'v1alpha1', resource: 'applications' },
-		{ group: 'helm.toolkit.fluxcd.io', version: 'v2', resource: 'helmreleases' },
-		{ group: 'kubevirt.io', version: 'v1', resource: 'virtualmachines' }
+		{ group: 'helm.toolkit.fluxcd.io', version: 'v2', resource: 'helmreleases' }
 	];
 
 	let {
@@ -46,12 +45,7 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	const workloadLabels = $derived([
-		m.model(),
-		m.application(),
-		m.release(),
-		m.workspace_workload_vm_label()
-	]);
+	const workloadLabels = $derived([m.model(), m.application(), m.release()]);
 
 	let rows: { label: string; ready: number; total: number }[] = $state([]);
 

@@ -10,25 +10,6 @@ function files(dir: string): string[] {
 	});
 }
 
-// Namespace scope forces namespace="<ns>". KubeVirt's PodMonitor keeps the
-// VMI's own namespace label (helm-charts kubevirt 1.2.0), so a selector on
-// exported_namespace would only ever match nothing for a tenant.
-describe('compute dashboard', () => {
-	it('selects VM metrics on namespace, not exported_namespace', () => {
-		const dir = join(process.cwd(), 'src/lib/components/dashboard/compute');
-		const offenders = files(dir).filter((f) =>
-			readFileSync(f, 'utf8').includes('exported_namespace')
-		);
-		expect(offenders).toEqual([]);
-	});
-
-	it('builds namespace matchers with namespaceSelector, so "all namespaces" selects all', () => {
-		const dir = join(process.cwd(), 'src/lib/components/dashboard/compute');
-		const offenders = files(dir).filter((f) => /namespace="\$\{/.test(readFileSync(f, 'utf8')));
-		expect(offenders).toEqual([]);
-	});
-});
-
 /**
  * Everything a Workspace page renders: its routes and the components they use.
  * The cluster and storage dashboards live under the Workspace route too, but
@@ -37,7 +18,6 @@ describe('compute dashboard', () => {
 const workspaceRoots = [
 	'src/lib/components/dashboard/workspace',
 	'src/lib/components/dashboard/model',
-	'src/lib/components/dashboard/compute',
 	'src/lib/components/gpu-allocation',
 	'src/lib/components/kind-viewer',
 	'src/routes/(auth)/[cluster]/[workspace]'
@@ -72,8 +52,7 @@ const infrastructureHelpers = [
 ];
 
 /** Infrastructure metrics: their series can name other tenants' pods, or none. */
-const infrastructureMetrics =
-	/DCGM_FI_|hami_|kubevirt_info|kubevirt_virt_controller|\bceph_|node_disk_|node_uname_info|topolvm_/;
+const infrastructureMetrics = /DCGM_FI_|hami_|\bceph_|node_disk_|node_uname_info|topolvm_/;
 
 const forbidden: [string, RegExp][] = [
 	['new PrometheusDriver', /\bnew\s+PrometheusDriver\b/],
@@ -82,8 +61,8 @@ const forbidden: [string, RegExp][] = [
 ];
 
 // Workspace pages make drivers with workspacePrometheusDriver, which keeps a
-// viewer without cluster metrics access at namespace scope, and take GPU,
-// KubeVirt and Ceph numbers from the server's named queries (shared scope),
+// viewer without cluster metrics access at namespace scope, and take GPU
+// and Ceph numbers from the server's named queries (shared scope),
 // for admins and members alike. No file they render may pick the cluster
 // scope or carry infrastructure PromQL of its own.
 describe('workspace pages', () => {
@@ -125,8 +104,6 @@ describe('shared-scope components', () => {
 		'src/lib/components/kind-viewer/kind-viewer-actions/utils/gpu-resources.svelte',
 		'src/lib/components/dashboard/model/analytics/b-gpu-memory.svelte',
 		'src/lib/components/dashboard/model/analytics/b-pod-health.svelte',
-		'src/lib/components/dashboard/compute/overview/controller.svelte',
-		'src/lib/components/dashboard/compute/overview/worker.svelte',
 		'src/lib/components/dashboard/workspace/overview/storage.svelte'
 	];
 	const sharedCall =

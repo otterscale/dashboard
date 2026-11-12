@@ -48,12 +48,6 @@ import {
 	getDaemonSetUISchemas
 } from './daemonset.js';
 import {
-	getDataVolumeColumnDefinitions,
-	getDataVolumeData,
-	getDataVolumeDataSchemas,
-	getDataVolumeUISchemas
-} from './datavolume.js';
-import {
 	getDefaultColumnDefinitions,
 	getDefaultData,
 	getDefaultDataSchemas,
@@ -230,12 +224,6 @@ import {
 	getTaskUISchemas
 } from './task.js';
 import {
-	getVirtualMachineColumnDefinitions,
-	getVirtualMachineData,
-	getVirtualMachineDataSchemas,
-	getVirtualMachineUISchemas
-} from './virtualmachine.js';
-import {
 	getWorkspaceColumnDefinitions,
 	getWorkspaceData,
 	getWorkspaceDataSchemas,
@@ -314,12 +302,6 @@ function getDataSchemas(kind: string, group?: string): Record<string, DataSchema
 			return getGatewayDataSchemas();
 		case 'HelmRelease':
 			return getHelmReleaseDataSchemas();
-		case 'VirtualMachine':
-			return getVirtualMachineDataSchemas();
-		case 'DataVolume':
-			return getDataVolumeDataSchemas();
-		// case 'VirtualMachineInstancetype':
-		// 	return getVirtualMachineInstancetypeDataSchemas();
 		case 'Application':
 			return getApplicationDataSchemas();
 		case 'Task':
@@ -410,12 +392,6 @@ function getData(apiResource: APIResource, object: JsonObject): Record<string, J
 			return getGatewayData(resource);
 		case 'HelmRelease':
 			return getHelmReleaseData(resource);
-		case 'VirtualMachine':
-			return getVirtualMachineData(resource);
-		case 'DataVolume':
-			return getDataVolumeData(resource);
-		// case 'VirtualMachineInstancetype':
-		// 	return getVirtualMachineInstancetypeData(resource);
 		case 'Application':
 			return getApplicationData(resource);
 		case 'Task':
@@ -503,12 +479,6 @@ function getUISchemas(kind: string, group?: string): Record<string, UISchemaType
 			return getGatewayUISchemas();
 		case 'HelmRelease':
 			return getHelmReleaseUISchemas();
-		case 'VirtualMachine':
-			return getVirtualMachineUISchemas();
-		case 'DataVolume':
-			return getDataVolumeUISchemas();
-		// case 'VirtualMachineInstancetype':
-		// 	return getVirtualMachineInstancetypeUISchemas();
 		case 'Application':
 			return getApplicationUISchemas();
 		case 'Task':
@@ -601,10 +571,6 @@ function getColumnDefinitions(
 			return getGatewayColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'HelmRelease':
 			return getHelmReleaseColumnDefinitions(apiResource, uiSchemas, dataSchemas);
-		case 'VirtualMachine':
-			return getVirtualMachineColumnDefinitions(apiResource, uiSchemas, dataSchemas, cluster);
-		case 'DataVolume':
-			return getDataVolumeColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'Application':
 			return getApplicationColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'Task':

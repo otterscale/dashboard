@@ -8,7 +8,6 @@ export type Path = {
 const PATH_ICON_MAP: Record<string, string> = {
 	'/applications': 'ph:compass',
 	'/registry': 'ph:table',
-	'/compute': 'ph:cpu',
 	'/configuration': 'ph:gear',
 	'/databases': 'ph:database',
 	'/machines': 'ph:computer-tower',
