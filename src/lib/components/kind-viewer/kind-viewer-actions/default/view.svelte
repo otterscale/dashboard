@@ -23,11 +23,17 @@
 	let {
 		schema,
 		object,
-		onOpenChangeComplete
+		onOpenChangeComplete,
+		open = $bindable(false),
+		hideTrigger = false
 	}: {
 		schema: Schema;
 		object: any; // eslint-disable-line @typescript-eslint/no-explicit-any
-		onOpenChangeComplete?: () => void;
+		onOpenChangeComplete?: (isOpen: boolean) => void;
+		/** Bindable, so a parent can open the dialog without the trigger. */
+		open?: boolean;
+		/** Omit the menu item when a parent drives `open`. */
+		hideTrigger?: boolean;
 	} = $props();
 
 	const name: string = $derived(object?.metadata?.name ?? object?.kind ?? '');
@@ -40,7 +46,6 @@
 		)
 	);
 
-	let open = $state(false);
 	let fullscreen = $state(false);
 	let mode = $state<'yaml' | 'json'>('yaml');
 
@@ -64,16 +69,18 @@
 	{onOpenChangeComplete}
 	onOpenChange={(isOpen) => !isOpen && (fullscreen = false)}
 >
-	<Dialog.Trigger class="w-full">
-		<Item.Root class="p-0 text-xs" size="sm">
-			<Item.Media>
-				<EyeIcon />
-			</Item.Media>
-			<Item.Content>
-				<Item.Title>View</Item.Title>
-			</Item.Content>
-		</Item.Root>
-	</Dialog.Trigger>
+	{#if !hideTrigger}
+		<Dialog.Trigger class="w-full">
+			<Item.Root class="p-0 text-xs" size="sm">
+				<Item.Media>
+					<EyeIcon />
+				</Item.Media>
+				<Item.Content>
+					<Item.Title>View</Item.Title>
+				</Item.Content>
+			</Item.Root>
+		</Dialog.Trigger>
+	{/if}
 	<Dialog.Content
 		class={fullscreen ? ACTION_DIALOG_CONTENT_FULLSCREEN_CLASS : ACTION_DIALOG_CONTENT_CLASS}
 	>
