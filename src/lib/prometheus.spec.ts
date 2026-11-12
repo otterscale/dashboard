@@ -164,7 +164,7 @@ describe('prometheus drivers', () => {
 
 	it('shared scope leaves namespace out when the Workspace has none', async () => {
 		seen.length = 0;
-		await sharedMetrics('c1', '', origin).instant('kubevirt-handlers');
+		await sharedMetrics('c1', '', origin).instant('ceph-total-bytes');
 		expect([...seen[0].searchParams.keys()]).toEqual([]);
 	});
 

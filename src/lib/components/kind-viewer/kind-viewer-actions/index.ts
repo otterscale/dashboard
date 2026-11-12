@@ -13,8 +13,6 @@ import ClusterRoleBindingActions from './cluster-role-binding/actions.svelte';
 import ClusterRoleBindingCreate from './cluster-role-binding/create.svelte';
 import CronJobActions from './cronjob/actions.svelte';
 import DaemonSetActions from './daemonset/actions.svelte';
-import DataVolumeActions from './data-volume/actions.svelte';
-import DataVolumeCreate from './data-volume/create.svelte';
 import DefaultActions from './default/actions.svelte';
 import DefaultCreate from './default/create.svelte';
 import DeploymentActions from './deployment/actions.svelte';
@@ -36,8 +34,6 @@ import StatefulSetActions from './statefulset/actions.svelte';
 import TaskActions from './task/actions.svelte';
 import TaskCreate from './task/create.svelte';
 import DisabledCreate from './utils/disabled-create.svelte';
-import VirtualMachineActions from './virtual-machine/actions.svelte';
-import VirtualMachineCreate from './virtual-machine/create.svelte';
 import WorkspaceActions from './workspace/actions.svelte';
 import WorkspaceCreate from './workspace/create.svelte';
 
@@ -93,8 +89,6 @@ function getCreate(kind: string, namespace?: string, group?: string): CreateType
 			return ApplicationCreate as CreateType;
 		case 'ClusterRoleBinding':
 			return ClusterRoleBindingCreate as CreateType;
-		case 'DataVolume':
-			return DataVolumeCreate as CreateType;
 		case 'GitRepository':
 			return GitRepositoryCreate as CreateType;
 		case 'HelmRepository':
@@ -107,10 +101,6 @@ function getCreate(kind: string, namespace?: string, group?: string): CreateType
 			return ScheduleCreate as CreateType;
 		case 'Task':
 			return TaskCreate as CreateType;
-		case 'VirtualMachine':
-			return VirtualMachineCreate as CreateType;
-		// case 'VirtualMachineInstancetype':
-		// 	return InstanceTypeCreate as CreateType;
 		case 'Workspace':
 			return WorkspaceCreate as CreateType;
 		case 'LLMInferenceServiceConfig':
@@ -137,8 +127,6 @@ function getActions(kind: string, namespace?: string, group?: string): ActionsTy
 			return CronJobActions as ActionsType;
 		case 'DaemonSet':
 			return DaemonSetActions as ActionsType;
-		case 'DataVolume':
-			return DataVolumeActions as ActionsType;
 		case 'Deployment':
 			return DeploymentActions as ActionsType;
 		case 'HelmRelease':
@@ -166,10 +154,6 @@ function getActions(kind: string, namespace?: string, group?: string): ActionsTy
 			return StatefulSetActions as ActionsType;
 		case 'Task':
 			return TaskActions as ActionsType;
-		case 'VirtualMachine':
-			return VirtualMachineActions as ActionsType;
-		// case 'VirtualMachineInstancetype':
-		// 	return InstanceTypeActions as ActionsType;
 		case 'Workspace':
 			return WorkspaceActions as ActionsType;
 		default:

@@ -8,7 +8,6 @@
 	import BracesIcon from '@lucide/svelte/icons/braces';
 	import CircleQuestionMarkIcon from '@lucide/svelte/icons/circle-question-mark';
 	import CompassIcon from '@lucide/svelte/icons/compass';
-	import CpuIcon from '@lucide/svelte/icons/cpu';
 	import FileTextIcon from '@lucide/svelte/icons/file-text';
 	import GaugeIcon from '@lucide/svelte/icons/gauge';
 	import HardDriveIcon from '@lucide/svelte/icons/hard-drive';
@@ -271,15 +270,6 @@
 								})
 							: ''
 					},
-					{
-						title: m.compute(),
-						url: page.params.workspace
-							? resolve('/(auth)/[cluster]/[workspace]/dashboard/compute', {
-									cluster: activeCluster,
-									workspace: page.params.workspace
-								})
-							: ''
-					},
 					...(hasRookCeph && data.canViewClusterMetrics
 						? [
 								{
@@ -361,30 +351,6 @@
 							version: 'v1',
 							kind: 'HelmRepository',
 							resource: 'helmrepositories'
-						})
-					}
-				]
-			},
-			{
-				title: m.compute(),
-				icon: CpuIcon,
-				items: [
-					{
-						title: m.virtual_machine(),
-						url: resourceUrl({
-							group: 'kubevirt.io',
-							version: 'v1',
-							kind: 'VirtualMachine',
-							resource: 'virtualmachines'
-						})
-					},
-					{
-						title: m.data_volume(),
-						url: resourceUrl({
-							group: 'cdi.kubevirt.io',
-							version: 'v1beta1',
-							kind: 'DataVolume',
-							resource: 'datavolumes'
 						})
 					}
 				]
