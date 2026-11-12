@@ -4,7 +4,7 @@ import type { Row } from '@tanstack/table-core';
 import type { ValidateFunction } from 'ajv';
 import type { Component } from 'svelte';
 
-import ModelTemplateGridLayout from './modeltemplate.svelte';
+import ModelTemplateGridLayout from './modeltemplate/model-card.svelte';
 
 type GridLayoutType =
 	| Component<{
