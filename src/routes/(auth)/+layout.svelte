@@ -571,6 +571,15 @@
 						})
 					},
 					{
+						title: m.listener_set(),
+						url: resourceUrl({
+							group: 'gateway.networking.k8s.io',
+							version: 'v1',
+							kind: 'ListenerSet',
+							resource: 'listenersets'
+						})
+					},
+					{
 						title: m.gateway(),
 						url: resourceUrl({
 							group: 'gateway.networking.k8s.io',

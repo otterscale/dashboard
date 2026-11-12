@@ -13,18 +13,17 @@ import type { LinkMetadata } from '$lib/components/dynamic-table/dynamic-table-c
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
 
-import { buildResourceDetailUrl } from '../utils';
+import { buildResourceDetailUrl, summarizeConditions } from '../utils';
 
-// kubectl get httproute -o wide
-// NAME   HOSTNAMES   PARENT   AGE
-type HTTPRouteAttribute = 'Name' | 'Namespace' | 'Hostnames' | 'Parent' | 'Age' | 'raw';
+type HTTPRouteAttribute = 'Name' | 'Namespace' | 'Hostnames' | 'Parent' | 'Status' | 'Age' | 'raw';
 
 function getHTTPRouteDataSchemas(): Record<HTTPRouteAttribute, DataSchemaType> {
 	return {
 		Name: 'text',
 		Namespace: 'text',
-		Hostnames: 'number',
+		Hostnames: 'text',
 		Parent: 'number',
+		Status: 'text',
 		Age: 'time',
 		raw: 'object'
 	};
@@ -36,8 +35,12 @@ function getHTTPRouteData(
 	return {
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.metadata?.namespace ?? null,
-		Hostnames: object?.spec?.hostnames?.length ?? 0,
+		Hostnames: object?.spec?.hostnames?.join(', ') || null,
 		Parent: object?.spec?.parentRefs?.length ?? 0,
+		Status: summarizeConditions(
+			object?.status?.parents?.flatMap((parent) => parent.conditions ?? []),
+			['ResolvedRefs', 'Accepted']
+		),
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
 	};
@@ -47,8 +50,9 @@ function getHTTPRouteUISchemas(): Record<HTTPRouteAttribute, UISchemaType> {
 	return {
 		Name: 'link',
 		Namespace: 'text',
-		Hostnames: 'array-of-object',
+		Hostnames: 'text',
 		Parent: 'array-of-object',
+		Status: 'text',
 		Age: 'time',
 		raw: 'object'
 	};
@@ -127,16 +131,7 @@ function getHTTPRouteColumnDefinitions(
 				renderComponent(DynamicTableCell, {
 					row: row,
 					column: column,
-					uiSchemas: uiSchemas,
-					metadata: {
-						items: (
-							(row.original.raw as GatewayNetworkingK8SIoV1HTTPRoute).spec?.hostnames ?? []
-						).map((hostname) => ({
-							title: hostname,
-							description: null,
-							raw: { hostname }
-						})) as ArrayOfObjectItemsType
-					} satisfies ArrayOfObjectMetadata
+					uiSchemas: uiSchemas
 				}),
 			accessorKey: 'Hostnames'
 		},
@@ -170,6 +165,27 @@ function getHTTPRouteColumnDefinitions(
 				}),
 			accessorKey: 'Parent',
 			meta: { class: 'hidden xl:table-cell' }
+		},
+		{
+			id: 'Status',
+			header: ({ column }: { column: Column<Record<HTTPRouteAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<HTTPRouteAttribute, JsonValue>>;
+				row: Row<Record<HTTPRouteAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Status'
 		},
 		{
 			id: 'Age',
