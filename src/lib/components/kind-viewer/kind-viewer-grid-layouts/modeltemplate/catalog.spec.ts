@@ -5,11 +5,15 @@ import {
 	coerceSelection,
 	defaultSelection,
 	describeEntry,
+	gpuAmountLabel,
 	gpuOptions,
+	gpuProductLabel,
 	gpusOptions,
 	kvOffloadOptions,
 	type ModelTemplateObject,
+	parseGpuAmount,
 	pickTemplate,
+	templateResources,
 	workloadOptions
 } from './catalog';
 
@@ -95,8 +99,8 @@ describe('buildTemplateDict', () => {
 		expect(workloadOptions(dict)).toEqual([]);
 	});
 
-	it('sorts GPU counts numerically, fractions included', () => {
-		const templates = ['2', '0.5', '1', '0.17', '0.33', '10'].map((gpus) => {
+	it('sorts GPU counts numerically, vGPU fractions included', () => {
+		const templates = ['2', '1of2', '1', '1of6', '1of3', '10', '0.5'].map((gpus) => {
 			const object = generated({ workload: 'agent', gpus: 1, offload: false });
 			object.metadata!.name = `fraction-${gpus}`;
 			object.metadata!.labels!['otterscale.io/gpus-in-total'] = gpus;
@@ -104,9 +108,10 @@ describe('buildTemplateDict', () => {
 		});
 		const dict = buildTemplateDict(templates);
 		expect(gpusOptions(dict, 'agent', 'rtx-pro-6000')).toEqual([
-			'0.17',
-			'0.33',
+			'1of6',
+			'1of3',
 			'0.5',
+			'1of2',
 			'1',
 			'2',
 			'10'
@@ -174,5 +179,72 @@ describe('describeEntry', () => {
 			description: 'Hybrid-architecture 27B model.'
 		});
 		expect(describeEntry({ metadata: { name: 'bare' }, spec: {} }).modelName).toBe('bare');
+	});
+});
+
+describe('templateResources', () => {
+	it('reads the main container, preferring requests over limits', () => {
+		expect(
+			templateResources({
+				metadata: {
+					annotations: {
+						'otterscale.io/gpu-memory-per-instance-mebibytes': '97871',
+						'otterscale.io/gpu-memory-in-total-mebibytes': '195742'
+					}
+				},
+				spec: {
+					template: {
+						containers: [
+							{ name: 'sidecar', resources: { requests: { cpu: '1' } } },
+							{
+								name: 'main',
+								resources: {
+									requests: { cpu: '8', memory: '64Gi' },
+									limits: { cpu: '16' }
+								}
+							}
+						]
+					}
+				}
+			})
+		).toEqual({ cpu: '8', memory: '64Gi', vram: '191.2 Gi' });
+	});
+
+	it('formats whole and sub-GiB VRAM and handles missing values', () => {
+		const withVram = (total: string): ModelTemplateObject => ({
+			metadata: {
+				annotations: { 'otterscale.io/gpu-memory-in-total-mebibytes': total }
+			},
+			spec: {}
+		});
+		expect(templateResources(withVram('2048')).vram).toBe('2 Gi');
+		expect(templateResources(withVram('512')).vram).toBe('512 Mi');
+		expect(templateResources({ spec: {} })).toEqual({ cpu: null, memory: null, vram: null });
+	});
+});
+
+describe('GPU amounts', () => {
+	it('parses whole and fractional values', () => {
+		expect(parseGpuAmount('2')).toEqual({ numerator: 2, denominator: 1 });
+		expect(parseGpuAmount('1of3')).toEqual({ numerator: 1, denominator: 3 });
+		expect(parseGpuAmount('1/3')).toEqual({ numerator: 1, denominator: 3 });
+		expect(parseGpuAmount('0of3')).toBeNull();
+		expect(parseGpuAmount('half')).toBeNull();
+		expect(parseGpuAmount(undefined)).toBeNull();
+	});
+
+	it('shows the gpu-product annotation for the GPU type, falling back to the label', () => {
+		const object = generated({ workload: 'agent', gpus: 1, offload: false });
+		object.metadata!.annotations!['otterscale.io/gpu-product'] = 'NVIDIA RTX PRO 6000';
+		const dict = buildTemplateDict([object]);
+		expect(gpuProductLabel(dict, 'agent', 'rtx-pro-6000')).toBe('NVIDIA RTX PRO 6000');
+		expect(gpuProductLabel(buildTemplateDict(ALL), 'agent', 'rtx-pro-6000')).toBe('rtx-pro-6000');
+	});
+
+	it('labels fractions with a slash', () => {
+		expect(gpuAmountLabel('1of3')).toBe('1/3');
+		expect(gpuAmountLabel('1/3')).toBe('1/3');
+		expect(gpuAmountLabel('2')).toBe('2');
+		expect(gpuAmountLabel('0.5')).toBe('0.5');
 	});
 });

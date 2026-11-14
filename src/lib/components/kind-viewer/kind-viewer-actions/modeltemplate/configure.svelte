@@ -16,13 +16,16 @@
 		coerceSelection,
 		defaultSelection,
 		describeEntry,
+		gpuAmountLabel,
 		gpuOptions,
+		gpuProductLabel,
 		gpusOptions,
 		kvOffloadOptions,
 		type ModelTemplate,
 		type ModelTemplateObject,
 		pickTemplate,
 		type Selection,
+		templateResources,
 		workloadDescription,
 		workloadLabel,
 		workloadOptions
@@ -276,11 +279,13 @@
 							onValueChange={(value) => update({ gpu: value })}
 						>
 							<Select.Trigger id="gpu-type" class="w-full">
-								<span class="truncate">{selection.gpu}</span>
+								<span class="truncate">
+									{gpuProductLabel(dict, selection.workload, selection.gpu)}
+								</span>
 							</Select.Trigger>
 							<Select.Content>
 								{#each gpus as gpu (gpu)}
-									<Select.Item value={gpu} label={gpu} />
+									<Select.Item value={gpu} label={gpuProductLabel(dict, selection.workload, gpu)} />
 								{/each}
 							</Select.Content>
 						</Select.Root>
@@ -294,11 +299,11 @@
 							onValueChange={(value) => update({ gpus: value })}
 						>
 							<Select.Trigger id="gpu-count" class="w-full">
-								<span class="truncate">{selection.gpus} GPU</span>
+								<span class="truncate">{gpuAmountLabel(selection.gpus)} GPU</span>
 							</Select.Trigger>
 							<Select.Content>
 								{#each counts as count (count)}
-									<Select.Item value={count} label={`${count} GPU`} />
+									<Select.Item value={count} label={`${gpuAmountLabel(count)} GPU`} />
 								{/each}
 							</Select.Content>
 						</Select.Root>
@@ -331,6 +336,7 @@
 				{#if chosen}
 					{@const details = chosen.details}
 					{@const measured = details.expectedTimeToFirstTokenMs !== null}
+					{@const resources = templateResources(chosen.object)}
 					<dl class="grid grid-cols-3 gap-4">
 						<div>
 							<dt class="text-xs text-muted-foreground">Concurrency</dt>
@@ -366,6 +372,25 @@
 							</dd>
 						</div>
 					</dl>
+					{#if resources.cpu !== null || resources.memory !== null || resources.vram !== null}
+						<dl class="mt-4 grid grid-cols-3 gap-4 border-t pt-4">
+							<div>
+								<dt class="text-xs text-muted-foreground">CPU</dt>
+								<dd class="text-lg font-semibold tabular-nums">{resources.cpu ?? '–'}</dd>
+								<dd class="text-xs text-muted-foreground">cores</dd>
+							</div>
+							<div>
+								<dt class="text-xs text-muted-foreground">DRAM</dt>
+								<dd class="text-lg font-semibold tabular-nums">{resources.memory ?? '–'}</dd>
+								<dd class="text-xs text-muted-foreground">host memory</dd>
+							</div>
+							<div>
+								<dt class="text-xs text-muted-foreground">VRAM</dt>
+								<dd class="text-lg font-semibold tabular-nums">{resources.vram ?? '–'}</dd>
+								<dd class="text-xs text-muted-foreground">in total</dd>
+							</div>
+						</dl>
+					{/if}
 					{#if details.provisional}
 						<p class="mt-3 text-xs text-amber-600 dark:text-amber-500">
 							Provisional: capacity and latency are predictions, not measurements.

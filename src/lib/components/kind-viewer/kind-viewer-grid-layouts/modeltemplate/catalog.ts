@@ -7,6 +7,15 @@ export type ModelTemplateObject = {
 	};
 	spec?: {
 		model?: { name?: string; uri?: string };
+		template?: {
+			containers?: {
+				name?: string;
+				resources?: {
+					requests?: Record<string, string | number>;
+					limits?: Record<string, string | number>;
+				};
+			}[];
+		};
 	};
 };
 
@@ -151,13 +160,50 @@ export function gpuOptions(dict: TemplateDict, workload: string): string[] {
 	return Object.keys(dict[workload] ?? {}).sort();
 }
 
+export function parseGpuAmount(
+	value: string | undefined
+): { numerator: number; denominator: number } | null {
+	const match = value?.trim().match(/^(\d+)(?:(?:of|\/)(\d+))?$/);
+	if (!match) return null;
+	const numerator = Number(match[1]);
+	const denominator = Number(match[2] ?? 1);
+	if (numerator < 1 || denominator < 1) return null;
+	return { numerator, denominator };
+}
+
+function gpuAmountValue(value: string): number | null {
+	const parsed = parseGpuAmount(value);
+	if (parsed) return parsed.numerator / parsed.denominator;
+	const numeric = Number(value);
+	return Number.isFinite(numeric) ? numeric : null;
+}
+
+export function gpuAmountLabel(value: string): string {
+	const parsed = parseGpuAmount(value);
+	if (!parsed) return value;
+	return parsed.denominator === 1
+		? String(parsed.numerator)
+		: `${parsed.numerator}/${parsed.denominator}`;
+}
+
+export function gpuProductLabel(dict: TemplateDict, workload: string, gpu: string): string {
+	for (const byOffload of Object.values(dict[workload]?.[gpu] ?? {}))
+		for (const bucket of Object.values(byOffload))
+			for (const template of bucket) {
+				const product =
+					template.object.metadata?.annotations?.['otterscale.io/gpu-product']?.trim();
+				if (product) return product;
+			}
+	return gpu;
+}
+
 export function gpusOptions(dict: TemplateDict, workload: string, gpu: string): string[] {
 	return Object.keys(dict[workload]?.[gpu] ?? {}).sort((a, b) => {
-		const numberA = Number(a);
-		const numberB = Number(b);
-		if (Number.isFinite(numberA) && Number.isFinite(numberB)) return numberA - numberB;
-		if (Number.isFinite(numberA)) return -1;
-		if (Number.isFinite(numberB)) return 1;
+		const valueA = gpuAmountValue(a);
+		const valueB = gpuAmountValue(b);
+		if (valueA !== null && valueB !== null) return valueA - valueB || a.localeCompare(b);
+		if (valueA !== null) return -1;
+		if (valueB !== null) return 1;
 		return a.localeCompare(b);
 	});
 }
@@ -217,5 +263,38 @@ export function describeEntry(object: ModelTemplateObject): EntrySummary {
 		vendor: annotations['otterscale.io/vendor']?.trim() || null,
 		modelUri: object.spec?.model?.uri?.trim() || null,
 		description: annotations['otterscale.io/description']?.trim() || null
+	};
+}
+
+export interface TemplateResources {
+	cpu: string | null;
+	memory: string | null;
+	vram: string | null;
+}
+
+function formatMebibytes(raw: string | undefined): string | null {
+	if (raw === undefined || raw.trim() === '') return null;
+	const value = Number(raw);
+	if (!Number.isFinite(value)) return raw;
+	if (value < 1024) return `${value} Mi`;
+	const gibibytes = value / 1024;
+	return `${Number.isInteger(gibibytes) ? gibibytes : gibibytes.toFixed(1)} Gi`;
+}
+
+export function templateResources(object: ModelTemplateObject): TemplateResources {
+	const containers = object.spec?.template?.containers ?? [];
+	const container = containers.find((entry) => entry.name === 'main') ?? containers[0];
+	const requests = container?.resources?.requests ?? {};
+	const limits = container?.resources?.limits ?? {};
+	const read = (key: string) => {
+		const raw = requests[key] ?? limits[key];
+		return raw === undefined ? null : String(raw);
+	};
+	return {
+		cpu: read('cpu'),
+		memory: read('memory'),
+		vram: formatMebibytes(
+			object.metadata?.annotations?.['otterscale.io/gpu-memory-in-total-mebibytes']
+		)
 	};
 }
