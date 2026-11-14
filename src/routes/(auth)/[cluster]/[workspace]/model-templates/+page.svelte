@@ -36,7 +36,7 @@
 	const kind = 'LLMInferenceServiceConfig';
 	const resource = 'llminferenceserviceconfigs';
 	const fieldSelector = 'metadata.namespace==otterscale-system';
-	const labelSelector = 'otterscale.io/template-role=model';
+	const labelSelector = 'template.otterscale.io/template-role=model';
 
 	const transport: Transport = getContext('transport');
 	const client = createClient(ResourceService, transport);

@@ -24,6 +24,8 @@
 		type ModelTemplate,
 		type ModelTemplateObject,
 		pickTemplate,
+		replicasOptions,
+		routingOptions,
 		type Selection,
 		templateResources,
 		workloadDescription,
@@ -84,7 +86,14 @@
 	const summary = $derived(describeEntry(entry));
 	const dict = $derived(buildTemplateDict(templates));
 
-	let selection: Selection = $state({ workload: '', gpu: '', gpus: '', kvOffload: 'false' });
+	let selection: Selection = $state({
+		workload: '',
+		gpu: '',
+		gpus: '',
+		replicas: '',
+		kvOffload: 'false',
+		routing: 'false'
+	});
 	let pendingTemplate: ModelTemplate | undefined = $state(undefined);
 	let pendingObject: ServingKserveIoV1Alpha2LLMInferenceServiceConfig | undefined =
 		$state(undefined);
@@ -92,7 +101,7 @@
 	let handoffOpen = $state(false);
 
 	async function listTemplates(): Promise<ModelTemplateObject[]> {
-		const modelLabel = entry.metadata?.labels?.['otterscale.io/model'];
+		const modelLabel = entry.metadata?.labels?.['template.otterscale.io/model'];
 		if (!modelLabel) return [];
 		const items: ModelTemplateObject[] = [];
 		let continueToken: string | undefined = undefined;
@@ -103,7 +112,7 @@
 				group,
 				version,
 				resource,
-				labelSelector: `otterscale.io/template-role=deployment,otterscale.io/model=${modelLabel}`,
+				labelSelector: `template.otterscale.io/template-role=deployment,template.otterscale.io/model=${modelLabel}`,
 				continue: continueToken
 			} as ListRequest);
 			continueToken = response.continue;
@@ -136,7 +145,14 @@
 		if (!open) return;
 		untrack(() => {
 			templates = [];
-			selection = { workload: '', gpu: '', gpus: '', kvOffload: 'false' };
+			selection = {
+				workload: '',
+				gpu: '',
+				gpus: '',
+				replicas: '',
+				kvOffload: 'false',
+				routing: 'false'
+			};
 			loadTemplates();
 		});
 	});
@@ -144,11 +160,26 @@
 	const workloads = $derived(workloadOptions(dict));
 	const gpus = $derived(gpuOptions(dict, selection.workload));
 	const counts = $derived(gpusOptions(dict, selection.workload, selection.gpu));
+	const replicaCounts = $derived(
+		replicasOptions(dict, selection.workload, selection.gpu, selection.gpus)
+	);
 	const kvValues = $derived(
-		kvOffloadOptions(dict, selection.workload, selection.gpu, selection.gpus)
+		kvOffloadOptions(dict, selection.workload, selection.gpu, selection.gpus, selection.replicas)
 	);
 	const kvOn = $derived(kvValues.includes('true'));
 	const kvOff = $derived(kvValues.includes('false'));
+	const routingValues = $derived(
+		routingOptions(
+			dict,
+			selection.workload,
+			selection.gpu,
+			selection.gpus,
+			selection.replicas,
+			selection.kvOffload
+		)
+	);
+	const routingOn = $derived(routingValues.includes('true'));
+	const routingOff = $derived(routingValues.includes('false'));
 	const chosen = $derived(pickTemplate(dict, selection));
 
 	function update(patch: Partial<Selection>) {
@@ -163,11 +194,6 @@
 		open = false;
 	}
 
-	function formatDuration(milliseconds: number | null): string {
-		if (milliseconds === null) return '–';
-		return milliseconds >= 1000 ? `${(milliseconds / 1000).toFixed(1)} s` : `${milliseconds} ms`;
-	}
-
 	function formatTokens(tokens: number): string {
 		return tokens >= 1024 && tokens % 1024 === 0 ? `${tokens / 1024}K` : String(tokens);
 	}
@@ -175,12 +201,14 @@
 	function workloadFacts(workload: string): string {
 		const lengths: number[] = [];
 		for (const byGpus of Object.values(dict[workload] ?? {}))
-			for (const byOffload of Object.values(byGpus))
-				for (const bucket of Object.values(byOffload))
-					for (const template of bucket) {
-						const length = template.details.maxModelLen;
-						if (length !== null && !lengths.includes(length)) lengths.push(length);
-					}
+			for (const byReplicas of Object.values(byGpus))
+				for (const byOffload of Object.values(byReplicas))
+					for (const byRouting of Object.values(byOffload))
+						for (const bucket of Object.values(byRouting))
+							for (const template of bucket) {
+								const length = template.details.maxModelLen;
+								if (length !== null && !lengths.includes(length)) lengths.push(length);
+							}
 		if (lengths.length === 0) return '';
 		return `${lengths
 			.sort((a, b) => a - b)
@@ -237,8 +265,8 @@
 				<Item.Content class="text-left">
 					<Item.Title>No deployment templates</Item.Title>
 					<Item.Description>
-						No deployment template of this model carries the workload, GPU and KV cache offload
-						labels.
+						No deployment template of this model carries the workload, GPU, replicas and KV cache
+						offload labels.
 					</Item.Description>
 				</Item.Content>
 			</Item.Root>
@@ -270,7 +298,7 @@
 					{/each}
 				</RadioGroup.Root>
 
-				<div class="grid gap-4 sm:grid-cols-2">
+				<div class="grid gap-4 sm:grid-cols-3">
 					<Field.Field>
 						<Field.Label for="gpu-type">Type</Field.Label>
 						<Select.Root
@@ -292,7 +320,7 @@
 					</Field.Field>
 
 					<Field.Field>
-						<Field.Label for="gpu-count">Number</Field.Label>
+						<Field.Label for="gpu-count">GPU per replica</Field.Label>
 						<Select.Root
 							type="single"
 							value={selection.gpus}
@@ -304,6 +332,30 @@
 							<Select.Content>
 								{#each counts as count (count)}
 									<Select.Item value={count} label={`${gpuAmountLabel(count)} GPU`} />
+								{/each}
+							</Select.Content>
+						</Select.Root>
+					</Field.Field>
+
+					<Field.Field>
+						<Field.Label for="replica-count">Replicas</Field.Label>
+						<Select.Root
+							type="single"
+							value={selection.replicas}
+							onValueChange={(value) => update({ replicas: value })}
+						>
+							<Select.Trigger id="replica-count" class="w-full">
+								<span class="truncate">
+									{selection.replicas || '–'}
+									{selection.replicas === '1' ? 'replica' : 'replicas'}
+								</span>
+							</Select.Trigger>
+							<Select.Content>
+								{#each replicaCounts as count (count)}
+									<Select.Item
+										value={count}
+										label={`${count} ${count === '1' ? 'replica' : 'replicas'}`}
+									/>
 								{/each}
 							</Select.Content>
 						</Select.Root>
@@ -330,45 +382,61 @@
 						disabled={!(kvOn && kvOff)}
 					/>
 				</Field.Field>
+
+				<Field.Field orientation="horizontal">
+					<Field.Content>
+						<Field.Label for="prefix-routing">Precise prefix cache routing</Field.Label>
+						<Field.Description>
+							{#if routingOn && routingOff}
+								Send each request to the replica holding the longest prefix of its prompt in KV
+								cache.
+							{:else if routingOn}
+								Every template for this choice routes by the precise prefix cache.
+							{:else}
+								No template for this choice routes by the precise prefix cache.
+							{/if}
+						</Field.Description>
+					</Field.Content>
+					<Switch
+						id="prefix-routing"
+						checked={selection.routing === 'true'}
+						onCheckedChange={(checked) => update({ routing: String(checked) })}
+						disabled={!(routingOn && routingOff)}
+					/>
+				</Field.Field>
 			</Field.Group>
 
 			<div class="rounded-lg bg-muted p-4">
 				{#if chosen}
 					{@const details = chosen.details}
-					{@const measured = details.expectedTimeToFirstTokenMs !== null}
 					{@const resources = templateResources(chosen.object)}
+					{@const replicaCount = Number(chosen.replicas) || 1}
 					<dl class="grid grid-cols-3 gap-4">
 						<div>
 							<dt class="text-xs text-muted-foreground">Concurrency</dt>
 							<dd class="text-lg font-semibold tabular-nums">
-								{details.capacityPerInstance ?? '–'}
+								{details.concurrency ?? '–'}
 							</dd>
 							<dd class="text-xs text-muted-foreground">
-								requests{details.instances !== null && details.instances > 1
-									? ` × ${details.instances} instances`
+								requests{replicaCount > 1 ? ` × ${replicaCount} replicas` : ''}
+							</dd>
+						</div>
+						<div>
+							<dt class="text-xs text-muted-foreground">Context length</dt>
+							<dd class="text-lg font-semibold tabular-nums">
+								{details.maxModelLen !== null ? formatTokens(details.maxModelLen) : '–'}
+							</dd>
+							<dd class="text-xs text-muted-foreground">tokens</dd>
+						</div>
+						<div>
+							<dt class="text-xs text-muted-foreground">Engine</dt>
+							<dd class="text-lg font-semibold tabular-nums">
+								{details.vllmVersion ? `vLLM ${details.vllmVersion}` : '–'}
+							</dd>
+							<dd class="text-xs text-muted-foreground">
+								{details.tensorParallelSize !== null
+									? `tensor parallel ${details.tensorParallelSize}`
 									: ''}
-							</dd>
-						</div>
-						<div>
-							<dt class="text-xs text-muted-foreground">Time to first token</dt>
-							<dd class="text-lg font-semibold tabular-nums">
-								{formatDuration(details.expectedTimeToFirstTokenMs)}
-							</dd>
-							<dd class="text-xs text-muted-foreground">
-								{measured
-									? `${formatDuration(details.worstTimeToFirstTokenMs)} at capacity`
-									: 'not measured'}
-							</dd>
-						</div>
-						<div>
-							<dt class="text-xs text-muted-foreground">Inter-token latency</dt>
-							<dd class="text-lg font-semibold tabular-nums">
-								{formatDuration(details.expectedInterTokenLatencyMs)}
-							</dd>
-							<dd class="text-xs text-muted-foreground">
-								{measured
-									? `${formatDuration(details.worstInterTokenLatencyMs)} at capacity`
-									: 'not measured'}
 							</dd>
 						</div>
 					</dl>
@@ -377,23 +445,31 @@
 							<div>
 								<dt class="text-xs text-muted-foreground">CPU</dt>
 								<dd class="text-lg font-semibold tabular-nums">{resources.cpu ?? '–'}</dd>
-								<dd class="text-xs text-muted-foreground">cores</dd>
+								<dd class="text-xs text-muted-foreground">cores per replica</dd>
 							</div>
 							<div>
 								<dt class="text-xs text-muted-foreground">DRAM</dt>
 								<dd class="text-lg font-semibold tabular-nums">{resources.memory ?? '–'}</dd>
-								<dd class="text-xs text-muted-foreground">host memory</dd>
+								<dd class="text-xs text-muted-foreground">host memory per replica</dd>
 							</div>
 							<div>
 								<dt class="text-xs text-muted-foreground">VRAM</dt>
 								<dd class="text-lg font-semibold tabular-nums">{resources.vram ?? '–'}</dd>
-								<dd class="text-xs text-muted-foreground">in total</dd>
+								<dd class="text-xs text-muted-foreground">{resources.gpu ?? 'in total'}</dd>
 							</div>
 						</dl>
 					{/if}
+					{#if selection.kvOffload === 'true' && details.kvOffloadCpuGibibytes !== null}
+						<p class="mt-3 text-xs text-muted-foreground">
+							KV cache offload tiers: {details.kvOffloadCpuGibibytes} Gi host memory{details.kvOffloadStorageDefaultGibibytes !==
+							null
+								? ` + ${details.kvOffloadStorageDefaultGibibytes} Gi disk`
+								: ''}.
+						</p>
+					{/if}
 					{#if details.provisional}
 						<p class="mt-3 text-xs text-amber-600 dark:text-amber-500">
-							Provisional: capacity and latency are predictions, not measurements.
+							Provisional: capacity and resources are predictions, not measurements.
 						</p>
 					{/if}
 				{:else}
@@ -404,7 +480,8 @@
 						<Item.Content class="text-left">
 							<Item.Title>No matching template</Item.Title>
 							<Item.Description>
-								No template of this model matches the selected workload, GPU and KV cache offload.
+								No template of this model matches the selected workload, GPU, replicas, KV cache
+								offload and routing.
 							</Item.Description>
 						</Item.Content>
 					</Item.Root>

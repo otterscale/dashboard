@@ -7,6 +7,7 @@ export type ModelTemplateObject = {
 	};
 	spec?: {
 		model?: { name?: string; uri?: string };
+		replicas?: number;
 		template?: {
 			containers?: {
 				name?: string;
@@ -21,13 +22,15 @@ export type ModelTemplateObject = {
 
 export interface TemplateDetails {
 	maxModelLen: number | null;
-	capacityPerInstance: number | null;
-	instances: number | null;
+	concurrency: number | null;
 	provisional: boolean;
-	expectedTimeToFirstTokenMs: number | null;
-	expectedInterTokenLatencyMs: number | null;
-	worstTimeToFirstTokenMs: number | null;
-	worstInterTokenLatencyMs: number | null;
+	vllmVersion: string | null;
+	tensorParallelSize: number | null;
+	gpuUsage: string | null;
+	gpuKvCacheGibibytes: number | null;
+	kvOffloadCpuGibibytes: number | null;
+	kvOffloadStorageDefaultGibibytes: number | null;
+	kvOffloadStorageMinimumGibibytes: number | null;
 }
 
 export interface ModelTemplate {
@@ -37,21 +40,36 @@ export interface ModelTemplate {
 	workload: string;
 	gpu: string;
 	gpus: string;
+	replicas: string;
 	kvOffload: string;
-	version: number;
+	routing: string;
 	details: TemplateDetails;
 }
 
 export type TemplateDict = Record<
-	string,
-	Record<string, Record<string, Record<string, ModelTemplate[]>>>
+	string, // workload
+	Record<
+		string, // gpu type
+		Record<
+			string, // gpus per replica
+			Record<
+				string, // replicas
+				Record<
+					string, // kv cache offload
+					Record<string, ModelTemplate[]> // precise prefix cache routing
+				>
+			>
+		>
+	>
 >;
 
 export interface Selection {
 	workload: string;
 	gpu: string;
 	gpus: string;
+	replicas: string;
 	kvOffload: string;
+	routing: string;
 }
 
 function annotationNumber(object: ModelTemplateObject, key: string): number | null {
@@ -62,26 +80,26 @@ function annotationNumber(object: ModelTemplateObject, key: string): number | nu
 }
 
 function readDetails(object: ModelTemplateObject): TemplateDetails {
+	const annotations = object.metadata?.annotations ?? {};
 	return {
-		maxModelLen: annotationNumber(object, 'otterscale.io/max-model-len'),
-		capacityPerInstance: annotationNumber(object, 'otterscale.io/capacity-per-instance'),
-		instances: annotationNumber(object, 'otterscale.io/instances'),
-		provisional: object.metadata?.annotations?.['otterscale.io/provisional'] === 'true',
-		expectedTimeToFirstTokenMs: annotationNumber(
+		maxModelLen: annotationNumber(object, 'template.otterscale.io/max-model-len'),
+		concurrency: annotationNumber(object, 'template.otterscale.io/concurrency'),
+		provisional: annotations['template.otterscale.io/provisional'] === 'true',
+		vllmVersion: annotations['template.otterscale.io/vllm-version']?.trim() || null,
+		tensorParallelSize: annotationNumber(object, 'template.otterscale.io/tensor-parallel-size'),
+		gpuUsage: annotations['template.otterscale.io/gpu-usage']?.trim() || null,
+		gpuKvCacheGibibytes: annotationNumber(object, 'template.otterscale.io/gpu-kv-cache-gibibytes'),
+		kvOffloadCpuGibibytes: annotationNumber(
 			object,
-			'otterscale.io/expected-time-to-first-token-milliseconds'
+			'template.otterscale.io/kv-offload-cpu-gibibytes'
 		),
-		expectedInterTokenLatencyMs: annotationNumber(
+		kvOffloadStorageDefaultGibibytes: annotationNumber(
 			object,
-			'otterscale.io/expected-inter-token-latency-milliseconds'
+			'template.otterscale.io/kv-offload-storage-default-gibibytes'
 		),
-		worstTimeToFirstTokenMs: annotationNumber(
+		kvOffloadStorageMinimumGibibytes: annotationNumber(
 			object,
-			'otterscale.io/worst-time-to-first-token-milliseconds'
-		),
-		worstInterTokenLatencyMs: annotationNumber(
-			object,
-			'otterscale.io/worst-inter-token-latency-milliseconds'
+			'template.otterscale.io/kv-offload-storage-minimum-gibibytes'
 		)
 	};
 }
@@ -90,11 +108,13 @@ export function buildTemplateDict(templates: ModelTemplateObject[]): TemplateDic
 	const dict: TemplateDict = {};
 	for (const object of templates) {
 		const labels = object.metadata?.labels ?? {};
-		const workload = labels['otterscale.io/workload'];
-		const gpu = labels['otterscale.io/gpu'];
-		const gpus = labels['otterscale.io/gpus-in-total'];
-		const kvOffload = labels['otterscale.io/kv-offload'];
-		if (!workload || !gpu || !gpus || !kvOffload) continue;
+		const workload = labels['template.otterscale.io/workload'];
+		const gpu = labels['template.otterscale.io/gpu-type'];
+		const gpus = labels['template.otterscale.io/gpus-per-replica'];
+		const replicas = labels['template.otterscale.io/replicas'];
+		const kvOffload = labels['template.otterscale.io/kv-cache-offload'];
+		const routing = labels['template.otterscale.io/precise-prefix-cache-routing'] ?? 'false';
+		if (!workload || !gpu || !gpus || !replicas || !kvOffload) continue;
 		const template: ModelTemplate = {
 			name: object.metadata?.name ?? '',
 			namespace: object.metadata?.namespace ?? '',
@@ -102,17 +122,22 @@ export function buildTemplateDict(templates: ModelTemplateObject[]): TemplateDic
 			workload,
 			gpu,
 			gpus,
+			replicas,
 			kvOffload,
-			version: Number(labels['otterscale.io/template-version']) || 1,
+			routing,
 			details: readDetails(object)
 		};
-		((((dict[workload] ??= {})[gpu] ??= {})[gpus] ??= {})[kvOffload] ??= []).push(template);
+		((((((dict[workload] ??= {})[gpu] ??= {})[gpus] ??= {})[replicas] ??= {})[kvOffload] ??= {})[
+			routing
+		] ??= []).push(template);
 	}
 	for (const byGpu of Object.values(dict))
 		for (const byGpus of Object.values(byGpu))
-			for (const byOffload of Object.values(byGpus))
-				for (const bucket of Object.values(byOffload))
-					bucket.sort((a, b) => b.version - a.version || a.name.localeCompare(b.name));
+			for (const byReplicas of Object.values(byGpus))
+				for (const byOffload of Object.values(byReplicas))
+					for (const byRouting of Object.values(byOffload))
+						for (const bucket of Object.values(byRouting))
+							bucket.sort((a, b) => a.name.localeCompare(b.name));
 	return dict;
 }
 
@@ -160,10 +185,23 @@ export function gpuOptions(dict: TemplateDict, workload: string): string[] {
 	return Object.keys(dict[workload] ?? {}).sort();
 }
 
+const WORD_FRACTIONS: Record<string, { numerator: number; denominator: number }> = {
+	'one-half': { numerator: 1, denominator: 2 },
+	'one-third': { numerator: 1, denominator: 3 },
+	'one-quarter': { numerator: 1, denominator: 4 },
+	'one-eighth': { numerator: 1, denominator: 8 },
+	'two-thirds': { numerator: 2, denominator: 3 },
+	'three-quarters': { numerator: 3, denominator: 4 }
+};
+
 export function parseGpuAmount(
 	value: string | undefined
 ): { numerator: number; denominator: number } | null {
-	const match = value?.trim().match(/^(\d+)(?:(?:of|\/)(\d+))?$/);
+	const trimmed = value?.trim();
+	if (!trimmed) return null;
+	const word = WORD_FRACTIONS[trimmed];
+	if (word) return word;
+	const match = trimmed.match(/^(\d+)(?:(?:of|\/)(\d+))?$/);
 	if (!match) return null;
 	const numerator = Number(match[1]);
 	const denominator = Number(match[2] ?? 1);
@@ -186,39 +224,68 @@ export function gpuAmountLabel(value: string): string {
 		: `${parsed.numerator}/${parsed.denominator}`;
 }
 
+function compareGpuAmounts(a: string, b: string): number {
+	const valueA = gpuAmountValue(a);
+	const valueB = gpuAmountValue(b);
+	if (valueA !== null && valueB !== null) return valueA - valueB || a.localeCompare(b);
+	if (valueA !== null) return -1;
+	if (valueB !== null) return 1;
+	return a.localeCompare(b);
+}
+
 export function gpuProductLabel(dict: TemplateDict, workload: string, gpu: string): string {
-	for (const byOffload of Object.values(dict[workload]?.[gpu] ?? {}))
-		for (const bucket of Object.values(byOffload))
-			for (const template of bucket) {
-				const product =
-					template.object.metadata?.annotations?.['otterscale.io/gpu-product']?.trim();
-				if (product) return product;
-			}
+	for (const byReplicas of Object.values(dict[workload]?.[gpu] ?? {}))
+		for (const byOffload of Object.values(byReplicas))
+			for (const byRouting of Object.values(byOffload))
+				for (const bucket of Object.values(byRouting))
+					for (const template of bucket) {
+						const product =
+							template.object.metadata?.annotations?.['template.otterscale.io/gpu-type']?.trim();
+						if (product) return product;
+					}
 	return gpu;
 }
 
 export function gpusOptions(dict: TemplateDict, workload: string, gpu: string): string[] {
-	return Object.keys(dict[workload]?.[gpu] ?? {}).sort((a, b) => {
-		const valueA = gpuAmountValue(a);
-		const valueB = gpuAmountValue(b);
-		if (valueA !== null && valueB !== null) return valueA - valueB || a.localeCompare(b);
-		if (valueA !== null) return -1;
-		if (valueB !== null) return 1;
-		return a.localeCompare(b);
-	});
+	return Object.keys(dict[workload]?.[gpu] ?? {}).sort(compareGpuAmounts);
+}
+
+export function replicasOptions(
+	dict: TemplateDict,
+	workload: string,
+	gpu: string,
+	gpus: string
+): string[] {
+	return Object.keys(dict[workload]?.[gpu]?.[gpus] ?? {}).sort(
+		(a, b) => Number(a) - Number(b) || a.localeCompare(b)
+	);
 }
 
 export function kvOffloadOptions(
 	dict: TemplateDict,
 	workload: string,
 	gpu: string,
-	gpus: string
+	gpus: string,
+	replicas: string
 ): string[] {
-	return Object.keys(dict[workload]?.[gpu]?.[gpus] ?? {}).sort();
+	return Object.keys(dict[workload]?.[gpu]?.[gpus]?.[replicas] ?? {}).sort();
+}
+
+export function routingOptions(
+	dict: TemplateDict,
+	workload: string,
+	gpu: string,
+	gpus: string,
+	replicas: string,
+	kvOffload: string
+): string[] {
+	return Object.keys(dict[workload]?.[gpu]?.[gpus]?.[replicas]?.[kvOffload] ?? {}).sort();
 }
 
 export function pickTemplate(dict: TemplateDict, selection: Selection): ModelTemplate | undefined {
-	return dict[selection.workload]?.[selection.gpu]?.[selection.gpus]?.[selection.kvOffload]?.[0];
+	return dict[selection.workload]?.[selection.gpu]?.[selection.gpus]?.[selection.replicas]?.[
+		selection.kvOffload
+	]?.[selection.routing]?.[0];
 }
 
 export function coerceSelection(dict: TemplateDict, selection: Selection): Selection {
@@ -230,17 +297,34 @@ export function coerceSelection(dict: TemplateDict, selection: Selection): Selec
 	const gpu = gpuList.includes(selection.gpu) ? selection.gpu : (gpuList[0] ?? '');
 	const gpusList = gpusOptions(dict, workload, gpu);
 	const gpus = gpusList.includes(selection.gpus) ? selection.gpus : (gpusList[0] ?? '');
-	const kvList = kvOffloadOptions(dict, workload, gpu, gpus);
+	const replicasList = replicasOptions(dict, workload, gpu, gpus);
+	const replicas = replicasList.includes(selection.replicas)
+		? selection.replicas
+		: (replicasList[0] ?? '');
+	const kvList = kvOffloadOptions(dict, workload, gpu, gpus, replicas);
 	const kvOffload = kvList.includes(selection.kvOffload)
 		? selection.kvOffload
 		: kvList.includes('false')
 			? 'false'
 			: (kvList[0] ?? '');
-	return { workload, gpu, gpus, kvOffload };
+	const routingList = routingOptions(dict, workload, gpu, gpus, replicas, kvOffload);
+	const routing = routingList.includes(selection.routing)
+		? selection.routing
+		: routingList.includes('false')
+			? 'false'
+			: (routingList[0] ?? '');
+	return { workload, gpu, gpus, replicas, kvOffload, routing };
 }
 
 export function defaultSelection(dict: TemplateDict): Selection {
-	return coerceSelection(dict, { workload: '', gpu: '', gpus: '', kvOffload: 'false' });
+	return coerceSelection(dict, {
+		workload: '',
+		gpu: '',
+		gpus: '',
+		replicas: '',
+		kvOffload: 'false',
+		routing: 'false'
+	});
 }
 
 export interface EntrySummary {
@@ -259,26 +343,22 @@ export function describeEntry(object: ModelTemplateObject): EntrySummary {
 		name,
 		namespace: object.metadata?.namespace ?? '',
 		modelName:
-			annotations['otterscale.io/model-name']?.trim() || object.spec?.model?.name?.trim() || name,
-		vendor: annotations['otterscale.io/vendor']?.trim() || null,
+			annotations['template.otterscale.io/model-name']?.trim() ||
+			object.spec?.model?.name?.trim() ||
+			name,
+		vendor: annotations['template.otterscale.io/vendor']?.trim() || null,
 		modelUri: object.spec?.model?.uri?.trim() || null,
-		description: annotations['otterscale.io/description']?.trim() || null
+		description: annotations['template.otterscale.io/description']?.trim() || null
 	};
 }
 
 export interface TemplateResources {
 	cpu: string | null;
 	memory: string | null;
+	/** The GPU share, e.g. "2 x 1/2 GPU", from the gpu-usage annotation. */
+	gpu: string | null;
+	/** The VRAM total, e.g. "95.6 GiB", from the gpu-usage annotation. */
 	vram: string | null;
-}
-
-function formatMebibytes(raw: string | undefined): string | null {
-	if (raw === undefined || raw.trim() === '') return null;
-	const value = Number(raw);
-	if (!Number.isFinite(value)) return raw;
-	if (value < 1024) return `${value} Mi`;
-	const gibibytes = value / 1024;
-	return `${Number.isInteger(gibibytes) ? gibibytes : gibibytes.toFixed(1)} Gi`;
 }
 
 export function templateResources(object: ModelTemplateObject): TemplateResources {
@@ -290,11 +370,22 @@ export function templateResources(object: ModelTemplateObject): TemplateResource
 		const raw = requests[key] ?? limits[key];
 		return raw === undefined ? null : String(raw);
 	};
+	const usage = object.metadata?.annotations?.['template.otterscale.io/gpu-usage']?.trim();
+	let gpu: string | null = null;
+	let vram: string | null = null;
+	if (usage) {
+		const match = usage.match(/^(.*?),\s*(.+?)\s*VRAM$/);
+		if (match) {
+			gpu = match[1].trim();
+			vram = match[2].trim();
+		} else {
+			gpu = usage;
+		}
+	}
 	return {
 		cpu: read('cpu'),
 		memory: read('memory'),
-		vram: formatMebibytes(
-			object.metadata?.annotations?.['otterscale.io/gpu-memory-in-total-mebibytes']
-		)
+		gpu,
+		vram
 	};
 }
