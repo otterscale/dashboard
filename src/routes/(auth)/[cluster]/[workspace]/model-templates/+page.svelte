@@ -7,10 +7,6 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import KindViewer from '$lib/components/kind-viewer/kind-viewer.svelte';
-	import {
-		TEMPLATE_LABELS,
-		TEMPLATE_ROLES
-	} from '$lib/components/kind-viewer/kind-viewer-grid-layouts/modeltemplate/catalog';
 	import * as Alert from '$lib/components/ui/alert/index.js';
 	import Button from '$lib/components/ui/button/button.svelte';
 	import * as Empty from '$lib/components/ui/empty/index.js';
@@ -40,9 +36,7 @@
 	const kind = 'LLMInferenceServiceConfig';
 	const resource = 'llminferenceserviceconfigs';
 	const fieldSelector = 'metadata.namespace==otterscale-system';
-	// The catalog lists models, not ways to run them: a deployment template is
-	// reached through a model entry's actions, never as a row of its own.
-	const labelSelector = `${TEMPLATE_LABELS.role}=${TEMPLATE_ROLES.model}`;
+	const labelSelector = 'otterscale.io/template-role=model';
 
 	const transport: Transport = getContext('transport');
 	const client = createClient(ResourceService, transport);

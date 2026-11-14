@@ -8,7 +8,6 @@ import type { LinkMetadata } from '$lib/components/dynamic-table/dynamic-table-c
 import { type DataSchemaType, type UISchemaType } from '$lib/components/dynamic-table/utils';
 import { renderComponent } from '$lib/components/ui/data-table';
 
-import { TEMPLATE_ANNOTATIONS } from '../kind-viewer-grid-layouts/modeltemplate/catalog';
 import { buildResourceDetailUrl } from '../utils';
 
 type LLMInferenceServiceConfigObject = {
@@ -58,7 +57,7 @@ function getLLMInferenceServiceConfigData(
 		Namespace: object?.metadata?.namespace ?? null,
 		'Model Name': object?.spec?.model?.name ?? null,
 		'Model URI': object?.spec?.model?.uri ?? null,
-		Description: object?.metadata?.annotations?.[TEMPLATE_ANNOTATIONS.description]?.trim() || null,
+		Description: object?.metadata?.annotations?.['otterscale.io/description']?.trim() || null,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
 	};
