@@ -1,10 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import type { NodeInfo } from '$lib/components/gpu-allocation/types';
-
 import {
 	buildTemplateDict,
-	clusterGpuTypes,
 	coerceSelection,
 	defaultSelection,
 	describeEntry,
@@ -98,6 +95,24 @@ describe('buildTemplateDict', () => {
 		expect(workloadOptions(dict)).toEqual([]);
 	});
 
+	it('sorts GPU counts numerically, fractions included', () => {
+		const templates = ['2', '0.5', '1', '0.17', '0.33', '10'].map((gpus) => {
+			const object = generated({ workload: 'agent', gpus: 1, offload: false });
+			object.metadata!.name = `fraction-${gpus}`;
+			object.metadata!.labels!['otterscale.io/gpus-in-total'] = gpus;
+			return object;
+		});
+		const dict = buildTemplateDict(templates);
+		expect(gpusOptions(dict, 'agent', 'rtx-pro-6000')).toEqual([
+			'0.17',
+			'0.33',
+			'0.5',
+			'1',
+			'2',
+			'10'
+		]);
+	});
+
 	it('puts the newest version first', () => {
 		const dict = buildTemplateDict([
 			generated({ workload: 'agent', gpus: 1, offload: false, version: 1 }),
@@ -159,27 +174,5 @@ describe('describeEntry', () => {
 			description: 'Hybrid-architecture 27B model.'
 		});
 		expect(describeEntry({ metadata: { name: 'bare' }, spec: {} }).modelName).toBe('bare');
-	});
-});
-
-describe('cluster GPU types', () => {
-	const device = (type: string) => ({
-		id: 'GPU',
-		index: 0,
-		count: 10,
-		devcore: 100,
-		devmem: 97871,
-		type,
-		mode: '',
-		health: true
-	});
-	const PRO6000 = 'NVIDIA RTX PRO 6000 Blackwell Server Edition';
-	const nodes: NodeInfo[] = [
-		{ name: 'a', devices: [device(PRO6000), device(PRO6000)] },
-		{ name: 'b', devices: [device(PRO6000), device('NVIDIA L40S')] }
-	];
-
-	it('lists the distinct device models in the cluster', () => {
-		expect(clusterGpuTypes(nodes)).toEqual(['NVIDIA L40S', PRO6000]);
 	});
 });

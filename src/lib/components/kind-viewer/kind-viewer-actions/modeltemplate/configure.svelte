@@ -8,13 +8,11 @@
 	import type { ValidateFunction } from 'ajv';
 	import { getContext, untrack } from 'svelte';
 
-	import { fetchAllGpuNodes } from '$lib/components/gpu-allocation';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Copy from '$lib/components/kind-viewer/kind-viewer-actions/modeltemplate/copy.svelte';
 	import Deploy from '$lib/components/kind-viewer/kind-viewer-actions/modeltemplate/deploy.svelte';
 	import {
 		buildTemplateDict,
-		clusterGpuTypes,
 		coerceSelection,
 		defaultSelection,
 		describeEntry,
@@ -84,8 +82,6 @@
 	const dict = $derived(buildTemplateDict(templates));
 
 	let selection: Selection = $state({ workload: '', gpu: '', gpus: '', kvOffload: 'false' });
-	let topology: Promise<string[]> = $state(Promise.resolve([]));
-	let clusterTypes: string[] = $state([]);
 	let pendingTemplate: ModelTemplate | undefined = $state(undefined);
 	let pendingObject: ServingKserveIoV1Alpha2LLMInferenceServiceConfig | undefined =
 		$state(undefined);
@@ -138,11 +134,6 @@
 		untrack(() => {
 			templates = [];
 			selection = { workload: '', gpu: '', gpus: '', kvOffload: 'false' };
-			clusterTypes = [];
-			topology = fetchAllGpuNodes(resourceClient, cluster).then((nodes) => {
-				clusterTypes = clusterGpuTypes(nodes);
-				return clusterTypes;
-			});
 			loadTemplates();
 		});
 	});
@@ -293,22 +284,6 @@
 								{/each}
 							</Select.Content>
 						</Select.Root>
-						{#await topology}
-							<Field.Description class="flex items-center gap-2">
-								<Spinner class="size-3" />
-								Reading cluster GPUs
-							</Field.Description>
-						{:then}
-							{#if clusterTypes.length === 0}
-								<Field.Description>No GPUs registered in this cluster.</Field.Description>
-							{:else}
-								<Field.Description>Cluster GPUs: {clusterTypes.join(', ')}</Field.Description>
-							{/if}
-						{:catch error}
-							<Field.Description class="text-destructive">
-								Cluster GPUs unavailable: {(error as Error).message}.
-							</Field.Description>
-						{/await}
 					</Field.Field>
 
 					<Field.Field>

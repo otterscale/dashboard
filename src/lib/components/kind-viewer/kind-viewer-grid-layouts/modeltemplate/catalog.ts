@@ -1,5 +1,3 @@
-import type { NodeInfo } from '$lib/components/gpu-allocation/types';
-
 export type ModelTemplateObject = {
 	metadata?: {
 		name?: string;
@@ -154,7 +152,14 @@ export function gpuOptions(dict: TemplateDict, workload: string): string[] {
 }
 
 export function gpusOptions(dict: TemplateDict, workload: string, gpu: string): string[] {
-	return Object.keys(dict[workload]?.[gpu] ?? {}).sort((a, b) => Number(a) - Number(b));
+	return Object.keys(dict[workload]?.[gpu] ?? {}).sort((a, b) => {
+		const numberA = Number(a);
+		const numberB = Number(b);
+		if (Number.isFinite(numberA) && Number.isFinite(numberB)) return numberA - numberB;
+		if (Number.isFinite(numberA)) return -1;
+		if (Number.isFinite(numberB)) return 1;
+		return a.localeCompare(b);
+	});
 }
 
 export function kvOffloadOptions(
@@ -213,12 +218,4 @@ export function describeEntry(object: ModelTemplateObject): EntrySummary {
 		modelUri: object.spec?.model?.uri?.trim() || null,
 		description: annotations['otterscale.io/description']?.trim() || null
 	};
-}
-
-export function clusterGpuTypes(nodes: NodeInfo[]): string[] {
-	const types: string[] = [];
-	for (const node of nodes)
-		for (const device of node.devices)
-			if (device.type && !types.includes(device.type)) types.push(device.type);
-	return types.sort();
 }
