@@ -8,30 +8,26 @@
 	import type { ValidateFunction } from 'ajv';
 	import { getContext, untrack } from 'svelte';
 
-	import { fetchAllGpuNodes } from '$lib/components/gpu-allocation';
 	import View from '$lib/components/kind-viewer/kind-viewer-actions/default/view.svelte';
 	import Copy from '$lib/components/kind-viewer/kind-viewer-actions/modeltemplate/copy.svelte';
 	import Deploy from '$lib/components/kind-viewer/kind-viewer-actions/modeltemplate/deploy.svelte';
 	import {
-		clusterGpuTypesFor,
+		buildTemplateDict,
 		coerceSelection,
-		composeTemplate,
 		defaultSelection,
-		fitsOnOneNode,
-		gpuCountOptions,
-		gpuTypeOptions,
-		type GpuTypeSummary,
-		groupForEntry,
+		describeEntry,
+		gpuAmountLabel,
+		gpuOptions,
+		gpuProductLabel,
+		gpusOptions,
 		kvOffloadOptions,
-		type ModelGroup,
+		type ModelTemplate,
 		type ModelTemplateObject,
-		pinClusterGpuType,
-		resolveTemplate,
+		pickTemplate,
+		replicasOptions,
+		routingOptions,
 		type Selection,
-		summarizeGpuTopology,
-		TEMPLATE_LABELS,
-		TEMPLATE_ROLES,
-		type TemplateVariant,
+		templateResources,
 		workloadDescription,
 		workloadLabel,
 		workloadOptions
@@ -44,9 +40,7 @@
 	import * as Select from '$lib/components/ui/select/index.js';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import { Switch } from '$lib/components/ui/switch/index.js';
-	import { cn } from '$lib/utils';
 
-	/** Which per-template action the picked template is handed to. */
 	export type ConfigureAction = 'view' | 'copy' | 'deploy';
 
 	let {
@@ -64,7 +58,6 @@
 	}: {
 		action: ConfigureAction;
 		cluster: string;
-		/** Workspace namespace that Copy and Deploy write to. */
 		namespace: string;
 		group: string;
 		version: string;
@@ -72,7 +65,6 @@
 		resource: string;
 		schema: Schema;
 		validate: ValidateFunction;
-		/** The model entry; its deployment templates are listed each time the dialog opens. */
 		entry: ServingKserveIoV1Alpha2LLMInferenceServiceConfig;
 		open?: boolean;
 	} = $props();
@@ -80,18 +72,38 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	// The entry alone until its templates arrive; every opening reloads them.
-	// svelte-ignore state_referenced_locally
-	let model: ModelGroup = $state(groupForEntry(entry, []));
+	const ACTION_LABELS: Record<ConfigureAction, string> = {
+		view: 'View',
+		copy: 'Copy',
+		deploy: 'Deploy'
+	};
+
+	let templates: ModelTemplateObject[] = $state([]);
 	let templatesLoading = $state(false);
 	let templatesError: string | undefined = $state(undefined);
 	let loadToken = 0;
 
-	/** Every deployment template in the entry's namespace that carries its model label. */
+	const summary = $derived(describeEntry(entry));
+	const dict = $derived(buildTemplateDict(templates));
+
+	let selection: Selection = $state({
+		workload: '',
+		gpu: '',
+		gpus: '',
+		replicas: '',
+		kvOffload: 'false',
+		routing: 'false'
+	});
+	let pendingTemplate: ModelTemplate | undefined = $state(undefined);
+	let pendingObject: ServingKserveIoV1Alpha2LLMInferenceServiceConfig | undefined =
+		$state(undefined);
+	let pendingAction: ConfigureAction | undefined = $state(undefined);
+	let handoffOpen = $state(false);
+
 	async function listTemplates(): Promise<ModelTemplateObject[]> {
-		const modelLabel = entry.metadata?.labels?.[TEMPLATE_LABELS.model];
+		const modelLabel = entry.metadata?.labels?.['template.otterscale.io/model'];
 		if (!modelLabel) return [];
-		const templates: ModelTemplateObject[] = [];
+		const items: ModelTemplateObject[] = [];
 		let continueToken: string | undefined = undefined;
 		do {
 			const response = await resourceClient.list({
@@ -100,27 +112,26 @@
 				group,
 				version,
 				resource,
-				labelSelector: `${TEMPLATE_LABELS.role}=${TEMPLATE_ROLES.deployment},${TEMPLATE_LABELS.model}=${modelLabel}`,
+				labelSelector: `template.otterscale.io/template-role=deployment,template.otterscale.io/model=${modelLabel}`,
 				continue: continueToken
 			} as ListRequest);
 			continueToken = response.continue;
 			for (const item of response.items) {
-				if (item.object) templates.push(item.object as unknown as ModelTemplateObject);
+				if (item.object) items.push(item.object as unknown as ModelTemplateObject);
 			}
 		} while (continueToken);
-		return templates;
+		return items;
 	}
 
-	// A reopening while a list is in flight must not let the older result land.
 	async function loadTemplates() {
 		const token = ++loadToken;
 		templatesLoading = true;
 		templatesError = undefined;
 		try {
-			const templates = await listTemplates();
+			const items = await listTemplates();
 			if (token !== loadToken) return;
-			model = groupForEntry(entry, templates);
-			reset();
+			templates = items;
+			selection = defaultSelection(dict);
 		} catch (error) {
 			if (token !== loadToken) return;
 			console.error('Failed to list deployment templates:', error);
@@ -130,127 +141,79 @@
 		}
 	}
 
-	const ACTION_LABELS: Record<ConfigureAction, string> = {
-		view: 'View',
-		copy: 'Copy',
-		deploy: 'Deploy'
-	};
-
-	// A legacy middleware template only wraps another one, so Copy (like the
-	// row menu) does not offer it; the picker then narrows to the standalone ones.
-	const candidatesModel: ModelGroup = $derived(
-		action === 'copy'
-			? { ...model, variants: model.variants.filter((variant) => !variant.middleware) }
-			: model
-	);
-
-	// Only the initial value: every opening resets it from the current model.
-	// svelte-ignore state_referenced_locally
-	let selection: Selection = $state(defaultSelection(candidatesModel));
-	let tieBreaker: string | undefined = $state(undefined);
-	let topology: Promise<GpuTypeSummary[]> = $state(Promise.resolve([]));
-	let summaries: GpuTypeSummary[] = $state([]);
-	let pendingTemplate: TemplateVariant | undefined = $state(undefined);
-	/** The template with its entry's model merged in: what View shows and Copy/Deploy write. */
-	let pendingObject: ServingKserveIoV1Alpha2LLMInferenceServiceConfig | undefined =
-		$state(undefined);
-	let pendingAction: ConfigureAction | undefined = $state(undefined);
-	let handoffOpen = $state(false);
-
-	// Every opening starts from the entry alone, the defaults, one fresh list
-	// of its templates and one fresh look at the cluster GPUs. The entry row may
-	// refresh while the dialog is open; that must not discard the viewer's
-	// choices, hence `untrack`.
 	$effect(() => {
 		if (!open) return;
 		untrack(() => {
-			model = groupForEntry(entry, []);
-			reset();
-			summaries = [];
-			topology = fetchAllGpuNodes(resourceClient, cluster).then((nodes) => {
-				summaries = summarizeGpuTopology(nodes);
-				return summaries;
-			});
+			templates = [];
+			selection = {
+				workload: '',
+				gpu: '',
+				gpus: '',
+				replicas: '',
+				kvOffload: 'false',
+				routing: 'false'
+			};
 			loadTemplates();
 		});
 	});
 
-	const workloads = $derived(workloadOptions(candidatesModel));
-	const gpuTypes = $derived(gpuTypeOptions(candidatesModel, selection.workload));
-	const counts = $derived(gpuCountOptions(candidatesModel, selection.workload, selection.gpuType));
-	const kv = $derived(
-		kvOffloadOptions(candidatesModel, selection.workload, selection.gpuType, selection.gpuCount)
+	const workloads = $derived(workloadOptions(dict));
+	const gpus = $derived(gpuOptions(dict, selection.workload));
+	const counts = $derived(gpusOptions(dict, selection.workload, selection.gpu));
+	const replicaCounts = $derived(
+		replicasOptions(dict, selection.workload, selection.gpu, selection.gpus)
 	);
-	const resolution = $derived(resolveTemplate(candidatesModel, selection));
-	const candidates = $derived(resolution.kind === 'ambiguous' ? resolution.candidates : []);
-	const chosen = $derived(
-		resolution.kind === 'match'
-			? resolution.variant
-			: candidates.find((candidate) => candidate.name === tieBreaker)
+	const kvValues = $derived(
+		kvOffloadOptions(dict, selection.workload, selection.gpu, selection.gpus, selection.replicas)
 	);
-
-	/** Cluster GPU models the selected template GPU names; one exact hit can be pinned. */
-	const clusterMatches = $derived(clusterGpuTypesFor(selection.gpuType, summaries));
-	const pinnedClusterType = $derived(
-		pinClusterGpuType(
-			selection.gpuType,
-			summaries.map((summary) => summary.type)
+	const kvOn = $derived(kvValues.includes('true'));
+	const kvOff = $derived(kvValues.includes('false'));
+	const routingValues = $derived(
+		routingOptions(
+			dict,
+			selection.workload,
+			selection.gpu,
+			selection.gpus,
+			selection.replicas,
+			selection.kvOffload
 		)
 	);
-
-	function reset() {
-		selection = defaultSelection(candidatesModel);
-		tieBreaker = undefined;
-	}
+	const routingOn = $derived(routingValues.includes('true'));
+	const routingOff = $derived(routingValues.includes('false'));
+	const chosen = $derived(pickTemplate(dict, selection));
 
 	function update(patch: Partial<Selection>) {
-		selection = coerceSelection(candidatesModel, { ...selection, ...patch });
-		tieBreaker = undefined;
+		selection = coerceSelection(dict, { ...selection, ...patch });
 	}
 
 	function proceed() {
 		if (!chosen) return;
 		pendingTemplate = chosen;
-		pendingObject = composeTemplate(
-			model,
-			chosen
-		) as ServingKserveIoV1Alpha2LLMInferenceServiceConfig;
+		pendingObject = chosen.object as ServingKserveIoV1Alpha2LLMInferenceServiceConfig;
 		pendingAction = action;
-		// The follow-up dialog opens once this one has finished closing (see onOpenChangeComplete).
 		open = false;
 	}
 
-	function describeUnmet(unmet: Array<keyof Selection>): string {
-		const names: Record<keyof Selection, string> = {
-			workload: `the ${workloadLabel(selection.workload)} workload`,
-			gpuType: `the ${selection.gpuType} GPU`,
-			gpuCount: `${selection.gpuCount} GPUs`,
-			kvOffload: selection.kvOffload ? 'KV cache offload' : 'running without KV cache offload'
-		};
-		return unmet.map((key) => names[key]).join(', ');
-	}
-
-	function formatDuration(milliseconds: number | null): string {
-		if (milliseconds === null) return '–';
-		return milliseconds >= 1000 ? `${(milliseconds / 1000).toFixed(1)} s` : `${milliseconds} ms`;
-	}
-
-	function formatTokens(tokens: number | null): string {
-		if (tokens === null) return '–';
+	function formatTokens(tokens: number): string {
 		return tokens >= 1024 && tokens % 1024 === 0 ? `${tokens / 1024}K` : String(tokens);
 	}
 
-	/** Facts of every template sharing this workload, for the radio description. */
 	function workloadFacts(workload: string): string {
-		const variants = candidatesModel.variants.filter((variant) => variant.workload === workload);
-		const lengths = [
-			...new Set(
-				variants
-					.map((variant) => variant.details.maxModelLen)
-					.filter((length): length is number => length !== null)
-			)
-		];
-		return lengths.length ? `${lengths.map(formatTokens).join(' / ')} context` : '';
+		const lengths: number[] = [];
+		for (const byGpus of Object.values(dict[workload] ?? {}))
+			for (const byReplicas of Object.values(byGpus))
+				for (const byOffload of Object.values(byReplicas))
+					for (const byRouting of Object.values(byOffload))
+						for (const bucket of Object.values(byRouting))
+							for (const template of bucket) {
+								const length = template.details.maxModelLen;
+								if (length !== null && !lengths.includes(length)) lengths.push(length);
+							}
+		if (lengths.length === 0) return '';
+		return `${lengths
+			.sort((a, b) => a - b)
+			.map(formatTokens)
+			.join(' / ')} context`;
 	}
 </script>
 
@@ -270,9 +233,10 @@
 					<BotIcon />
 				</Item.Media>
 				<Item.Content class="min-w-0 text-left">
-					<Dialog.Title class="truncate">{ACTION_LABELS[action]} — {model.modelName}</Dialog.Title>
+					<Dialog.Title class="truncate">{ACTION_LABELS[action]} — {summary.modelName}</Dialog.Title
+					>
 					<Dialog.Description class="truncate">
-						{model.modelUri ?? `${model.variants.length} templates`}
+						{summary.modelUri ?? `${templates.length} templates`}
 					</Dialog.Description>
 				</Item.Content>
 			</Item.Root>
@@ -293,30 +257,21 @@
 					<Item.Description>{templatesError}</Item.Description>
 				</Item.Content>
 			</Item.Root>
-		{:else if candidatesModel.variants.length === 0}
+		{:else if workloads.length === 0}
 			<Item.Root class="items-start rounded-lg bg-muted p-4">
 				<Item.Media variant="icon" class="text-amber-600 dark:text-amber-500">
 					<TriangleAlertIcon />
 				</Item.Media>
 				<Item.Content class="text-left">
-					<Item.Title>
-						{model.variants.length === 0 ? 'No deployment templates' : 'Nothing to copy'}
-					</Item.Title>
+					<Item.Title>No deployment templates</Item.Title>
 					<Item.Description>
-						{#if model.variants.length === 0 && model.skipped.length}
-							Every deployment template of this model is missing a required label.
-						{:else if model.variants.length === 0}
-							This model is declared, but no deployment template carries its model label yet.
-						{:else}
-							Every template of this model wraps the KV cache middleware, which is not copied on its
-							own.
-						{/if}
+						No deployment template of this model carries the workload, GPU, replicas and KV cache
+						offload labels.
 					</Item.Description>
 				</Item.Content>
 			</Item.Root>
 		{:else}
 			<Field.Group class="gap-6">
-				<!-- 1. Workload -->
 				<RadioGroup.Root
 					value={selection.workload}
 					onValueChange={(value) => update({ workload: value })}
@@ -343,105 +298,77 @@
 					{/each}
 				</RadioGroup.Root>
 
-				<!-- 2. GPU model and count -->
-				<div class="grid gap-4 sm:grid-cols-2">
+				<div class="grid gap-4 sm:grid-cols-3">
 					<Field.Field>
 						<Field.Label for="gpu-type">Type</Field.Label>
 						<Select.Root
 							type="single"
-							value={selection.gpuType}
-							onValueChange={(value) => update({ gpuType: value })}
+							value={selection.gpu}
+							onValueChange={(value) => update({ gpu: value })}
 						>
 							<Select.Trigger id="gpu-type" class="w-full">
-								<span class="truncate">{selection.gpuType}</span>
+								<span class="truncate">
+									{gpuProductLabel(dict, selection.workload, selection.gpu)}
+								</span>
 							</Select.Trigger>
 							<Select.Content>
-								{#each gpuTypes as gpuType (gpuType)}
-									{@const matches = clusterGpuTypesFor(gpuType, summaries)}
-									<Select.Item value={gpuType} label={gpuType}>
-										<div class="flex min-w-0 flex-col">
-											<span class="truncate">{gpuType}</span>
-											{#if summaries.length}
-												<span
-													class={cn(
-														'text-xs text-muted-foreground',
-														matches.length === 0 && 'text-amber-600 dark:text-amber-500'
-													)}
-												>
-													{#if matches.length === 0}
-														Not found in this cluster
-													{:else}
-														{matches.map((match) => match.type).join(', ')}
-													{/if}
-												</span>
-											{/if}
-										</div>
-									</Select.Item>
+								{#each gpus as gpu (gpu)}
+									<Select.Item value={gpu} label={gpuProductLabel(dict, selection.workload, gpu)} />
 								{/each}
 							</Select.Content>
 						</Select.Root>
-						{#await topology}
-							<Field.Description class="flex items-center gap-2">
-								<Spinner class="size-3" />
-								Reading cluster GPUs
-							</Field.Description>
-						{:then}
-							{#if summaries.length === 0}
-								<Field.Description>No GPUs registered in this cluster.</Field.Description>
-							{:else if clusterMatches.length === 0}
-								<Field.Description class="text-amber-600 dark:text-amber-500">
-									This cluster has no {selection.gpuType} cards.
-								</Field.Description>
-							{:else}
-								{@const fits = clusterMatches.some((match) =>
-									fitsOnOneNode(match, selection.gpuCount)
-								)}
-								<Field.Description class={cn(!fits && 'text-amber-600 dark:text-amber-500')}>
-									{clusterMatches.reduce((sum, match) => sum + match.totalCards, 0)} cards on
-									{clusterMatches.reduce((sum, match) => sum + match.nodeCount, 0)} nodes, up to
-									{Math.max(...clusterMatches.map((match) => match.maxPerNode))} per node.
-									{#if !fits}
-										No node holds {selection.gpuCount}.
-									{/if}
-									{#if action === 'deploy' && pinnedClusterType}
-										Pinned in the next step.
-									{/if}
-								</Field.Description>
-							{/if}
-						{:catch error}
-							<Field.Description class="text-destructive">
-								Cluster GPUs unavailable: {(error as Error).message}.
-							</Field.Description>
-						{/await}
 					</Field.Field>
 
 					<Field.Field>
-						<Field.Label for="gpu-count">Number</Field.Label>
+						<Field.Label for="gpu-count">GPU per replica</Field.Label>
 						<Select.Root
 							type="single"
-							value={String(selection.gpuCount)}
-							onValueChange={(value) => update({ gpuCount: Number(value) })}
+							value={selection.gpus}
+							onValueChange={(value) => update({ gpus: value })}
 						>
 							<Select.Trigger id="gpu-count" class="w-full">
-								<span class="truncate">{selection.gpuCount} GPU</span>
+								<span class="truncate">{gpuAmountLabel(selection.gpus)} GPU</span>
 							</Select.Trigger>
 							<Select.Content>
 								{#each counts as count (count)}
-									<Select.Item value={String(count)} label={`${count} GPU`} />
+									<Select.Item value={count} label={`${gpuAmountLabel(count)} GPU`} />
+								{/each}
+							</Select.Content>
+						</Select.Root>
+					</Field.Field>
+
+					<Field.Field>
+						<Field.Label for="replica-count">Replicas</Field.Label>
+						<Select.Root
+							type="single"
+							value={selection.replicas}
+							onValueChange={(value) => update({ replicas: value })}
+						>
+							<Select.Trigger id="replica-count" class="w-full">
+								<span class="truncate">
+									{selection.replicas || '–'}
+									{selection.replicas === '1' ? 'replica' : 'replicas'}
+								</span>
+							</Select.Trigger>
+							<Select.Content>
+								{#each replicaCounts as count (count)}
+									<Select.Item
+										value={count}
+										label={`${count} ${count === '1' ? 'replica' : 'replicas'}`}
+									/>
 								{/each}
 							</Select.Content>
 						</Select.Root>
 					</Field.Field>
 				</div>
 
-				<!-- 3. KV cache offload -->
 				<Field.Field orientation="horizontal">
 					<Field.Content>
 						<Field.Label for="kv-offload">KV cache offload</Field.Label>
 						<Field.Description>
-							{#if kv.on && kv.off}
+							{#if kvOn && kvOff}
 								Keep evicted KV cache in host memory and on disk, so repeated prefixes skip prefill.
-							{:else if kv.on}
+							{:else if kvOn}
 								Every template for this choice offloads the KV cache.
 							{:else}
 								No template for this choice offloads the KV cache.
@@ -450,79 +377,102 @@
 					</Field.Content>
 					<Switch
 						id="kv-offload"
-						checked={selection.kvOffload}
-						onCheckedChange={(checked) => update({ kvOffload: checked })}
-						disabled={!(kv.on && kv.off)}
+						checked={selection.kvOffload === 'true'}
+						onCheckedChange={(checked) => update({ kvOffload: String(checked) })}
+						disabled={!(kvOn && kvOff)}
+					/>
+				</Field.Field>
+
+				<Field.Field orientation="horizontal">
+					<Field.Content>
+						<Field.Label for="prefix-routing">Precise prefix cache routing</Field.Label>
+						<Field.Description>
+							{#if routingOn && routingOff}
+								Send each request to the replica holding the longest prefix of its prompt in KV
+								cache.
+							{:else if routingOn}
+								Every template for this choice routes by the precise prefix cache.
+							{:else}
+								No template for this choice routes by the precise prefix cache.
+							{/if}
+						</Field.Description>
+					</Field.Content>
+					<Switch
+						id="prefix-routing"
+						checked={selection.routing === 'true'}
+						onCheckedChange={(checked) => update({ routing: String(checked) })}
+						disabled={!(routingOn && routingOff)}
 					/>
 				</Field.Field>
 			</Field.Group>
 
-			<!-- Performance of the resolved template -->
 			<div class="rounded-lg bg-muted p-4">
 				{#if chosen}
 					{@const details = chosen.details}
-					{@const measured = details.expectedTimeToFirstTokenMs !== null}
+					{@const resources = templateResources(chosen.object)}
+					{@const replicaCount = Number(chosen.replicas) || 1}
 					<dl class="grid grid-cols-3 gap-4">
 						<div>
 							<dt class="text-xs text-muted-foreground">Concurrency</dt>
 							<dd class="text-lg font-semibold tabular-nums">
-								{details.capacityPerInstance ?? '–'}
+								{details.concurrency ?? '–'}
 							</dd>
 							<dd class="text-xs text-muted-foreground">
-								requests{details.instances !== null && details.instances > 1
-									? ` × ${details.instances} instances`
+								requests{replicaCount > 1 ? ` × ${replicaCount} replicas` : ''}
+							</dd>
+						</div>
+						<div>
+							<dt class="text-xs text-muted-foreground">Context length</dt>
+							<dd class="text-lg font-semibold tabular-nums">
+								{details.maxModelLen !== null ? formatTokens(details.maxModelLen) : '–'}
+							</dd>
+							<dd class="text-xs text-muted-foreground">tokens</dd>
+						</div>
+						<div>
+							<dt class="text-xs text-muted-foreground">Engine</dt>
+							<dd class="text-lg font-semibold tabular-nums">
+								{details.vllmVersion ? `vLLM ${details.vllmVersion}` : '–'}
+							</dd>
+							<dd class="text-xs text-muted-foreground">
+								{details.tensorParallelSize !== null
+									? `tensor parallel ${details.tensorParallelSize}`
 									: ''}
 							</dd>
 						</div>
-						<div>
-							<dt class="text-xs text-muted-foreground">Time to first token</dt>
-							<dd class="text-lg font-semibold tabular-nums">
-								{formatDuration(details.expectedTimeToFirstTokenMs)}
-							</dd>
-							<dd class="text-xs text-muted-foreground">
-								{measured
-									? `${formatDuration(details.worstTimeToFirstTokenMs)} at capacity`
-									: 'not measured'}
-							</dd>
-						</div>
-						<div>
-							<dt class="text-xs text-muted-foreground">Inter-token latency</dt>
-							<dd class="text-lg font-semibold tabular-nums">
-								{formatDuration(details.expectedInterTokenLatencyMs)}
-							</dd>
-							<dd class="text-xs text-muted-foreground">
-								{measured
-									? `${formatDuration(details.worstInterTokenLatencyMs)} at capacity`
-									: 'not measured'}
-							</dd>
-						</div>
 					</dl>
-					{#if details.provisional}
-						<p class="mt-3 text-xs text-amber-600 dark:text-amber-500">
-							Provisional: capacity and latency are predictions, not measurements.
+					{#if resources.cpu !== null || resources.memory !== null || resources.vram !== null}
+						<dl class="mt-4 grid grid-cols-3 gap-4 border-t pt-4">
+							<div>
+								<dt class="text-xs text-muted-foreground">CPU</dt>
+								<dd class="text-lg font-semibold tabular-nums">{resources.cpu ?? '–'}</dd>
+								<dd class="text-xs text-muted-foreground">cores per replica</dd>
+							</div>
+							<div>
+								<dt class="text-xs text-muted-foreground">DRAM</dt>
+								<dd class="text-lg font-semibold tabular-nums">{resources.memory ?? '–'}</dd>
+								<dd class="text-xs text-muted-foreground">host memory per replica</dd>
+							</div>
+							<div>
+								<dt class="text-xs text-muted-foreground">VRAM</dt>
+								<dd class="text-lg font-semibold tabular-nums">{resources.vram ?? '–'}</dd>
+								<dd class="text-xs text-muted-foreground">{resources.gpu ?? 'in total'}</dd>
+							</div>
+						</dl>
+					{/if}
+					{#if selection.kvOffload === 'true' && details.kvOffloadCpuGibibytes !== null}
+						<p class="mt-3 text-xs text-muted-foreground">
+							KV cache offload tiers: {details.kvOffloadCpuGibibytes} Gi host memory{details.kvOffloadStorageDefaultGibibytes !==
+							null
+								? ` + ${details.kvOffloadStorageDefaultGibibytes} Gi disk`
+								: ''}.
 						</p>
 					{/if}
-				{:else if resolution.kind === 'ambiguous'}
-					<Field.Field>
-						<Field.Description>
-							{candidates.length} templates fit this choice. Pick the one to {action}.
-						</Field.Description>
-						<Select.Root
-							type="single"
-							value={tieBreaker ?? ''}
-							onValueChange={(value) => (tieBreaker = value || undefined)}
-						>
-							<Select.Trigger id="template" class="w-full" aria-label="Template">
-								<span class="truncate font-mono">{tieBreaker ?? 'Choose a template'}</span>
-							</Select.Trigger>
-							<Select.Content>
-								{#each candidates as candidate (candidate.name)}
-									<Select.Item value={candidate.name} label={candidate.name} class="font-mono" />
-								{/each}
-							</Select.Content>
-						</Select.Root>
-					</Field.Field>
-				{:else if resolution.kind === 'none'}
+					{#if details.provisional}
+						<p class="mt-3 text-xs text-amber-600 dark:text-amber-500">
+							Provisional: capacity and resources are predictions, not measurements.
+						</p>
+					{/if}
+				{:else}
 					<Item.Root class="items-start p-0">
 						<Item.Media variant="icon" class="text-amber-600 dark:text-amber-500">
 							<TriangleAlertIcon />
@@ -530,28 +480,12 @@
 						<Item.Content class="text-left">
 							<Item.Title>No matching template</Item.Title>
 							<Item.Description>
-								None of the {candidatesModel.variants.length} templates for this model supports
-								{describeUnmet(resolution.unmet)}.
+								No template of this model matches the selected workload, GPU, replicas, KV cache
+								offload and routing.
 							</Item.Description>
 						</Item.Content>
 					</Item.Root>
 				{/if}
-			</div>
-		{/if}
-
-		{#if !templatesLoading && !templatesError && model.skipped.length}
-			<div class="text-xs text-muted-foreground">
-				<p>
-					Skipped {model.skipped.length}
-					{model.skipped.length === 1 ? 'template' : 'templates'} with missing or invalid labels:
-				</p>
-				<ul class="mt-1 space-y-0.5">
-					{#each model.skipped as template (template.name)}
-						<li>
-							<span class="font-mono">{template.name}</span> — {template.labels.join(', ')}
-						</li>
-					{/each}
-				</ul>
 			</div>
 		{/if}
 
@@ -562,7 +496,6 @@
 	</Dialog.Content>
 </Dialog.Root>
 
-<!-- The follow-up dialog lives outside the picker, so closing the picker never unmounts it. -->
 {#if pendingTemplate && pendingObject && pendingAction === 'view'}
 	<View
 		bind:open={handoffOpen}

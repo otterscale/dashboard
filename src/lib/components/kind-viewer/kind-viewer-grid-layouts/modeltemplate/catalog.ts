@@ -1,31 +1,3 @@
-/**
- * Model template catalog.
- *
- * The LLMInferenceServiceConfigs in `otterscale-system` come in two layers,
- * told apart by the `otterscale.io/template-role` label:
- *
- * - A **model entry** (`template-role=model`) declares a model only:
- *   `spec.model` (name and source) plus a description. The model list is the
- *   set of these entries, one card each.
- * - A **deployment template** (`template-role=deployment`) is one way to run
- *   a model. Its labels state exactly what a selection matches on (workload,
- *   GPU model, GPU total, KV cache offload, version) and its annotations what
- *   it displays (capacity, latency, offload tier sizes). It shares the
- *   `otterscale.io/model` label with its model entry.
- *
- * Deploying copies the chosen template with the entry's `spec.model` merged
- * in (`composeTemplate`), so nothing stacks the entry through baseRefs. A
- * template missing a required label is skipped and reported, never guessed
- * from its spec.
- *
- * Nothing here touches Svelte or the network; `catalog.spec.ts` covers it.
- */
-import type { NodeInfo } from '$lib/components/gpu-allocation/types';
-
-/**
- * Structural view of an LLMInferenceServiceConfig: what the catalog reads.
- * Both the generated kserve type and a raw JSON object satisfy it.
- */
 export type ModelTemplateObject = {
 	metadata?: {
 		name?: string;
@@ -35,53 +7,141 @@ export type ModelTemplateObject = {
 	};
 	spec?: {
 		model?: { name?: string; uri?: string };
-		template?: { containers?: Array<{ name?: string; image?: string }> };
+		replicas?: number;
+		template?: {
+			containers?: {
+				name?: string;
+				resources?: {
+					requests?: Record<string, string | number>;
+					limits?: Record<string, string | number>;
+				};
+			}[];
+		};
 	};
 };
 
-const PREFIX = 'otterscale.io';
+export interface TemplateDetails {
+	maxModelLen: number | null;
+	concurrency: number | null;
+	provisional: boolean;
+	vllmVersion: string | null;
+	tensorParallelSize: number | null;
+	gpuUsage: string | null;
+	gpuKvCacheGibibytes: number | null;
+	kvOffloadCpuGibibytes: number | null;
+	kvOffloadStorageDefaultGibibytes: number | null;
+	kvOffloadStorageMinimumGibibytes: number | null;
+}
 
-/** Labels: what tells the layers apart and what a selection is matched on. */
-export const TEMPLATE_LABELS = {
-	role: `${PREFIX}/template-role`,
-	model: `${PREFIX}/model`,
-	workload: `${PREFIX}/workload`,
-	gpu: `${PREFIX}/gpu`,
-	gpusInTotal: `${PREFIX}/gpus-in-total`,
-	kvOffload: `${PREFIX}/kv-offload`,
-	version: `${PREFIX}/template-version`
-} as const;
+export interface ModelTemplate {
+	name: string;
+	namespace: string;
+	object: ModelTemplateObject;
+	workload: string;
+	gpu: string;
+	gpus: string;
+	replicas: string;
+	kvOffload: string;
+	routing: string;
+	details: TemplateDetails;
+}
 
-/** Values of `TEMPLATE_LABELS.role`. */
-export const TEMPLATE_ROLES = {
-	model: 'model',
-	deployment: 'deployment'
-} as const;
+export type TemplateDict = Record<
+	string, // workload
+	Record<
+		string, // gpu type
+		Record<
+			string, // gpus per replica
+			Record<
+				string, // replicas
+				Record<
+					string, // kv cache offload
+					Record<string, ModelTemplate[]> // precise prefix cache routing
+				>
+			>
+		>
+	>
+>;
 
-/** Annotations: what a template or model entry displays about itself. */
-export const TEMPLATE_ANNOTATIONS = {
-	modelName: `${PREFIX}/model-name`,
-	vendor: `${PREFIX}/vendor`,
-	description: `${PREFIX}/description`,
-	vllmVersion: `${PREFIX}/vllm-version`,
-	maxModelLen: `${PREFIX}/max-model-len`,
-	demandedConcurrency: `${PREFIX}/demanded-concurrency`,
-	capacityPerInstance: `${PREFIX}/capacity-per-instance`,
-	instances: `${PREFIX}/instances`,
-	gpusPerInstance: `${PREFIX}/gpus-per-instance`,
-	tensorParallelSize: `${PREFIX}/tensor-parallel-size`,
-	provisional: `${PREFIX}/provisional`,
-	latencyConditions: `${PREFIX}/latency-conditions`,
-	expectedTimeToFirstToken: `${PREFIX}/expected-time-to-first-token-milliseconds`,
-	expectedInterTokenLatency: `${PREFIX}/expected-inter-token-latency-milliseconds`,
-	worstTimeToFirstToken: `${PREFIX}/worst-time-to-first-token-milliseconds`,
-	worstInterTokenLatency: `${PREFIX}/worst-inter-token-latency-milliseconds`,
-	gpuKvCache: `${PREFIX}/gpu-kv-cache-gibibytes`,
-	kvOffloadCpu: `${PREFIX}/kv-offload-cpu-gibibytes`,
-	kvOffloadStorageDefault: `${PREFIX}/kv-offload-storage-default-gibibytes`,
-	kvOffloadStorageMinimum: `${PREFIX}/kv-offload-storage-minimum-gibibytes`,
-	kvOffloadStorageMaximum: `${PREFIX}/kv-offload-storage-maximum-gibibytes`
-} as const;
+export interface Selection {
+	workload: string;
+	gpu: string;
+	gpus: string;
+	replicas: string;
+	kvOffload: string;
+	routing: string;
+}
+
+function annotationNumber(object: ModelTemplateObject, key: string): number | null {
+	const raw = object.metadata?.annotations?.[key];
+	if (raw === undefined || raw.trim() === '') return null;
+	const value = Number(raw);
+	return Number.isFinite(value) ? value : null;
+}
+
+function readDetails(object: ModelTemplateObject): TemplateDetails {
+	const annotations = object.metadata?.annotations ?? {};
+	return {
+		maxModelLen: annotationNumber(object, 'template.otterscale.io/max-model-len'),
+		concurrency: annotationNumber(object, 'template.otterscale.io/concurrency'),
+		provisional: annotations['template.otterscale.io/provisional'] === 'true',
+		vllmVersion: annotations['template.otterscale.io/vllm-version']?.trim() || null,
+		tensorParallelSize: annotationNumber(object, 'template.otterscale.io/tensor-parallel-size'),
+		gpuUsage: annotations['template.otterscale.io/gpu-usage']?.trim() || null,
+		gpuKvCacheGibibytes: annotationNumber(object, 'template.otterscale.io/gpu-kv-cache-gibibytes'),
+		kvOffloadCpuGibibytes: annotationNumber(
+			object,
+			'template.otterscale.io/kv-offload-cpu-gibibytes'
+		),
+		kvOffloadStorageDefaultGibibytes: annotationNumber(
+			object,
+			'template.otterscale.io/kv-offload-storage-default-gibibytes'
+		),
+		kvOffloadStorageMinimumGibibytes: annotationNumber(
+			object,
+			'template.otterscale.io/kv-offload-storage-minimum-gibibytes'
+		)
+	};
+}
+
+export function buildTemplateDict(templates: ModelTemplateObject[]): TemplateDict {
+	const dict: TemplateDict = {};
+	for (const object of templates) {
+		const labels = object.metadata?.labels ?? {};
+		const workload = labels['template.otterscale.io/workload'];
+		const gpu = labels['template.otterscale.io/gpu-type'];
+		const gpus = labels['template.otterscale.io/gpus-per-replica'];
+		const replicas = labels['template.otterscale.io/replicas'];
+		const kvOffload = labels['template.otterscale.io/kv-cache-offload'];
+		const routing = labels['template.otterscale.io/precise-prefix-cache-routing'] ?? 'false';
+		if (!workload || !gpu || !gpus || !replicas || !kvOffload) continue;
+		const template: ModelTemplate = {
+			name: object.metadata?.name ?? '',
+			namespace: object.metadata?.namespace ?? '',
+			object,
+			workload,
+			gpu,
+			gpus,
+			replicas,
+			kvOffload,
+			routing,
+			details: readDetails(object)
+		};
+		((((((dict[workload] ??= {})[gpu] ??= {})[gpus] ??= {})[replicas] ??= {})[kvOffload] ??= {})[
+			routing
+		] ??= []).push(template);
+	}
+	for (const byGpu of Object.values(dict))
+		for (const byGpus of Object.values(byGpu))
+			for (const byReplicas of Object.values(byGpus))
+				for (const byOffload of Object.values(byReplicas))
+					for (const byRouting of Object.values(byOffload))
+						for (const bucket of Object.values(byRouting))
+							bucket.sort((a, b) => a.name.localeCompare(b.name));
+	return dict;
+}
+
+const WORKLOAD_ORDER = ['retrieval', 'document', 'agent'];
 
 const WORKLOAD_INFO: Record<string, { label: string; description: string }> = {
 	retrieval: {
@@ -97,8 +157,6 @@ const WORKLOAD_INFO: Record<string, { label: string; description: string }> = {
 		description: 'Long tool-using sessions with a large accumulated context.'
 	}
 };
-
-const WORKLOAD_ORDER = ['retrieval', 'document', 'agent'];
 
 export function workloadLabel(workload: string): string {
 	return WORKLOAD_INFO[workload]?.label ?? workload.charAt(0).toUpperCase() + workload.slice(1);
@@ -119,446 +177,215 @@ function compareWorkloads(a: string, b: string): number {
 	return a.localeCompare(b);
 }
 
-/** What a template says about itself; every field is absent when the annotation is. */
-export interface TemplateDetails {
-	vllmVersion: string | null;
-	maxModelLen: number | null;
-	demandedConcurrency: number | null;
-	capacityPerInstance: number | null;
-	instances: number | null;
-	gpusPerInstance: number | null;
-	tensorParallelSize: number | null;
-	/** Capacity, resources and latency are predictions, not measurements. */
-	provisional: boolean;
-	latencyConditions: string | null;
-	expectedTimeToFirstTokenMs: number | null;
-	expectedInterTokenLatencyMs: number | null;
-	worstTimeToFirstTokenMs: number | null;
-	worstInterTokenLatencyMs: number | null;
-	gpuKvCacheGiB: number | null;
-	kvOffloadCpuGiB: number | null;
-	kvOffloadStorageDefaultGiB: number | null;
-	kvOffloadStorageMinimumGiB: number | null;
-	kvOffloadStorageMaximumGiB: number | null;
+export function workloadOptions(dict: TemplateDict): string[] {
+	return Object.keys(dict).sort(compareWorkloads);
 }
 
-/** The facts a selection is matched on, all read from the labels. */
-export interface Selection {
-	/** Workload slug, e.g. `agent`. */
-	workload: string;
-	/** GPU model slug the template was calibrated on, e.g. `rtx-pro-6000`. */
-	gpuType: string;
-	/** GPUs the whole service occupies. */
-	gpuCount: number;
-	kvOffload: boolean;
+export function gpuOptions(dict: TemplateDict, workload: string): string[] {
+	return Object.keys(dict[workload] ?? {}).sort();
 }
 
-export interface TemplateVariant extends Selection {
-	name: string;
-	namespace: string;
-	object: ModelTemplateObject;
-	/** Wraps the legacy KV cache middleware image; not standalone, so not copied. */
-	middleware: boolean;
-	version: number;
-	details: TemplateDetails;
+const WORD_FRACTIONS: Record<string, { numerator: number; denominator: number }> = {
+	'one-half': { numerator: 1, denominator: 2 },
+	'one-third': { numerator: 1, denominator: 3 },
+	'one-quarter': { numerator: 1, denominator: 4 },
+	'one-eighth': { numerator: 1, denominator: 8 },
+	'two-thirds': { numerator: 2, denominator: 3 },
+	'three-quarters': { numerator: 3, denominator: 4 }
+};
+
+export function parseGpuAmount(
+	value: string | undefined
+): { numerator: number; denominator: number } | null {
+	const trimmed = value?.trim();
+	if (!trimmed) return null;
+	const word = WORD_FRACTIONS[trimmed];
+	if (word) return word;
+	const match = trimmed.match(/^(\d+)(?:(?:of|\/)(\d+))?$/);
+	if (!match) return null;
+	const numerator = Number(match[1]);
+	const denominator = Number(match[2] ?? 1);
+	if (numerator < 1 || denominator < 1) return null;
+	return { numerator, denominator };
 }
 
-/** A deployment template left out, and the required labels it lacks or misspells. */
-export interface SkippedTemplate {
-	name: string;
-	labels: string[];
+function gpuAmountValue(value: string): number | null {
+	const parsed = parseGpuAmount(value);
+	if (parsed) return parsed.numerator / parsed.denominator;
+	const numeric = Number(value);
+	return Number.isFinite(numeric) ? numeric : null;
 }
 
-/** The model entry a card stands for. */
-export interface ModelEntry {
-	name: string;
-	namespace: string;
-	object: ModelTemplateObject;
+export function gpuAmountLabel(value: string): string {
+	const parsed = parseGpuAmount(value);
+	if (!parsed) return value;
+	return parsed.denominator === 1
+		? String(parsed.numerator)
+		: `${parsed.numerator}/${parsed.denominator}`;
 }
 
-/** What a model entry shows about itself: on its card, its row and the picker header. */
+function compareGpuAmounts(a: string, b: string): number {
+	const valueA = gpuAmountValue(a);
+	const valueB = gpuAmountValue(b);
+	if (valueA !== null && valueB !== null) return valueA - valueB || a.localeCompare(b);
+	if (valueA !== null) return -1;
+	if (valueB !== null) return 1;
+	return a.localeCompare(b);
+}
+
+export function gpuProductLabel(dict: TemplateDict, workload: string, gpu: string): string {
+	for (const byReplicas of Object.values(dict[workload]?.[gpu] ?? {}))
+		for (const byOffload of Object.values(byReplicas))
+			for (const byRouting of Object.values(byOffload))
+				for (const bucket of Object.values(byRouting))
+					for (const template of bucket) {
+						const product =
+							template.object.metadata?.annotations?.['template.otterscale.io/gpu-type']?.trim();
+						if (product) return product;
+					}
+	return gpu;
+}
+
+export function gpusOptions(dict: TemplateDict, workload: string, gpu: string): string[] {
+	return Object.keys(dict[workload]?.[gpu] ?? {}).sort(compareGpuAmounts);
+}
+
+export function replicasOptions(
+	dict: TemplateDict,
+	workload: string,
+	gpu: string,
+	gpus: string
+): string[] {
+	return Object.keys(dict[workload]?.[gpu]?.[gpus] ?? {}).sort(
+		(a, b) => Number(a) - Number(b) || a.localeCompare(b)
+	);
+}
+
+export function kvOffloadOptions(
+	dict: TemplateDict,
+	workload: string,
+	gpu: string,
+	gpus: string,
+	replicas: string
+): string[] {
+	return Object.keys(dict[workload]?.[gpu]?.[gpus]?.[replicas] ?? {}).sort();
+}
+
+export function routingOptions(
+	dict: TemplateDict,
+	workload: string,
+	gpu: string,
+	gpus: string,
+	replicas: string,
+	kvOffload: string
+): string[] {
+	return Object.keys(dict[workload]?.[gpu]?.[gpus]?.[replicas]?.[kvOffload] ?? {}).sort();
+}
+
+export function pickTemplate(dict: TemplateDict, selection: Selection): ModelTemplate | undefined {
+	return dict[selection.workload]?.[selection.gpu]?.[selection.gpus]?.[selection.replicas]?.[
+		selection.kvOffload
+	]?.[selection.routing]?.[0];
+}
+
+export function coerceSelection(dict: TemplateDict, selection: Selection): Selection {
+	const workloads = workloadOptions(dict);
+	const workload = workloads.includes(selection.workload)
+		? selection.workload
+		: (workloads[0] ?? '');
+	const gpuList = gpuOptions(dict, workload);
+	const gpu = gpuList.includes(selection.gpu) ? selection.gpu : (gpuList[0] ?? '');
+	const gpusList = gpusOptions(dict, workload, gpu);
+	const gpus = gpusList.includes(selection.gpus) ? selection.gpus : (gpusList[0] ?? '');
+	const replicasList = replicasOptions(dict, workload, gpu, gpus);
+	const replicas = replicasList.includes(selection.replicas)
+		? selection.replicas
+		: (replicasList[0] ?? '');
+	const kvList = kvOffloadOptions(dict, workload, gpu, gpus, replicas);
+	const kvOffload = kvList.includes(selection.kvOffload)
+		? selection.kvOffload
+		: kvList.includes('false')
+			? 'false'
+			: (kvList[0] ?? '');
+	const routingList = routingOptions(dict, workload, gpu, gpus, replicas, kvOffload);
+	const routing = routingList.includes(selection.routing)
+		? selection.routing
+		: routingList.includes('false')
+			? 'false'
+			: (routingList[0] ?? '');
+	return { workload, gpu, gpus, replicas, kvOffload, routing };
+}
+
+export function defaultSelection(dict: TemplateDict): Selection {
+	return coerceSelection(dict, {
+		workload: '',
+		gpu: '',
+		gpus: '',
+		replicas: '',
+		kvOffload: 'false',
+		routing: 'false'
+	});
+}
+
 export interface EntrySummary {
 	name: string;
 	namespace: string;
 	modelName: string;
-	/** Who publishes the model, e.g. `Alibaba`; null when the entry does not say. */
 	vendor: string | null;
 	modelUri: string | null;
 	description: string | null;
 }
 
-export interface ModelGroup {
-	modelName: string;
-	modelUri: string | null;
-	description: string | null;
-	entry: ModelEntry;
-	variants: TemplateVariant[];
-	skipped: SkippedTemplate[];
-}
-
-export type Resolution =
-	| { kind: 'match'; variant: TemplateVariant; alternatives: TemplateVariant[] }
-	| { kind: 'ambiguous'; candidates: TemplateVariant[] }
-	| { kind: 'none'; unmet: Array<keyof Selection> };
-
-/* Reading a template */
-
-function label(object: ModelTemplateObject, key: string): string | undefined {
-	const value = object.metadata?.labels?.[key]?.trim();
-	return value ? value : undefined;
-}
-
-function annotation(object: ModelTemplateObject, key: string): string | undefined {
-	const value = object.metadata?.annotations?.[key]?.trim();
-	return value ? value : undefined;
-}
-
-function parseNumber(value: string | undefined): number | null {
-	if (value === undefined) return null;
-	const number = Number(value);
-	return Number.isFinite(number) ? number : null;
-}
-
-function parseBoolean(value: string | undefined): boolean | undefined {
-	if (value === undefined) return undefined;
-	const normalized = value.toLowerCase();
-	if (['true', 'yes', 'on', '1'].includes(normalized)) return true;
-	if (['false', 'no', 'off', '0'].includes(normalized)) return false;
-	return undefined;
-}
-
-/** Whole positive numbers only: a GPU memory quantity or fraction is not a card count. */
-export function parsePositiveInteger(value: string | undefined): number | null {
-	if (value === undefined) return null;
-	const count = Number(value.trim());
-	if (!Number.isInteger(count) || count <= 0) return null;
-	return count;
-}
-
-function readDetails(object: ModelTemplateObject): TemplateDetails {
-	const read = (key: string) => annotation(object, key);
-	const number = (key: string) => parseNumber(read(key));
-	return {
-		vllmVersion: read(TEMPLATE_ANNOTATIONS.vllmVersion) ?? null,
-		maxModelLen: number(TEMPLATE_ANNOTATIONS.maxModelLen),
-		demandedConcurrency: number(TEMPLATE_ANNOTATIONS.demandedConcurrency),
-		capacityPerInstance: number(TEMPLATE_ANNOTATIONS.capacityPerInstance),
-		instances: number(TEMPLATE_ANNOTATIONS.instances),
-		gpusPerInstance: number(TEMPLATE_ANNOTATIONS.gpusPerInstance),
-		tensorParallelSize: number(TEMPLATE_ANNOTATIONS.tensorParallelSize),
-		provisional: parseBoolean(read(TEMPLATE_ANNOTATIONS.provisional)) ?? false,
-		latencyConditions: read(TEMPLATE_ANNOTATIONS.latencyConditions) ?? null,
-		expectedTimeToFirstTokenMs: number(TEMPLATE_ANNOTATIONS.expectedTimeToFirstToken),
-		expectedInterTokenLatencyMs: number(TEMPLATE_ANNOTATIONS.expectedInterTokenLatency),
-		worstTimeToFirstTokenMs: number(TEMPLATE_ANNOTATIONS.worstTimeToFirstToken),
-		worstInterTokenLatencyMs: number(TEMPLATE_ANNOTATIONS.worstInterTokenLatency),
-		gpuKvCacheGiB: number(TEMPLATE_ANNOTATIONS.gpuKvCache),
-		kvOffloadCpuGiB: number(TEMPLATE_ANNOTATIONS.kvOffloadCpu),
-		kvOffloadStorageDefaultGiB: number(TEMPLATE_ANNOTATIONS.kvOffloadStorageDefault),
-		kvOffloadStorageMinimumGiB: number(TEMPLATE_ANNOTATIONS.kvOffloadStorageMinimum),
-		kvOffloadStorageMaximumGiB: number(TEMPLATE_ANNOTATIONS.kvOffloadStorageMaximum)
-	};
-}
-
-/**
- * Describes one deployment template from its labels, or lists the required
- * labels it lacks or misspells.
- */
-export function extractVariant(
-	object: ModelTemplateObject
-): { variant: TemplateVariant } | { invalid: string[] } {
-	const workload = label(object, TEMPLATE_LABELS.workload)?.toLowerCase();
-	const gpuType = label(object, TEMPLATE_LABELS.gpu)?.toLowerCase();
-	const gpuCount = parsePositiveInteger(label(object, TEMPLATE_LABELS.gpusInTotal));
-	const kvOffload = parseBoolean(label(object, TEMPLATE_LABELS.kvOffload));
-	const version = parsePositiveInteger(label(object, TEMPLATE_LABELS.version));
-
-	if (
-		workload === undefined ||
-		gpuType === undefined ||
-		gpuCount === null ||
-		kvOffload === undefined ||
-		version === null
-	) {
-		const invalid: string[] = [];
-		if (workload === undefined) invalid.push(TEMPLATE_LABELS.workload);
-		if (gpuType === undefined) invalid.push(TEMPLATE_LABELS.gpu);
-		if (gpuCount === null) invalid.push(TEMPLATE_LABELS.gpusInTotal);
-		if (kvOffload === undefined) invalid.push(TEMPLATE_LABELS.kvOffload);
-		if (version === null) invalid.push(TEMPLATE_LABELS.version);
-		return { invalid };
-	}
-
-	return {
-		variant: {
-			name: object.metadata?.name ?? '',
-			namespace: object.metadata?.namespace ?? '',
-			object,
-			workload,
-			gpuType,
-			gpuCount,
-			kvOffload,
-			middleware: (object.spec?.template?.containers ?? []).some((container) =>
-				(container.image ?? '').includes('/ai-mw/')
-			),
-			version,
-			details: readDetails(object)
-		}
-	};
-}
-
-function compareVariants(a: TemplateVariant, b: TemplateVariant): number {
-	return (
-		compareWorkloads(a.workload, b.workload) ||
-		a.gpuType.localeCompare(b.gpuType) ||
-		a.gpuCount - b.gpuCount ||
-		Number(a.kvOffload) - Number(b.kvOffload) ||
-		b.version - a.version ||
-		a.name.localeCompare(b.name)
-	);
-}
-
-/** Whether a config is labelled as a model entry. */
-export function isModelEntry(object: ModelTemplateObject): boolean {
-	return label(object, TEMPLATE_LABELS.role) === TEMPLATE_ROLES.model;
-}
-
-/** Reads the display facts off a model entry; the display name falls back to the model, then the name. */
 export function describeEntry(object: ModelTemplateObject): EntrySummary {
 	const name = object.metadata?.name ?? '';
+	const annotations = object.metadata?.annotations ?? {};
 	return {
 		name,
 		namespace: object.metadata?.namespace ?? '',
 		modelName:
-			annotation(object, TEMPLATE_ANNOTATIONS.modelName) ??
-			(object.spec?.model?.name?.trim() || name),
-		vendor: annotation(object, TEMPLATE_ANNOTATIONS.vendor) ?? null,
+			annotations['template.otterscale.io/model-name']?.trim() ||
+			object.spec?.model?.name?.trim() ||
+			name,
+		vendor: annotations['template.otterscale.io/vendor']?.trim() || null,
 		modelUri: object.spec?.model?.uri?.trim() || null,
-		description: annotation(object, TEMPLATE_ANNOTATIONS.description) ?? null
+		description: annotations['template.otterscale.io/description']?.trim() || null
 	};
 }
 
-/**
- * One model entry with its deployment templates: `templates` are the configs
- * a `template-role=deployment` selector on the entry's model label returns.
- */
-export function groupForEntry(
-	entry: ModelTemplateObject,
-	templates: ModelTemplateObject[]
-): ModelGroup {
-	const summary = describeEntry(entry);
-	const variants: TemplateVariant[] = [];
-	const skipped: SkippedTemplate[] = [];
-	for (const object of templates) {
-		const result = extractVariant(object);
-		if ('variant' in result) variants.push(result.variant);
-		else skipped.push({ name: object.metadata?.name ?? '', labels: result.invalid });
-	}
-	return {
-		modelName: summary.modelName,
-		modelUri: summary.modelUri,
-		description: summary.description,
-		entry: { name: summary.name, namespace: summary.namespace, object: entry },
-		variants: variants.sort(compareVariants),
-		skipped
+export interface TemplateResources {
+	cpu: string | null;
+	memory: string | null;
+	/** The GPU share, e.g. "2 x 1/2 GPU", from the gpu-usage annotation. */
+	gpu: string | null;
+	/** The VRAM total, e.g. "95.6 GiB", from the gpu-usage annotation. */
+	vram: string | null;
+}
+
+export function templateResources(object: ModelTemplateObject): TemplateResources {
+	const containers = object.spec?.template?.containers ?? [];
+	const container = containers.find((entry) => entry.name === 'main') ?? containers[0];
+	const requests = container?.resources?.requests ?? {};
+	const limits = container?.resources?.limits ?? {};
+	const read = (key: string) => {
+		const raw = requests[key] ?? limits[key];
+		return raw === undefined ? null : String(raw);
 	};
-}
-
-/**
- * The deployment template as a complete config: the model entry's `spec.model`
- * filled in where the template is silent, so the deployed config needs no
- * baseRef to the entry.
- */
-export function composeTemplate(group: ModelGroup, variant: TemplateVariant): ModelTemplateObject {
-	// Not structuredClone: Svelte state hands the variant over as a Proxy, which it cannot clone.
-	const object = JSON.parse(JSON.stringify(variant.object)) as ModelTemplateObject;
-	const entryModel = group.entry.object.spec?.model;
-	if (entryModel) {
-		const spec = (object.spec ??= {});
-		spec.model = { ...entryModel, ...(spec.model ?? {}) };
-	}
-	return object;
-}
-
-/* Options: each level lists only what the templates above it offer. */
-
-export function workloadOptions(group: ModelGroup): string[] {
-	return [...new Set(group.variants.map((variant) => variant.workload))].sort(compareWorkloads);
-}
-
-function matching(group: ModelGroup, selection: Partial<Selection>): TemplateVariant[] {
-	return group.variants.filter(
-		(variant) =>
-			(selection.workload === undefined || variant.workload === selection.workload) &&
-			(selection.gpuType === undefined || variant.gpuType === selection.gpuType) &&
-			(selection.gpuCount === undefined || variant.gpuCount === selection.gpuCount) &&
-			(selection.kvOffload === undefined || variant.kvOffload === selection.kvOffload)
-	);
-}
-
-export function gpuTypeOptions(group: ModelGroup, workload: string): string[] {
-	return [...new Set(matching(group, { workload }).map((variant) => variant.gpuType))].sort();
-}
-
-export function gpuCountOptions(group: ModelGroup, workload: string, gpuType: string): number[] {
-	const counts = new Set(matching(group, { workload, gpuType }).map((variant) => variant.gpuCount));
-	return [...counts].sort((a, b) => a - b);
-}
-
-export function kvOffloadOptions(
-	group: ModelGroup,
-	workload: string,
-	gpuType: string,
-	gpuCount: number
-): { on: boolean; off: boolean } {
-	const variants = matching(group, { workload, gpuType, gpuCount });
-	return {
-		on: variants.some((variant) => variant.kvOffload),
-		off: variants.some((variant) => !variant.kvOffload)
-	};
-}
-
-/**
- * The first workload, GPU and smallest count, without offload where a
- * template offers that. A group without variants gets a placeholder that no
- * template matches.
- */
-export function defaultSelection(group: ModelGroup): Selection {
-	const workload = workloadOptions(group)[0];
-	if (workload === undefined) return { workload: '', gpuType: '', gpuCount: 0, kvOffload: false };
-	const gpuType = gpuTypeOptions(group, workload)[0];
-	const gpuCount = gpuCountOptions(group, workload, gpuType)[0];
-	const kv = kvOffloadOptions(group, workload, gpuType, gpuCount);
-	return { workload, gpuType, gpuCount, kvOffload: !kv.off };
-}
-
-/**
- * Re-validates a selection top-down after one field changed, so dependent
- * fields never point at a combination no template offers.
- */
-export function coerceSelection(group: ModelGroup, selection: Selection): Selection {
-	const workloads = workloadOptions(group);
-	if (workloads.length === 0) return selection;
-	const workload = workloads.includes(selection.workload) ? selection.workload : workloads[0];
-
-	const types = gpuTypeOptions(group, workload);
-	const gpuType = types.includes(selection.gpuType) ? selection.gpuType : types[0];
-
-	const counts = gpuCountOptions(group, workload, gpuType);
-	const gpuCount = counts.includes(selection.gpuCount) ? selection.gpuCount : counts[0];
-
-	const kv = kvOffloadOptions(group, workload, gpuType, gpuCount);
-	let kvOffload = selection.kvOffload;
-	if (kvOffload && !kv.on) kvOffload = false;
-	if (!kvOffload && !kv.off) kvOffload = true;
-
-	return { workload, gpuType, gpuCount, kvOffload };
-}
-
-/**
- * Picks the template for a selection. All four facts must match; among
- * several versions the newest wins, and equal versions are reported as a tie.
- */
-export function resolveTemplate(group: ModelGroup, selection: Selection): Resolution {
-	const steps: Array<[keyof Selection, Partial<Selection>]> = [
-		['workload', { workload: selection.workload }],
-		['gpuType', { workload: selection.workload, gpuType: selection.gpuType }],
-		[
-			'gpuCount',
-			{ workload: selection.workload, gpuType: selection.gpuType, gpuCount: selection.gpuCount }
-		],
-		['kvOffload', selection]
-	];
-	let candidates: TemplateVariant[] = group.variants;
-	for (const [field, partial] of steps) {
-		candidates = matching(group, partial);
-		if (candidates.length === 0) return { kind: 'none', unmet: [field] };
-	}
-	const ranked = [...candidates].sort(compareVariants);
-	const newest = ranked[0].version;
-	const top = ranked.filter((variant) => variant.version === newest);
-	if (top.length > 1) return { kind: 'ambiguous', candidates: top };
-	return { kind: 'match', variant: ranked[0], alternatives: ranked.slice(1) };
-}
-
-/* Cluster GPU topology */
-
-export interface GpuTypeSummary {
-	/** Device model as HAMi registers it, e.g. `NVIDIA RTX PRO 6000 Blackwell Server Edition`. */
-	type: string;
-	/** Nodes carrying at least one usable card of this type. */
-	nodeCount: number;
-	/** Most usable cards of this type on any single node. */
-	maxPerNode: number;
-	totalCards: number;
-	/** Frame buffer of one card in MiB, when HAMi reports it. */
-	memoryMiB: number | null;
-}
-
-/**
- * Whole, healthy cards per GPU model. MIG-mode cards are split into slices
- * and cannot back a whole-GPU request, so they are left out.
- */
-export function summarizeGpuTopology(nodes: NodeInfo[]): GpuTypeSummary[] {
-	const summaries = new Map<string, GpuTypeSummary>();
-	for (const node of nodes) {
-		const perType = new Map<string, number>();
-		for (const device of node.devices) {
-			if (!device.type || device.health === false || device.mode === 'mig') continue;
-			perType.set(device.type, (perType.get(device.type) ?? 0) + 1);
-			const summary = summaries.get(device.type);
-			if (summary) {
-				if (summary.memoryMiB === null && device.devmem > 0) summary.memoryMiB = device.devmem;
-			} else {
-				summaries.set(device.type, {
-					type: device.type,
-					nodeCount: 0,
-					maxPerNode: 0,
-					totalCards: 0,
-					memoryMiB: device.devmem > 0 ? device.devmem : null
-				});
-			}
-		}
-		for (const [type, count] of perType) {
-			const summary = summaries.get(type)!;
-			summary.nodeCount++;
-			summary.totalCards += count;
-			summary.maxPerNode = Math.max(summary.maxPerNode, count);
+	const usage = object.metadata?.annotations?.['template.otterscale.io/gpu-usage']?.trim();
+	let gpu: string | null = null;
+	let vram: string | null = null;
+	if (usage) {
+		const match = usage.match(/^(.*?),\s*(.+?)\s*VRAM$/);
+		if (match) {
+			gpu = match[1].trim();
+			vram = match[2].trim();
+		} else {
+			gpu = usage;
 		}
 	}
-	return [...summaries.values()].sort((a, b) => a.type.localeCompare(b.type));
-}
-
-function normalizeGpuName(name: string): string {
-	return name.toLowerCase().replace(/[^a-z0-9]+/g, '');
-}
-
-function namesGpu(gpuType: string, clusterType: string): boolean {
-	return normalizeGpuName(clusterType).includes(normalizeGpuName(gpuType));
-}
-
-/**
- * Cluster GPU models that a template GPU slug names: `rtx-pro-6000` matches
- * `NVIDIA RTX PRO 6000 Blackwell Server Edition`.
- */
-export function clusterGpuTypesFor(gpuType: string, summaries: GpuTypeSummary[]): GpuTypeSummary[] {
-	return summaries.filter((summary) => namesGpu(gpuType, summary.type));
-}
-
-/**
- * The one cluster GPU model a template GPU slug names, to pin at deploy;
- * undefined when the template names none, or when none or several match.
- */
-export function pinClusterGpuType(
-	gpuType: string | undefined,
-	clusterTypes: string[]
-): string | undefined {
-	if (!gpuType || !normalizeGpuName(gpuType)) return undefined;
-	const matches = clusterTypes.filter((type) => namesGpu(gpuType, type));
-	return matches.length === 1 ? matches[0] : undefined;
-}
-
-/** Whether one node of the type can hold every GPU the service needs. */
-export function fitsOnOneNode(summary: GpuTypeSummary, gpuCount: number): boolean {
-	return summary.maxPerNode >= gpuCount;
+	return {
+		cpu: read('cpu'),
+		memory: read('memory'),
+		gpu,
+		vram
+	};
 }
