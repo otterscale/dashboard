@@ -317,6 +317,15 @@
 									workspace: page.params.workspace
 								})
 							: ''
+					},
+					{
+						title: m.api_key(),
+						url: resourceUrl({
+							group: 'maas.phison.com',
+							version: 'v1alpha1',
+							kind: 'ApiKey',
+							resource: 'apikeys'
+						})
 					}
 				]
 			},
