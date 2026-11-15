@@ -7,6 +7,8 @@ import type { Component, Snippet } from 'svelte';
 import type { ResourceRuleVerbs } from '$lib/components/api-resources-viewer/types';
 
 import { getKindExtension } from '../extensions';
+import ApiKeyActions from './api-key/actions.svelte';
+import ApiKeyCreate from './api-key/create.svelte';
 import ApplicationActions from './applications/actions.svelte';
 import ApplicationCreate from './applications/create.svelte';
 import ClusterRoleBindingActions from './cluster-role-binding/actions.svelte';
@@ -85,6 +87,11 @@ function getCreate(kind: string, namespace?: string, group?: string): CreateType
 		return extension.Create;
 	}
 	switch (kind) {
+		case 'ApiKey':
+			if (group === 'maas.phison.com') {
+				return ApiKeyCreate as CreateType;
+			}
+			return DefaultCreate as CreateType;
 		case 'Application':
 			return ApplicationCreate as CreateType;
 		case 'ClusterRoleBinding':
@@ -119,6 +126,11 @@ function getActions(kind: string, namespace?: string, group?: string): ActionsTy
 		return extension.Actions;
 	}
 	switch (kind) {
+		case 'ApiKey':
+			if (group === 'maas.phison.com') {
+				return ApiKeyActions as ActionsType;
+			}
+			return DefaultActions as ActionsType;
 		case 'Application':
 			return ApplicationActions as ActionsType;
 		case 'ClusterRoleBinding':
