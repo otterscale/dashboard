@@ -6,6 +6,12 @@ import type { DataSchemaType, UISchemaType } from '$lib/components/dynamic-table
 
 import { getKindExtension } from '../extensions.js';
 import {
+	getApiKeyColumnDefinitions,
+	getApiKeyData,
+	getApiKeyDataSchemas,
+	getApiKeyUISchemas
+} from './apikey.js';
+import {
 	getApplicationColumnDefinitions,
 	getApplicationData,
 	getApplicationDataSchemas,
@@ -238,6 +244,11 @@ function getDataSchemas(kind: string, group?: string): Record<string, DataSchema
 		return extension.getDataSchemas();
 	}
 	switch (kind) {
+		case 'ApiKey':
+			if (group === 'maas.phison.com') {
+				return getApiKeyDataSchemas();
+			}
+			return getDefaultDataSchemas();
 		case 'CronJob':
 			return getCronJobDataSchemas();
 		case 'DaemonSet':
@@ -328,6 +339,11 @@ function getData(apiResource: APIResource, object: JsonObject): Record<string, J
 		return extension.getData(object);
 	}
 	switch (apiResource.kind) {
+		case 'ApiKey':
+			if (apiResource.group === 'maas.phison.com') {
+				return getApiKeyData(resource);
+			}
+			return getDefaultData(apiResource, resource);
 		case 'CronJob':
 			return getCronJobData(resource);
 		case 'DaemonSet':
@@ -415,6 +431,11 @@ function getUISchemas(kind: string, group?: string): Record<string, UISchemaType
 		return extension.getUISchemas();
 	}
 	switch (kind) {
+		case 'ApiKey':
+			if (group === 'maas.phison.com') {
+				return getApiKeyUISchemas();
+			}
+			return getDefaultUISchemas();
 		case 'CronJob':
 			return getCronJobUISchemas();
 		case 'DaemonSet':
@@ -507,6 +528,11 @@ function getColumnDefinitions(
 		return extension.getColumnDefinitions(apiResource, uiSchemas, dataSchemas, cluster);
 	}
 	switch (apiResource.kind) {
+		case 'ApiKey':
+			if (apiResource.group === 'maas.phison.com') {
+				return getApiKeyColumnDefinitions(apiResource, uiSchemas, dataSchemas);
+			}
+			return getDefaultColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'CronJob':
 			return getCronJobColumnDefinitions(apiResource, uiSchemas, dataSchemas);
 		case 'DaemonSet':
