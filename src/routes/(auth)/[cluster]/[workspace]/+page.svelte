@@ -82,11 +82,9 @@
 		const endpoint = config?.[endpointKey];
 		if (!endpoint) return 'Unavailable';
 
-		const ns = namespace || '<Namespace>';
 		const nodePort = config?.nodePortRange ? `<NodePort ${config.nodePortRange}>` : '<NodePort>';
 		const suffixMap: Record<string, string> = {
-			Application: `:${nodePort}`,
-			LLMInferenceService: `/${ns}/<Name>`
+			Application: `:${nodePort}`
 		};
 		return `Available at ${endpoint}${suffixMap[kind] ?? ''}`;
 	}
