@@ -26,9 +26,65 @@ These are facts about the real data, found while checking the first branch. Ever
 - Loading happens in three stages on a real cluster: the sidebar menu, then the page before its Prometheus driver is ready, then each widget. A placeholder should have the same footprint as what replaces it, so nothing jumps between stages. Check this with network throttling, not only with a mocked instant response.
 - When Prometheus returns nothing, every widget on the page should show the same kind of empty state. Today some show a message, some show `N/A` and some show zeros.
 
+## Local environment for checking the UI
+
+A fresh worktree cannot run or log in on its own. Set these up before the first visual check.
+
+### Files to copy from the main checkout
+
+None of these are committed, so a new worktree does not have them. Copy them from `../dashboard/`:
+
+- `.env`
+- `otterscale-ca.crt`: without it, server-side API calls fail with `UNABLE_TO_VERIFY_LEAF_SIGNATURE`.
+- `project.inlang/cache/`: without it Paraglide tries to fetch its plugins from jsdelivr, and when that fails every message compiles to an empty string. The dev server still starts, so check that `src/lib/paraglide/messages/en.js` is around 200 KB, not 21 bytes.
+
+### Starting the dev server
+
+```bash
+NODE_EXTRA_CA_CERTS=$PWD/otterscale-ca.crt pnpm dev --host --port 5174 --strictPort
+```
+
+The port must match `PUBLIC_WEB_URL` in `.env` (`http://192.168.41.240:5174`), because Keycloak redirects back to that address after login. Only one branch can run at a time for this reason. If the port is taken, another branch's server is running: stop and ask the owner. Do not kill a process you did not start, and do not change the port.
+
+### Login: `.env.e2e`
+
+The owner creates `.env.e2e` in the worktree root. It is covered by the `.env.*` rule in `.gitignore`. Read credentials only from this file. Never print them, and never ask for them in chat.
+
+```
+E2E_TENANT_USERNAME=
+E2E_TENANT_PASSWORD=
+E2E_CLUSTER=phison-hci
+E2E_WORKSPACE=testbed
+```
+
+- The variable names are the ones `e2e/tenant-metrics.test.ts` already uses.
+- The account must be able to see cluster metrics, or dashboard/cluster will not load.
+- If `.env.e2e` is missing, stop and ask the owner to create it. Do not look for credentials elsewhere.
+
+The Keycloak form has two steps: fill `#username`, click `#kc-login`, then fill `#password` and click `#kc-login` again. Save the session with Playwright's `storageState` and reuse it for every capture instead of logging in each time. Keep the `storageState` file outside the repo.
+
+### Browser
+
+Google Chrome is not installed on this machine, so the `chrome-devtools` MCP server cannot launch. Use the Chromium that ships with the repo's `playwright` dev dependency, driven by a script kept outside the repo (the session scratchpad). Do not add the script or any new dependency to the branch. Say in the report that Playwright was used in place of `chrome-devtools`.
+
+### Capturing each state
+
+- Pages: `http://192.168.41.240:5174/<E2E_CLUSTER>/<E2E_WORKSPACE>/dashboard/overview` and `.../dashboard/cluster`.
+- Theme: set `localStorage['mode-watcher-mode']` to `light` or `dark` before the page loads.
+- Full page: the app scrolls inside the inner `<main>`, not the document. Grow the viewport to that element's `scrollHeight` before taking the screenshot; a plain full-page capture stops at 900 px.
+- Empty: answer every request matching `/proxy/<cluster>/prometheus/api/v1/query` with `{"status":"success","data":{"resultType":"vector","result":[]}}`.
+- Widget-stage loading: leave those same requests unanswered.
+- Page-stage loading: hold all `script` requests, so the server-rendered page stays on screen.
+- Collapsed sidebar: press `Ctrl+B`.
+- Mobile sidebar (390 wide): click `[data-sidebar="trigger"]`.
+
+To check that nothing jumps between loading stages, compare the page height in the page-stage, widget-stage and loaded captures at the same width. They should be equal.
+
 ## Screenshots
 
-Save to `screenshots/` (do not commit) with exactly these names, so branches can be compared file by file. Viewport height 900; capture the full page.
+Save as PNG directly in `D:\frontend-design\<letter>\`, with no subfolder, where `<letter>` is the last letter of the branch name (`frontend-design-b` saves to `D:\frontend-design\b\`). From WSL the same folder is `/mnt/d/frontend-design/<letter>/`. Create the folder if it is missing. Do not keep a copy inside the repo and do not commit screenshots. Do not touch another branch's folder. The shared "before" baseline is already in `D:\frontend-design\before\`; do not capture or store it again.
+
+Use exactly these file names, so branches can be compared file by file. Viewport height 900; capture the full page.
 
 | Page | 1440 wide | 768 wide | 390 wide |
 | --- | --- | --- | --- |
