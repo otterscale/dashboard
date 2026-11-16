@@ -26,13 +26,17 @@ type LLMInferenceServiceObject = {
 			uri?: string;
 		};
 		replicas?: number;
-		baseRefs?: { name?: string }[];
 		prefill?: unknown;
 	};
 	status?: {
 		url?: string;
 		address?: { url?: string };
 		conditions?: { type?: string; status?: string; reason?: string }[];
+		appliedConfigs?: { name?: string; namespace?: string; source?: string }[];
+		workloads?: {
+			primary?: { readyReplicas?: number };
+			scheduler?: { readyReplicas?: number };
+		};
 	};
 };
 
@@ -41,8 +45,10 @@ type LLMInferenceServiceAttribute =
 	| 'Namespace'
 	| 'Model Name'
 	| 'Model URI'
-	| 'Templates'
+	| 'Configurations'
 	| 'Mode'
+	| 'Engines'
+	| 'Schedulers'
 	| 'Status'
 	| 'Age'
 	| 'raw';
@@ -53,8 +59,10 @@ function getLLMInferenceServiceDataSchemas(): Record<LLMInferenceServiceAttribut
 		Namespace: 'text',
 		'Model Name': 'text',
 		'Model URI': 'text',
-		Templates: 'number',
+		Configurations: 'number',
 		Mode: 'text',
+		Engines: 'number',
+		Schedulers: 'number',
 		Status: 'text',
 		Age: 'time',
 		raw: 'object'
@@ -67,13 +75,12 @@ function getLLMInferenceServiceData(
 	const readyCondition = object?.status?.conditions?.find(
 		(condition) => condition.type === 'Ready'
 	);
-	const baseRefs = object?.spec?.baseRefs ?? [];
 	return {
 		Name: object?.metadata?.name ?? null,
 		Namespace: object?.metadata?.namespace ?? null,
 		'Model Name': object?.spec?.model?.name ?? null,
 		'Model URI': object?.spec?.model?.uri ?? null,
-		Templates: baseRefs.length,
+		Configurations: object?.status?.appliedConfigs?.length ?? 0,
 		Mode: object?.spec?.prefill ? 'Prefill/Decode' : 'Single',
 		Status:
 			readyCondition?.status === 'True'
@@ -81,6 +88,8 @@ function getLLMInferenceServiceData(
 				: readyCondition?.status === 'False'
 					? (readyCondition.reason ?? '')
 					: '',
+		Engines: object?.status?.workloads?.primary?.readyReplicas ?? null,
+		Schedulers: object?.status?.workloads?.scheduler?.readyReplicas ?? null,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
 	};
@@ -92,8 +101,10 @@ function getLLMInferenceServiceUISchemas(): Record<LLMInferenceServiceAttribute,
 		Namespace: 'text',
 		'Model Name': 'text',
 		'Model URI': 'text',
-		Templates: 'array-of-object',
+		Configurations: 'array-of-object',
 		Mode: 'text',
+		Engines: 'number',
+		Schedulers: 'number',
 		Status: 'text',
 		Age: 'time',
 		raw: 'object'
@@ -199,7 +210,7 @@ function getLLMInferenceServiceColumnDefinitions(
 			accessorKey: 'Model URI'
 		},
 		{
-			id: 'Templates',
+			id: 'Configurations',
 			header: ({ column }: { column: Column<Record<LLMInferenceServiceAttribute, JsonValue>> }) =>
 				renderComponent(DynamicTableHeader, {
 					column: column,
@@ -217,15 +228,19 @@ function getLLMInferenceServiceColumnDefinitions(
 					column: column,
 					uiSchemas: uiSchemas,
 					metadata: {
-						items: ((row.original.raw as LLMInferenceServiceObject)?.spec?.baseRefs ?? []).map(
-							(ref) =>
+						items: (
+							(row.original.raw as LLMInferenceServiceObject)?.status?.appliedConfigs ?? []
+						).map(
+							(config) =>
 								({
-									title: ref?.name
-								}) as ArrayOfObjectItemType
+									title: config?.name ?? null,
+									description: [config?.namespace, config?.source].filter(Boolean).join(' · '),
+									raw: config as JsonObject
+								}) satisfies ArrayOfObjectItemType
 						)
 					} satisfies ArrayOfObjectMetadata
 				}),
-			accessorKey: 'Templates'
+			accessorKey: 'Configurations'
 		},
 		{
 			id: 'Mode',
@@ -248,7 +263,48 @@ function getLLMInferenceServiceColumnDefinitions(
 				}),
 			accessorKey: 'Mode'
 		},
-
+		{
+			id: 'Engines',
+			header: ({ column }: { column: Column<Record<LLMInferenceServiceAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<LLMInferenceServiceAttribute, JsonValue>>;
+				row: Row<Record<LLMInferenceServiceAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Engines'
+		},
+		{
+			id: 'Schedulers',
+			header: ({ column }: { column: Column<Record<LLMInferenceServiceAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<LLMInferenceServiceAttribute, JsonValue>>;
+				row: Row<Record<LLMInferenceServiceAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Schedulers'
+		},
 		{
 			id: 'Status',
 			header: ({ column }: { column: Column<Record<LLMInferenceServiceAttribute, JsonValue>> }) =>
