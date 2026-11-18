@@ -30,7 +30,7 @@ export default defineConfig(
 	prettier,
 	...svelte.configs.prettier,
 	{
-		ignores: ['src/lib/components/ui/**/*', 'src/lib/api/**/*', 'static/vnc/**/*']
+		ignores: ['src/lib/components/ui/**/*', 'src/lib/components/shadcnio/**/*', 'src/lib/api/**/*', 'static/vnc/**/*']
 	},
 	{
 		languageOptions: {
