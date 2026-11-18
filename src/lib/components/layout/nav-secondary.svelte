@@ -1,49 +1,48 @@
 <script lang="ts">
 	import LifeBuoyIcon from '@lucide/svelte/icons/life-buoy';
 	import PackageIcon from '@lucide/svelte/icons/package';
-	import type { ComponentProps } from 'svelte';
 
-	import * as Sidebar from '$lib/components/ui/sidebar';
+	import {
+		SidebarGroup,
+		SidebarGroupContent,
+		SidebarMenu,
+		SidebarMenuButton,
+		SidebarMenuItem
+	} from '$lib/components/shadcnio/sidebar';
 	import { m } from '$lib/messages';
 
 	import DialogAbout from './dialog-about.svelte';
 
-	type Props = ComponentProps<typeof Sidebar.Group> & { harborUrl?: string };
-
-	let { ref = $bindable(null), harborUrl, ...restProps }: Props = $props();
+	let { harborUrl, class: className }: { harborUrl?: string; class?: string } = $props();
 
 	let open = $state(false);
 </script>
 
 <DialogAbout bind:open />
 
-<Sidebar.Group bind:ref {...restProps}>
-	<Sidebar.GroupContent>
-		<Sidebar.Menu>
-			<Sidebar.MenuItem>
-				<Sidebar.MenuButton size="sm" tooltipContent={m.support()}>
-					{#snippet child({ props })}
-						<button type="button" {...props} onclick={() => (open = true)}>
-							<LifeBuoyIcon />
-							<span>{m.support()}</span>
-						</button>
-					{/snippet}
-				</Sidebar.MenuButton>
-			</Sidebar.MenuItem>
+<SidebarGroup class={className}>
+	<SidebarGroupContent>
+		<SidebarMenu>
+			<SidebarMenuItem>
+				<SidebarMenuButton size="sm" tooltip={m.support()} onclick={() => (open = true)}>
+					<LifeBuoyIcon />
+					<span>{m.support()}</span>
+				</SidebarMenuButton>
+			</SidebarMenuItem>
 			{#if harborUrl}
-				<Sidebar.MenuItem>
-					<Sidebar.MenuButton size="sm" tooltipContent={m.registry()}>
-						{#snippet child({ props })}
+				<SidebarMenuItem>
+					<SidebarMenuButton size="sm" tooltip={m.registry()}>
+						{#snippet asChild(props)}
 							<!-- eslint-disable svelte/no-navigation-without-resolve -->
-							<a href={harborUrl} target="_blank" rel="noopener noreferrer" {...props}>
+							<a href={harborUrl} target="_blank" rel="noopener noreferrer" {...props()}>
 								<PackageIcon />
 								<span>{m.registry()}</span>
 							</a>
 							<!-- eslint-enable svelte/no-navigation-without-resolve -->
 						{/snippet}
-					</Sidebar.MenuButton>
-				</Sidebar.MenuItem>
+					</SidebarMenuButton>
+				</SidebarMenuItem>
 			{/if}
-		</Sidebar.Menu>
-	</Sidebar.GroupContent>
-</Sidebar.Group>
+		</SidebarMenu>
+	</SidebarGroupContent>
+</SidebarGroup>

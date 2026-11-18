@@ -1,13 +1,28 @@
 <script lang="ts">
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
-	import LayersIcon from '@lucide/svelte/icons/layers';
-	import SquareTerminalIcon from '@lucide/svelte/icons/square-terminal';
 	import type { Component } from 'svelte';
 
 	import { page } from '$app/state';
-	import * as Collapsible from '$lib/components/ui/collapsible';
-	import * as Sidebar from '$lib/components/ui/sidebar';
-	import * as Tabs from '$lib/components/ui/tabs';
+	import {
+		Collapsible,
+		CollapsibleContent,
+		CollapsibleTrigger
+	} from '$lib/components/shadcnio/collapsible';
+	import {
+		SegmentGroup,
+		SegmentGroupItem,
+		SegmentGroupItemText
+	} from '$lib/components/shadcnio/segment-group';
+	import {
+		SidebarGroup,
+		SidebarMenu,
+		SidebarMenuButton,
+		SidebarMenuItem,
+		SidebarMenuSub,
+		SidebarMenuSubButton,
+		SidebarMenuSubItem,
+		useSidebar
+	} from '$lib/components/shadcnio/sidebar';
 
 	type NavItem = {
 		title: string;
@@ -32,6 +47,8 @@
 		kubernetesLabel: string;
 		kubernetesItems: NavItem[];
 	} = $props();
+
+	const sidebar = useSidebar();
 
 	const currentUrl = $derived(page.url.pathname + page.url.search);
 
@@ -61,80 +78,89 @@
 	});
 
 	const views = $derived([
-		{ label: platformLabel, icon: LayersIcon, items: platformItems },
-		{ label: kubernetesLabel, icon: SquareTerminalIcon, items: kubernetesItems }
+		{ label: platformLabel, items: platformItems },
+		{ label: kubernetesLabel, items: kubernetesItems }
 	]);
 	const currentView = $derived(views[activeIndex]);
+
+	// Collapsed to icons there is no room for a sub-menu: open the sidebar instead.
+	function expandIfCollapsed() {
+		if (sidebar.state === 'collapsed' && !sidebar.isMobile) sidebar.setOpen(true);
+	}
 </script>
 
-<Sidebar.Group>
-	<Tabs.Root
+<SidebarGroup class="pb-0 group-data-[collapsible=icon]:hidden">
+	<SegmentGroup
+		aria-label={`${platformLabel} / ${kubernetesLabel}`}
 		value={String(activeIndex)}
-		onValueChange={(value) => (activeIndex = Number(value))}
-		class="group-data-[collapsible=icon]:hidden"
+		onValueChange={(details) => (activeIndex = Number(details.value))}
+		class="w-full gap-0 rounded-lg bg-sidebar-foreground/6 p-0.5 *:data-[slot=segment-group-indicator]:rounded-md *:data-[slot=segment-group-indicator]:bg-background *:data-[slot=segment-group-indicator]:shadow-xs dark:*:data-[slot=segment-group-indicator]:bg-sidebar-foreground/15"
 	>
-		<Tabs.List class="w-full">
-			{#each views as view, index (index)}
-				<Tabs.Trigger value={String(index)}>
-					{view.label}
-				</Tabs.Trigger>
-			{/each}
-		</Tabs.List>
-	</Tabs.Root>
-</Sidebar.Group>
+		{#each views as view, index (index)}
+			<SegmentGroupItem
+				value={String(index)}
+				class="flex h-7 flex-1 items-center justify-center rounded-md text-xs font-medium text-sidebar-foreground/70 data-checked:text-sidebar-foreground"
+			>
+				<SegmentGroupItemText class="relative z-1">{view.label}</SegmentGroupItemText>
+			</SegmentGroupItem>
+		{/each}
+	</SegmentGroup>
+</SidebarGroup>
 
-<Sidebar.Group>
-	<Sidebar.Menu>
+<SidebarGroup>
+	<SidebarMenu>
 		{#each currentView.items as item (item.title)}
 			{#if item.items && item.items.length > 0}
-				<Collapsible.Root
-					open={item.isActive || item.items.some((subItem) => matchesUrl(subItem.url))}
-					class="group/collapsible"
-				>
-					{#snippet child({ props })}
-						<Sidebar.MenuItem {...props}>
-							<Collapsible.Trigger>
-								{#snippet child({ props })}
-									<Sidebar.MenuButton {...props} tooltipContent={item.title}>
-										{#if item.icon}
-											<item.icon />
-										{/if}
-										<span>{item.title}</span>
-										<ChevronRightIcon
-											class="ms-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
-										/>
-									</Sidebar.MenuButton>
-								{/snippet}
-							</Collapsible.Trigger>
-							<Collapsible.Content>
-								<Sidebar.MenuSub>
-									{#each item.items as subItem (subItem.title)}
-										<Sidebar.MenuSubItem>
-											<Sidebar.MenuSubButton
-												isActive={matchesUrl(subItem.url)}
-												aria-disabled={subItem.disabled}
-											>
-												{#snippet child({ props })}
-													<!-- eslint-disable svelte/no-navigation-without-resolve -->
-													<a href={subItem.disabled ? undefined : subItem.url} {...props}>
-														<span>{subItem.title}</span>
-													</a>
-													<!-- eslint-enable svelte/no-navigation-without-resolve -->
-												{/snippet}
-											</Sidebar.MenuSubButton>
-										</Sidebar.MenuSubItem>
-									{/each}
-								</Sidebar.MenuSub>
-							</Collapsible.Content>
-						</Sidebar.MenuItem>
-					{/snippet}
-				</Collapsible.Root>
+				{@const containsCurrent = item.items.some((subItem) => matchesUrl(subItem.url))}
+				<SidebarMenuItem>
+					<Collapsible defaultOpen={item.isActive || containsCurrent} class="group/collapsible">
+						<CollapsibleTrigger>
+							{#snippet asChild(props)}
+								<SidebarMenuButton
+									{...props({ onclick: expandIfCollapsed })}
+									tooltip={item.title}
+									isActive={containsCurrent && sidebar.state === 'collapsed'}
+								>
+									{#if item.icon}
+										<item.icon />
+									{/if}
+									<span>{item.title}</span>
+									<ChevronRightIcon
+										class="ms-auto size-3.5! transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
+									/>
+								</SidebarMenuButton>
+							{/snippet}
+						</CollapsibleTrigger>
+						<CollapsibleContent class="group-data-[collapsible=icon]:hidden">
+							<SidebarMenuSub>
+								{#each item.items as subItem (subItem.title)}
+									<SidebarMenuSubItem>
+										<!-- eslint-disable svelte/no-navigation-without-resolve -->
+										<SidebarMenuSubButton
+											href={subItem.disabled ? undefined : subItem.url}
+											isActive={matchesUrl(subItem.url)}
+											aria-current={matchesUrl(subItem.url) ? 'page' : undefined}
+											aria-disabled={subItem.disabled}
+										>
+											<span>{subItem.title}</span>
+										</SidebarMenuSubButton>
+										<!-- eslint-enable svelte/no-navigation-without-resolve -->
+									</SidebarMenuSubItem>
+								{/each}
+							</SidebarMenuSub>
+						</CollapsibleContent>
+					</Collapsible>
+				</SidebarMenuItem>
 			{:else}
-				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={matchesUrl(item.url)} tooltipContent={item.title}>
-						{#snippet child({ props })}
+				<SidebarMenuItem>
+					<SidebarMenuButton isActive={matchesUrl(item.url)} tooltip={item.title}>
+						{#snippet asChild(props)}
 							<!-- eslint-disable svelte/no-navigation-without-resolve -->
-							<a href={item.url} {...props}>
+							<a
+								href={item.url}
+								aria-current={matchesUrl(item.url) ? 'page' : undefined}
+								{...props()}
+							>
 								{#if item.icon}
 									<item.icon />
 								{/if}
@@ -142,9 +168,9 @@
 							</a>
 							<!-- eslint-enable svelte/no-navigation-without-resolve -->
 						{/snippet}
-					</Sidebar.MenuButton>
-				</Sidebar.MenuItem>
+					</SidebarMenuButton>
+				</SidebarMenuItem>
 			{/if}
 		{/each}
-	</Sidebar.Menu>
-</Sidebar.Group>
+	</SidebarMenu>
+</SidebarGroup>

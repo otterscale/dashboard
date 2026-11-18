@@ -801,5 +801,8 @@
 	"license_adjust_nodes_last_accepted": "上次接受：",
 	"alerting": "告警",
 	"alerting_description": "透過 SMTP 郵件伺服器寄送平台告警。",
-	"containers_without_limit": "{containers} 個容器中有 {uncapped} 個未宣告 Limit"
+	"containers_without_limit": "{containers} 個容器中有 {uncapped} 個未宣告 Limit",
+	"workspace_settings": "工作區設定",
+	"start_guide_tour": "開始導覽",
+	"switch_cluster_action": "切換叢集"
 }

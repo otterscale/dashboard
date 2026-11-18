@@ -801,5 +801,8 @@
 	"license_adjust_nodes_last_accepted": "Last accepted: ",
 	"alerting": "Alerting",
 	"alerting_description": "Email platform alerts through an SMTP server.",
-	"containers_without_limit": "{uncapped} of {containers} containers declare no limit"
+	"containers_without_limit": "{uncapped} of {containers} containers declare no limit",
+	"workspace_settings": "Workspace settings",
+	"start_guide_tour": "Start guide tour",
+	"switch_cluster_action": "Switch cluster"
 }
