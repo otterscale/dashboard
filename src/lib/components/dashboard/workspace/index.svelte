@@ -1,5 +1,4 @@
 <script lang="ts">
-	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
@@ -11,8 +10,9 @@
 	} from '$lib/components/custom/datetime-picker';
 	import { Reloader } from '$lib/components/custom/reloader';
 	import { WidgetGrid } from '$lib/components/custom/widget-grid';
-	import * as Item from '$lib/components/ui/item';
-	import * as Tabs from '$lib/components/ui/tabs';
+	import PageHeader from '$lib/components/dashboard/shared/page-header.svelte';
+	import { Spinner } from '$lib/components/shadcnio/spinner';
+	import { Tabs, TabsContent, TabsList, TabsTrigger } from '$lib/components/shadcnio/tabs';
 	import { m } from '$lib/messages';
 	import { dashboardBody, sharedMetrics, workspacePrometheusDriver } from '$lib/prometheus';
 
@@ -66,48 +66,32 @@
 	});
 </script>
 
-<div class="space-y-4">
-	<div class="flex items-end justify-between gap-4">
-		<Item.Root class="p-0">
-			<Item.Content class="text-left">
-				<Item.Title class="text-xl font-bold">
-					{m.workspace_dashboard_title()}
-				</Item.Title>
-				<Item.Description class="text-base">
-					{m.workspace_dashboard_description()}
-				</Item.Description>
-			</Item.Content>
-		</Item.Root>
-	</div>
+<div class="flex flex-col gap-5">
+	<PageHeader
+		title={m.workspace_dashboard_title()}
+		description={m.workspace_dashboard_description()}
+	>
+		{#snippet actions()}
+			{#if prometheusDriver}
+				<DatetimePicker bind:from={pickerFrom} bind:to={pickerTo} bind:toIsNow={pickerToIsNow} />
+				<Reloader bind:checked={isReloading} />
+			{/if}
+		{/snippet}
+	</PageHeader>
 	{#if prometheusDriver}
-		<div class="mx-auto grid w-full gap-6">
-			<Tabs.Root value="overview">
-				<div class="flex justify-between gap-2">
-					<Tabs.List>
-						<Tabs.Trigger value="overview">{m.overview()}</Tabs.Trigger>
-						<Tabs.Trigger value="analytics" disabled>{m.analytics()}</Tabs.Trigger>
-					</Tabs.List>
-					<div class="flex flex-wrap items-center justify-end gap-2">
-						<DatetimePicker
-							bind:from={pickerFrom}
-							bind:to={pickerTo}
-							bind:toIsNow={pickerToIsNow}
-						/>
-						<Reloader bind:checked={isReloading} />
-					</div>
-				</div>
-				<Tabs.Content
-					value="overview"
-					class="grid auto-rows-auto grid-cols-2 gap-4 pt-4 md:gap-6 lg:grid-cols-12"
-				>
-					<WidgetGrid {cluster} {widgets} {prometheusDriver} bind:isReloading />
-				</Tabs.Content>
-				<Tabs.Content value="analytics"></Tabs.Content>
-			</Tabs.Root>
-		</div>
+		<Tabs defaultValue="overview" class="gap-5">
+			<TabsList variant="line" class="w-full justify-start rounded-none border-b px-0">
+				<TabsTrigger value="overview" class="flex-none px-3">{m.overview()}</TabsTrigger>
+				<TabsTrigger value="analytics" class="flex-none px-3" disabled>{m.analytics()}</TabsTrigger>
+			</TabsList>
+			<TabsContent value="overview" class="grid grid-cols-12 gap-4">
+				<WidgetGrid {cluster} {widgets} {prometheusDriver} bind:isReloading />
+			</TabsContent>
+			<TabsContent value="analytics"></TabsContent>
+		</Tabs>
 	{:else if body === 'loading'}
 		<div class="flex min-h-[400px] w-full items-center justify-center">
-			<LoaderCircle class="size-12 animate-spin text-muted-foreground" />
+			<Spinner class="size-8 text-muted-foreground" />
 		</div>
 	{:else if body === 'no-namespace'}
 		<div class="flex min-h-[400px] w-full items-center justify-center text-muted-foreground">

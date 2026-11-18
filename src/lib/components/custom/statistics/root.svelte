@@ -15,7 +15,7 @@
 	data-slot="data-table-statistics-root"
 	data-type={type}
 	class={cn(
-		'relative flex flex-col gap-3 overflow-hidden rounded-xl border bg-card p-6 shadow-sm',
+		'relative flex flex-col gap-3 overflow-hidden rounded-xl bg-card p-4 ring-1 ring-foreground/10',
 		className
 	)}
 	{...restProps}

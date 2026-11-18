@@ -1,12 +1,10 @@
 <script lang="ts">
-	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
 	import ClockIcon from '@lucide/svelte/icons/clock';
-	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Card from '$lib/components/ui/card';
+	import StatTile from '$lib/components/dashboard/shared/stat-tile.svelte';
 	import { m } from '$lib/messages';
 	import { fetchCombinedInstant } from '$lib/prometheus';
 
@@ -65,28 +63,11 @@
 	}
 </script>
 
-<Card.Root class="relative h-full min-h-[140px] gap-2 overflow-hidden">
-	<ClockIcon
-		class="absolute -right-10 bottom-0 size-36 text-8xl tracking-tight text-nowrap text-primary/5 uppercase group-hover:hidden"
-	/>
-	<Card.Header>
-		<Card.Title>{m.uptime()}</Card.Title>
-		<Card.Description class="flex h-6 items-center"
-			>{new Date(Number(create_time)).toLocaleDateString()}</Card.Description
-		>
-	</Card.Header>
-	{#if !isLoaded}
-		<div class="flex h-9 w-full items-center justify-center">
-			<Loader2Icon class="size-10 animate-spin" />
-		</div>
-	{:else if !uptime}
-		<div class="flex h-full w-full flex-col items-center justify-center">
-			<ChartColumnIcon class="size-6 animate-pulse text-muted-foreground" />
-			<p class="p-0 text-xs text-muted-foreground">{m.no_data_display()}</p>
-		</div>
-	{:else}
-		<Card.Content class="text-3xl font-bold">
-			{uptime?.value ? formatUptime(Number(uptime.value)) : 'N/A'}
-		</Card.Content>
-	{/if}
-</Card.Root>
+<StatTile
+	label={m.uptime()}
+	icon={ClockIcon}
+	loading={!isLoaded}
+	value={!uptime ? null : uptime.value ? formatUptime(Number(uptime.value)) : 'N/A'}
+	tone={uptime ? 'primary' : 'muted'}
+	hint={!uptime ? m.no_data_display() : new Date(Number(create_time)).toLocaleDateString()}
+/>

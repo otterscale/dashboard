@@ -13,31 +13,31 @@ import Pods from './pods.svelte';
 import Uptime from './uptime.svelte';
 
 export const widgets = [
-	{ key: 'health', class: 'col-span-1 row-span-1', component: Health },
-	{ key: 'uptime', class: 'col-span-1 row-span-1', component: Uptime },
+	{ key: 'health', class: 'col-span-6 xl:col-span-3', component: Health },
+	{ key: 'uptime', class: 'col-span-6 xl:col-span-3', component: Uptime },
 	{
 		key: 'information',
-		class: 'col-span-1 row-span-1',
+		class: 'col-span-6 xl:col-span-3',
 		component: Information
 	},
 	{
 		key: 'consumption',
-		class: 'col-span-1 row-span-1',
+		class: 'col-span-6 xl:col-span-3',
 		component: Consumption
 	},
-	{ key: 'nodes', class: 'col-span-1 row-span-1', component: Nodes },
+	{ key: 'nodes', class: 'col-span-6 xl:col-span-3', component: Nodes },
 	{
 		key: 'deployments',
-		class: 'col-span-1 row-span-1',
+		class: 'col-span-6 xl:col-span-3',
 		component: Deployments
 	},
-	{ key: 'pods', class: 'col-span-2 row-span-1', component: Pods },
-	{ key: 'cpu', class: 'col-span-1 row-span-2', component: CpuUsage },
-	{ key: 'memory', class: 'col-span-1 row-span-2', component: MemoryUsage },
-	{ key: 'gpu', class: 'col-span-1 row-span-2', component: Gpu },
+	{ key: 'pods', class: 'col-span-12 xl:col-span-6', component: Pods },
+	{ key: 'cpu', class: 'col-span-12 sm:col-span-6 xl:col-span-3', component: CpuUsage },
+	{ key: 'memory', class: 'col-span-12 sm:col-span-6 xl:col-span-3', component: MemoryUsage },
+	{ key: 'gpu', class: 'col-span-12 sm:col-span-6 xl:col-span-3', component: Gpu },
 	{
 		key: 'ai100-disk',
-		class: 'col-span-1 row-span-2',
+		class: 'col-span-12 sm:col-span-6 xl:col-span-3',
 		component: Ai100Disk
 	}
 ] satisfies WidgetDefinition[];

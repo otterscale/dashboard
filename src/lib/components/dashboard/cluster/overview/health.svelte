@@ -1,12 +1,10 @@
 <script lang="ts">
-	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
 	import HeartPulseIcon from '@lucide/svelte/icons/heart-pulse';
-	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Card from '$lib/components/ui/card';
+	import StatTile from '$lib/components/dashboard/shared/stat-tile.svelte';
 	import { m } from '$lib/messages';
 
 	let {
@@ -48,34 +46,21 @@
 	onDestroy(() => {
 		reloadManager.stop();
 	});
+
+	// Assigned only inside fetch(), which the type checker does not follow: without the
+	// annotation it narrows the state to `undefined` here.
+	const unreadyNodes = $derived(Number((nodeNotReady as SampleValue | undefined)?.value ?? 0));
 </script>
 
-<Card.Root class="relative h-full min-h-[140px] gap-2 overflow-hidden">
-	<HeartPulseIcon
-		class="absolute -right-10 bottom-0 size-36 text-8xl tracking-tight text-nowrap text-primary/5 uppercase group-hover:hidden"
-	/>
-	<Card.Header>
-		<Card.Title>{m.state()}</Card.Title>
-		{#if nodeNotReady && Number(nodeNotReady.value) === 0}
-			<Card.Description class="flex h-6 items-center">All Nodes Ready</Card.Description>
-		{:else if nodeNotReady && Number(nodeNotReady.value) !== 0}
-			<Card.Description class="flex h-6 items-center">
-				{nodeNotReady?.value ? Number(nodeNotReady.value) : 'Some'} nodes unready
-			</Card.Description>
-		{/if}
-	</Card.Header>
-	{#if !isLoaded}
-		<div class="flex h-9 w-full items-center justify-center">
-			<Loader2Icon class="size-10 animate-spin" />
-		</div>
-	{:else if nodeNotReady === undefined}
-		<div class="flex h-full w-full flex-col items-center justify-center">
-			<ChartColumnIcon class="size-6 animate-pulse text-muted-foreground" />
-			<p class="p-0 text-xs text-muted-foreground">{m.no_data_display()}</p>
-		</div>
-	{:else if Number(nodeNotReady.value) === 0}
-		<Card.Content class="text-3xl font-bold text-chart-2">Healthy</Card.Content>
-	{:else}
-		<Card.Content class="text-3xl font-bold text-chart-1">Unhealthy</Card.Content>
-	{/if}
-</Card.Root>
+<StatTile
+	label={m.state()}
+	icon={HeartPulseIcon}
+	loading={!isLoaded}
+	value={nodeNotReady === undefined ? null : unreadyNodes === 0 ? 'Healthy' : 'Unhealthy'}
+	tone={nodeNotReady === undefined ? 'muted' : unreadyNodes === 0 ? 'success' : 'destructive'}
+	hint={nodeNotReady === undefined
+		? m.no_data_display()
+		: unreadyNodes === 0
+			? 'All Nodes Ready'
+			: `${unreadyNodes || 'Some'} nodes unready`}
+/>

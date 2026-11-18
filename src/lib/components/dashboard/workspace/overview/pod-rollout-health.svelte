@@ -1,15 +1,17 @@
 <script lang="ts">
-	import BriefcaseMedical from '@lucide/svelte/icons/briefcase-medical';
-	import ChartBar from '@lucide/svelte/icons/chart-bar';
+	import CheckCheck from '@lucide/svelte/icons/check-check';
+	import CircleAlert from '@lucide/svelte/icons/circle-alert';
+	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
-	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import OctagonAlert from '@lucide/svelte/icons/octagon-alert';
 	import Rocket from '@lucide/svelte/icons/rocket';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
-	import { onDestroy, onMount } from 'svelte';
+	import { type Component, onDestroy, onMount, type Snippet } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Card from '$lib/components/ui/card';
+	import StatTile from '$lib/components/dashboard/shared/stat-tile.svelte';
+	import { problemTone, type Tone, toneText } from '$lib/components/dashboard/shared/tone';
+	import WidgetCard from '$lib/components/dashboard/shared/widget-card.svelte';
 	import { m } from '$lib/messages';
 	import { escapePromqlStringLiteral } from '$lib/prometheus';
 	import { cn } from '$lib/utils';
@@ -143,185 +145,127 @@
 		});
 	}
 
-	type Kpi = { label: string; value: number; tone: 'default' | 'success' | 'warn' | 'danger' };
-	const kpis = $derived.by((): Kpi[] => {
-		if (!snap) return [];
-		return [
-			{ label: m.workspace_pods_running(), value: snap.running, tone: 'success' },
-			{
-				label: m.workspace_pods_not_ready(),
-				value: snap.notReady,
-				tone: snap.notReady > 0 ? 'warn' : 'default'
-			},
-			{
-				label: m.workspace_pod_rollout_kpi_issues(),
-				value: containerIssueTotal,
-				tone: containerIssueTotal > 0 ? 'danger' : 'default'
-			},
-			{ label: m.workspace_pods_succeeded(), value: snap.succeeded, tone: 'default' }
-		];
-	});
+	/** A rollout with nothing desired is not a problem; one short of its replicas is. */
+	function rolloutTone(ready: number, desired: number): Tone {
+		if (desired === 0) return 'muted';
+		return ready >= desired ? 'default' : 'warning';
+	}
 
-	const toneClass: Record<Kpi['tone'], string> = {
-		default: 'text-foreground',
-		success: 'text-emerald-600 dark:text-emerald-400',
-		warn: 'text-amber-600 dark:text-amber-400',
-		danger: 'text-destructive'
+	type Kpi = {
+		label: string;
+		value: number | null;
+		tone: Tone;
+		icon: Component<{ class?: string }>;
 	};
+	// Always four tiles, so the row keeps its shape while loading and when there is no data.
+	const kpis = $derived.by((): Kpi[] => [
+		{
+			label: m.workspace_pods_running(),
+			value: snap?.running ?? null,
+			tone: snap ? 'success' : 'muted',
+			icon: CircleCheck
+		},
+		{
+			label: m.workspace_pods_not_ready(),
+			value: snap?.notReady ?? null,
+			tone: problemTone(snap?.notReady ?? 0, 'warning'),
+			icon: CircleAlert
+		},
+		{
+			label: m.workspace_pod_rollout_kpi_issues(),
+			value: snap ? containerIssueTotal : null,
+			tone: problemTone(containerIssueTotal),
+			icon: OctagonAlert
+		},
+		{
+			label: m.workspace_pods_succeeded(),
+			value: snap?.succeeded ?? null,
+			tone: 'default',
+			icon: CheckCheck
+		}
+	]);
 </script>
 
-<Card.Root
-	class="group relative overflow-hidden border-border/80 bg-card/50 shadow-sm ring-1 ring-border/40"
->
-	<BriefcaseMedical
-		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"
-		aria-hidden="true"
-	/>
-	<Card.Header class="relative space-y-2 pb-2">
-		<Card.Title class="text-lg font-semibold tracking-tight md:text-xl">
-			{m.workspace_pod_rollout_health_title()}
-		</Card.Title>
-		<Card.Description class="max-w-3xl text-sm leading-relaxed text-muted-foreground">
-			{m.workspace_pod_rollout_health_description()}
-		</Card.Description>
-	</Card.Header>
-	{#if !namespace}
-		<Card.Content class="text-sm text-muted-foreground"
-			>{m.workspace_namespace_unresolved()}</Card.Content
-		>
-	{:else if !isLoaded}
-		<div class="flex min-h-[200px] w-full items-center justify-center py-10">
-			<LoaderCircle class="size-10 animate-spin text-muted-foreground" />
-		</div>
-	{:else if !snap}
-		<div class="flex flex-col items-center justify-center gap-2 py-12">
-			<ChartBar class="size-8 text-muted-foreground/80" />
-			<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
-		</div>
-	{:else}
-		<Card.Content class="relative space-y-6 px-4 pt-0 pb-6 sm:px-6">
-			<!-- Quick scan: headline metrics -->
-			<div class="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-				{#each kpis as k (k.label)}
-					<div
-						class="flex flex-col gap-1 rounded-xl border border-border/60 bg-muted/25 px-3 py-3 shadow-sm backdrop-blur-sm transition-colors hover:bg-muted/35"
-					>
-						<span class="text-[11px] font-medium tracking-wider text-muted-foreground uppercase"
-							>{k.label}</span
-						>
-						<span class={cn('text-2xl font-semibold tabular-nums sm:text-3xl', toneClass[k.tone])}
-							>{k.value}</span
-						>
-					</div>
-				{/each}
-			</div>
+{#snippet row(label: string, value: string | number, tone: Tone = 'default')}
+	<div class="flex items-center justify-between gap-3 py-2">
+		<dt class="min-w-0 truncate text-muted-foreground">{label}</dt>
+		<dd class={cn('shrink-0 font-medium tabular-nums', toneText[tone])}>{value}</dd>
+	</div>
+{/snippet}
 
-			<!-- Detail panels -->
-			<div class="grid gap-4 lg:grid-cols-3 lg:gap-5">
-				<section
-					class="flex min-w-0 flex-col rounded-2xl border border-border/70 bg-background/80 p-4 shadow-sm ring-1 ring-border/30"
-				>
-					<div class="mb-3 flex items-center gap-2.5">
-						<span
-							class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-chart-2/15 text-chart-2"
-						>
-							<LayoutGrid class="size-5" />
-						</span>
-						<h3 class="text-sm leading-none font-semibold">{m.workspace_health_section_pods()}</h3>
-					</div>
-					<ul class="divide-y divide-border/50 text-sm">
-						<li class="flex items-center justify-between gap-3 py-2.5 first:pt-0">
-							<span class="min-w-0 text-muted-foreground">{m.workspace_pods_running()}</span>
-							<span class="shrink-0 font-medium text-chart-2 tabular-nums">{snap.running}</span>
-						</li>
-						<li class="flex items-center justify-between gap-3 py-2.5">
-							<span class="min-w-0 text-muted-foreground">{m.workspace_pods_unknown()}</span>
-							<span class="shrink-0 font-medium tabular-nums">{snap.unknown}</span>
-						</li>
-						<li class="flex items-center justify-between gap-3 py-2.5">
-							<span class="min-w-0 text-muted-foreground">{m.workspace_pods_not_ready()}</span>
-							<span class="shrink-0 font-semibold text-amber-600 tabular-nums dark:text-amber-400"
-								>{snap.notReady}</span
-							>
-						</li>
-						<li class="flex items-center justify-between gap-3 py-2.5">
-							<span class="min-w-0 text-muted-foreground">{m.workspace_pods_succeeded()}</span>
-							<span class="shrink-0 font-medium tabular-nums">{snap.succeeded}</span>
-						</li>
-					</ul>
-				</section>
+{#snippet section(title: string, Icon: Component<{ class?: string }>, rows: Snippet)}
+	<section class="min-w-0 py-4 first:pt-0 last:pb-0 lg:px-5 lg:py-0 lg:first:ps-0 lg:last:pe-0">
+		<h3 class="mb-1 flex items-center gap-2 text-sm font-medium">
+			<Icon class="size-4 text-muted-foreground" />
+			{title}
+		</h3>
+		<dl class="divide-y text-sm">
+			{@render rows()}
+		</dl>
+	</section>
+{/snippet}
 
-				<section
-					class="flex min-w-0 flex-col rounded-2xl border border-border/70 bg-background/80 p-4 shadow-sm ring-1 ring-border/30"
-				>
-					<div class="mb-3 flex items-center gap-2.5">
-						<span
-							class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-destructive/15 text-destructive"
-						>
-							<OctagonAlert class="size-5" />
-						</span>
-						<h3 class="text-sm leading-none font-semibold">
-							{m.workspace_health_section_containers()}
-						</h3>
-					</div>
-					<ul class="divide-y divide-border/50 text-sm">
-						{#each [{ label: m.workspace_containers_crashloop(), value: snap.crashLoop }, { label: m.workspace_containers_image_pull(), value: snap.imagePull }, { label: m.workspace_containers_config_error(), value: snap.configError }, { label: m.workspace_containers_oom_killed(), value: snap.oomKilled }] as row (row.label)}
-							<li class="flex items-center justify-between gap-3 py-2.5 first:pt-0">
-								<span class="min-w-0 truncate text-muted-foreground">{row.label}</span>
-								<span class="shrink-0 font-semibold text-destructive tabular-nums">{row.value}</span
-								>
-							</li>
-						{/each}
-					</ul>
-				</section>
+<!-- Two grid items in the page's grid: the headline counts lead the page, the breakdown closes it. -->
+<div class="order-1 col-span-full grid grid-cols-2 gap-4 lg:grid-cols-4">
+	{#each kpis as kpi (kpi.label)}
+		<StatTile
+			label={kpi.label}
+			value={kpi.value}
+			tone={kpi.tone}
+			icon={kpi.icon}
+			loading={!!namespace && !isLoaded}
+		/>
+	{/each}
+</div>
 
-				<section
-					class="flex min-w-0 flex-col rounded-2xl border border-border/70 bg-background/80 p-4 shadow-sm ring-1 ring-border/30"
-				>
-					<div class="mb-3 flex items-center gap-2.5">
-						<span
-							class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary"
-						>
-							<Rocket class="size-5" />
-						</span>
-						<h3 class="text-sm leading-none font-semibold">
-							{m.workspace_health_section_rollouts()}
-						</h3>
-					</div>
-					<ul class="divide-y divide-border/50 text-sm">
-						<li class="flex items-center justify-between gap-3 py-2.5 first:pt-0">
-							<span class="min-w-0 text-muted-foreground">{m.deployment()}</span>
-							<span class="shrink-0 font-medium tabular-nums"
-								>{ratio(snap.deployReady, snap.deployDesired)}</span
-							>
-						</li>
-						<li class="flex items-center justify-between gap-3 py-2.5">
-							<span class="min-w-0 text-muted-foreground">{m.stateful_set()}</span>
-							<span class="shrink-0 font-medium tabular-nums"
-								>{ratio(snap.stsReady, snap.stsDesired)}</span
-							>
-						</li>
-						<li class="flex items-center justify-between gap-3 py-2.5">
-							<span class="min-w-0 text-muted-foreground">{m.daemon_set()}</span>
-							<span class="shrink-0 font-medium tabular-nums"
-								>{ratio(snap.dsReady, snap.dsDesired)}</span
-							>
-						</li>
-						<li class="flex items-center justify-between gap-3 py-2.5">
-							<span class="min-w-0 text-muted-foreground">{m.workspace_pvc_pending()}</span>
-							<span class="shrink-0 font-semibold text-amber-600 tabular-nums dark:text-amber-400"
-								>{snap.pvcPending}</span
-							>
-						</li>
-						<li class="flex items-center justify-between gap-3 py-2.5">
-							<span class="min-w-0 text-muted-foreground">{m.workspace_job_failed_pods()}</span>
-							<span class="shrink-0 font-semibold text-destructive tabular-nums"
-								>{snap.jobFailed}</span
-							>
-						</li>
-					</ul>
-				</section>
-			</div>
-		</Card.Content>
-	{/if}
-</Card.Root>
+<div class="order-5 col-span-full">
+	<WidgetCard
+		title={m.workspace_pod_rollout_health_title()}
+		description={m.workspace_pod_rollout_health_description()}
+		state={!namespace ? 'message' : !isLoaded ? 'loading' : !snap ? 'empty' : 'ready'}
+		message={m.workspace_namespace_unresolved()}
+		contentClass="grid divide-y lg:grid-cols-3 lg:divide-x lg:divide-y-0"
+	>
+		{#if snap}
+			{@const s = snap}
+			{#snippet pods()}
+				{@render row(m.workspace_pods_running(), s.running, 'success')}
+				{@render row(m.workspace_pods_unknown(), s.unknown, problemTone(s.unknown, 'warning'))}
+				{@render row(m.workspace_pods_not_ready(), s.notReady, problemTone(s.notReady, 'warning'))}
+				{@render row(m.workspace_pods_succeeded(), s.succeeded)}
+			{/snippet}
+			{#snippet containers()}
+				{@render row(m.workspace_containers_crashloop(), s.crashLoop, problemTone(s.crashLoop))}
+				{@render row(m.workspace_containers_image_pull(), s.imagePull, problemTone(s.imagePull))}
+				{@render row(
+					m.workspace_containers_config_error(),
+					s.configError,
+					problemTone(s.configError)
+				)}
+				{@render row(m.workspace_containers_oom_killed(), s.oomKilled, problemTone(s.oomKilled))}
+			{/snippet}
+			{#snippet rollouts()}
+				{@render row(
+					m.deployment(),
+					ratio(s.deployReady, s.deployDesired),
+					rolloutTone(s.deployReady, s.deployDesired)
+				)}
+				{@render row(
+					m.stateful_set(),
+					ratio(s.stsReady, s.stsDesired),
+					rolloutTone(s.stsReady, s.stsDesired)
+				)}
+				{@render row(
+					m.daemon_set(),
+					ratio(s.dsReady, s.dsDesired),
+					rolloutTone(s.dsReady, s.dsDesired)
+				)}
+				{@render row(m.workspace_pvc_pending(), s.pvcPending, problemTone(s.pvcPending, 'warning'))}
+				{@render row(m.workspace_job_failed_pods(), s.jobFailed, problemTone(s.jobFailed))}
+			{/snippet}
+			{@render section(m.workspace_health_section_pods(), LayoutGrid, pods)}
+			{@render section(m.workspace_health_section_containers(), OctagonAlert, containers)}
+			{@render section(m.workspace_health_section_rollouts(), Rocket, rollouts)}
+		{/if}
+	</WidgetCard>
+</div>

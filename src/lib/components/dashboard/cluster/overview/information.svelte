@@ -1,12 +1,10 @@
 <script lang="ts">
-	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
 	import InfoIcon from '@lucide/svelte/icons/info';
-	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Card from '$lib/components/ui/card';
+	import StatTile from '$lib/components/dashboard/shared/stat-tile.svelte';
 	import { m } from '$lib/messages';
 
 	let {
@@ -50,26 +48,11 @@
 	});
 </script>
 
-<Card.Root class="relative h-full min-h-[140px] gap-2 overflow-hidden">
-	<InfoIcon
-		class="absolute -right-10 bottom-0 size-36 text-8xl tracking-tight text-nowrap text-primary/5 uppercase group-hover:hidden"
-	/>
-	<Card.Header>
-		<Card.Title>{m.information()}</Card.Title>
-		<Card.Description class="text-md flex h-6 items-center">{platform ?? 'N/A'}</Card.Description>
-	</Card.Header>
-	{#if !isLoaded}
-		<div class="flex h-9 w-full items-center justify-center">
-			<Loader2Icon class="size-10 animate-spin" />
-		</div>
-	{:else if !version}
-		<div class="flex h-full w-full flex-col items-center justify-center">
-			<ChartColumnIcon class="size-6 animate-pulse text-muted-foreground" />
-			<p class="p-0 text-xs text-muted-foreground">{m.no_data_display()}</p>
-		</div>
-	{:else}
-		<Card.Content>
-			<p class="text-3xl">{version ?? 'N/A'}</p>
-		</Card.Content>
-	{/if}
-</Card.Root>
+<StatTile
+	label={m.information()}
+	icon={InfoIcon}
+	loading={!isLoaded}
+	value={version ?? null}
+	tone={version ? 'primary' : 'muted'}
+	hint={!version ? m.no_data_display() : (platform ?? 'N/A')}
+/>

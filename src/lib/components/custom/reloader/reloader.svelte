@@ -1,22 +1,25 @@
-<script lang="ts" module>
-	import { Switch as SwitchPrimitive } from 'bits-ui';
-
-	import { Switch } from '$lib/components/ui/switch/index.js';
+<script lang="ts">
+	import { Switch } from '$lib/components/shadcnio/switch';
 	import { m } from '$lib/messages';
 	import { cn } from '$lib/utils';
-	import { type WithoutChildrenOrChild } from '$lib/utils.js';
-</script>
 
-<script lang="ts">
 	let {
-		ref = $bindable(null),
 		checked = $bindable(),
-		class: className,
-		...restProps
-	}: WithoutChildrenOrChild<SwitchPrimitive.RootProps> = $props();
+		disabled,
+		class: className
+	}: {
+		checked?: boolean;
+		disabled?: boolean;
+		class?: string;
+	} = $props();
 </script>
 
-<div class={cn('flex items-center justify-start gap-1', className)}>
-	<Switch bind:ref bind:checked {...restProps} />
-	<span class="text-sm font-medium capitalize">{m.auto_update()}</span>
+<div class={cn('flex items-center gap-2', className)}>
+	<Switch
+		aria-label={m.auto_update()}
+		{checked}
+		{disabled}
+		onCheckedChange={(details) => (checked = details.checked)}
+	/>
+	<span class="text-sm font-medium whitespace-nowrap">{m.auto_update()}</span>
 </div>

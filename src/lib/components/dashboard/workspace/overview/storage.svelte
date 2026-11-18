@@ -1,16 +1,13 @@
 <script lang="ts">
-	import CheckCircle from '@lucide/svelte/icons/check-circle';
-	import Clock from '@lucide/svelte/icons/clock';
-	import Database from '@lucide/svelte/icons/database';
-	import HardDrive from '@lucide/svelte/icons/hard-drive';
-	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Card from '$lib/components/ui/card';
-	import { Progress } from '$lib/components/ui/progress';
+	import Meter from '$lib/components/dashboard/shared/meter.svelte';
+	import { problemTone, toneFill, usageTone } from '$lib/components/dashboard/shared/tone';
+	import WidgetCard from '$lib/components/dashboard/shared/widget-card.svelte';
+	import { Status } from '$lib/components/shadcnio/status';
 	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/messages';
 	import { escapePromqlStringLiteral, type SharedMetrics } from '$lib/prometheus';
@@ -120,153 +117,101 @@
 	const bound = $derived(scalar(boundCount) ?? 0);
 	const pending = $derived(scalar(pendingCount) ?? 0);
 
+	const usedPercent = $derived.by(() => {
+		const requested = scalar(requestedBytes) ?? 0;
+		return requested > 0
+			? Math.min(100, Math.round((100 * (scalar(usedBytes) ?? 0)) / requested))
+			: 0;
+	});
 	const boundPercent = $derived(total > 0 ? Math.min(100, Math.round((100 * bound) / total)) : 0);
 </script>
 
-<!-- Shell matches Workload health; content keeps KPI + mount status blocks. -->
-<Card.Root class="group relative h-full min-h-[280px] gap-2 overflow-hidden">
-	<HardDrive
-		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"
-		aria-hidden="true"
-	/>
-	<Card.Header>
-		<Card.Title>{m.workspace_storage_title()}</Card.Title>
-		<Card.Description class="text-md flex min-h-6 items-center">
-			{m.workspace_storage_description()}
-		</Card.Description>
-	</Card.Header>
-	{#if !namespace}
-		<Card.Content class="text-sm text-muted-foreground"
-			>{m.workspace_namespace_unresolved()}</Card.Content
-		>
-	{:else if !isLoaded}
-		<div class="flex h-9 w-full items-center justify-center">
-			<LoaderCircle class="size-10 animate-spin text-muted-foreground" />
+<WidgetCard
+	title={m.workspace_storage_title()}
+	description={m.workspace_storage_description()}
+	state={!namespace ? 'message' : !isLoaded ? 'loading' : 'ready'}
+	message={m.workspace_namespace_unresolved()}
+	contentClass="flex flex-col gap-4"
+>
+	<div class="grid grid-cols-2 gap-4">
+		<div class="min-w-0 space-y-0.5">
+			<p class="text-xs text-muted-foreground">{m.workspace_pvc_used()}</p>
+			<p class="text-2xl leading-8 font-semibold tracking-tight tabular-nums">
+				{used.value}
+				<span class="text-base font-medium text-muted-foreground">{used.unit}</span>
+			</p>
 		</div>
-	{:else}
-		<Card.Content class="relative space-y-4 px-4 pt-0 pb-5 sm:px-5">
-			<div
+		<div class="min-w-0 space-y-0.5">
+			<p class="text-xs text-muted-foreground">{m.workspace_pvc_provisioned()}</p>
+			<p
 				class={cn(
-					'space-y-2 rounded-xl border px-4 py-3.5 ring-1',
-					overProvisioned
-						? 'border-amber-500/30 bg-amber-500/5 ring-amber-500/20'
-						: 'border-border/70 bg-muted/20 ring-border/30'
+					'text-2xl leading-8 font-semibold tracking-tight tabular-nums',
+					overProvisioned && 'text-warning'
 				)}
 			>
-				<div class="flex items-start justify-between gap-3">
-					<div class="grid min-w-0 grow grid-cols-2 gap-3">
-						<div class="min-w-0 space-y-1">
-							<p class="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-								{m.workspace_pvc_provisioned()}
-							</p>
-							<p
-								class={cn(
-									'text-3xl font-semibold tracking-tight tabular-nums',
-									overProvisioned ? 'text-amber-700 dark:text-amber-400' : 'text-foreground'
-								)}
-							>
-								{provisioned.value}
-								<span class="text-lg font-medium text-muted-foreground">{provisioned.unit}</span>
-							</p>
-						</div>
-						<div class="min-w-0 space-y-1">
-							<p class="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-								{m.workspace_pvc_used()}
-							</p>
-							<p class="text-3xl font-semibold tracking-tight text-foreground tabular-nums">
-								{used.value}
-								<span class="text-lg font-medium text-muted-foreground">{used.unit}</span>
-							</p>
-							<p class="text-[11px] text-muted-foreground">{m.workspace_pvc_used_hint()}</p>
-						</div>
-					</div>
-					<span
-						class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-chart-3/15 text-chart-3"
-						aria-hidden="true"
-					>
-						<Database class="size-5" />
-					</span>
-				</div>
-				{#if overProvisioned}
-					<p class="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400">
-						<TriangleAlert class="size-3.5 shrink-0" aria-hidden="true" />
-						{m.workspace_pvc_exceeds_cluster({
-							capacity: `${clusterCapacity.value} ${clusterCapacity.unit}`
-						})}
-					</p>
-				{/if}
-			</div>
-
-			<div class="space-y-3">
-				<p class="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-					{m.workspace_pvc_volume_status()}
-				</p>
-
-				<div class="flex items-end justify-between gap-2">
-					<div>
-						<p class="text-2xl leading-none font-semibold tabular-nums">{total}</p>
-						<p class="mt-1 text-xs text-muted-foreground">{m.workspace_pvc_total_count()}</p>
-					</div>
-					{#if total > 0}
-						<p class="max-w-[55%] text-right text-xs leading-snug text-muted-foreground">
-							{m.workspace_pvc_bound_of_total({
-								bound: String(bound),
-								total: String(total)
-							})}
-						</p>
-					{/if}
-				</div>
-
-				{#if total > 0}
-					<Progress value={boundPercent} max={100} class="h-2 bg-muted/80" />
-				{/if}
-
-				<div class="grid grid-cols-2 gap-2 sm:gap-3">
-					<div
-						class="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2.5"
-					>
-						<span
-							class="flex size-8 shrink-0 items-center justify-center rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
-						>
-							<CheckCircle class="size-4" />
-						</span>
-						<div class="min-w-0">
-							<p class="text-lg leading-none font-semibold tabular-nums">{bound}</p>
-							<p class="truncate text-[11px] text-muted-foreground">
-								{m.workspace_pvc_bound_count()}
-							</p>
-						</div>
-					</div>
-					<div
-						class={cn(
-							'flex items-center gap-2 rounded-lg border px-3 py-2.5',
-							pending > 0 ? 'border-amber-500/30 bg-amber-500/10' : 'border-border/60 bg-muted/15'
-						)}
-					>
-						<span
-							class={cn(
-								'flex size-8 shrink-0 items-center justify-center rounded-md',
-								pending > 0
-									? 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
-									: 'bg-muted text-muted-foreground'
-							)}
-						>
-							<Clock class="size-4" />
-						</span>
-						<div class="min-w-0">
-							<p
-								class={cn(
-									'text-lg leading-none font-semibold tabular-nums',
-									pending > 0 && 'text-amber-700 dark:text-amber-400'
-								)}
-							>
-								{pending}
-							</p>
-							<p class="truncate text-[11px] text-muted-foreground">{m.workspace_pvc_pending()}</p>
-						</div>
-					</div>
-				</div>
-			</div>
-		</Card.Content>
+				{provisioned.value}
+				<span class="text-base font-medium text-muted-foreground">{provisioned.unit}</span>
+			</p>
+		</div>
+	</div>
+	<div class="space-y-1.5">
+		<Meter value={usedPercent} label={m.workspace_pvc_used()} tone={usageTone(usedPercent / 100)} />
+		<p class="text-xs text-muted-foreground">{m.workspace_pvc_used_hint()}</p>
+	</div>
+	{#if overProvisioned}
+		<p
+			class="flex items-start gap-1.5 rounded-md bg-warning/10 px-2.5 py-2 text-xs text-warning-foreground"
+		>
+			<TriangleAlert class="mt-px size-3.5 shrink-0" aria-hidden="true" />
+			{m.workspace_pvc_exceeds_cluster({
+				capacity: `${clusterCapacity.value} ${clusterCapacity.unit}`
+			})}
+		</p>
 	{/if}
-</Card.Root>
+
+	<div class="mt-auto space-y-2 border-t pt-4">
+		<div class="flex items-baseline justify-between gap-2">
+			<p class="text-sm font-medium">{m.workspace_pvc_volume_status()}</p>
+			{#if total > 0}
+				<p class="text-xs text-muted-foreground tabular-nums">
+					{m.workspace_pvc_bound_of_total({
+						bound: String(bound),
+						total: String(total)
+					})}
+				</p>
+			{/if}
+		</div>
+		<Meter
+			value={boundPercent}
+			label={m.workspace_pvc_volume_status()}
+			tone={total === 0 ? 'muted' : pending > 0 ? 'warning' : 'success'}
+		/>
+		<dl class="divide-y pt-1 text-sm">
+			<div class="flex items-center justify-between gap-2 py-1.5">
+				<dt class="text-muted-foreground">{m.workspace_pvc_total_count()}</dt>
+				<dd class="font-medium tabular-nums">{total}</dd>
+			</div>
+			<div class="flex items-center justify-between gap-2 py-1.5">
+				<dt class="flex items-center gap-2 text-muted-foreground">
+					<Status size="sm" variant="success" class="ring-0" />
+					{m.workspace_pvc_bound_count()}
+				</dt>
+				<dd class="font-medium tabular-nums">{bound}</dd>
+			</div>
+			<div class="flex items-center justify-between gap-2 py-1.5 last:pb-0">
+				<dt class="flex items-center gap-2 text-muted-foreground">
+					<Status size="sm" class={cn('ring-0', toneFill[problemTone(pending, 'warning')])} />
+					{m.workspace_pvc_pending()}
+				</dt>
+				<dd
+					class={cn(
+						'font-medium tabular-nums',
+						pending > 0 ? 'text-warning' : 'text-muted-foreground'
+					)}
+				>
+					{pending}
+				</dd>
+			</div>
+		</dl>
+	</div>
+</WidgetCard>

@@ -1,14 +1,20 @@
 <script lang="ts">
 	import BoxIcon from '@lucide/svelte/icons/box';
-	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
-	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Card from '$lib/components/ui/card';
+	import StatTile from '$lib/components/dashboard/shared/stat-tile.svelte';
+	import {
+		problemTone,
+		type Tone,
+		toneFill,
+		toneText
+	} from '$lib/components/dashboard/shared/tone';
+	import { Status } from '$lib/components/shadcnio/status';
 	import { m } from '$lib/messages';
 	import { escapePromqlStringLiteral, fetchCombinedInstant } from '$lib/prometheus';
+	import { cn } from '$lib/utils';
 
 	let {
 		prometheusDriver,
@@ -63,47 +69,40 @@
 	onDestroy(() => {
 		reloadManager.stop();
 	});
+
+	const empty = $derived(!maxAllocatablePods && !runningPods && !pendingPods);
 </script>
 
-<Card.Root class="relative h-full min-h-[140px] gap-2 overflow-hidden">
-	<BoxIcon
-		class="absolute -right-10 bottom-0 size-36 text-8xl tracking-tight text-nowrap text-primary/5 uppercase group-hover:hidden"
-	/>
-	<Card.Header>
-		<Card.Title>{m.pods()}</Card.Title>
-		<Card.Description class="flex h-6 items-center">
-			{m.cluster_dashboard_pod_description()}
-		</Card.Description>
-	</Card.Header>
-	{#if !isLoaded}
-		<div class="flex h-9 w-full items-center justify-center">
-			<Loader2Icon class="size-10 animate-spin" />
+{#snippet figure(label: string, value: number | string | undefined, tone: Tone)}
+	<div class="min-w-0">
+		<p class={cn('text-2xl leading-8 font-semibold tracking-tight tabular-nums', toneText[tone])}>
+			{value ?? 'N/A'}
+		</p>
+		<p class="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+			<Status size="sm" class={cn('ring-0', toneFill[tone === 'default' ? 'muted' : tone])} />
+			{label}
+		</p>
+	</div>
+{/snippet}
+
+<StatTile
+	label={m.pods()}
+	icon={BoxIcon}
+	tone="primary"
+	loading={!isLoaded}
+	hint={empty ? m.no_data_display() : undefined}
+	value={empty ? null : undefined}
+>
+	{#if !empty}
+		<div class="grid grid-cols-4 gap-3">
+			{@render figure('Allocatable', maxAllocatablePods?.value, 'default')}
+			{@render figure('Running', runningPods?.value, 'success')}
+			{@render figure(
+				'Pending',
+				pendingPods?.value,
+				problemTone(Number(pendingPods?.value ?? 0), 'warning')
+			)}
+			{@render figure('Failed', failedPods?.value, problemTone(Number(failedPods?.value ?? 0)))}
 		</div>
-	{:else if !maxAllocatablePods && !runningPods && !pendingPods}
-		<div class="flex h-full w-full flex-col items-center justify-center">
-			<ChartColumnIcon class="size-6 animate-pulse text-muted-foreground" />
-			<p class="p-0 text-xs text-muted-foreground">{m.no_data_display()}</p>
-		</div>
-	{:else}
-		<Card.Content class="my-4 flex flex-col gap-4">
-			<div class="grid grid-cols-4">
-				<div>
-					<p class="text-3xl font-bold">{maxAllocatablePods?.value ?? 'N/A'}</p>
-					<p class="text-1xl font-medium tracking-wider uppercase">Allocatable</p>
-				</div>
-				<div class="text-chart-2">
-					<p class="text-3xl font-bold">{runningPods?.value ?? 'N/A'}</p>
-					<p class="text-1xl font-medium tracking-wider uppercase">Running</p>
-				</div>
-				<div class="text-muted-foreground">
-					<p class="text-3xl font-bold">{pendingPods?.value ?? 'N/A'}</p>
-					<p class="text-1xl font-medium tracking-wider uppercase">Pending</p>
-				</div>
-				<div class="text-chart-1">
-					<p class="text-3xl font-bold">{failedPods?.value ?? 'N/A'}</p>
-					<p class="text-1xl font-medium tracking-wider uppercase">Failed</p>
-				</div>
-			</div>
-		</Card.Content>
 	{/if}
-</Card.Root>
+</StatTile>

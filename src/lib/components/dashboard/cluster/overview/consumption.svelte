@@ -1,14 +1,12 @@
 <script lang="ts">
-	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
 	import GpuIcon from '@lucide/svelte/icons/gpu';
-	import InfoIcon from '@lucide/svelte/icons/info';
-	import Loader2Icon from '@lucide/svelte/icons/loader-2';
 	import ThermometerIcon from '@lucide/svelte/icons/thermometer';
+	import ZapIcon from '@lucide/svelte/icons/zap';
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Card from '$lib/components/ui/card';
+	import StatTile from '$lib/components/dashboard/shared/stat-tile.svelte';
 	import { m } from '$lib/messages';
 	import { classifyThreshold, fetchCombinedInstant, thresholdClasses } from '$lib/prometheus';
 
@@ -68,44 +66,33 @@
 	});
 </script>
 
-<Card.Root class="relative h-full min-h-[140px] gap-2 overflow-hidden">
-	<InfoIcon
-		class="absolute -right-10 bottom-0 size-36 text-8xl tracking-tight text-nowrap text-primary/5 uppercase group-hover:hidden"
-	/>
-	<Card.Header>
-		<Card.Title>{m.gpu_power_usage()}</Card.Title>
-		<Card.Description class="text-md flex h-6 items-center"
-			>{m.cluster_dashboard_gpu_power_usage_description()}</Card.Description
-		>
-	</Card.Header>
-	{#if !isLoaded}
-		<div class="flex h-9 w-full items-center justify-center">
-			<Loader2Icon class="size-10 animate-spin" />
-		</div>
-		<!-- `undefined`, not falsy: an idle fleet legitimately draws ~0 W and must still render. -->
-	{:else if consumption === undefined}
-		<div class="flex h-full w-full flex-col items-center justify-center">
-			<ChartColumnIcon class="size-6 animate-pulse text-muted-foreground" />
-			<p class="p-0 text-xs text-muted-foreground">{m.no_data_display()}</p>
-		</div>
-	{:else}
-		<Card.Content class="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-			<p class="text-3xl">{(Number(consumption) / 1000).toFixed(2)} kW</p>
+<!-- `undefined`, not falsy: an idle fleet legitimately draws ~0 W and must still render. -->
+<StatTile
+	label={m.gpu_power_usage()}
+	icon={ZapIcon}
+	loading={!isLoaded}
+	value={consumption === undefined ? null : (Number(consumption) / 1000).toFixed(2)}
+	unit="kW"
+	tone={consumption === undefined ? 'muted' : 'primary'}
+	hint={consumption === undefined ? m.no_data_display() : undefined}
+>
+	{#if consumption !== undefined && (cardCount !== undefined || temperature !== undefined)}
+		<p class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
 			{#if cardCount !== undefined}
 				<!-- Uncolored: an inventory count, not a signal that can go wrong. -->
-				<p class="flex items-center gap-1 text-sm whitespace-nowrap text-muted-foreground">
-					<GpuIcon class="size-4 shrink-0" />
+				<span class="flex items-center gap-1 whitespace-nowrap text-muted-foreground">
+					<GpuIcon class="size-3.5 shrink-0" />
 					{m.gpu_cards()}
 					{Math.round(Number(cardCount))}
-				</p>
+				</span>
 			{/if}
 			{#if temperature !== undefined}
-				<p class="flex items-center gap-1 text-sm whitespace-nowrap {temperatureClass}">
-					<ThermometerIcon class="size-4 shrink-0" />
+				<span class="flex items-center gap-1 whitespace-nowrap {temperatureClass}">
+					<ThermometerIcon class="size-3.5 shrink-0" />
 					{m.gpu_peak()}
 					{Math.round(Number(temperature))} °C
-				</p>
+				</span>
 			{/if}
-		</Card.Content>
+		</p>
 	{/if}
-</Card.Root>
+</StatTile>

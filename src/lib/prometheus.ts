@@ -397,9 +397,9 @@ export function thresholdClasses(level: ThresholdLevel): {
 } {
 	switch (level) {
 		case 'green':
-			return { text: 'text-chart-2', border: '', bg: '' };
+			return { text: 'text-success', border: '', bg: '' };
 		case 'orange':
-			return { text: 'text-chart-1', border: 'border-chart-1', bg: '' };
+			return { text: 'text-warning', border: 'border-warning', bg: '' };
 		case 'red':
 			return { text: 'text-destructive', border: 'border-destructive', bg: 'bg-destructive/5' };
 	}
@@ -408,14 +408,16 @@ export function thresholdClasses(level: ThresholdLevel): {
 /**
  * Chart CSS variable matching {@link thresholdClasses}' text color, so a KPI card's
  * sparkline can be tinted by the same health level as its big number.
- * Mirrors the text mapping: green → chart-2, orange → chart-1, red → destructive.
+ * Mirrors the text mapping: green → success, orange → warning, red → destructive.
+ * These are the theme's status colors, not chart series colors: a series color says which
+ * line is which and changes with the theme, a status color has to keep meaning the same thing.
  */
 export function thresholdChartColor(level: ThresholdLevel): string {
 	switch (level) {
 		case 'green':
-			return 'var(--chart-2)';
+			return 'var(--success)';
 		case 'orange':
-			return 'var(--chart-1)';
+			return 'var(--warning)';
 		case 'red':
 			return 'var(--destructive)';
 	}

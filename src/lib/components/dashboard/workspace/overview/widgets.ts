@@ -9,23 +9,24 @@ import WorkloadHealth from './workload-health.svelte';
 export const workspaceOverviewWidgets = [
 	{
 		key: 'resource-quota',
-		class: 'col-span-2 row-span-1 md:col-span-2 lg:col-span-4',
+		class: 'order-2 col-span-full xl:col-span-6',
 		component: ResourceQuota
 	},
 	{
 		key: 'workload-health',
-		class: 'col-span-2 row-span-1 md:col-span-2 lg:col-span-4',
+		class: 'order-3 col-span-full md:col-span-6 xl:col-span-3',
 		component: WorkloadHealth,
 		needsCluster: true
 	},
 	{
 		key: 'storage',
-		class: 'col-span-2 row-span-1 md:col-span-2 lg:col-span-4',
+		class: 'order-4 col-span-full md:col-span-6 xl:col-span-3',
 		component: Storage
 	},
 	{
 		key: 'pod-rollout-health',
-		class: 'col-span-2 row-span-1 md:col-span-2 lg:col-span-12',
+		// Renders two grid items of its own (headline counts first, breakdown last): see the component.
+		class: 'contents',
 		component: PodRolloutHealth
 	}
 ] as unknown as WidgetDefinition[];
