@@ -11,7 +11,6 @@
 		type SidebarProps,
 		useSidebar
 	} from './shared';
-	import Sidebar from './sidebar.svelte';
 	import SidebarPlacementContext from './sidebar-placement-context.svelte';
 	let {
 		collapsible = 'offcanvas',

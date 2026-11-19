@@ -8,7 +8,6 @@
 	import { cn } from '$lib/utils';
 
 	import { useSidebar } from './shared';
-	import Sidebar from './sidebar.svelte';
 	let {
 		class: className,
 		onclick: onClick,

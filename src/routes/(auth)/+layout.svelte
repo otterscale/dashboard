@@ -837,12 +837,16 @@
 					<TooltipContent>{m.dash_guide_tour()}</TooltipContent>
 				</Tooltip>
 				<NotificationTrigger />
-				<DropdownMenu positioning={{ placement: 'bottom-end', gutter: 6 }}>
+				<!-- The guide tour points at this button by id. Ark finds the menu's anchor by the
+				     trigger id too, so the id is handed to the menu instead of set on the button. -->
+				<DropdownMenu
+					ids={{ trigger: 'cluster-guide-step' }}
+					positioning={{ placement: 'bottom-end', gutter: 6 }}
+				>
 					<DropdownMenuTrigger>
 						{#snippet asChild(props)}
 							<Button
 								{...props({ class: 'relative overflow-visible' })}
-								id="cluster-guide-step"
 								variant="ghost"
 								size="icon-sm"
 								title={m.dash_switch_cluster()}

@@ -11,7 +11,6 @@ import { cn } from '$lib/utils';
 
 import { SidebarContext_DEFAULT, SidebarContext_KEY } from './context-keys';
 import type SidebarGroupContent from './sidebar-group-content.svelte';
-import SidebarProvider from './sidebar-provider.svelte';
 
 export const SIDEBAR_COOKIE_NAME = 'sidebar_state';
 
