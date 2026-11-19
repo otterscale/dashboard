@@ -53,14 +53,14 @@
 	// crash-looping) turns red. GPU utilisation is the opposite — high is the desired state —
 	// so it gets one calm colour and lets the descending rank surface idle nodes instead.
 	function classes(value: number): { barClass?: string; textClass?: string } {
-		if (kind === 'gpu') return { barClass: 'bg-chart-2' };
+		if (kind === 'gpu') return { barClass: 'bg-primary' };
 		const level: ThresholdLevel =
 			kind === 'pods'
 				? classifyThreshold(value, { green: 70, orange: 90 })
 				: classifyThreshold(value, { green: 0, orange: 10 });
 		return {
 			barClass:
-				level === 'red' ? 'bg-destructive' : level === 'orange' ? 'bg-chart-1' : 'bg-chart-2',
+				level === 'red' ? 'bg-destructive' : level === 'orange' ? 'bg-warning' : 'bg-success',
 			textClass: level === 'red' ? 'text-destructive' : ''
 		};
 	}

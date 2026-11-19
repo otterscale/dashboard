@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { PrometheusDriver } from 'prometheus-query';
 
+	import Band from '$lib/components/dashboard/shared/band.svelte';
+
 	import { default as CPUCommitment } from './cpu-commit-chart.svelte';
 	import { default as CPUCoreProcessor } from './cpu-core-chart.svelte';
 	import { default as DiskIOTime } from './disk-io-time-chart.svelte';
@@ -37,12 +39,12 @@
 {#key `${fqdn}-${start.getTime()}-${endIsNow ? 'now' : end.getTime()}`}
 	<div class="flex flex-col gap-4">
 		<!-- KPI summary: OS utilisation (node_exporter) + pod capacity (kube-state-metrics) -->
-		<div class="grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-4">
+		<Band class="grid-cols-2 lg:grid-cols-4">
 			<UsageRateCPU {client} {fqdn} {isReloading} />
 			<UsageRateRAM {client} {fqdn} {isReloading} />
 			<UsageRatePods {client} {nodeName} {isReloading} />
 			<UsageRateRootFS {client} {fqdn} {isReloading} />
-		</div>
+		</Band>
 
 		<!-- Scheduling commitment (cAdvisor + KSM): usage vs request vs limit of allocatable -->
 		<div class="grid w-full gap-4 lg:grid-cols-2">

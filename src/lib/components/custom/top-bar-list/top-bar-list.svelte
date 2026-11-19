@@ -58,8 +58,8 @@
      shortest bars, and no two cards' bars were drawn at the same scale. -->
 {#snippet barContent(bar: TopBar)}
 	{@const pct = maxValue > 0 ? Math.max(2, (bar.value / maxValue) * 100) : 0}
-	<span class="flex items-baseline gap-2">
-		<span class="flex min-w-0 flex-1 items-center gap-1.5">
+	<span class="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+		<span class="flex max-w-full min-w-0 items-center gap-1.5">
 			<span class="truncate text-xs font-medium" title={bar.label}>{bar.label}</span>
 			{#if bar.badge}
 				<Badge variant="secondary" class="shrink-0">{bar.badge}</Badge>
@@ -71,7 +71,7 @@
 					<Tooltip.Trigger>
 						{#snippet child({ props })}
 							<span {...props} class="mr-1 cursor-help">
-								<TriangleAlertIcon class="inline size-3 shrink-0 align-[-1px] text-chart-1" />
+								<TriangleAlertIcon class="inline size-3 shrink-0 align-[-1px] text-warning" />
 								<span class="sr-only">{bar.warning}</span>
 							</span>
 						{/snippet}
@@ -92,7 +92,7 @@
 			</span>
 		{:else}
 			<span
-				class={cn('absolute inset-y-0 left-0 rounded bg-chart-1', bar.barClass)}
+				class={cn('absolute inset-y-0 left-0 rounded bg-primary', bar.barClass)}
 				style="width: {pct}%"
 			></span>
 		{/if}

@@ -186,12 +186,14 @@
 	<Statistics.Content class="min-h-16">
 		{#if !isLoaded}
 			<div class="flex h-[200px] w-full items-center justify-center">
-				<LoaderCircle class="size-12 animate-spin text-muted-foreground/50" />
+				<LoaderCircle class="size-6 animate-spin text-muted-foreground" />
 			</div>
 		{:else if hasError || displayData.length === 0}
-			<div class="flex h-[200px] w-full flex-col items-center justify-center">
-				<ChartLine class="size-12 animate-pulse text-muted-foreground" />
-				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
+			<div
+				class="flex h-[200px] w-full flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed"
+			>
+				<ChartLine class="size-6 text-muted-foreground opacity-60" />
+				<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
 			</div>
 		{:else}
 			{#snippet sharedTooltip()}

@@ -115,7 +115,7 @@
 		const level: ThresholdLevel = classifyThreshold(value, { green: 0, orange: 10 });
 		return {
 			barClass:
-				level === 'red' ? 'bg-destructive' : level === 'orange' ? 'bg-chart-1' : 'bg-chart-2',
+				level === 'red' ? 'bg-destructive' : level === 'orange' ? 'bg-warning' : 'bg-success',
 			textClass: level === 'red' ? 'text-destructive' : ''
 		};
 	}

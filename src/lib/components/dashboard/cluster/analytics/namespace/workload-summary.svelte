@@ -7,7 +7,7 @@
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Card from '$lib/components/ui/card/index.js';
+	import Band from '$lib/components/dashboard/shared/band.svelte';
 	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/messages';
 	import { escapePromqlStringLiteral, fetchCombinedInstant } from '$lib/prometheus';
@@ -68,7 +68,7 @@
 	const mem = $derived(formatCapacity(Number(memBytes ?? 0)));
 </script>
 
-<div class="grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-4">
+<Band class="grid-cols-2 lg:grid-cols-4">
 	<KpiCard
 		title={m.pods()}
 		description={m.workload_kpi_pods_description()}
@@ -77,9 +77,11 @@
 		{isLoaded}
 		isEmpty={podsRunning === null}
 	>
-		<Card.Content class="mt-1 flex flex-col gap-1">
-			<p class="text-3xl font-bold">{Math.round(Number(podsRunning ?? 0))}</p>
-		</Card.Content>
+		<div>
+			<p class="text-2xl leading-8 font-semibold tracking-tight tabular-nums">
+				{Math.round(Number(podsRunning ?? 0))}
+			</p>
+		</div>
 	</KpiCard>
 
 	<KpiCard
@@ -90,11 +92,15 @@
 		{isLoaded}
 		isEmpty={restarts1h === null}
 	>
-		<Card.Content class="mt-1 flex flex-col gap-1">
-			<p class="text-3xl font-bold {Number(restarts1h) > 0 ? 'text-chart-1' : ''}">
+		<div>
+			<p
+				class="text-2xl leading-8 font-semibold tracking-tight tabular-nums {Number(restarts1h) > 0
+					? 'text-warning'
+					: ''}"
+			>
 				{Math.round(Number(restarts1h ?? 0))}
 			</p>
-		</Card.Content>
+		</div>
 	</KpiCard>
 
 	<KpiCard
@@ -105,9 +111,11 @@
 		{isLoaded}
 		isEmpty={cpuCores === null}
 	>
-		<Card.Content class="mt-1 flex flex-col gap-1">
-			<p class="text-3xl font-bold">{Number(cpuCores ?? 0).toFixed(1)}</p>
-		</Card.Content>
+		<div>
+			<p class="text-2xl leading-8 font-semibold tracking-tight tabular-nums">
+				{Number(cpuCores ?? 0).toFixed(1)}
+			</p>
+		</div>
 	</KpiCard>
 
 	<KpiCard
@@ -118,8 +126,11 @@
 		{isLoaded}
 		isEmpty={memBytes === null}
 	>
-		<Card.Content class="mt-1 flex flex-col gap-1">
-			<p class="text-3xl font-bold">{mem.value} {mem.unit}</p>
-		</Card.Content>
+		<div>
+			<p class="text-2xl leading-8 font-semibold tracking-tight tabular-nums">
+				{mem.value}
+				{mem.unit}
+			</p>
+		</div>
 	</KpiCard>
-</div>
+</Band>

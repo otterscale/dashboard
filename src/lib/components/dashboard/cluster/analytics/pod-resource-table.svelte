@@ -318,7 +318,7 @@
 	}
 	function restartClass(n: number): string {
 		if (n >= 5) return 'font-bold text-destructive';
-		if (n >= 1) return 'text-chart-1';
+		if (n >= 1) return 'text-warning';
 		return 'text-muted-foreground';
 	}
 

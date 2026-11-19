@@ -121,11 +121,11 @@
 	}
 </script>
 
-<div class="flex flex-col gap-6 pt-4">
+<div class="flex flex-col gap-6">
 	{#if view === 'node'}
 		<!-- Section A: per-node ranking (cluster-wide, click to drill in) -->
 		<section class="flex flex-col gap-3">
-			<h2 class="text-lg font-semibold">{m.section_node_ranking()}</h2>
+			<h2 class="text-base font-semibold">{m.section_node_ranking()}</h2>
 			<div class="grid w-full items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-4">
 				<NodePressure
 					prometheusDriver={client}
@@ -168,7 +168,7 @@
 
 		<!-- Section B: selected-node system detail (node_exporter time series) -->
 		<section class="flex flex-col gap-3">
-			<h2 class="text-lg font-semibold">{m.section_node_detail()}</h2>
+			<h2 class="text-base font-semibold">{m.section_node_detail()}</h2>
 			{#if hasNodeSelected}
 				<NodeDetail
 					{client}
@@ -199,7 +199,7 @@
 	{:else}
 		<!-- Section A: namespace ranking (cluster-wide, click to select a namespace) -->
 		<section class="flex flex-col gap-3">
-			<h2 class="text-lg font-semibold">{m.section_namespace_ranking()}</h2>
+			<h2 class="text-base font-semibold">{m.section_namespace_ranking()}</h2>
 			<div class="grid w-full items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-4">
 				<NamespaceRanking
 					prometheusDriver={client}
@@ -246,7 +246,7 @@
 
 		<!-- Section B: selected-namespace detail (summary + commitment + pvc + pod table) -->
 		<section class="flex flex-col gap-3">
-			<h2 class="text-lg font-semibold">{m.section_namespace_detail()}</h2>
+			<h2 class="text-base font-semibold">{m.section_namespace_detail()}</h2>
 			{#if hasNamespaceSelected}
 				{#key selectedNamespace}
 					<WorkloadSummary {client} namespace={selectedNamespace} isReloading={reloading} />

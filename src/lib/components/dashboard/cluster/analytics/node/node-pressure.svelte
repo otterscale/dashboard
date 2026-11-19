@@ -75,7 +75,7 @@
 	let isLoaded = $state(false);
 
 	function barClass(level: ThresholdLevel): string {
-		return level === 'red' ? 'bg-destructive' : level === 'orange' ? 'bg-chart-1' : 'bg-chart-2';
+		return level === 'red' ? 'bg-destructive' : level === 'orange' ? 'bg-warning' : 'bg-success';
 	}
 	function textClass(level: ThresholdLevel): string {
 		return level === 'red' ? 'text-destructive' : '';
