@@ -1,17 +1,13 @@
 <script lang="ts">
 	import type { PrometheusDriver } from 'prometheus-query';
-	import { onDestroy, onMount } from 'svelte';
 
-	import { ReloadManager } from '$lib/components/custom/reloader';
-	import { type TopBar, TopBarList } from '$lib/components/custom/top-bar-list';
+	import { orThrow, useLoadable } from '$lib/components/dashboard/shared/loadable.svelte';
+	import { levelOf } from '$lib/components/dashboard/shared/status';
 	import { m } from '$lib/messages';
-	import {
-		classifyThreshold,
-		fetchCombinedInstant,
-		LIVE_PODS,
-		type ThresholdLevel,
-		withoutLimit
-	} from '$lib/prometheus';
+	import { fetchCombinedInstantOrNull, LIVE_PODS, withoutLimit } from '$lib/prometheus';
+
+	import type { RankingRow } from '../ranking';
+	import RankingList from '../ranking-list.svelte';
 
 	// Reusable node-pressure ranking: one bar per node, sized by Request%, labelled with usage,
 	// request and limit as percentages of the same allocatable total. Used for both CPU
@@ -71,21 +67,11 @@
 		};
 	});
 
-	let bars = $state<TopBar[]>([]);
-	let isLoaded = $state(false);
-
-	function barClass(level: ThresholdLevel): string {
-		return level === 'red' ? 'bg-destructive' : level === 'orange' ? 'bg-chart-1' : 'bg-chart-2';
-	}
-	function textClass(level: ThresholdLevel): string {
-		return level === 'red' ? 'text-destructive' : '';
-	}
-
 	type Row = { use: number; req: number; lim: number; open: number; containers: number };
 
-	async function fetch() {
-		try {
-			const result = await fetchCombinedInstant(prometheusDriver, queries);
+	const ranking = useLoadable<RankingRow[]>(
+		async () => {
+			const result = orThrow(await fetchCombinedInstantOrNull(prometheusDriver, queries));
 			const byNode: Record<string, Row> = {};
 			for (const [key, vectors] of Object.entries(result)) {
 				for (const v of vectors) {
@@ -97,47 +83,33 @@
 					row[key as keyof Row] = value;
 				}
 			}
-			bars = Object.entries(byNode)
-				.map(([node, { use, req, lim, open, containers }]) => {
-					// Colour by request%, matching the bar length: request is what constrains
+			const rows = Object.entries(byNode)
+				.map(([node, { use, req, lim, open, containers }]) => ({
+					label: node,
+					value: req,
+					// Whole percentages: a node's share of its own capacity is never read to a
+					// decimal, and three numbers have to fit the same slot two used to.
+					displayValue: `${Math.round(use)}% / ${Math.round(req)}% / ${Math.round(lim)}%`,
+					warning:
+						open > 0 ? m.containers_without_limit({ uncapped: open, containers }) : undefined,
+					// Coloured by request%, matching the bar length: request is what constrains
 					// scheduling (its sum can't exceed allocatable), whereas a limit% over 100% is a
 					// normal burst-ceiling overcommit and would otherwise paint almost every node red.
-					const level = classifyThreshold(req, { green: 70, orange: 90 });
-					return {
-						label: node,
-						value: req,
-						// Whole percentages: a node's share of its own capacity is never read to a
-						// decimal, and three numbers have to fit the same slot two used to.
-						displayValue: `${Math.round(use)}% / ${Math.round(req)}% / ${Math.round(lim)}%`,
-						warning:
-							open > 0 ? m.containers_without_limit({ uncapped: open, containers }) : undefined,
-						barClass: barClass(level),
-						textClass: textClass(level)
-					};
-				})
+					level: levelOf(req)
+				}))
 				.sort((a, b) => b.value - a.value);
-		} catch (error) {
-			console.error('Failed to fetch node pressure:', error);
-		}
-	}
-
-	const reloadManager = new ReloadManager(fetch);
-
-	$effect(() => {
-		if (isReloading) {
-			reloadManager.restart();
-		} else {
-			reloadManager.stop();
-		}
-	});
-
-	onMount(async () => {
-		await fetch();
-		isLoaded = true;
-	});
-	onDestroy(() => {
-		reloadManager.stop();
-	});
+			return rows.length > 0 ? rows : null;
+		},
+		() => isReloading ?? false
+	);
 </script>
 
-<TopBarList {title} {description} {tooltip} {bars} {isLoaded} onBarClick={onNodeClick} scrollable />
+<RankingList
+	{title}
+	{description}
+	info={tooltip}
+	rows={ranking.data ?? []}
+	status={ranking.status}
+	stale={ranking.stale}
+	onRowClick={onNodeClick}
+/>

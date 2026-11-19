@@ -35,9 +35,9 @@
 </script>
 
 {#key `${fqdn}-${start.getTime()}-${endIsNow ? 'now' : end.getTime()}`}
-	<div class="flex flex-col gap-4">
+	<div class="flex flex-col gap-5">
 		<!-- KPI summary: OS utilisation (node_exporter) + pod capacity (kube-state-metrics) -->
-		<div class="grid w-full gap-4 sm:grid-cols-2 lg:grid-cols-4">
+		<div class="grid w-full gap-5 sm:grid-cols-2 xl:grid-cols-4">
 			<UsageRateCPU {client} {fqdn} {isReloading} />
 			<UsageRateRAM {client} {fqdn} {isReloading} />
 			<UsageRatePods {client} {nodeName} {isReloading} />
@@ -45,13 +45,13 @@
 		</div>
 
 		<!-- Scheduling commitment (cAdvisor + KSM): usage vs request vs limit of allocatable -->
-		<div class="grid w-full gap-4 lg:grid-cols-2">
+		<div class="grid w-full gap-5 lg:grid-cols-2">
 			<CPUCommitment {client} {nodeName} {start} {end} {endIsNow} {isReloading} />
 			<MemoryCommitment {client} {nodeName} {start} {end} {endIsNow} {isReloading} />
 		</div>
 
 		<!-- OS-level detail (node_exporter) -->
-		<div class="grid w-full gap-4 lg:grid-cols-2">
+		<div class="grid w-full gap-5 lg:grid-cols-2">
 			<CPUCoreProcessor {client} {fqdn} {start} {end} {endIsNow} {isReloading} />
 			<NetworkIO {client} {fqdn} {start} {end} {endIsNow} {isReloading} />
 			<BasicDisk {client} {fqdn} {start} {end} {endIsNow} {isReloading} />

@@ -1,7 +1,5 @@
 <script lang="ts">
-	import ChartLine from '@lucide/svelte/icons/chart-line';
-	import InfoIcon from '@lucide/svelte/icons/info';
-	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
 	import { scaleBand } from 'd3-scale';
 	import {
 		Axis,
@@ -12,14 +10,11 @@
 		Tooltip as LayerTooltip
 	} from 'layerchart';
 	import type { PrometheusDriver } from 'prometheus-query';
-	import { onDestroy, onMount } from 'svelte';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 
-	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Statistics from '$lib/components/custom/statistics/index';
-	import { buttonVariants } from '$lib/components/ui/button';
-	import * as Chart from '$lib/components/ui/chart';
-	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { useLoadable } from '$lib/components/dashboard/shared/loadable.svelte';
+	import WidgetCard from '$lib/components/dashboard/shared/widget-card.svelte';
+	import { Skeleton } from '$lib/components/shadcnio/skeleton';
 	import { formatChartTimeRange, formatChartXAxisDate } from '$lib/formatter';
 	import { m } from '$lib/messages';
 	import {
@@ -28,6 +23,10 @@
 		dcgmNodeSelector,
 		fetchFlattenedRange
 	} from '$lib/prometheus';
+	import { cn } from '$lib/utils';
+
+	import { chartFrameClass } from '../chart';
+	import ChartTooltip from '../chart-tooltip.svelte';
 
 	// Per-card GPU heatmap: one row per GPU, one column per time bin, colour depth = value.
 	// Like c-token-size-distribution.svelte's band×band grid, but cells on a Canvas layer.
@@ -53,8 +52,9 @@
 	const hostFilter = $derived(dcgmNodeSelector(nodeName));
 
 	// `token` is the theme chart var the cell ramp mixes up to (see cellFill); theme tokens
-	// stay on-palette and flip with light/dark. All four share --chart-2 to read as one
-	// group — swap an individual `token` to give a metric its own hue.
+	// stay on-palette and flip with light/dark. All four share --chart-1 — the step of the blue
+	// ramp furthest from the card in both themes, so a full cell reads at full contrast in
+	// either — and read as one group.
 	// `max by(gpu)` collapses DCGM's extra labels to one series per card index, so
 	// fetchFlattenedRange keys each row by the bare index "0"…"N".
 	const config = $derived.by(() => {
@@ -68,7 +68,7 @@
 					// Saturation metrics colour against the full 0–100% scale so "dark = full".
 					fixedMax: 100,
 					format: (v: number) => `${v.toFixed(0)}%`,
-					token: 'var(--chart-2)'
+					token: 'var(--chart-1)'
 				};
 			case 'memory':
 				return {
@@ -80,7 +80,7 @@
 						`(max by(gpu) (DCGM_FI_DEV_FB_USED{${hostFilter}}) + max by(gpu) (DCGM_FI_DEV_FB_FREE{${hostFilter}}))`,
 					fixedMax: 100,
 					format: (v: number) => `${v.toFixed(0)}%`,
-					token: 'var(--chart-2)'
+					token: 'var(--chart-1)'
 				};
 			case 'power':
 				return {
@@ -91,7 +91,7 @@
 					// Open-ended metrics colour against the observed maximum instead.
 					fixedMax: undefined,
 					format: (v: number) => `${v.toFixed(0)} W`,
-					token: 'var(--chart-2)'
+					token: 'var(--chart-1)'
 				};
 			case 'temp':
 				return {
@@ -101,7 +101,7 @@
 					query: `max by(gpu) (DCGM_FI_DEV_GPU_TEMP{${hostFilter}})`,
 					fixedMax: undefined,
 					format: (v: number) => `${v.toFixed(0)}°C`,
-					token: 'var(--chart-2)'
+					token: 'var(--chart-1)'
 				};
 		}
 	});
@@ -110,19 +110,13 @@
 	const HEATMAP_MIN_STEP_SEC = 60;
 	const HEATMAP_MAX_BINS = 48;
 
-	let rawData = $state<DataPoint[]>([]);
-	let isLoaded = $state(false);
-
-	// Skip the `rawData` swap (and the whole derived chain + canvas redraw) when a reload
-	// tick returns identical data — common on fixed time windows.
+	// Skip the data swap (and the whole derived chain + canvas redraw) when a reload tick
+	// returns identical data — common on fixed time windows.
 	let lastSignature = '';
-	// Mount fires fetch twice (onMount + the reload $effect's immediate tick); dedupe them.
-	let inFlight = false;
+	let lastData: DataPoint[] = [];
 
-	async function fetch() {
-		if (inFlight) return;
-		inFlight = true;
-		try {
+	const points = useLoadable<DataPoint[]>(
+		async () => {
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const next = await fetchFlattenedRange(
@@ -132,6 +126,14 @@
 				new Date(endMs),
 				computeStep(startMs, endMs, HEATMAP_MIN_STEP_SEC, HEATMAP_MAX_BINS)
 			);
+			// No card reported a single reading: nothing to draw.
+			const any = next.some((p) =>
+				Object.entries(p).some(([k, v]) => k !== 'date' && Number.isFinite(Number(v)))
+			);
+			if (!any) {
+				lastSignature = '';
+				return null;
+			}
 			const signature = next
 				.map((p) =>
 					Object.entries(p)
@@ -141,25 +143,13 @@
 				.join(';');
 			if (signature !== lastSignature) {
 				lastSignature = signature;
-				rawData = next;
+				lastData = next;
 			}
-		} catch {
-			lastSignature = '';
-			rawData = [];
-		} finally {
-			inFlight = false;
-		}
-	}
-
-	const reloadManager = new ReloadManager(fetch);
-	onMount(() => {
-		fetch().then(() => (isLoaded = true));
-	});
-	onDestroy(() => reloadManager.stop());
-	$effect(() => {
-		if (isReloading) reloadManager.restart();
-		else reloadManager.stop();
-	});
+			return lastData;
+		},
+		() => isReloading ?? false
+	);
+	const rawData = $derived(points.data ?? []);
 
 	// GPU indices arrive as bare strings; sort numerically so GPU 10 follows GPU 9, not GPU 1.
 	const gpuKeys = $derived.by(() => {
@@ -196,7 +186,8 @@
 		config.fixedMax ?? cells.reduce((mx, c) => Math.max(mx, c.value ?? 0), 0)
 	);
 
-	// Cell fill ramps from --card (value 0) up to the metric token. OKLAB, not OKLCH:
+	// Cell fill ramps from nearly --card (value 0, kept a step off the card so a zero reading is
+	// still a drawn cell) up to the metric token. OKLAB, not OKLCH:
 	// --card is achromatic, so a polar mix would rotate mid cells through blue/purple.
 	// Must reference CSS vars — layerchart's canvas only resolves a fill via getComputedStyle
 	// when it contains `var(`. Quantising to 20 levels caps that resolve cache per chart.
@@ -206,12 +197,16 @@
 		if (d.value === null) return EMPTY_FILL;
 		const t = Math.min(1, Math.max(0, d.value / (maxValue || 1)));
 		const pct = Math.round((Math.round(t * COLOR_LEVELS) / COLOR_LEVELS) * 100);
-		return `color-mix(in oklab, ${config.token} ${pct}%, var(--card))`;
+		return rampColor(pct);
+	}
+	const RAMP_FLOOR = 12;
+	function rampColor(pct: number): string {
+		const mixed = Math.round(RAMP_FLOOR + (pct / 100) * (100 - RAMP_FLOOR));
+		return `color-mix(in oklab, ${config.token} ${mixed}%, var(--card))`;
 	}
 
 	const xDomain = $derived(rawData.map((p) => (p.date as Date).toISOString()));
 	const yDomain = $derived(gpuKeys.map((k) => `GPU ${k}`));
-	const hasData = $derived(cells.some((c) => c.value !== null));
 
 	const cellLookup = $derived.by(() => {
 		const map = new SvelteMap<string, HeatCell>();
@@ -258,150 +253,110 @@
 		}
 		return hoverRect;
 	}
-
-	const chartConfig = $derived({
-		value: { label: config.title, color: config.token }
-	} satisfies Chart.ChartConfig);
 </script>
 
-<Statistics.Root type="count" class="overflow-visible">
-	<Statistics.Header class="flex flex-row items-center gap-2 space-y-0">
-		<div class="grid flex-1 gap-1">
-			<Statistics.Title class="text-base leading-normal text-foreground">
-				{config.title}
-			</Statistics.Title>
-			<p class="text-sm text-muted-foreground">{config.description}</p>
+<WidgetCard
+	title={config.title}
+	description={config.description}
+	info={config.tooltip}
+	status={points.status}
+	stale={points.stale}
+	emptyIcon={ChartLineIcon}
+	bodyClass="min-h-[232px]"
+>
+	{#snippet skeleton()}
+		<div class="flex flex-col gap-3" aria-hidden="true">
+			<Skeleton class="h-[200px] w-full" />
+			<Skeleton class="h-5 w-48" />
 		</div>
-		<Tooltip.Root>
-			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}>
-				<InfoIcon class="size-4 text-muted-foreground" />
-			</Tooltip.Trigger>
-			<Tooltip.Content class="max-w-xs">
-				<p>{config.tooltip}</p>
-			</Tooltip.Content>
-		</Tooltip.Root>
-	</Statistics.Header>
-	<Statistics.Content class="min-h-16">
-		{#if !isLoaded}
-			<div class="flex h-[200px] w-full items-center justify-center">
-				<LoaderCircle class="size-12 animate-spin" />
-			</div>
-		{:else if !hasData}
-			<div class="flex h-[200px] w-full flex-col items-center justify-center">
-				<ChartLine class="size-12 animate-pulse text-muted-foreground" />
-				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
-			</div>
-		{:else}
-			<Chart.Container config={chartConfig} class="h-[200px] w-full">
-				<LayerChart
-					data={cells}
-					x="dateKey"
-					xScale={scaleBand().padding(0.02)}
-					{xDomain}
-					y="gpuLabel"
-					yScale={scaleBand().padding(0.15)}
-					{yDomain}
-					padding={{ left: 48, bottom: 22, top: 4, right: 8 }}
-				>
-					{#snippet children({ context })}
-						<LayerTooltip.Context mode="manual">
-							<!-- One canvas node for all cells (vs one <rect> each) keeps the mount cheap. -->
-							<Canvas>
-								<Cell x="dateKey" y="gpuLabel" fill={cellFill} />
-							</Canvas>
-							<Svg>
-								<Axis
-									placement="left"
-									tickLength={0}
-									rule={false}
-									labelProps={{ class: 'text-[10px] fill-muted-foreground' }}
-								/>
-								<Axis
-									placement="bottom"
-									tickLength={0}
-									rule={false}
-									format={xTickFormat}
-									labelProps={{ class: 'text-[10px] fill-muted-foreground' }}
-								/>
-								<!-- Transparent hit target — the canvas cells can't receive pointer events. -->
-								<rect
-									role="presentation"
-									x={0}
-									y={0}
-									width={context.width}
-									height={context.height}
-									fill="transparent"
-									onpointermove={(e) => {
-										const bbox = plotRect(e.currentTarget);
-										const px = e.clientX - bbox.left;
-										const py = e.clientY - bbox.top;
-										const dateKey = invertBand(context.xScale as unknown as BandLike, px);
-										const gpuLabel = invertBand(context.yScale as unknown as BandLike, py);
-										if (dateKey == null || gpuLabel == null) {
-											hoverKey = null;
-											context.tooltip.hide();
-											return;
-										}
-										const key = `${dateKey}|${gpuLabel}`;
-										// Still inside the same cell — the visible tooltip is already correct.
-										if (key === hoverKey) return;
-										const cell = cellLookup.get(key);
-										if (!cell || cell.value === null) {
-											hoverKey = null;
-											context.tooltip.hide();
-											return;
-										}
-										hoverKey = key;
-										context.tooltip.show(e, cell);
-										context.tooltip.series = [
-											{
-												key: 'value',
-												label: cell.gpuLabel,
-												value: cell.value,
-												color: 'var(--color-value)',
-												visible: true,
-												// eslint-disable-next-line @typescript-eslint/no-explicit-any
-												config: {} as any
-											}
-										];
-									}}
-									onpointerleave={() => {
+	{/snippet}
+
+	<div class="flex min-w-0 flex-col gap-3">
+		<div class={cn(chartFrameClass, 'h-[200px]')}>
+			<LayerChart
+				data={cells}
+				x="dateKey"
+				xScale={scaleBand().padding(0.02)}
+				{xDomain}
+				y="gpuLabel"
+				yScale={scaleBand().padding(0.15)}
+				{yDomain}
+				padding={{ left: 48, bottom: 22, top: 4, right: 8 }}
+			>
+				{#snippet children({ context })}
+					<LayerTooltip.Context mode="manual">
+						<!-- One canvas node for all cells (vs one <rect> each) keeps the mount cheap. -->
+						<Canvas>
+							<Cell x="dateKey" y="gpuLabel" fill={cellFill} />
+						</Canvas>
+						<Svg>
+							<Axis placement="left" tickLength={0} rule={false} />
+							<Axis placement="bottom" tickLength={0} rule={false} format={xTickFormat} />
+							<!-- Transparent hit target — the canvas cells can't receive pointer events. -->
+							<rect
+								role="presentation"
+								x={0}
+								y={0}
+								width={context.width}
+								height={context.height}
+								fill="transparent"
+								onpointermove={(e) => {
+									const bbox = plotRect(e.currentTarget);
+									const px = e.clientX - bbox.left;
+									const py = e.clientY - bbox.top;
+									const dateKey = invertBand(context.xScale as unknown as BandLike, px);
+									const gpuLabel = invertBand(context.yScale as unknown as BandLike, py);
+									if (dateKey == null || gpuLabel == null) {
 										hoverKey = null;
-										hoverRect = null;
 										context.tooltip.hide();
-									}}
-								/>
-							</Svg>
-							<Chart.Tooltip
-								indicator="dot"
-								labelFormatter={(v: string) =>
-									new Date(v).toLocaleDateString('en-US', {
-										year: 'numeric',
-										month: 'short',
-										day: 'numeric',
-										hour: 'numeric',
-										minute: 'numeric'
-									})}
-							>
-								{#snippet formatter({ item, name, value })}
-									<div
-										style="--color-bg: {item.color}; --color-border: {item.color};"
-										class="size-2.5 shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)"
-									></div>
-									<div class="flex flex-1 shrink-0 items-center justify-between leading-none">
-										<div class="grid gap-1.5">
-											<span class="text-muted-foreground">{name}</span>
-										</div>
-										<span class="font-mono font-medium text-foreground tabular-nums">
-											{config.format(Number(value))}
-										</span>
-									</div>
-								{/snippet}
-							</Chart.Tooltip>
-						</LayerTooltip.Context>
-					{/snippet}
-				</LayerChart>
-			</Chart.Container>
-		{/if}
-	</Statistics.Content>
-</Statistics.Root>
+										return;
+									}
+									const key = `${dateKey}|${gpuLabel}`;
+									// Still inside the same cell — the visible tooltip is already correct.
+									if (key === hoverKey) return;
+									const cell = cellLookup.get(key);
+									if (!cell || cell.value === null) {
+										hoverKey = null;
+										context.tooltip.hide();
+										return;
+									}
+									hoverKey = key;
+									context.tooltip.show(e, cell);
+									context.tooltip.series = [
+										{
+											key: 'value',
+											label: cell.gpuLabel,
+											value: cell.value,
+											color: cellFill(cell),
+											visible: true,
+											// eslint-disable-next-line @typescript-eslint/no-explicit-any
+											config: {} as any
+										}
+									];
+								}}
+								onpointerleave={() => {
+									hoverKey = null;
+									hoverRect = null;
+									context.tooltip.hide();
+								}}
+							/>
+						</Svg>
+						<ChartTooltip format={config.format} />
+					</LayerTooltip.Context>
+				{/snippet}
+			</LayerChart>
+		</div>
+		<!-- The scale: what the lightest and the strongest cell stand for. -->
+		<div
+			class="flex h-5 items-center gap-2 font-mono text-xs text-muted-foreground tabular-nums"
+			aria-hidden="true"
+		>
+			<span>{config.format(0)}</span>
+			<span
+				class="h-2 w-28 rounded-full border border-border/60"
+				style="background: linear-gradient(to right, {rampColor(0)}, {rampColor(100)});"
+			></span>
+			<span>{config.format(maxValue)}</span>
+		</div>
+	</div>
+</WidgetCard>

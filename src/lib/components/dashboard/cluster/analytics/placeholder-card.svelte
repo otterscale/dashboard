@@ -1,8 +1,10 @@
 <script lang="ts">
-	import MousePointerClick from '@lucide/svelte/icons/mouse-pointer-click';
+	import MousePointerClickIcon from '@lucide/svelte/icons/mouse-pointer-click';
 
-	import * as Statistics from '$lib/components/custom/statistics/index';
+	import WidgetCard from '$lib/components/dashboard/shared/widget-card.svelte';
+	import WidgetState from '$lib/components/dashboard/shared/widget-state.svelte';
 
+	// Shown in place of a detail section until a node or a namespace is picked.
 	let {
 		title,
 		message
@@ -12,18 +14,12 @@
 	} = $props();
 </script>
 
-<Statistics.Root type="count" class="overflow-visible">
-	<Statistics.Header class="flex flex-row items-center gap-2 space-y-0">
-		<div class="grid flex-1 gap-1">
-			<Statistics.Title class="text-base leading-normal text-foreground">
-				{title}
-			</Statistics.Title>
-		</div>
-	</Statistics.Header>
-	<Statistics.Content class="min-h-16">
-		<div class="flex h-[200px] w-full flex-col items-center justify-center gap-2">
-			<MousePointerClick class="size-10 text-muted-foreground/60" />
-			<p class="text-center text-sm text-muted-foreground">{message}</p>
-		</div>
-	</Statistics.Content>
-</Statistics.Root>
+<WidgetCard {title} bodyClass="min-h-[200px]">
+	<WidgetState
+		kind="empty"
+		title={message}
+		description=""
+		icon={MousePointerClickIcon}
+		class="flex-1"
+	/>
+</WidgetCard>

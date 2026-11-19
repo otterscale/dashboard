@@ -28,13 +28,16 @@
 		return `100 * sum by (mode)(rate(node_cpu_seconds_total{instance=~"${fqdn}", mode!="idle"}[5m])) / ${cores}`;
 	};
 	const format = (value: number) => `${value.toFixed(1)}%`;
-	// Calm teal for normal user work; iowait pops in orange (storage bottleneck signal).
+	const axisFormat = (value: number) => `${Math.round(value)}%`;
+	// One blue ramp, told apart by lightness and named in the legend. iowait is the storage
+	// bottleneck signal and takes --chart-1, the step furthest from the card in both themes;
+	// user and system, the bulk of the stack, take the middle steps.
 	const colors = {
-		user: 'var(--chart-2)',
-		system: 'var(--chart-3)',
+		user: 'var(--chart-3)',
+		system: 'var(--chart-2)',
 		iowait: 'var(--chart-1)',
-		softirq: 'var(--chart-5)',
-		steal: 'var(--chart-4)'
+		softirq: 'var(--chart-4)',
+		steal: 'var(--chart-5)'
 	};
 </script>
 
@@ -45,6 +48,7 @@
 	tooltip={m.node_chart_cpu_core_tooltip()}
 	{buildQuery}
 	{format}
+	{axisFormat}
 	{colors}
 	stacked
 	{start}

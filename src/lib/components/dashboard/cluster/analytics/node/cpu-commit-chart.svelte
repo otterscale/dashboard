@@ -35,12 +35,16 @@
 		};
 	};
 	const format = (value: number) => `${value.toFixed(1)}%`;
-	// Semantic colours: the (large) Limit band stays calm/teal, Usage pops on top in orange.
+	const axisFormat = (value: number) => `${Math.round(value)}%`;
+	// One blue ramp, told apart by lightness: Usage is the reading that matters and takes
+	// --chart-1, the step furthest from the card in both themes; Request sits in the middle and
+	// Limit, a ceiling rather than a measurement, takes the quietest step and a dashed line.
 	const colors = {
-		[m.limit()]: 'var(--chart-2)',
+		[m.limit()]: 'var(--chart-4)',
 		[m.request()]: 'var(--chart-3)',
 		[m.usage()]: 'var(--chart-1)'
 	};
+	const dashed = [m.limit()];
 </script>
 
 <AreaTimeSeries
@@ -50,7 +54,9 @@
 	tooltip={m.node_chart_cpu_commit_tooltip()}
 	{buildQuery}
 	{format}
+	{axisFormat}
 	{colors}
+	{dashed}
 	{start}
 	{end}
 	{endIsNow}

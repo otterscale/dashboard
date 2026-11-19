@@ -42,15 +42,19 @@
 		const { value: v, unit } = formatCapacity(value);
 		return `${v.toLocaleString()} ${unit}`;
 	};
-	// Calm teal for the Limit band; Usage pops on top in orange.
+	const cpuAxisFormat = (value: number) => value.toFixed(value < 10 ? 1 : 0);
+	// One blue ramp, told apart by lightness: Usage is the reading that matters and takes
+	// --chart-1, the step furthest from the card in both themes; Request sits in the middle and
+	// Limit, a ceiling rather than a measurement, takes the quietest step and a dashed line.
 	const colors = {
-		[m.limit()]: 'var(--chart-2)',
+		[m.limit()]: 'var(--chart-4)',
 		[m.request()]: 'var(--chart-3)',
 		[m.usage()]: 'var(--chart-1)'
 	};
+	const dashed = [m.limit()];
 </script>
 
-<div class="grid w-full items-start gap-4 lg:grid-cols-2">
+<div class="grid w-full items-stretch gap-5 lg:grid-cols-2">
 	<AreaTimeSeries
 		{client}
 		title={`${m.cpu()} · ${m.commitment()}`}
@@ -58,7 +62,9 @@
 		tooltip={m.ns_commit_cpu_tooltip()}
 		buildQuery={cpuQuery}
 		format={cpuFormat}
+		axisFormat={cpuAxisFormat}
 		{colors}
+		{dashed}
 		{start}
 		{end}
 		{endIsNow}
@@ -72,6 +78,7 @@
 		buildQuery={memQuery}
 		format={memFormat}
 		{colors}
+		{dashed}
 		{start}
 		{end}
 		{endIsNow}

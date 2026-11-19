@@ -1,18 +1,14 @@
 <script lang="ts">
 	import type { PrometheusDriver } from 'prometheus-query';
-	import { onDestroy, onMount } from 'svelte';
 
-	import { ReloadManager } from '$lib/components/custom/reloader';
-	import { TopBarList } from '$lib/components/custom/top-bar-list';
+	import { orThrow, useLoadable } from '$lib/components/dashboard/shared/loadable.svelte';
+	import { type Level, levelOf } from '$lib/components/dashboard/shared/status';
 	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/messages';
-	import {
-		classifyThreshold,
-		fetchCombinedInstant,
-		LIVE_PODS,
-		type ThresholdLevel,
-		withoutLimit
-	} from '$lib/prometheus';
+	import { fetchCombinedInstantOrNull, LIVE_PODS, withoutLimit } from '$lib/prometheus';
+
+	import type { RankingRow } from '../ranking';
+	import RankingList from '../ranking-list.svelte';
 
 	// Reusable "top namespaces" ranking. `kind="cpu"` and `kind="memory"` rank by declared
 	// limit and print usage / request / limit together; `kind="gpu"` ranks by nvidia.com/gpu
@@ -109,50 +105,24 @@
 	}
 
 	// Only the restart ranking carries a health threshold: the list only ever shows namespaces
-	// with ≥1 restart, so 1–10/h is orange and >10/h (sustained crash-looping) turns red.
-	function classes(value: number): { barClass?: string; textClass?: string } {
-		if (kind !== 'restart') return {};
-		const level: ThresholdLevel = classifyThreshold(value, { green: 0, orange: 10 });
-		return {
-			barClass:
-				level === 'red' ? 'bg-destructive' : level === 'orange' ? 'bg-chart-1' : 'bg-chart-2',
-			textClass: level === 'red' ? 'text-destructive' : ''
-		};
+	// with at least one restart, so 1-10/h is a warning and more than 10/h (sustained
+	// crash-looping) is danger. Every other ranking keeps the plain bar colour.
+	function levelFor(value: number): Level | undefined {
+		return kind === 'restart' ? levelOf(value, { warn: 0, danger: 10 }) : undefined;
 	}
 
 	// Raw rows keep the namespace; the displayed label is resolved at render so bars relabel
 	// reactively if the workspace map arrives after the first fetch.
-	type RawBar = {
+	type RawRow = {
 		namespace: string;
 		value: number;
 		displayValue: string;
 		warning?: string;
-		barClass?: string;
-		textClass?: string;
+		level?: Level;
 	};
-	let rawBars = $state<RawBar[]>([]);
-	let isLoaded = $state(false);
 
-	// label = workspace name (fallback: namespace); id = namespace (click payload for drill-in).
-	// Bars resolved to a workspace get a "Workspace" badge, like the standalone-model tag.
-	const bars = $derived(
-		rawBars.map((b) => {
-			const workspace = namespaceToWorkspace[b.namespace];
-			return {
-				label: workspace || b.namespace,
-				id: b.namespace,
-				badge: workspace ? m.workspace() : undefined,
-				value: b.value,
-				displayValue: b.displayValue,
-				warning: b.warning,
-				barClass: b.barClass,
-				textClass: b.textClass
-			};
-		})
-	);
-
-	async function fetchCommitment() {
-		const result = await fetchCombinedInstant(prometheusDriver, commitmentQueries);
+	async function loadCommitment(): Promise<RawRow[]> {
+		const result = orThrow(await fetchCombinedInstantOrNull(prometheusDriver, commitmentQueries));
 		const byNamespace: Record<string, Commitment & { uncapped: number; containers: number }> = {};
 		for (const [key, vectors] of Object.entries(result)) {
 			for (const v of vectors) {
@@ -171,7 +141,7 @@
 		}
 		const rows = Object.entries(byNamespace);
 		const format = commitmentFormatter(rows.map(([, c]) => c));
-		rawBars = rows
+		return rows
 			.map(([namespace, c]) => ({
 				namespace,
 				// Ranked by limit: it is the number the question is about, and usage sitting beside it
@@ -189,57 +159,63 @@
 			.sort((a, b) => b.value - a.value);
 	}
 
-	async function fetch() {
-		try {
-			if (isCommitment) {
-				await fetchCommitment();
-				return;
-			}
-			const response = await prometheusDriver.instantQuery(query);
-			const series = (response.result ?? []) as {
-				metric: { labels: Record<string, string> };
-				value?: { value: unknown };
-			}[];
-			rawBars = series
-				.map((s) => {
-					const namespace = s.metric?.labels?.namespace ?? '';
-					const value = Number(s.value?.value);
-					return namespace && Number.isFinite(value)
-						? { namespace, value, displayValue: displayValue(value), ...classes(value) }
-						: null;
-				})
-				.filter((b): b is RawBar => b !== null)
-				.sort((a, b) => b.value - a.value);
-		} catch (error) {
-			console.error('Failed to fetch namespace ranking:', error);
-		}
+	async function loadSingle(): Promise<RawRow[]> {
+		const response = await prometheusDriver.instantQuery(query);
+		const series = (response.result ?? []) as {
+			metric: { labels: Record<string, string> };
+			value?: { value: unknown };
+		}[];
+		return series
+			.map((s) => {
+				const namespace = s.metric?.labels?.namespace ?? '';
+				const value = Number(s.value?.value);
+				return namespace && Number.isFinite(value)
+					? { namespace, value, displayValue: displayValue(value), level: levelFor(value) }
+					: null;
+			})
+			.filter((row): row is NonNullable<typeof row> => row !== null)
+			.sort((a, b) => b.value - a.value);
 	}
 
-	const reloadManager = new ReloadManager(fetch);
+	const ranking = useLoadable<RawRow[]>(
+		async () => {
+			const rows = isCommitment ? await loadCommitment() : await loadSingle();
+			return rows.length > 0 ? rows : null;
+		},
+		() => isReloading ?? false
+	);
 
-	$effect(() => {
-		if (isReloading) {
-			reloadManager.restart();
-		} else {
-			reloadManager.stop();
-		}
-	});
+	// label = workspace name (fallback: namespace); id = namespace (click payload for drill-in).
+	// Rows resolved to a workspace get a "Workspace" badge, like the standalone-model tag.
+	const rows = $derived<RankingRow[]>(
+		(ranking.data ?? []).map((row) => {
+			const workspace = namespaceToWorkspace[row.namespace];
+			return {
+				label: workspace || row.namespace,
+				id: row.namespace,
+				badge: workspace ? m.workspace() : undefined,
+				value: row.value,
+				displayValue: row.displayValue,
+				warning: row.warning,
+				level: row.level
+			};
+		})
+	);
 
-	onMount(async () => {
-		await fetch();
-		isLoaded = true;
-	});
-	onDestroy(() => {
-		reloadManager.stop();
-	});
+	// An empty restart list is the healthy answer, and no GPU limits means no GPU: say which.
+	const emptyTitle = $derived(
+		kind === 'restart' ? m.dash_no_restarts() : kind === 'gpu' ? m.dash_no_gpu() : undefined
+	);
 </script>
 
-<TopBarList
+<RankingList
 	{title}
 	{description}
-	{tooltip}
-	{bars}
-	{isLoaded}
-	onBarClick={onNamespaceClick}
-	scrollable
+	info={tooltip}
+	{rows}
+	status={ranking.status}
+	stale={ranking.stale}
+	onRowClick={onNamespaceClick}
+	{emptyTitle}
+	emptyDescription={emptyTitle ? '' : undefined}
 />

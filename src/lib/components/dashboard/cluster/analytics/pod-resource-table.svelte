@@ -1,31 +1,31 @@
 <script lang="ts">
 	import ArrowDownIcon from '@lucide/svelte/icons/arrow-down';
 	import ArrowUpIcon from '@lucide/svelte/icons/arrow-up';
-	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
 	import ChevronsUpDownIcon from '@lucide/svelte/icons/chevrons-up-down';
-	import InfoIcon from '@lucide/svelte/icons/info';
-	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import Maximize2Icon from '@lucide/svelte/icons/maximize-2';
 	import type { PrometheusDriver } from 'prometheus-query';
-	import { onDestroy, onMount } from 'svelte';
 
 	import { page } from '$app/state';
-	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Statistics from '$lib/components/custom/statistics/index';
+	import { orThrow, useLoadable } from '$lib/components/dashboard/shared/loadable.svelte';
+	import { dataTable, levelOf, levelText } from '$lib/components/dashboard/shared/status';
+	import WidgetCard from '$lib/components/dashboard/shared/widget-card.svelte';
 	import { GpuAllocationDialog } from '$lib/components/gpu-allocation';
-	import { buttonVariants } from '$lib/components/ui/button';
-	import { ScrollArea } from '$lib/components/ui/scroll-area';
-	import * as Sheet from '$lib/components/ui/sheet';
-	import * as Table from '$lib/components/ui/table/index.js';
-	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { Button } from '$lib/components/shadcnio/button';
+	import {
+		Sheet,
+		SheetBody,
+		SheetContent,
+		SheetHeader,
+		SheetTrigger
+	} from '$lib/components/shadcnio/sheet';
+	import { Skeleton } from '$lib/components/shadcnio/skeleton';
+	import { Tooltip, TooltipContent, TooltipTrigger } from '$lib/components/shadcnio/tooltip';
 	import { formatCapacity, formatDuration, formatIO } from '$lib/formatter';
 	import { m } from '$lib/messages';
 	import {
-		classifyThreshold,
 		escapePromqlStringLiteral,
-		fetchCombinedInstant,
-		LIVE_PODS,
-		thresholdClasses
+		fetchCombinedInstantOrNull,
+		LIVE_PODS
 	} from '$lib/prometheus';
 	import { cn } from '$lib/utils';
 
@@ -123,11 +123,6 @@
 		};
 	});
 
-	let rows = $state<PodRow[]>([]);
-	let cpuAllocatable = $state<Record<string, number>>({});
-	let memAllocatable = $state<Record<string, number>>({});
-	let isLoaded = $state(false);
-
 	// Every column is always present, GPU included: a namespace whose pods hold no GPU reads "—"
 	// rather than changing the table's shape, so the same header sits in the same place everywhere.
 	type SortKey =
@@ -166,27 +161,15 @@
 		return namespaceToWorkspace[ns] || ns || '—';
 	}
 
-	const sortedRows = $derived.by(() => {
-		const list = [...rows];
-		const key = sortKey;
-		// Default order surfaces trouble first: most-restarted pods on top, then the heaviest.
-		if (key === null) return list.sort((a, b) => b.restarts - a.restarts || b.mem - a.mem);
-		const direction = sortAscending ? 1 : -1;
-		if (key === 'pod') return list.sort((a, b) => direction * a.pod.localeCompare(b.pod));
-		if (key === 'workspace') {
-			return list.sort(
-				(a, b) =>
-					direction * workspaceOf(a.namespace).localeCompare(workspaceOf(b.namespace)) ||
-					a.pod.localeCompare(b.pod)
-			);
-		}
-		// `gpuUtil` is null for pods HAMi never saw; -1 keeps them below a genuine 0%.
-		return list.sort((a, b) => direction * ((a[key] ?? -1) - (b[key] ?? -1)));
-	});
+	type Snapshot = {
+		rows: PodRow[];
+		cpuAllocatable: Record<string, number>;
+		memAllocatable: Record<string, number>;
+	};
 
-	async function fetch() {
-		try {
-			const result = await fetchCombinedInstant(client, queries);
+	const snapshot = useLoadable<Snapshot>(
+		async () => {
+			const result = orThrow(await fetchCombinedInstantOrNull(client, queries));
 			const byPod: Record<string, PodRow> = {};
 			const cpuByNode: Record<string, number> = {};
 			const memByNode: Record<string, number> = {};
@@ -248,17 +231,39 @@
 					assign[key]?.(ensure(ns, p), value, labels);
 				}
 			}
-			cpuAllocatable = cpuByNode;
-			memAllocatable = memByNode;
 			// Drops the pods a cluster-wide HAMi query dragged in from other nodes.
 			const inScope = (r: PodRow) =>
 				scope.kind === 'node' ? r.node === scope.value : r.namespace === scope.value;
 			// Order lives in `sortedRows` so a reload never undoes the column the user picked.
-			rows = Object.values(byPod).filter(inScope);
-		} catch (error) {
-			console.error('Failed to fetch pod resource table:', error);
+			const rows = Object.values(byPod).filter(inScope);
+			return rows.length > 0
+				? { rows, cpuAllocatable: cpuByNode, memAllocatable: memByNode }
+				: null;
+		},
+		() => isReloading ?? false
+	);
+
+	const rows = $derived(snapshot.data?.rows ?? []);
+	const cpuAllocatable = $derived(snapshot.data?.cpuAllocatable ?? {});
+	const memAllocatable = $derived(snapshot.data?.memAllocatable ?? {});
+
+	const sortedRows = $derived.by(() => {
+		const list = [...rows];
+		const key = sortKey;
+		// Default order surfaces trouble first: most-restarted pods on top, then the heaviest.
+		if (key === null) return list.sort((a, b) => b.restarts - a.restarts || b.mem - a.mem);
+		const direction = sortAscending ? 1 : -1;
+		if (key === 'pod') return list.sort((a, b) => direction * a.pod.localeCompare(b.pod));
+		if (key === 'workspace') {
+			return list.sort(
+				(a, b) =>
+					direction * workspaceOf(a.namespace).localeCompare(workspaceOf(b.namespace)) ||
+					a.pod.localeCompare(b.pod)
+			);
 		}
-	}
+		// `gpuUtil` is null for pods HAMi never saw; -1 keeps them below a genuine 0%.
+		return list.sort((a, b) => direction * ((a[key] ?? -1) - (b[key] ?? -1)));
+	});
 
 	/** Share of the owning node's allocatable capacity, as `kubectl describe node` reports it. */
 	function share(value: number, allocatable: Record<string, number>, node: string): number | null {
@@ -305,119 +310,106 @@
 		return `${mantissa(value)} ${SHORT_RATE_UNITS[unit] ?? unit}`;
 	}
 
-	function pctClass(value: number): string {
-		return thresholdClasses(classifyThreshold(value, { green: 70, orange: 90 })).text;
-	}
 	// Usage prints no share of its own: what decides whether a pod gets throttled or OOM-killed is
-	// its own limit, which sits in the next column, so the color carries that ratio instead.
-	// Uncolored when uncapped — there is nothing to be close to. Deliberately not applied to GPU
+	// its own limit, which sits in the next column, so the colour carries that ratio instead.
+	// Uncoloured when uncapped — there is nothing to be close to. Deliberately not applied to GPU
 	// memory: vLLM pre-allocates its KV cache to ~90% of the booking, so every serving pod would
 	// sit permanently red.
 	function usageClass(used: number, limit: number): string {
-		return limit > 0 ? pctClass((used / limit) * 100) : '';
+		return limit > 0 ? levelText[levelOf((used / limit) * 100)] : '';
 	}
+	// No restarts is the normal case and takes no colour.
 	function restartClass(n: number): string {
 		if (n >= 5) return 'font-bold text-destructive';
-		if (n >= 1) return 'text-chart-1';
-		return 'text-muted-foreground';
+		if (n >= 1) return 'text-warning-foreground';
+		return '';
 	}
 
-	const reloadManager = new ReloadManager(fetch);
-
-	$effect(() => {
-		if (isReloading) {
-			reloadManager.restart();
-		} else {
-			reloadManager.stop();
-		}
-	});
-
-	onMount(async () => {
-		await fetch();
-		isLoaded = true;
-	});
-	onDestroy(() => {
-		reloadManager.stop();
-	});
-
 	const SCROLL_AFTER = 8;
+
+	let open = $state(false);
+
+	// The header cells stay put while the body scrolls under them, so they need an opaque ground:
+	// the table's muted tint mixed onto the card instead of laid over it.
+	const HEAD_GROUND = 'bg-[color-mix(in_oklab,var(--muted)_40%,var(--card))]';
+	const groupHead = cn(dataTable.groupHead, HEAD_GROUND, 'sticky top-0 z-20');
+	const head = cn(dataTable.head, HEAD_GROUND, 'sticky top-8 z-20');
+	// First cell of a column group.
+	const GROUP_START = 'border-l border-l-border/60';
+	// A pod that restarted five times or more tints its whole row; the sticky name cell is opaque,
+	// so it carries the same tint mixed onto the card.
+	const ROW_ALERT = 'bg-destructive/5';
+	const STICKY_ALERT = 'bg-[color-mix(in_oklab,var(--destructive)_5%,var(--card))]';
 </script>
 
 <!-- Sized in `ch` against a monospace face, so the widest possible sample already fits and nothing
      reflows when the values change. -->
 {#snippet valueCell(text: string, width: string, klass: string)}
-	<Table.Cell class={cn('text-right font-mono whitespace-nowrap tabular-nums', klass)}>
+	<td class={cn(dataTable.cell, text === DASH && dataTable.absent, klass)}>
 		<span class="inline-block text-right {width}">{text}</span>
-	</Table.Cell>
+	</td>
 {/snippet}
 
-<!-- Requests and limits print their share of the node in parentheses; usage never does, so a "%"
-     in this table always means the same thing. The parentheses keep their slot even when there is
-     no share to show, which is what stops a column of unset `0`s from collapsing. Only the number
-     inside is padded — the brackets themselves stay put against the value. -->
+<!-- Requests and limits carry their share of the node in a tooltip; usage never does, so a "%"
+     in this table always means the same thing. -->
 {#snippet specCell(text: string, pct: number | null, width: string, unset: boolean)}
-	<Table.Cell
-		class={cn(
-			'text-right font-mono whitespace-nowrap tabular-nums',
-			unset && 'text-muted-foreground'
-		)}
-	>
+	<td class={cn(dataTable.cell, unset && dataTable.absent)}>
 		{#if unset || pct === null}
 			<span class="inline-block text-right {width}">{text}</span>
 		{:else}
-			<Tooltip.Root>
-				<Tooltip.Trigger>
-					{#snippet child({ props })}
-						<!-- The underline waits for the pointer: 242 permanently dotted cells would be
-						     louder than the brackets this replaced. -->
+			<Tooltip>
+				<TooltipTrigger>
+					{#snippet asChild(props)}
+						<!-- The underline waits for the pointer: hundreds of permanently dotted cells would
+						     be louder than the values themselves. -->
 						<span
-							{...props}
-							class="inline-block cursor-help text-right underline decoration-transparent decoration-dotted underline-offset-4 hover:decoration-current {width}"
+							{...props({
+								class: cn(
+									'inline-block cursor-help text-right underline decoration-transparent decoration-dotted underline-offset-4 hover:decoration-current',
+									width
+								)
+							})}
 						>
 							{text}
 							<span class="sr-only">{m.share_of_allocatable({ percent: Math.round(pct) })}</span>
 						</span>
 					{/snippet}
-				</Tooltip.Trigger>
-				<Tooltip.Content>
-					<span class="whitespace-nowrap">
-						{m.share_of_allocatable({ percent: Math.round(pct) })}
-					</span>
-				</Tooltip.Content>
-			</Tooltip.Root>
+				</TooltipTrigger>
+				<TooltipContent class="whitespace-nowrap">
+					{m.share_of_allocatable({ percent: Math.round(pct) })}
+				</TooltipContent>
+			</Tooltip>
 		{/if}
-	</Table.Cell>
+	</td>
 {/snippet}
 
 <!-- The sort arrow occupies its slot whether or not the column is active, so switching columns
      never resizes them. Inactive shows the both-ways chevron at low contrast — the only hint that
      a header is clickable at all. -->
-{#snippet sortHead(key: SortKey, label: string, group = false)}
-	<Table.Head
-		class={cn(
-			'whitespace-nowrap',
-			group && 'border-l',
-			key !== 'pod' && key !== 'workspace' && 'text-right'
-		)}
+{#snippet sortHead(key: SortKey, label: string, klass = '')}
+	<th
+		scope="col"
+		class={cn(head, klass)}
+		aria-sort={sortKey !== key ? 'none' : sortAscending ? 'ascending' : 'descending'}
 	>
 		<button
 			type="button"
 			class={cn(
-				'inline-flex items-center gap-1 hover:text-foreground',
+				'inline-flex items-center gap-1 rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/60',
 				sortKey === key && 'text-foreground'
 			)}
 			onclick={() => toggleSort(key)}
 		>
 			{label}
 			{#if sortKey !== key}
-				<ChevronsUpDownIcon class="size-3 shrink-0 opacity-30" />
+				<ChevronsUpDownIcon class="size-3 shrink-0 opacity-40" aria-hidden="true" />
 			{:else if sortAscending}
-				<ArrowUpIcon class="size-3 shrink-0" />
+				<ArrowUpIcon class="size-3 shrink-0" aria-hidden="true" />
 			{:else}
-				<ArrowDownIcon class="size-3 shrink-0" />
+				<ArrowDownIcon class="size-3 shrink-0" aria-hidden="true" />
 			{/if}
 		</button>
-	</Table.Head>
+	</th>
 {/snippet}
 
 <!-- The count comes from KSM, which sees every pod. Clicking it opens the node's Pod → GPU → Node
@@ -425,9 +417,9 @@
      without overflowing, and the same view the node kind-viewer offers. -->
 {#snippet cardsCell(row: PodRow)}
 	{@const cards = Math.round(row.gpuCards)}
-	<Table.Cell class="border-l text-right font-mono tabular-nums">
+	<td class={cn(dataTable.cell, GROUP_START, cards === 0 && dataTable.absent)}>
 		{#if cards === 0}
-			—
+			{DASH}
 		{:else if !row.node}
 			{cards}
 		{:else}
@@ -443,88 +435,112 @@
 				{/snippet}
 			</GpuAllocationDialog>
 		{/if}
-	</Table.Cell>
+	</td>
 {/snippet}
 
-{#snippet table()}
-	<!-- `min-w-0` all the way down, or nothing scrolls: every ancestor here is a flex item, and a
-	     flex item's default `min-width: auto` makes it grow to its content instead of letting
-	     Table.Root's own `overflow-x-auto` container take over. A wide table then pushes the whole
-	     page sideways rather than scrolling inside its card. -->
-	<div class="min-w-0">
-		<Table.Root>
-			<Table.Header>
-				<Table.Row class="hover:bg-transparent">
-					<Table.Head colspan={scope.kind === 'node' ? 2 : 1}></Table.Head>
-					<Table.Head colspan={3} class="border-l text-center whitespace-nowrap">
-						{m.cpu()}
-					</Table.Head>
-					<Table.Head colspan={3} class="border-l text-center whitespace-nowrap">
-						{m.memory()}
-					</Table.Head>
-					<Table.Head colspan={4} class="border-l text-center whitespace-nowrap">
-						{m.gpu()}
-					</Table.Head>
-					<Table.Head colspan={3} class="border-l text-center whitespace-nowrap">
-						{m.runtime()}
-					</Table.Head>
-				</Table.Row>
-				<Table.Row>
+<!-- The table scrolls inside this box in both directions and never widens the page. `bounded`
+     caps the height once there are more rows than fit; the two header rows and the pod name
+     stay in view either way. -->
+{#snippet table(bounded: boolean)}
+	<!-- Focusable so the keyboard can scroll it. -->
+	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+	<div
+		class={cn(dataTable.scroller, bounded && 'max-h-96 overflow-y-auto')}
+		data-scroll-x
+		role="region"
+		aria-label={m.pod_detail_table()}
+		tabindex="0"
+	>
+		<table class={dataTable.table}>
+			<thead>
+				<tr>
 					<!-- A node-scoped table spans workspaces, which is the first thing to know about a
 					     pod there; the namespace-scoped one already answers that in its title. -->
 					{#if scope.kind === 'node'}
-						{@render sortHead('workspace', m.workspace())}
+						<td class={groupHead}></td>
 					{/if}
-					{@render sortHead('pod', m.pod())}
-					{@render sortHead('cpu', m.usage(), true)}
+					<td class={cn(groupHead, dataTable.sticky, HEAD_GROUND, 'z-30')}></td>
+					<th scope="colgroup" colspan={3} class={cn(groupHead, GROUP_START)}>{m.cpu()}</th>
+					<th scope="colgroup" colspan={3} class={cn(groupHead, GROUP_START)}>{m.memory()}</th>
+					<th scope="colgroup" colspan={4} class={cn(groupHead, GROUP_START)}>{m.gpu()}</th>
+					<th scope="colgroup" colspan={3} class={cn(groupHead, GROUP_START)}>{m.runtime()}</th>
+				</tr>
+				<tr>
+					{#if scope.kind === 'node'}
+						{@render sortHead('workspace', m.workspace(), dataTable.headFirst)}
+					{/if}
+					{@render sortHead(
+						'pod',
+						m.pod(),
+						cn(dataTable.headFirst, dataTable.sticky, HEAD_GROUND, 'z-30')
+					)}
+					{@render sortHead('cpu', m.usage(), GROUP_START)}
 					{@render sortHead('cpuRequest', m.request())}
 					{@render sortHead('cpuLimit', m.limit())}
-					{@render sortHead('mem', m.usage(), true)}
+					{@render sortHead('mem', m.usage(), GROUP_START)}
 					{@render sortHead('memRequest', m.request())}
 					{@render sortHead('memLimit', m.limit())}
-					{@render sortHead('gpuCards', m.gpu_cards(), true)}
+					{@render sortHead('gpuCards', m.gpu_cards(), GROUP_START)}
 					{@render sortHead('gpuAllocated', m.gpu_allocated())}
 					{@render sortHead('gpuUsed', m.usage())}
 					{@render sortHead('gpuUtil', m.utilization())}
-					{@render sortHead('restarts', m.restarts(), true)}
+					{@render sortHead('restarts', m.restarts(), GROUP_START)}
 					{@render sortHead('ageSec', m.age())}
 					{@render sortHead('net', m.network())}
-				</Table.Row>
-			</Table.Header>
-			<Table.Body>
+				</tr>
+			</thead>
+			<tbody>
 				{#each sortedRows as row (row.namespace + '/' + row.pod)}
 					{@const age = formatDuration(row.ageSec)}
-					<Table.Row class={cn(row.restarts >= 5 && 'bg-destructive/5')}>
+					{@const alert = row.restarts >= 5}
+					<tr class={cn('group/row hover:bg-muted/40', alert && ROW_ALERT)}>
 						{#if scope.kind === 'node'}
-							<Table.Cell class="max-w-[12rem] truncate">{workspaceOf(row.namespace)}</Table.Cell>
+							<td class={cn(dataTable.cell, dataTable.cellFirst, 'font-normal')}>
+								<span
+									class="block max-w-24 truncate sm:max-w-40"
+									title={workspaceOf(row.namespace)}
+								>
+									{workspaceOf(row.namespace)}
+								</span>
+							</td>
 						{/if}
 						<!-- The second identity fact rides in the tooltip rather than a second line: the
 						     share percentages need the node to be readable, but a subtitle raises every
-						     row's height. Tooltip.Content is an inline-flex row, so one child only. -->
-						<Table.Cell class="max-w-[16rem] font-medium">
-							<Tooltip.Root>
-								<Tooltip.Trigger>
-									{#snippet child({ props })}
-										<span {...props} class="block truncate">{row.pod}</span>
+						     row's height. -->
+						<th
+							scope="row"
+							class={cn(
+								dataTable.cell,
+								dataTable.cellFirst,
+								dataTable.sticky,
+								alert
+									? STICKY_ALERT
+									: 'group-hover/row:bg-[color-mix(in_oklab,var(--muted)_40%,var(--card))]'
+							)}
+						>
+							<Tooltip>
+								<TooltipTrigger>
+									{#snippet asChild(props)}
+										<span {...props({ class: 'block max-w-32 truncate sm:max-w-64' })}>
+											{row.pod}
+										</span>
 									{/snippet}
-								</Tooltip.Trigger>
-								<Tooltip.Content>
-									<span class="whitespace-nowrap">
-										{#if scope.kind === 'node'}
-											<span class="text-background/70">{m.namespace()}</span>
-											<span class="ml-2 font-mono">{row.namespace || '—'}</span>
-										{:else}
-											<span class="text-background/70">{m.node()}</span>
-											<span class="ml-2 font-mono">{row.node || '—'}</span>
-										{/if}
-									</span>
-								</Tooltip.Content>
-							</Tooltip.Root>
-						</Table.Cell>
+								</TooltipTrigger>
+								<TooltipContent class="whitespace-nowrap">
+									{#if scope.kind === 'node'}
+										<span class="opacity-70">{m.namespace()}</span>
+										<span class="font-mono">{row.namespace || DASH}</span>
+									{:else}
+										<span class="opacity-70">{m.node()}</span>
+										<span class="font-mono">{row.node || DASH}</span>
+									{/if}
+								</TooltipContent>
+							</Tooltip>
+						</th>
 						{@render valueCell(
 							formatCores(row.cpu),
 							'w-[5ch]',
-							cn('border-l', usageClass(row.cpu, row.cpuLimit))
+							cn(GROUP_START, usageClass(row.cpu, row.cpuLimit))
 						)}
 						{@render specCell(
 							formatCores(row.cpuRequest),
@@ -541,7 +557,7 @@
 						{@render valueCell(
 							formatBytes(row.mem),
 							'w-[7ch]',
-							cn('border-l', usageClass(row.mem, row.memLimit))
+							cn(GROUP_START, usageClass(row.mem, row.memLimit))
 						)}
 						{@render specCell(
 							formatBytes(row.memRequest),
@@ -572,67 +588,69 @@
 						{@render valueCell(
 							String(row.restarts),
 							'w-[3ch]',
-							cn('border-l', restartClass(row.restarts))
+							cn(GROUP_START, restartClass(row.restarts))
 						)}
 						<!-- Only the number is padded: `formatDuration` returns a translated word, and a `ch`
 						     slot sized for "Minute" would not hold every locale's. -->
-						<Table.Cell class="text-right font-mono whitespace-nowrap tabular-nums">
+						<td class={dataTable.cell}>
 							<span class="inline-block w-[4ch] text-right">{age.value.toFixed(1)}</span>
 							{age.unit}
-						</Table.Cell>
+						</td>
 						{@render valueCell(formatRate(row.net), 'w-[8ch]', '')}
-					</Table.Row>
+					</tr>
 				{/each}
-			</Table.Body>
-		</Table.Root>
+			</tbody>
+		</table>
 	</div>
 {/snippet}
 
-<Statistics.Root type="count" class="min-w-0 overflow-visible">
-	<Statistics.Header class="flex flex-row items-center gap-2 space-y-0">
-		<div class="grid flex-1 gap-1">
-			<Statistics.Title class="text-base leading-normal text-foreground">
-				{m.pod_detail_table()}
-			</Statistics.Title>
-			<p class="text-sm text-muted-foreground">{m.pod_detail_table_description()}</p>
-		</div>
-		<Sheet.Root>
-			<Sheet.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}>
-				<Maximize2Icon class="size-4 text-muted-foreground" />
-			</Sheet.Trigger>
-			<Sheet.Content class="flex min-w-[50vw] flex-col gap-4 overflow-auto p-8">
-				<Sheet.Header class="p-0">
-					<Sheet.Title>{m.pod_detail_table()}</Sheet.Title>
-					<Sheet.Description>{m.pod_detail_table_description()}</Sheet.Description>
-				</Sheet.Header>
-				{@render table()}
-			</Sheet.Content>
-		</Sheet.Root>
-		<Tooltip.Root>
-			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}>
-				<InfoIcon class="size-4 text-muted-foreground" />
-			</Tooltip.Trigger>
-			<Tooltip.Content class="max-w-xs">
-				<p>{m.pod_detail_table_tooltip()}</p>
-			</Tooltip.Content>
-		</Tooltip.Root>
-	</Statistics.Header>
-	<Statistics.Content class="min-h-16 min-w-0">
-		{#if !isLoaded}
-			<div class="flex h-50 w-full items-center justify-center">
-				<LoaderCircle class="size-12 animate-spin" />
-			</div>
-		{:else if rows.length === 0}
-			<div class="flex h-50 w-full flex-col items-center justify-center">
-				<ChartColumnIcon class="size-12 animate-pulse text-muted-foreground" />
-				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
-			</div>
-		{:else if rows.length > SCROLL_AFTER}
-			<ScrollArea class="h-96 w-full min-w-0">
-				{@render table()}
-			</ScrollArea>
-		{:else}
-			{@render table()}
+<WidgetCard
+	title={m.pod_detail_table()}
+	description={m.pod_detail_table_description()}
+	info={m.pod_detail_table_tooltip()}
+	status={snapshot.status}
+	stale={snapshot.stale}
+	class="min-w-0"
+	bodyClass="min-h-50"
+>
+	{#snippet action()}
+		{#if snapshot.status === 'ready'}
+			<Sheet {open} onOpenChange={(details) => (open = details.open)}>
+				<SheetTrigger>
+					{#snippet asChild(props)}
+						<Button
+							{...props({ class: 'text-muted-foreground' })}
+							variant="ghost"
+							size="icon-sm"
+							aria-label={m.expand()}
+							title={m.expand()}
+						>
+							<Maximize2Icon aria-hidden="true" />
+						</Button>
+					{/snippet}
+				</SheetTrigger>
+				<SheetContent class="data-[side=right]:w-full data-[side=right]:sm:max-w-[min(96vw,96rem)]">
+					<SheetHeader
+						title={m.pod_detail_table()}
+						description={m.pod_detail_table_description()}
+						class="pe-12"
+					/>
+					<SheetBody class="px-4 pb-4">
+						{@render table(false)}
+					</SheetBody>
+				</SheetContent>
+			</Sheet>
 		{/if}
-	</Statistics.Content>
-</Statistics.Root>
+	{/snippet}
+
+	{#snippet skeleton()}
+		<div class="flex flex-col gap-2" aria-hidden="true">
+			<Skeleton class="h-16 w-full" />
+			{#each { length: 3 }, i (i)}
+				<Skeleton class="h-8 w-full" />
+			{/each}
+		</div>
+	{/snippet}
+
+	{@render table(rows.length > SCROLL_AFTER)}
+</WidgetCard>

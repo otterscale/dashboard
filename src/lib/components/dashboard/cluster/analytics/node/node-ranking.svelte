@@ -1,10 +1,12 @@
 <script lang="ts">
 	import type { PrometheusDriver } from 'prometheus-query';
-	import { onDestroy, onMount } from 'svelte';
 
-	import { ReloadManager } from '$lib/components/custom/reloader';
-	import { type TopBar, TopBarList } from '$lib/components/custom/top-bar-list';
-	import { classifyThreshold, type ThresholdLevel } from '$lib/prometheus';
+	import { useLoadable } from '$lib/components/dashboard/shared/loadable.svelte';
+	import { type Level, levelOf } from '$lib/components/dashboard/shared/status';
+	import { m } from '$lib/messages';
+
+	import type { RankingRow } from '../ranking';
+	import RankingList from '../ranking-list.svelte';
 
 	// Single-value node rankings complementing the CPU/Memory pressure cards. `pods` and
 	// `restart` are kube-state-metrics joined to `kube_pod_info` for the `node` label;
@@ -41,69 +43,55 @@
 	});
 	const labelKey = $derived(kind === 'gpu' ? 'hostname' : 'node');
 
-	let bars = $state<TopBar[]>([]);
-	let isLoaded = $state(false);
-
 	function displayValue(value: number): string {
 		return kind === 'restart' ? `${Math.round(value)}` : `${Math.round(value)}%`;
 	}
-	// Pods/restarts carry a health meaning, so colour those bars by threshold. Pod density
-	// reads as scheduling pressure (green ≤70%, orange ≤90%, red above). Restarts only ever
-	// list nodes with ≥1 restart, so green never shows — 1–10/h is orange, >10/h (sustained
-	// crash-looping) turns red. GPU utilisation is the opposite — high is the desired state —
-	// so it gets one calm colour and lets the descending rank surface idle nodes instead.
-	function classes(value: number): { barClass?: string; textClass?: string } {
-		if (kind === 'gpu') return { barClass: 'bg-chart-2' };
-		const level: ThresholdLevel =
-			kind === 'pods'
-				? classifyThreshold(value, { green: 70, orange: 90 })
-				: classifyThreshold(value, { green: 0, orange: 10 });
-		return {
-			barClass:
-				level === 'red' ? 'bg-destructive' : level === 'orange' ? 'bg-chart-1' : 'bg-chart-2',
-			textClass: level === 'red' ? 'text-destructive' : ''
-		};
+	// Pods/restarts carry a health meaning, so those bars are coloured by threshold. Pod density
+	// reads as scheduling pressure (fine up to 70%, warning up to 90%, danger above). Restarts only
+	// ever list nodes with at least one restart: 1-10/h is a warning, more than 10/h (sustained
+	// crash-looping) is danger. GPU utilisation is the opposite — high is the desired state — so
+	// it stays the plain bar colour and lets the descending rank surface idle nodes instead.
+	function levelFor(value: number): Level | undefined {
+		if (kind === 'gpu') return undefined;
+		return kind === 'pods' ? levelOf(value) : levelOf(value, { warn: 0, danger: 10 });
 	}
 
-	async function fetch() {
-		try {
+	const ranking = useLoadable<RankingRow[]>(
+		async () => {
 			const response = await prometheusDriver.instantQuery(query);
 			const series = (response.result ?? []) as {
 				metric: { labels: Record<string, string> };
 				value?: { value: unknown };
 			}[];
-			bars = series
+			const rows = series
 				.map((s) => {
 					const node = s.metric?.labels?.[labelKey] ?? '';
 					const value = Number(s.value?.value);
 					return node && Number.isFinite(value)
-						? { label: node, value, displayValue: displayValue(value), ...classes(value) }
+						? { label: node, value, displayValue: displayValue(value), level: levelFor(value) }
 						: null;
 				})
-				.filter((b): b is TopBar => b !== null)
+				.filter((row): row is NonNullable<typeof row> => row !== null)
 				.sort((a, b) => b.value - a.value);
-		} catch (error) {
-			console.error('Failed to fetch node ranking:', error);
-		}
-	}
+			return rows.length > 0 ? rows : null;
+		},
+		() => isReloading ?? false
+	);
 
-	const reloadManager = new ReloadManager(fetch);
-
-	$effect(() => {
-		if (isReloading) {
-			reloadManager.restart();
-		} else {
-			reloadManager.stop();
-		}
-	});
-
-	onMount(async () => {
-		await fetch();
-		isLoaded = true;
-	});
-	onDestroy(() => {
-		reloadManager.stop();
-	});
+	// An empty restart list is the healthy answer, and no GPU series means no GPU: say which.
+	const emptyTitle = $derived(
+		kind === 'restart' ? m.dash_no_restarts() : kind === 'gpu' ? m.dash_no_gpu() : undefined
+	);
 </script>
 
-<TopBarList {title} {description} {tooltip} {bars} {isLoaded} onBarClick={onNodeClick} scrollable />
+<RankingList
+	{title}
+	{description}
+	info={tooltip}
+	rows={ranking.data ?? []}
+	status={ranking.status}
+	stale={ranking.stale}
+	onRowClick={onNodeClick}
+	{emptyTitle}
+	emptyDescription={emptyTitle ? '' : undefined}
+/>

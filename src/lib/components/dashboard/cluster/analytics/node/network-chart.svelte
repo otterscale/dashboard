@@ -31,9 +31,10 @@
 		const { value: v, unit } = formatIO(value);
 		return `${v.toLocaleString()} ${unit}`;
 	};
+	// Two steps of the blue ramp far enough apart to read by lightness alone.
 	const colors = {
-		[m.received()]: 'var(--chart-2)',
-		[m.transmitted()]: 'var(--chart-1)'
+		[m.received()]: 'var(--chart-1)',
+		[m.transmitted()]: 'var(--chart-3)'
 	};
 </script>
 

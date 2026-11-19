@@ -31,6 +31,8 @@
 		const { value: v, unit } = formatIO(value);
 		return `${v.toLocaleString()} ${unit}`;
 	};
+	// Two steps of the blue ramp far enough apart to read by lightness alone.
+	const colors = { Read: 'var(--chart-1)', Write: 'var(--chart-3)' };
 </script>
 
 <AreaTimeSeries
@@ -40,6 +42,7 @@
 	tooltip={m.node_chart_disk_rw_tooltip()}
 	{buildQuery}
 	{format}
+	{colors}
 	{start}
 	{end}
 	{endIsNow}

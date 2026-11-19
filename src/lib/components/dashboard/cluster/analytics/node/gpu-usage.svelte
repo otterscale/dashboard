@@ -50,7 +50,7 @@
 
 {#if hasGpu && nodeName}
 	<!-- GPU detail (DCGM, per-card): heatmaps — one row per card — stay readable at any card count -->
-	<div class="grid w-full gap-4 lg:grid-cols-2">
+	<div class="grid w-full gap-5 lg:grid-cols-2">
 		<HeatmapChartGpu {client} {nodeName} metric="util" {start} {end} {endIsNow} bind:isReloading />
 		<HeatmapChartGpu
 			{client}

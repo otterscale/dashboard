@@ -1,20 +1,16 @@
 <script lang="ts">
-	import ChartLine from '@lucide/svelte/icons/chart-line';
+	import ChartLineIcon from '@lucide/svelte/icons/chart-line';
 	import FilterIcon from '@lucide/svelte/icons/filter';
-	import InfoIcon from '@lucide/svelte/icons/info';
-	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import { scaleUtc } from 'd3-scale';
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, LinearGradient, LineChart } from 'layerchart';
 	import type { PrometheusDriver } from 'prometheus-query';
-	import { onDestroy, onMount, untrack } from 'svelte';
+	import { untrack } from 'svelte';
 
-	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Statistics from '$lib/components/custom/statistics/index';
-	import { buttonVariants } from '$lib/components/ui/button';
-	import * as Chart from '$lib/components/ui/chart/index.js';
-	import Input from '$lib/components/ui/input/input.svelte';
-	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { useLoadable } from '$lib/components/dashboard/shared/loadable.svelte';
+	import WidgetCard from '$lib/components/dashboard/shared/widget-card.svelte';
+	import { inputVariants } from '$lib/components/shadcnio/input';
+	import { Skeleton } from '$lib/components/shadcnio/skeleton';
 	import { formatChartTimeRange, formatChartXAxisDate, getChartXAxisTicks } from '$lib/formatter';
 	import { m } from '$lib/messages';
 	import {
@@ -27,9 +23,12 @@
 	} from '$lib/prometheus';
 	import { cn } from '$lib/utils';
 
-	// Canonical node-detail time-series area chart. One shared shell keeps every
-	// chart's reload loop, header, tooltip and gradient identical; callers vary only
-	// the query, the value formatter and a few display flags.
+	import { chartFrameClass } from './chart';
+	import ChartTooltip from './chart-tooltip.svelte';
+
+	// Canonical node-detail time-series chart. One shared shell keeps every chart's reload loop,
+	// header, axes, tooltip and gradient identical; callers vary only the query, the value
+	// formatter and a few display flags.
 	let {
 		client,
 		title,
@@ -37,7 +36,9 @@
 		tooltip,
 		buildQuery,
 		format,
+		axisFormat,
 		colors,
+		dashed,
 		variant = 'area',
 		stacked = false,
 		highlightTop3 = false,
@@ -55,9 +56,16 @@
 		// `topk` is only meaningful when filterMode === 'server'.
 		buildQuery: (topk: number) => string | Record<string, string>;
 		format: (value: number) => string;
-		// Optional explicit colors keyed by series name, to override the order-based palette
-		// (e.g. semantic colouring of Usage / Request / Limit).
+		// Shorter form of `format` for the Y axis ticks. Defaults to `format`.
+		axisFormat?: (value: number) => string;
+		// Optional explicit colours keyed by series name, to override the order-based palette.
+		// Chart tokens only (`var(--chart-1)` … `var(--chart-5)`): they are one blue ramp, so
+		// series differ by lightness, and `--chart-1` is the one furthest from the card in both
+		// themes.
 		colors?: Record<string, string>;
+		// Series drawn with a dashed line, so a reference level reads apart from a measurement
+		// without relying on colour.
+		dashed?: string[];
 		// 'line' for reference-level / closely-tracking series (commitment, load average);
 		// 'area' (default) for volume-style series.
 		variant?: 'area' | 'line';
@@ -77,25 +85,33 @@
 	const chartTimeRange = $derived(formatChartTimeRange(timeRangeHours));
 
 	let topk = $state(10);
-	let rawData = $state<DataPoint[]>([]);
-	let isLoaded = $state(false);
-	let hasError = $state(false);
 
-	async function fetch(topkValue: number = topk) {
-		try {
+	const points = useLoadable<DataPoint[]>(
+		async () => {
 			const startMs = start.getTime();
 			const endMs = endIsNow ? Date.now() : end.getTime();
 			const step = computeStep(startMs, endMs, 60);
-			const q = buildQuery(topkValue);
-			rawData =
+			const q = buildQuery(topk);
+			const data =
 				typeof q === 'string'
 					? await fetchFlattenedRange(client, q, new Date(startMs), new Date(endMs), step)
 					: await fetchCombinedFlattenedRange(client, q, new Date(startMs), new Date(endMs), step);
-			hasError = false;
-		} catch {
-			hasError = true;
+			return data.length > 0 ? data : null;
+		},
+		() => isReloading ?? false
+	);
+
+	// Server-side top-k: refetch whenever the filter changes. The first load is the loadable's.
+	let topkSeen = false;
+	$effect(() => {
+		if (filterMode !== 'server') return;
+		void topk;
+		if (!topkSeen) {
+			topkSeen = true;
+			return;
 		}
-	}
+		untrack(() => void points.refresh());
+	});
 
 	function topKSeriesKeys(data: DataPoint[], k: number): string[] {
 		const config = generateChartConfig(data);
@@ -106,6 +122,7 @@
 			.map((i) => i.key);
 	}
 
+	const rawData = $derived(points.data ?? []);
 	const displayData = $derived.by(() => {
 		if (filterMode !== 'client') return rawData;
 		const keys = topKSeriesKeys(rawData, topk);
@@ -129,157 +146,139 @@
 	});
 	const series = $derived(getSeries(chartConfig));
 
-	const areaProps = {
-		curve: curveMonotoneX,
-		'fill-opacity': 0.4,
-		line: { class: 'stroke-1' },
-		motion: 'tween'
-	} as const;
+	// Whether the chart names its series. Known before the first answer, so the skeleton
+	// already leaves room for the legend.
+	const named = $derived(typeof buildQuery(topk) !== 'string');
+	const showLegend = $derived(points.status === 'ready' ? series.length > 1 : named);
 
-	const reloadManager = new ReloadManager(fetch);
+	const DASH = '[stroke-dasharray:5_4]';
+	const isDashed = (key: string) => dashed?.includes(key) ?? false;
 
-	$effect(() => {
-		if (isReloading) reloadManager.restart();
-		else reloadManager.stop();
+	const areaProps = { curve: curveMonotoneX, motion: 'tween' } as const;
+	const lineClass = (key: string) => cn('stroke-[1.5]', isDashed(key) && DASH);
+
+	const padding = { left: 52, bottom: 24, top: 8, right: 12 };
+	const axisProps = $derived({
+		xAxis: {
+			ticks: getChartXAxisTicks(chartTimeRange),
+			format: (date: Date) => formatChartXAxisDate(date, chartTimeRange)
+		},
+		yAxis: { ticks: 3, format: (value: number) => (axisFormat ?? format)(value) },
+		grid: { x: false, y: true }
 	});
-
-	// Server-side top-k: refetch whenever the filter changes (also drives the first load).
-	$effect(() => {
-		if (filterMode !== 'server') return;
-		const t = topk;
-		untrack(() => fetch(t).then(() => (isLoaded = true)));
-	});
-
-	onMount(async () => {
-		if (filterMode !== 'server') {
-			await fetch();
-			isLoaded = true;
-		}
-	});
-	onDestroy(() => reloadManager.stop());
 </script>
 
-<Statistics.Root type="count" class="overflow-visible">
-	<Statistics.Header class="flex flex-row items-center gap-2 space-y-0">
-		<div class="grid min-w-0 flex-1 gap-1">
-			<Statistics.Title class="text-base leading-normal text-foreground">{title}</Statistics.Title>
-			<p class="text-sm text-muted-foreground">{description}</p>
-		</div>
+<WidgetCard
+	{title}
+	{description}
+	info={tooltip}
+	status={points.status}
+	stale={points.stale}
+	emptyIcon={ChartLineIcon}
+	bodyClass={showLegend ? 'min-h-[232px]' : 'min-h-[200px]'}
+>
+	{#snippet action()}
 		{#if filterMode !== 'none'}
-			<div class="relative">
-				<span class="absolute top-1/2 left-2.5 -translate-y-1/2 text-muted-foreground">
-					<FilterIcon class="size-4" />
-				</span>
-				<Input type="number" bind:value={topk} min={0} step={5} class="h-8 w-20 pl-8" />
-			</div>
-		{/if}
-		<Tooltip.Root>
-			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}>
-				<InfoIcon class="size-4 text-muted-foreground" />
-			</Tooltip.Trigger>
-			<Tooltip.Content class="max-w-xs">
-				<p>{tooltip}</p>
-			</Tooltip.Content>
-		</Tooltip.Root>
-	</Statistics.Header>
-
-	<Statistics.Content class="min-h-16">
-		{#if !isLoaded}
-			<div class="flex h-[200px] w-full items-center justify-center">
-				<LoaderCircle class="size-12 animate-spin text-muted-foreground/50" />
-			</div>
-		{:else if hasError || displayData.length === 0}
-			<div class="flex h-[200px] w-full flex-col items-center justify-center">
-				<ChartLine class="size-12 animate-pulse text-muted-foreground" />
-				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
-			</div>
-		{:else}
-			{#snippet sharedTooltip()}
-				<Chart.Tooltip
-					indicator="dot"
-					labelFormatter={(v: Date) =>
-						v.toLocaleDateString('en-US', {
-							year: 'numeric',
-							month: 'short',
-							day: 'numeric',
-							hour: 'numeric',
-							minute: 'numeric'
-						})}
+			<label class="relative block">
+				<span class="sr-only">{m.cla_top_series()}</span>
+				<span
+					class="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-muted-foreground"
+					aria-hidden="true"
 				>
-					{#snippet formatter({ item, name, value, payload })}
-						{@const isTop =
-							highlightTop3 &&
-							payload
-								.map((d) => Number(d.value))
-								.sort((p, n) => n - p)
-								.slice(0, 3)
-								.includes(Number(value))}
-						<div
-							style="--color-bg: {item.color}; --color-border: {item.color};"
-							class="size-2.5 shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)"
-						></div>
-						<div class="flex flex-1 shrink-0 items-center justify-between gap-2 leading-none">
-							<span class={cn('text-muted-foreground', isTop && 'font-bold text-destructive')}>
-								{name}
-							</span>
-							<span
-								class={cn(
-									'font-mono font-medium text-foreground tabular-nums',
-									isTop && 'font-bold text-destructive'
-								)}
-							>
-								{format(Number(value))}
-							</span>
-						</div>
-					{/snippet}
-				</Chart.Tooltip>
-			{/snippet}
-
-			{@const axisProps = {
-				xAxis: {
-					ticks: getChartXAxisTicks(chartTimeRange),
-					format: (date: Date) => formatChartXAxisDate(date, chartTimeRange)
-				},
-				yAxis: { format: () => '' }
-			}}
-
-			<Chart.Container config={chartConfig} class="aspect-auto h-[200px] w-full">
-				{#if variant === 'line'}
-					<LineChart
-						data={displayData}
-						x="date"
-						xScale={scaleUtc()}
-						{series}
-						props={{ spline: { motion: 'tween', class: 'stroke-2' }, ...axisProps }}
-					>
-						{#snippet tooltip()}{@render sharedTooltip()}{/snippet}
-					</LineChart>
-				{:else}
-					<AreaChart
-						data={displayData}
-						x="date"
-						xScale={scaleUtc()}
-						{series}
-						seriesLayout={stacked ? 'stack' : undefined}
-						props={{ area: areaProps, ...axisProps }}
-					>
-						{#snippet marks({ context })}
-							{#each context.series.visibleSeries as s (s.key)}
-								<LinearGradient
-									stops={[s.color ?? '', 'color-mix(in lch, ' + s.color + ' 10%, transparent)']}
-									vertical
-								>
-									{#snippet children({ gradient })}
-										<Area seriesKey={s.key} {...areaProps} fill={gradient} />
-									{/snippet}
-								</LinearGradient>
-							{/each}
-						{/snippet}
-
-						{#snippet tooltip()}{@render sharedTooltip()}{/snippet}
-					</AreaChart>
-				{/if}
-			</Chart.Container>
+					<FilterIcon class="size-3.5" />
+				</span>
+				<input
+					type="number"
+					bind:value={topk}
+					min={0}
+					step={5}
+					class={cn(inputVariants({ size: 'sm' }), 'w-20 pl-8 font-mono tabular-nums')}
+				/>
+			</label>
 		{/if}
-	</Statistics.Content>
-</Statistics.Root>
+	{/snippet}
+
+	{#snippet skeleton()}
+		<div class="flex flex-col gap-3" aria-hidden="true">
+			<Skeleton class="h-[200px] w-full" />
+			{#if showLegend}
+				<Skeleton class="h-5 w-48" />
+			{/if}
+		</div>
+	{/snippet}
+
+	<div class="flex min-w-0 flex-col gap-3">
+		<div class={cn(chartFrameClass, 'h-[200px]')}>
+			{#if variant === 'line'}
+				<LineChart
+					data={displayData}
+					x="date"
+					xScale={scaleUtc()}
+					series={series.map((s) => ({ ...s, props: { class: lineClass(s.key) } }))}
+					{padding}
+					props={{ spline: { motion: 'tween', curve: curveMonotoneX }, ...axisProps }}
+				>
+					{#snippet tooltip()}<ChartTooltip {format} {highlightTop3} />{/snippet}
+				</LineChart>
+			{:else}
+				<AreaChart
+					data={displayData}
+					x="date"
+					xScale={scaleUtc()}
+					{series}
+					seriesLayout={stacked ? 'stack' : 'overlap'}
+					{padding}
+					props={{ area: areaProps, ...axisProps }}
+				>
+					{#snippet marks({ context })}
+						{#each context.series.visibleSeries as s (s.key)}
+							<LinearGradient
+								stops={[
+									'color-mix(in oklab, ' + s.color + ' 25%, transparent)',
+									'color-mix(in oklab, ' + s.color + ' 0%, transparent)'
+								]}
+								vertical
+							>
+								{#snippet children({ gradient })}
+									<Area
+										seriesKey={s.key}
+										{...areaProps}
+										fill={gradient}
+										line={{ class: lineClass(s.key) }}
+									/>
+								{/snippet}
+							</LinearGradient>
+						{/each}
+					{/snippet}
+
+					{#snippet tooltip()}<ChartTooltip {format} {highlightTop3} />{/snippet}
+				</AreaChart>
+			{/if}
+		</div>
+		{#if showLegend}
+			<!-- The series are one blue ramp: the legend names each one beside its colour key, and a
+			     dashed series is drawn dashed here too. -->
+			<ul
+				class="flex max-h-10 min-h-5 flex-wrap items-center gap-x-4 gap-y-1 overflow-y-auto text-xs text-muted-foreground"
+			>
+				{#each series as s (s.key)}
+					<li class="flex min-w-0 items-center gap-1.5">
+						<svg class="h-2 w-4 shrink-0" viewBox="0 0 16 8" aria-hidden="true">
+							<line
+								x1="0"
+								y1="4"
+								x2="16"
+								y2="4"
+								stroke={s.color}
+								stroke-width="2.5"
+								stroke-linecap={isDashed(s.key) ? 'butt' : 'round'}
+								stroke-dasharray={isDashed(s.key) ? '5 3' : undefined}
+							/>
+						</svg>
+						<span class="truncate">{s.key}</span>
+					</li>
+				{/each}
+			</ul>
+		{/if}
+	</div>
+</WidgetCard>
