@@ -3,10 +3,11 @@
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import ResourceCard from '$lib/components/dashboard/shared/resource-card.svelte';
+	import { fetchCombinedOrThrow } from '$lib/components/dashboard/shared/query';
+	import RingsCard from '$lib/components/dashboard/shared/rings-card.svelte';
 	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/messages';
-	import { fetchCombinedInstant, LIVE_PODS } from '$lib/prometheus';
+	import { LIVE_PODS } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -23,9 +24,12 @@
 
 	// All four scalars come back in a single HTTP request (one `or`-unioned instant query)
 	// to keep Prometheus request fan-out low.
+	// Whether the last fetch threw: a widget that failed says so, instead of reading as empty.
+	let failed = $state(false);
+
 	async function fetch() {
 		try {
-			const r = await fetchCombinedInstant(prometheusDriver, {
+			const r = await fetchCombinedOrThrow(prometheusDriver, {
 				usage: `100 * sum(container_memory_working_set_bytes{container!=""}) / sum(kube_node_status_allocatable{resource="memory", unit="byte"})`,
 				request: `100 * sum(kube_pod_container_resource_requests{resource="memory", unit="byte"} ${LIVE_PODS}) / sum(kube_node_status_allocatable{resource="memory", unit="byte"})`,
 				limit: `100 * sum(kube_pod_container_resource_limits{resource="memory", unit="byte"} ${LIVE_PODS}) / sum(kube_node_status_allocatable{resource="memory", unit="byte"})`,
@@ -35,7 +39,9 @@
 			memoryRequest = r.request[0]?.value ?? undefined;
 			memoryLimit = r.limit[0]?.value ?? undefined;
 			allocatableMemory = r.allocatable[0]?.value?.value ?? undefined;
+			failed = false;
 		} catch (error) {
+			failed = true;
 			console.error('Failed to fetch memory usage:', error);
 		}
 	}
@@ -65,15 +71,32 @@
 	});
 </script>
 
-<ResourceCard
+<RingsCard
 	title={m.memory()}
 	description={m.cluster_dashboard_memory_description()}
 	tooltip={m.cluster_dashboard_memory_tooltip()}
-	state={!isLoaded ? 'loading' : !memoryUsage ? 'empty' : 'ready'}
+	state={!isLoaded ? 'loading' : failed ? 'error' : !memoryUsage ? 'empty' : 'ready'}
+	onretry={fetch}
 	total={allocatable}
-	rows={[
-		{ label: m.usage(), percent: Number(memoryUsage?.value ?? 0) },
-		{ label: m.request(), percent: Number(memoryRequest?.value ?? 0) },
-		{ label: m.limit(), percent: Number(memoryLimit?.value ?? 0) }
+	totalLabel={m.allocatable_total()}
+	rings={[
+		{
+			key: 'limit',
+			label: m.limit(),
+			percent: Number(memoryLimit?.value ?? 0),
+			color: 'var(--chart-3)'
+		},
+		{
+			key: 'request',
+			label: m.request(),
+			percent: Number(memoryRequest?.value ?? 0),
+			color: 'var(--chart-2)'
+		},
+		{
+			key: 'usage',
+			label: m.usage(),
+			percent: Number(memoryUsage?.value ?? 0),
+			color: 'var(--chart-1)'
+		}
 	]}
 />

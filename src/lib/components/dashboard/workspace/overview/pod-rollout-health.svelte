@@ -1,7 +1,4 @@
 <script lang="ts">
-	import CheckCheck from '@lucide/svelte/icons/check-check';
-	import CircleAlert from '@lucide/svelte/icons/circle-alert';
-	import CircleCheck from '@lucide/svelte/icons/circle-check';
 	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 	import OctagonAlert from '@lucide/svelte/icons/octagon-alert';
 	import Rocket from '@lucide/svelte/icons/rocket';
@@ -9,6 +6,7 @@
 	import { type Component, onDestroy, onMount, type Snippet } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
+	import Band from '$lib/components/dashboard/shared/band.svelte';
 	import StatTile from '$lib/components/dashboard/shared/stat-tile.svelte';
 	import { problemTone, type Tone, toneText } from '$lib/components/dashboard/shared/tone';
 	import WidgetCard from '$lib/components/dashboard/shared/widget-card.svelte';
@@ -107,6 +105,9 @@
 		};
 	}
 
+	// Whether the last fetch threw: a widget that failed says so, instead of reading as empty.
+	let failed = $state(false);
+
 	async function fetch() {
 		try {
 			if (!namespace) {
@@ -114,7 +115,9 @@
 				return;
 			}
 			await fetchAll(namespace);
+			failed = false;
 		} catch (error) {
+			failed = true;
 			console.error('Failed to fetch namespace pod & rollout health:', error);
 		}
 	}
@@ -155,33 +158,28 @@
 		label: string;
 		value: number | null;
 		tone: Tone;
-		icon: Component<{ class?: string }>;
 	};
 	// Always four tiles, so the row keeps its shape while loading and when there is no data.
 	const kpis = $derived.by((): Kpi[] => [
 		{
 			label: m.workspace_pods_running(),
 			value: snap?.running ?? null,
-			tone: snap ? 'success' : 'muted',
-			icon: CircleCheck
+			tone: snap ? 'success' : 'muted'
 		},
 		{
 			label: m.workspace_pods_not_ready(),
 			value: snap?.notReady ?? null,
-			tone: problemTone(snap?.notReady ?? 0, 'warning'),
-			icon: CircleAlert
+			tone: problemTone(snap?.notReady ?? 0, 'warning')
 		},
 		{
 			label: m.workspace_pod_rollout_kpi_issues(),
 			value: snap ? containerIssueTotal : null,
-			tone: problemTone(containerIssueTotal),
-			icon: OctagonAlert
+			tone: problemTone(containerIssueTotal)
 		},
 		{
 			label: m.workspace_pods_succeeded(),
 			value: snap?.succeeded ?? null,
-			tone: 'default',
-			icon: CheckCheck
+			tone: 'default'
 		}
 	]);
 </script>
@@ -206,23 +204,34 @@
 {/snippet}
 
 <!-- Two grid items in the page's grid: the headline counts lead the page, the breakdown closes it. -->
-<div class="order-1 col-span-full grid grid-cols-2 gap-4 lg:grid-cols-4">
-	{#each kpis as kpi (kpi.label)}
-		<StatTile
-			label={kpi.label}
-			value={kpi.value}
-			tone={kpi.tone}
-			icon={kpi.icon}
-			loading={!!namespace && !isLoaded}
-		/>
-	{/each}
+<div class="order-1 col-span-full">
+	<Band class="grid-cols-2 lg:grid-cols-4">
+		{#each kpis as kpi (kpi.label)}
+			<StatTile
+				label={kpi.label}
+				value={kpi.value}
+				tone={kpi.tone}
+				state={!namespace || !isLoaded ? 'loading' : failed ? 'error' : !snap ? 'empty' : 'ready'}
+				onretry={fetch}
+			/>
+		{/each}
+	</Band>
 </div>
 
 <div class="order-5 col-span-full">
 	<WidgetCard
 		title={m.workspace_pod_rollout_health_title()}
 		description={m.workspace_pod_rollout_health_description()}
-		state={!namespace ? 'message' : !isLoaded ? 'loading' : !snap ? 'empty' : 'ready'}
+		state={!namespace
+			? 'message'
+			: !isLoaded
+				? 'loading'
+				: failed
+					? 'error'
+					: !snap
+						? 'empty'
+						: 'ready'}
+		onretry={fetch}
 		message={m.workspace_namespace_unresolved()}
 		contentClass="grid divide-y lg:grid-cols-3 lg:divide-x lg:divide-y-0"
 	>

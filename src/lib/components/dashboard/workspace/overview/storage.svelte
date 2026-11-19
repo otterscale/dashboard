@@ -77,11 +77,16 @@
 		pendingCount = pendingRes.result[0]?.value;
 	}
 
+	// Whether the last fetch threw: a widget that failed says so, instead of reading as empty.
+	let failed = $state(false);
+
 	async function fetch() {
 		try {
 			if (!namespace) return;
 			await fetchStorage();
+			failed = false;
 		} catch (error) {
+			failed = true;
 			console.error('Failed to fetch workspace storage metrics:', error);
 		}
 	}
@@ -129,7 +134,8 @@
 <WidgetCard
 	title={m.workspace_storage_title()}
 	description={m.workspace_storage_description()}
-	state={!namespace ? 'message' : !isLoaded ? 'loading' : 'ready'}
+	state={!namespace ? 'message' : !isLoaded ? 'loading' : failed ? 'error' : 'ready'}
+	onretry={fetch}
 	message={m.workspace_namespace_unresolved()}
 	contentClass="flex flex-col gap-4"
 >

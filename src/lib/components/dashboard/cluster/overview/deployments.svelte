@@ -1,5 +1,4 @@
 <script lang="ts">
-	import PackageIcon from '@lucide/svelte/icons/package';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
@@ -28,10 +27,15 @@
 		deployments = response.result[0]?.value ?? undefined;
 	}
 
+	// Whether the last fetch threw: a widget that failed says so, instead of reading as empty.
+	let failed = $state(false);
+
 	async function fetch() {
 		try {
 			await fetchdeployments();
+			failed = false;
 		} catch (error) {
+			failed = true;
 			console.error('Failed to fetch cluster nodes:', error);
 		}
 	}
@@ -58,9 +62,7 @@
 
 <StatTile
 	label={m.deployments()}
-	icon={PackageIcon}
-	loading={!isLoaded}
-	value={deployments?.value !== undefined ? deployments.value : 'N/A'}
-	tone="primary"
-	hint={m.cluster_dashboard_deployment_description()}
+	state={!isLoaded ? 'loading' : failed ? 'error' : deployments === undefined ? 'empty' : 'ready'}
+	onretry={fetch}
+	value={deployments?.value}
 />

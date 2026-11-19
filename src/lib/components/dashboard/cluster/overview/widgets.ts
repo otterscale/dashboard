@@ -13,25 +13,25 @@ import Pods from './pods.svelte';
 import Uptime from './uptime.svelte';
 
 export const widgets = [
-	{ key: 'health', class: 'col-span-6 xl:col-span-3', component: Health },
-	{ key: 'uptime', class: 'col-span-6 xl:col-span-3', component: Uptime },
+	{ key: 'health', class: 'min-w-0 bg-card', component: Health },
+	{ key: 'uptime', class: 'min-w-0 bg-card', component: Uptime },
 	{
 		key: 'information',
-		class: 'col-span-6 xl:col-span-3',
+		class: 'min-w-0 bg-card',
 		component: Information
 	},
 	{
 		key: 'consumption',
-		class: 'col-span-6 xl:col-span-3',
+		class: 'min-w-0 bg-card',
 		component: Consumption
 	},
-	{ key: 'nodes', class: 'col-span-6 xl:col-span-3', component: Nodes },
+	{ key: 'nodes', class: 'min-w-0 bg-card', component: Nodes },
 	{
 		key: 'deployments',
-		class: 'col-span-6 xl:col-span-3',
+		class: 'min-w-0 bg-card',
 		component: Deployments
 	},
-	{ key: 'pods', class: 'col-span-12 xl:col-span-6', component: Pods },
+	{ key: 'pods', class: 'contents', component: Pods },
 	{ key: 'cpu', class: 'col-span-12 sm:col-span-6 xl:col-span-3', component: CpuUsage },
 	{ key: 'memory', class: 'col-span-12 sm:col-span-6 xl:col-span-3', component: MemoryUsage },
 	{ key: 'gpu', class: 'col-span-12 sm:col-span-6 xl:col-span-3', component: Gpu },
@@ -41,3 +41,16 @@ export const widgets = [
 		component: Ai100Disk
 	}
 ] satisfies WidgetDefinition[];
+
+/** The three rows of the overview: a band of cluster facts, a band of pod counts, the resource cards. */
+const keysOf = (...keys: string[]) => widgets.filter((widget) => keys.includes(widget.key));
+export const factWidgets = keysOf(
+	'health',
+	'uptime',
+	'information',
+	'consumption',
+	'nodes',
+	'deployments'
+);
+export const podWidgets = keysOf('pods');
+export const resourceWidgets = keysOf('cpu', 'memory', 'gpu', 'ai100-disk');

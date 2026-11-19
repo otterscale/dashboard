@@ -3,14 +3,11 @@
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import ResourceCard from '$lib/components/dashboard/shared/resource-card.svelte';
+	import { fetchCombinedOrThrow } from '$lib/components/dashboard/shared/query';
+	import RingsCard from '$lib/components/dashboard/shared/rings-card.svelte';
 	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/messages';
-	import {
-		DCGM_GPU_MEMORY_TOTAL_BYTES,
-		DCGM_GPU_MEMORY_USED_BYTES,
-		fetchCombinedInstant
-	} from '$lib/prometheus';
+	import { DCGM_GPU_MEMORY_TOTAL_BYTES, DCGM_GPU_MEMORY_USED_BYTES } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -33,9 +30,12 @@
 	//
 	// No `or vector(0)` on either numerator: an absent sum means that stack is not deployed, and
 	// a substituted 0 would read as "0% allocated" on a cluster that simply has no HAMi.
+	// Whether the last fetch threw: a widget that failed says so, instead of reading as empty.
+	let failed = $state(false);
+
 	async function fetch() {
 		try {
-			const r = await fetchCombinedInstant(prometheusDriver, {
+			const r = await fetchCombinedOrThrow(prometheusDriver, {
 				allocatedPct: `100 * sum(hami_gpu_memory_allocated_bytes) / sum(${DCGM_GPU_MEMORY_TOTAL_BYTES})`,
 				usedPct: `100 * sum(${DCGM_GPU_MEMORY_USED_BYTES}) / sum(${DCGM_GPU_MEMORY_TOTAL_BYTES})`,
 				totalBytes: `sum(${DCGM_GPU_MEMORY_TOTAL_BYTES})`,
@@ -45,7 +45,9 @@
 			usedPct = r.usedPct[0]?.value?.value ?? undefined;
 			totalBytes = r.totalBytes[0]?.value?.value ?? undefined;
 			utilizationPct = r.utilizationPct[0]?.value?.value ?? undefined;
+			failed = false;
 		} catch (error) {
+			failed = true;
 			console.error('Failed to fetch GPU usage:', error);
 		}
 	}
@@ -80,20 +82,30 @@
 
 <!-- Gate on physical capacity: it exists whenever DCGM sees a card, so an idle cluster still
      renders 0% instead of an empty state. -->
-<ResourceCard
+<RingsCard
 	title={m.gpu()}
 	description={m.cluster_dashboard_gpu_description()}
 	tooltip={m.cluster_dashboard_gpu_memory_tooltip()}
 	state={!isLoaded
 		? 'loading'
-		: totalBytes === undefined || totalBytes === null
-			? 'empty'
-			: 'ready'}
+		: failed
+			? 'error'
+			: totalBytes === undefined || totalBytes === null
+				? 'empty'
+				: 'ready'}
+	onretry={fetch}
 	total={capacity}
-	rows={[
-		{ label: m.gpu_allocated(), percent: allocatedPct },
-		{ label: m.usage(), percent: Number(usedPct ?? 0) },
+	totalLabel={m.capacity_total()}
+	rings={[
+		{ key: 'allocated', label: m.gpu_allocated(), percent: allocatedPct, color: 'var(--chart-2)' },
+		{ key: 'used', label: m.usage(), percent: Number(usedPct ?? 0), color: 'var(--chart-1)' },
 		// A busy GPU is the goal, so the pressure thresholds don't apply.
-		{ label: m.utilization(), percent: Number(utilizationPct ?? 0), kind: 'neutral' }
+		{
+			key: 'utilization',
+			label: m.utilization(),
+			percent: Number(utilizationPct ?? 0),
+			color: 'var(--chart-4)',
+			kind: 'neutral'
+		}
 	]}
 />

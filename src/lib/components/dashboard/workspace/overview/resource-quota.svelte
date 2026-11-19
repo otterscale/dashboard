@@ -1,15 +1,18 @@
 <script lang="ts">
+	import InfinityIcon from '@lucide/svelte/icons/infinity';
 	import { type PrometheusDriver, ResponseType } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import Gauge from '$lib/components/dashboard/shared/gauge.svelte';
+	import Band from '$lib/components/dashboard/shared/band.svelte';
+	import Meter from '$lib/components/dashboard/shared/meter.svelte';
 	import Segmented from '$lib/components/dashboard/shared/segmented.svelte';
 	import { usageTone } from '$lib/components/dashboard/shared/tone';
 	import WidgetCard from '$lib/components/dashboard/shared/widget-card.svelte';
 	import { formatCapacity, formatPercentage } from '$lib/formatter';
 	import { m } from '$lib/messages';
 	import { escapePromqlStringLiteral, LIVE_PODS } from '$lib/prometheus';
+	import { cn } from '$lib/utils';
 
 	import { resourceQuotaPresence } from './resource-quota';
 
@@ -275,6 +278,11 @@
 	}
 </script>
 
+<!--
+	From shadcn.io stats-quota-tile-grid and stats-progress-threshold-colored: one tile per quota,
+	the amount in use, a bar whose color steps as it fills, then the share and what is left.
+	A resource without a limit has no bar at all: there is no ceiling to draw it against.
+-->
 {#snippet quota(
 	label: string,
 	used: number | null,
@@ -282,40 +290,59 @@
 	format: (n: number) => string
 )}
 	{@const failed = hasError || used === null}
-	<div class="flex min-w-0 flex-col items-center">
-		{#if quotaUnlimited}
-			<!-- No hard limit to divide by: keep the gauge shape, leave the track empty and report the
-				 raw usage against ∞. -->
-			<Gauge ratio={failed ? null : 0} primary={UNLIMITED} tone="muted" />
-		{:else if failed || hard === null}
-			<Gauge ratio={null} />
-		{:else if hard === 0}
-			<!-- A quota of zero: nothing may be requested, so there is no percentage to show. -->
-			<Gauge ratio={0} primary="0 %" tone="muted" />
+	<div class="flex min-w-0 flex-col bg-card px-(--card-spacing) py-4">
+		<h3 class="text-sm font-medium">{label}</h3>
+		{#if failed || (!quotaUnlimited && hard === null)}
+			<p class="mt-2 text-2xl font-semibold text-muted-foreground" aria-hidden="true">—</p>
+			<p class="mt-3 text-sm text-muted-foreground">{m.no_data_display()}</p>
 		{:else}
-			<Gauge
-				ratio={used! / hard}
-				primary={`${formatPercentage(used!, hard, 1)} %`}
-				tone={usageTone(used! / hard)}
-			/>
-		{/if}
-		<p class="-mt-4 text-sm font-medium">{label}</p>
-		<p class="text-xs text-muted-foreground tabular-nums">
-			{#if failed || (!quotaUnlimited && hard === null)}
-				&nbsp;
+			<p
+				class="mt-2 flex flex-wrap items-baseline gap-x-1.5 text-xl font-semibold tracking-tight tabular-nums"
+			>
+				<bdi class="whitespace-nowrap">{format(used!)}</bdi>
+				<span class="text-sm font-normal tracking-normal whitespace-nowrap text-muted-foreground">
+					/ {quotaUnlimited ? UNLIMITED : format(hard!)}
+				</span>
+			</p>
+			{#if quotaUnlimited}
+				<p class="mt-3 flex items-center gap-1.5 text-sm font-medium">
+					<InfinityIcon class="size-4 text-muted-foreground" />
+					{m.quota_no_limit()}
+				</p>
+				<p class="mt-2 text-xs text-muted-foreground">{m.quota_no_limit_hint()}</p>
+			{:else if hard === 0}
+				<Meter class="mt-4 **:data-[slot=progress-track]:h-2" value={0} {label} tone="muted" />
+				<p class="mt-2 text-sm text-muted-foreground">{m.quota_percent_used({ percent: '0' })}</p>
 			{:else}
-				{format(used!)} / {quotaUnlimited ? UNLIMITED : format(hard!)}
+				{@const ratio = used! / hard!}
+				<Meter
+					class="mt-4 **:data-[slot=progress-track]:h-2"
+					value={Math.min(100, ratio * 100)}
+					{label}
+					tone={usageTone(ratio)}
+				/>
+				<p class="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 text-sm tabular-nums">
+					<span class={cn('font-medium', ratio >= 0.9 && 'text-destructive')}>
+						{m.quota_percent_used({ percent: formatPercentage(used!, hard!, 1) ?? '0' })}
+					</span>
+					<span class={ratio > 1 ? 'font-medium text-destructive' : 'text-muted-foreground'}>
+						{ratio > 1
+							? m.quota_over({ amount: format(used! - hard!) })
+							: m.quota_left({ amount: format(hard! - used!) })}
+					</span>
+				</p>
 			{/if}
-		</p>
+		{/if}
 	</div>
 {/snippet}
 
 <WidgetCard
 	title={m.workspace_quota_usage_title()}
 	description={m.workspace_quota_usage_description()}
-	state={!namespace ? 'message' : !isLoaded ? 'loading' : 'ready'}
+	state={!namespace ? 'message' : !isLoaded ? 'loading' : hasError ? 'error' : 'ready'}
+	onretry={fetch}
 	message={m.workspace_namespace_unresolved()}
-	contentClass="grid grid-cols-1 items-center gap-x-2 gap-y-6 pb-2 sm:grid-cols-3"
+	flush
 >
 	{#snippet action()}
 		<Segmented
@@ -327,7 +354,9 @@
 			]}
 		/>
 	{/snippet}
-	{@render quota(m.cpu(), cpuUsed, cpuHard, formatCpuCores)}
-	{@render quota(m.ram(), memUsed, memHard, formatBytes)}
-	{@render quota('GPU Memory', gpuMemUsed, gpuMemHard, formatGpuMemText)}
+	<Band inset class="h-full sm:grid-cols-3">
+		{@render quota(m.cpu(), cpuUsed, cpuHard, formatCpuCores)}
+		{@render quota(m.ram(), memUsed, memHard, formatBytes)}
+		{@render quota(m.gpu_memory(), gpuMemUsed, gpuMemHard, formatGpuMemText)}
+	</Band>
 </WidgetCard>

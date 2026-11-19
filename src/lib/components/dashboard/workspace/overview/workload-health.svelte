@@ -11,8 +11,8 @@
 	import { getContext, onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import Meter from '$lib/components/dashboard/shared/meter.svelte';
-	import { type Tone, toneFill } from '$lib/components/dashboard/shared/tone';
+	import Band from '$lib/components/dashboard/shared/band.svelte';
+	import { toneFill } from '$lib/components/dashboard/shared/tone';
 	import WidgetCard from '$lib/components/dashboard/shared/widget-card.svelte';
 	import { Status } from '$lib/components/shadcnio/status';
 	import { m } from '$lib/messages';
@@ -164,33 +164,48 @@
 	});
 </script>
 
+<!-- From shadcn.io stats-kpi-status-tile-grid: a status word per tile, and a tile that is fine
+     stays uncolored. -->
 <WidgetCard
 	title={m.workspace_workload_health_title()}
 	description={m.workspace_workload_health_description()}
 	state={!namespace ? 'message' : !isLoaded ? 'loading' : 'ready'}
 	message={m.workspace_namespace_unresolved()}
+	flush
 >
-	<ul class="flex flex-col divide-y">
+	<Band inset class="grid-cols-1">
 		{#each rows as row (row.label)}
-			{@const pct = row.total > 0 ? Math.min(100, Math.round((100 * row.ready) / row.total)) : 0}
-			{@const tone: Tone = row.total === 0 ? 'muted' : row.ready >= row.total ? 'success' : 'warning'}
-			<li class="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
-				<div class="flex items-center justify-between gap-2">
-					<span class="flex min-w-0 items-center gap-2 text-sm font-medium">
-						<Status size="sm" class={cn('ring-0', toneFill[tone])} />
-						<span class="truncate">{row.label}</span>
-					</span>
-					<span
-						class="shrink-0 text-sm tabular-nums {row.total === 0 ? 'text-muted-foreground' : ''}"
-					>
+			{@const none = row.total === 0}
+			{@const ready = !none && row.ready >= row.total}
+			<div
+				class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 bg-card px-(--card-spacing) py-3"
+			>
+				<div class="min-w-0">
+					<h3 class="truncate text-sm font-medium">{row.label}</h3>
+					<p class="mt-0.5 flex items-center gap-1.5 text-xs">
+						<Status
+							size="sm"
+							class={cn('ring-0', toneFill[none ? 'muted' : ready ? 'success' : 'warning'])}
+						/>
+						<span class={none || ready ? 'text-muted-foreground' : 'font-medium text-warning'}>
+							{none ? m.workload_none() : ready ? m.workload_ready() : m.workload_degraded()}
+						</span>
+					</p>
+				</div>
+				<p
+					class={cn(
+						'text-xl font-semibold tracking-tight tabular-nums',
+						none && 'text-muted-foreground'
+					)}
+				>
+					<bdi>
 						{m.workspace_workload_ready_ratio({
 							ready: String(row.ready),
 							total: String(row.total)
 						})}
-					</span>
-				</div>
-				<Meter value={pct} label={row.label} {tone} />
-			</li>
+					</bdi>
+				</p>
+			</div>
 		{/each}
-	</ul>
+	</Band>
 </WidgetCard>

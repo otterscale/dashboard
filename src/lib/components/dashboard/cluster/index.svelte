@@ -11,6 +11,7 @@
 	} from '$lib/components/custom/datetime-picker';
 	import { Reloader } from '$lib/components/custom/reloader';
 	import { WidgetGrid } from '$lib/components/custom/widget-grid';
+	import Band from '$lib/components/dashboard/shared/band.svelte';
 	import PageHeader from '$lib/components/dashboard/shared/page-header.svelte';
 	import Segmented from '$lib/components/dashboard/shared/segmented.svelte';
 	import { Spinner } from '$lib/components/shadcnio/spinner';
@@ -22,7 +23,7 @@
 	import NamespacePicker from './analytics/namespace/namespace-picker.svelte';
 	import NodePicker from './analytics/node/node-picker.svelte';
 	import NodePressure from './overview/node-pressure.svelte';
-	import { widgets } from './overview/widgets';
+	import { factWidgets, podWidgets, resourceWidgets } from './overview/widgets';
 
 	let { cluster }: { cluster: string } = $props();
 
@@ -82,8 +83,14 @@
 				<TabsTrigger value="analytics" class="flex-none px-3">{m.analytics()}</TabsTrigger>
 			</TabsList>
 			<TabsContent value="overview" class="flex flex-col gap-4">
+				<Band class="grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+					<WidgetGrid {cluster} widgets={factWidgets} {prometheusDriver} bind:isReloading />
+				</Band>
+				<Band class="grid-cols-2 lg:grid-cols-4">
+					<WidgetGrid {cluster} widgets={podWidgets} {prometheusDriver} bind:isReloading />
+				</Band>
 				<div class="grid grid-cols-12 gap-4">
-					<WidgetGrid {cluster} {widgets} {prometheusDriver} bind:isReloading />
+					<WidgetGrid {cluster} widgets={resourceWidgets} {prometheusDriver} bind:isReloading />
 				</div>
 				<NodePressure {prometheusDriver} bind:isReloading />
 			</TabsContent>

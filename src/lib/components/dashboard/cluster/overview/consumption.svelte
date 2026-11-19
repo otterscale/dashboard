@@ -1,14 +1,14 @@
 <script lang="ts">
 	import GpuIcon from '@lucide/svelte/icons/gpu';
 	import ThermometerIcon from '@lucide/svelte/icons/thermometer';
-	import ZapIcon from '@lucide/svelte/icons/zap';
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
+	import { fetchCombinedOrThrow } from '$lib/components/dashboard/shared/query';
 	import StatTile from '$lib/components/dashboard/shared/stat-tile.svelte';
 	import { m } from '$lib/messages';
-	import { classifyThreshold, fetchCombinedInstant, thresholdClasses } from '$lib/prometheus';
+	import { classifyThreshold, thresholdClasses } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -22,9 +22,12 @@
 	// The denominator for the draw: 2 kW means very different things across 2 cards and 16.
 	let cardCount: number | undefined = $state(undefined);
 
+	// Whether the last fetch threw: a widget that failed says so, instead of reading as empty.
+	let failed = $state(false);
+
 	async function fetchConsumption() {
 		try {
-			const r = await fetchCombinedInstant(prometheusDriver, {
+			const r = await fetchCombinedOrThrow(prometheusDriver, {
 				power: `sum(DCGM_FI_DEV_POWER_USAGE)`,
 				temperature: `max(DCGM_FI_DEV_GPU_TEMP)`,
 				// Deduped by UUID: a second dcgm-exporter scrape target would otherwise double it.
@@ -33,7 +36,9 @@
 			consumption = r.power[0]?.value?.value ?? undefined;
 			temperature = r.temperature[0]?.value?.value ?? undefined;
 			cardCount = r.cardCount[0]?.value?.value ?? undefined;
+			failed = false;
 		} catch (error) {
+			failed = true;
 			console.error('Failed to fetch GPU power usage:', error);
 		}
 	}
@@ -69,15 +74,13 @@
 <!-- `undefined`, not falsy: an idle fleet legitimately draws ~0 W and must still render. -->
 <StatTile
 	label={m.gpu_power_usage()}
-	icon={ZapIcon}
-	loading={!isLoaded}
-	value={consumption === undefined ? null : (Number(consumption) / 1000).toFixed(2)}
+	state={!isLoaded ? 'loading' : failed ? 'error' : consumption === undefined ? 'empty' : 'ready'}
+	onretry={fetchConsumption}
+	value={(Number(consumption) / 1000).toFixed(2)}
 	unit="kW"
-	tone={consumption === undefined ? 'muted' : 'primary'}
-	hint={consumption === undefined ? m.no_data_display() : undefined}
 >
-	{#if consumption !== undefined && (cardCount !== undefined || temperature !== undefined)}
-		<p class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+	{#if cardCount !== undefined || temperature !== undefined}
+		<p class="flex min-h-5 flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
 			{#if cardCount !== undefined}
 				<!-- Uncolored: an inventory count, not a signal that can go wrong. -->
 				<span class="flex items-center gap-1 whitespace-nowrap text-muted-foreground">

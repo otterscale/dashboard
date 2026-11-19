@@ -381,8 +381,11 @@
 		return Math.max(row.cpuReq, row.cpuLim, row.memReq, row.memLim, row.gpuAllocPct ?? 0);
 	}
 
+	// Fine up to 70 %, close up to 90 %, critical beyond. The bar's mark sits at the upper one.
+	const PRESSURE = { green: 70, orange: 90 };
+
 	function pctClass(value: number): string {
-		return thresholdClasses(classifyThreshold(value, { green: 70, orange: 90 })).text;
+		return thresholdClasses(classifyThreshold(value, PRESSURE)).text;
 	}
 
 	const reloadManager = new ReloadManager(fetch);
@@ -535,14 +538,51 @@
 	</Tooltip.Root>
 {/snippet}
 
-{#snippet pctCell(value: number | undefined, colored = true)}
+<!--
+	A bar on a 0 to 100 scale with a mark at the critical threshold, then the figure. The bar is
+	for scanning a column; the figure carries the value, including one past 100 that the bar
+	cannot show. `secondary` columns have no bar, and are dropped below 768px where only the
+	leading column of each group fits.
+-->
+{#snippet meter(value: number | undefined, colored: boolean, bar: boolean)}
+	{@const level = value === undefined || !colored ? undefined : classifyThreshold(value, PRESSURE)}
+	<span class="flex items-center justify-end gap-2">
+		{#if bar && value !== undefined}
+			<span aria-hidden="true" class="relative block h-1.5 w-10 bg-muted max-lg:hidden">
+				<span
+					class={cn(
+						'absolute inset-y-0 start-0',
+						level === 'red'
+							? 'bg-destructive'
+							: level === 'orange'
+								? 'bg-warning'
+								: level === 'green'
+									? 'bg-success'
+									: 'bg-primary'
+					)}
+					style="width: {Math.min(100, Math.max(0, value))}%"
+				></span>
+				{#if colored}
+					<span
+						class="absolute -inset-y-0.5 w-px bg-foreground/50"
+						style="inset-inline-start: {PRESSURE.orange}%"
+					></span>
+				{/if}
+			</span>
+		{/if}
+		<span class="min-w-[4ch] text-end">{formatPct(value)}</span>
+	</span>
+{/snippet}
+
+{#snippet pctCell(value: number | undefined, colored = true, secondary = false)}
 	<Table.Cell
 		class={cn(
 			'text-right font-mono tabular-nums',
+			secondary && 'max-md:hidden',
 			colored && value !== undefined && pctClass(value)
 		)}
 	>
-		{formatPct(value)}
+		{@render meter(value, colored, !secondary)}
 	</Table.Cell>
 {/snippet}
 
@@ -623,7 +663,7 @@
 
 {#snippet rateCell(value: number | undefined)}
 	{@const io = value !== undefined && Number.isFinite(value) ? formatIO(Number(value)) : undefined}
-	<Table.Cell class="text-right font-mono whitespace-nowrap tabular-nums">
+	<Table.Cell class="text-right font-mono whitespace-nowrap tabular-nums max-md:hidden">
 		{#if io}
 			<span class="inline-block w-[4ch] text-right">{rateMantissa(io.value)}</span><span
 				class="ml-[1ch] text-muted-foreground">{SHORT_RATE_UNITS[io.unit] ?? io.unit}</span
@@ -660,7 +700,8 @@
 		<Table.Header>
 			<!-- Four blocks instead of a dozen flat columns. Allocated and Usage sit under GPU
 			     because Utilization beside them is what stops them reading as compute. -->
-			<Table.Row class="hover:bg-transparent">
+			<!-- Below 768px only one column of each block is left, and it takes the block's name. -->
+			<Table.Row class="hover:bg-transparent max-md:hidden">
 				<Table.Head></Table.Head>
 				<Table.Head colspan={3} class="border-l text-center whitespace-nowrap">
 					{m.cpu()}
@@ -685,31 +726,59 @@
 			<Table.Row>
 				<Table.Head>{m.node()}</Table.Head>
 				{#each CPU_COLUMNS as col, index (col.key)}
-					<Table.Head class={cn('text-right whitespace-nowrap', index === 0 && 'border-l')}>
-						{col.label}
+					<Table.Head
+						class={cn('text-right whitespace-nowrap', index === 0 ? 'border-l' : 'max-md:hidden')}
+					>
+						{#if index === 0}
+							<span class="md:hidden">{m.cpu()}</span><span class="max-md:hidden">{col.label}</span>
+						{:else}
+							{col.label}
+						{/if}
 					</Table.Head>
 				{/each}
 				{#each MEM_COLUMNS as col, index (col.key)}
-					<Table.Head class={cn('text-right whitespace-nowrap', index === 0 && 'border-l')}>
-						{col.label}
+					<Table.Head
+						class={cn('text-right whitespace-nowrap', index === 0 ? 'border-l' : 'max-md:hidden')}
+					>
+						{#if index === 0}
+							<span class="md:hidden">{m.memory()}</span><span class="max-md:hidden"
+								>{col.label}</span
+							>
+						{:else}
+							{col.label}
+						{/if}
 					</Table.Head>
 				{/each}
 				{#if showGpu}
-					<Table.Head class="border-l text-right whitespace-nowrap">
+					<Table.Head class="border-l text-right whitespace-nowrap max-md:hidden">
 						{m.gpu_allocated()}
 					</Table.Head>
-					<Table.Head class="text-right whitespace-nowrap">{m.usage()}</Table.Head>
-					<Table.Head class="text-right whitespace-nowrap">{m.utilization()}</Table.Head>
+					<Table.Head class="text-right whitespace-nowrap max-md:border-l">
+						<span class="md:hidden">{m.gpu()}</span><span class="max-md:hidden">{m.usage()}</span>
+					</Table.Head>
+					<Table.Head class="text-right whitespace-nowrap max-md:hidden">
+						{m.utilization()}
+					</Table.Head>
 				{/if}
 				{#each diskClasses as deviceClass (deviceClass)}
 					{#if deviceClass === AIDAPTIV_CACHE_DEVICE_CLASS}
-						<Table.Head class="border-l text-right whitespace-nowrap">
+						<Table.Head class="border-l text-right whitespace-nowrap max-md:hidden">
 							{m.disk_write()}
 						</Table.Head>
-						<Table.Head class="text-right whitespace-nowrap">{m.disk_read()}</Table.Head>
-						<Table.Head class="text-right whitespace-nowrap">{m.usage()}</Table.Head>
+						<Table.Head class="text-right whitespace-nowrap max-md:hidden">
+							{m.disk_read()}
+						</Table.Head>
+						<Table.Head class="text-right whitespace-nowrap max-md:border-l">
+							<span class="md:hidden">{deviceClassLabel(deviceClass)}</span><span
+								class="max-md:hidden">{m.usage()}</span
+							>
+						</Table.Head>
 					{:else}
-						<Table.Head class="border-l text-right whitespace-nowrap">{m.usage()}</Table.Head>
+						<Table.Head class="border-l text-right whitespace-nowrap">
+							<span class="md:hidden">{deviceClassLabel(deviceClass)}</span><span
+								class="max-md:hidden">{m.usage()}</span
+							>
+						</Table.Head>
 					{/if}
 				{/each}
 			</Table.Row>
@@ -735,7 +804,7 @@
 									)}
 								/>
 								<span>{row.node}</span>
-								<span class="text-xs text-muted-foreground">
+								<span class="text-xs text-muted-foreground max-lg:hidden">
 									({row.gpus.length} × {gpuModel} · {formatBytes(row.gpuTotal, 0)})
 								</span>
 							</div>
@@ -743,17 +812,17 @@
 							{row.node}
 						{/if}
 					</Table.Cell>
-					{#each CPU_COLUMNS as col (col.key)}
-						{@render pctCell(row[col.key])}
+					{#each CPU_COLUMNS as col, index (col.key)}
+						{@render pctCell(row[col.key], true, index > 0)}
 					{/each}
-					{#each MEM_COLUMNS as col (col.key)}
-						{@render pctCell(row[col.key])}
+					{#each MEM_COLUMNS as col, index (col.key)}
+						{@render pctCell(row[col.key], true, index > 0)}
 					{/each}
 					{#if showGpu}
-						{@render pctCell(row.gpuAllocPct)}
+						{@render pctCell(row.gpuAllocPct, true, true)}
 						{@render pctCell(row.gpuUsedPct)}
 						<!-- Utilization is not pressure: a busy GPU is the goal, so it stays uncolored. -->
-						{@render pctCell(row.gpuUtil, false)}
+						{@render pctCell(row.gpuUtil, false, true)}
 					{/if}
 					{#each diskClasses as deviceClass (deviceClass)}
 						{#if deviceClass === AIDAPTIV_CACHE_DEVICE_CLASS}

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import HeartPulseIcon from '@lucide/svelte/icons/heart-pulse';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
@@ -20,10 +19,15 @@
 		nodeNotReady = responseNotReadyNode.result[0]?.value ?? undefined;
 	}
 
+	// Whether the last fetch threw: a widget that failed says so, instead of reading as empty.
+	let failed = $state(false);
+
 	async function fetch() {
 		try {
 			await fetchNodeStatus();
+			failed = false;
 		} catch (error) {
+			failed = true;
 			console.error('Failed to fetch cluster health:', error);
 		}
 	}
@@ -54,13 +58,14 @@
 
 <StatTile
 	label={m.state()}
-	icon={HeartPulseIcon}
-	loading={!isLoaded}
-	value={nodeNotReady === undefined ? null : unreadyNodes === 0 ? 'Healthy' : 'Unhealthy'}
-	tone={nodeNotReady === undefined ? 'muted' : unreadyNodes === 0 ? 'success' : 'destructive'}
-	hint={nodeNotReady === undefined
-		? m.no_data_display()
-		: unreadyNodes === 0
-			? 'All Nodes Ready'
-			: `${unreadyNodes || 'Some'} nodes unready`}
+	state={!isLoaded ? 'loading' : failed ? 'error' : nodeNotReady === undefined ? 'empty' : 'ready'}
+	onretry={fetch}
+	value={unreadyNodes === 0 ? m.status_healthy() : m.status_unhealthy()}
+	tone={unreadyNodes === 0 ? 'success' : 'destructive'}
+	dot
+	hint={unreadyNodes === 0
+		? m.all_nodes_ready()
+		: unreadyNodes > 0
+			? m.nodes_unready({ count: String(unreadyNodes) })
+			: m.some_nodes_unready()}
 />

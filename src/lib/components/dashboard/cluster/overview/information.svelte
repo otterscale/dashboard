@@ -1,5 +1,4 @@
 <script lang="ts">
-	import InfoIcon from '@lucide/svelte/icons/info';
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
@@ -20,10 +19,15 @@
 		platform = response.result[0]?.metric?.labels?.platform ?? undefined;
 	}
 
+	// Whether the last fetch threw: a widget that failed says so, instead of reading as empty.
+	let failed = $state(false);
+
 	async function fetch() {
 		try {
 			await fetchBuildInformation();
+			failed = false;
 		} catch (error) {
+			failed = true;
 			console.error('Failed to fetch build info:', error);
 		}
 	}
@@ -50,9 +54,9 @@
 
 <StatTile
 	label={m.information()}
-	icon={InfoIcon}
-	loading={!isLoaded}
-	value={version ?? null}
-	tone={version ? 'primary' : 'muted'}
-	hint={!version ? m.no_data_display() : (platform ?? 'N/A')}
+	state={!isLoaded ? 'loading' : failed ? 'error' : !version ? 'empty' : 'ready'}
+	onretry={fetch}
+	value={version}
+	long
+	hint={platform ?? 'N/A'}
 />

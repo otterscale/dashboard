@@ -1,12 +1,11 @@
 <script lang="ts">
-	import ClockIcon from '@lucide/svelte/icons/clock';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
+	import { fetchCombinedOrThrow } from '$lib/components/dashboard/shared/query';
 	import StatTile from '$lib/components/dashboard/shared/stat-tile.svelte';
 	import { m } from '$lib/messages';
-	import { fetchCombinedInstant } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -17,15 +16,20 @@
 	let create_time: SampleValue | undefined = $state(undefined);
 
 	// Both scalars come back in a single `or`-unioned instant query.
+	// Whether the last fetch threw: a widget that failed says so, instead of reading as empty.
+	let failed = $state(false);
+
 	async function fetch() {
 		try {
-			const r = await fetchCombinedInstant(prometheusDriver, {
+			const r = await fetchCombinedOrThrow(prometheusDriver, {
 				uptime: `time() - min(kube_node_created{})`,
 				create: `min(kube_node_created{}) * 1000`
 			});
 			uptime = r.uptime[0]?.value ?? undefined;
 			create_time = r.create[0]?.value?.value ?? undefined;
+			failed = false;
 		} catch (error) {
+			failed = true;
 			console.error('Failed to fetch uptime:', error);
 		}
 	}
@@ -65,9 +69,10 @@
 
 <StatTile
 	label={m.uptime()}
-	icon={ClockIcon}
-	loading={!isLoaded}
-	value={!uptime ? null : uptime.value ? formatUptime(Number(uptime.value)) : 'N/A'}
-	tone={uptime ? 'primary' : 'muted'}
-	hint={!uptime ? m.no_data_display() : new Date(Number(create_time)).toLocaleDateString()}
+	state={!isLoaded ? 'loading' : failed ? 'error' : !uptime ? 'empty' : 'ready'}
+	onretry={fetch}
+	value={uptime?.value ? formatUptime(Number(uptime.value)) : 'N/A'}
+	hint={Number.isFinite(Number(create_time))
+		? new Date(Number(create_time)).toLocaleDateString()
+		: undefined}
 />

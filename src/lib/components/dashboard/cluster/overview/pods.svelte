@@ -1,20 +1,13 @@
 <script lang="ts">
-	import BoxIcon from '@lucide/svelte/icons/box';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
+	import { fetchCombinedOrThrow } from '$lib/components/dashboard/shared/query';
 	import StatTile from '$lib/components/dashboard/shared/stat-tile.svelte';
-	import {
-		problemTone,
-		type Tone,
-		toneFill,
-		toneText
-	} from '$lib/components/dashboard/shared/tone';
-	import { Status } from '$lib/components/shadcnio/status';
+	import { problemTone, type Tone } from '$lib/components/dashboard/shared/tone';
 	import { m } from '$lib/messages';
-	import { escapePromqlStringLiteral, fetchCombinedInstant } from '$lib/prometheus';
-	import { cn } from '$lib/utils';
+	import { escapePromqlStringLiteral } from '$lib/prometheus';
 
 	let {
 		prometheusDriver,
@@ -32,11 +25,14 @@
 	let failedPods: SampleValue | undefined = $state(undefined);
 
 	// Allocatable + the three pod phases come back in a single `or`-unioned instant query.
+	// Whether the last fetch threw: a widget that failed says so, instead of reading as empty.
+	let failed = $state(false);
+
 	async function fetch() {
 		const ns = (namespace ?? '').trim();
 		const nsFilter = ns ? `,namespace="${escapePromqlStringLiteral(ns)}"` : '';
 		try {
-			const r = await fetchCombinedInstant(prometheusDriver, {
+			const r = await fetchCombinedOrThrow(prometheusDriver, {
 				allocatable: `sum(kube_node_status_allocatable{resource="pods", container!=""})`,
 				running: `sum(kube_pod_status_phase{phase="Running", container!=""${nsFilter}})`,
 				pending: `sum(kube_pod_status_phase{phase="Pending", container!=""${nsFilter}})`,
@@ -46,7 +42,9 @@
 			runningPods = r.running[0]?.value ?? undefined;
 			pendingPods = r.pending[0]?.value ?? undefined;
 			failedPods = r.failed[0]?.value ?? undefined;
+			failed = false;
 		} catch (error) {
+			failed = true;
 			console.error('Failed to fetch pods:', error);
 		}
 	}
@@ -71,38 +69,34 @@
 	});
 
 	const empty = $derived(!maxAllocatablePods && !runningPods && !pendingPods);
+
+	const tileState = $derived(!isLoaded ? 'loading' : failed ? 'error' : empty ? 'empty' : 'ready');
+	// The samples are assigned only inside fetch(), which the type checker does not follow:
+	// read them through a typed parameter so they are not narrowed to `undefined` here.
+	const read = (sample: SampleValue | undefined) => sample?.value;
+	const figures = $derived<{ label: string; value: number | string | undefined; tone: Tone }[]>([
+		{ label: m.pods_allocatable(), value: read(maxAllocatablePods), tone: 'default' },
+		{ label: m.pods_running(), value: read(runningPods), tone: 'success' },
+		{
+			label: m.pods_pending(),
+			value: read(pendingPods),
+			tone: problemTone(Number(read(pendingPods) ?? 0), 'warning')
+		},
+		{
+			label: m.pods_failed(),
+			value: read(failedPods),
+			tone: problemTone(Number(read(failedPods) ?? 0))
+		}
+	]);
 </script>
 
-{#snippet figure(label: string, value: number | string | undefined, tone: Tone)}
-	<div class="min-w-0">
-		<p class={cn('text-2xl leading-8 font-semibold tracking-tight tabular-nums', toneText[tone])}>
-			{value ?? 'N/A'}
-		</p>
-		<p class="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
-			<Status size="sm" class={cn('ring-0', toneFill[tone === 'default' ? 'muted' : tone])} />
-			{label}
-		</p>
-	</div>
-{/snippet}
-
-<StatTile
-	label={m.pods()}
-	icon={BoxIcon}
-	tone="primary"
-	loading={!isLoaded}
-	hint={empty ? m.no_data_display() : undefined}
-	value={empty ? null : undefined}
->
-	{#if !empty}
-		<div class="grid grid-cols-4 gap-3">
-			{@render figure('Allocatable', maxAllocatablePods?.value, 'default')}
-			{@render figure('Running', runningPods?.value, 'success')}
-			{@render figure(
-				'Pending',
-				pendingPods?.value,
-				problemTone(Number(pendingPods?.value ?? 0), 'warning')
-			)}
-			{@render figure('Failed', failedPods?.value, problemTone(Number(failedPods?.value ?? 0)))}
-		</div>
-	{/if}
-</StatTile>
+<!-- Four cells of the band, not one: the widget's wrapper is `display: contents`. -->
+{#each figures as figure (figure.label)}
+	<StatTile
+		label={figure.label}
+		state={tileState}
+		onretry={fetch}
+		value={figure.value ?? 'N/A'}
+		tone={figure.tone}
+	/>
+{/each}

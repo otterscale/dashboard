@@ -1,5 +1,4 @@
 <script lang="ts">
-	import ServerIcon from '@lucide/svelte/icons/server';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
@@ -18,10 +17,15 @@
 		clusterNodes = response.result[0]?.value ?? undefined;
 	}
 
+	// Whether the last fetch threw: a widget that failed says so, instead of reading as empty.
+	let failed = $state(false);
+
 	async function fetch() {
 		try {
 			await fetchClusterNodes();
+			failed = false;
 		} catch (error) {
+			failed = true;
 			console.error('Failed to fetch cluster nodes:', error);
 		}
 	}
@@ -48,9 +52,7 @@
 
 <StatTile
 	label={m.node()}
-	icon={ServerIcon}
-	loading={!isLoaded}
-	value={clusterNodes?.value !== undefined ? clusterNodes.value : 'N/A'}
-	tone="primary"
-	hint={m.cluster_dashboard_node_description()}
+	state={!isLoaded ? 'loading' : failed ? 'error' : clusterNodes === undefined ? 'empty' : 'ready'}
+	onretry={fetch}
+	value={clusterNodes?.value}
 />

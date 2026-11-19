@@ -1,11 +1,13 @@
 <script lang="ts">
-	import type { Component, Snippet } from 'svelte';
+	import type { Snippet } from 'svelte';
 
-	import { Card } from '$lib/components/shadcnio/card';
+	import { Button } from '$lib/components/shadcnio/button';
 	import { Skeleton } from '$lib/components/shadcnio/skeleton';
+	import { Status } from '$lib/components/shadcnio/status';
+	import { m } from '$lib/messages';
 	import { cn } from '$lib/utils';
 
-	import { type Tone, toneChip, toneText } from './tone';
+	import { type Tone, toneFill, toneText } from './tone';
 
 	let {
 		label,
@@ -13,58 +15,95 @@
 		unit,
 		hint,
 		tone = 'default',
-		icon: Icon,
-		loading = false,
+		dot = false,
+		state = 'ready',
+		onretry,
+		long = false,
 		class: className,
 		children
 	}: {
 		label: string;
-		/** The headline figure. Leave out and pass `children` for anything richer. */
+		/** The headline figure. */
 		value?: string | number | null;
 		unit?: string;
-		/** One line under the figure. */
+		/** One line under the label. */
 		hint?: string;
-		/** Colors the figure and the icon chip. */
+		/** Colors the figure. A count that is fine stays `default` or `muted`. */
 		tone?: Tone;
-		icon?: Component<{ class?: string }>;
-		loading?: boolean;
+		/** Puts a status dot in front of the hint, in the tile's tone. */
+		dot?: boolean;
+		/**
+		 * `loading` swaps only the figure for a bar of the same size, so the label is there from
+		 * the start and nothing moves when the figure arrives.
+		 */
+		state?: 'ready' | 'loading' | 'empty' | 'error';
+		onretry?: () => void;
+		/** For a figure that is a long string, like a version: smaller, and it wraps instead of being cut. */
+		long?: boolean;
 		class?: string;
+		/** Extra content under the hint. */
 		children?: Snippet;
 	} = $props();
 </script>
 
-<Card size="sm" class={cn('h-full gap-2 px-4', className)}>
-	<div class="flex items-center justify-between gap-2">
-		<span class="truncate text-sm text-muted-foreground">{label}</span>
-		{#if Icon}
-			<span
-				class={cn('flex size-7 shrink-0 items-center justify-center rounded-md', toneChip[tone])}
-				aria-hidden="true"
-			>
-				<Icon class="size-4" />
-			</span>
-		{/if}
-	</div>
-	{#if loading}
-		<Skeleton class="h-8 w-24" />
-		<Skeleton class="h-3.5 w-32" />
-	{:else}
-		{#if value !== undefined}
+<!--
+	One cell of a KPI band (shadcn.io stats-connected-kpi-bar): figure first, its label under it,
+	then a line of context. Cells share hairlines through the band's `gap-px`, so a cell has a
+	background and padding but no border of its own.
+-->
+<div class={cn('flex h-full min-w-0 flex-col bg-card px-4 py-4 sm:px-5', className)}>
+	<div class="flex min-h-9 items-center">
+		{#if state === 'loading'}
+			<Skeleton class="h-7 w-20" />
+		{:else if state === 'empty' || state === 'error' || value === null || value === undefined}
+			<span class="text-2xl font-semibold text-muted-foreground" aria-hidden="true">—</span>
+		{:else}
 			<p
 				class={cn(
-					'text-2xl leading-8 font-semibold tracking-tight tabular-nums',
+					'font-semibold tracking-tight tabular-nums',
+					long ? 'text-lg leading-6 break-all' : 'truncate text-2xl',
 					toneText[tone === 'primary' ? 'default' : tone]
 				)}
+				title={String(value)}
 			>
-				{value ?? '—'}
-				{#if unit && value !== null}
-					<span class="text-base font-medium text-muted-foreground">{unit}</span>
+				<bdi>{value}</bdi>
+				{#if unit}
+					<span class="ms-0.5 text-sm font-normal tracking-normal text-muted-foreground"
+						>{unit}</span
+					>
 				{/if}
 			</p>
 		{/if}
-		{@render children?.()}
-		{#if hint}
-			<p class="truncate text-xs text-muted-foreground" title={hint}>{hint}</p>
+	</div>
+	<p class="mt-1 truncate text-sm text-muted-foreground">{label}</p>
+	<!-- A tile without a hint has no third line, loading or not, so the band keeps its height. -->
+	<div
+		class={cn(
+			'mt-2 flex items-center gap-1.5 text-xs text-muted-foreground',
+			(hint || state === 'error' || state === 'empty') && 'min-h-5'
+		)}
+	>
+		{#if state === 'loading' && hint}
+			<Skeleton class="h-3 w-24" />
+		{:else if state === 'loading'}
+			<!-- nothing -->
+		{:else if state === 'error'}
+			<span class="truncate text-destructive">{m.widget_load_failed()}</span>
+			{#if onretry}
+				<Button variant="outline" size="xs" class="ms-auto shrink-0" onclick={onretry}>
+					{m.retry()}
+				</Button>
+			{/if}
+		{:else if state === 'empty'}
+			<span class="truncate">{m.no_data_display()}</span>
+		{:else if hint}
+			{#if dot}
+				<Status size="sm" class={cn('ring-0', toneFill[tone])} />
+			{/if}
+			<span class="truncate" title={hint}>{hint}</span>
 		{/if}
+	</div>
+	{#if state === 'ready'}
+		{@render children?.()}
 	{/if}
-</Card>
+</div>
