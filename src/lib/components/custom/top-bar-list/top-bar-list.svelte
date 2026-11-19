@@ -71,7 +71,9 @@
 					<Tooltip.Trigger>
 						{#snippet child({ props })}
 							<span {...props} class="mr-1 cursor-help">
-								<TriangleAlertIcon class="inline size-3 shrink-0 align-[-1px] text-chart-1" />
+								<TriangleAlertIcon
+									class="inline size-3 shrink-0 align-[-1px] text-warning-foreground"
+								/>
 								<span class="sr-only">{bar.warning}</span>
 							</span>
 						{/snippet}
@@ -92,7 +94,7 @@
 			</span>
 		{:else}
 			<span
-				class={cn('absolute inset-y-0 left-0 rounded bg-chart-1', bar.barClass)}
+				class={cn('absolute inset-y-0 left-0 rounded bg-primary', bar.barClass)}
 				style="width: {pct}%"
 			></span>
 		{/if}

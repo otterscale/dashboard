@@ -394,25 +394,25 @@ export function thresholdClasses(level: ThresholdLevel): {
 } {
 	switch (level) {
 		case 'green':
-			return { text: 'text-chart-2', border: '', bg: '' };
+			return { text: 'text-success-foreground', border: '', bg: '' };
 		case 'orange':
-			return { text: 'text-chart-1', border: 'border-chart-1', bg: '' };
+			return { text: 'text-warning-foreground', border: 'border-warning', bg: '' };
 		case 'red':
 			return { text: 'text-destructive', border: 'border-destructive', bg: 'bg-destructive/5' };
 	}
 }
 
 /**
- * Chart CSS variable matching {@link thresholdClasses}' text color, so a KPI card's
+ * CSS variable matching {@link thresholdClasses}' text color, so a KPI card's
  * sparkline can be tinted by the same health level as its big number.
- * Mirrors the text mapping: green → chart-2, orange → chart-1, red → destructive.
+ * Status tokens, not chart colors: green → success, orange → warning, red → destructive.
  */
 export function thresholdChartColor(level: ThresholdLevel): string {
 	switch (level) {
 		case 'green':
-			return 'var(--chart-2)';
+			return 'var(--success)';
 		case 'orange':
-			return 'var(--chart-1)';
+			return 'var(--warning)';
 		case 'red':
 			return 'var(--destructive)';
 	}
