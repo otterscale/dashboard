@@ -1,27 +1,36 @@
 <script lang="ts">
-	import BriefcaseMedical from '@lucide/svelte/icons/briefcase-medical';
-	import ChartBar from '@lucide/svelte/icons/chart-bar';
-	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
-	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
-	import OctagonAlert from '@lucide/svelte/icons/octagon-alert';
-	import Rocket from '@lucide/svelte/icons/rocket';
+	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
+	import CircleDashedIcon from '@lucide/svelte/icons/circle-dashed';
+	import CirclePlayIcon from '@lucide/svelte/icons/circle-play';
+	import OctagonAlertIcon from '@lucide/svelte/icons/octagon-alert';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
-	import { onDestroy, onMount } from 'svelte';
 
-	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Card from '$lib/components/ui/card';
+	import { useLoadable } from '$lib/components/dashboard/shared/loadable.svelte';
+	import StatCard from '$lib/components/dashboard/shared/stat-card.svelte';
+	import { type Level, levelOfCount, levelText } from '$lib/components/dashboard/shared/status';
+	import WidgetCard from '$lib/components/dashboard/shared/widget-card.svelte';
 	import { m } from '$lib/messages';
 	import { escapePromqlStringLiteral } from '$lib/prometheus';
-	import { cn } from '$lib/utils';
 
+	import ValueList from './value-list.svelte';
+
+	// One fetch (sixteen instant queries) feeds seven cards: the four stat tiles
+	// and the three lists. The root is `display: contents`, so the page's grid
+	// places the stat row and each list card itself (`statsClass`, `listClass`).
 	let {
 		prometheusDriver,
 		namespace,
-		isReloading = $bindable()
+		isReloading = $bindable(),
+		statsClass,
+		listClass
 	}: {
 		prometheusDriver: PrometheusDriver;
 		namespace: string;
 		isReloading: boolean;
+		/** Grid placement of the row of four stat tiles. */
+		statsClass?: string;
+		/** Grid placement of each of the three list cards. */
+		listClass?: string;
 	} = $props();
 
 	type PodRolloutSnapshot = {
@@ -43,21 +52,13 @@
 		oomKilled: number;
 	};
 
-	let snap: PodRolloutSnapshot | undefined = $state(undefined);
-
 	function num(v: SampleValue | undefined): number {
 		if (v?.value === undefined || v?.value === null) return 0;
 		const n = Number(v.value);
 		return Number.isFinite(n) ? Math.round(n) : 0;
 	}
 
-	const containerIssueTotal = $derived.by(() => {
-		const s = snap;
-		if (s === undefined) return 0;
-		return s.crashLoop + s.imagePull + s.configError + s.oomKilled;
-	});
-
-	async function fetchAll(ns: string) {
+	async function fetchAll(ns: string): Promise<PodRolloutSnapshot | null> {
 		const n = escapePromqlStringLiteral(ns);
 		const base = `namespace="${n}"`;
 
@@ -85,7 +86,11 @@
 			q.map((query) => prometheusDriver.instantQuery(query, evalAt))
 		);
 
-		snap = {
+		// Every query answered with no series at all: nothing is reporting on this
+		// namespace. (A live kube-state-metrics answers the `or vector(0)` ones with 0.)
+		if (results.every((r) => r.result.length === 0)) return null;
+
+		return {
 			running: num(results[0]?.result[0]?.value),
 			unknown: num(results[1]?.result[0]?.value),
 			notReady: num(results[2]?.result[0]?.value),
@@ -105,36 +110,17 @@
 		};
 	}
 
-	async function fetch() {
-		try {
-			if (!namespace) {
-				snap = undefined;
-				return;
-			}
-			await fetchAll(namespace);
-		} catch (error) {
-			console.error('Failed to fetch namespace pod & rollout health:', error);
-		}
-	}
+	const health = useLoadable<PodRolloutSnapshot>(
+		async () => (namespace ? fetchAll(namespace) : null),
+		() => isReloading
+	);
 
-	const reloadManager = new ReloadManager(fetch);
+	const snap = $derived(health.data);
+	const emptyDescription = $derived(namespace ? undefined : m.workspace_namespace_unresolved());
 
-	$effect(() => {
-		if (isReloading) {
-			reloadManager.restart();
-		} else {
-			reloadManager.stop();
-		}
-	});
-
-	let isLoaded = $state(false);
-	onMount(async () => {
-		await fetch();
-		isLoaded = true;
-	});
-	onDestroy(() => {
-		reloadManager.stop();
-	});
+	const containerIssueTotal = $derived(
+		snap ? snap.crashLoop + snap.imagePull + snap.configError + snap.oomKilled : 0
+	);
 
 	function ratio(ready: number, desired: number): string {
 		return m.workspace_workload_ready_ratio({
@@ -143,185 +129,157 @@
 		});
 	}
 
-	type Kpi = { label: string; value: number; tone: 'default' | 'success' | 'warn' | 'danger' };
-	const kpis = $derived.by((): Kpi[] => {
-		if (!snap) return [];
+	/** A rollout short of its desired replicas is a warning; a complete or absent one is not. */
+	function rolloutLevel(ready: number, desired: number): Level {
+		return ready < desired ? 'warn' : 'neutral';
+	}
+
+	type Row = { label: string; value: string | number; level?: Level };
+
+	const stats = $derived([
+		{
+			label: m.workspace_pods_running(),
+			icon: CirclePlayIcon,
+			value: snap?.running ?? 0,
+			level: 'neutral' as Level
+		},
+		{
+			label: m.workspace_pods_not_ready(),
+			icon: CircleDashedIcon,
+			value: snap?.notReady ?? 0,
+			level: levelOfCount(snap?.notReady ?? 0, 'warn')
+		},
+		{
+			label: m.wso_container_issues(),
+			icon: OctagonAlertIcon,
+			value: containerIssueTotal,
+			level: levelOfCount(containerIssueTotal, 'danger')
+		},
+		{
+			label: m.workspace_pods_succeeded(),
+			icon: CircleCheckIcon,
+			value: snap?.succeeded ?? 0,
+			level: 'neutral' as Level
+		}
+	]);
+
+	const lists = $derived.by((): { title: string; rows: Row[]; size: number }[] => {
+		const s = snap;
 		return [
-			{ label: m.workspace_pods_running(), value: snap.running, tone: 'success' },
 			{
-				label: m.workspace_pods_not_ready(),
-				value: snap.notReady,
-				tone: snap.notReady > 0 ? 'warn' : 'default'
+				title: m.workspace_health_section_pods(),
+				size: 4,
+				rows: s
+					? [
+							{ label: m.workspace_pods_running(), value: s.running },
+							{
+								label: m.workspace_pods_unknown(),
+								value: s.unknown,
+								level: levelOfCount(s.unknown, 'warn')
+							},
+							{
+								label: m.workspace_pods_not_ready(),
+								value: s.notReady,
+								level: levelOfCount(s.notReady, 'warn')
+							},
+							{ label: m.workspace_pods_succeeded(), value: s.succeeded }
+						]
+					: []
 			},
 			{
-				label: m.workspace_pod_rollout_kpi_issues(),
-				value: containerIssueTotal,
-				tone: containerIssueTotal > 0 ? 'danger' : 'default'
+				title: m.workspace_health_section_containers(),
+				size: 4,
+				rows: s
+					? [
+							{
+								label: m.workspace_containers_crashloop(),
+								value: s.crashLoop,
+								level: levelOfCount(s.crashLoop, 'danger')
+							},
+							{
+								label: m.workspace_containers_image_pull(),
+								value: s.imagePull,
+								level: levelOfCount(s.imagePull, 'danger')
+							},
+							{
+								label: m.workspace_containers_config_error(),
+								value: s.configError,
+								level: levelOfCount(s.configError, 'danger')
+							},
+							{
+								label: m.workspace_containers_oom_killed(),
+								value: s.oomKilled,
+								level: levelOfCount(s.oomKilled, 'danger')
+							}
+						]
+					: []
 			},
-			{ label: m.workspace_pods_succeeded(), value: snap.succeeded, tone: 'default' }
+			{
+				title: m.workspace_health_section_rollouts(),
+				size: 5,
+				rows: s
+					? [
+							{
+								label: m.deployment(),
+								value: ratio(s.deployReady, s.deployDesired),
+								level: rolloutLevel(s.deployReady, s.deployDesired)
+							},
+							{
+								label: m.stateful_set(),
+								value: ratio(s.stsReady, s.stsDesired),
+								level: rolloutLevel(s.stsReady, s.stsDesired)
+							},
+							{
+								label: m.daemon_set(),
+								value: ratio(s.dsReady, s.dsDesired),
+								level: rolloutLevel(s.dsReady, s.dsDesired)
+							},
+							{
+								label: m.workspace_pvc_pending(),
+								value: s.pvcPending,
+								level: levelOfCount(s.pvcPending, 'warn')
+							},
+							{
+								label: m.workspace_job_failed_pods(),
+								value: s.jobFailed,
+								level: levelOfCount(s.jobFailed, 'danger')
+							}
+						]
+					: []
+			}
 		];
 	});
-
-	const toneClass: Record<Kpi['tone'], string> = {
-		default: 'text-foreground',
-		success: 'text-emerald-600 dark:text-emerald-400',
-		warn: 'text-amber-600 dark:text-amber-400',
-		danger: 'text-destructive'
-	};
 </script>
 
-<Card.Root
-	class="group relative overflow-hidden border-border/80 bg-card/50 shadow-sm ring-1 ring-border/40"
->
-	<BriefcaseMedical
-		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"
-		aria-hidden="true"
-	/>
-	<Card.Header class="relative space-y-2 pb-2">
-		<Card.Title class="text-lg font-semibold tracking-tight md:text-xl">
-			{m.workspace_pod_rollout_health_title()}
-		</Card.Title>
-		<Card.Description class="max-w-3xl text-sm leading-relaxed text-muted-foreground">
-			{m.workspace_pod_rollout_health_description()}
-		</Card.Description>
-	</Card.Header>
-	{#if !namespace}
-		<Card.Content class="text-sm text-muted-foreground"
-			>{m.workspace_namespace_unresolved()}</Card.Content
-		>
-	{:else if !isLoaded}
-		<div class="flex min-h-[200px] w-full items-center justify-center py-10">
-			<LoaderCircle class="size-10 animate-spin text-muted-foreground" />
+<div class="contents">
+	<div class={statsClass}>
+		{#each stats as stat (stat.label)}
+			<StatCard
+				label={stat.label}
+				icon={stat.icon}
+				status={health.status}
+				stale={health.stale}
+				valueClass={levelText[stat.level]}
+			>
+				{stat.value}
+			</StatCard>
+		{/each}
+	</div>
+
+	{#each lists as list (list.title)}
+		<div class={listClass}>
+			<WidgetCard
+				title={list.title}
+				status={health.status}
+				stale={health.stale}
+				{emptyDescription}
+				bodyClass="min-h-40"
+			>
+				{#snippet skeleton()}
+					<ValueList skeleton={list.size} />
+				{/snippet}
+				<ValueList rows={list.rows} />
+			</WidgetCard>
 		</div>
-	{:else if !snap}
-		<div class="flex flex-col items-center justify-center gap-2 py-12">
-			<ChartBar class="size-8 text-muted-foreground/80" />
-			<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
-		</div>
-	{:else}
-		<Card.Content class="relative space-y-6 px-4 pt-0 pb-6 sm:px-6">
-			<!-- Quick scan: headline metrics -->
-			<div class="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-				{#each kpis as k (k.label)}
-					<div
-						class="flex flex-col gap-1 rounded-xl border border-border/60 bg-muted/25 px-3 py-3 shadow-sm backdrop-blur-sm transition-colors hover:bg-muted/35"
-					>
-						<span class="text-[11px] font-medium tracking-wider text-muted-foreground uppercase"
-							>{k.label}</span
-						>
-						<span class={cn('text-2xl font-semibold tabular-nums sm:text-3xl', toneClass[k.tone])}
-							>{k.value}</span
-						>
-					</div>
-				{/each}
-			</div>
-
-			<!-- Detail panels -->
-			<div class="grid gap-4 lg:grid-cols-3 lg:gap-5">
-				<section
-					class="flex min-w-0 flex-col rounded-2xl border border-border/70 bg-background/80 p-4 shadow-sm ring-1 ring-border/30"
-				>
-					<div class="mb-3 flex items-center gap-2.5">
-						<span
-							class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-chart-2/15 text-chart-2"
-						>
-							<LayoutGrid class="size-5" />
-						</span>
-						<h3 class="text-sm leading-none font-semibold">{m.workspace_health_section_pods()}</h3>
-					</div>
-					<ul class="divide-y divide-border/50 text-sm">
-						<li class="flex items-center justify-between gap-3 py-2.5 first:pt-0">
-							<span class="min-w-0 text-muted-foreground">{m.workspace_pods_running()}</span>
-							<span class="shrink-0 font-medium text-chart-2 tabular-nums">{snap.running}</span>
-						</li>
-						<li class="flex items-center justify-between gap-3 py-2.5">
-							<span class="min-w-0 text-muted-foreground">{m.workspace_pods_unknown()}</span>
-							<span class="shrink-0 font-medium tabular-nums">{snap.unknown}</span>
-						</li>
-						<li class="flex items-center justify-between gap-3 py-2.5">
-							<span class="min-w-0 text-muted-foreground">{m.workspace_pods_not_ready()}</span>
-							<span class="shrink-0 font-semibold text-amber-600 tabular-nums dark:text-amber-400"
-								>{snap.notReady}</span
-							>
-						</li>
-						<li class="flex items-center justify-between gap-3 py-2.5">
-							<span class="min-w-0 text-muted-foreground">{m.workspace_pods_succeeded()}</span>
-							<span class="shrink-0 font-medium tabular-nums">{snap.succeeded}</span>
-						</li>
-					</ul>
-				</section>
-
-				<section
-					class="flex min-w-0 flex-col rounded-2xl border border-border/70 bg-background/80 p-4 shadow-sm ring-1 ring-border/30"
-				>
-					<div class="mb-3 flex items-center gap-2.5">
-						<span
-							class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-destructive/15 text-destructive"
-						>
-							<OctagonAlert class="size-5" />
-						</span>
-						<h3 class="text-sm leading-none font-semibold">
-							{m.workspace_health_section_containers()}
-						</h3>
-					</div>
-					<ul class="divide-y divide-border/50 text-sm">
-						{#each [{ label: m.workspace_containers_crashloop(), value: snap.crashLoop }, { label: m.workspace_containers_image_pull(), value: snap.imagePull }, { label: m.workspace_containers_config_error(), value: snap.configError }, { label: m.workspace_containers_oom_killed(), value: snap.oomKilled }] as row (row.label)}
-							<li class="flex items-center justify-between gap-3 py-2.5 first:pt-0">
-								<span class="min-w-0 truncate text-muted-foreground">{row.label}</span>
-								<span class="shrink-0 font-semibold text-destructive tabular-nums">{row.value}</span
-								>
-							</li>
-						{/each}
-					</ul>
-				</section>
-
-				<section
-					class="flex min-w-0 flex-col rounded-2xl border border-border/70 bg-background/80 p-4 shadow-sm ring-1 ring-border/30"
-				>
-					<div class="mb-3 flex items-center gap-2.5">
-						<span
-							class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary"
-						>
-							<Rocket class="size-5" />
-						</span>
-						<h3 class="text-sm leading-none font-semibold">
-							{m.workspace_health_section_rollouts()}
-						</h3>
-					</div>
-					<ul class="divide-y divide-border/50 text-sm">
-						<li class="flex items-center justify-between gap-3 py-2.5 first:pt-0">
-							<span class="min-w-0 text-muted-foreground">{m.deployment()}</span>
-							<span class="shrink-0 font-medium tabular-nums"
-								>{ratio(snap.deployReady, snap.deployDesired)}</span
-							>
-						</li>
-						<li class="flex items-center justify-between gap-3 py-2.5">
-							<span class="min-w-0 text-muted-foreground">{m.stateful_set()}</span>
-							<span class="shrink-0 font-medium tabular-nums"
-								>{ratio(snap.stsReady, snap.stsDesired)}</span
-							>
-						</li>
-						<li class="flex items-center justify-between gap-3 py-2.5">
-							<span class="min-w-0 text-muted-foreground">{m.daemon_set()}</span>
-							<span class="shrink-0 font-medium tabular-nums"
-								>{ratio(snap.dsReady, snap.dsDesired)}</span
-							>
-						</li>
-						<li class="flex items-center justify-between gap-3 py-2.5">
-							<span class="min-w-0 text-muted-foreground">{m.workspace_pvc_pending()}</span>
-							<span class="shrink-0 font-semibold text-amber-600 tabular-nums dark:text-amber-400"
-								>{snap.pvcPending}</span
-							>
-						</li>
-						<li class="flex items-center justify-between gap-3 py-2.5">
-							<span class="min-w-0 text-muted-foreground">{m.workspace_job_failed_pods()}</span>
-							<span class="shrink-0 font-semibold text-destructive tabular-nums"
-								>{snap.jobFailed}</span
-							>
-						</li>
-					</ul>
-				</section>
-			</div>
-		</Card.Content>
-	{/if}
-</Card.Root>
+	{/each}
+</div>

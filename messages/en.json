@@ -838,5 +838,17 @@
 	"dash_guide_tour": "Start guide tour",
 	"dash_switch_cluster": "Switch cluster",
 	"dash_toggle_sidebar": "Toggle sidebar",
-	"dash_navigation": "Navigation"
+	"dash_navigation": "Navigation",
+	"wso_container_issues": "Container issues",
+	"wso_gpu_quota_zero": "The GPU memory quota of this workspace is 0.",
+	"wso_quota_value_missing": "Nothing was reported for this resource.",
+	"wso_storage_empty": "No volume claims were reported for this workspace.",
+	"clo_allocatable": "Allocatable",
+	"clo_analytics_scope": "Analytics scope",
+	"clo_open_full_table": "Open the full table",
+	"clo_no_cluster": "No cluster is selected.",
+	"clo_fault_remapped_rows": "Uncorrectable remapped rows: {count}",
+	"clo_fault_remap_failure": "Row remap failure: {count}",
+	"clo_fault_pcie_replays": "PCIe replays: {count}",
+	"cla_top_series": "Number of series shown"
 }

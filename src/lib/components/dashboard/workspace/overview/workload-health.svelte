@@ -1,8 +1,6 @@
 <script lang="ts">
 	import type { JsonObject } from '@bufbuild/protobuf';
-	import { createClient, type Transport } from '@connectrpc/connect';
-	import HeartPulse from '@lucide/svelte/icons/heart-pulse';
-	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
+	import { Code, ConnectError, createClient, type Transport } from '@connectrpc/connect';
 	import {
 		type ListRequest,
 		type ListResponse,
@@ -10,11 +8,20 @@
 		ResourceService
 	} from '@otterscale/api/resource/v1';
 	import type { PrometheusDriver } from 'prometheus-query';
-	import { getContext, onDestroy, onMount } from 'svelte';
+	import { getContext } from 'svelte';
 
-	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Card from '$lib/components/ui/card';
-	import { Progress } from '$lib/components/ui/progress';
+	import { useLoadable } from '$lib/components/dashboard/shared/loadable.svelte';
+	import WidgetCard from '$lib/components/dashboard/shared/widget-card.svelte';
+	import { Skeleton } from '$lib/components/shadcnio/skeleton';
+	import { Status } from '$lib/components/shadcnio/status';
+	import {
+		Table,
+		TableBody,
+		TableCell,
+		TableHead,
+		TableHeader,
+		TableRow
+	} from '$lib/components/shadcnio/table';
 	import { m } from '$lib/messages';
 
 	type WorkloadListSpec = {
@@ -42,12 +49,15 @@
 		isReloading: boolean;
 	} = $props();
 
+	// Every overview tile is handed the driver; this one uses the Resource API only.
+	$effect(() => void prometheusDriver);
+
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
 	const workloadLabels = $derived([m.model(), m.application(), m.release()]);
 
-	let rows: { label: string; ready: number; total: number }[] = $state([]);
+	type Row = { label: string; ready: number; total: number };
 
 	function hasReadyConditionTrue(obj: JsonObject | undefined): boolean {
 		if (!obj || typeof obj !== 'object') return false;
@@ -91,108 +101,104 @@
 		return out;
 	}
 
-	async function fetchWorkloadSafe(
-		spec: WorkloadListSpec,
-		label: string,
-		ns: string
-	): Promise<{ label: string; ready: number; total: number }> {
+	/**
+	 * A failed list call throws: the card then shows the error state, not `0 / 0`.
+	 * The one exception is `not_found`, which is how the API answers for a kind whose
+	 * CRD is not installed on the cluster: that is "none of this kind", an answer.
+	 */
+	async function fetchWorkload(spec: WorkloadListSpec, label: string, ns: string): Promise<Row> {
 		try {
 			const items = await listAllInNamespace(spec, ns);
 			const { ready, total } = totalsFromItems(items);
 			return { label, ready, total };
 		} catch (error) {
-			console.error(
-				`Failed to list ${spec.group}/${spec.version}/${spec.resource} in namespace ${ns}:`,
-				error
-			);
-			return { label, ready: 0, total: 0 };
+			if (ConnectError.from(error).code === Code.NotFound) return { label, ready: 0, total: 0 };
+			throw error;
 		}
 	}
 
-	async function fetch() {
-		if (!namespace || !cluster) {
-			rows = [];
-			return;
-		}
-		const labels = workloadLabels;
-		try {
-			rows = await Promise.all(
-				WORKLOAD_SPECS.map((w, i) => fetchWorkloadSafe(w, labels[i]!, namespace))
-			);
-		} catch (error) {
-			console.error('Failed to fetch workspace workload health:', error);
-			rows = WORKLOAD_SPECS.map((_, i) => ({
-				label: labels[i]!,
-				ready: 0,
-				total: 0
-			}));
-		}
-	}
+	const workloads = useLoadable<Row[]>(
+		async () => {
+			if (!namespace || !cluster) return null;
+			const labels = workloadLabels;
+			return Promise.all(WORKLOAD_SPECS.map((w, i) => fetchWorkload(w, labels[i]!, namespace)));
+		},
+		() => isReloading
+	);
 
-	const reloadManager = new ReloadManager(fetch);
-
-	$effect(() => {
-		if (isReloading) {
-			reloadManager.restart();
-		} else {
-			reloadManager.stop();
-		}
-	});
-
+	// Another cluster or namespace: ask again without waiting for the next tick.
+	let asked = false;
 	$effect(() => {
 		void cluster;
 		void namespace;
-		if (isLoaded) fetch();
+		if (asked) void workloads.refresh();
+		asked = true;
 	});
 
-	let isLoaded = $state(false);
-	onMount(async () => {
-		// widget-grid passes prometheusDriver to every tile; this widget uses Resource API only.
-		void prometheusDriver;
-		await fetch();
-		isLoaded = true;
-	});
-	onDestroy(() => {
-		reloadManager.stop();
-	});
+	const cell = 'h-11 bg-muted/40 px-3 first:rounded-l-lg last:rounded-r-lg';
+	const head = 'h-7 px-3 text-xs font-normal text-muted-foreground';
 </script>
 
-<Card.Root class="group relative h-full min-h-[280px] gap-2 overflow-hidden">
-	<HeartPulse
-		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"
-		aria-hidden="true"
-	/>
-	<Card.Header>
-		<Card.Title>{m.workspace_workload_health_title()}</Card.Title>
-		<Card.Description class="text-md flex min-h-6 items-center">
-			{m.workspace_workload_health_description()}
-		</Card.Description>
-	</Card.Header>
-	{#if !namespace}
-		<Card.Content class="text-sm text-muted-foreground"
-			>{m.workspace_namespace_unresolved()}</Card.Content
-		>
-	{:else if !isLoaded}
-		<div class="flex h-9 w-full items-center justify-center">
-			<LoaderCircle class="size-10 animate-spin text-muted-foreground" />
-		</div>
-	{:else}
-		<Card.Content class="space-y-2.5">
-			{#each rows as row (row.label)}
-				{@const pct = row.total > 0 ? Math.min(100, Math.round((100 * row.ready) / row.total)) : 0}
-				<div class="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/15 px-3 py-2.5">
-					<div class="flex items-center justify-between gap-2">
-						<span class="text-sm font-medium">{row.label}</span>
-						<span class="shrink-0 text-sm text-muted-foreground tabular-nums">
+{#snippet frame(body: 'rows' | 'skeleton')}
+	<Table isHoverable={false} class="border-separate border-spacing-x-0 border-spacing-y-2">
+		<TableHeader>
+			<TableRow class="border-0">
+				<TableHead class={head}>{m.dash_kind()}</TableHead>
+				<TableHead class="{head} text-end">{m.dash_ready()}</TableHead>
+				<TableHead class="{head} w-28">{m.dash_status()}</TableHead>
+			</TableRow>
+		</TableHeader>
+		<TableBody>
+			{#if body === 'skeleton'}
+				{#each WORKLOAD_SPECS as spec (spec.resource)}
+					<TableRow class="border-0">
+						<TableCell class={cell}><Skeleton class="h-3.5 w-24" /></TableCell>
+						<TableCell class={cell}><Skeleton class="ms-auto h-3.5 w-10" /></TableCell>
+						<TableCell class={cell}><Skeleton class="h-3.5 w-16" /></TableCell>
+					</TableRow>
+				{/each}
+			{:else}
+				{#each workloads.data ?? [] as row (row.label)}
+					<TableRow class="border-0">
+						<TableCell class="{cell} font-medium">{row.label}</TableCell>
+						<TableCell class="{cell} text-end font-mono text-xs tabular-nums">
 							{m.workspace_workload_ready_ratio({
 								ready: String(row.ready),
 								total: String(row.total)
 							})}
-						</span>
-					</div>
-					<Progress value={pct} max={100} class="h-1.5 bg-muted/80" />
-				</div>
-			{/each}
-		</Card.Content>
-	{/if}
-</Card.Root>
+						</TableCell>
+						<TableCell class={cell}>
+							{#if row.total === 0}
+								<span class="text-muted-foreground">{m.dash_none()}</span>
+							{:else if row.ready >= row.total}
+								<span class="inline-flex items-center gap-2">
+									<Status variant="success" size="sm" class="ring-0" />
+									{m.dash_ready()}
+								</span>
+							{:else}
+								<span class="inline-flex items-center gap-2 text-warning-foreground">
+									<Status variant="warning" size="sm" class="ring-0" />
+									{m.dash_degraded()}
+								</span>
+							{/if}
+						</TableCell>
+					</TableRow>
+				{/each}
+			{/if}
+		</TableBody>
+	</Table>
+{/snippet}
+
+<WidgetCard
+	title={m.workspace_workload_health_title()}
+	info={m.workspace_workload_health_description()}
+	status={workloads.status}
+	stale={workloads.stale}
+	emptyDescription={m.workspace_namespace_unresolved()}
+	bodyClass="min-h-48"
+>
+	{#snippet skeleton()}
+		{@render frame('skeleton')}
+	{/snippet}
+	{@render frame('rows')}
+</WidgetCard>

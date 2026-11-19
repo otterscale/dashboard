@@ -838,5 +838,17 @@
 	"dash_guide_tour": "開始導覽",
 	"dash_switch_cluster": "切換叢集",
 	"dash_toggle_sidebar": "切換側邊欄",
-	"dash_navigation": "導覽"
+	"dash_navigation": "導覽",
+	"wso_container_issues": "容器異常",
+	"wso_gpu_quota_zero": "此工作區的 GPU 記憶體配額為 0。",
+	"wso_quota_value_missing": "此資源沒有回報任何數值。",
+	"wso_storage_empty": "此工作區沒有回報任何磁碟區宣告。",
+	"clo_allocatable": "可分配",
+	"clo_analytics_scope": "分析範圍",
+	"clo_open_full_table": "開啟完整表格",
+	"clo_no_cluster": "尚未選擇叢集。",
+	"clo_fault_remapped_rows": "無法修正的重新對應列：{count}",
+	"clo_fault_remap_failure": "列重新對應失敗：{count}",
+	"clo_fault_pcie_replays": "PCIe 重送次數：{count}",
+	"cla_top_series": "顯示的序列數"
 }
