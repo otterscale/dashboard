@@ -8,17 +8,33 @@
 
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
-	import * as Avatar from '$lib/components/ui/avatar/index.js';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import { useSidebar } from '$lib/components/ui/sidebar/index.js';
+	import { Avatar, AvatarFallback, AvatarImage } from '$lib/components/shadcnio/avatar';
+	import {
+		DropdownMenu,
+		DropdownMenuContent,
+		DropdownMenuGroup,
+		DropdownMenuItem,
+		DropdownMenuRadioGroup,
+		DropdownMenuRadioItem,
+		DropdownMenuSeparator,
+		DropdownMenuSub,
+		DropdownMenuSubContent,
+		DropdownMenuSubTrigger,
+		DropdownMenuTrigger
+	} from '$lib/components/shadcnio/dropdown-menu';
+	import {
+		SidebarMenu,
+		SidebarMenuButton,
+		SidebarMenuItem,
+		useSidebar
+	} from '$lib/components/shadcnio/sidebar';
 	import { m } from '$lib/messages';
 	import { getLocale, type Locale, setLocale } from '$lib/paraglide/runtime';
 	import type { User } from '$lib/server/session';
 
 	let { user }: { user: User } = $props();
 
-	let locale = $state(getLocale());
+	let locale = $state<string>(getLocale());
 
 	const sidebar = useSidebar();
 
@@ -40,49 +56,43 @@
 	};
 </script>
 
-<Sidebar.Menu>
-	<Sidebar.MenuItem>
-		<DropdownMenu.Root>
-			<DropdownMenu.Trigger>
-				{#snippet child({ props })}
-					<Sidebar.MenuButton
-						size="lg"
-						class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-						{...props}
-					>
-						<Avatar.Root class="size-8 rounded-lg">
-							<Avatar.Image src={user.picture} alt={user.name} />
-							<Avatar.Fallback class="rounded-lg">{getUserInitials(user.name)}</Avatar.Fallback>
-						</Avatar.Root>
-						<div class="grid flex-1 text-start text-sm leading-tight">
-							<span class="truncate font-medium">{user.name}</span>
-							<span class="truncate text-xs text-muted-foreground">{user.email}</span>
-						</div>
+{#snippet identity()}
+	<Avatar class="size-8 rounded-lg after:rounded-lg">
+		{#if user.picture}
+			<AvatarImage src={user.picture} alt={user.name} class="rounded-lg" />
+		{/if}
+		<AvatarFallback class="rounded-lg">{getUserInitials(user.name)}</AvatarFallback>
+	</Avatar>
+	<div class="grid min-w-0 flex-1 text-start text-sm leading-tight">
+		<span class="truncate font-medium">{user.name}</span>
+		<span class="truncate text-xs text-muted-foreground">{user.email}</span>
+	</div>
+{/snippet}
+
+<SidebarMenu>
+	<SidebarMenuItem>
+		<DropdownMenu
+			positioning={{
+				placement: sidebar.isMobile ? 'top-start' : 'right-end',
+				gutter: 8,
+				sameWidth: sidebar.isMobile
+			}}
+		>
+			<DropdownMenuTrigger>
+				{#snippet asChild(props)}
+					<SidebarMenuButton {...props()} size="lg" class="data-[state=open]:bg-sidebar-accent">
+						{@render identity()}
 						<ChevronsUpDownIcon class="ms-auto size-4" />
-					</Sidebar.MenuButton>
+					</SidebarMenuButton>
 				{/snippet}
-			</DropdownMenu.Trigger>
-			<DropdownMenu.Content
-				class="w-(--bits-dropdown-menu-anchor-width) min-w-56 rounded-lg"
-				side={sidebar.isMobile ? 'bottom' : 'right'}
-				align="end"
-				sideOffset={4}
-			>
-				<DropdownMenu.Label class="p-0 font-normal">
-					<div class="flex items-center gap-2 px-1 py-1.5 text-start text-sm">
-						<Avatar.Root class="size-8 rounded-lg">
-							<Avatar.Image src={user.picture} alt={user.name} />
-							<Avatar.Fallback class="rounded-lg">{getUserInitials(user.name)}</Avatar.Fallback>
-						</Avatar.Root>
-						<div class="grid flex-1 text-start text-sm leading-tight">
-							<span class="truncate font-medium">{user.name}</span>
-							<span class="truncate text-xs text-muted-foreground">{user.email}</span>
-						</div>
-					</div>
-				</DropdownMenu.Label>
-				<DropdownMenu.Separator />
-				<DropdownMenu.Group>
-					<DropdownMenu.Item onclick={toggleMode}>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent class="min-w-56">
+				<div class="flex items-center gap-2 px-1.5 py-1.5">
+					{@render identity()}
+				</div>
+				<DropdownMenuSeparator />
+				<DropdownMenuGroup>
+					<DropdownMenuItem value="mode" onSelect={toggleMode}>
 						{#if mode.current === 'light'}
 							<MoonIcon />
 							{m.dark_mode()}
@@ -90,33 +100,29 @@
 							<SunIcon />
 							{m.light_mode()}
 						{/if}
-					</DropdownMenu.Item>
-					<DropdownMenu.Sub>
-						<DropdownMenu.SubTrigger>
+					</DropdownMenuItem>
+					<DropdownMenuSub positioning={{ placement: 'right-start', gutter: 4 }}>
+						<DropdownMenuSubTrigger>
 							<GlobeIcon />
 							{m.locale()}
-						</DropdownMenu.SubTrigger>
-						<DropdownMenu.SubContent>
-							<DropdownMenu.RadioGroup bind:value={locale}>
-								<DropdownMenu.RadioItem value="en" onclick={() => handleLanguageChange('en')}>
-									English
-								</DropdownMenu.RadioItem>
-								<DropdownMenu.RadioItem
-									value="zh-hant"
-									onclick={() => handleLanguageChange('zh-hant')}
-								>
-									繁體中文
-								</DropdownMenu.RadioItem>
-							</DropdownMenu.RadioGroup>
-						</DropdownMenu.SubContent>
-					</DropdownMenu.Sub>
-				</DropdownMenu.Group>
-				<DropdownMenu.Separator />
-				<DropdownMenu.Item variant="destructive" onclick={handleSignOut}>
+						</DropdownMenuSubTrigger>
+						<DropdownMenuSubContent>
+							<DropdownMenuRadioGroup
+								value={locale}
+								onValueChange={(details) => handleLanguageChange(details.value as Locale)}
+							>
+								<DropdownMenuRadioItem value="en">English</DropdownMenuRadioItem>
+								<DropdownMenuRadioItem value="zh-hant">繁體中文</DropdownMenuRadioItem>
+							</DropdownMenuRadioGroup>
+						</DropdownMenuSubContent>
+					</DropdownMenuSub>
+				</DropdownMenuGroup>
+				<DropdownMenuSeparator />
+				<DropdownMenuItem value="logout" variant="destructive" onSelect={handleSignOut}>
 					<LogOutIcon />
 					{m.log_out()}
-				</DropdownMenu.Item>
-			</DropdownMenu.Content>
-		</DropdownMenu.Root>
-	</Sidebar.MenuItem>
-</Sidebar.Menu>
+				</DropdownMenuItem>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	</SidebarMenuItem>
+</SidebarMenu>

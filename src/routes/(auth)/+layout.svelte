@@ -36,14 +36,40 @@
 	} from '$lib/components/layout';
 	import ImportCluster from '$lib/components/layout/import-cluster-external.svelte';
 	import RegisteClusterTrigger from '$lib/components/layout/registe-cluster-trigger.svelte';
-	import * as Alert from '$lib/components/ui/alert';
-	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
-	import { Button } from '$lib/components/ui/button';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
-	import { Separator } from '$lib/components/ui/separator';
-	import * as Sidebar from '$lib/components/ui/sidebar';
-	import { Skeleton } from '$lib/components/ui/skeleton';
-	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { Alert, AlertDescription } from '$lib/components/shadcnio/alert';
+	import {
+		Breadcrumb,
+		BreadcrumbItem,
+		BreadcrumbLink,
+		BreadcrumbList,
+		BreadcrumbPage,
+		BreadcrumbSeparator
+	} from '$lib/components/shadcnio/breadcrumb';
+	import { Button } from '$lib/components/shadcnio/button';
+	import {
+		DropdownMenu,
+		DropdownMenuContent,
+		DropdownMenuRadioGroup,
+		DropdownMenuRadioItem,
+		DropdownMenuTrigger
+	} from '$lib/components/shadcnio/dropdown-menu';
+	import { Separator } from '$lib/components/shadcnio/separator';
+	import {
+		Sidebar,
+		SidebarContent,
+		SidebarFooter,
+		SidebarHeader,
+		SidebarInset,
+		SidebarProvider,
+		SidebarRail,
+		SidebarTrigger
+	} from '$lib/components/shadcnio/sidebar';
+	import { Skeleton } from '$lib/components/shadcnio/skeleton';
+	import { Tooltip, TooltipContent, TooltipTrigger } from '$lib/components/shadcnio/tooltip';
+	// The app shell runs on the shadcn.io sidebar. Three pages outside it (the two
+	// console pages and the construction placeholder) still read the open state from
+	// the sidebar context of components/ui, so that context is provided too, fed from here.
+	import { setSidebar as setLegacySidebar } from '$lib/components/ui/sidebar/context.svelte.js';
 	import { m } from '$lib/messages';
 	import { breadcrumbs } from '$lib/stores';
 	import { pulse } from '$lib/stores/pulse.svelte';
@@ -80,6 +106,7 @@
 	let workspaces = $state<TenantOtterscaleIoV1Alpha1Workspace[]>([]);
 
 	let sidebarOpen = $state(true);
+	setLegacySidebar({ open: () => sidebarOpen, setOpen: (open) => (sidebarOpen = open) });
 	let importOpen = $state(false);
 	let hasRookCeph = $state(false);
 	let clusterFeatures = $state<ClusterFeatures>({});
@@ -727,18 +754,25 @@
 	<title>{current ? `${current.title} - ${m.site_title()}` : m.site_title()}</title>
 </svelte:head>
 
-<Sidebar.Provider class="h-svh overflow-hidden" bind:open={sidebarOpen}>
-	<Sidebar.Root id="sidebar-guide-step" collapsible="icon" variant="inset" class="p-3">
+<SidebarProvider
+	class="h-svh min-h-0 overflow-hidden"
+	open={sidebarOpen}
+	onOpenChange={(open) => (sidebarOpen = open)}
+>
+	<Sidebar id="sidebar-guide-step" collapsible="icon">
 		{#if activeCluster && isMounted}
-			<Sidebar.Header id="workspace-guide-step">
+			<SidebarHeader
+				id="workspace-guide-step"
+				class="h-14 justify-center border-b border-sidebar-border"
+			>
 				<WorkspaceSwitcher
 					cluster={activeCluster}
 					{workspaces}
 					user={data.user}
 					workspace={page.params.workspace}
 				/>
-			</Sidebar.Header>
-			<Sidebar.Content class="gap-0">
+			</SidebarHeader>
+			<SidebarContent>
 				{#if page.params.workspace}
 					<NavMain
 						platformLabel={m.platform()}
@@ -749,160 +783,143 @@
 				{:else}
 					{@render contentSkeleton(sidebarOpen)}
 				{/if}
-			</Sidebar.Content>
+			</SidebarContent>
 		{:else}
-			<Sidebar.Header id="workspace-guide-step">
+			<SidebarHeader
+				id="workspace-guide-step"
+				class="h-14 justify-center border-b border-sidebar-border"
+			>
 				{@render headerSkeleton(sidebarOpen)}
-			</Sidebar.Header>
-			<Sidebar.Content class="gap-2">
+			</SidebarHeader>
+			<SidebarContent>
 				{@render contentSkeleton(sidebarOpen)}
-			</Sidebar.Content>
+			</SidebarContent>
 		{/if}
-		<NavSecondary harborUrl={env.PUBLIC_HARBOR_URL} />
-		<Sidebar.Footer>
+		<NavSecondary harborUrl={env.PUBLIC_HARBOR_URL} class="border-t border-sidebar-border" />
+		<SidebarFooter class="border-t border-sidebar-border">
 			<NavUser user={data.user} />
-		</Sidebar.Footer>
-		<Sidebar.Rail />
-	</Sidebar.Root>
-	<Sidebar.Inset class="min-w-0 overflow-hidden">
-		<header
-			class="flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12"
-		>
-			<div class="flex items-center gap-2 px-4">
-				<Sidebar.Trigger class="-ms-1" />
-				<Separator orientation="vertical" class="me-2 data-[orientation=vertical]:h-4" />
-				<Breadcrumb.Root>
-					<Breadcrumb.List>
+		</SidebarFooter>
+		<SidebarRail />
+	</Sidebar>
+	<SidebarInset class="min-w-0 overflow-hidden">
+		<header class="flex h-14 shrink-0 items-center justify-between gap-2 border-b px-4">
+			<div class="flex min-w-0 items-center gap-2">
+				<SidebarTrigger class="-ms-1" aria-label={m.dash_toggle_sidebar()} />
+				<Separator orientation="vertical" class="me-2 h-4! self-center!" />
+				<Breadcrumb class="min-w-0">
+					<BreadcrumbList class="flex-nowrap">
 						{#each $breadcrumbs as item (item.url)}
 							{#if item.url === current?.url}
-								<Breadcrumb.Item>
-									<Breadcrumb.Page>{current.title}</Breadcrumb.Page>
-								</Breadcrumb.Item>
+								<BreadcrumbItem class="min-w-0">
+									<BreadcrumbPage class="truncate">{current.title}</BreadcrumbPage>
+								</BreadcrumbItem>
 							{:else}
-								<Breadcrumb.Item class="hidden md:block">
-									<Breadcrumb.Link href={item.url}>{item.title}</Breadcrumb.Link>
-								</Breadcrumb.Item>
-								<Breadcrumb.Separator class="hidden md:block" />
+								<BreadcrumbItem class="hidden md:block">
+									<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+									<BreadcrumbLink href={item.url}>{item.title}</BreadcrumbLink>
+								</BreadcrumbItem>
+								<BreadcrumbSeparator class="hidden md:block" />
 							{/if}
 						{/each}
-					</Breadcrumb.List>
-				</Breadcrumb.Root>
+					</BreadcrumbList>
+				</Breadcrumb>
 			</div>
-			<div class="flex items-center gap-2 px-4">
-				<Tooltip.Root>
-					<Tooltip.Trigger>
-						{#snippet child({ props })}
-							<Button {...props} variant="ghost" size="icon" class="size-7" onclick={startTour}>
+			<div class="flex shrink-0 items-center gap-1">
+				<Tooltip>
+					<TooltipTrigger>
+						{#snippet asChild(props)}
+							<Button {...props()} variant="ghost" size="icon-sm" onclick={startTour}>
 								<CircleQuestionMarkIcon />
-								<span class="sr-only">Guide Tour</span>
+								<span class="sr-only">{m.dash_guide_tour()}</span>
 							</Button>
 						{/snippet}
-					</Tooltip.Trigger>
-					<Tooltip.Content>Start Guide Tour</Tooltip.Content>
-				</Tooltip.Root>
+					</TooltipTrigger>
+					<TooltipContent>{m.dash_guide_tour()}</TooltipContent>
+				</Tooltip>
 				<NotificationTrigger />
-				<Tooltip.Root>
-					<DropdownMenu.Root>
-						<Tooltip.Trigger>
-							<DropdownMenu.Trigger>
-								{#snippet child({ props })}
-									<Button
-										{...props}
-										id="cluster-guide-step"
-										variant="ghost"
-										size="icon"
-										class="size-7"
-									>
-										<LayersIcon />
-										<span class="sr-only">Toggle Clusters</span>
-									</Button>
-									{#if !activeCluster}
-										<span class="absolute top-3.5 right-3.5 flex size-2.5 transition-all">
-											<span
-												class="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"
-											></span>
-											<span class="relative inline-flex size-2.5 rounded-full bg-blue-500"></span>
-										</span>
-									{/if}
-								{/snippet}
-							</DropdownMenu.Trigger>
-						</Tooltip.Trigger>
-						<DropdownMenu.Content class="w-40" align="end">
-							<DropdownMenu.Group>
-								<DropdownMenu.Label>{m.cluster()}</DropdownMenu.Label>
-								{#if links.length > 0}
-									<DropdownMenu.Separator />
-									<DropdownMenu.RadioGroup
-										bind:value={activeCluster}
-										onValueChange={onClusterChange}
-									>
-										{#each links as link, index (index)}
-											<DropdownMenu.RadioItem value={link.cluster}
-												>{link.cluster}</DropdownMenu.RadioItem
-											>
-										{/each}
-									</DropdownMenu.RadioGroup>
+				<DropdownMenu positioning={{ placement: 'bottom-end', gutter: 6 }}>
+					<DropdownMenuTrigger>
+						{#snippet asChild(props)}
+							<Button
+								{...props({ class: 'relative overflow-visible' })}
+								id="cluster-guide-step"
+								variant="ghost"
+								size="icon-sm"
+								title={m.dash_switch_cluster()}
+							>
+								<LayersIcon />
+								<span class="sr-only">{m.dash_switch_cluster()}</span>
+								{#if !activeCluster}
+									<span class="absolute -top-0.5 -right-0.5 flex size-2.5">
+										<span
+											class="absolute inline-flex h-full w-full animate-ping rounded-full bg-info opacity-75"
+										></span>
+										<span class="relative inline-flex size-2.5 rounded-full bg-info"></span>
+									</span>
 								{/if}
-								{#if data.user.roles.includes('admin')}
-									<RegisteClusterTrigger bind:open={importOpen} />
-								{/if}
-							</DropdownMenu.Group>
-						</DropdownMenu.Content>
-					</DropdownMenu.Root>
-					<Tooltip.Content>Switch Cluster</Tooltip.Content>
-				</Tooltip.Root>
+							</Button>
+						{/snippet}
+					</DropdownMenuTrigger>
+					<DropdownMenuContent class="w-44">
+						<DropdownMenuRadioGroup
+							heading={m.cluster()}
+							value={activeCluster}
+							onValueChange={(details) => {
+								activeCluster = details.value;
+								onClusterChange(details.value);
+							}}
+						>
+							{#each links as link, index (index)}
+								<DropdownMenuRadioItem value={link.cluster}>{link.cluster}</DropdownMenuRadioItem>
+							{/each}
+						</DropdownMenuRadioGroup>
+						{#if data.user.roles.includes('admin')}
+							<RegisteClusterTrigger bind:open={importOpen} />
+						{/if}
+					</DropdownMenuContent>
+				</DropdownMenu>
 			</div>
 		</header>
-		<main class="flex min-w-0 flex-1 flex-col overflow-auto px-2 md:px-4 lg:px-8">
+		<main class="flex min-w-0 flex-1 flex-col overflow-auto p-4 md:p-6">
 			{#if data.clusterMetricsAccess === 'unknown'}
-				<Alert.Root class="mt-4">
+				<Alert variant="warning" class="mb-4">
 					<TriangleAlertIcon />
-					<Alert.Description>{m.cluster_metrics_access_unknown()}</Alert.Description>
-				</Alert.Root>
+					<AlertDescription>{m.cluster_metrics_access_unknown()}</AlertDescription>
+				</Alert>
 			{/if}
 			{@render children()}
 		</main>
-	</Sidebar.Inset>
-</Sidebar.Provider>
+	</SidebarInset>
+</SidebarProvider>
 
 {#snippet headerSkeleton(sidebarOpen?: boolean)}
 	{#if sidebarOpen}
 		<div class="flex w-full items-center gap-2 overflow-hidden rounded-md p-2">
-			<Skeleton class="size-8 bg-foreground/10" />
-			<div class="space-y-2">
-				<Skeleton class="h-3 w-36 bg-foreground/10" />
-				<Skeleton class="h-2 w-12 bg-foreground/10" />
+			<Skeleton class="size-8 shrink-0" />
+			<div class="grid flex-1 gap-2">
+				<Skeleton class="h-3 w-32" />
+				<Skeleton class="h-2 w-12" />
 			</div>
 		</div>
 	{:else}
-		<Skeleton class="size-8 bg-foreground/10" />
+		<Skeleton class="size-8" />
 	{/if}
 {/snippet}
 
 {#snippet contentSkeleton(sidebarOpen?: boolean)}
-	{#each Array.from({ length: 3 }, (_, i) => i) as index (index)}
+	<div class="flex flex-col gap-1 p-2" aria-hidden="true">
 		{#if sidebarOpen}
-			<div class="relative flex w-full min-w-0 flex-col space-y-4 px-4 py-2">
-				<Skeleton class="h-3 w-8 bg-foreground/10" />
-				<div class="flex items-center space-x-2">
-					<Skeleton class="h-4 w-4 bg-foreground/10" />
-					<Skeleton class="h-4 w-32 bg-foreground/10" />
-				</div>
-				<div class="flex items-center space-x-2">
-					<Skeleton class="h-4 w-4 bg-foreground/10" />
-					<Skeleton class="h-4 w-32 bg-foreground/10" />
-				</div>
-				<div class="flex items-center space-x-2">
-					<Skeleton class="h-4 w-4 bg-foreground/10" />
-					<Skeleton class="h-4 w-32 bg-foreground/10" />
-				</div>
-			</div>
-		{:else}
-			<div class="flex h-8 items-center justify-center gap-2 rounded-md pt-4 pl-1">
-				<Skeleton class="size-4 bg-foreground/10" />
-			</div>
+			<Skeleton class="mb-2 h-8 w-full" />
 		{/if}
-	{/each}
+		{#each Array.from({ length: 6 }, (_, i) => i) as index (index)}
+			<div class="flex h-8 items-center gap-2 px-2 group-data-[collapsible=icon]:px-0">
+				<Skeleton class="size-4 shrink-0" />
+				{#if sidebarOpen}
+					<Skeleton class="h-3 flex-1" />
+				{/if}
+			</div>
+		{/each}
+	</div>
 {/snippet}
 
 <ImportCluster

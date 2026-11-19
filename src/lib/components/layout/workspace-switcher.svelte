@@ -47,10 +47,19 @@
 	import { page } from '$app/state';
 	import { shortcut } from '$lib/actions/shortcut.svelte';
 	import CreateWorkspace from '$lib/components/kind-viewer/kind-viewer-actions/utils/create-workspace.svelte';
+	import {
+		DropdownMenu,
+		DropdownMenuContent,
+		DropdownMenuGroup,
+		DropdownMenuItem,
+		DropdownMenuLabel,
+		DropdownMenuShortcut,
+		DropdownMenuTrigger
+	} from '$lib/components/shadcnio/dropdown-menu';
+	import { SidebarMenu, SidebarMenuItem, useSidebar } from '$lib/components/shadcnio/sidebar';
+	// The icon is a link to the workspace's own page. The shadcn.io button has no
+	// link form, so this one stays the project's button (it is a plain anchor).
 	import Button from '$lib/components/ui/button/button.svelte';
-	import * as DropdownMenu from '$lib/components/ui/dropdown-menu/index.js';
-	import { useSidebar } from '$lib/components/ui/sidebar';
-	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
 	import { m } from '$lib/messages';
 	import type { User } from '$lib/server/session';
 	import { role } from '$lib/stores';
@@ -213,107 +222,112 @@
 	}}
 />
 
-<Sidebar.Menu>
-	<Sidebar.MenuItem>
-		<DropdownMenu.Root>
-			<DropdownMenu.Trigger>
-				{#snippet child({ props })}
-					<Sidebar.MenuButton
-						data-state={props['data-state']}
-						size="lg"
-						class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-					>
-						<Button
-							href={activeWorkspace
-								? resolve(
-										`/(auth)/${cluster}/${activeWorkspace.metadata?.name}/${activeWorkspace.metadata?.name}?group=tenant.otterscale.io&version=v1alpha1&kind=Workspace&resource=workspaces`
-									)
-								: undefined}
-							class="group/icon flex aspect-square size-8.5 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground transition"
-							disabled={!activeWorkspace}
-						>
-							<ActiveIcon class="size-4 group-hover/icon:hidden" />
-							<Settings2Icon class="hidden size-4 group-hover/icon:block" />
-						</Button>
-						{#if !activeWorkspace}
+<SidebarMenu>
+	<SidebarMenuItem>
+		<DropdownMenu
+			positioning={{
+				placement: sidebar.isMobile ? 'bottom-start' : 'right-start',
+				gutter: 8,
+				sameWidth: sidebar.isMobile
+			}}
+		>
+			<div
+				class="flex h-12 w-full min-w-0 items-center gap-2 rounded-md p-2 group-data-[collapsible=icon]:p-0 has-[[data-state=open]]:bg-sidebar-accent"
+			>
+				<Button
+					href={activeWorkspace
+						? resolve(
+								`/(auth)/${cluster}/${activeWorkspace.metadata?.name}/${activeWorkspace.metadata?.name}?group=tenant.otterscale.io&version=v1alpha1&kind=Workspace&resource=workspaces`
+							)
+						: undefined}
+					class="group/icon relative flex aspect-square size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground transition"
+					disabled={!activeWorkspace}
+				>
+					<ActiveIcon class="size-4 group-hover/icon:hidden" />
+					<Settings2Icon class="hidden size-4 group-hover/icon:block" />
+					{#if !activeWorkspace}
+						<span class="pointer-events-none absolute -top-1 -right-1 flex size-3">
 							<span
-								class="pointer-events-none absolute flex size-3 transition-all {sidebar.open
-									? 'top-1 left-8'
-									: '-top-1 left-6'}"
-							>
-								<span
-									class="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"
-								></span>
-								<span class="relative inline-flex size-3 rounded-full bg-blue-500"></span>
-							</span>
-						{/if}
-						<div {...props} class="flex h-12 w-full items-center">
-							<div class="grid flex-1 text-start text-sm leading-tight">
+								class="absolute inline-flex h-full w-full animate-ping rounded-full bg-info opacity-75"
+							></span>
+							<span class="relative inline-flex size-3 rounded-full bg-info"></span>
+						</span>
+					{/if}
+				</Button>
+				<DropdownMenuTrigger>
+					{#snippet asChild(props)}
+						<button
+							{...props({
+								type: 'button',
+								class:
+									'flex h-full min-w-0 flex-1 items-center gap-2 rounded-md text-start outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:hidden'
+							})}
+						>
+							<span class="grid min-w-0 flex-1 text-sm leading-tight">
 								{#if activeWorkspace}
 									<span class="truncate font-medium">
 										{activeWorkspace.metadata?.name}
 									</span>
-									<span class="flex items-center gap-2 truncate text-xs text-muted-foreground">
+									<span class="truncate text-xs text-muted-foreground">
 										{activeWorkspace.spec.members?.find(
 											(u: { subject?: string; role?: string }) => u.subject === user.sub
 										)?.role}
 									</span>
 								{:else}
 									<span class="truncate font-medium"> {m.site_title()} </span>
-									<span class="flex items-center gap-2 truncate text-xs text-muted-foreground">
+									<span class="truncate text-xs text-muted-foreground">
 										{m.no_workspace_selected()}
 									</span>
 								{/if}
-							</div>
-							<ChevronsUpDownIcon class="ms-auto size-4 shrink-0" />
-						</div>
-					</Sidebar.MenuButton>
-				{/snippet}
-			</DropdownMenu.Trigger>
-			<DropdownMenu.Content
-				class="w-(--bits-dropdown-menu-anchor-width) min-w-56 rounded-lg"
-				align="start"
-				side={sidebar.isMobile ? 'bottom' : 'right'}
-				sideOffset={4}
-			>
-				<DropdownMenu.Label class="text-xs text-muted-foreground">
-					{m.workspace()}
-				</DropdownMenu.Label>
-				{#each workspaces as workspace, index (workspace.metadata?.name)}
-					{@const WorkspaceIcon = getWorkspaceIcon(workspace.metadata?.name)}
-					<DropdownMenu.Item onSelect={() => onSelect(index)} class="gap-2 p-2">
-						<div class="flex size-7 items-center justify-center rounded-md border">
-							<WorkspaceIcon class="size-3.5 shrink-0" />
-						</div>
-						<div class="grid flex-1 text-start text-xs leading-tight">
-							<span class="truncate font-medium">{workspace.metadata?.name}</span>
-							<span class="truncate text-[10px] text-muted-foreground"
-								>{workspace.spec.members?.find(
-									(u: { subject?: string; role?: string }) => u.subject === user.sub
-								)?.role}</span
-							>
-						</div>
-						<DropdownMenu.Shortcut
-							class={cn('flex gap-0.5 text-sm', {
-								invisible: index >= 9,
-								'items-center': isMac
-							})}
+							</span>
+							<ChevronsUpDownIcon class="ms-auto size-4 shrink-0 text-muted-foreground" />
+						</button>
+					{/snippet}
+				</DropdownMenuTrigger>
+			</div>
+			<DropdownMenuContent class="min-w-56">
+				<DropdownMenuGroup>
+					<DropdownMenuLabel>{m.workspace()}</DropdownMenuLabel>
+					{#each workspaces as workspace, index (workspace.metadata?.name)}
+						{@const WorkspaceIcon = getWorkspaceIcon(workspace.metadata?.name)}
+						<DropdownMenuItem
+							value={workspace.metadata?.name ?? String(index)}
+							onSelect={() => onSelect(index)}
+							class="gap-2 p-2"
 						>
-							{#if isMac}
-								<CommandIcon class="size-3" />
-							{:else}
-								<span class="font-mono tracking-tight">Ctrl</span>
-								<span class="font-mono">+</span>
-							{/if}
-							<span class="font-mono">{index + 1}</span>
-						</DropdownMenu.Shortcut>
-					</DropdownMenu.Item>
-				{/each}
+							<div class="flex size-7 items-center justify-center rounded-md border">
+								<WorkspaceIcon class="size-3.5 shrink-0" />
+							</div>
+							<div class="grid flex-1 text-start text-xs leading-tight">
+								<span class="truncate font-medium">{workspace.metadata?.name}</span>
+								<span class="truncate text-[10px] text-muted-foreground"
+									>{workspace.spec.members?.find(
+										(u: { subject?: string; role?: string }) => u.subject === user.sub
+									)?.role}</span
+								>
+							</div>
+							<DropdownMenuShortcut
+								class={cn('flex gap-0.5 text-sm tracking-normal', {
+									invisible: index >= 9,
+									'items-center': isMac
+								})}
+							>
+								{#if isMac}
+									<CommandIcon class="size-3" />
+								{:else}
+									<span class="font-mono tracking-tight">Ctrl</span>
+									<span class="font-mono">+</span>
+								{/if}
+								<span class="font-mono">{index + 1}</span>
+							</DropdownMenuShortcut>
+						</DropdownMenuItem>
+					{/each}
+				</DropdownMenuGroup>
 				<CreateWorkspaceTrigger bind:open={createWorkspaceOpen} />
-			</DropdownMenu.Content>
-		</DropdownMenu.Root>
-	</Sidebar.MenuItem>
-</Sidebar.Menu>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	</SidebarMenuItem>
+</SidebarMenu>
 
 {#if workspaceSchema}
 	<CreateWorkspace

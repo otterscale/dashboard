@@ -1,13 +1,25 @@
 <script lang="ts">
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
-	import LayersIcon from '@lucide/svelte/icons/layers';
-	import SquareTerminalIcon from '@lucide/svelte/icons/square-terminal';
 	import type { Component } from 'svelte';
 
 	import { page } from '$app/state';
-	import * as Collapsible from '$lib/components/ui/collapsible';
-	import * as Sidebar from '$lib/components/ui/sidebar';
-	import * as Tabs from '$lib/components/ui/tabs';
+	import { Collapsible, CollapsibleContent } from '$lib/components/shadcnio/collapsible';
+	import { CollapsibleTrigger } from '$lib/components/shadcnio/collapsible';
+	import {
+		SegmentGroup,
+		SegmentGroupItem,
+		SegmentGroupItemText
+	} from '$lib/components/shadcnio/segment-group';
+	import {
+		SidebarGroup,
+		SidebarMenu,
+		SidebarMenuButton,
+		SidebarMenuItem,
+		SidebarMenuSub,
+		SidebarMenuSubButton,
+		SidebarMenuSubItem
+	} from '$lib/components/shadcnio/sidebar';
+	import { m } from '$lib/messages';
 
 	type NavItem = {
 		title: string;
@@ -61,80 +73,88 @@
 	});
 
 	const views = $derived([
-		{ label: platformLabel, icon: LayersIcon, items: platformItems },
-		{ label: kubernetesLabel, icon: SquareTerminalIcon, items: kubernetesItems }
+		{ label: platformLabel, items: platformItems },
+		{ label: kubernetesLabel, items: kubernetesItems }
 	]);
 	const currentView = $derived(views[activeIndex]);
+
+	// A group the user opened or closed by hand keeps that choice; the others
+	// follow the page: open when they hold the current page or are open by default.
+	let toggled = $state<Record<string, boolean>>({});
+	function isOpen(item: NavItem): boolean {
+		const key = `${activeIndex}:${item.title}`;
+		if (key in toggled) return toggled[key];
+		return Boolean(item.isActive || item.items?.some((subItem) => matchesUrl(subItem.url)));
+	}
 </script>
 
-<Sidebar.Group>
-	<Tabs.Root
+<SidebarGroup class="pb-0 group-data-[collapsible=icon]:hidden">
+	<SegmentGroup
+		aria-label={m.dash_navigation()}
 		value={String(activeIndex)}
-		onValueChange={(value) => (activeIndex = Number(value))}
-		class="group-data-[collapsible=icon]:hidden"
+		onValueChange={(details) => (activeIndex = Number(details.value))}
+		class="w-full gap-0 rounded-lg bg-sidebar-accent/60 p-[3px]"
 	>
-		<Tabs.List class="w-full">
-			{#each views as view, index (index)}
-				<Tabs.Trigger value={String(index)}>
-					{view.label}
-				</Tabs.Trigger>
-			{/each}
-		</Tabs.List>
-	</Tabs.Root>
-</Sidebar.Group>
+		{#each views as view, index (index)}
+			<SegmentGroupItem
+				value={String(index)}
+				class="inline-flex h-7 flex-1 items-center justify-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 transition-colors hover:text-sidebar-foreground data-[state=checked]:text-sidebar-foreground"
+			>
+				<SegmentGroupItemText>{view.label}</SegmentGroupItemText>
+			</SegmentGroupItem>
+		{/each}
+	</SegmentGroup>
+</SidebarGroup>
 
-<Sidebar.Group>
-	<Sidebar.Menu>
+<SidebarGroup>
+	<SidebarMenu>
 		{#each currentView.items as item (item.title)}
 			{#if item.items && item.items.length > 0}
-				<Collapsible.Root
-					open={item.isActive || item.items.some((subItem) => matchesUrl(subItem.url))}
-					class="group/collapsible"
+				<Collapsible
+					open={isOpen(item)}
+					onOpenChange={(details) => (toggled[`${activeIndex}:${item.title}`] = details.open)}
 				>
-					{#snippet child({ props })}
-						<Sidebar.MenuItem {...props}>
-							<Collapsible.Trigger>
-								{#snippet child({ props })}
-									<Sidebar.MenuButton {...props} tooltipContent={item.title}>
+					{#snippet asChild(rootProps)}
+						<SidebarMenuItem {...rootProps()}>
+							<CollapsibleTrigger>
+								{#snippet asChild(triggerProps)}
+									<SidebarMenuButton {...triggerProps()} tooltip={item.title}>
 										{#if item.icon}
 											<item.icon />
 										{/if}
 										<span>{item.title}</span>
 										<ChevronRightIcon
-											class="ms-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90"
+											class="ms-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90 motion-reduce:transition-none"
 										/>
-									</Sidebar.MenuButton>
+									</SidebarMenuButton>
 								{/snippet}
-							</Collapsible.Trigger>
-							<Collapsible.Content>
-								<Sidebar.MenuSub>
+							</CollapsibleTrigger>
+							<CollapsibleContent>
+								<SidebarMenuSub>
 									{#each item.items as subItem (subItem.title)}
-										<Sidebar.MenuSubItem>
-											<Sidebar.MenuSubButton
+										<SidebarMenuSubItem>
+											<!-- eslint-disable svelte/no-navigation-without-resolve -->
+											<SidebarMenuSubButton
 												isActive={matchesUrl(subItem.url)}
 												aria-disabled={subItem.disabled}
+												href={subItem.disabled ? undefined : subItem.url}
 											>
-												{#snippet child({ props })}
-													<!-- eslint-disable svelte/no-navigation-without-resolve -->
-													<a href={subItem.disabled ? undefined : subItem.url} {...props}>
-														<span>{subItem.title}</span>
-													</a>
-													<!-- eslint-enable svelte/no-navigation-without-resolve -->
-												{/snippet}
-											</Sidebar.MenuSubButton>
-										</Sidebar.MenuSubItem>
+												<span>{subItem.title}</span>
+											</SidebarMenuSubButton>
+											<!-- eslint-enable svelte/no-navigation-without-resolve -->
+										</SidebarMenuSubItem>
 									{/each}
-								</Sidebar.MenuSub>
-							</Collapsible.Content>
-						</Sidebar.MenuItem>
+								</SidebarMenuSub>
+							</CollapsibleContent>
+						</SidebarMenuItem>
 					{/snippet}
-				</Collapsible.Root>
+				</Collapsible>
 			{:else}
-				<Sidebar.MenuItem>
-					<Sidebar.MenuButton isActive={matchesUrl(item.url)} tooltipContent={item.title}>
-						{#snippet child({ props })}
+				<SidebarMenuItem>
+					<SidebarMenuButton isActive={matchesUrl(item.url)} tooltip={item.title}>
+						{#snippet asChild(linkProps)}
 							<!-- eslint-disable svelte/no-navigation-without-resolve -->
-							<a href={item.url} {...props}>
+							<a href={item.url} {...linkProps()}>
 								{#if item.icon}
 									<item.icon />
 								{/if}
@@ -142,9 +162,9 @@
 							</a>
 							<!-- eslint-enable svelte/no-navigation-without-resolve -->
 						{/snippet}
-					</Sidebar.MenuButton>
-				</Sidebar.MenuItem>
+					</SidebarMenuButton>
+				</SidebarMenuItem>
 			{/if}
 		{/each}
-	</Sidebar.Menu>
-</Sidebar.Group>
+	</SidebarMenu>
+</SidebarGroup>
