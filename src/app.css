@@ -8,42 +8,43 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-	/* Solaris ships a dark theme only. This light set is derived from it: the same
-	   neutral greys and the same blue, on a white ground. */
+	/* Light theme: the AWS palette from the shadcn.io design systems (the user's choice;
+	   Solaris ships dark only). Ink, canvas, surfaces, hairline, primary blue and error
+	   red are its values; the sidebar tints and chart-3/4/5 are derived from them. */
 	--radius: 0.625rem;
-	--background: oklch(1 0 0);
-	--foreground: oklch(0.145 0 0);
-	--card: oklch(1 0 0);
-	--card-foreground: oklch(0.145 0 0);
-	--popover: oklch(1 0 0);
-	--popover-foreground: oklch(0.145 0 0);
-	--primary: oklch(55.9% 0.238 260.78);
-	--primary-foreground: oklch(0.97 0.014 254.604);
-	--secondary: oklch(0.967 0.001 286.375);
-	--secondary-foreground: oklch(0.205 0 0);
-	--muted: oklch(0.97 0 0);
-	--muted-foreground: oklch(0.556 0 0);
-	--accent: oklch(0.97 0 0);
-	--accent-foreground: oklch(0.205 0 0);
-	--destructive: oklch(0.577 0.245 27.325);
-	--border: oklch(0.922 0 0);
-	--input: oklch(0.922 0 0);
-	--ring: oklch(0.708 0 0);
-	--chart-1: oklch(0.488 0.243 264.376);
-	--chart-2: oklch(0.546 0.245 262.881);
-	--chart-3: oklch(0.623 0.214 259.815);
-	--chart-4: oklch(0.809 0.105 251.813);
-	--chart-5: oklch(55.9% 0.238 260.78);
-	--sidebar: oklch(0.985 0 0);
-	--sidebar-foreground: oklch(0.145 0 0);
-	--sidebar-primary: oklch(55.9% 0.238 260.78);
-	--sidebar-primary-foreground: oklch(0.97 0.014 254.604);
-	--sidebar-accent: oklch(0.97 0 0);
-	--sidebar-accent-foreground: oklch(0.205 0 0);
-	--sidebar-border: oklch(0.922 0 0);
-	--sidebar-ring: oklch(0.708 0 0);
-	/* Status colours. Solaris has none; these are not chart colours on purpose, so a
-	   warning stays amber whatever the chart ramp is. */
+	--background: #ffffff;
+	--foreground: #161d26;
+	--card: #ffffff;
+	--card-foreground: #161d26;
+	--popover: #ffffff;
+	--popover-foreground: #161d26;
+	--primary: #0972d3;
+	--primary-foreground: #ffffff;
+	--secondary: #f3f3f7;
+	--secondary-foreground: #161d26;
+	--muted: #f3f3f7;
+	--muted-foreground: #5f6b7a;
+	--accent: #f3f3f7;
+	--accent-foreground: #161d26;
+	--destructive: #db0000;
+	--border: #dedee3;
+	--input: #ccccd1;
+	--ring: #0972d3;
+	--chart-1: #0972d3;
+	--chart-2: #003b8f;
+	--chart-3: #5aa2e3;
+	--chart-4: #a6cbf0;
+	--chart-5: #06519a;
+	--sidebar: #f8f8fa;
+	--sidebar-foreground: #161d26;
+	--sidebar-primary: #0972d3;
+	--sidebar-primary-foreground: #ffffff;
+	--sidebar-accent: #ebebf0;
+	--sidebar-accent-foreground: #161d26;
+	--sidebar-border: #dedee3;
+	--sidebar-ring: #0972d3;
+	/* Status colours. Neither Solaris nor the AWS palette has a full set; these are not
+	   chart colours on purpose, so a warning stays amber whatever the chart ramp is. */
 	--success: var(--color-emerald-500);
 	--success-foreground: var(--color-emerald-700);
 	--warning: var(--color-amber-500);
