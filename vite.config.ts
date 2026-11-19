@@ -1,8 +1,8 @@
 import { paraglideVitePlugin } from '@inlang/paraglide-js';
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
-import type { Plugin } from 'vite';
 import { playwright } from '@vitest/browser-playwright';
+import type { Plugin } from 'vite';
 import devtoolsJson from 'vite-plugin-devtools-json';
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 import { defineConfig } from 'vitest/config';
