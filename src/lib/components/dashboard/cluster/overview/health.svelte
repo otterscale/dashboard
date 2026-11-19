@@ -1,12 +1,10 @@
 <script lang="ts">
-	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
 	import HeartPulseIcon from '@lucide/svelte/icons/heart-pulse';
-	import Loader2Icon from '@lucide/svelte/icons/loader-2';
-	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
-	import { onDestroy, onMount } from 'svelte';
+	import type { PrometheusDriver } from 'prometheus-query';
 
-	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Card from '$lib/components/ui/card';
+	import { useLoadable } from '$lib/components/dashboard/shared/loadable.svelte';
+	import StatCard from '$lib/components/dashboard/shared/stat-card.svelte';
+	import { Status } from '$lib/components/shadcnio/status';
 	import { m } from '$lib/messages';
 
 	let {
@@ -14,68 +12,33 @@
 		isReloading = $bindable()
 	}: { prometheusDriver: PrometheusDriver; isReloading: boolean } = $props();
 
-	let nodeNotReady: SampleValue | undefined = $state(undefined);
-	async function fetchNodeStatus() {
-		const responseNotReadyNode = await prometheusDriver.instantQuery(
-			`sum(kube_node_status_condition{condition="Ready", status!="true", container!=""}) or vector(0)`
-		);
-		nodeNotReady = responseNotReadyNode.result[0]?.value ?? undefined;
-	}
+	// Number of nodes whose Ready condition is not true.
+	const health = useLoadable(
+		async () => {
+			const response = await prometheusDriver.instantQuery(
+				`sum(kube_node_status_condition{condition="Ready", status!="true", container!=""}) or vector(0)`
+			);
+			const value = Number(response.result[0]?.value?.value);
+			return Number.isFinite(value) ? { notReady: value } : null;
+		},
+		() => isReloading
+	);
 
-	async function fetch() {
-		try {
-			await fetchNodeStatus();
-		} catch (error) {
-			console.error('Failed to fetch cluster health:', error);
-		}
-	}
-
-	const reloadManager = new ReloadManager(fetch);
-
-	$effect(() => {
-		if (isReloading) {
-			reloadManager.restart();
-		} else {
-			reloadManager.stop();
-		}
-	});
-
-	let isLoaded = $state(false);
-	onMount(async () => {
-		await fetch();
-		isLoaded = true;
-	});
-	onDestroy(() => {
-		reloadManager.stop();
-	});
+	const healthy = $derived(health.data?.notReady === 0);
 </script>
 
-<Card.Root class="relative h-full min-h-[140px] gap-2 overflow-hidden">
-	<HeartPulseIcon
-		class="absolute -right-10 bottom-0 size-36 text-8xl tracking-tight text-nowrap text-primary/5 uppercase group-hover:hidden"
-	/>
-	<Card.Header>
-		<Card.Title>{m.state()}</Card.Title>
-		{#if nodeNotReady && Number(nodeNotReady.value) === 0}
-			<Card.Description class="flex h-6 items-center">All Nodes Ready</Card.Description>
-		{:else if nodeNotReady && Number(nodeNotReady.value) !== 0}
-			<Card.Description class="flex h-6 items-center">
-				{nodeNotReady?.value ? Number(nodeNotReady.value) : 'Some'} nodes unready
-			</Card.Description>
+<StatCard label={m.dash_state()} icon={HeartPulseIcon} status={health.status} stale={health.stale}>
+	<span class="flex min-w-0 items-center gap-2">
+		<Status variant={healthy ? 'success' : 'destructive'} class="ring-0" />
+		<span class="truncate">{healthy ? m.dash_healthy() : m.dash_unhealthy()}</span>
+	</span>
+	{#snippet detail()}
+		{#if healthy}
+			{m.dash_all_nodes_ready()}
+		{:else}
+			<span class="text-destructive">
+				{m.dash_nodes_unready({ count: health.data?.notReady ?? 0 })}
+			</span>
 		{/if}
-	</Card.Header>
-	{#if !isLoaded}
-		<div class="flex h-9 w-full items-center justify-center">
-			<Loader2Icon class="size-10 animate-spin" />
-		</div>
-	{:else if nodeNotReady === undefined}
-		<div class="flex h-full w-full flex-col items-center justify-center">
-			<ChartColumnIcon class="size-6 animate-pulse text-muted-foreground" />
-			<p class="p-0 text-xs text-muted-foreground">{m.no_data_display()}</p>
-		</div>
-	{:else if Number(nodeNotReady.value) === 0}
-		<Card.Content class="text-3xl font-bold text-chart-2">Healthy</Card.Content>
-	{:else}
-		<Card.Content class="text-3xl font-bold text-chart-1">Unhealthy</Card.Content>
-	{/if}
-</Card.Root>
+	{/snippet}
+</StatCard>

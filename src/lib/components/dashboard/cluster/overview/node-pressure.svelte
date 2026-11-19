@@ -1,39 +1,42 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
-	import InfoIcon from '@lucide/svelte/icons/info';
-	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import Maximize2Icon from '@lucide/svelte/icons/maximize-2';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { InstantVector, PrometheusDriver } from 'prometheus-query';
-	import { getContext, onDestroy, onMount } from 'svelte';
+	import { getContext, onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 
 	import { page } from '$app/state';
-	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Statistics from '$lib/components/custom/statistics/index';
+	import { orThrow, useLoadable } from '$lib/components/dashboard/shared/loadable.svelte';
+	import { dataTable, levelOf, levelText } from '$lib/components/dashboard/shared/status';
+	import WidgetCard from '$lib/components/dashboard/shared/widget-card.svelte';
 	import { formatWithBinarySuffix } from '$lib/components/dynamic-table/utils';
-	import { buttonVariants } from '$lib/components/ui/button';
-	import { ScrollArea } from '$lib/components/ui/scroll-area';
-	import * as Sheet from '$lib/components/ui/sheet';
-	import * as Table from '$lib/components/ui/table/index.js';
-	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { Badge } from '$lib/components/shadcnio/badge';
+	import { Button } from '$lib/components/shadcnio/button';
+	import {
+		Sheet,
+		SheetContent,
+		SheetDescription,
+		SheetHeader,
+		SheetTitle,
+		SheetTrigger
+	} from '$lib/components/shadcnio/sheet';
+	import { Skeleton } from '$lib/components/shadcnio/skeleton';
+	import { Tooltip, TooltipContent, TooltipTrigger } from '$lib/components/shadcnio/tooltip';
 	import { formatIO } from '$lib/formatter';
 	import { m } from '$lib/messages';
 	import {
 		ai100DiskRateByNode,
 		AIDAPTIV_CACHE_DEVICE_CLASS,
 		classifyGpuGovernance,
-		classifyThreshold,
 		DCGM_GPU_MEMORY_TOTAL_BYTES,
 		DCGM_GPU_MEMORY_USED_BYTES,
 		deviceClassLabel,
-		fetchCombinedInstant,
+		fetchCombinedInstantOrNull,
 		type GpuGovernance,
-		LIVE_PODS,
-		thresholdClasses
+		LIVE_PODS
 	} from '$lib/prometheus';
 	import { cn } from '$lib/utils';
 
@@ -190,9 +193,6 @@
 		consumers: 'hami_vgpu_memory_allocated_bytes'
 	};
 
-	let rows = $state<NodeRow[]>([]);
-	let isLoaded = $state(false);
-
 	// Sum a GPU field across a node's devices; undefined when none report it (cell renders "—").
 	function sumGpuField(gpus: GpuDevice[], key: 'allocated' | 'used' | 'total'): number | undefined {
 		let sum = 0;
@@ -247,133 +247,128 @@
 	}
 
 	// Fetch GPU devices, grouped by node name (DCGM's `hostname` label == the K8s node name).
+	// A failed query throws: "no GPU" and "could not ask" are different answers.
 	async function fetchGpusByNode(): Promise<Record<string, GpuDevice[]>> {
-		try {
-			const r = await fetchCombinedInstant(prometheusDriver, GPU_QUERIES);
+		const r = orThrow(await fetchCombinedInstantOrNull(prometheusDriver, GPU_QUERIES));
 
-			// DCGM keys its cards on `UUID`, HAMi on `device_uuid` — same value, different label.
-			const used = numbersByLabel(r.used, 'UUID');
-			const util = numbersByLabel(r.util, 'UUID');
-			const smClock = numbersByLabel(r.smClock, 'UUID');
-			const temperature = numbersByLabel(r.temperature, 'UUID');
-			const power = numbersByLabel(r.power, 'UUID');
-			const remappedUncorrectable = numbersByLabel(r.remappedUncorrectable, 'UUID');
-			const remapFailure = numbersByLabel(r.remapFailure, 'UUID');
-			const pcieReplay = numbersByLabel(r.pcieReplay, 'UUID');
-			const allocated = numbersByLabel(r.allocated, 'device_uuid');
+		// DCGM keys its cards on `UUID`, HAMi on `device_uuid` — same value, different label.
+		const used = numbersByLabel(r.used, 'UUID');
+		const util = numbersByLabel(r.util, 'UUID');
+		const smClock = numbersByLabel(r.smClock, 'UUID');
+		const temperature = numbersByLabel(r.temperature, 'UUID');
+		const power = numbersByLabel(r.power, 'UUID');
+		const remappedUncorrectable = numbersByLabel(r.remappedUncorrectable, 'UUID');
+		const remapFailure = numbersByLabel(r.remapFailure, 'UUID');
+		const pcieReplay = numbersByLabel(r.pcieReplay, 'UUID');
+		const allocated = numbersByLabel(r.allocated, 'device_uuid');
 
-			// Fold the per-pod allocation series into deduped consumers (same ns/pod summed).
-			const consumersByUuid: Record<string, Record<string, GpuConsumer>> = {};
-			for (const series of r.consumers) {
-				const labels = series.metric.labels as Record<string, string>;
-				const uuid = labels.device_uuid;
-				if (!uuid) continue;
-				const value = Number(series.value?.value);
-				const consumed = Number.isFinite(value) ? value : undefined;
-				// The exporter's own `namespace`/`pod` labels win the scrape, so HAMi's workload
-				// labels arrive prefixed; fall back to the bare names for scrapes without honor_labels.
-				const namespace = labels.exported_namespace ?? labels.namespace ?? '';
-				const pod = labels.exported_pod ?? labels.pod ?? '';
-				if (!namespace && !pod) continue;
-				const byKey = (consumersByUuid[uuid] ??= {});
-				const key = `${namespace}/${pod}`;
-				const existing = byKey[key];
-				if (existing) {
-					if (consumed !== undefined) existing.allocated = (existing.allocated ?? 0) + consumed;
-				} else {
-					byKey[key] = { namespace, pod, allocated: consumed };
-				}
+		// Fold the per-pod allocation series into deduped consumers (same ns/pod summed).
+		const consumersByUuid: Record<string, Record<string, GpuConsumer>> = {};
+		for (const series of r.consumers) {
+			const labels = series.metric.labels as Record<string, string>;
+			const uuid = labels.device_uuid;
+			if (!uuid) continue;
+			const value = Number(series.value?.value);
+			const consumed = Number.isFinite(value) ? value : undefined;
+			// The exporter's own `namespace`/`pod` labels win the scrape, so HAMi's workload
+			// labels arrive prefixed; fall back to the bare names for scrapes without honor_labels.
+			const namespace = labels.exported_namespace ?? labels.namespace ?? '';
+			const pod = labels.exported_pod ?? labels.pod ?? '';
+			if (!namespace && !pod) continue;
+			const byKey = (consumersByUuid[uuid] ??= {});
+			const key = `${namespace}/${pod}`;
+			const existing = byKey[key];
+			if (existing) {
+				if (consumed !== undefined) existing.allocated = (existing.allocated ?? 0) + consumed;
+			} else {
+				byKey[key] = { namespace, pod, allocated: consumed };
 			}
-
-			const byNode: Record<string, GpuDevice[]> = {};
-			for (const series of r.total) {
-				const labels = series.metric.labels as Record<string, string>;
-				const host = labels.hostname;
-				if (!host) continue;
-				const uuid = labels.UUID ?? '';
-				const total = Number(series.value?.value);
-				(byNode[host] ??= []).push({
-					uuid,
-					modelName: labels.modelName ?? '',
-					device: labels.device ?? '',
-					total: Number.isFinite(total) ? total : undefined,
-					allocated: allocated[uuid],
-					used: used[uuid],
-					util: util[uuid],
-					smClock: smClock[uuid],
-					temperature: temperature[uuid],
-					power: power[uuid],
-					remappedUncorrectable: remappedUncorrectable[uuid],
-					remapFailure: remapFailure[uuid],
-					pcieReplay: pcieReplay[uuid],
-					consumers: Object.values(consumersByUuid[uuid] ?? {}),
-					governance: classifyGpuGovernance(allocated[uuid], used[uuid])
-				});
-			}
-			return byNode;
-		} catch (error) {
-			console.error('Failed to fetch GPU resources:', error);
-			return {};
 		}
+
+		const byNode: Record<string, GpuDevice[]> = {};
+		for (const series of r.total) {
+			const labels = series.metric.labels as Record<string, string>;
+			const host = labels.hostname;
+			if (!host) continue;
+			const uuid = labels.UUID ?? '';
+			const total = Number(series.value?.value);
+			(byNode[host] ??= []).push({
+				uuid,
+				modelName: labels.modelName ?? '',
+				device: labels.device ?? '',
+				total: Number.isFinite(total) ? total : undefined,
+				allocated: allocated[uuid],
+				used: used[uuid],
+				util: util[uuid],
+				smClock: smClock[uuid],
+				temperature: temperature[uuid],
+				power: power[uuid],
+				remappedUncorrectable: remappedUncorrectable[uuid],
+				remapFailure: remapFailure[uuid],
+				pcieReplay: pcieReplay[uuid],
+				consumers: Object.values(consumersByUuid[uuid] ?? {}),
+				governance: classifyGpuGovernance(allocated[uuid], used[uuid])
+			});
+		}
+		return byNode;
 	}
 
-	async function fetch() {
-		try {
-			const [result, gpusByNode] = await Promise.all([
-				fetchCombinedInstant(prometheusDriver, queries),
-				fetchGpusByNode()
-			]);
-			const byNode: Record<string, NodeRow> = {};
-			const ensure = (node: string): NodeRow =>
-				(byNode[node] ??= {
-					node,
-					cpuUse: 0,
-					cpuReq: 0,
-					cpuLim: 0,
-					memUse: 0,
-					memReq: 0,
-					memLim: 0,
-					gpus: [],
-					disks: {}
-				});
-			for (const [key, vectors] of Object.entries(result)) {
-				for (const v of vectors) {
-					const labels = v.metric.labels as Record<string, string>;
-					const node = labels.node;
-					if (!node) continue;
-					const value = Number(v.value?.value);
-					if (!Number.isFinite(value)) continue;
-					if (key === 'diskUsed' || key === 'diskTotal') {
-						const deviceClass = labels.device_class;
-						if (!deviceClass) continue;
-						const pool = (ensure(node).disks[deviceClass] ??= {});
-						if (key === 'diskUsed') pool.used = value;
-						else pool.total = value;
-					} else if (key === 'diskWrite' || key === 'diskRead') {
-						ensure(node)[key] = value;
-					} else {
-						ensure(node)[key as PressureKey] = value;
-					}
+	async function loadRows(): Promise<NodeRow[] | null> {
+		const [pressureResult, gpusByNode] = await Promise.all([
+			fetchCombinedInstantOrNull(prometheusDriver, queries),
+			fetchGpusByNode()
+		]);
+		const result = orThrow(pressureResult);
+		const byNode: Record<string, NodeRow> = {};
+		const ensure = (node: string): NodeRow =>
+			(byNode[node] ??= {
+				node,
+				cpuUse: 0,
+				cpuReq: 0,
+				cpuLim: 0,
+				memUse: 0,
+				memReq: 0,
+				memLim: 0,
+				gpus: [],
+				disks: {}
+			});
+		for (const [key, vectors] of Object.entries(result)) {
+			for (const v of vectors) {
+				const labels = v.metric.labels as Record<string, string>;
+				const node = labels.node;
+				if (!node) continue;
+				const value = Number(v.value?.value);
+				if (!Number.isFinite(value)) continue;
+				if (key === 'diskUsed' || key === 'diskTotal') {
+					const deviceClass = labels.device_class;
+					if (!deviceClass) continue;
+					const pool = (ensure(node).disks[deviceClass] ??= {});
+					if (key === 'diskUsed') pool.used = value;
+					else pool.total = value;
+				} else if (key === 'diskWrite' || key === 'diskRead') {
+					ensure(node)[key] = value;
+				} else {
+					ensure(node)[key as PressureKey] = value;
 				}
 			}
-			// Seed rows from GPU hosts too (a node may have GPUs but no pressure series).
-			for (const node of Object.keys(gpusByNode)) ensure(node);
-			for (const row of Object.values(byNode)) {
-				row.gpus = gpusByNode[row.node] ?? [];
-				row.gpuAllocated = sumGpuField(row.gpus, 'allocated');
-				row.gpuUsed = sumGpuField(row.gpus, 'used');
-				row.gpuTotal = sumGpuField(row.gpus, 'total');
-				row.gpuAllocPct = ratioPct(row.gpuAllocated, row.gpuTotal);
-				row.gpuUsedPct = ratioPct(row.gpuUsed, row.gpuTotal);
-				row.gpuUtil = avgGpuField(row.gpus, 'util');
-				for (const pool of Object.values(row.disks)) {
-					pool.usePct = ratioPct(pool.used, pool.total);
-				}
-			}
-			rows = Object.values(byNode).sort((a, b) => pressure(b) - pressure(a));
-		} catch (error) {
-			console.error('Failed to fetch node pressure:', error);
 		}
+		// Seed rows from GPU hosts too (a node may have GPUs but no pressure series).
+		for (const node of Object.keys(gpusByNode)) ensure(node);
+		for (const row of Object.values(byNode)) {
+			row.gpus = gpusByNode[row.node] ?? [];
+			row.gpuAllocated = sumGpuField(row.gpus, 'allocated');
+			row.gpuUsed = sumGpuField(row.gpus, 'used');
+			row.gpuTotal = sumGpuField(row.gpus, 'total');
+			row.gpuAllocPct = ratioPct(row.gpuAllocated, row.gpuTotal);
+			row.gpuUsedPct = ratioPct(row.gpuUsed, row.gpuTotal);
+			row.gpuUtil = avgGpuField(row.gpus, 'util');
+			for (const pool of Object.values(row.disks)) {
+				pool.usePct = ratioPct(pool.used, pool.total);
+			}
+		}
+		// Most saturated node first.
+		const sorted = Object.values(byNode).sort((a, b) => pressure(b) - pressure(a));
+		return sorted.length > 0 ? sorted : null;
 	}
 
 	// Worst reservation pressure on a node (CPU/Mem/GPU booking) — what blocks scheduling.
@@ -381,26 +376,12 @@
 		return Math.max(row.cpuReq, row.cpuLim, row.memReq, row.memLim, row.gpuAllocPct ?? 0);
 	}
 
-	function pctClass(value: number): string {
-		return thresholdClasses(classifyThreshold(value, { green: 70, orange: 90 })).text;
-	}
+	// A failed refresh keeps the rows already on screen and marks the card stale.
+	const loadable = useLoadable(loadRows, () => isReloading);
+	const rows = $derived(loadable.data ?? []);
 
-	const reloadManager = new ReloadManager(fetch);
-
-	$effect(() => {
-		if (isReloading) {
-			reloadManager.restart();
-		} else {
-			reloadManager.stop();
-		}
-	});
-
-	onMount(async () => {
-		await Promise.all([fetch(), fetchWorkspaceMap()]);
-		isLoaded = true;
-	});
-	onDestroy(() => {
-		reloadManager.stop();
+	onMount(() => {
+		void fetchWorkspaceMap();
 	});
 
 	// Sub-columns of the full view, grouped under a spanning header per resource.
@@ -436,9 +417,6 @@
 		return namespaceToWorkspace[namespace] || namespace || '—';
 	}
 
-	// Grow the card's scroll viewport while any node is expanded (detail rows need the room).
-	const anyExpanded = $derived(expandedNodes.size > 0);
-
 	// Format a byte count as "12.34 Gi"; "—" when not reported. The suffix table bottoms out with
 	// an empty symbol, so sub-kibibyte values would render as a bare "0.00" — name the base unit.
 	function formatBytes(value: number | undefined, digits = 2): string {
@@ -468,14 +446,16 @@
 		return scaled.toFixed(magnitude >= 100 ? 0 : magnitude >= 10 ? 1 : 2);
 	}
 
+	function present(value: number | undefined): value is number {
+		return value !== undefined && Number.isFinite(value);
+	}
+
 	function formatPct(value: number | undefined): string {
-		return value === undefined || !Number.isFinite(value) ? '—' : `${Math.round(value)}%`;
+		return present(value) ? `${Math.round(value)}%` : '—';
 	}
 
 	function formatUnit(value: number | undefined, unit: string, digits = 0): string {
-		return value === undefined || !Number.isFinite(value)
-			? '—'
-			: `${value.toFixed(digits)} ${unit}`;
+		return present(value) ? `${value.toFixed(digits)} ${unit}` : '—';
 	}
 
 	// Reported only once a counter has left zero. Worded at metric level — that is what an
@@ -483,71 +463,108 @@
 	function gpuFaults(gpu: GpuDevice): string[] {
 		const faults: string[] = [];
 		if ((gpu.remappedUncorrectable ?? 0) > 0) {
-			faults.push(`Uncorrectable remapped rows: ${gpu.remappedUncorrectable}`);
+			faults.push(m.clo_fault_remapped_rows({ count: gpu.remappedUncorrectable ?? 0 }));
 		}
-		if ((gpu.remapFailure ?? 0) > 0) faults.push(`Row remap failure: ${gpu.remapFailure}`);
-		if ((gpu.pcieReplay ?? 0) > 0) faults.push(`PCIe replays: ${gpu.pcieReplay}`);
+		if ((gpu.remapFailure ?? 0) > 0) {
+			faults.push(m.clo_fault_remap_failure({ count: gpu.remapFailure ?? 0 }));
+		}
+		if ((gpu.pcieReplay ?? 0) > 0) {
+			faults.push(m.clo_fault_pcie_replays({ count: gpu.pcieReplay ?? 0 }));
+		}
 		return faults;
 	}
 
-	// Beyond this many rows the table moves into a fixed-height ScrollArea instead of growing.
-	const SCROLL_AFTER = 5;
+	// Beyond this many rows the card stops growing and the table scrolls inside it, under a
+	// header that stays in view. Up to it, the card is exactly as tall as its rows.
+	const SCROLL_AFTER = 8;
+	const capped = $derived(rows.length > SCROLL_AFTER);
+	// Detail rows need the room.
+	const anyExpanded = $derived(expandedNodes.size > 0);
+
+	// Whether the in-card table is wider than its box, to say so in words.
+	let scroller = $state<HTMLDivElement>();
+	let overflowing = $state(false);
+	$effect(() => {
+		const element = scroller;
+		if (!element) return;
+		const measure = () => (overflowing = element.scrollWidth > element.clientWidth + 1);
+		const observer = new ResizeObserver(measure);
+		observer.observe(element);
+		if (element.firstElementChild) observer.observe(element.firstElementChild);
+		measure();
+		return () => observer.disconnect();
+	});
+
+	// Head cells and the fixed first column sit over scrolling content, so their grounds are
+	// opaque: the head's muted tint mixed into the card colour, not laid over it.
+	const headGround = 'bg-[color-mix(in_oklab,var(--muted)_40%,var(--card))]';
+	const rowHover = 'group-hover/row:bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))]';
+	const groupStart = 'border-l';
+	const cellClass = cn(dataTable.cell, 'max-md:px-1.5');
+	const headClass = cn(dataTable.head, headGround, 'max-md:px-1.5');
+	const subHead = 'h-8 px-3 text-right text-xs font-medium whitespace-nowrap text-muted-foreground';
+	const subCell = 'h-9 px-3 text-right font-mono text-xs whitespace-nowrap tabular-nums';
+	const hintClass = 'cursor-help underline decoration-dotted underline-offset-4';
 </script>
 
-<!-- Extra detail on an inline value. Tooltip.Trigger renders a <button>, which a table cell
-     can't afford, so it is projected onto a span; the dotted underline advertises the hover. -->
+<!-- Extra detail on an inline value. A tooltip trigger is normally a <button>, which a table
+     cell can't afford, so it is projected onto a span; the dotted underline advertises the hover. -->
 {#snippet hint(label: string, content: string)}
-	<Tooltip.Root>
-		<Tooltip.Trigger>
-			{#snippet child({ props })}
-				<span {...props} class="cursor-help underline decoration-dotted underline-offset-4">
+	<Tooltip>
+		<TooltipTrigger>
+			{#snippet asChild(props)}
+				<span {...props({ class: hintClass })}>
 					{label}
 					<!-- The only path to this value without a pointer. A tab stop per cell would bury the
 					     table's real controls. -->
 					<span class="sr-only">{content}</span>
 				</span>
 			{/snippet}
-		</Tooltip.Trigger>
-		<Tooltip.Content class="max-w-xs">
+		</TooltipTrigger>
+		<TooltipContent>
 			<p class="font-mono text-xs break-all">{content}</p>
-		</Tooltip.Content>
-	</Tooltip.Root>
+		</TooltipContent>
+	</Tooltip>
 {/snippet}
 
 <!-- Faults sit on the device name rather than claiming three columns that read zero forever. -->
 {#snippet faultMark(faults: string[])}
-	<Tooltip.Root>
-		<Tooltip.Trigger>
-			{#snippet child({ props })}
-				<span {...props} class="cursor-help">
-					<TriangleAlertIcon class="inline size-4 shrink-0 text-destructive" />
+	<Tooltip>
+		<TooltipTrigger>
+			{#snippet asChild(props)}
+				<span {...props({ class: 'cursor-help' })}>
+					<TriangleAlertIcon class="inline size-4 shrink-0 text-destructive" aria-hidden="true" />
 					<span class="sr-only">{faults.join('; ')}</span>
 				</span>
 			{/snippet}
-		</Tooltip.Trigger>
-		<Tooltip.Content class="max-w-xs">
+		</TooltipTrigger>
+		<TooltipContent>
 			<ul class="text-xs">
 				{#each faults as fault (fault)}
 					<li>{fault}</li>
 				{/each}
 			</ul>
-		</Tooltip.Content>
-	</Tooltip.Root>
+		</TooltipContent>
+	</Tooltip>
 {/snippet}
 
-{#snippet pctCell(value: number | undefined, colored = true)}
-	<Table.Cell
+<!-- A percentage of the node's allocatable. At or over 100 % it is said with weight and a tint
+     as well as colour; below, the status colours; utilization passes `colored = false`. -->
+{#snippet pctCell(value: number | undefined, first = false, colored = true)}
+	<td
 		class={cn(
-			'text-right font-mono tabular-nums',
-			colored && value !== undefined && pctClass(value)
+			cellClass,
+			rowHover,
+			first && groupStart,
+			!present(value)
+				? dataTable.absent
+				: colored && (value >= 100 ? dataTable.over : levelText[levelOf(value)])
 		)}
 	>
 		{formatPct(value)}
-	</Table.Cell>
+	</td>
 {/snippet}
 
-<!-- Fixed width at every value so the column doesn't resize on each reload: a 4ch slot absorbs
-     the mantissa's swing (`123` vs `1024`), then one gap character and a three-character unit. -->
 <!-- The workloads sharing one card, as a count — listing them inline made a row as tall as the
      card had pods. `?` marks memory in use that HAMi never booked; it rides alongside the count
      rather than replacing it, because a card can carry scheduled pods and an escapee at once. -->
@@ -558,16 +575,16 @@
 		unattributed === undefined
 			? undefined
 			: m.gpu_unattributed_pods({ amount: formatBytes(unattributed) })}
-	<Table.Cell class="text-right font-mono tabular-nums">
+	<td class={subCell}>
 		{#if consumers.length === 0 && unattributed === undefined}
-			—
+			<span class={dataTable.absent}>—</span>
 		{:else}
-			<Tooltip.Root>
-				<Tooltip.Trigger>
-					{#snippet child({ props })}
-						<span {...props} class="cursor-help underline decoration-dotted underline-offset-4">
+			<Tooltip>
+				<TooltipTrigger>
+					{#snippet asChild(props)}
+						<span {...props({ class: hintClass })}>
 							{#if consumers.length}{consumers.length}{/if}{#if unattributed !== undefined}<span
-									class={cn('text-destructive', consumers.length && 'ml-1')}
+									class={cn('font-semibold text-destructive', consumers.length && 'ml-1')}
 									>{consumers.length ? '+ ?' : '?'}</span
 								>{/if}
 							<span class="sr-only">
@@ -578,16 +595,20 @@
 							</span>
 						</span>
 					{/snippet}
-				</Tooltip.Trigger>
-				<Tooltip.Content class={consumers.length ? 'max-w-[calc(100vw-2rem)]' : 'max-w-sm'}>
+				</TooltipTrigger>
+				<TooltipContent class={consumers.length ? 'max-w-[calc(100vw-2rem)]' : 'max-w-sm'}>
 					<div class="text-xs">
 						{#if consumers.length}
 							<table class="text-left whitespace-nowrap">
 								<thead>
-									<tr class="border-b border-background/20 text-background/70">
-										<th class="pr-4 pb-1 font-medium">{m.workspace()}</th>
-										<th class="pr-4 pb-1 font-medium">{m.pod()}</th>
-										<th class="pb-1 text-right font-medium">{m.gpu_allocated()}</th>
+									<tr class="text-background/70">
+										<th class="border-b border-background/20 pr-4 pb-1 font-medium">
+											{m.workspace()}
+										</th>
+										<th class="border-b border-background/20 pr-4 pb-1 font-medium">{m.pod()}</th>
+										<th class="border-b border-background/20 pb-1 text-right font-medium">
+											{m.gpu_allocated()}
+										</th>
 									</tr>
 								</thead>
 								<tbody>
@@ -615,15 +636,17 @@
 							</p>
 						{/if}
 					</div>
-				</Tooltip.Content>
-			</Tooltip.Root>
+				</TooltipContent>
+			</Tooltip>
 		{/if}
-	</Table.Cell>
+	</td>
 {/snippet}
 
-{#snippet rateCell(value: number | undefined)}
-	{@const io = value !== undefined && Number.isFinite(value) ? formatIO(Number(value)) : undefined}
-	<Table.Cell class="text-right font-mono whitespace-nowrap tabular-nums">
+<!-- Fixed width at every value so the column doesn't resize on each reload: a 4ch slot absorbs
+     the mantissa's swing (`123` vs `1024`), then one gap character and a three-character unit. -->
+{#snippet rateCell(value: number | undefined, first = false)}
+	{@const io = present(value) ? formatIO(Number(value)) : undefined}
+	<td class={cn(cellClass, rowHover, first && groupStart, !io && dataTable.absent)}>
 		{#if io}
 			<span class="inline-block w-[4ch] text-right">{rateMantissa(io.value)}</span><span
 				class="ml-[1ch] text-muted-foreground">{SHORT_RATE_UNITS[io.unit] ?? io.unit}</span
@@ -631,261 +654,321 @@
 		{:else}
 			—
 		{/if}
-	</Table.Cell>
+	</td>
 {/snippet}
 
-{#snippet diskCell(pool: DiskPool | undefined)}
-	<Table.Cell
+{#snippet diskCell(pool: DiskPool | undefined, first = false)}
+	{@const value = pool?.usePct}
+	<td
 		class={cn(
-			'text-right font-mono tabular-nums',
-			pool?.usePct !== undefined && pctClass(pool.usePct)
+			cellClass,
+			rowHover,
+			first && groupStart,
+			!present(value) ? dataTable.absent : value >= 100 ? dataTable.over : levelText[levelOf(value)]
 		)}
 	>
 		{#if pool?.total !== undefined}
-			{@render hint(
-				formatPct(pool.usePct),
-				`${formatBytes(pool.used)} / ${formatBytes(pool.total)}`
-			)}
+			{@render hint(formatPct(value), `${formatBytes(pool.used)} / ${formatBytes(pool.total)}`)}
 		{:else}
-			{formatPct(pool?.usePct)}
+			{formatPct(value)}
 		{/if}
-	</Table.Cell>
+	</td>
 {/snippet}
 
-{#snippet table()}
+<!-- The per-card detail of one node, in the row that opens under it. -->
+{#snippet gpuTable(row: NodeRow)}
+	<table class="w-max min-w-full border-separate border-spacing-0 text-sm">
+		<thead>
+			<tr>
+				<th class={cn(subHead, 'text-left')}>{m.type()}</th>
+				<!-- UUID rides on hover: at 40 characters it was what pushed this table too wide. -->
+				<th class={cn(subHead, 'text-left')}>{m.device()}</th>
+				<!-- Count only: listing pods inline made this row as tall as the card had pods. -->
+				<th class={subHead}>{m.pods()}</th>
+				<th class={subHead}>{m.gpu_allocated()}</th>
+				<th class={subHead}>{m.usage()}</th>
+				<th class={subHead}>{m.total()}</th>
+				<th class={subHead}>{m.utilization()}</th>
+				<th class={subHead}>{m.clock()}</th>
+				<th class={subHead}>{m.temperature()}</th>
+				<th class={subHead}>{m.power()}</th>
+			</tr>
+		</thead>
+		<tbody>
+			{#each row.gpus as gpu, index (gpu.uuid || index)}
+				{@const faults = gpuFaults(gpu)}
+				<tr>
+					<td class={cn(subCell, 'text-left font-sans')}>{gpu.modelName || '—'}</td>
+					<td class={cn(subCell, 'text-left')}>
+						<span class="inline-flex items-center gap-1.5">
+							{#if faults.length}
+								{@render faultMark(faults)}
+							{/if}
+							{#if gpu.uuid}
+								{@render hint(gpu.device || '—', gpu.uuid)}
+							{:else}
+								{gpu.device || '—'}
+							{/if}
+						</span>
+					</td>
+					{@render consumersCell(gpu)}
+					<!-- No warning here: a booking runs ahead of usage for as long as a model takes to load its
+					     weights, so flagging the gap fired on every startup. Usage outrunning the booking shows
+					     as the `?` in Pods instead. -->
+					<td class={cn(subCell, !present(gpu.allocated) && dataTable.absent)}>
+						{formatBytes(gpu.allocated)}
+					</td>
+					<td class={cn(subCell, !present(gpu.used) && dataTable.absent)}>
+						{formatBytes(gpu.used)}
+					</td>
+					<td class={cn(subCell, !present(gpu.total) && dataTable.absent)}>
+						{formatBytes(gpu.total)}
+					</td>
+					<td class={cn(subCell, !present(gpu.util) && dataTable.absent)}>
+						{formatPct(gpu.util)}
+					</td>
+					<td class={cn(subCell, !present(gpu.smClock) && dataTable.absent)}>
+						{formatUnit(gpu.smClock, 'MHz')}
+					</td>
+					<td class={cn(subCell, !present(gpu.temperature) && dataTable.absent)}>
+						{formatUnit(gpu.temperature, '°C')}
+					</td>
+					<td class={cn(subCell, !present(gpu.power) && dataTable.absent)}>
+						{formatUnit(gpu.power, 'W', 1)}
+					</td>
+				</tr>
+			{/each}
+		</tbody>
+	</table>
+{/snippet}
+
+<!-- `stickyHead`: the box around this table also scrolls up and down, so the head stays put. -->
+{#snippet table(stickyHead: boolean)}
 	{@const showGpu = hasGpu}
 	{@const colSpan =
 		7 + (showGpu ? 3 : 0) + diskClasses.reduce((total, c) => total + diskColumns(c), 0)}
-	<Table.Root>
-		<Table.Header>
+	{@const groupHead = cn(
+		dataTable.groupHead,
+		headGround,
+		groupStart,
+		stickyHead && 'sticky top-0 z-10'
+	)}
+	{@const head = cn(headClass, stickyHead && 'sticky top-8 z-10')}
+	<table class={dataTable.table}>
+		<thead>
 			<!-- Four blocks instead of a dozen flat columns. Allocated and Usage sit under GPU
 			     because Utilization beside them is what stops them reading as compute. -->
-			<Table.Row class="hover:bg-transparent">
-				<Table.Head></Table.Head>
-				<Table.Head colspan={3} class="border-l text-center whitespace-nowrap">
-					{m.cpu()}
-				</Table.Head>
-				<Table.Head colspan={3} class="border-l text-center whitespace-nowrap">
-					{m.memory()}
-				</Table.Head>
+			<tr>
+				<th
+					rowspan="2"
+					scope="col"
+					class={cn(
+						headClass,
+						dataTable.headFirst,
+						dataTable.sticky,
+						headGround,
+						'z-20 h-auto pb-2.5 align-bottom',
+						stickyHead && 'top-0 z-30'
+					)}
+				>
+					{m.node()}
+				</th>
+				<th colspan="3" scope="colgroup" class={groupHead}>{m.cpu()}</th>
+				<th colspan="3" scope="colgroup" class={groupHead}>{m.memory()}</th>
 				{#if showGpu}
-					<Table.Head colspan={3} class="border-l text-center whitespace-nowrap">
-						{m.gpu()}
-					</Table.Head>
+					<th colspan="3" scope="colgroup" class={groupHead}>{m.gpu()}</th>
 				{/if}
 				{#each diskClasses as deviceClass (deviceClass)}
-					<Table.Head
-						colspan={diskColumns(deviceClass)}
-						class="border-l text-center whitespace-nowrap"
-					>
+					<th colspan={diskColumns(deviceClass)} scope="colgroup" class={groupHead}>
 						{deviceClassLabel(deviceClass)}
-					</Table.Head>
+					</th>
 				{/each}
-			</Table.Row>
-			<Table.Row>
-				<Table.Head>{m.node()}</Table.Head>
+			</tr>
+			<tr>
 				{#each CPU_COLUMNS as col, index (col.key)}
-					<Table.Head class={cn('text-right whitespace-nowrap', index === 0 && 'border-l')}>
-						{col.label}
-					</Table.Head>
+					<th scope="col" class={cn(head, index === 0 && groupStart)}>{col.label}</th>
 				{/each}
 				{#each MEM_COLUMNS as col, index (col.key)}
-					<Table.Head class={cn('text-right whitespace-nowrap', index === 0 && 'border-l')}>
-						{col.label}
-					</Table.Head>
+					<th scope="col" class={cn(head, index === 0 && groupStart)}>{col.label}</th>
 				{/each}
 				{#if showGpu}
-					<Table.Head class="border-l text-right whitespace-nowrap">
-						{m.gpu_allocated()}
-					</Table.Head>
-					<Table.Head class="text-right whitespace-nowrap">{m.usage()}</Table.Head>
-					<Table.Head class="text-right whitespace-nowrap">{m.utilization()}</Table.Head>
+					<th scope="col" class={cn(head, groupStart)}>{m.gpu_allocated()}</th>
+					<th scope="col" class={head}>{m.usage()}</th>
+					<th scope="col" class={head}>{m.utilization()}</th>
 				{/if}
 				{#each diskClasses as deviceClass (deviceClass)}
 					{#if deviceClass === AIDAPTIV_CACHE_DEVICE_CLASS}
-						<Table.Head class="border-l text-right whitespace-nowrap">
-							{m.disk_write()}
-						</Table.Head>
-						<Table.Head class="text-right whitespace-nowrap">{m.disk_read()}</Table.Head>
-						<Table.Head class="text-right whitespace-nowrap">{m.usage()}</Table.Head>
+						<th scope="col" class={cn(head, groupStart)}>{m.disk_write()}</th>
+						<th scope="col" class={head}>{m.disk_read()}</th>
+						<th scope="col" class={head}>{m.usage()}</th>
 					{:else}
-						<Table.Head class="border-l text-right whitespace-nowrap">{m.usage()}</Table.Head>
+						<th scope="col" class={cn(head, groupStart)}>{m.usage()}</th>
 					{/if}
 				{/each}
-			</Table.Row>
-		</Table.Header>
-		<Table.Body>
+			</tr>
+		</thead>
+		<tbody>
 			{#each rows as row (row.node)}
 				{@const saturated = pressure(row) >= 100}
 				{@const expandable = showGpu && row.gpus.length > 0}
 				{@const open = expandedNodes.has(row.node)}
 				{@const gpuModel =
-					[...new Set(row.gpus.map((gpu) => gpu.modelName).filter(Boolean))].join(', ') || 'GPU'}
-				<Table.Row
-					class={cn(saturated && 'bg-destructive/5', expandable && 'cursor-pointer')}
+					[...new Set(row.gpus.map((gpu) => gpu.modelName).filter(Boolean))].join(', ') || m.gpu()}
+				<tr
+					class={cn('group/row', expandable && 'cursor-pointer')}
 					onclick={expandable ? () => toggleNode(row.node) : undefined}
 				>
-					<Table.Cell class="font-medium">
-						{#if expandable}
-							<div class="flex items-center gap-1.5 whitespace-nowrap">
-								<ChevronRightIcon
-									class={cn(
-										'size-4 shrink-0 text-muted-foreground transition-transform',
-										open && 'rotate-90'
-									)}
-								/>
-								<span>{row.node}</span>
-								<span class="text-xs text-muted-foreground">
-									({row.gpus.length} × {gpuModel} · {formatBytes(row.gpuTotal, 0)})
-								</span>
+					<th
+						scope="row"
+						class={cn(
+							cellClass,
+							dataTable.cellFirst,
+							dataTable.sticky,
+							rowHover,
+							'py-1.5 max-md:ps-1'
+						)}
+					>
+						<div class="flex items-center gap-1 md:gap-1.5">
+							{#if expandable}
+								<button
+									type="button"
+									class="inline-flex size-5 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/50 md:size-6"
+									aria-expanded={open}
+									aria-label={`${open ? m.collapse() : m.expand()} ${row.node}`}
+									onclick={(event) => {
+										event.stopPropagation();
+										toggleNode(row.node);
+									}}
+								>
+									<ChevronRightIcon
+										class={cn('size-4 transition-transform', open && 'rotate-90')}
+										aria-hidden="true"
+									/>
+								</button>
+							{:else if showGpu}
+								<span class="size-5 shrink-0 md:size-6" aria-hidden="true"></span>
+							{/if}
+							<div class="grid min-w-0 gap-0.5">
+								<div
+									class="flex flex-col items-start gap-x-2 gap-y-0.5 md:flex-row md:items-center"
+								>
+									<span class="max-w-32 truncate md:max-w-none" title={row.node}>{row.node}</span>
+									{#if saturated}
+										<Badge variant="destructive" pill>{m.dash_over()}</Badge>
+									{/if}
+								</div>
+								{#if expandable}
+									{@const summary = `${row.gpus.length} × ${gpuModel} · ${formatBytes(row.gpuTotal, 0)}`}
+									<span
+										class="hidden max-w-56 truncate text-xs font-normal text-muted-foreground lg:block"
+										title={summary}
+									>
+										{summary}
+									</span>
+								{/if}
 							</div>
-						{:else}
-							{row.node}
-						{/if}
-					</Table.Cell>
-					{#each CPU_COLUMNS as col (col.key)}
-						{@render pctCell(row[col.key])}
+						</div>
+					</th>
+					{#each CPU_COLUMNS as col, index (col.key)}
+						{@render pctCell(row[col.key], index === 0)}
 					{/each}
-					{#each MEM_COLUMNS as col (col.key)}
-						{@render pctCell(row[col.key])}
+					{#each MEM_COLUMNS as col, index (col.key)}
+						{@render pctCell(row[col.key], index === 0)}
 					{/each}
 					{#if showGpu}
-						{@render pctCell(row.gpuAllocPct)}
+						{@render pctCell(row.gpuAllocPct, true)}
 						{@render pctCell(row.gpuUsedPct)}
-						<!-- Utilization is not pressure: a busy GPU is the goal, so it stays uncolored. -->
-						{@render pctCell(row.gpuUtil, false)}
+						<!-- Utilization is not pressure: a busy GPU is the goal, so it stays uncoloured. -->
+						{@render pctCell(row.gpuUtil, false, false)}
 					{/if}
 					{#each diskClasses as deviceClass (deviceClass)}
 						{#if deviceClass === AIDAPTIV_CACHE_DEVICE_CLASS}
-							{@render rateCell(row.diskWrite)}
+							{@render rateCell(row.diskWrite, true)}
 							{@render rateCell(row.diskRead)}
+							{@render diskCell(row.disks[deviceClass])}
+						{:else}
+							{@render diskCell(row.disks[deviceClass], true)}
 						{/if}
-						{@render diskCell(row.disks[deviceClass])}
 					{/each}
-				</Table.Row>
+				</tr>
 				{#if expandable && open}
-					<Table.Row class="hover:bg-transparent">
-						<Table.Cell colspan={colSpan} class="bg-muted/30 p-3">
-							<Table.Root>
-								<Table.Header>
-									<Table.Row class="hover:bg-transparent">
-										<Table.Head>{m.type()}</Table.Head>
-										<!-- UUID rides on hover: at 40 characters it was what pushed this table too wide. -->
-										<Table.Head>{m.device()}</Table.Head>
-										<!-- Count only: listing pods inline made this row as tall as the card had pods. -->
-										<Table.Head class="text-right">{m.pods()}</Table.Head>
-										<Table.Head class="text-right">{m.gpu_allocated()}</Table.Head>
-										<Table.Head class="text-right">{m.usage()}</Table.Head>
-										<Table.Head class="text-right">{m.total()}</Table.Head>
-										<Table.Head class="text-right">{m.utilization()}</Table.Head>
-										<Table.Head class="text-right">{m.clock()}</Table.Head>
-										<Table.Head class="text-right">{m.temperature()}</Table.Head>
-										<Table.Head class="text-right">{m.power()}</Table.Head>
-									</Table.Row>
-								</Table.Header>
-								<Table.Body>
-									{#each row.gpus as gpu, index (gpu.uuid || index)}
-										{@const faults = gpuFaults(gpu)}
-										<Table.Row class="border-none">
-											<Table.Cell class="whitespace-nowrap">{gpu.modelName || '—'}</Table.Cell>
-											<Table.Cell class="font-mono whitespace-nowrap">
-												<span class="inline-flex items-center gap-1.5">
-													{#if faults.length}
-														{@render faultMark(faults)}
-													{/if}
-													{#if gpu.uuid}
-														{@render hint(gpu.device || '—', gpu.uuid)}
-													{:else}
-														{gpu.device || '—'}
-													{/if}
-												</span>
-											</Table.Cell>
-											{@render consumersCell(gpu)}
-											<!-- No warning here: a booking runs ahead of usage for as long as a model takes to load its
-											     weights, so flagging the gap fired on every startup. Usage outrunning the booking shows
-											     as the `?` in Pods instead. -->
-											<Table.Cell class="text-right font-mono tabular-nums">
-												{formatBytes(gpu.allocated)}
-											</Table.Cell>
-											<Table.Cell class="text-right font-mono tabular-nums">
-												{formatBytes(gpu.used)}
-											</Table.Cell>
-											<Table.Cell class="text-right font-mono tabular-nums">
-												{formatBytes(gpu.total)}
-											</Table.Cell>
-											<Table.Cell class="text-right font-mono tabular-nums">
-												{formatPct(gpu.util)}
-											</Table.Cell>
-											<Table.Cell class="text-right font-mono tabular-nums">
-												{formatUnit(gpu.smClock, 'MHz')}
-											</Table.Cell>
-											<Table.Cell class="text-right font-mono tabular-nums">
-												{formatUnit(gpu.temperature, '°C')}
-											</Table.Cell>
-											<Table.Cell class="text-right font-mono tabular-nums">
-												{formatUnit(gpu.power, 'W', 1)}
-											</Table.Cell>
-										</Table.Row>
-									{/each}
-								</Table.Body>
-							</Table.Root>
-						</Table.Cell>
-					</Table.Row>
+					<tr>
+						<td colspan={colSpan} class="border-b border-border/40 bg-muted/30 p-3 max-md:p-2">
+							<div class="w-max rounded-lg border border-border/60 bg-card px-1 py-1">
+								{@render gpuTable(row)}
+							</div>
+						</td>
+					</tr>
 				{/if}
 			{/each}
-		</Table.Body>
-	</Table.Root>
+		</tbody>
+	</table>
 {/snippet}
 
-<Statistics.Root type="count" class="overflow-visible">
-	<Statistics.Header class="flex flex-row items-center gap-2 space-y-0">
-		<div class="grid flex-1 gap-1">
-			<Statistics.Title class="text-base leading-normal text-foreground">
-				{m.node_resource_pressure()}
-			</Statistics.Title>
-			<p class="text-sm text-muted-foreground">
-				{m.cluster_dashboard_node_pressure_description()}
-			</p>
-		</div>
-		<Sheet.Root>
-			<Sheet.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}>
-				<Maximize2Icon class="size-4 text-muted-foreground" />
-			</Sheet.Trigger>
-			<Sheet.Content class="flex min-w-[77vw] flex-col gap-4 overflow-auto p-8">
-				<Sheet.Header class="p-0">
-					<Sheet.Title>{m.node_resource_pressure()}</Sheet.Title>
-					<Sheet.Description>{m.cluster_dashboard_node_pressure_description()}</Sheet.Description>
-				</Sheet.Header>
-				{@render table()}
-			</Sheet.Content>
-		</Sheet.Root>
-		<Tooltip.Root>
-			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}>
-				<InfoIcon class="size-4 text-muted-foreground" />
-			</Tooltip.Trigger>
-			<Tooltip.Content class="max-w-xs">
-				<p>{m.cluster_dashboard_node_pressure_tooltip()}</p>
-			</Tooltip.Content>
-		</Tooltip.Root>
-	</Statistics.Header>
-	<Statistics.Content class="min-h-16">
-		{#if !isLoaded}
-			<div class="flex h-50 w-full items-center justify-center">
-				<LoaderCircle class="size-12 animate-spin" />
-			</div>
-		{:else if rows.length === 0}
-			<div class="flex h-50 w-full flex-col items-center justify-center">
-				<ChartColumnIcon class="size-12 animate-pulse text-muted-foreground" />
-				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
-			</div>
-		{:else if rows.length > SCROLL_AFTER}
-			<ScrollArea
-				class={cn('w-full transition-[height] duration-200', anyExpanded ? 'h-[40rem]' : 'h-80')}
-			>
-				{@render table()}
-			</ScrollArea>
-		{:else}
-			{@render table()}
+<WidgetCard
+	title={m.node_resource_pressure()}
+	description={m.cluster_dashboard_node_pressure_description()}
+	info={m.cluster_dashboard_node_pressure_tooltip()}
+	status={loadable.status}
+	stale={loadable.stale}
+	class="h-auto min-w-0 max-md:[--card-spacing:--spacing(3)]"
+	bodyClass="gap-2"
+>
+	{#snippet action()}
+		{#if loadable.status === 'ready'}
+			<Sheet>
+				<SheetTrigger>
+					{#snippet asChild(props)}
+						<Button
+							{...props()}
+							variant="ghost"
+							size="icon-sm"
+							class="text-muted-foreground"
+							aria-label={m.clo_open_full_table()}
+							title={m.clo_open_full_table()}
+						>
+							<Maximize2Icon aria-hidden="true" />
+						</Button>
+					{/snippet}
+				</SheetTrigger>
+				<SheetContent
+					class="gap-4 overflow-y-auto p-6 data-[side=right]:w-full data-[side=right]:sm:max-w-[min(96vw,90rem)]"
+				>
+					<SheetHeader class="p-0 pe-8">
+						<SheetTitle>{m.node_resource_pressure()}</SheetTitle>
+						<SheetDescription>{m.cluster_dashboard_node_pressure_description()}</SheetDescription>
+					</SheetHeader>
+					<div class={cn(dataTable.scroller, 'shrink-0')} data-scroll-x>
+						{@render table(false)}
+					</div>
+				</SheetContent>
+			</Sheet>
 		{/if}
-	</Statistics.Content>
-</Statistics.Root>
+	{/snippet}
+	{#snippet skeleton()}
+		<div class="grid gap-2">
+			<Skeleton class="h-16 w-full" />
+			<Skeleton class="h-10 w-full" />
+		</div>
+	{/snippet}
+	<!-- Focusable so the columns out of view can be reached from the keyboard. -->
+	<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+	<div
+		bind:this={scroller}
+		class={cn(
+			dataTable.scroller,
+			'outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
+			capped && 'overflow-y-auto',
+			capped && (anyExpanded ? 'max-h-[44rem]' : 'max-h-[30rem]')
+		)}
+		data-scroll-x
+		role="region"
+		aria-label={m.node_resource_pressure()}
+		tabindex={overflowing ? 0 : undefined}
+	>
+		{@render table(capped)}
+	</div>
+	{#if overflowing}
+		<p class="text-xs text-muted-foreground">{m.dash_scroll_hint()}</p>
+	{/if}
+</WidgetCard>

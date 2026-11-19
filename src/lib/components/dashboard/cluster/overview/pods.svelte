@@ -1,14 +1,23 @@
 <script lang="ts">
 	import BoxIcon from '@lucide/svelte/icons/box';
-	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
-	import Loader2Icon from '@lucide/svelte/icons/loader-2';
-	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
-	import { onDestroy, onMount } from 'svelte';
+	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
+	import type { PrometheusDriver } from 'prometheus-query';
 
-	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Card from '$lib/components/ui/card';
+	import InfoTip from '$lib/components/dashboard/shared/info-tip.svelte';
+	import { orThrow, useLoadable } from '$lib/components/dashboard/shared/loadable.svelte';
+	import {
+		cardClass,
+		dataTable,
+		type Level,
+		levelOfCount,
+		levelText
+	} from '$lib/components/dashboard/shared/status';
+	import WidgetState from '$lib/components/dashboard/shared/widget-state.svelte';
+	import { Card } from '$lib/components/shadcnio/card';
+	import { Skeleton } from '$lib/components/shadcnio/skeleton';
 	import { m } from '$lib/messages';
-	import { escapePromqlStringLiteral, fetchCombinedInstant } from '$lib/prometheus';
+	import { escapePromqlStringLiteral, fetchCombinedInstantOrNull } from '$lib/prometheus';
+	import { cn } from '$lib/utils';
 
 	let {
 		prometheusDriver,
@@ -20,90 +29,101 @@
 		isReloading: boolean;
 	} = $props();
 
-	let maxAllocatablePods: SampleValue | undefined = $state(undefined);
-	let runningPods: SampleValue | undefined = $state(undefined);
-	let pendingPods: SampleValue | undefined = $state(undefined);
-	let failedPods: SampleValue | undefined = $state(undefined);
-
-	// Allocatable + the three pod phases come back in a single `or`-unioned instant query.
-	async function fetch() {
-		const ns = (namespace ?? '').trim();
-		const nsFilter = ns ? `,namespace="${escapePromqlStringLiteral(ns)}"` : '';
-		try {
-			const r = await fetchCombinedInstant(prometheusDriver, {
-				allocatable: `sum(kube_node_status_allocatable{resource="pods", container!=""})`,
-				running: `sum(kube_pod_status_phase{phase="Running", container!=""${nsFilter}})`,
-				pending: `sum(kube_pod_status_phase{phase="Pending", container!=""${nsFilter}})`,
-				failed: `sum(kube_pod_status_phase{phase="Failed", container!=""${nsFilter}})`
-			});
-			maxAllocatablePods = r.allocatable[0]?.value ?? undefined;
-			runningPods = r.running[0]?.value ?? undefined;
-			pendingPods = r.pending[0]?.value ?? undefined;
-			failedPods = r.failed[0]?.value ?? undefined;
-		} catch (error) {
-			console.error('Failed to fetch pods:', error);
-		}
+	function finite(value: unknown): number | undefined {
+		const n = Number(value);
+		return value !== undefined && value !== null && Number.isFinite(n) ? n : undefined;
 	}
 
-	const reloadManager = new ReloadManager(fetch);
+	// Allocatable + the three pod phases come back in a single `or`-unioned instant query.
+	const pods = useLoadable(
+		async () => {
+			const ns = (namespace ?? '').trim();
+			const nsFilter = ns ? `,namespace="${escapePromqlStringLiteral(ns)}"` : '';
+			const r = orThrow(
+				await fetchCombinedInstantOrNull(prometheusDriver, {
+					allocatable: `sum(kube_node_status_allocatable{resource="pods", container!=""})`,
+					running: `sum(kube_pod_status_phase{phase="Running", container!=""${nsFilter}})`,
+					pending: `sum(kube_pod_status_phase{phase="Pending", container!=""${nsFilter}})`,
+					failed: `sum(kube_pod_status_phase{phase="Failed", container!=""${nsFilter}})`
+				})
+			);
+			const allocatable = finite(r.allocatable[0]?.value?.value);
+			const running = finite(r.running[0]?.value?.value);
+			const pending = finite(r.pending[0]?.value?.value);
+			const failed = finite(r.failed[0]?.value?.value);
+			if (allocatable === undefined && running === undefined && pending === undefined) return null;
+			return { allocatable, running, pending, failed };
+		},
+		() => isReloading
+	);
 
-	$effect(() => {
-		if (isReloading) {
-			reloadManager.restart();
-		} else {
-			reloadManager.stop();
+	// Running is the normal case and Allocatable is a capacity: neither is coloured.
+	// Pending and Failed pick up a colour only once there is something in them.
+	const readings = $derived<{ label: string; value: number | undefined; level: Level }[]>([
+		{ label: m.dash_pods_allocatable(), value: pods.data?.allocatable, level: 'neutral' },
+		{ label: m.running(), value: pods.data?.running, level: 'neutral' },
+		{
+			label: m.dash_pods_pending(),
+			value: pods.data?.pending,
+			level: levelOfCount(pods.data?.pending ?? 0, 'warn')
+		},
+		{
+			label: m.dash_pods_failed(),
+			value: pods.data?.failed,
+			level: levelOfCount(pods.data?.failed ?? 0, 'danger')
 		}
-	});
-
-	let isLoaded = $state(false);
-	onMount(async () => {
-		await fetch();
-		isLoaded = true;
-	});
-	onDestroy(() => {
-		reloadManager.stop();
-	});
+	]);
 </script>
 
-<Card.Root class="relative h-full min-h-[140px] gap-2 overflow-hidden">
-	<BoxIcon
-		class="absolute -right-10 bottom-0 size-36 text-8xl tracking-tight text-nowrap text-primary/5 uppercase group-hover:hidden"
-	/>
-	<Card.Header>
-		<Card.Title>{m.pods()}</Card.Title>
-		<Card.Description class="flex h-6 items-center">
-			{m.cluster_dashboard_pod_description()}
-		</Card.Description>
-	</Card.Header>
-	{#if !isLoaded}
-		<div class="flex h-9 w-full items-center justify-center">
-			<Loader2Icon class="size-10 animate-spin" />
+<!-- The stat tile, with four readings where the others have one. Same line heights as
+     StatCard, so the row of tiles lines up. -->
+<Card class={cn(cardClass, '@container/pods justify-center')} data-status={pods.status}>
+	<div class="flex min-w-0 items-start gap-4 px-(--card-spacing)">
+		<div
+			class="flex size-11 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"
+			aria-hidden="true"
+		>
+			<BoxIcon class="size-5" />
 		</div>
-	{:else if !maxAllocatablePods && !runningPods && !pendingPods}
-		<div class="flex h-full w-full flex-col items-center justify-center">
-			<ChartColumnIcon class="size-6 animate-pulse text-muted-foreground" />
-			<p class="p-0 text-xs text-muted-foreground">{m.no_data_display()}</p>
-		</div>
-	{:else}
-		<Card.Content class="my-4 flex flex-col gap-4">
-			<div class="grid grid-cols-4">
-				<div>
-					<p class="text-3xl font-bold">{maxAllocatablePods?.value ?? 'N/A'}</p>
-					<p class="text-1xl font-medium tracking-wider uppercase">Allocatable</p>
-				</div>
-				<div class="text-chart-2">
-					<p class="text-3xl font-bold">{runningPods?.value ?? 'N/A'}</p>
-					<p class="text-1xl font-medium tracking-wider uppercase">Running</p>
-				</div>
-				<div class="text-muted-foreground">
-					<p class="text-3xl font-bold">{pendingPods?.value ?? 'N/A'}</p>
-					<p class="text-1xl font-medium tracking-wider uppercase">Pending</p>
-				</div>
-				<div class="text-chart-1">
-					<p class="text-3xl font-bold">{failedPods?.value ?? 'N/A'}</p>
-					<p class="text-1xl font-medium tracking-wider uppercase">Failed</p>
-				</div>
+		<div class="grid min-w-0 flex-1 gap-1">
+			<div class="flex min-h-6 min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+				<span class="truncate">{m.pods()}</span>
+				{#if pods.stale}
+					<InfoTip
+						text={m.dash_state_stale()}
+						icon={TriangleAlertIcon}
+						class="text-warning-foreground hover:text-warning-foreground"
+					/>
+				{/if}
 			</div>
-		</Card.Content>
-	{/if}
-</Card.Root>
+			{#if pods.status === 'error' || pods.status === 'empty'}
+				<div class="flex min-h-8 min-w-0 items-center">
+					<WidgetState kind={pods.status} compact />
+				</div>
+				<div class="min-h-5"></div>
+			{:else}
+				<dl class="grid min-w-0 grid-cols-2 gap-x-4 gap-y-3 @md/pods:grid-cols-4">
+					{#each readings as reading (reading.label)}
+						<div class="flex min-w-0 flex-col-reverse gap-1">
+							<dt class="min-h-5 truncate text-xs text-muted-foreground">{reading.label}</dt>
+							<dd
+								class={cn(
+									'flex min-h-8 items-center text-2xl leading-8 font-medium tabular-nums',
+									levelText[reading.level]
+								)}
+							>
+								{#if pods.status === 'loading'}
+									<Skeleton class="h-6 w-14" />
+								{:else if reading.value === undefined}
+									<span class={dataTable.absent}>—</span>
+								{:else}
+									{reading.value}
+								{/if}
+							</dd>
+						</div>
+					{/each}
+				</dl>
+			{/if}
+		</div>
+	</div>
+</Card>
