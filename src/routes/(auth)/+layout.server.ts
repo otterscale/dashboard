@@ -1,10 +1,3 @@
-// Evaluated before the layout and page components are loaded side by side.
-// The shadcn.io components reach svelte/attachments through Ark UI, and that module
-// is part of an import cycle inside Svelte: when two components pull it in at the
-// same moment, the dev server hands one of them a half-initialised copy and the
-// page answers 500. Loading it here first, on its own, avoids that.
-import 'svelte/attachments';
-
 import { redirect } from '@sveltejs/kit';
 
 import { env } from '$env/dynamic/private';
