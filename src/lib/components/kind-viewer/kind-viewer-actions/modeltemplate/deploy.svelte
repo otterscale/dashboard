@@ -18,7 +18,8 @@
 		object,
 		onOpenChangeComplete,
 		open = $bindable(false),
-		hideTrigger = false
+		hideTrigger = false,
+		isPublic = false
 	}: {
 		cluster: string;
 		namespace: string;
@@ -29,6 +30,8 @@
 		open?: boolean;
 		/** Omit the dropdown "Deploy" item when a parent drives `open`. */
 		hideTrigger?: boolean;
+		/** Deploy the service callable without an API key. */
+		isPublic?: boolean;
 	} = $props();
 
 	// svelte-ignore state_referenced_locally
@@ -44,4 +47,6 @@
 	void open;
 	// svelte-ignore state_referenced_locally
 	void hideTrigger;
+	// svelte-ignore state_referenced_locally
+	void isPublic;
 </script>

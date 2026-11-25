@@ -99,6 +99,7 @@
 		$state(undefined);
 	let pendingAction: ConfigureAction | undefined = $state(undefined);
 	let handoffOpen = $state(false);
+	let isPublic = $state(false);
 
 	async function listTemplates(): Promise<ModelTemplateObject[]> {
 		const modelLabel = entry.metadata?.labels?.['template.otterscale.io/model'];
@@ -153,6 +154,7 @@
 				kvOffload: 'false',
 				routing: 'false'
 			};
+			isPublic = false;
 			loadTemplates();
 		});
 	});
@@ -404,6 +406,22 @@
 						disabled={!(routingOn && routingOff)}
 					/>
 				</Field.Field>
+
+				{#if action === 'deploy'}
+					<Field.Field orientation="horizontal">
+						<Field.Content>
+							<Field.Label for="public-access">Public</Field.Label>
+							<Field.Description>
+								Anyone who can reach the gateway can call this model without an API key.
+							</Field.Description>
+						</Field.Content>
+						<Switch
+							id="public-access"
+							checked={isPublic}
+							onCheckedChange={(checked) => (isPublic = checked)}
+						/>
+					</Field.Field>
+				{/if}
 			</Field.Group>
 
 			<div class="rounded-lg bg-muted p-4">
@@ -530,6 +548,7 @@
 		{cluster}
 		{namespace}
 		{schema}
+		{isPublic}
 		object={pendingObject}
 		onOpenChangeComplete={(isOpen) => {
 			if (!isOpen) pendingTemplate = undefined;
