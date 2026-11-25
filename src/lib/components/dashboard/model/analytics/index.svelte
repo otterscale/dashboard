@@ -1,259 +1,191 @@
 <script lang="ts">
-	import { PrometheusDriver } from 'prometheus-query';
+	import { createClient, type Transport } from '@connectrpc/connect';
+	import { ResourceService } from '@otterscale/api/resource/v1';
+	import type { PrometheusDriver } from 'prometheus-query';
+	import { getContext, untrack } from 'svelte';
+	import { prefersReducedMotion } from 'svelte/motion';
+	import { fade } from 'svelte/transition';
 
+	import { Loader } from '$lib/components/dashboard/cluster/analytics/lib/loader.svelte';
+	import { Tile } from '$lib/components/dashboard/kit';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
 	import type { SharedMetrics } from '$lib/prometheus';
 
-	import ATopKvPressure from './a-top-kv-pressure.svelte';
-	import ATopP99Latency from './a-top-p99-latency.svelte';
-	import ATopRequests from './a-top-requests.svelte';
-	import ATopThroughput from './a-top-throughput.svelte';
-	import BEngineInfo from './b-engine-info.svelte';
-	import BGpuMemory from './b-gpu-memory.svelte';
-	import BMemoryUsage from './b-memory-usage.svelte';
 	import BPodHealth from './b-pod-health.svelte';
-	import CGenerationSizeHeatmap from './c-generation-size-heatmap.svelte';
-	import CPrefillDecode from './c-prefill-decode.svelte';
-	import CPrefixCacheHit from './c-prefix-cache-hit.svelte';
-	import CPromptSizeHeatmap from './c-prompt-size-heatmap.svelte';
-	import CTokensPerReplica from './c-tokens-per-replica.svelte';
-	import DActiveRequests from './d-active-requests.svelte';
-	import DKvCache from './d-kv-cache.svelte';
-	import DThroughput from './d-throughput.svelte';
-	import DTimePerOutputToken from './d-time-per-output-token.svelte';
-	import DTimeToFirstToken from './d-time-to-first-token.svelte';
-	import PlaceholderCard from './placeholder-card.svelte';
+	import HistoryView from './history/history-view.svelte';
+	import { fetchModelPods, type ModelPods } from './lib/model-pods';
+	import { engineVersion } from './lib/pods';
+	import { pickModel, quietState, type RankedModel, type RankTab } from './lib/ranking';
+	import ModelHeading from './model-heading.svelte';
+	import ModelRanking from './model-ranking.svelte';
+	import EngineConfig from './now/engine-config.svelte';
+	import NowCards from './now/now-cards.svelte';
+	import PodsTable from './now/pods-table.svelte';
 
+	// The Analytics tab: a ranking that is also the picker, then the picked model as it is now or
+	// over the chosen window, arranged by four questions: is it slow, busy, why, and the hardware.
 	let {
 		cluster,
 		namespace,
 		client,
-		selectedModel = $bindable(),
+		shared,
+		history,
+		tick,
 		start,
 		end,
-		endIsNow,
-		shared,
-		isReloading = $bindable()
+		windowLabel,
+		selected = $bindable(),
+		tab = $bindable(),
+		deployHref,
+		onLonger
 	}: {
 		cluster: string;
-		namespace: string | undefined;
+		/** '' for every namespace. */
+		namespace: string;
 		client: PrometheusDriver;
-		selectedModel: string | undefined;
+		shared: SharedMetrics;
+		history: boolean;
+		/** Bumped by Auto update; Now cards refetch on it. */
+		tick: number;
 		start: Date;
 		end: Date;
-		endIsNow: boolean;
-		/** The shared scope the GPU panels ask, as the Workspace's member. */
-		shared: SharedMetrics;
-		isReloading?: boolean;
+		windowLabel: string;
+		/** `namespace/id` of the picked model (a bare id from an older link is resolved). */
+		selected: string | undefined;
+		tab: RankTab;
+		/** AI Studio's Model list, for the empty state. */
+		deployHref?: string;
+		/** Widen History's window, for the empty state; absent when it cannot grow. */
+		onLonger?: () => void;
 	} = $props();
 
-	const modelFilter = $derived(selectedModel ?? '.*');
-	const hasModelSelected = $derived(modelFilter !== '.*');
+	const transport = getContext<Transport>('transport');
+	const resources = createClient(ResourceService, transport);
 
-	function selectModel(model: string) {
-		selectedModel = model;
+	let models = $state.raw<RankedModel[]>([]);
+	let answered = $state(false);
+	function onRows(rows: RankedModel[]) {
+		models = rows;
+		answered = true;
+		const pick = pickModel(
+			rows.map((r) => r.key),
+			selected
+		);
+		if (pick !== selected) selected = pick;
 	}
+	const current = $derived(models.find((r) => r.key === selected));
+	const quiet = $derived(current ? quietState(current) : undefined);
+
+	// The picked model's pods, shared by the heading, the Pods table, Health, Engine and History.
+	const pods = new Loader<ModelPods>(() =>
+		selected ? fetchModelPods(resources, client, cluster, selected) : Promise.resolve(null)
+	);
+	// Which model the pod list belongs to; plain, since only the effect below reads it.
+	let podsFor: string | undefined;
+	const hasCurrent = $derived(current !== undefined);
+	$effect(() => {
+		const key = selected;
+		void tick;
+		if (!key || !hasCurrent) return;
+		untrack(async () => {
+			if (podsFor !== key) {
+				podsFor = key;
+				pods.data = undefined;
+				pods.state = 'loading';
+			}
+			await pods.load();
+		});
+	});
+	const podsState = $derived<'loading' | 'ready' | 'error'>(
+		pods.state === 'loading' ? 'loading' : pods.state === 'error' ? 'error' : 'ready'
+	);
+	const version = $derived(
+		engineVersion(
+			(pods.data?.pods.find((p) => p.status.key === 'running' && p.image) ?? pods.data?.pods[0])
+				?.image
+		)
+	);
+	/** A short fade from placeholder to content; none for anyone who asks for less motion. */
+	const reveal = $derived({ duration: prefersReducedMotion.current ? 0 : 150 });
+	const rangeKey = $derived(`${start.getTime()}-${end.getTime()}`);
 </script>
 
-<div class="flex flex-col gap-6 pt-4">
-	<section class="flex flex-col gap-3">
-		<h2 class="text-lg font-semibold">{m.section_model_comparison()}</h2>
-		<!-- Four columns only from xl: at lg a quarter-width card is too narrow for a bar list
-		     with a value column, so the row folds to 2×2 first. Section B mirrors this. -->
-		<div class="grid w-full gap-4 md:grid-cols-2 xl:grid-cols-4">
-			<ATopThroughput
-				prometheusDriver={client}
-				{namespace}
-				isReloading={isReloading ?? false}
-				onModelClick={selectModel}
-			/>
-			<ATopRequests
-				prometheusDriver={client}
-				{namespace}
-				isReloading={isReloading ?? false}
-				onModelClick={selectModel}
-			/>
-			<ATopKvPressure
-				prometheusDriver={client}
-				{namespace}
-				isReloading={isReloading ?? false}
-				onModelClick={selectModel}
-			/>
-			<ATopP99Latency
-				prometheusDriver={client}
-				{namespace}
-				isReloading={isReloading ?? false}
-				onModelClick={selectModel}
-			/>
+{#snippet pending()}
+	<!-- Same footprint as the Now detail while the ranking is still loading. -->
+	<div class="flex flex-col gap-2 @md:gap-3">
+		<Skeleton class="mt-3 h-7 w-64" />
+		<div class="grid grid-cols-1 gap-2 @sm:grid-cols-2 @md:gap-3 @2xl:grid-cols-3 @5xl:grid-cols-5">
+			{#each [m.model_analytics_rps(), m.model_analytics_gen_tps(), m.model_analytics_kv_cache(), m.model_analytics_ttft_p95(), m.model_analytics_tpot_p95()] as label (label)}
+				<Tile {label} state="loading" />
+			{/each}
 		</div>
-	</section>
+		<Skeleton class="h-40 w-full rounded-2xl bg-card shadow-(--card-frame)" />
+	</div>
+{/snippet}
 
-	{#key modelFilter}
-		<section class="flex flex-col gap-3">
-			<h2 class="text-lg font-semibold">{m.section_pod_hardware()}</h2>
-			{#if !hasModelSelected}
-				<PlaceholderCard
-					title={m.section_pod_hardware()}
-					message={m.select_model_to_view_details()}
-				/>
-			{:else}
-				<div class="grid w-full items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
-					<BEngineInfo
-						{namespace}
-						prometheusDriver={client}
-						selectedModel={modelFilter}
-						isReloading={isReloading ?? false}
-					/>
-					<BPodHealth
-						{namespace}
-						prometheusDriver={client}
-						selectedModel={modelFilter}
-						isReloading={isReloading ?? false}
-						{shared}
-					/>
-					<BMemoryUsage
-						{namespace}
-						prometheusDriver={client}
-						selectedModel={modelFilter}
-						{start}
-						{end}
-						{endIsNow}
-						isReloading={isReloading ?? false}
-					/>
-					<BGpuMemory
-						{namespace}
-						prometheusDriver={client}
-						{shared}
-						selectedModel={modelFilter}
-						{start}
-						{end}
-						{endIsNow}
-						isReloading={isReloading ?? false}
-					/>
-				</div>
-			{/if}
-		</section>
+<!-- `@container`: every layout below follows this element's width, not the viewport's. -->
+<div class="@container flex flex-col gap-2 pt-3 @md:gap-3">
+	<ModelRanking
+		{client}
+		{cluster}
+		{namespace}
+		{tick}
+		{history}
+		{start}
+		{end}
+		{windowLabel}
+		bind:tab
+		{selected}
+		onSelect={(key) => (selected = key)}
+		{onRows}
+		{deployHref}
+		onLonger={history ? onLonger : undefined}
+	/>
 
-		<section class="flex flex-col gap-3">
-			<h2 class="text-lg font-semibold">{m.section_tuning_decision()}</h2>
-			{#if !hasModelSelected}
-				<PlaceholderCard
-					title={m.section_tuning_decision()}
-					message={m.select_model_to_view_details()}
-				/>
-			{:else}
-				<div class="grid w-full items-start gap-4 lg:grid-cols-2">
-					<CPrefillDecode
-						{namespace}
-						prometheusDriver={client}
-						selectedModel={modelFilter}
-						{start}
-						{end}
-						{endIsNow}
-						isReloading={isReloading ?? false}
+	{#if current && selected}
+		{#key selected}
+			<!-- The picked model fades in over its placeholder rather than cutting to it. -->
+			<div class="flex flex-col gap-2" in:fade|global={reveal}>
+				<ModelHeading row={current} {version} versionLoading={podsState === 'loading'} />
+				{#if history}
+					{#if !quiet}
+						{#key rangeKey}
+							<HistoryView {client} {shared} modelKey={selected} model={pods.data} {start} {end} />
+						{/key}
+					{/if}
+				{:else}
+					<NowCards {client} modelKey={selected} {tick} {quiet} />
+					<PodsTable
+						{client}
+						{shared}
+						modelKey={selected}
+						model={pods.data}
+						modelState={podsState}
 					/>
-					<CPrefixCacheHit
-						{namespace}
-						prometheusDriver={client}
-						selectedModel={modelFilter}
-						{start}
-						{end}
-						{endIsNow}
-						isReloading={isReloading ?? false}
-					/>
-					<CPromptSizeHeatmap
-						{namespace}
-						prometheusDriver={client}
-						selectedModel={modelFilter}
-						{start}
-						{end}
-						{endIsNow}
-						isReloading={isReloading ?? false}
-					/>
-					<CGenerationSizeHeatmap
-						{namespace}
-						prometheusDriver={client}
-						selectedModel={modelFilter}
-						{start}
-						{end}
-						{endIsNow}
-						isReloading={isReloading ?? false}
-					/>
-					<div class="lg:col-span-2">
-						<CTokensPerReplica
-							{namespace}
-							prometheusDriver={client}
-							selectedModel={modelFilter}
-							{start}
-							{end}
-							{endIsNow}
-							isReloading={isReloading ?? false}
+					<!-- Side by side and the same height; stacked at 900px and below. -->
+					<div
+						class="grid grid-cols-1 items-stretch gap-2 min-[901px]:grid-cols-[minmax(280px,1fr)_minmax(0,2fr)] @md:gap-3"
+					>
+						<BPodHealth
+							{client}
+							{shared}
+							modelKey={selected}
+							model={pods.data}
+							modelState={podsState}
+						/>
+						<EngineConfig
+							{client}
+							modelKey={selected}
+							{tick}
+							model={pods.data}
+							modelState={podsState}
 						/>
 					</div>
-				</div>
-			{/if}
-		</section>
-
-		<section class="flex flex-col gap-3">
-			<h2 class="text-lg font-semibold">{m.section_model_detail()}</h2>
-			{#if !hasModelSelected}
-				<PlaceholderCard
-					title={m.section_model_detail()}
-					message={m.select_model_to_view_details()}
-				/>
-			{:else}
-				<div class="grid w-full items-start gap-4 lg:grid-cols-2">
-					<DTimeToFirstToken
-						{cluster}
-						{namespace}
-						prometheusDriver={client}
-						selectedModel={modelFilter}
-						{start}
-						{end}
-						{endIsNow}
-						isReloading={isReloading ?? false}
-					/>
-					<DTimePerOutputToken
-						{cluster}
-						{namespace}
-						prometheusDriver={client}
-						selectedModel={modelFilter}
-						{start}
-						{end}
-						{endIsNow}
-						isReloading={isReloading ?? false}
-					/>
-					<DActiveRequests
-						{namespace}
-						prometheusDriver={client}
-						selectedModel={modelFilter}
-						{start}
-						{end}
-						{endIsNow}
-						isReloading={isReloading ?? false}
-					/>
-					<DKvCache
-						{namespace}
-						prometheusDriver={client}
-						selectedModel={modelFilter}
-						{start}
-						{end}
-						{endIsNow}
-						isReloading={isReloading ?? false}
-					/>
-					<div class="lg:col-span-2">
-						<DThroughput
-							{namespace}
-							prometheusDriver={client}
-							selectedModel={modelFilter}
-							{start}
-							{end}
-							{endIsNow}
-							isReloading={isReloading ?? false}
-						/>
-					</div>
-				</div>
-			{/if}
-		</section>
-	{/key}
+				{/if}
+			</div>
+		{/key}
+	{:else if !answered}
+		{@render pending()}
+	{/if}
 </div>
