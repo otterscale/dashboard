@@ -101,7 +101,7 @@
 	let handoffOpen = $state(false);
 
 	async function listTemplates(): Promise<ModelTemplateObject[]> {
-		const modelLabel = entry.metadata?.labels?.['template.otterscale.io/model'];
+		const modelLabel = entry.metadata?.labels?.['template.phison.com/model'];
 		if (!modelLabel) return [];
 		const items: ModelTemplateObject[] = [];
 		let continueToken: string | undefined = undefined;
@@ -112,7 +112,7 @@
 				group,
 				version,
 				resource,
-				labelSelector: `template.otterscale.io/template-role=deployment,template.otterscale.io/model=${modelLabel}`,
+				labelSelector: `template.phison.com/template-role=deployment,template.phison.com/model=${modelLabel}`,
 				continue: continueToken
 			} as ListRequest);
 			continueToken = response.continue;
