@@ -34,30 +34,30 @@ function generated(options: {
 			name,
 			namespace: 'otterscale-system',
 			labels: {
-				'template.otterscale.io/template-role': 'deployment',
-				'template.otterscale.io/model': 'qwen3-8-27b',
-				'template.otterscale.io/workload': workload,
-				'template.otterscale.io/gpu-type': 'NVIDIA-RTX-PRO-6000-Blackwell-Server-Edition',
-				'template.otterscale.io/gpus-per-replica': gpus,
-				'template.otterscale.io/replicas': String(replicas),
-				'template.otterscale.io/kv-cache-offload': String(offload),
-				'template.otterscale.io/precise-prefix-cache-routing': String(routing),
-				'template.otterscale.io/vendor': 'Qwen'
+				'template.phison.com/template-role': 'deployment',
+				'template.phison.com/model': 'qwen3-8-27b',
+				'template.phison.com/workload': workload,
+				'template.phison.com/gpu-type': 'NVIDIA-RTX-PRO-6000-Blackwell-Server-Edition',
+				'template.phison.com/gpus-per-replica': gpus,
+				'template.phison.com/replicas': String(replicas),
+				'template.phison.com/kv-cache-offload': String(offload),
+				'template.phison.com/precise-prefix-cache-routing': String(routing),
+				'template.phison.com/vendor': 'Qwen'
 			},
 			annotations: {
-				'template.otterscale.io/gpu-type': 'NVIDIA RTX PRO 6000 Blackwell Server Edition',
-				'template.otterscale.io/vllm-version': '0.33.0',
-				'template.otterscale.io/max-model-len': String(maxModelLen),
-				'template.otterscale.io/concurrency': '11',
-				'template.otterscale.io/gpu-usage': '2 x 1/2 GPU, 95.6 GiB VRAM',
-				'template.otterscale.io/tensor-parallel-size': '1',
-				'template.otterscale.io/provisional': 'true',
+				'template.phison.com/gpu-type': 'NVIDIA RTX PRO 6000 Blackwell Server Edition',
+				'template.phison.com/vllm-version': '0.33.0',
+				'template.phison.com/max-model-len': String(maxModelLen),
+				'template.phison.com/concurrency': '11',
+				'template.phison.com/gpu-usage': '2 x 1/2 GPU, 95.6 GiB VRAM',
+				'template.phison.com/tensor-parallel-size': '1',
+				'template.phison.com/provisional': 'true',
 				...(offload
 					? {
-							'template.otterscale.io/gpu-kv-cache-gibibytes': '11',
-							'template.otterscale.io/kv-offload-cpu-gibibytes': '22',
-							'template.otterscale.io/kv-offload-storage-default-gibibytes': '44',
-							'template.otterscale.io/kv-offload-storage-minimum-gibibytes': '44'
+							'template.phison.com/gpu-kv-cache-gibibytes': '11',
+							'template.phison.com/kv-offload-cpu-gibibytes': '22',
+							'template.phison.com/kv-offload-storage-default-gibibytes': '44',
+							'template.phison.com/kv-offload-storage-minimum-gibibytes': '44'
 						}
 					: {})
 			}
@@ -79,13 +79,13 @@ const entry: ModelTemplateObject = {
 		name: 'qwen3-8-27b',
 		namespace: 'otterscale-system',
 		labels: {
-			'template.otterscale.io/template-role': 'model',
-			'template.otterscale.io/model': 'qwen3-8-27b'
+			'template.phison.com/template-role': 'model',
+			'template.phison.com/model': 'qwen3-8-27b'
 		},
 		annotations: {
-			'template.otterscale.io/model-name': 'Qwen3.8 27B',
-			'template.otterscale.io/vendor': 'Alibaba',
-			'template.otterscale.io/description': 'Hybrid-architecture 27B model.'
+			'template.phison.com/model-name': 'Qwen3.8 27B',
+			'template.phison.com/vendor': 'Alibaba',
+			'template.phison.com/description': 'Hybrid-architecture 27B model.'
 		}
 	},
 	spec: { model: { uri: 'pvc://qwen-models/Qwen3.8-27B', name: 'qwen3-8-27b' } }
@@ -143,14 +143,14 @@ describe('buildTemplateDict', () => {
 
 	it('skips a template missing one of the labels', () => {
 		const incomplete = generated({ workload: 'agent', offload: false });
-		delete incomplete.metadata!.labels!['template.otterscale.io/kv-cache-offload'];
+		delete incomplete.metadata!.labels!['template.phison.com/kv-cache-offload'];
 		const dict = buildTemplateDict([incomplete]);
 		expect(workloadOptions(dict)).toEqual([]);
 	});
 
 	it('defaults a missing routing label to false', () => {
 		const object = generated({ workload: 'agent', offload: false });
-		delete object.metadata!.labels!['template.otterscale.io/precise-prefix-cache-routing'];
+		delete object.metadata!.labels!['template.phison.com/precise-prefix-cache-routing'];
 		const dict = buildTemplateDict([object]);
 		expect(routingOptions(dict, 'agent', GPU, '1', '1', 'false')).toEqual(['false']);
 	});
@@ -159,7 +159,7 @@ describe('buildTemplateDict', () => {
 		const templates = ['2', 'one-half', '1', 'one-quarter', '1of3', '10'].map((gpus) => {
 			const object = generated({ workload: 'agent', offload: false });
 			object.metadata!.name = `fraction-${gpus}`;
-			object.metadata!.labels!['template.otterscale.io/gpus-per-replica'] = gpus;
+			object.metadata!.labels!['template.phison.com/gpus-per-replica'] = gpus;
 			return object;
 		});
 		const dict = buildTemplateDict(templates);
@@ -269,7 +269,7 @@ describe('templateResources', () => {
 			templateResources({
 				metadata: {
 					annotations: {
-						'template.otterscale.io/gpu-usage': '2 GPUs, 191.2 GiB VRAM'
+						'template.phison.com/gpu-usage': '2 GPUs, 191.2 GiB VRAM'
 					}
 				},
 				spec: {
@@ -293,7 +293,7 @@ describe('templateResources', () => {
 	it('keeps an unsplittable gpu-usage as the GPU share and handles missing values', () => {
 		expect(
 			templateResources({
-				metadata: { annotations: { 'template.otterscale.io/gpu-usage': '1 GPU' } },
+				metadata: { annotations: { 'template.phison.com/gpu-usage': '1 GPU' } },
 				spec: {}
 			})
 		).toEqual({ cpu: null, memory: null, gpu: '1 GPU', vram: null });
@@ -324,7 +324,7 @@ describe('GPU amounts', () => {
 			'NVIDIA RTX PRO 6000 Blackwell Server Edition'
 		);
 		const bare = generated({ workload: 'agent', offload: false });
-		delete bare.metadata!.annotations!['template.otterscale.io/gpu-type'];
+		delete bare.metadata!.annotations!['template.phison.com/gpu-type'];
 		expect(gpuProductLabel(buildTemplateDict([bare]), 'agent', GPU)).toBe(GPU);
 	});
 

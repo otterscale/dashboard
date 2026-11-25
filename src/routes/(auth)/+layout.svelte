@@ -309,15 +309,20 @@
 							fieldSelector: 'metadata.namespace!=kserve,metadata.namespace!=otterscale-system'
 						})
 					},
-					{
-						title: m.model_template(),
-						url: page.params.workspace
-							? resolve('/(auth)/[cluster]/[workspace]/model-templates', {
-									cluster: activeCluster,
-									workspace: page.params.workspace
-								})
-							: ''
-					},
+					// Model templates are a licensed feature: only show with a valid license.
+					...(page.data.isRestricted
+						? []
+						: [
+								{
+									title: m.model_template(),
+									url: page.params.workspace
+										? resolve('/(auth)/[cluster]/[workspace]/model-templates', {
+												cluster: activeCluster,
+												workspace: page.params.workspace
+											})
+										: ''
+								}
+							]),
 					{
 						title: m.api_key(),
 						url: resourceUrl({
