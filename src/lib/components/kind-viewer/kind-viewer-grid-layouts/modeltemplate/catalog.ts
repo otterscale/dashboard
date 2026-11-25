@@ -82,24 +82,21 @@ function annotationNumber(object: ModelTemplateObject, key: string): number | nu
 function readDetails(object: ModelTemplateObject): TemplateDetails {
 	const annotations = object.metadata?.annotations ?? {};
 	return {
-		maxModelLen: annotationNumber(object, 'template.otterscale.io/max-model-len'),
-		concurrency: annotationNumber(object, 'template.otterscale.io/concurrency'),
-		provisional: annotations['template.otterscale.io/provisional'] === 'true',
-		vllmVersion: annotations['template.otterscale.io/vllm-version']?.trim() || null,
-		tensorParallelSize: annotationNumber(object, 'template.otterscale.io/tensor-parallel-size'),
-		gpuUsage: annotations['template.otterscale.io/gpu-usage']?.trim() || null,
-		gpuKvCacheGibibytes: annotationNumber(object, 'template.otterscale.io/gpu-kv-cache-gibibytes'),
-		kvOffloadCpuGibibytes: annotationNumber(
-			object,
-			'template.otterscale.io/kv-offload-cpu-gibibytes'
-		),
+		maxModelLen: annotationNumber(object, 'template.phison.com/max-model-len'),
+		concurrency: annotationNumber(object, 'template.phison.com/concurrency'),
+		provisional: annotations['template.phison.com/provisional'] === 'true',
+		vllmVersion: annotations['template.phison.com/vllm-version']?.trim() || null,
+		tensorParallelSize: annotationNumber(object, 'template.phison.com/tensor-parallel-size'),
+		gpuUsage: annotations['template.phison.com/gpu-usage']?.trim() || null,
+		gpuKvCacheGibibytes: annotationNumber(object, 'template.phison.com/gpu-kv-cache-gibibytes'),
+		kvOffloadCpuGibibytes: annotationNumber(object, 'template.phison.com/kv-offload-cpu-gibibytes'),
 		kvOffloadStorageDefaultGibibytes: annotationNumber(
 			object,
-			'template.otterscale.io/kv-offload-storage-default-gibibytes'
+			'template.phison.com/kv-offload-storage-default-gibibytes'
 		),
 		kvOffloadStorageMinimumGibibytes: annotationNumber(
 			object,
-			'template.otterscale.io/kv-offload-storage-minimum-gibibytes'
+			'template.phison.com/kv-offload-storage-minimum-gibibytes'
 		)
 	};
 }
@@ -108,12 +105,12 @@ export function buildTemplateDict(templates: ModelTemplateObject[]): TemplateDic
 	const dict: TemplateDict = {};
 	for (const object of templates) {
 		const labels = object.metadata?.labels ?? {};
-		const workload = labels['template.otterscale.io/workload'];
-		const gpu = labels['template.otterscale.io/gpu-type'];
-		const gpus = labels['template.otterscale.io/gpus-per-replica'];
-		const replicas = labels['template.otterscale.io/replicas'];
-		const kvOffload = labels['template.otterscale.io/kv-cache-offload'];
-		const routing = labels['template.otterscale.io/precise-prefix-cache-routing'] ?? 'false';
+		const workload = labels['template.phison.com/workload'];
+		const gpu = labels['template.phison.com/gpu-type'];
+		const gpus = labels['template.phison.com/gpus-per-replica'];
+		const replicas = labels['template.phison.com/replicas'];
+		const kvOffload = labels['template.phison.com/kv-cache-offload'];
+		const routing = labels['template.phison.com/precise-prefix-cache-routing'] ?? 'false';
 		if (!workload || !gpu || !gpus || !replicas || !kvOffload) continue;
 		const template: ModelTemplate = {
 			name: object.metadata?.name ?? '',
@@ -240,7 +237,7 @@ export function gpuProductLabel(dict: TemplateDict, workload: string, gpu: strin
 				for (const bucket of Object.values(byRouting))
 					for (const template of bucket) {
 						const product =
-							template.object.metadata?.annotations?.['template.otterscale.io/gpu-type']?.trim();
+							template.object.metadata?.annotations?.['template.phison.com/gpu-type']?.trim();
 						if (product) return product;
 					}
 	return gpu;
@@ -343,12 +340,12 @@ export function describeEntry(object: ModelTemplateObject): EntrySummary {
 		name,
 		namespace: object.metadata?.namespace ?? '',
 		modelName:
-			annotations['template.otterscale.io/model-name']?.trim() ||
+			annotations['template.phison.com/model-name']?.trim() ||
 			object.spec?.model?.name?.trim() ||
 			name,
-		vendor: annotations['template.otterscale.io/vendor']?.trim() || null,
+		vendor: annotations['template.phison.com/vendor']?.trim() || null,
 		modelUri: object.spec?.model?.uri?.trim() || null,
-		description: annotations['template.otterscale.io/description']?.trim() || null
+		description: annotations['template.phison.com/description']?.trim() || null
 	};
 }
 
@@ -370,7 +367,7 @@ export function templateResources(object: ModelTemplateObject): TemplateResource
 		const raw = requests[key] ?? limits[key];
 		return raw === undefined ? null : String(raw);
 	};
-	const usage = object.metadata?.annotations?.['template.otterscale.io/gpu-usage']?.trim();
+	const usage = object.metadata?.annotations?.['template.phison.com/gpu-usage']?.trim();
 	let gpu: string | null = null;
 	let vram: string | null = null;
 	if (usage) {

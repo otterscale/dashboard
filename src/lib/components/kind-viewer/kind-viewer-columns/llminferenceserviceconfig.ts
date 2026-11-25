@@ -57,8 +57,7 @@ function getLLMInferenceServiceConfigData(
 		Namespace: object?.metadata?.namespace ?? null,
 		'Model Name': object?.spec?.model?.name ?? null,
 		'Model URI': object?.spec?.model?.uri ?? null,
-		Description:
-			object?.metadata?.annotations?.['template.otterscale.io/description']?.trim() || null,
+		Description: object?.metadata?.annotations?.['template.phison.com/description']?.trim() || null,
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
 	};
