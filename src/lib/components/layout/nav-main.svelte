@@ -73,7 +73,9 @@
 		onValueChange={(value) => (activeIndex = Number(value))}
 		class="group-data-[collapsible=icon]:hidden"
 	>
-		<Tabs.List class="w-full">
+		<!-- No track: the unselected tab sits on the sidebar itself, the selected one is a white
+		     chip with a soft shadow. -->
+		<Tabs.List class="w-full bg-transparent">
 			{#each views as view, index (index)}
 				<Tabs.Trigger value={String(index)}>
 					{view.label}
