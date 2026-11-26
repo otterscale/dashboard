@@ -52,6 +52,14 @@
 	const steps = Array.from({ length: 4 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 
+	// Written to maas.phison.com/api-schema; picks the AIServiceBackend.
+	const apiSchemas = ['OpenAI', 'Cohere'];
+
+	function getAPISchema(config: ServingKserveIoV1Alpha2LLMInferenceServiceConfig): string {
+		const value = config.metadata?.annotations?.['maas.phison.com/api-schema']?.toLowerCase();
+		return apiSchemas.find((apiSchema) => apiSchema.toLowerCase() === value) ?? apiSchemas[0];
+	}
+
 	type GPUDevice = { type: string; node: string };
 
 	function getComputeResources(nodes: NodeInfo[]): GPUDevice[] {
@@ -269,6 +277,13 @@
 									) as Schema,
 									['description']
 								)
+							},
+							apiSchema: {
+								type: 'string',
+								title: 'AI Provider',
+								description:
+									'The provider API the gateway serves this model with. Rerankers need Cohere.',
+								enum: apiSchemas
 							}
 						}
 					} as Schema}
@@ -277,9 +292,17 @@
 							translations: {
 								submit: 'Next'
 							}
+						},
+						apiSchema: {
+							'ui:components': {
+								stringField: 'enumField'
+							}
 						}
 					} as UiSchemaRoot}
-					initialValue={{ uri: lodash.get(object, 'spec.model.uri', '') } as FormValue}
+					initialValue={{
+						uri: lodash.get(object, 'spec.model.uri', ''),
+						apiSchema: getAPISchema(object)
+					} as FormValue}
 					handleSubmit={{
 						posthook: (form) => {
 							const formValue = getValueSnapshot(form);
@@ -288,6 +311,11 @@
 								...lodash.omit(lodash.get(object, ['spec', 'model'], {}), ['uri']),
 								uri: lodash.get(formValue, 'uri', '')
 							});
+							lodash.set(
+								values,
+								['metadata', 'annotations', 'maas.phison.com/api-schema'],
+								lodash.get(formValue, 'apiSchema', apiSchemas[0])
+							);
 
 							handleNext();
 						}
