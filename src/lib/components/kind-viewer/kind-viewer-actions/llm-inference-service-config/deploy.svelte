@@ -197,16 +197,6 @@
 							name: {
 								...(lodash.get(jsonSchema, 'properties.metadata.properties.name') as Schema),
 								title: 'Name'
-							},
-							public: {
-								type: 'boolean',
-								title: 'Public',
-								default:
-									String(
-										lodash.get(object, ['metadata', 'annotations', 'maas.phison.com/public'], '')
-									).toLowerCase() === 'true',
-								description:
-									'When enabled, anyone who can reach the gateway can call this model without an API key.'
 							}
 						}
 					} as Schema}
@@ -230,12 +220,6 @@
 									...lodash.get(object, ['metadata', 'annotations'], {})
 								}
 							});
-
-							if (lodash.get(formValue, ['public'], false) === true) {
-								lodash.set(values, ['metadata', 'annotations', 'maas.phison.com/public'], 'true');
-							} else {
-								lodash.unset(values, ['metadata', 'annotations', 'maas.phison.com/public']);
-							}
 
 							lodash.set(
 								values,

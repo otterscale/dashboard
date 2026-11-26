@@ -38,7 +38,6 @@ type LLMInferenceServiceConfigAttribute =
 	| 'Namespace'
 	| 'Model Name'
 	| 'Model URI'
-	| 'Description'
 	| 'Status'
 	| 'Usage'
 	| 'Referenced By'
@@ -54,7 +53,6 @@ function getLLMInferenceServiceConfigDataSchemas(): Record<
 		Namespace: 'text',
 		'Model Name': 'text',
 		'Model URI': 'text',
-		Description: 'text',
 		Status: 'text',
 		Usage: 'text',
 		'Referenced By': 'number',
@@ -74,7 +72,6 @@ function getLLMInferenceServiceConfigData(
 		Namespace: object?.metadata?.namespace ?? null,
 		'Model Name': object?.spec?.model?.name ?? null,
 		'Model URI': object?.spec?.model?.uri ?? null,
-		Description: object?.metadata?.annotations?.['template.phison.com/description']?.trim() || null,
 		Status:
 			readyCondition?.status === 'True'
 				? 'Ready'
@@ -102,7 +99,6 @@ function getLLMInferenceServiceConfigUISchemas(): Record<
 		Namespace: 'text',
 		'Model Name': 'text',
 		'Model URI': 'text',
-		Description: 'text',
 		Status: 'text',
 		Usage: 'text',
 		'Referenced By': 'array-of-object',
@@ -224,31 +220,6 @@ function getLLMInferenceServiceConfigColumnDefinitions(
 					uiSchemas: uiSchemas
 				}),
 			accessorKey: 'Model URI'
-		},
-		{
-			id: 'Description',
-			header: ({
-				column
-			}: {
-				column: Column<Record<LLMInferenceServiceConfigAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableHeader, {
-					column: column,
-					dataSchemas: dataSchemas
-				}),
-			cell: ({
-				column,
-				row
-			}: {
-				column: Column<Record<LLMInferenceServiceConfigAttribute, JsonValue>>;
-				row: Row<Record<LLMInferenceServiceConfigAttribute, JsonValue>>;
-			}) =>
-				renderComponent(DynamicTableCell, {
-					row: row,
-					column: column,
-					uiSchemas: uiSchemas
-				}),
-			accessorKey: 'Description'
 		},
 		{
 			id: 'Status',

@@ -119,7 +119,7 @@
 		};
 	}
 
-	const steps = Array.from({ length: 3 }, (_, index) => String(index + 1));
+	const steps = Array.from({ length: 2 }, (_, index) => String(index + 1));
 	const [firstStep] = steps;
 	let currentStep = $state(firstStep);
 	const currentIndex = $derived(steps.indexOf(currentStep));
@@ -174,59 +174,8 @@
 			</Item.Content>
 		</Item.Root>
 		<Tabs.Root value={currentStep}>
-			<!-- Step 1: Access -->
+			<!-- Step 1: Workload Placement -->
 			<Tabs.Content value={steps[0]}>
-				<Form
-					schema={{
-						title: 'Access',
-						type: 'object',
-						properties: {
-							public: {
-								type: 'boolean',
-								title: 'Public',
-								description:
-									'When enabled, anyone who can reach the gateway can call this model without an API key.'
-							}
-						}
-					} as Schema}
-					uiSchema={{
-						'ui:options': {
-							translations: {
-								submit: 'Next'
-							}
-						}
-					} as UiSchemaRoot}
-					initialValue={{
-						public:
-							String(
-								lodash.get(values, ['metadata', 'annotations', 'maas.phison.com/public'], '')
-							).toLowerCase() === 'true'
-					} as FormValue}
-					handleSubmit={{
-						posthook: (form) => {
-							const formValue = getValueSnapshot(form);
-
-							if (lodash.get(formValue, 'public', false) === true) {
-								lodash.set(values, ['metadata', 'annotations', 'maas.phison.com/public'], 'true');
-							} else {
-								lodash.unset(values, ['metadata', 'annotations', 'maas.phison.com/public']);
-							}
-
-							handleNext();
-						}
-					}}
-				>
-					{#snippet actions()}
-						<div class="flex w-full items-center justify-between gap-3">
-							<Button disabled>Previous</Button>
-							<SubmitButton />
-						</div>
-					{/snippet}
-				</Form>
-			</Tabs.Content>
-
-			<!-- Step 2: Workload Placement -->
-			<Tabs.Content value={steps[1]}>
 				{#await fetchAllGpuNodes(resourceClient, cluster)}
 					<Empty.Root>
 						<Empty.Header>
@@ -456,8 +405,8 @@
 				{/await}
 			</Tabs.Content>
 
-			<!-- Step 3: YAML Review + Submit -->
-			<Tabs.Content value={steps[2]} class="min-h-[77vh]">
+			<!-- Step 2: YAML Review + Submit -->
+			<Tabs.Content value={steps[1]} class="min-h-[77vh]">
 				<div class="flex h-full flex-col gap-3">
 					<Monaco
 						options={{

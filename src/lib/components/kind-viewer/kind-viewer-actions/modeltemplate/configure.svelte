@@ -99,7 +99,6 @@
 		$state(undefined);
 	let pendingAction: ConfigureAction | undefined = $state(undefined);
 	let handoffOpen = $state(false);
-	let isPublic = $state(false);
 	let apiSchema = $state('OpenAI');
 	/** Set when the deploy wizard hands back, so reopening keeps the choices. */
 	let returning = false;
@@ -161,7 +160,6 @@
 				kvOffload: 'false',
 				routing: 'false'
 			};
-			isPublic = false;
 			apiSchema = 'OpenAI';
 			loadTemplates();
 		});
@@ -435,20 +433,6 @@
 							</Select.Content>
 						</Select.Root>
 					</Field.Field>
-
-					<Field.Field orientation="horizontal">
-						<Field.Content>
-							<Field.Label for="public-access">Public</Field.Label>
-							<Field.Description>
-								Anyone who can reach the gateway can call this model without an API key.
-							</Field.Description>
-						</Field.Content>
-						<Switch
-							id="public-access"
-							checked={isPublic}
-							onCheckedChange={(checked) => (isPublic = checked)}
-						/>
-					</Field.Field>
 				{/if}
 			</Field.Group>
 
@@ -576,7 +560,6 @@
 		{cluster}
 		{namespace}
 		{schema}
-		{isPublic}
 		{apiSchema}
 		onBack={() => {
 			returning = true;
