@@ -103,7 +103,7 @@
 	>
 		{#snippet actions()}
 			{#if groups}
-				<span class="mt-1.5 mr-1 text-xs whitespace-nowrap text-muted-foreground {NUM}"
+				<span class={cn('mt-1.5 mr-1 text-xs whitespace-nowrap text-muted-foreground', NUM)}
 					>{m.storage_pgs_total({ count: fmtCount(groups.total) })}</span
 				>
 			{/if}
@@ -113,7 +113,7 @@
 			<Skeleton class="mt-3 h-3.5 w-48" />
 			<div class="mt-auto grid grid-cols-3 gap-4 pt-6">
 				{#each [0, 1, 2] as index (index)}
-					<div class="space-y-2">
+					<div class="flex flex-col gap-2">
 						<Skeleton class="h-3 w-20" />
 						<Skeleton class="h-6 w-14" />
 						<Skeleton class="h-3 w-24" />

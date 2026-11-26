@@ -13,10 +13,14 @@ import type { Vectors } from './vectors';
  * so the server renders the card in its loading state.
  */
 export class InstantPoll {
-	data = $state<Vectors | null>(null);
+	// Only ever replaced whole, so it is not made deeply reactive.
+	data = $state.raw<Vectors | null>(null);
 	loaded = $state(false);
 	failed = $state(false);
 	#manager: ReloadManager;
+	#seq = 0;
+	// The newest request whose answer is on screen.
+	#applied = 0;
 
 	constructor(
 		private readonly client: () => PrometheusDriver,
@@ -26,7 +30,12 @@ export class InstantPoll {
 	}
 
 	async fetch() {
+		const seq = ++this.#seq;
 		const result = await fetchCombinedInstantOrNull(this.client(), this.queries);
+		// A slow answer must not replace a newer one already on screen (the health query looks
+		// back 7 days and can outlast the 10 s interval).
+		if (seq < this.#applied) return;
+		this.#applied = seq;
 		this.failed = result === null;
 		// A failed refresh keeps the last answer on screen.
 		if (result) this.data = result;

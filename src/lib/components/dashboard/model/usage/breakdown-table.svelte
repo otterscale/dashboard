@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { NUM } from '$lib/components/dashboard/kit';
+	import { Chip, NUM } from '$lib/components/dashboard/kit';
 	import * as Table from '$lib/components/ui/table';
 	import { m } from '$lib/messages';
 	import { cn } from '$lib/utils';
 
 	import type { DisplayRow } from './lib/display';
-	import { fmtCount, fmtShare, fmtTokensOrDash } from './lib/format';
+	import { fmtGrouped, fmtShare, fmtTokensOrDash } from './lib/format';
 	import { failedIsHigh, tokensOf } from './lib/usage';
 
 	// What the selected row is made of: its keys, models or people, each as a share of its tokens.
@@ -62,11 +62,7 @@
 									{item.label}
 								</span>
 								{#each item.chips as chip (chip)}
-									<span
-										class="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs leading-4 text-muted-foreground"
-									>
-										{chip}
-									</span>
+									<Chip>{chip}</Chip>
 								{/each}
 								{#if item.aside}
 									<span class="shrink-0 text-xs text-muted-foreground">{item.aside}</span>
@@ -76,7 +72,7 @@
 							</span>
 						</Table.Cell>
 						<Table.Cell class={num}>{fmtShare(tokensOf(t), total)}</Table.Cell>
-						<Table.Cell class={num}>{fmtCount(t.requests)}</Table.Cell>
+						<Table.Cell class={num}>{fmtGrouped(t.requests)}</Table.Cell>
 						<Table.Cell class={num}>{fmtTokensOrDash(t.input)}</Table.Cell>
 						<Table.Cell class={num}>{fmtTokensOrDash(t.cached)}</Table.Cell>
 						<Table.Cell class={num}>{fmtTokensOrDash(t.output)}</Table.Cell>
@@ -84,7 +80,7 @@
 						<Table.Cell
 							class={cn(num, 'pr-0', failedIsHigh(t) ? 'text-chart-1' : 'text-muted-foreground')}
 						>
-							{fmtCount(t.failed)}
+							{fmtGrouped(t.failed)}
 						</Table.Cell>
 					</Table.Row>
 				{/each}

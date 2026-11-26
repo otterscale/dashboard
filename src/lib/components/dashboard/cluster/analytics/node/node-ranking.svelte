@@ -2,13 +2,22 @@
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { untrack } from 'svelte';
 
+	import {
+		byLabel,
+		fetchInstant,
+		fetchRange,
+		rangeLiteral,
+		stepFor
+	} from '$lib/components/dashboard/kit/fetch';
+	import { fmt, fmtPct, pressureText } from '$lib/components/dashboard/kit/format';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
+	import RankingCard, {
+		type RankMetric,
+		type RankRow
+	} from '$lib/components/dashboard/kit/ranking-card.svelte';
 	import { m } from '$lib/messages';
 
-	import { byLabel, fetchInstant, fetchRange, rangeLiteral, stepFor } from '../lib/fetch';
-	import { fmt, fmtPct, pressureText } from '../lib/format';
-	import { Loader } from '../lib/loader.svelte';
 	import { averaged, NODE_FACTS, nodeRankingQueries, nodeTrendQuery } from '../lib/promql';
-	import RankingCard, { type RankMetric, type RankRow } from '../ranking-card.svelte';
 
 	let {
 		client,
@@ -32,7 +41,7 @@
 		selected: string | undefined;
 		onSelect: (node: string) => void;
 		/** The node list in ranking order, so the page can pick a default. */
-		onNodes: (nodes: { name: string; roles: string[]; gpus: number }[]) => void;
+		onNodes: (nodes: { name: string; chips: string[]; gpus: number }[]) => void;
 	} = $props();
 
 	type Node = {
@@ -100,16 +109,20 @@
 		return new Map(r.trend.map((s) => [s.labels.node, s.points.map((p) => p.v)]));
 	});
 
-	// After each answer, tell the page the order so it can preselect the first node.
+	// After each answer, tell the page the order so it can preselect the first node. A first
+	// request that failed answers with no nodes, so the page stops waiting for one.
 	async function refresh() {
 		await values.load();
 		const data = values.data;
-		if (!data) return;
+		if (!data) {
+			if (values.state === 'error') onNodes([]);
+			return;
+		}
 		onNodes(
 			rows
 				.map((r) => data.find((n) => n.name === r.id))
 				.filter((n): n is Node => !!n)
-				.map((n) => ({ name: n.name, roles: n.roles, gpus: n.gpus }))
+				.map((n) => ({ name: n.name, chips: chips(n), gpus: n.gpus }))
 		);
 	}
 
@@ -120,7 +133,11 @@
 	$effect(() => {
 		if (!history) return;
 		void [metric, start.getTime(), end.getTime()];
-		untrack(() => trends.load());
+		// Another metric or window: the lines on screen belong to the old one, so they go first.
+		untrack(() => {
+			trends.reset();
+			trends.load();
+		});
 	});
 
 	const isMaster = (roles: string[]) => roles.some((r) => r === 'control-plane' || r === 'master');
@@ -176,7 +193,9 @@
 	}
 
 	const rows = $derived.by(() => {
-		const list = (values.data ?? []).map(row).sort((a, b) => b.sortKey - a.sortKey);
+		const list = (values.data ?? [])
+			.map(row)
+			.sort((a, b) => b.sortKey - a.sortKey || a.id.localeCompare(b.id));
 		if (metric === 'restarts') {
 			const top = Math.max(1, ...list.map((r) => r.sortKey));
 			for (const r of list) r.bar = { solid: (r.sortKey / top) * 100 };

@@ -6,6 +6,7 @@
 
 	import * as Select from '$lib/components/ui/select';
 	import { m } from '$lib/messages';
+	import { cn } from '$lib/utils';
 
 	// Usage's Workspace choice. An admin picks one Workspace or all of them; a member sees their
 	// own, fixed. The value is the Workspace's namespace, the label its name.
@@ -22,7 +23,7 @@
 	} = $props();
 
 	const transport: Transport = getContext('transport');
-	let options = $state<{ value: string; label: string }[]>([]);
+	let options = $state.raw<{ value: string; label: string }[]>([]);
 
 	onMount(() => {
 		if (fixed) return;
@@ -57,18 +58,21 @@
 				: m.usage_all_workspaces())
 	);
 	const trigger =
-		'inline-flex h-9 max-w-[14rem] items-center gap-2 rounded-full border bg-background px-3.5 text-sm font-medium shadow-xs dark:border-input dark:bg-input/30';
+		'inline-flex h-9 max-w-[14rem] items-center gap-2 rounded-full border bg-background px-3.5 text-sm font-medium shadow-xs';
+	// The fixed pill is not a control, so nothing gives it the dark ground the Select trigger and
+	// the outline buttons beside it bring themselves; it is named here to match them.
+	const fixedGround = 'text-foreground dark:border-input dark:bg-input/30';
 </script>
 
 {#if fixed}
-	<span class="{trigger} text-foreground" title={m.usage_workspace_filter()}>
+	<span class={cn(trigger, fixedGround)} title={m.usage_workspace_filter()}>
 		<LayoutGridIcon class="size-4 shrink-0 text-muted-foreground" />
 		<span class="truncate">{label}</span>
 	</span>
 {:else}
 	<Select.Root type="single" bind:value={namespace}>
 		<Select.Trigger
-			class="{trigger} data-[size=default]:h-9"
+			class={cn(trigger, 'data-[size=default]:h-9')}
 			aria-label={m.usage_workspace_filter()}
 		>
 			<LayoutGridIcon class="size-4 shrink-0 text-muted-foreground" />

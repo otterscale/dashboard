@@ -4,11 +4,13 @@
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import { CommitBars, NUM, Panel, widgetState } from '$lib/components/dashboard/kit';
+	import { CAPACITY_THRESHOLDS } from '$lib/components/dashboard/kit/format';
 	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/messages';
 	import { AIDAPTIV_CACHE_DEVICE_CLASS, fetchCombinedInstantOrNull } from '$lib/prometheus';
+	import { cn } from '$lib/utils';
 
-	import { CAPACITY_THRESHOLDS } from './format';
+	import { firstNumber } from './instant';
 	import ScopeLabel from './scope-label.svelte';
 
 	let {
@@ -38,14 +40,10 @@
 		});
 		failed = r === null;
 		if (!r) return;
-		const pick = (key: string) => {
-			const value = r[key][0]?.value?.value;
-			return value === undefined ? undefined : Number(value);
-		};
-		cephTotal = pick('cephTotal');
-		cephUsedPct = pick('cephUsedPct');
-		aidaptivTotal = pick('aidaptivTotal');
-		aidaptivPct = pick('aidaptivPct');
+		cephTotal = firstNumber(r.cephTotal);
+		cephUsedPct = firstNumber(r.cephUsedPct);
+		aidaptivTotal = firstNumber(r.aidaptivTotal);
+		aidaptivPct = firstNumber(r.aidaptivPct);
 	}
 
 	const reloadManager = new ReloadManager(fetch);
@@ -88,7 +86,7 @@
 		<ScopeLabel label="Ceph" />
 	{/snippet}
 	{@const raw = cephTotal === undefined ? undefined : formatCapacity(cephTotal)}
-	<p class="text-[1.75rem] leading-8 tracking-tight {NUM}">
+	<p class={cn('text-[1.75rem] leading-8 tracking-tight', NUM)}>
 		{raw?.value ?? '—'}<span class="ml-1.5 text-sm tracking-normal text-muted-foreground"
 			>{raw ? m.cluster_raw({ unit: raw.unit }) : ''}</span
 		>

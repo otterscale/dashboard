@@ -15,7 +15,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { getLocale } from '$lib/paraglide/runtime';
 
-	import { niceTop } from './lib/format';
+	import { niceCountTop } from './lib/format';
 
 	// Bars per time bucket, two series stacked: one y axis with three ticks (top, half, zero),
 	// five time ticks, the bucket's numbers on hover.
@@ -33,8 +33,8 @@
 		/** Behind the ⓘ beside the title. */
 		tooltip?: string;
 		data: BarPoint[];
-		/** Bottom first. */
-		series: [BarSeries, BarSeries];
+		/** Bottom first; one series draws plain bars. */
+		series: [BarSeries, BarSeries] | [BarSeries];
 		format: (value: number) => string;
 		state: WidgetState;
 		bucketSeconds: number;
@@ -51,7 +51,7 @@
 			for (const s of series) sum += Number(d[s.key]) || 0;
 			max = Math.max(max, sum);
 		}
-		return niceTop(max);
+		return niceCountTop(max);
 	});
 	const yTicks = $derived(top > 0 ? [0, top / 2, top] : [0]);
 	const xTicks = $derived.by(() => {
@@ -97,11 +97,11 @@
 	{/snippet}
 	<div style:height="{height}px">
 		{#if state === 'loading' || data.length === 0}
-			<Skeleton class="h-full w-full rounded-lg" />
+			<Skeleton class="size-full rounded-lg" />
 		{:else}
 			<Chart.Container
 				{config}
-				class="aspect-auto h-full w-full [&_.lc-axis-tick-label]:fill-muted-foreground [&_.lc-grid-y-line]:stroke-border [&_.lc-text]:text-[11px]"
+				class="aspect-auto size-full [&_.lc-axis-tick-label]:fill-muted-foreground [&_.lc-grid-y-line]:stroke-border [&_.lc-text]:text-[11px]"
 			>
 				<BarChart
 					{data}

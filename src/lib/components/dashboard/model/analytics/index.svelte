@@ -6,8 +6,8 @@
 	import { prefersReducedMotion } from 'svelte/motion';
 	import { fade } from 'svelte/transition';
 
-	import { Loader } from '$lib/components/dashboard/cluster/analytics/lib/loader.svelte';
 	import { Tile } from '$lib/components/dashboard/kit';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
 	import type { SharedMetrics } from '$lib/prometheus';
@@ -63,52 +63,58 @@
 	const transport = getContext<Transport>('transport');
 	const resources = createClient(ResourceService, transport);
 
+	// The picked model's pods, shared by the heading, the Pods table, Health, Engine and History.
+	// The answer carries the model it was asked for, so a list is never read as another model's.
+	const pods = new Loader<{ key: string; model: ModelPods }>(async () => {
+		const key = selected;
+		if (!key) return null;
+		const model = await fetchModelPods(resources, client, cluster, key);
+		return model && { key, model };
+	});
+	/** Pick a model: the last one's pods go at once, with any answer still on its way. */
+	function select(key: string | undefined) {
+		if (key === selected) return;
+		pods.reset();
+		selected = key;
+	}
+
 	let models = $state.raw<RankedModel[]>([]);
 	let answered = $state(false);
 	function onRows(rows: RankedModel[]) {
 		models = rows;
 		answered = true;
-		const pick = pickModel(
-			rows.map((r) => r.key),
-			selected
+		select(
+			pickModel(
+				rows.map((r) => r.key),
+				selected
+			)
 		);
-		if (pick !== selected) selected = pick;
 	}
 	const current = $derived(models.find((r) => r.key === selected));
 	const quiet = $derived(current ? quietState(current) : undefined);
 
-	// The picked model's pods, shared by the heading, the Pods table, Health, Engine and History.
-	const pods = new Loader<ModelPods>(() =>
-		selected ? fetchModelPods(resources, client, cluster, selected) : Promise.resolve(null)
-	);
-	// Which model the pod list belongs to; plain, since only the effect below reads it.
-	let podsFor: string | undefined;
 	const hasCurrent = $derived(current !== undefined);
 	$effect(() => {
-		const key = selected;
-		void tick;
-		if (!key || !hasCurrent) return;
-		untrack(async () => {
-			if (podsFor !== key) {
-				podsFor = key;
-				pods.data = undefined;
-				pods.state = 'loading';
-			}
-			await pods.load();
-		});
+		void [selected, tick];
+		if (!selected || !hasCurrent) return;
+		untrack(() => pods.load());
+	});
+	// The cards under `{#key selected}` are created before any effect runs, so they must not be
+	// handed the last model's pods: a list counts only when it was asked for the picked model.
+	const model = $derived.by(() => {
+		const answer = pods.data;
+		return answer && answer.key === selected ? answer.model : undefined;
 	});
 	const podsState = $derived<'loading' | 'ready' | 'error'>(
-		pods.state === 'loading' ? 'loading' : pods.state === 'error' ? 'error' : 'ready'
+		model ? 'ready' : pods.state === 'error' ? 'error' : 'loading'
 	);
 	const version = $derived(
 		engineVersion(
-			(pods.data?.pods.find((p) => p.status.key === 'running' && p.image) ?? pods.data?.pods[0])
-				?.image
+			(model?.pods.find((p) => p.status.key === 'running' && p.image) ?? model?.pods[0])?.image
 		)
 	);
 	/** A short fade from placeholder to content; none for anyone who asks for less motion. */
 	const reveal = $derived({ duration: prefersReducedMotion.current ? 0 : 150 });
-	const rangeKey = $derived(`${start.getTime()}-${end.getTime()}`);
 </script>
 
 {#snippet pending()}
@@ -137,7 +143,7 @@
 		{windowLabel}
 		bind:tab
 		{selected}
-		onSelect={(key) => (selected = key)}
+		onSelect={select}
 		{onRows}
 		{deployHref}
 		onLonger={history ? onLonger : undefined}
@@ -150,37 +156,17 @@
 				<ModelHeading row={current} {version} versionLoading={podsState === 'loading'} />
 				{#if history}
 					{#if !quiet}
-						{#key rangeKey}
-							<HistoryView {client} {shared} modelKey={selected} model={pods.data} {start} {end} />
-						{/key}
+						<HistoryView {client} {shared} modelKey={selected} {model} {start} {end} />
 					{/if}
 				{:else}
 					<NowCards {client} modelKey={selected} {tick} {quiet} />
-					<PodsTable
-						{client}
-						{shared}
-						modelKey={selected}
-						model={pods.data}
-						modelState={podsState}
-					/>
+					<PodsTable {client} {shared} modelKey={selected} {model} modelState={podsState} />
 					<!-- Side by side and the same height; stacked at 900px and below. -->
 					<div
 						class="grid grid-cols-1 items-stretch gap-2 min-[901px]:grid-cols-[minmax(280px,1fr)_minmax(0,2fr)] @md:gap-3"
 					>
-						<BPodHealth
-							{client}
-							{shared}
-							modelKey={selected}
-							model={pods.data}
-							modelState={podsState}
-						/>
-						<EngineConfig
-							{client}
-							modelKey={selected}
-							{tick}
-							model={pods.data}
-							modelState={podsState}
-						/>
+						<BPodHealth {client} {shared} modelKey={selected} {model} modelState={podsState} />
+						<EngineConfig {client} modelKey={selected} {tick} {model} modelState={podsState} />
 					</div>
 				{/if}
 			</div>

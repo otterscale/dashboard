@@ -97,11 +97,11 @@
 	{/snippet}
 	<div class="h-[180px]">
 		{#if state === 'loading' || data.length === 0}
-			<Skeleton class="h-full w-full rounded-lg" />
+			<Skeleton class="size-full rounded-lg" />
 		{:else}
 			<Chart.Container
 				{config}
-				class="aspect-auto h-full w-full [&_.lc-axis-tick-label]:fill-muted-foreground [&_.lc-grid-y-line]:stroke-border [&_.lc-text]:text-[11px]"
+				class="aspect-auto size-full [&_.lc-axis-tick-label]:fill-muted-foreground [&_.lc-grid-y-line]:stroke-border [&_.lc-text]:text-[11px]"
 			>
 				<AreaChart
 					{data}

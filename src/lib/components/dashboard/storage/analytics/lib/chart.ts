@@ -1,4 +1,4 @@
-import type { ChartSeries } from '$lib/components/dashboard/cluster/analytics/history/history-chart.svelte';
+import type { ChartSeries } from '$lib/components/dashboard/kit/history-chart.svelte';
 
 // History lines (SPEC 5): the main line in ink at 2 px, a second one in chart-6, reference
 // levels dashed. A warning level takes the warning colour, a stop level the critical one.

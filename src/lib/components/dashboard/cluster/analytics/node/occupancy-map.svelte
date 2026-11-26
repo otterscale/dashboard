@@ -1,7 +1,7 @@
 <script lang="ts">
+	import { fmtCores, fmtGiB } from '$lib/components/dashboard/kit/format';
 	import { m } from '$lib/messages';
 
-	import { fmtCores, fmtGiB } from '../lib/format';
 	import { squarify } from '../lib/treemap';
 	import MapTooltip from './map-tooltip.svelte';
 	import { type Measure, type OccupancyPod, podValue } from './occupancy-types';

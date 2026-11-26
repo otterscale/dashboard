@@ -4,6 +4,7 @@
 	import { classifyThreshold, thresholdClasses } from '$lib/prometheus';
 	import { cn } from '$lib/utils';
 
+	import { NUM } from './index';
 	import Status from './status.svelte';
 
 	// Usage, request and limit as a share of allocatable. Requests and limits routinely pass
@@ -49,7 +50,7 @@
 	}
 </script>
 
-<div class={cn('grid gap-y-1 slashed-zero tabular-nums', className)}>
+<div class={cn('grid gap-y-1', NUM, className)}>
 	<div class="commit-row text-[11px] leading-4 text-muted-foreground" aria-hidden="true">
 		<span></span>
 		<span class="relative h-4">

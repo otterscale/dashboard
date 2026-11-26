@@ -1,6 +1,18 @@
 import { type Client } from '@connectrpc/connect';
 import type { ResourceService } from '@otterscale/api/resource/v1';
 
+import { ReloadManager } from '$lib/components/custom/reloader';
+
+import {
+	field,
+	type KubeObject,
+	list,
+	listObjects,
+	type ListParams,
+	readFailure,
+	text
+} from './kube';
+
 // The cluster's fixed addresses and which master answers each, read from the Kubernetes API
 // (SPEC 3.5). Shaped like the `entryPoints` of the backend summary SPEC 3.7 proposes, so the
 // source can be swapped for that API without touching the card.
@@ -47,27 +59,6 @@ const KUBE_VIP_LEASE = 'plndr-cp-lock';
 const L2_LEASE_PREFIX = 'cilium-l2announce-';
 const OWNING_NAME = 'gateway.envoyproxy.io/owning-gateway-name';
 const OWNING_NAMESPACE = 'gateway.envoyproxy.io/owning-gateway-namespace';
-
-type KubeObject = Record<string, unknown>;
-
-function field(object: unknown, ...path: string[]): unknown {
-	let current = object;
-	for (const key of path) {
-		if (typeof current !== 'object' || current === null) return undefined;
-		current = (current as Record<string, unknown>)[key];
-	}
-	return current;
-}
-
-function text(object: unknown, ...path: string[]): string | undefined {
-	const value = field(object, ...path);
-	return typeof value === 'string' && value ? value : undefined;
-}
-
-function list(object: unknown, ...path: string[]): unknown[] {
-	const value = field(object, ...path);
-	return Array.isArray(value) ? value : [];
-}
 
 /** `http://10.0.0.5:8080/x` → `10.0.0.5`; a bare host passes through. */
 function hostOf(url: string | undefined): string | undefined {
@@ -182,22 +173,14 @@ export function buildEntryPoints(inputs: EntryPointInputs): EntryPoint[] {
 	return out;
 }
 
-type ListParams = {
-	group: string;
-	version: string;
-	resource: string;
-	namespace: string;
-	labelSelector?: string;
-};
-
 /** Reads the objects every 60 s; `entryPoints` is null until something could be read. */
 export class EntryPointsSource {
-	entryPoints = $state<EntryPoint[] | null>(null);
+	entryPoints = $state.raw<EntryPoint[] | null>(null);
 
 	#client: Client<typeof ResourceService>;
 	#cluster: string;
 	#nodeReady: EntryPointInputs['nodeReady'];
-	#timer: ReturnType<typeof setInterval> | undefined;
+	#reload: ReloadManager;
 
 	constructor(
 		client: Client<typeof ResourceService>,
@@ -207,29 +190,25 @@ export class EntryPointsSource {
 		this.#client = client;
 		this.#cluster = cluster;
 		this.#nodeReady = nodeReady;
+		this.#reload = new ReloadManager(() => void this.refresh());
+		this.#reload.interval = 60;
 	}
 
+	/** Read now, then every interval. */
 	start() {
-		void this.refresh();
-		this.#timer ??= setInterval(() => void this.refresh(), 60_000);
+		this.#reload.restart();
 	}
 
 	stop() {
-		clearInterval(this.#timer);
-		this.#timer = undefined;
+		this.#reload.stop();
 	}
 
-	async #list(params: ListParams): Promise<KubeObject[] | null> {
-		try {
-			const response = await this.#client.list({ cluster: this.#cluster, ...params });
-			return response.items.map((item) => (item.object ?? {}) as KubeObject);
-		} catch {
-			// Forbidden for anyone but cluster admins, or the API group is not installed.
-			return null;
-		}
+	#list(params: ListParams) {
+		return listObjects(this.#client, this.#cluster, params);
 	}
 
-	async #info(): Promise<Record<string, string> | undefined> {
+	/** `data` of otterscale-info; undefined when there is none to read, `failed` when the read broke. */
+	async #info(): Promise<Record<string, string> | undefined | 'failed'> {
 		try {
 			const response = await this.#client.get({
 				cluster: this.#cluster,
@@ -241,8 +220,8 @@ export class EntryPointsSource {
 			});
 			const data = field(response.object, 'data');
 			return typeof data === 'object' && data ? (data as Record<string, string>) : undefined;
-		} catch {
-			return undefined;
+		} catch (error) {
+			return readFailure(error) === 'failed' ? 'failed' : undefined;
 		}
 	}
 
@@ -265,18 +244,23 @@ export class EntryPointsSource {
 			this.#list({ group: '', version: 'v1', resource: 'services', ...envoy }),
 			this.#list({ group: 'apps', version: 'v1', resource: 'daemonsets', namespace: 'kube-system' })
 		]);
+		// A read that broke (network, timeout) says nothing about the cluster: keep what the last
+		// read showed, or the table would vanish and come back with the next poll.
+		if ([info, leases, gateways, services, daemonsets].includes('failed')) return;
+		// Refused (anyone but a cluster admin) or not installed reads as nothing there.
+		const read = (listed: KubeObject[] | string) => (Array.isArray(listed) ? listed : undefined);
 		// Without the Kubernetes objects there is no status to show, only addresses, and those
 		// belong in connection info rather than a health table.
-		if (!leases && !gateways) {
+		if (!read(leases) && !read(gateways)) {
 			this.entryPoints = null;
 			return;
 		}
 		const built = buildEntryPoints({
-			info,
-			leases: leases ?? [],
-			gateways: gateways ?? [],
-			services: services ?? [],
-			daemonsets: daemonsets ?? [],
+			info: typeof info === 'object' ? info : undefined,
+			leases: read(leases) ?? [],
+			gateways: read(gateways) ?? [],
+			services: read(services) ?? [],
+			daemonsets: read(daemonsets) ?? [],
 			nodeReady: this.#nodeReady
 		});
 		this.entryPoints = built.length > 0 ? built : null;

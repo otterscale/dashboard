@@ -6,6 +6,8 @@
 
 	import { cn } from '$lib/utils';
 
+	import { type Tone, TONE_DOT, TONE_PILL, TONE_TEXT } from './tone';
+
 	// A status is always a mark and a word; the colour only repeats what they say.
 	let {
 		tone,
@@ -14,8 +16,7 @@
 		class: className,
 		children
 	}: {
-		/** `muted` is a fact that is neither good nor bad, such as a design limit. */
-		tone: 'ok' | 'warn' | 'bad' | 'muted';
+		tone: Tone;
 		/** `alert` for a level that is past a threshold, `x` for something that failed. */
 		icon?: 'alert' | 'x';
 		/**
@@ -26,25 +27,6 @@
 		class?: string;
 		children: Snippet;
 	} = $props();
-
-	const toneClass = {
-		ok: 'text-chart-2',
-		warn: 'text-chart-1',
-		bad: 'text-destructive',
-		muted: 'text-muted-foreground'
-	};
-	const dotClass = {
-		ok: 'bg-chart-2',
-		warn: 'bg-chart-1',
-		bad: 'bg-destructive',
-		muted: 'bg-muted-foreground'
-	};
-	const pillClass = {
-		ok: 'bg-chart-2/12',
-		warn: 'bg-chart-1/12',
-		bad: 'bg-destructive/10',
-		muted: 'bg-muted'
-	};
 </script>
 
 <span
@@ -52,8 +34,8 @@
 		'inline-flex items-center text-xs whitespace-nowrap',
 		variant === 'icon' ? 'gap-1' : 'gap-1.5',
 		variant === 'pill' && 'h-5 rounded-full px-2 leading-4',
-		variant === 'pill' && pillClass[tone],
-		toneClass[tone],
+		variant === 'pill' && TONE_PILL[tone],
+		TONE_TEXT[tone],
 		className
 	)}
 >
@@ -61,7 +43,7 @@
 		<!-- One line tall, so the dot sits on the first line of a wrapped status; it grows with the
 		     text, from 6px at text-xs to 8px beside a headline number. -->
 		<span class="inline-flex h-[1lh] shrink-0 items-center" aria-hidden="true">
-			<span class={cn('size-[max(0.375rem,0.33em)] rounded-full', dotClass[tone])}></span>
+			<span class={cn('size-[max(0.375rem,0.33em)] rounded-full', TONE_DOT[tone])}></span>
 		</span>
 	{:else if tone === 'ok'}
 		<CircleCheckIcon class="size-3.5 shrink-0" aria-hidden="true" />

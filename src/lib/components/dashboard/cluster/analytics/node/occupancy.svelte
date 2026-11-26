@@ -3,11 +3,14 @@
 	import { untrack } from 'svelte';
 
 	import { Panel } from '$lib/components/dashboard/kit';
+	import { byPod, fetchInstant, scalar } from '$lib/components/dashboard/kit/fetch';
+	import { fmt, fmtCores, fmtGiB, fmtGpuGiB, sum } from '$lib/components/dashboard/kit/format';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
+	import Segmented from '$lib/components/dashboard/kit/segmented.svelte';
+	import * as Empty from '$lib/components/ui/empty';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
 
-	import { byPod, fetchInstant, scalar } from '../lib/fetch';
-	import { fmt, fmtCores, fmtGiB, fmtGpuGiB, sum } from '../lib/format';
 	import {
 		buildGpuCards,
 		type CardInput,
@@ -15,10 +18,8 @@
 		gpuGrid,
 		type PodShare
 	} from '../lib/gpu-cards';
-	import { Loader } from '../lib/loader.svelte';
 	import { nodePodQueries } from '../lib/promql';
 	import { OTHER_GROUP, SYSTEM_GROUP, type WorkspacePalette } from '../lib/workspaces';
-	import Segmented from '../segmented.svelte';
 	import GpuCardMap from './gpu-card-map.svelte';
 	import OccupancyMap from './occupancy-map.svelte';
 	import OccupancyTable from './occupancy-table.svelte';
@@ -35,17 +36,22 @@
 		tick,
 		node,
 		palette
-	}: { client: PrometheusDriver; tick: number; node: string; palette: WorkspacePalette } = $props();
+	}: {
+		client: PrometheusDriver;
+		tick: number;
+		/** Left out while the page has no node yet: the card then waits in its loading state. */
+		node: string | undefined;
+		palette: WorkspacePalette;
+	} = $props();
 
 	let resource = $state<Resource>('cpu');
 	let cpuMeasure = $state<Measure>('request');
 	let gpuMeasure = $state<'usage' | 'allocated'>('allocated');
 	const measure = $derived<Measure>(resource === 'gpu' ? gpuMeasure : cpuMeasure);
 
-	let cardsOfPod = $state.raw(new Map<string, number>());
-
 	const loader = new Loader<Occupancy>(
 		async () => {
+			if (!node) return null;
 			const r = await fetchInstant(client, nodePodQueries(node));
 			if (!r) return null;
 			const cards: CardInput[] = r.gpuTotal.map((s) => ({
@@ -68,7 +74,7 @@
 			const allocations = share(r.gpuAlloc);
 			const tracked = share(r.gpuTracked);
 			const gpuCards = buildGpuCards(cards, allocations, tracked);
-			cardsOfPod = cardsPerPod(allocations);
+			const cardsOfPod = cardsPerPod(allocations);
 
 			const onNode = new Set(cards.map((c) => c.uuid));
 			const gpuSum = (list: PodShare[]) => {
@@ -94,14 +100,12 @@
 			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- built and read in one pass, never reactive
 			const keys = new Set(r.pods.map((s) => `${s.labels.namespace}/${s.labels.pod}`));
 			for (const k of gpuAlloc.keys()) keys.add(k);
-			const pods: OccupancyPod[] = [...keys].map((key) => {
+			const pods: Occupancy['pods'] = [...keys].map((key) => {
 				const [namespace, ...rest] = key.split('/');
 				return {
 					key,
 					namespace,
 					pod: rest.join('/'),
-					// Placeholder; `pods` below groups at render, so a late workspace list still applies.
-					group: { id: '', color: '' },
 					cpu: [cpuUse.get(key) ?? 0, cpuReq.get(key) ?? 0, cpuLim.get(key) ?? 0],
 					memory: [memUse.get(key) ?? 0, memReq.get(key) ?? 0, memLim.get(key) ?? 0],
 					gpuUsed: gpuUsed.get(key),
@@ -113,7 +117,8 @@
 				pods,
 				cpuAllocatable: scalar(r.cpuAlloc),
 				memAllocatable: scalar(r.memAlloc),
-				cards: gpuCards
+				cards: gpuCards,
+				cardsOfPod
 			};
 		},
 		(d) => d.pods.length === 0 && d.cards.length === 0
@@ -121,11 +126,12 @@
 
 	$effect(() => {
 		void tick;
+		if (!node) return;
 		untrack(() => loader.load());
 	});
 
 	const data = $derived(loader.data);
-	const pods = $derived(
+	const pods = $derived<OccupancyPod[]>(
 		(data?.pods ?? []).map((p) => ({ ...p, group: palette.groupOf(p.namespace) }))
 	);
 	const cards = $derived(data?.cards ?? []);
@@ -186,6 +192,13 @@
 	);
 </script>
 
+<!-- Where the map would be, at the map's height. -->
+{#snippet nothing(text: string)}
+	<Empty.Root class="h-[360px] flex-none gap-0 border border-border p-0">
+		<Empty.Description class="text-sm">{text}</Empty.Description>
+	</Empty.Root>
+{/snippet}
+
 <Panel
 	title={m.analytics_occupancy_title()}
 	tooltip={m.analytics_occupancy_tooltip()}
@@ -232,11 +245,7 @@
 				<Skeleton class="h-[360px] w-full rounded-lg" />
 			{:else if resource === 'gpu'}
 				{#if cards.length === 0}
-					<div
-						class="flex h-[360px] items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground"
-					>
-						{m.analytics_node_has_no_gpus()}
-					</div>
+					{@render nothing(m.analytics_node_has_no_gpus())}
 				{:else}
 					<div
 						class="grid gap-x-3 gap-y-4"
@@ -248,7 +257,7 @@
 								measure={gpuMeasure}
 								height={grid.height}
 								groupOf={(ns) => palette.groupOf(ns)}
-								cardsOf={(key) => cardsOfPod.get(key) ?? 0}
+								cardsOf={(key) => data.cardsOfPod.get(key) ?? 0}
 							/>
 						{/each}
 					</div>
@@ -258,6 +267,9 @@
 				{#if overcommitted}
 					<p class="mt-2 text-xs text-muted-foreground">{m.analytics_limit_overcommit_note()}</p>
 				{/if}
+			{:else}
+				<!-- The node's allocatable did not come back, so there is no whole to draw shares of. -->
+				{@render nothing(m.no_data_display())}
 			{/if}
 		</div>
 	</div>

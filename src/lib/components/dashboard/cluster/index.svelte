@@ -14,13 +14,15 @@
 		toNow
 	} from '$lib/components/custom/range-picker';
 	import { AutoRefresh, RefreshControl, reloadNow } from '$lib/components/custom/reloader';
+	import { TAB_LIST, TAB_TRIGGER } from '$lib/components/dashboard/kit';
+	import { formatDuration } from '$lib/components/dashboard/kit/format';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/messages';
 	import { clusterPrometheusDriver } from '$lib/prometheus';
+	import { cn } from '$lib/utils';
 
 	import { Dashboard as AnalyticsDashboard } from './analytics/index';
 	import ClusterFacts from './overview/cluster-facts.svelte';
-	import { formatDuration } from './overview/format';
 	import Overview from './overview/overview.svelte';
 	import { ClusterSignals } from './overview/signals.svelte';
 
@@ -58,6 +60,12 @@
 	let selectedNode = $state<string | undefined>(initial.get('node') ?? undefined);
 	let selectedNamespace = $state<string | undefined>(initial.get('namespace') ?? undefined);
 
+	// History's window. A quick range ends at `anchor`, which moves to now when History is entered
+	// or the range is picked or refreshed; a fixed range stays where it was set.
+	let historyRange = $state<TimeRange>(rangeFromParams(initial));
+	let anchor = $state(Date.now());
+
+	// The URL is read once, above; from here on it only follows the state.
 	// replaceState throws until the router has started; afterNavigate runs once it has.
 	let routerReady = $state(false);
 	afterNavigate(() => (routerReady = true));
@@ -84,10 +92,6 @@
 		if (url.search !== page.url.search) replaceState(url, page.state);
 	});
 
-	// History's window. A quick range ends at `anchor`, which moves to now when History is entered
-	// or the range is picked or refreshed; a fixed range stays where it was set.
-	let historyRange = $state<TimeRange>(rangeFromParams(initial));
-	let anchor = $state(Date.now());
 	const resolved = $derived(resolveRange(historyRange, anchor));
 	const start = $derived(new Date(resolved.start));
 	const end = $derived(new Date(resolved.end));
@@ -128,17 +132,14 @@
 		anchor = Date.now();
 	}
 
-	// Node readiness, roles and firing alerts, shared by the header and the overview's cards.
-	const signals = $derived(prometheusDriver ? new ClusterSignals(prometheusDriver) : null);
+	// Node readiness, roles and firing alerts, shared by the header and the overview's cards. They
+	// belong to the page, not to the Overview tab: the header's facts stay current on Analytics too.
+	const signals = prometheusDriver ? new ClusterSignals(prometheusDriver) : null;
 	$effect(() => {
-		const current = signals;
-		if (!current) return;
-		current.setReloading(isReloading);
-		return () => current.stop();
+		if (!signals) return;
+		signals.setReloading(isReloading);
+		return () => signals.stop();
 	});
-
-	const TAB_LIST = 'rounded-full';
-	const TAB_TRIGGER = 'rounded-full px-3 data-active:bg-card dark:data-active:bg-card';
 
 	onDestroy(() => {
 		isReloading = false;
@@ -174,9 +175,12 @@
 					</Tabs.List>
 					<div class="flex flex-wrap items-center justify-end gap-2">
 						<div
-							class="flex-wrap items-center justify-end gap-2 {selectedTab !== 'analytics'
-								? 'pointer-events-none hidden select-none **:transition-none @5xl:invisible @5xl:flex'
-								: 'flex'}"
+							class={cn(
+								'flex-wrap items-center justify-end gap-2',
+								selectedTab !== 'analytics'
+									? 'pointer-events-none hidden select-none **:transition-none @5xl:invisible @5xl:flex'
+									: 'flex'
+							)}
 							aria-hidden={selectedTab !== 'analytics'}
 						>
 							<!-- History's window sits first, so it never pushes the switches aside; where
@@ -227,21 +231,27 @@
 						<RangePicker bind:range={historyRange} bind:anchor />
 					</div>
 				{/if}
+				<!-- Tabs keep both panels in the page; only the shown one is mounted, so the hidden one
+				     does not keep polling Prometheus. -->
 				<Tabs.Content value="overview" class="pt-3">
-					<Overview {prometheusDriver} {signals} bind:isReloading />
+					{#if selectedTab === 'overview'}
+						<Overview {prometheusDriver} {signals} bind:isReloading />
+					{/if}
 				</Tabs.Content>
 				<Tabs.Content value="analytics" class="pt-3">
-					<AnalyticsDashboard
-						client={prometheusDriver}
-						view={analyticsView}
-						history={analyticsMode === 'history'}
-						bind:selectedNode
-						bind:selectedNamespace
-						{start}
-						{end}
-						{windowLabel}
-						tick={clock.tick}
-					/>
+					{#if selectedTab === 'analytics'}
+						<AnalyticsDashboard
+							client={prometheusDriver}
+							view={analyticsView}
+							history={analyticsMode === 'history'}
+							bind:selectedNode
+							bind:selectedNamespace
+							{start}
+							{end}
+							{windowLabel}
+							tick={clock.tick}
+						/>
+					{/if}
 				</Tabs.Content>
 			</Tabs.Root>
 		</div>

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { PrometheusDriver } from 'prometheus-query';
 
-	import { NUM, Panel } from '$lib/components/dashboard/kit';
+	import { NUM, Panel, type Tone, TONE_TEXT } from '$lib/components/dashboard/kit';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
 	import { cn } from '$lib/utils';
@@ -19,7 +19,7 @@
 	const poll = new InstantPoll(() => client, DAEMON_QUERIES);
 	$effect(() => poll.run(isReloading));
 
-	type Row = { label: string; value: string; tone: 'ok' | 'warn' | 'bad' };
+	type Row = { label: string; value: string; tone: Tone };
 
 	function share(part: number | undefined, total: number | undefined, majority = false) {
 		const p = part ?? 0;
@@ -68,9 +68,6 @@
 	});
 
 	const cardState = $derived(poll.state(() => rows.length > 0));
-
-	// The number alone carries the state, in the healthy, warning or critical colour.
-	const TONE_TEXT = { ok: 'text-chart-2', warn: 'text-chart-1', bad: 'text-destructive' };
 </script>
 
 <div class={LAYOUT.daemons}>
@@ -91,6 +88,7 @@
 				{#each rows as row (row.label)}
 					<li class="flex h-10 items-center justify-between gap-3 border-b text-sm last:border-b-0">
 						<span class="truncate">{row.label}</span>
+						<!-- The number alone carries the state, in the healthy, warning or critical colour. -->
 						<span class={cn('whitespace-nowrap', NUM, TONE_TEXT[row.tone])}>{row.value}</span>
 					</li>
 				{/each}

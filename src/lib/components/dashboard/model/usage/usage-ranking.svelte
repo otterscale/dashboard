@@ -1,7 +1,8 @@
 <script lang="ts">
-	import Segmented from '$lib/components/dashboard/cluster/analytics/segmented.svelte';
-	import Sparkline from '$lib/components/dashboard/cluster/analytics/sparkline.svelte';
-	import { NUM, type WidgetState } from '$lib/components/dashboard/kit';
+	import { Chip, NUM, type WidgetState } from '$lib/components/dashboard/kit';
+	import Segmented from '$lib/components/dashboard/kit/segmented.svelte';
+	import Sparkline from '$lib/components/dashboard/kit/sparkline.svelte';
+	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
 	import { cn } from '$lib/utils';
@@ -9,7 +10,7 @@
 	import { SOFT_FILL } from './hourly-chart.svelte';
 	import type { DisplayRow } from './lib/display';
 	import { viewLabel } from './lib/display';
-	import { fmtCount, fmtTokensOrDash } from './lib/format';
+	import { fmtGrouped, fmtTokensOrDash } from './lib/format';
 	import { failedIsHigh, type SortKey, tokensOf, type View } from './lib/usage';
 
 	// The ranking is also the picker: each row is a button, and the pressed one is what the
@@ -78,10 +79,10 @@
 		</p>
 	{/if}
 
-	<div class="mt-3 min-h-8 text-xs text-muted-foreground {grid}">
+	<div class={cn('mt-3 min-h-8 text-xs text-muted-foreground', grid)}>
 		<span>#</span>
 		<span class="truncate">{viewLabel(view)}</span>
-		<span class="flex items-center gap-3 {wide}" aria-hidden="true">
+		<span class={cn('flex items-center gap-3', wide)} aria-hidden="true">
 			<span class="flex items-center gap-1.5">
 				<span class="size-2 rounded-[2px] bg-chart-3"></span>{m.usage_input()}
 			</span>
@@ -95,16 +96,16 @@
 			<span class={minor}>{m.usage_output()}</span>
 			<span>{m.usage_failed()}</span>
 		</span>
-		<span class="text-right {wide}">{m.analytics_trend()}</span>
+		<span class={cn('text-right', wide)}>{m.analytics_trend()}</span>
 	</div>
 
 	{#if status === 'loading'}
 		<ul class="mt-1 flex flex-col gap-1" aria-busy="true">
 			{#each Array.from({ length: 5 }, (_, i) => i) as i (i)}
-				<li class="{grid} h-12">
-					<Skeleton class="h-3 w-3" />
+				<li class={cn(grid, 'h-12')}>
+					<Skeleton class="size-3" />
 					<Skeleton class="h-3 w-32" />
-					<Skeleton class="h-1.5 w-full {wide}" />
+					<Skeleton class={cn('h-1.5 w-full', wide)} />
 					<Skeleton class="h-3 w-24 justify-self-end" />
 				</li>
 			{/each}
@@ -132,7 +133,7 @@
 							on ? 'bg-accent' : 'hover:bg-accent/60'
 						)}
 					>
-						<span class="text-xs text-muted-foreground {NUM}">
+						<span class={cn('text-xs text-muted-foreground', NUM)}>
 							{item.row.pinned ? '–' : i + 1}
 						</span>
 						<span class="flex min-w-0 flex-col" title={item.title ?? item.label}>
@@ -143,20 +144,13 @@
 									{item.label}
 								</span>
 								{#each item.chips as chip (chip)}
-									<span
-										class={cn(
-											'shrink-0 rounded-full px-2 py-0.5 text-xs leading-4 text-muted-foreground @max-xl:hidden',
-											on ? 'bg-card' : 'bg-muted'
-										)}
-									>
-										{chip}
-									</span>
+									<Chip class={cn('@max-xl:hidden', on && 'bg-card')}>{chip}</Chip>
 								{/each}
 							</span>
 							<span class="truncate text-xs leading-4 text-muted-foreground">{item.sub}</span>
 						</span>
 						<span
-							class="relative h-1.5 overflow-hidden rounded-full bg-muted {wide}"
+							class={cn('relative h-1.5 overflow-hidden rounded-full bg-muted', wide)}
 							aria-hidden="true"
 						>
 							<span
@@ -169,12 +163,12 @@
 								style:width="{(t.input / maxTokens) * 100}%"
 							></span>
 						</span>
-						<span class="{valuesGrid} text-[0.8125rem] {NUM}">
-							<span>{fmtCount(t.requests)}</span>
+						<span class={cn(valuesGrid, 'text-[0.8125rem]', NUM)}>
+							<span>{fmtGrouped(t.requests)}</span>
 							<span class={minor}>{fmtTokensOrDash(t.input)}</span>
 							<span class={minor}>{fmtTokensOrDash(t.output)}</span>
 							<span class={failedIsHigh(t) ? 'text-chart-1' : 'text-muted-foreground'}>
-								{fmtCount(t.failed)}
+								{fmtGrouped(t.failed)}
 							</span>
 						</span>
 						<span class={wide}>
@@ -185,14 +179,14 @@
 			{/each}
 		</ul>
 		{#if ranked.length > limit}
-			<button
-				type="button"
-				class="mt-2 inline-flex min-h-9 items-center rounded-md px-3 text-[0.8125rem] font-medium text-chart-2 hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+			<Button
+				variant="link"
+				class="mt-2 border-0 px-3 text-[0.8125rem] text-chart-2 underline-offset-auto"
 				aria-expanded={expanded}
 				onclick={() => (expanded = !expanded)}
 			>
 				{expanded ? m.analytics_show_fewer() : m.usage_show_all({ count: String(rows.length) })}
-			</button>
+			</Button>
 		{/if}
 	{/if}
 </section>

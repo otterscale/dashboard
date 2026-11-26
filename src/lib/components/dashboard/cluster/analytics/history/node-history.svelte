@@ -1,18 +1,27 @@
 <script lang="ts">
 	import type { PrometheusDriver } from 'prometheus-query';
-	import { onMount } from 'svelte';
+	import { untrack } from 'svelte';
 
+	import {
+		fetchInstant,
+		fetchRange,
+		rangeLiteral,
+		stats,
+		stepFor,
+		toPoints
+	} from '$lib/components/dashboard/kit/fetch';
+	import { DASH, fmt, fmtPct, fmtRate, splitRate } from '$lib/components/dashboard/kit/format';
+	import HistoryChart, {
+		type ChartPoint
+	} from '$lib/components/dashboard/kit/history-chart.svelte';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
+	import SummaryStrip from '$lib/components/dashboard/kit/summary-strip.svelte';
 	import { m } from '$lib/messages';
 
-	import { fetchInstant, fetchRange, rangeLiteral, stats, stepFor, toPoints } from '../lib/fetch';
-	import { fmt, fmtPct, fmtRate, splitRate } from '../lib/format';
-	import { Loader } from '../lib/loader.svelte';
 	import { nodeHistoryQueries, restartsByNode } from '../lib/promql';
 	import type { WorkspacePalette } from '../lib/workspaces';
 	import GpuRows from './gpu-rows.svelte';
-	import HistoryChart, { type ChartPoint } from './history-chart.svelte';
 	import RestartsCard from './restarts-card.svelte';
-	import SummaryStrip from './summary-strip.svelte';
 
 	let {
 		client,
@@ -25,7 +34,8 @@
 		palette
 	}: {
 		client: PrometheusDriver;
-		node: string;
+		/** Left out while the page has no node yet: the cards then wait in their loading state. */
+		node: string | undefined;
 		instance: string | undefined;
 		hasGpu: boolean;
 		start: Date;
@@ -44,9 +54,10 @@
 	};
 
 	const loader = new Loader<Data>(async () => {
+		if (!node) return null;
 		const [r, restarts] = await Promise.all([
 			fetchRange(client, nodeHistoryQueries(node, instance), start, end, stepFor(start, end, 90)),
-			fetchInstant(client, { restarts: `${restartsByNode(rangeLiteral(start, end))}` }, end)
+			fetchInstant(client, { restarts: restartsByNode(rangeLiteral(start, end)) }, end)
 		]);
 		if (!r) return null;
 		const withAllocatable = (points: ChartPoint[]) => points.map((p) => ({ ...p, alloc: 100 }));
@@ -77,8 +88,14 @@
 		};
 	});
 
-	onMount(() => {
-		loader.load();
+	// A new window starts from the loading cards; the page remounts this for a new node.
+	$effect(() => {
+		void [start.getTime(), end.getTime()];
+		if (!node) return;
+		untrack(() => {
+			loader.reset();
+			loader.load();
+		});
 	});
 
 	const s = $derived(loader.data?.summary ?? {});
@@ -97,7 +114,7 @@
 		},
 		{
 			label: m.analytics_gpu_utilization(),
-			value: hasGpu ? fmtPct(s.gpuUtil?.avg) : '—',
+			value: hasGpu ? fmtPct(s.gpuUtil?.avg) : DASH,
 			note: hasGpu
 				? m.analytics_avg_peak({ peak: fmtPct(s.gpuUtil?.peak) })
 				: m.analytics_no_gpus_on_node()
@@ -156,7 +173,7 @@
 		title={m.analytics_network()}
 		peak={m.analytics_peak({ value: fmtRate(s.netRx?.peak) })}
 		data={loader.data?.network ?? []}
-		state={instance ? loader.state : 'empty'}
+		state={node && !instance ? 'empty' : loader.state}
 		format={fmtRate}
 		series={[
 			{ key: 'netRx', label: m.analytics_received(), style: 'area' },
@@ -169,7 +186,7 @@
 			value: fmtRate(Math.max(s.diskRead?.peak ?? 0, s.diskWrite?.peak ?? 0))
 		})}
 		data={loader.data?.disk ?? []}
-		state={instance ? loader.state : 'empty'}
+		state={node && !instance ? 'empty' : loader.state}
 		format={fmtRate}
 		series={[
 			{ key: 'diskRead', label: m.analytics_read(), style: 'area' },
@@ -178,13 +195,13 @@
 	/>
 </div>
 
-{#if hasGpu}
+{#if hasGpu && node}
 	<GpuRows {client} {node} {start} {end} {windowLabel} />
 {/if}
 
 <RestartsCard
 	{client}
-	scope={{ node }}
+	scope={node ? { node } : undefined}
 	{start}
 	{end}
 	{windowLabel}

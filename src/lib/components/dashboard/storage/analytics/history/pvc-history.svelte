@@ -1,17 +1,13 @@
 <script lang="ts">
 	import type { PrometheusDriver } from 'prometheus-query';
-	import { onMount } from 'svelte';
+	import { untrack } from 'svelte';
 
+	import type { WidgetState } from '$lib/components/dashboard/kit';
+	import { fetchRange, stepFor, toPoints } from '$lib/components/dashboard/kit/fetch';
 	import HistoryChart, {
 		type ChartPoint
-	} from '$lib/components/dashboard/cluster/analytics/history/history-chart.svelte';
-	import {
-		fetchRange,
-		stepFor,
-		toPoints
-	} from '$lib/components/dashboard/cluster/analytics/lib/fetch';
-	import { Loader } from '$lib/components/dashboard/cluster/analytics/lib/loader.svelte';
-	import type { WidgetState } from '$lib/components/dashboard/kit';
+	} from '$lib/components/dashboard/kit/history-chart.svelte';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
 	import { m } from '$lib/messages';
 
 	import { fmtBytes } from '../../overview/format';
@@ -52,8 +48,20 @@
 		},
 		(d) => d.length === 0
 	);
-	onMount(() => {
-		if (pvc) void loader.load();
+	// Loads once the PVC is known (the list may still be on its way when a link opens History)
+	// and again for a new window, each time from the loading state.
+	// The list refreshes with a new object for the same PVC; only a different PVC reloads.
+	const key = $derived(pvc?.key);
+	const from = $derived(start.getTime());
+	const to = $derived(end.getTime());
+	$effect(() => {
+		void from;
+		void to;
+		if (key === undefined) return;
+		untrack(() => {
+			loader.reset();
+			void loader.load();
+		});
 	});
 
 	const state = $derived(pvc ? loader.state : listState);

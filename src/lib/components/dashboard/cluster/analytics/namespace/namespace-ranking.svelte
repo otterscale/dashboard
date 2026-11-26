@@ -2,18 +2,27 @@
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { untrack } from 'svelte';
 
+	import {
+		byLabel,
+		fetchInstant,
+		fetchRange,
+		rangeLiteral,
+		stepFor
+	} from '$lib/components/dashboard/kit/fetch';
+	import { fmt, fmtCores, fmtGiB, fmtPct, GIB } from '$lib/components/dashboard/kit/format';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
+	import RankingCard, {
+		type RankMetric,
+		type RankRow
+	} from '$lib/components/dashboard/kit/ranking-card.svelte';
 	import { m } from '$lib/messages';
 
-	import { byLabel, fetchInstant, fetchRange, rangeLiteral, stepFor } from '../lib/fetch';
-	import { fmt, fmtCores, fmtGiB, fmtPct } from '../lib/format';
-	import { Loader } from '../lib/loader.svelte';
 	import {
 		averaged,
 		NAMESPACE_FACTS,
 		namespaceRankingQueries,
 		namespaceTrendQuery
 	} from '../lib/promql';
-	import RankingCard, { type RankMetric, type RankRow } from '../ranking-card.svelte';
 
 	let {
 		client,
@@ -98,10 +107,12 @@
 		return new Map(r.trend.map((s) => [s.labels.namespace, s.points.map((p) => p.v)]));
 	});
 
-	// After each answer, tell the page the order so it can preselect the first namespace.
+	// After each answer, tell the page the order so it can preselect the first namespace. A first
+	// request that failed answers with no namespaces, so the page stops waiting for one.
 	async function refresh() {
 		await values.load();
 		if (values.data) onNamespaces(rows.map((r) => r.id));
+		else if (values.state === 'error') onNamespaces([]);
 	}
 
 	$effect(() => {
@@ -111,10 +122,12 @@
 	$effect(() => {
 		if (!history) return;
 		void [metric, start.getTime(), end.getTime()];
-		untrack(() => trends.load());
+		// Another metric or window: the lines on screen belong to the old one, so they go first.
+		untrack(() => {
+			trends.reset();
+			trends.load();
+		});
 	});
-
-	const GIB = 1024 ** 3;
 
 	function row(ns: Ns, scale: number): RankRow {
 		const workspace = namespaceToWorkspace[ns.name];

@@ -21,11 +21,14 @@ export type OccupancyPod = {
 	gpuCards: number;
 };
 
+/** What one request answers. A pod's group is added at render, so a late workspace list still applies. */
 export type Occupancy = {
-	pods: OccupancyPod[];
+	pods: Omit<OccupancyPod, 'group'>[];
 	cpuAllocatable: number | undefined;
 	memAllocatable: number | undefined;
 	cards: GpuCard[];
+	/** Cards each pod holds an allocation on, across the cluster, by `namespace/pod`. */
+	cardsOfPod: Map<string, number>;
 };
 
 export const MEASURE_INDEX: Record<'usage' | 'request' | 'limit', 0 | 1 | 2> = {

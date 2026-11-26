@@ -1,8 +1,5 @@
-import type {
-	ChartPoint,
-	ChartSeries
-} from '$lib/components/dashboard/cluster/analytics/history/history-chart.svelte';
-import type { Series } from '$lib/components/dashboard/cluster/analytics/lib/fetch';
+import type { Series } from '$lib/components/dashboard/kit/fetch';
+import type { ChartPoint, ChartSeries } from '$lib/components/dashboard/kit/history-chart.svelte';
 
 import { colorsFor, finishGroup, type LineSpec } from './chart-style';
 import { shortPod } from './pods';
@@ -148,4 +145,14 @@ export function lengthGrid(
 export function bucketFor(start: Date, end: Date, points: number, unit: number): number {
 	const seconds = (end.getTime() - start.getTime()) / 1000;
 	return Math.max(unit, Math.round(seconds / points / unit) * unit);
+}
+
+/** A count that may be an average: a whole number as it is, anything else to one decimal. */
+export function fmtDecimal(v: number): string {
+	return Number.isInteger(v) ? String(v) : v.toFixed(1);
+}
+
+/** A window over a day and a half reads by date, a shorter one by time. */
+export function isLongSpan(ms: number): boolean {
+	return ms > 36 * 3600_000;
 }

@@ -50,7 +50,8 @@
 		node?: string;
 		restarts: number;
 	};
-	let pods = $state<PodFacts[]>([]);
+	// Replaced whole by each fetch.
+	let pods = $state.raw<PodFacts[]>([]);
 	let failed = $state(false);
 
 	async function fetch() {
@@ -105,6 +106,8 @@
 		reloadManager.stop();
 	});
 
+	const ROW_GRID = 'grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3';
+
 	type Row = {
 		name: string;
 		node?: string;
@@ -150,7 +153,7 @@
 		<div class="min-w-0">
 			<p class="text-xs leading-4 text-muted-foreground">{m.services_ready()}</p>
 			<div class="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-				<span class="text-2xl leading-8 tracking-tight whitespace-nowrap {NUM}">
+				<span class={cn('text-2xl leading-8 tracking-tight whitespace-nowrap', NUM)}>
 					{readyCount} / {installed.length}
 				</span>
 				{#if readyCount === installed.length}
@@ -168,7 +171,7 @@
 		<div class="min-w-0">
 			<p class="text-xs leading-4 text-muted-foreground">{m.restarts_24h()}</p>
 			<div class="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-				<span class="text-2xl leading-8 tracking-tight {NUM}">{restartTotal}</span>
+				<span class={cn('text-2xl leading-8 tracking-tight', NUM)}>{restartTotal}</span>
 				{#if restartTotal === 0}
 					<Status tone="ok" variant="pill">{m.restarts_stable()}</Status>
 				{/if}
@@ -177,17 +180,13 @@
 	</div>
 	<!-- Rows share whatever height the card has, so it lines up with the card beside it. -->
 	<div class="mt-4 flex flex-1 flex-col text-sm">
-		<div
-			class="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)] gap-3 border-b pb-2 text-xs leading-4 text-muted-foreground"
-		>
+		<div class={cn(ROW_GRID, 'border-b pb-2 text-xs leading-4 text-muted-foreground')}>
 			<span>{m.service()}</span>
 			<span>{m.running_on()}</span>
 			<span>{m.status()}</span>
 		</div>
 		{#each rows as row (row.name)}
-			<div
-				class="grid min-h-10 flex-1 grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 border-b last:border-b-0"
-			>
+			<div class={cn(ROW_GRID, 'min-h-10 flex-1 items-center border-b last:border-b-0')}>
 				<span class="truncate font-[550]">{row.name}</span>
 				<span
 					class={cn('truncate font-mono text-[0.8125rem]', !row.node && 'text-muted-foreground')}

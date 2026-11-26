@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { PrometheusDriver } from 'prometheus-query';
-	import { onDestroy } from 'svelte';
 
 	import { afterNavigate, replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -17,7 +16,7 @@
 		toNow
 	} from '$lib/components/custom/range-picker';
 	import { AutoRefresh, RefreshControl } from '$lib/components/custom/reloader';
-	import { formatDuration } from '$lib/components/dashboard/cluster/overview/format';
+	import { formatDuration } from '$lib/components/dashboard/kit/format';
 	import { Dashboard } from '$lib/components/dashboard/model/analytics';
 	import {
 		type RankTab,
@@ -68,11 +67,11 @@
 	// GPU panels ask the shared scope as the Workspace's member, whichever
 	// namespace an admin picks for the charts.
 	const shared = $derived(sharedMetrics(cluster, defaultNamespace));
-	const initialized = true;
+	// With no driver there is nothing to wait for: the page says why at once.
 	const body = $derived(
 		dashboardBody({
 			hasDriver: prometheusDriver !== null,
-			initialized,
+			initialized: true,
 			cluster,
 			namespace: defaultNamespace
 		})
@@ -89,22 +88,36 @@
 	let usageAnchor = $state(Date.now());
 	const usageResolved = $derived(resolveRange(usage.range, usageAnchor));
 	// An admin with cluster scope picks a Workspace or all; anyone else sees their own.
-	const usageEverywhere = $derived(isClusterAdmin && canViewClusterMetrics);
+	const clusterWide = $derived(isClusterAdmin && canViewClusterMetrics);
+	/** The Workspace's list of one kind of resource. */
+	function resourceListHref(kind: {
+		group: string;
+		version: string;
+		kind: string;
+		resource: string;
+	}): string {
+		const base = resolve('/(auth)/[cluster]/[workspace]', {
+			cluster,
+			workspace: currentWorkspace || '_'
+		});
+		return `${base}?${new URLSearchParams(kind)}`;
+	}
 	const manageKeysHref = $derived(
-		`${resolve('/(auth)/[cluster]/[workspace]', { cluster, workspace: currentWorkspace || '_' })}?${new URLSearchParams(
-			{ group: 'maas.phison.com', version: 'v1alpha1', kind: 'ApiKey', resource: 'apikeys' }
-		)}`
+		resourceListHref({
+			group: 'maas.phison.com',
+			version: 'v1alpha1',
+			kind: 'ApiKey',
+			resource: 'apikeys'
+		})
 	);
 	// AI Studio › Model, where an empty Overview sends you to deploy one.
 	const modelServiceHref = $derived(
-		`${resolve('/(auth)/[cluster]/[workspace]', { cluster, workspace: currentWorkspace || '_' })}?${new URLSearchParams(
-			{
-				group: 'serving.kserve.io',
-				version: 'v1alpha2',
-				kind: 'LLMInferenceService',
-				resource: 'llminferenceservices'
-			}
-		)}`
+		resourceListHref({
+			group: 'serving.kserve.io',
+			version: 'v1alpha2',
+			kind: 'LLMInferenceService',
+			resource: 'llminferenceservices'
+		})
 	);
 	function longerUsageRange() {
 		usage.range = { kind: 'relative', minutes: 7 * 24 * 60 };
@@ -122,41 +135,12 @@
 		usageAnchor = Date.now();
 	}
 
-	// replaceState throws until the router has started; afterNavigate runs once it has.
-	let routerReady = $state(false);
-	afterNavigate(() => (routerReady = true));
-	$effect(() => {
-		if (!routerReady) return;
-		const url = new URL(page.url);
-		for (const key of ['tab', ...ANALYTICS_PARAM_KEYS, ...USAGE_PARAM_KEYS]) {
-			url.searchParams.delete(key);
-		}
-		if (selectedTab !== 'overview') url.searchParams.set('tab', selectedTab);
-		if (selectedTab === 'analytics') {
-			if (selectedModel) url.searchParams.set('model', selectedModel);
-			if (analyticsMode === 'history') {
-				url.searchParams.set('mode', 'history');
-				for (const [k, v] of Object.entries(rangeToParams(analyticsRange))) {
-					url.searchParams.set(k, v);
-				}
-			}
-			if (rankTab !== 'requests') url.searchParams.set('rank', rankTab);
-		}
-		if (selectedTab === 'usage') {
-			for (const [k, v] of usageToParams(usage)) {
-				if (k === 'ws' && !usageEverywhere) continue;
-				url.searchParams.set(k, v);
-			}
-		}
-		// eslint-disable-next-line svelte/no-navigation-without-resolve -- same route, only the query changes
-		if (url.search !== page.url.search) replaceState(url, page.state);
-	});
 	/** Currently selected namespace; empty string means "all namespaces" */
 	let selectedNamespace = $state<string | undefined>(getInitialNamespace());
 
 	// An admin with cluster scope starts on every Workspace; anyone else sees their own.
 	function getInitialNamespace() {
-		if (isClusterAdmin && canViewClusterMetrics) return '';
+		if (clusterWide) return '';
 		return defaultNamespace !== '' ? defaultNamespace : undefined;
 	}
 	/**
@@ -192,6 +176,37 @@
 		if (mode === 'history' && analyticsRange.kind === 'relative') analyticsAnchor = Date.now();
 		analyticsMode = mode;
 	}
+
+	// replaceState throws until the router has started; afterNavigate runs once it has.
+	let routerReady = $state(false);
+	afterNavigate(() => (routerReady = true));
+	$effect(() => {
+		if (!routerReady) return;
+		const url = new URL(page.url);
+		for (const key of ['tab', ...ANALYTICS_PARAM_KEYS, ...USAGE_PARAM_KEYS]) {
+			url.searchParams.delete(key);
+		}
+		if (selectedTab !== 'overview') url.searchParams.set('tab', selectedTab);
+		if (selectedTab === 'analytics') {
+			if (selectedModel) url.searchParams.set('model', selectedModel);
+			if (analyticsMode === 'history') {
+				url.searchParams.set('mode', 'history');
+				for (const [k, v] of Object.entries(rangeToParams(analyticsRange))) {
+					url.searchParams.set(k, v);
+				}
+			}
+			if (rankTab !== 'requests') url.searchParams.set('rank', rankTab);
+		}
+		if (selectedTab === 'usage') {
+			for (const [k, v] of usageToParams(usage)) {
+				if (k === 'ws' && !clusterWide) continue;
+				url.searchParams.set(k, v);
+			}
+		}
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- same route, only the query changes
+		if (url.search !== page.url.search) replaceState(url, page.state);
+	});
+
 	const inAnalytics = $derived(selectedTab === 'analytics');
 	function longerAnalyticsRange() {
 		analyticsRange = { kind: 'relative', minutes: 7 * 24 * 60 };
@@ -221,13 +236,9 @@
 		range = toNow(range);
 		refresh();
 	}
-
-	onDestroy(() => {
-		isReloading = false;
-	});
 </script>
 
-<div class="space-y-4">
+<div class="flex flex-col gap-4">
 	<!-- Same title as Cluster Status. Overview and Analytics name their source; Usage keeps its line. -->
 	<header>
 		<h1 class="text-3xl leading-9 font-[350] tracking-tight">{m.model_status()}</h1>
@@ -275,7 +286,7 @@
 							<WorkspaceFilter
 								{cluster}
 								bind:namespace={usage.namespace}
-								fixed={usageEverywhere ? undefined : currentWorkspace || defaultNamespace}
+								fixed={clusterWide ? undefined : currentWorkspace || defaultNamespace}
 							/>
 							<RangePicker bind:range={usage.range} bind:anchor={usageAnchor} />
 							<RefreshControl
@@ -290,7 +301,7 @@
 						<div class="flex flex-wrap items-center justify-end gap-2">
 							<!-- Another Workspace is reachable only at cluster scope: an admin whose
 						cluster metrics access is denied or unknown queries this one alone. -->
-							{#if isClusterAdmin && canViewClusterMetrics}
+							{#if clusterWide}
 								<!-- The picker appears once the Workspaces are listed; a block holds its place
 								     until then, so the controls beside it do not move. -->
 								<div class="group/ws relative min-h-9 min-w-[11rem] sm:min-w-[12rem]">
@@ -376,7 +387,7 @@
 							start={usageResolved.start}
 							end={usageResolved.end}
 							clusterScope={canViewClusterMetrics}
-							everywhere={usageEverywhere}
+							everywhere={clusterWide}
 							{currentWorkspace}
 							{defaultNamespace}
 							{manageKeysHref}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { fmtTokens, niceTop } from './format';
+import { fmtTokens, niceCountTop } from './format';
 import { usageFromParams, usageToParams } from './params';
 import { counterIncrease, makeBuckets, scopeMatchers, toFacts, toSeries } from './queries';
 import {
@@ -350,6 +350,6 @@ describe('format', () => {
 	});
 
 	it('rounds the y axis top so its half is round too', () => {
-		expect([0, 1, 6, 7, 201, 880_000].map(niceTop)).toEqual([0, 2, 6, 8, 240, 1_000_000]);
+		expect([0, 1, 6, 7, 201, 880_000].map(niceCountTop)).toEqual([0, 2, 6, 8, 240, 1_000_000]);
 	});
 });

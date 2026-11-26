@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { NUM } from '$lib/components/dashboard/kit';
+	import { cn } from '$lib/utils';
 
 	// The dark hover card over a map tile. It trails the pointer (`x`/`y` are viewport
 	// coordinates) and flips to the pointer's other side near a window edge; `fixed`, so no
@@ -49,7 +50,7 @@
 		<dl class="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
 			{#each lines as line (line.k)}
 				<dt class="text-ink-muted">{line.k}</dt>
-				<dd class="font-mono {NUM}">{line.v}</dd>
+				<dd class={cn('font-mono', NUM)}>{line.v}</dd>
 			{/each}
 		</dl>
 	{/if}

@@ -2,15 +2,15 @@
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { untrack } from 'svelte';
 
-	import { fetchInstant } from '$lib/components/dashboard/cluster/analytics/lib/fetch';
-	import { Loader } from '$lib/components/dashboard/cluster/analytics/lib/loader.svelte';
 	import { Panel } from '$lib/components/dashboard/kit';
+	import { fetchInstant } from '$lib/components/dashboard/kit/fetch';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
 
 	import { DASH } from '../../overview/lib/models';
 	import type { ModelPods } from '../lib/model-pods';
-	import { argValue, engineVersion, fmtTokens, imageText, shortGpuName } from '../lib/pods';
+	import { argValue, engineVersion, fmtContextTokens, imageText, shortGpuName } from '../lib/pods';
 	import { engineConfigQueries } from '../lib/queries';
 
 	// The engine and how it is set up: the version and image from the pod spec, parallelism and
@@ -90,7 +90,7 @@
 		{ label: m.model_analytics_gpus_per_replica(), value: gpusText() },
 		{
 			label: m.model_analytics_max_model_len(),
-			value: (pod && fmtTokens(argValue(pod.argv, '--max-model-len'))) ?? DASH
+			value: (pod && fmtContextTokens(argValue(pod.argv, '--max-model-len'))) ?? DASH
 		},
 		{
 			label: m.model_analytics_prefix_caching(),

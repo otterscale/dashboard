@@ -64,7 +64,7 @@ export function severityRank(severity: string): number {
 }
 
 /** Identity of an alert across ALERTS and ALERTS_FOR_STATE: its labels without alertstate. */
-function alertKey(labels: Record<string, string>): string {
+export function alertKey(labels: Record<string, string>): string {
 	return Object.keys(labels)
 		.filter((key) => key !== 'alertstate' && key !== '__name__')
 		.sort()
@@ -78,8 +78,9 @@ function labelsOf(series: InstantVector): Record<string, string> {
 
 export class ClusterSignals {
 	status = $state<SignalsStatus>('loading');
-	nodes = $state<NodeSignal[]>([]);
-	alerts = $state<FiringAlert[]>([]);
+	// Replaced whole by each refresh, never changed in place.
+	nodes = $state.raw<NodeSignal[]>([]);
+	alerts = $state.raw<FiringAlert[]>([]);
 	kubernetesVersion = $state<string>();
 	kubernetesPlatform = $state<string>();
 	/** When the last request succeeded, in ms. */
@@ -88,12 +89,8 @@ export class ClusterSignals {
 	readonly readyCount = $derived(this.nodes.filter((node) => node.ready).length);
 	readonly allReady = $derived(this.nodes.length > 0 && this.readyCount === this.nodes.length);
 	readonly masterCount = $derived(this.nodes.filter((node) => node.isMaster).length);
-	/** Alerts that make the cluster Degraded: `alerts` holds only critical and warning ones. */
-	readonly actionableCount = $derived(
-		this.alerts.filter((alert) => alert.severity === 'critical' || alert.severity === 'warning')
-			.length
-	);
-	readonly isDegraded = $derived(this.actionableCount > 0 || !this.allReady);
+	/** Any alert makes the cluster Degraded: `alerts` holds only critical and warning ones. */
+	readonly isDegraded = $derived(this.alerts.length > 0 || !this.allReady);
 
 	#driver: PrometheusDriver;
 	#reload: ReloadManager;
@@ -103,7 +100,7 @@ export class ClusterSignals {
 		this.#reload = new ReloadManager(() => void this.refresh());
 	}
 
-	/** Start or stop the periodic refresh; the first fetch runs either way. */
+	/** Start the periodic refresh, which fetches at once, or stop it. */
 	setReloading(on: boolean) {
 		if (on) this.#reload.restart();
 		else this.#reload.stop();

@@ -5,10 +5,11 @@
 	import * as Chart from '$lib/components/ui/chart/index.js';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
+	import { getLocale } from '$lib/paraglide/runtime';
 
 	import { niceTop } from '../../overview/lib/models';
 	import { FINISH } from '../lib/chart-style';
-	import type { FinishPoint } from '../lib/history';
+	import { type FinishPoint, fmtDecimal as fmt, isLongSpan } from '../lib/history';
 
 	// Finished requests per bucket, stacked: Stop, Length limit, Aborted.
 	let {
@@ -39,15 +40,18 @@
 		if (n <= 5) return data.map((d) => d.date);
 		return Array.from({ length: 5 }, (_, i) => data[Math.round((i * (n - 1)) / 4)].date);
 	});
-	// A window over a day and a half reads by date, a shorter one by time.
 	const long = $derived(
-		data.length > 1 && data[data.length - 1].end.getTime() - data[0].date.getTime() > 36 * 3600_000
+		data.length > 1 && isLongSpan(data[data.length - 1].end.getTime() - data[0].date.getTime())
 	);
 	const time = (d: Date) =>
 		long
-			? d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', hour12: false })
-			: d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-	const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
+			? d.toLocaleString(getLocale(), {
+					month: 'short',
+					day: 'numeric',
+					hour: '2-digit',
+					hour12: false
+				})
+			: d.toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit', hour12: false });
 </script>
 
 <Panel title={m.model_analytics_finish_reason()} {state} class="min-h-[18rem]" bodyClass="pt-2">
@@ -60,11 +64,11 @@
 	{/snippet}
 	<div style:height="{height}px">
 		{#if data.length === 0}
-			<Skeleton class="h-full w-full rounded-lg" />
+			<Skeleton class="size-full rounded-lg" />
 		{:else}
 			<Chart.Container
 				{config}
-				class="aspect-auto h-full w-full [&_.lc-axis-tick-label]:fill-muted-foreground [&_.lc-grid-y-line]:stroke-border [&_.lc-text]:text-[11px]"
+				class="aspect-auto size-full [&_.lc-axis-tick-label]:fill-muted-foreground [&_.lc-grid-y-line]:stroke-border [&_.lc-text]:text-[11px]"
 			>
 				<BarChart
 					{data}

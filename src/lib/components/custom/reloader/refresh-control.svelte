@@ -4,6 +4,8 @@
 	import PauseIcon from '@lucide/svelte/icons/pause';
 	import RotateCwIcon from '@lucide/svelte/icons/rotate-cw';
 
+	import { Button, buttonVariants } from '$lib/components/ui/button';
+	import * as ButtonGroup from '$lib/components/ui/button-group';
 	import { m } from '$lib/messages';
 	import { cn } from '$lib/utils';
 
@@ -52,42 +54,45 @@
 		return m.duration_days({ count: String(Math.floor(hours / 24)) });
 	}
 
-	const part =
-		'inline-flex items-center gap-2 px-3 whitespace-nowrap transition-colors outline-none hover:bg-muted focus-visible:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset disabled:pointer-events-none disabled:opacity-50 dark:hover:bg-input/50';
+	// Text beside a state: smaller, quieter, and in figures that do not shift as they count.
 	const meta = 'text-xs font-normal text-muted-foreground tabular-nums';
 </script>
 
-<div
+<!-- One pill out of outline buttons: the group squares the inner corners and shares the border
+     between them, and the classes here round the two ends fully. -->
+<ButtonGroup.Root
 	class={cn(
-		'inline-flex h-9 shrink-0 items-stretch overflow-hidden rounded-full border border-border bg-background text-sm font-medium shadow-xs dark:border-input dark:bg-input/30',
+		'shrink-0 [&>[data-slot]:first-child]:rounded-l-full! [&>[data-slot]:not(:has(~[data-slot]))]:rounded-r-full!',
 		className
 	)}
 >
-	<button
-		type="button"
-		class={cn(part, 'w-9 justify-center px-0')}
+	<!-- The group shares one border between its parts; the widths below give that pixel back, so
+	     the control is as wide as it was when each part had its own divider. -->
+	<Button
+		variant="outline"
+		size="icon"
+		class="w-[2.375rem]"
 		aria-label={m.refresh_now()}
 		title={m.refresh_now()}
 		disabled={past || updating}
 		onclick={onrefresh}
 	>
 		{#if updating}
-			<LoaderCircleIcon class="size-4 animate-spin text-muted-foreground" />
+			<LoaderCircleIcon class="animate-spin text-muted-foreground" />
 		{:else}
-			<RotateCwIcon class="size-4" />
+			<RotateCwIcon />
 		{/if}
-	</button>
-	<span class="w-px bg-border dark:bg-input" aria-hidden="true"></span>
+	</Button>
 	{#if past && onnow}
-		<button type="button" class={part} onclick={onnow}>
-			<ChevronsRightIcon class="size-4 text-muted-foreground" />{m.refresh_back_to_now()}
-		</button>
+		<Button variant="outline" class="gap-2 px-3" onclick={onnow}>
+			<ChevronsRightIcon class="text-muted-foreground" />{m.refresh_back_to_now()}
+		</Button>
 	{:else if live !== undefined}
 		<!-- As wide as the wider of "● Live 9 s" and "‖ Paused" in either language, so pausing
 		     and resuming move nothing beside it. -->
-		<button
-			type="button"
-			class={cn(part, 'min-w-[6.25rem]')}
+		<Button
+			variant="outline"
+			class="min-w-[6.3125rem] justify-start gap-2 px-3"
 			aria-pressed={live}
 			title={[
 				live ? m.refresh_pause() : m.refresh_resume(),
@@ -106,21 +111,26 @@
 				</span>
 				{m.refresh_live()}
 				{#if updatedAt !== undefined}
-					<span class="{meta} max-sm:hidden">{ago(updatedAt)}</span>
+					<span class={cn(meta, 'max-sm:hidden')}>{ago(updatedAt)}</span>
 				{/if}
 			{:else}
 				<PauseIcon class="size-3.5 text-muted-foreground" />
 				<!-- No age here: Paused is wider than Live, and the age is in the tooltip. -->
 				<span class="text-muted-foreground">{m.refresh_paused()}</span>
 			{/if}
-		</button>
+		</Button>
 	{:else}
-		<span class="flex items-center px-3 text-[0.8125rem] font-normal text-muted-foreground">
-			<span class="tabular-nums">
-				{updatedAt === undefined
-					? m.refresh_updating()
-					: m.refresh_updated_ago({ ago: ago(updatedAt) })}
-			</span>
+		<!-- Not a control, but the same ground and border as the button it sits against. -->
+		<span
+			data-slot="button-group-text"
+			class={cn(
+				buttonVariants({ variant: 'outline' }),
+				'pointer-events-none px-3 text-[0.8125rem] font-normal text-muted-foreground tabular-nums'
+			)}
+		>
+			{updatedAt === undefined
+				? m.refresh_updating()
+				: m.refresh_updated_ago({ ago: ago(updatedAt) })}
 		</span>
 	{/if}
-</div>
+</ButtonGroup.Root>

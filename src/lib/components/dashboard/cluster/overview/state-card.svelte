@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Chip, NUM } from '$lib/components/dashboard/kit';
 	import * as Card from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
@@ -51,7 +52,8 @@
 	);
 	const pill = $derived(
 		cn(
-			'inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-xs whitespace-nowrap slashed-zero tabular-nums',
+			'h-6 gap-1.5 border-0 px-2.5',
+			NUM,
 			tone === 'ink'
 				? 'bg-attention-foreground/10 text-attention-foreground'
 				: 'bg-card/60 text-mint-foreground'
@@ -100,21 +102,21 @@
 	<div class="flex min-h-6 flex-wrap gap-1.5">
 		{#if ready}
 			{#if signals.alerts.length === 0}
-				<span class={pill}>
+				<Chip class={pill}>
 					<span class="size-2 rounded-full bg-chart-2" aria-hidden="true"></span>
 					{m.cluster_alerts_firing_none()}
-				</span>
+				</Chip>
 			{:else}
-				<span class={pill}>
+				<Chip class={pill}>
 					<span class="size-2 rounded-full bg-destructive" aria-hidden="true"></span>
 					{counts.critical}
 					{m.alert_severity_critical()}
-				</span>
-				<span class={pill}>
+				</Chip>
+				<Chip class={pill}>
 					<span class="size-2 rounded-full bg-chart-1" aria-hidden="true"></span>
 					{counts.warning}
 					{m.alert_severity_warning()}
-				</span>
+				</Chip>
 			{/if}
 		{/if}
 	</div>
