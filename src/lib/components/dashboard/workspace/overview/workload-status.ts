@@ -200,15 +200,27 @@ export type WorkspaceObjects = {
 	pods: PodObject[];
 };
 
-/** Every workload in the namespace with its state. */
-export function classifyWorkloads(objects: WorkspaceObjects, now: number): Workload[] {
+/** One workload with the objects that decide its state: its own readiness and its pods. */
+type Attributed = {
+	kind: WorkloadKind;
+	name: string;
+	resource?: 'deployments' | 'statefulsets';
+	ready: boolean;
+	pods: PodObject[];
+	/** The Deployments and StatefulSets behind it, as `deployments/<name>`. */
+	owners: string[];
+	ownFailure: string | null;
+};
+
+/** Every workload in the namespace with the pods that belong to it. */
+function attribute(objects: WorkspaceObjects): Attributed[] {
 	const podsByOwner = new Map<string, PodObject[]>();
 	for (const pod of objects.pods) {
 		const key = podOwnerKey(pod);
 		if (key) podsByOwner.set(key, [...(podsByOwner.get(key) ?? []), pod]);
 	}
 
-	const workloads: Workload[] = [];
+	const workloads: Attributed[] = [];
 
 	for (const model of objects.models) {
 		const name = model.metadata?.name;
@@ -218,7 +230,15 @@ export function classifyWorkloads(objects: WorkspaceObjects, now: number): Workl
 				pod.metadata?.labels?.[MODEL_PART_OF] === 'llminferenceservice' &&
 				pod.metadata?.labels?.[MODEL_NAME] === name
 		);
-		workloads.push({ kind: 'model', name, ...decide(isReadyCondition(model), pods, now, null) });
+		const owners = pods.map(podOwnerKey).filter((key): key is string => key !== null);
+		workloads.push({
+			kind: 'model',
+			name,
+			ready: isReadyCondition(model),
+			pods,
+			owners: [...new Set(owners)],
+			ownFailure: null
+		});
 	}
 
 	const releasedKeys = new Set<string>();
@@ -227,11 +247,13 @@ export function classifyWorkloads(objects: WorkspaceObjects, now: number): Workl
 		if (!name) continue;
 		const keys = inventoryKeys(release);
 		keys.forEach((key) => releasedKeys.add(key));
-		const pods = keys.flatMap((key) => podsByOwner.get(key) ?? []);
 		workloads.push({
 			kind: 'release',
 			name,
-			...decide(isReadyCondition(release), pods, now, releaseFailure(release))
+			ready: isReadyCondition(release),
+			pods: keys.flatMap((key) => podsByOwner.get(key) ?? []),
+			owners: keys,
+			ownFailure: releaseFailure(release)
 		});
 	}
 
@@ -251,11 +273,46 @@ export function classifyWorkloads(objects: WorkspaceObjects, now: number): Workl
 			kind: 'other',
 			name,
 			resource,
-			...decide(replicasReady(object), podsByOwner.get(key) ?? [], now, null)
+			ready: replicasReady(object),
+			pods: podsByOwner.get(key) ?? [],
+			owners: [key],
+			ownFailure: null
 		});
 	}
 
 	return workloads;
+}
+
+/** Every workload in the namespace with its state. */
+export function classifyWorkloads(objects: WorkspaceObjects, now: number): Workload[] {
+	return attribute(objects).map(({ kind, name, resource, ready, pods, ownFailure }) => ({
+		kind,
+		name,
+		...(resource ? { resource } : {}),
+		...decide(ready, pods, now, ownFailure)
+	}));
+}
+
+/** A workload with the names of its pods, for pages that add up numbers per workload. */
+export type WorkloadMembers = Workload & {
+	pods: string[];
+	/** The Deployments and StatefulSets behind it, as `deployments/<name>`. */
+	owners: string[];
+};
+
+/**
+ * `classifyWorkloads` with each workload's pods and owners, from the same attribution, so a
+ * page that sums per workload lists the workloads the health card lists.
+ */
+export function classifyWorkloadMembers(objects: WorkspaceObjects, now: number): WorkloadMembers[] {
+	return attribute(objects).map(({ kind, name, resource, ready, pods, owners, ownFailure }) => ({
+		kind,
+		name,
+		...(resource ? { resource } : {}),
+		...decide(ready, pods, now, ownFailure),
+		pods: pods.map((pod) => pod.metadata?.name).filter((n): n is string => !!n),
+		owners
+	}));
 }
 
 const STATE_ORDER: Record<WorkloadState, number> = { failing: 0, starting: 1, ready: 2 };

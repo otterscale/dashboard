@@ -33,8 +33,8 @@
 		/** Behind the ⓘ beside the title. */
 		tooltip?: string;
 		data: BarPoint[];
-		/** Bottom first. */
-		series: [BarSeries, BarSeries];
+		/** Bottom first; one series draws plain bars. */
+		series: [BarSeries, BarSeries] | [BarSeries];
 		format: (value: number) => string;
 		state: WidgetState;
 		bucketSeconds: number;

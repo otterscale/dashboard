@@ -10,6 +10,8 @@
 	export type RankRow = {
 		id: string;
 		label: string;
+		/** Written in the # column instead of the row's position, e.g. "—" for a total row. */
+		rank?: string;
 		/** Shown on hover, e.g. the workspace that owns a namespace. */
 		title?: string;
 		chips: string[];
@@ -94,6 +96,11 @@
 
 	let expanded = $state(false);
 	const visible = $derived(limit && !expanded ? rows.slice(0, limit) : rows);
+	// A row with its own `rank` is not counted, so the rows after it still number from 1.
+	const positions = $derived.by(() => {
+		let n = 0;
+		return visible.map((row) => row.rank ?? String(++n));
+	});
 
 	const METRICS = $derived(
 		metrics ??
@@ -197,7 +204,7 @@
 							on ? 'bg-accent' : 'hover:bg-accent/60'
 						)}
 					>
-						<span class="text-xs text-muted-foreground {NUM}">{i + 1}</span>
+						<span class="text-xs text-muted-foreground {NUM}">{positions[i]}</span>
 						<span class="flex min-w-0 items-center gap-2" title={row.title ?? row.label}>
 							<span class="truncate font-mono text-[0.8125rem]">{row.label}</span>
 							{#each row.chips as chip (chip)}

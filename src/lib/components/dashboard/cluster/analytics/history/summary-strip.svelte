@@ -8,7 +8,8 @@
 		items,
 		state
 	}: {
-		items: { label: string; value: string; note: string }[];
+		/** `valueClass` colours one number, e.g. a warning for a count that should be zero. */
+		items: { label: string; value: string; note: string; valueClass?: string }[];
 		state: WidgetState;
 	} = $props();
 </script>
@@ -31,7 +32,12 @@
 				<p class="mt-1 text-[1.75rem] leading-8 text-muted-foreground" aria-hidden="true">—</p>
 				<p class="text-xs leading-4 text-muted-foreground">{m.dashboard_couldnt_load()}</p>
 			{:else}
-				<p class="mt-1 truncate text-[1.75rem] leading-8 tracking-tight {NUM}">{item.value}</p>
+				<p
+					class="mt-1 truncate text-[1.75rem] leading-8 tracking-tight {NUM} {item.valueClass ??
+						''}"
+				>
+					{item.value}
+				</p>
 				<p class="truncate text-xs leading-4 text-muted-foreground" title={item.note}>
 					{item.note}
 				</p>
