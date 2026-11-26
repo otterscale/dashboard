@@ -99,6 +99,10 @@
 		$state(undefined);
 	let pendingAction: ConfigureAction | undefined = $state(undefined);
 	let handoffOpen = $state(false);
+	let isPublic = $state(false);
+	let apiSchema = $state('OpenAI');
+	/** Set when the deploy wizard hands back, so reopening keeps the choices. */
+	let returning = false;
 
 	async function listTemplates(): Promise<ModelTemplateObject[]> {
 		const modelLabel = entry.metadata?.labels?.['template.phison.com/model'];
@@ -144,6 +148,10 @@
 	$effect(() => {
 		if (!open) return;
 		untrack(() => {
+			if (returning) {
+				returning = false;
+				return;
+			}
 			templates = [];
 			selection = {
 				workload: '',
@@ -153,6 +161,8 @@
 				kvOffload: 'false',
 				routing: 'false'
 			};
+			isPublic = false;
+			apiSchema = 'OpenAI';
 			loadTemplates();
 		});
 	});
@@ -404,6 +414,42 @@
 						disabled={!(routingOn && routingOff)}
 					/>
 				</Field.Field>
+
+				{#if action === 'deploy'}
+					<Field.Field orientation="horizontal">
+						<Field.Content>
+							<Field.Label for="api-schema">API schema</Field.Label>
+							<Field.Description>
+								The API the gateway serves this model with. Rerankers need Cohere.
+							</Field.Description>
+						</Field.Content>
+						<Select.Root
+							type="single"
+							value={apiSchema}
+							onValueChange={(value) => (apiSchema = value)}
+						>
+							<Select.Trigger id="api-schema" class="w-32 shrink-0">{apiSchema}</Select.Trigger>
+							<Select.Content align="end">
+								<Select.Item value="OpenAI" label="OpenAI" />
+								<Select.Item value="Cohere" label="Cohere" />
+							</Select.Content>
+						</Select.Root>
+					</Field.Field>
+
+					<Field.Field orientation="horizontal">
+						<Field.Content>
+							<Field.Label for="public-access">Public</Field.Label>
+							<Field.Description>
+								Anyone who can reach the gateway can call this model without an API key.
+							</Field.Description>
+						</Field.Content>
+						<Switch
+							id="public-access"
+							checked={isPublic}
+							onCheckedChange={(checked) => (isPublic = checked)}
+						/>
+					</Field.Field>
+				{/if}
 			</Field.Group>
 
 			<div class="rounded-lg bg-muted p-4">
@@ -530,9 +576,17 @@
 		{cluster}
 		{namespace}
 		{schema}
+		{isPublic}
+		{apiSchema}
+		onBack={() => {
+			returning = true;
+			handoffOpen = false;
+		}}
 		object={pendingObject}
 		onOpenChangeComplete={(isOpen) => {
-			if (!isOpen) pendingTemplate = undefined;
+			if (isOpen) return;
+			pendingTemplate = undefined;
+			if (returning) open = true;
 		}}
 	/>
 {/if}
