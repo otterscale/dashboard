@@ -19,6 +19,7 @@ type LLMInferenceServiceObject = {
 		name?: string;
 		namespace?: string;
 		creationTimestamp?: string;
+		annotations?: Record<string, string>;
 	};
 	spec?: {
 		model?: {
@@ -49,6 +50,7 @@ type LLMInferenceServiceAttribute =
 	| 'Mode'
 	| 'Engines'
 	| 'Schedulers'
+	| 'Access'
 	| 'Status'
 	| 'Age'
 	| 'raw';
@@ -63,6 +65,7 @@ function getLLMInferenceServiceDataSchemas(): Record<LLMInferenceServiceAttribut
 		Mode: 'text',
 		Engines: 'number',
 		Schedulers: 'number',
+		Access: 'text',
 		Status: 'text',
 		Age: 'time',
 		raw: 'object'
@@ -90,6 +93,10 @@ function getLLMInferenceServiceData(
 					: '',
 		Engines: object?.status?.workloads?.primary?.readyReplicas ?? null,
 		Schedulers: object?.status?.workloads?.scheduler?.readyReplicas ?? null,
+		Access:
+			object?.metadata?.annotations?.['maas.phison.com/public']?.toLowerCase() === 'true'
+				? 'Public'
+				: 'Private',
 		Age: object?.metadata?.creationTimestamp ?? null,
 		raw: (object as JsonObject) ?? null
 	};
@@ -105,6 +112,7 @@ function getLLMInferenceServiceUISchemas(): Record<LLMInferenceServiceAttribute,
 		Mode: 'text',
 		Engines: 'number',
 		Schedulers: 'number',
+		Access: 'text',
 		Status: 'text',
 		Age: 'time',
 		raw: 'object'
@@ -304,6 +312,27 @@ function getLLMInferenceServiceColumnDefinitions(
 					uiSchemas: uiSchemas
 				}),
 			accessorKey: 'Schedulers'
+		},
+		{
+			id: 'Access',
+			header: ({ column }: { column: Column<Record<LLMInferenceServiceAttribute, JsonValue>> }) =>
+				renderComponent(DynamicTableHeader, {
+					column: column,
+					dataSchemas: dataSchemas
+				}),
+			cell: ({
+				column,
+				row
+			}: {
+				column: Column<Record<LLMInferenceServiceAttribute, JsonValue>>;
+				row: Row<Record<LLMInferenceServiceAttribute, JsonValue>>;
+			}) =>
+				renderComponent(DynamicTableCell, {
+					row: row,
+					column: column,
+					uiSchemas: uiSchemas
+				}),
+			accessorKey: 'Access'
 		},
 		{
 			id: 'Status',
