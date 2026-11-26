@@ -9,6 +9,7 @@ import { fetchCombinedInstantOrNull } from '$lib/prometheus';
 
 import { firstNumber } from './instant';
 import { field, type KubeObject, listObjects, type ListParams, text } from './kube';
+import { getAdditionalChecks } from './platform-checks-extra';
 
 // Platform checks (SPEC 3.7): facts about the platform an admin should not have to go looking
 // for. SPEC planned a backend summary API; until it exists they are read here, the way the entry
@@ -20,9 +21,11 @@ import { field, type KubeObject, listObjects, type ListParams, text } from './ku
 //   Notifications   Alertmanager's own count of configured integrations
 //
 // The checks are shaped like SPEC's `checks` array, so the source can be swapped for the backend
-// API without touching the card. License belongs to the enterprise edition and is added there.
+// API without touching the card. License belongs to the enterprise edition, which adds it through
+// `getAdditionalChecks` (platform-checks-extra.ts); its id and title live here so the card can
+// draw it.
 
-export type CheckId = 'modules' | 'backup' | 'certificates' | 'notifications';
+export type CheckId = 'modules' | 'backup' | 'certificates' | 'notifications' | 'license';
 
 /** `unknown`: the check could not be read. `none`: nothing to judge yet, neither good nor bad. */
 export type CheckState = 'ok' | 'warning' | 'critical' | 'none' | 'unknown';
@@ -305,7 +308,10 @@ export class PlatformChecksSource {
 	}
 
 	async refresh() {
-		const [releases, schedules, backups, certificates, alertmanager] = await Promise.all([
+		// The other lists only feed their own check, which says it cannot be read.
+		const listed = (result: Awaited<ReturnType<typeof listObjects>>): Listed =>
+			result === 'denied' ? 'failed' : result;
+		const [releases, schedules, backups, certificates, alertmanager, extra] = await Promise.all([
 			this.#list({
 				group: 'helm.toolkit.fluxcd.io',
 				version: 'v2',
@@ -323,7 +329,9 @@ export class PlatformChecksSource {
 			fetchCombinedInstantOrNull(this.#driver(), {
 				integrations: 'sum(alertmanager_integrations)',
 				reloaded: 'min(alertmanager_config_last_reload_successful)'
-			})
+			}),
+			// An edition's own checks must not take the four above down with them.
+			getAdditionalChecks((params) => this.#list(params).then(listed)).catch(() => [])
 		]);
 		// Every OtterScale cluster runs Flux, so a refused module list means this user may not read
 		// the platform's objects: SPEC hides the whole card for them.
@@ -339,9 +347,6 @@ export class PlatformChecksSource {
 			this.loaded = true;
 			return;
 		}
-		// The other lists only feed their own check, which says it cannot be read.
-		const listed = (result: Awaited<ReturnType<typeof listObjects>>): Listed =>
-			result === 'denied' ? 'failed' : result;
 		const now = Date.now();
 		this.checks = [
 			modulesCheck(releases),
@@ -350,7 +355,8 @@ export class PlatformChecksSource {
 			notificationsCheck(
 				firstNumber(alertmanager?.integrations),
 				firstNumber(alertmanager?.reloaded)
-			)
+			),
+			...extra
 		];
 		this.loaded = true;
 	}

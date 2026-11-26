@@ -47,7 +47,8 @@
 		modules: m.check_title_modules,
 		backup: m.check_title_backup,
 		certificates: m.check_title_certificates,
-		notifications: m.check_title_notifications
+		notifications: m.check_title_notifications,
+		license: m.license
 	};
 	// The dashboards' one status scale; a check that cannot be judged is neither good nor bad.
 	const TONE: Record<CheckState, Tone> = {
@@ -67,13 +68,17 @@
 			state={source.loaded ? 'ready' : 'loading'}
 			class="min-h-44"
 		>
-			<!-- Cells on a 1px border-coloured ground: the gaps draw the dividers at any column count. -->
+			<!-- Cells on a 1px border-coloured ground: the gaps draw the dividers at any column count.
+			     Wide, one column per check however many an edition has; two across, the last of an
+			     odd number takes the whole row so no empty cell shows the ground. -->
 			<ul
-				class="grid grid-cols-1 gap-px overflow-hidden rounded-xl border bg-border @md/panel:grid-cols-2 @4xl/panel:grid-cols-4"
+				class="grid grid-cols-1 gap-px overflow-hidden rounded-xl border bg-border @md/panel:grid-cols-2 @4xl/panel:auto-cols-fr @4xl/panel:grid-flow-col @4xl/panel:grid-cols-none"
 			>
 				{#each source.checks ?? [] as check (check.id)}
 					{@const tone = TONE[check.state]}
-					<li class="min-w-0 bg-card px-3.5 py-3">
+					<li
+						class="min-w-0 bg-card px-3.5 py-3 @md/panel:last:odd:col-span-2 @4xl/panel:last:odd:col-span-1"
+					>
 						<p class="truncate text-xs leading-4 text-muted-foreground">{TITLES[check.id]()}</p>
 						<p
 							class={cn(
