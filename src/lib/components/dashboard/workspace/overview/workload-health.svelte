@@ -1,8 +1,6 @@
 <script lang="ts">
 	import type { JsonObject } from '@bufbuild/protobuf';
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import HeartPulse from '@lucide/svelte/icons/heart-pulse';
-	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import {
 		type ListRequest,
 		type ListResponse,
@@ -13,8 +11,7 @@
 	import { getContext, onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Card from '$lib/components/ui/card';
-	import { Progress } from '$lib/components/ui/progress';
+	import { Panel, Status, widgetState } from '$lib/components/dashboard/kit';
 	import { m } from '$lib/messages';
 
 	type WorkloadListSpec = {
@@ -26,7 +23,6 @@
 	/** Same GVR as console nav / model.svelte (ResourceService.list). */
 	const WORKLOAD_SPECS: WorkloadListSpec[] = [
 		{ group: 'serving.kserve.io', version: 'v1alpha2', resource: 'llminferenceservices' },
-		{ group: 'kro.run', version: 'v1alpha1', resource: 'applications' },
 		{ group: 'helm.toolkit.fluxcd.io', version: 'v2', resource: 'helmreleases' }
 	];
 
@@ -45,7 +41,7 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	const workloadLabels = $derived([m.model(), m.application(), m.release()]);
+	const workloadLabels = $derived([m.model(), m.release()]);
 
 	let rows: { label: string; ready: number; total: number }[] = $state([]);
 
@@ -157,42 +153,39 @@
 	});
 </script>
 
-<Card.Root class="group relative h-full min-h-[280px] gap-2 overflow-hidden">
-	<HeartPulse
-		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"
-		aria-hidden="true"
-	/>
-	<Card.Header>
-		<Card.Title>{m.workspace_workload_health_title()}</Card.Title>
-		<Card.Description class="text-md flex min-h-6 items-center">
-			{m.workspace_workload_health_description()}
-		</Card.Description>
-	</Card.Header>
+<Panel
+	title={m.workspace_workload_health_title()}
+	description={m.workspace_workload_health_description()}
+	state={namespace ? widgetState(isLoaded, rows.length > 0) : 'ready'}
+	class="min-h-[13.625rem] @md:min-h-[13.875rem]"
+>
 	{#if !namespace}
-		<Card.Content class="text-sm text-muted-foreground"
-			>{m.workspace_namespace_unresolved()}</Card.Content
-		>
-	{:else if !isLoaded}
-		<div class="flex h-9 w-full items-center justify-center">
-			<LoaderCircle class="size-10 animate-spin text-muted-foreground" />
-		</div>
+		<p class="text-sm text-muted-foreground">{m.workspace_namespace_unresolved()}</p>
 	{:else}
-		<Card.Content class="space-y-2.5">
+		<!-- One row per kind, laid out like the quota card beside it. A ready count is a number,
+		     not a capacity, so there is no bar: only an amber mark when some are not ready. -->
+		<ul class="flex flex-1 flex-col slashed-zero tabular-nums">
 			{#each rows as row (row.label)}
-				{@const pct = row.total > 0 ? Math.min(100, Math.round((100 * row.ready) / row.total)) : 0}
-				<div class="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/15 px-3 py-2.5">
-					<div class="flex items-center justify-between gap-2">
-						<span class="text-sm font-medium">{row.label}</span>
-						<span class="shrink-0 text-sm text-muted-foreground tabular-nums">
-							{m.workspace_workload_ready_ratio({
-								ready: String(row.ready),
-								total: String(row.total)
-							})}
-						</span>
-					</div>
-					<Progress value={pct} max={100} class="h-1.5 bg-muted/80" />
-				</div>
+				<li
+					class="flex flex-1 items-center justify-between gap-3 border-t border-border py-2.5 first:border-t-0 first:pt-0 last:pb-0"
+				>
+					<p class="min-w-0 truncate text-sm font-medium" title={row.label}>{row.label}</p>
+					{#if row.total === 0}
+						<!-- Nothing of this kind is deployed: not a zero to read, so a word. -->
+						<p class="shrink-0 text-sm text-muted-foreground">{m.dashboard_none()}</p>
+					{:else}
+						<p class="shrink-0 text-2xl leading-8 tracking-tight">
+							{#if row.ready < row.total}
+								<Status tone="warn" variant="dot" class="text-2xl leading-8">{row.ready}</Status>
+							{:else}
+								{row.ready}
+							{/if}<span class="ml-1 text-xs tracking-normal text-muted-foreground"
+								>/ {row.total} {m.ready()}</span
+							>
+						</p>
+					{/if}
+				</li>
 			{/each}
-		</Card.Content>
+		</ul>
 	{/if}
-</Card.Root>
+</Panel>

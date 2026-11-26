@@ -1,65 +1,37 @@
 <script lang="ts">
-	import { PrometheusDriver } from 'prometheus-query';
+	import type { PrometheusDriver } from 'prometheus-query';
 
-	import { default as AreaCapacity } from './area-chart-capacity.svelte';
-	import { default as AreaOSDReadLatency } from './area-chart-osd-read-latency.svelte';
-	import { default as AreaOSDWriteLatency } from './area-chart-osd-write-latency.svelte';
-	import { default as BarOSDIOPS } from './bar-chart-osd-iops.svelte';
-	import { default as BarOSDThroughtput } from './bar-chart-osd-throughtput.svelte';
-	import { default as PieOSDType } from './pie-chart-osd-type.svelte';
-	import { default as TextClusterHealth } from './text-chart-cluster-health.svelte';
-	import { default as TextOSDs } from './text-chart-osds.svelte';
-	import { default as TextQuorum } from './text-chart-quorum.svelte';
-	import { default as TextTimeTillFull } from './text-chart-time-till-full.svelte';
-	import { default as UsageCapacity } from './usage-chart-capacity.svelte';
+	import { m } from '$lib/messages';
 
+	import Capacity from './capacity.svelte';
+	import Daemons from './daemons.svelte';
+	import Health from './health.svelte';
+	import { LAYOUT } from './layout';
+	import Performance from './performance.svelte';
+	import PlacementGroups from './placement-groups.svelte';
+	import Pools from './pools.svelte';
+
+	// Top to bottom, the order an operator asks in: is storage healthy and why not, will it fill
+	// and when, are the daemons and placement groups whole, is it slow, then pool by pool.
 	let {
 		client,
 		start,
 		end,
-		endIsNow = false,
 		isReloading = $bindable()
 	}: {
 		client: PrometheusDriver;
 		start: Date;
 		end: Date;
-		endIsNow?: boolean;
 		isReloading: boolean;
 	} = $props();
 </script>
 
-<div class="grid auto-rows-auto grid-cols-2 gap-5 pt-4 md:grid-cols-4 lg:grid-cols-10">
-	<div class="col-span-2">
-		<TextClusterHealth {client} bind:isReloading />
-	</div>
-	<div class="col-span-2">
-		<TextTimeTillFull {client} bind:isReloading />
-	</div>
-	<div class="col-span-2 row-span-2">
-		<UsageCapacity {client} bind:isReloading />
-	</div>
-	<div class="col-span-2 row-span-2">
-		<AreaCapacity {client} {start} {end} {endIsNow} bind:isReloading />
-	</div>
-	<div class="col-span-2 row-span-2">
-		<PieOSDType {client} bind:isReloading />
-	</div>
-	<div class="col-span-2">
-		<TextQuorum {client} bind:isReloading />
-	</div>
-	<div class="col-span-2">
-		<TextOSDs {client} bind:isReloading />
-	</div>
-	<div class="col-span-4 row-span-2">
-		<BarOSDThroughtput {client} {start} {end} {endIsNow} bind:isReloading />
-	</div>
-	<div class="col-span-4 row-span-2">
-		<BarOSDIOPS {client} {start} {end} {endIsNow} bind:isReloading />
-	</div>
-	<div class="col-span-2">
-		<AreaOSDReadLatency {client} {start} {end} {endIsNow} bind:isReloading />
-	</div>
-	<div class="col-span-2">
-		<AreaOSDWriteLatency {client} {start} {end} {endIsNow} bind:isReloading />
-	</div>
+<div class={LAYOUT.grid}>
+	<Health {client} bind:isReloading />
+	<Capacity {client} bind:isReloading />
+	<Daemons {client} bind:isReloading />
+	<PlacementGroups {client} bind:isReloading />
+	<h2 class="{LAYOUT.full} mt-5 mb-1 text-base leading-6 font-[550]">{m.storage_performance()}</h2>
+	<Performance {client} {start} {end} />
+	<Pools {client} bind:isReloading />
 </div>

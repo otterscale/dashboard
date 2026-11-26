@@ -1,20 +1,18 @@
 <script lang="ts">
-	import ChartBar from '@lucide/svelte/icons/chart-bar';
-	import Gauge from '@lucide/svelte/icons/gauge';
-	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
-	import { ArcChart, Text } from 'layerchart';
 	import { type PrometheusDriver, ResponseType } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Statistics from '$lib/components/custom/statistics/index';
+	import { Meter, Panel, widgetState } from '$lib/components/dashboard/kit';
 	import { Button } from '$lib/components/ui/button/index.js';
-	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
-	import * as Card from '$lib/components/ui/card';
-	import * as Chart from '$lib/components/ui/chart/index.js';
-	import { formatCapacity, formatPercentage } from '$lib/formatter';
+	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/messages';
-	import { escapePromqlStringLiteral, LIVE_PODS } from '$lib/prometheus';
+	import {
+		classifyThreshold,
+		escapePromqlStringLiteral,
+		LIVE_PODS,
+		thresholdClasses
+	} from '$lib/prometheus';
 
 	import { resourceQuotaPresence } from './resource-quota';
 
@@ -28,13 +26,11 @@
 		isReloading: boolean;
 	} = $props();
 
-	const UNLIMITED = '∞';
-
 	/**
 	 * No ResourceQuota exists for the namespace (the workspace was created without
 	 * `spec.resourceQuota.hard`), so `kube_resourcequota` reports nothing at all — neither `hard`
-	 * nor `used`. Detected from Prometheus on every fetch; the tile then renders `used / ∞` from
-	 * pod-level requests/limits instead of a ratio.
+	 * nor `used`. Detected from Prometheus on every fetch; the tile then shows the pod-level
+	 * requests/limits as plain numbers, with no bar: there is nothing to take a share of.
 	 */
 	let quotaUnlimited = $state(false);
 
@@ -269,344 +265,159 @@
 	function formatGpuMem(nMb: number): { value: number; unit: string } {
 		return formatCapacity(nMb * 1024 * 1024);
 	}
+
+	type Amount = { value: string; unit: string };
+	type QuotaRow = {
+		label: string;
+		/** `null`: the usage query failed or returned nothing. */
+		used: Amount | null;
+		/** `null`: no hard quota for this resource. */
+		hard: Amount | null;
+		/** Share of the hard quota, when there is one above zero. */
+		percent: number | null;
+	};
+
+	function percentOf(used: number | null, hard: number | null): number | null {
+		if (used === null || hard === null || hard <= 0) return null;
+		return (100 * used) / hard;
+	}
+
+	function capacity(bytes: number | null): Amount | null {
+		if (bytes === null) return null;
+		const { value, unit } = formatCapacity(bytes);
+		return { value: String(value), unit };
+	}
+
+	function gpuCapacity(mb: number | null): Amount | null {
+		if (mb === null) return null;
+		const { value, unit } = formatGpuMem(mb);
+		return { value: String(value), unit };
+	}
+
+	const rows = $derived.by((): QuotaRow[] => {
+		const failed = hasError;
+		const limited = !quotaUnlimited;
+		return [
+			{
+				label: m.cpu(),
+				used:
+					failed || cpuUsed === null ? null : { value: formatCpuCores(cpuUsed), unit: m.cores() },
+				hard:
+					limited && cpuHard !== null ? { value: formatCpuCores(cpuHard), unit: m.cores() } : null,
+				percent: limited ? percentOf(cpuUsed, cpuHard) : null
+			},
+			{
+				label: m.ram(),
+				used: failed ? null : capacity(memUsed),
+				hard: limited ? capacity(memHard) : null,
+				percent: limited ? percentOf(memUsed, memHard) : null
+			},
+			{
+				label: 'GPU Memory',
+				used: failed ? null : gpuCapacity(gpuMemUsed),
+				hard: limited ? gpuCapacity(gpuMemHard) : null,
+				percent: limited ? percentOf(gpuMemUsed, gpuMemHard) : null
+			}
+		];
+	});
+
+	// Same bands the cluster cards use for a share of a ceiling.
+	function percentClass(percent: number): string {
+		return thresholdClasses(classifyThreshold(percent, { green: 70, orange: 90 })).text;
+	}
 </script>
 
-<!-- No hard limit to divide by: keep the gauge shape but leave the track empty, and report the
-	 raw usage against ∞. `used === null` means the usage query itself failed. -->
-{#snippet unlimitedGauge(used: string | null)}
-	{#if used === null}
-		<div class="flex h-[168px] w-full flex-col items-center justify-center">
-			<ChartBar class="size-16 animate-pulse text-muted-foreground" />
-			<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
-		</div>
-	{:else}
-		{@const chartConfig = { data: { color: 'var(--chart-3)' } } satisfies Chart.ChartConfig}
-		<Chart.Container
-			config={chartConfig}
-			class="mx-auto my-auto aspect-square h-[168px] w-full max-w-[220px]"
+<Panel
+	title={m.workspace_quota_usage_title()}
+	description={m.workspace_quota_usage_description()}
+	state={namespace
+		? widgetState(
+				isLoaded,
+				rows.some((row) => row.used !== null)
+			)
+		: 'ready'}
+	class="min-h-[16rem] @md:min-h-[16.25rem]"
+>
+	{#snippet actions()}
+		<div
+			class="flex rounded-full bg-muted p-0.5"
+			role="group"
+			aria-label={m.workspace_quota_toggle_aria()}
 		>
-			<ArcChart
-				data={[{ value: 0 }]}
-				innerRadius={-15}
-				cornerRadius={15}
-				range={[-120, 120]}
-				maxValue={1}
-				series={[{ key: 'data', color: chartConfig.data.color }]}
-				props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
-				tooltipContext={false}
+			<Button
+				type="button"
+				size="sm"
+				variant={quotaView === 'requests' ? 'outline' : 'ghost'}
+				class="h-6 rounded-full px-2 text-xs {quotaView === 'requests'
+					? ''
+					: 'text-muted-foreground'}"
+				aria-pressed={quotaView === 'requests'}
+				onclick={() => (quotaView = 'requests')}
 			>
-				{#snippet aboveMarks()}
-					<Text
-						value={UNLIMITED}
-						textAnchor="middle"
-						verticalAnchor="middle"
-						class="fill-foreground text-3xl! font-bold"
-						dy={-15}
-					/>
-					<Text
-						value={`${used} / ${UNLIMITED}`}
-						textAnchor="middle"
-						verticalAnchor="middle"
-						class="text-md! text-muted-foreground"
-						dy={15}
-					/>
-				{/snippet}
-			</ArcChart>
-		</Chart.Container>
-	{/if}
-{/snippet}
-
-<Card.Root class="group relative h-full min-h-[160px] gap-2 overflow-hidden">
-	<Gauge
-		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"
-		aria-hidden="true"
-	/>
-	<Card.Header class="space-y-3">
-		<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-			<div class="min-w-0 flex-1 space-y-1.5">
-				<Card.Title>{m.workspace_quota_usage_title()}</Card.Title>
-				<Card.Description class="text-md flex min-h-6 items-center">
-					{m.workspace_quota_usage_description()}
-				</Card.Description>
-			</div>
-			<ButtonGroup.Root
-				class="shrink-0 self-stretch sm:self-auto"
-				aria-label={m.workspace_quota_toggle_aria()}
+				{m.workspace_quota_toggle_requests()}
+			</Button>
+			<Button
+				type="button"
+				size="sm"
+				variant={quotaView === 'limits' ? 'outline' : 'ghost'}
+				class="h-6 rounded-full px-2 text-xs {quotaView === 'limits'
+					? ''
+					: 'text-muted-foreground'}"
+				aria-pressed={quotaView === 'limits'}
+				onclick={() => (quotaView = 'limits')}
 			>
-				<Button
-					type="button"
-					size="sm"
-					variant={quotaView === 'requests' ? 'secondary' : 'outline'}
-					class="min-w-[5.5rem]"
-					onclick={() => (quotaView = 'requests')}
-				>
-					{m.workspace_quota_toggle_requests()}
-				</Button>
-				<Button
-					type="button"
-					size="sm"
-					variant={quotaView === 'limits' ? 'secondary' : 'outline'}
-					class="min-w-[5.5rem]"
-					onclick={() => (quotaView = 'limits')}
-				>
-					{m.workspace_quota_toggle_limits()}
-				</Button>
-			</ButtonGroup.Root>
+				{m.workspace_quota_toggle_limits()}
+			</Button>
 		</div>
-	</Card.Header>
+	{/snippet}
 	{#if !namespace}
-		<Card.Content class="text-sm text-muted-foreground"
-			>{m.workspace_namespace_unresolved()}</Card.Content
-		>
-	{:else if !isLoaded}
-		<div class="flex h-9 w-full items-center justify-center">
-			<LoaderCircle class="size-10 animate-spin text-muted-foreground" />
-		</div>
+		<p class="text-sm text-muted-foreground">{m.workspace_namespace_unresolved()}</p>
 	{:else}
-		<Card.Content class="grid gap-4 md:grid-cols-2">
-			<!-- CPU: same pattern as cluster analytics usage-rate-chart-cpu -->
-			<Statistics.Root
-				type="ratio"
-				class="overflow-visible border-0 bg-transparent p-0 shadow-none"
-			>
-				<Statistics.Header>
-					<div class="flex justify-between gap-4">
-						<Statistics.Title>{m.cpu()}</Statistics.Title>
-						{#if quotaUnlimited}
-							<div class="flex items-center gap-1 text-xl">
-								<p class="font-bold">{UNLIMITED}</p>
-							</div>
-						{:else if cpuHard !== null}
-							<div class="flex items-center gap-1 text-xl">
-								<p class="font-bold">{formatCpuCores(cpuHard)}</p>
-							</div>
-						{/if}
-					</div>
-				</Statistics.Header>
-				<Statistics.Content class="min-h-20">
-					{#if quotaUnlimited}
-						{@render unlimitedGauge(hasError || cpuUsed === null ? null : formatCpuCores(cpuUsed))}
-					{:else if hasError || cpuUsed === null || cpuHard === null || cpuHard === 0 || formatPercentage(cpuUsed, cpuHard, 1) === null}
-						<div class="flex h-[168px] w-full flex-col items-center justify-center">
-							<ChartBar class="size-16 animate-pulse text-muted-foreground" />
-							<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
+		<!-- One row per resource: its name and what it is measured against on the left, the amount
+		     on the right, and a bar only when a hard quota gives it a scale. -->
+		<ul class="flex flex-1 flex-col slashed-zero tabular-nums">
+			{#each rows as row (row.label)}
+				<li
+					class="flex flex-1 flex-col justify-center border-t border-border py-2.5 first:border-t-0 first:pt-0 last:pb-0"
+				>
+					<div class="flex items-center justify-between gap-3">
+						<div class="min-w-0">
+							<p class="truncate text-sm font-medium" title={row.label}>{row.label}</p>
+							<p class="truncate text-xs leading-4 text-muted-foreground">
+								{#if row.used === null}
+									{m.no_data_display()}
+								{:else if row.hard === null}
+									{m.dashboard_no_quota()}
+								{:else}
+									{m.dashboard_of_total({ total: `${row.hard.value} ${row.hard.unit}` })}
+								{/if}
+							</p>
 						</div>
-					{:else}
-						{@const chartConfig = { data: { color: 'var(--chart-3)' } } satisfies Chart.ChartConfig}
-						{@const ratio = cpuUsed / cpuHard}
-						{@const data = [{ value: ratio }]}
-						<Chart.Container
-							config={chartConfig}
-							class="mx-auto my-auto aspect-square h-[168px] w-full max-w-[220px]"
-						>
-							<ArcChart
-								{data}
-								innerRadius={-15}
-								cornerRadius={15}
-								range={[-120, 120]}
-								maxValue={1}
-								series={[{ key: 'data', color: chartConfig.data.color }]}
-								props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
-								tooltipContext={false}
-							>
-								{#snippet aboveMarks()}
-									{@const percentage = formatPercentage(cpuUsed!, cpuHard!, 1)}
-									<Text
-										value={`${percentage} %`}
-										textAnchor="middle"
-										verticalAnchor="middle"
-										class="fill-foreground text-3xl! font-bold"
-										dy={-12}
-									/>
-									<Text
-										value={`${formatCpuCores(cpuUsed!)} / ${formatCpuCores(cpuHard!)}`}
-										textAnchor="middle"
-										verticalAnchor="middle"
-										class="text-md! font-normal text-muted-foreground"
-										dy={14}
-									/>
-								{/snippet}
-							</ArcChart>
-						</Chart.Container>
-					{/if}
-				</Statistics.Content>
-			</Statistics.Root>
-
-			<!-- Memory: same pattern as cluster analytics usage-rate-chart-ram -->
-			<Statistics.Root
-				type="ratio"
-				class="overflow-visible border-0 bg-transparent p-0 shadow-none"
-			>
-				<Statistics.Header>
-					<div class="flex justify-between gap-4">
-						<Statistics.Title>{m.ram()}</Statistics.Title>
-						{#if quotaUnlimited}
-							<div class="flex items-center gap-1 text-xl">
-								<p class="font-bold">{UNLIMITED}</p>
-							</div>
-						{:else if memHard !== null}
-							{@const { value, unit } = formatCapacity(memHard)}
-							<div class="flex items-center gap-1 text-xl">
-								<p class="font-bold">{value} {unit}</p>
-							</div>
-						{/if}
+						<p class="shrink-0 text-2xl leading-8 tracking-tight">
+							{#if row.used === null}
+								<span class="text-muted-foreground" aria-hidden="true">—</span>
+							{:else}
+								{row.used.value}<span class="ml-1 text-xs tracking-normal text-muted-foreground"
+									>{row.used.unit}</span
+								>
+								{#if row.hard !== null && row.percent !== null}
+									<span class="ml-1.5 text-sm tracking-normal {percentClass(row.percent)}">
+										{Math.round(row.percent)} %
+									</span>
+								{/if}
+							{/if}
+						</p>
 					</div>
-				</Statistics.Header>
-				<Statistics.Content class="min-h-20">
-					{#if quotaUnlimited}
-						{@const used = memUsed === null ? null : formatCapacity(memUsed)}
-						{@render unlimitedGauge(
-							hasError || used === null ? null : `${used.value} ${used.unit}`
-						)}
-					{:else if hasError || memUsed === null || memHard === null || memHard === 0 || formatPercentage(memUsed, memHard, 1) === null}
-						<div class="flex h-[168px] w-full flex-col items-center justify-center">
-							<ChartBar class="size-16 animate-pulse text-muted-foreground" />
-							<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
+					{#if row.used !== null && row.hard !== null && row.percent !== null}
+						<div class="mt-2 flex">
+							<Meter
+								value={row.percent}
+								class={row.percent >= 70 ? percentClass(row.percent) : ''}
+							/>
 						</div>
-					{:else}
-						{@const chartConfig = { data: { color: 'var(--chart-3)' } } satisfies Chart.ChartConfig}
-						{@const ratio = memUsed / memHard}
-						{@const data = [{ value: ratio }]}
-						<Chart.Container
-							config={chartConfig}
-							class="mx-auto my-auto aspect-square h-[168px] w-full max-w-[220px]"
-						>
-							<ArcChart
-								{data}
-								innerRadius={-15}
-								cornerRadius={15}
-								range={[-120, 120]}
-								maxValue={1}
-								series={[{ key: 'data', color: chartConfig.data.color }]}
-								props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
-								tooltipContext={false}
-							>
-								{#snippet aboveMarks()}
-									{@const percentage = formatPercentage(memUsed!, memHard!, 1)}
-									{@const { value: usingValue, unit: usingUnit } = formatCapacity(memUsed!)}
-									{@const { value: totalValue, unit: totalUnit } = formatCapacity(memHard!)}
-									<Text
-										value={`${percentage} %`}
-										textAnchor="middle"
-										verticalAnchor="middle"
-										class="fill-foreground text-3xl! font-bold"
-										dy={-15}
-									/>
-									<Text
-										value={`${usingValue} ${usingUnit}/${totalValue} ${totalUnit}`}
-										textAnchor="middle"
-										verticalAnchor="middle"
-										class="text-md! text-muted-foreground"
-										dy={15}
-									/>
-								{/snippet}
-							</ArcChart>
-						</Chart.Container>
 					{/if}
-				</Statistics.Content>
-			</Statistics.Root>
-
-			<!-- GPU Memory: nvidia.com/gpumem -->
-			<Statistics.Root
-				type="ratio"
-				class="overflow-visible border-0 bg-transparent p-0 shadow-none"
-			>
-				<Statistics.Header>
-					<div class="flex justify-between gap-4">
-						<Statistics.Title>GPU Memory</Statistics.Title>
-						{#if quotaUnlimited}
-							<div class="flex items-center gap-1 text-xl">
-								<p class="font-bold">{UNLIMITED}</p>
-							</div>
-						{:else if gpuMemHard !== null}
-							{@const { value, unit } = formatGpuMem(gpuMemHard)}
-							<div class="flex items-center gap-1 text-xl">
-								<p class="font-bold">{value} {unit}</p>
-							</div>
-						{/if}
-					</div>
-				</Statistics.Header>
-				<Statistics.Content class="min-h-20">
-					{#if quotaUnlimited}
-						{@const used = gpuMemUsed === null ? null : formatGpuMem(gpuMemUsed)}
-						{@render unlimitedGauge(
-							hasError || used === null ? null : `${used.value} ${used.unit}`
-						)}
-					{:else if hasError || gpuMemUsed === null || gpuMemHard === null}
-						<div class="flex h-[168px] w-full flex-col items-center justify-center">
-							<ChartBar class="size-16 animate-pulse text-muted-foreground" />
-							<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
-						</div>
-					{:else if gpuMemHard === 0}
-						{@const chartConfig = { data: { color: 'var(--chart-3)' } } satisfies Chart.ChartConfig}
-						{@const data = [{ value: 0 }]}
-						<Chart.Container
-							config={chartConfig}
-							class="mx-auto my-auto aspect-square h-[168px] w-full max-w-[220px]"
-						>
-							<ArcChart
-								{data}
-								innerRadius={-15}
-								cornerRadius={15}
-								range={[-120, 120]}
-								maxValue={1}
-								series={[{ key: 'data', color: chartConfig.data.color }]}
-								props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
-								tooltipContext={false}
-							>
-								{#snippet aboveMarks()}
-									<Text
-										value="0 / 0"
-										textAnchor="middle"
-										verticalAnchor="middle"
-										class="fill-foreground text-3xl! font-bold"
-										dy={0}
-									/>
-								{/snippet}
-							</ArcChart>
-						</Chart.Container>
-					{:else}
-						{@const chartConfig = { data: { color: 'var(--chart-3)' } } satisfies Chart.ChartConfig}
-						{@const ratio = gpuMemUsed / gpuMemHard}
-						{@const data = [{ value: ratio }]}
-						<Chart.Container
-							config={chartConfig}
-							class="mx-auto my-auto aspect-square h-[168px] w-full max-w-[220px]"
-						>
-							<ArcChart
-								{data}
-								innerRadius={-15}
-								cornerRadius={15}
-								range={[-120, 120]}
-								maxValue={1}
-								series={[{ key: 'data', color: chartConfig.data.color }]}
-								props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
-								tooltipContext={false}
-							>
-								{#snippet aboveMarks()}
-									{@const percentage = formatPercentage(gpuMemUsed!, gpuMemHard!, 1)}
-									{@const { value: usingValue, unit: usingUnit } = formatGpuMem(gpuMemUsed!)}
-									{@const { value: totalValue, unit: totalUnit } = formatGpuMem(gpuMemHard!)}
-									<Text
-										value={`${percentage} %`}
-										textAnchor="middle"
-										verticalAnchor="middle"
-										class="fill-foreground text-3xl! font-bold"
-										dy={-15}
-									/>
-									<Text
-										value={`${usingValue} ${usingUnit}/${totalValue} ${totalUnit}`}
-										textAnchor="middle"
-										verticalAnchor="middle"
-										class="text-md! text-muted-foreground"
-										dy={15}
-									/>
-								{/snippet}
-							</ArcChart>
-						</Chart.Container>
-					{/if}
-				</Statistics.Content>
-			</Statistics.Root>
-		</Card.Content>
+				</li>
+			{/each}
+		</ul>
 	{/if}
-</Card.Root>
+</Panel>

@@ -1,276 +1,235 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import { ResourceService } from '@otterscale/api/resource/v1';
-	import { PrometheusDriver } from 'prometheus-query';
+	import type { PrometheusDriver } from 'prometheus-query';
 	import { getContext, onMount } from 'svelte';
 
 	import { page } from '$app/state';
+	import { Tile } from '$lib/components/dashboard/kit';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
 
-	import NamespaceCommitment from './namespace/namespace-commitment.svelte';
+	import NamespaceHistory from './history/namespace-history.svelte';
+	import NodeHistory from './history/node-history.svelte';
+	import { WorkspacePalette } from './lib/workspaces';
+	import NamespaceNow from './namespace/namespace-now.svelte';
 	import NamespaceRanking from './namespace/namespace-ranking.svelte';
-	import PvcStorage from './namespace/pvc-storage.svelte';
-	import WorkloadSummary from './namespace/workload-summary.svelte';
-	import NodeDetail from './node/node-detail.svelte';
-	import NodePressure from './node/node-pressure.svelte';
+	import NodeKpis from './node/node-kpis.svelte';
 	import NodeRanking from './node/node-ranking.svelte';
-	import PlaceholderCard from './placeholder-card.svelte';
-	import PodResourceTable from './pod-resource-table.svelte';
+	import Occupancy from './node/occupancy.svelte';
+	import type { RankMetric } from './ranking-card.svelte';
 
+	// The Analytics tab. Top to bottom: a ranking that is also the picker, then the picked node or
+	// namespace, as it is now or over the chosen window.
 	let {
 		client,
 		view,
+		history,
 		selectedNode = $bindable(),
 		selectedNamespace = $bindable(),
 		start,
 		end,
-		endIsNow,
-		isReloading = $bindable()
+		windowLabel,
+		tick
 	}: {
 		client: PrometheusDriver;
-		// `node` shows Sections A+B (per-node), `namespace` shows Section C (per-namespace).
 		view: 'node' | 'namespace';
-		// node_exporter `instance` of the selected node (drives Section B)
+		history: boolean;
 		selectedNode: string | undefined;
 		selectedNamespace: string | undefined;
 		start: Date;
 		end: Date;
-		endIsNow: boolean;
-		isReloading?: boolean;
+		/** "the last 1 h", or the fixed span, for the History copy. */
+		windowLabel: string;
+		/** Bumped by the page's Auto update timer; Now cards refetch on it. */
+		tick: number;
 	} = $props();
 
 	const transport = getContext<Transport>('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	const reloading = $derived(isReloading ?? false);
-
-	// namespace → workspace name (Workspace CRD owns one namespace via `spec.namespace`); lets the
-	// Section-A ranking bars show the owning workspace instead of the raw namespace.
+	// namespace → workspace (a Workspace owns one namespace through `spec.namespace`).
 	let namespaceToWorkspace = $state<Record<string, string>>({});
-	async function fetchWorkspaceMap() {
-		try {
-			const response = await resourceClient.list({
+	const palette = $derived(new WorkspacePalette(namespaceToWorkspace));
+
+	// node_exporter keys a node by `instance`; node_uname_info maps the two.
+	let nodeToInstance = $state<Record<string, string>>({});
+	// Node detail waits for that map, so its node_exporter cards load once, with the right instance.
+	let instancesKnown = $state(false);
+
+	onMount(() => {
+		resourceClient
+			.list({
 				cluster: page.params.cluster ?? '',
 				group: 'tenant.otterscale.io',
 				version: 'v1alpha1',
 				resource: 'workspaces',
 				namespace: ''
-			});
-			const map: Record<string, string> = {};
-			for (const item of response.items) {
-				const obj = item.object as Record<string, unknown> | undefined;
-				const meta = obj?.metadata as Record<string, unknown> | undefined;
-				const spec = obj?.spec as Record<string, unknown> | undefined;
-				const name = meta?.name;
-				const ns = spec?.namespace;
-				if (typeof name === 'string' && typeof ns === 'string' && name && ns) {
-					map[ns] = name;
+			})
+			.then((response) => {
+				const map: Record<string, string> = {};
+				for (const item of response.items) {
+					const obj = item.object as Record<string, unknown> | undefined;
+					const name = (obj?.metadata as Record<string, unknown> | undefined)?.name;
+					const ns = (obj?.spec as Record<string, unknown> | undefined)?.namespace;
+					if (typeof name === 'string' && typeof ns === 'string' && name && ns) map[ns] = name;
 				}
-			}
-			namespaceToWorkspace = map;
-		} catch (error) {
-			console.error('Failed to list workspaces:', error);
-		}
-	}
-	// `.*` is the "all" sentinel selected by default in the pickers; treat it as "nothing
-	// drilled in" so Section B shows its placeholder until a concrete node / namespace is picked.
-	const hasNodeSelected = $derived(!!selectedNode && selectedNode !== '.*');
-	const hasNamespaceSelected = $derived(!!selectedNamespace && selectedNamespace !== '.*');
-
-	// Section-A bars are labelled by the Kubernetes node name, while Section B's node_exporter
-	// charts filter on the `instance` label. Resolve node name → instance so clicking a ranking
-	// bar drills into the matching node detail.
-	let nodeToInstance = $state<Record<string, string>>({});
-	// Reverse of the above: node_exporter `instance` → Kubernetes node name. cAdvisor /
-	// kube-state-metrics charts filter on the `node` label (the k8s name), so the
-	// commitment + pods cards resolve the selected instance back to its node name.
-	let instanceToNode = $state<Record<string, string>>({});
-	onMount(async () => {
-		fetchWorkspaceMap();
-		try {
-			const response = await client.instantQuery('node_uname_info');
-			const series = (response.result ?? []) as { metric: { labels: Record<string, string> } }[];
-			const map: Record<string, string> = {};
-			const reverse: Record<string, string> = {};
-			for (const s of series) {
-				const labels = s.metric?.labels ?? {};
-				if (labels.nodename && labels.instance) {
-					map[labels.nodename] = labels.instance;
-					reverse[labels.instance] = labels.nodename;
+				namespaceToWorkspace = map;
+			})
+			.catch((error) => console.error('Failed to list workspaces:', error));
+		client
+			.instantQuery('node_uname_info')
+			.then((response) => {
+				const map: Record<string, string> = {};
+				for (const s of response.result as { metric: { labels: Record<string, string> } }[]) {
+					const { nodename, instance } = s.metric.labels;
+					if (nodename && instance) map[nodename] = instance;
 				}
-			}
-			nodeToInstance = map;
-			instanceToNode = reverse;
-		} catch {
-			nodeToInstance = {};
-			instanceToNode = {};
-		}
+				nodeToInstance = map;
+			})
+			.catch(() => (nodeToInstance = {}))
+			.finally(() => (instancesKnown = true));
 	});
 
-	// `selectedNode` holds the node_exporter instance; resolve it to the k8s node name
-	// (falling back to the value itself when the uname mapping is unavailable).
-	const selectedNodeName = $derived(
-		selectedNode ? (instanceToNode[selectedNode] ?? selectedNode) : undefined
-	);
+	let nodeMetric = $state<RankMetric>('cpu');
+	let namespaceMetric = $state<RankMetric>('cpu');
 
-	function handleNodeClick(node: string) {
-		selectedNode = nodeToInstance[node] ?? node;
+	let nodes = $state.raw<{ name: string; roles: string[]; gpus: number }[]>([]);
+	// Until a ranking answers, the detail holds its place with a skeleton; an empty answer clears it.
+	let nodesAnswered = $state(false);
+	let namespacesAnswered = $state(false);
+	function onNodes(list: typeof nodes) {
+		nodes = list;
+		nodesAnswered = true;
+		if (list.length > 0 && (!selectedNode || !list.some((n) => n.name === selectedNode))) {
+			selectedNode = list[0].name;
+		}
 	}
-	function handleNamespaceClick(namespace: string) {
-		selectedNamespace = namespace;
+	function onNamespaces(list: string[]) {
+		namespacesAnswered = true;
+		if (list.length > 0 && (!selectedNamespace || !list.includes(selectedNamespace))) {
+			selectedNamespace = list[0];
+		}
 	}
+
+	const current = $derived(nodes.find((n) => n.name === selectedNode));
+	const nodeChips = $derived.by(() => {
+		if (!current) return [];
+		const list: string[] = [];
+		if (current.roles.some((r) => r === 'control-plane' || r === 'master'))
+			list.push(m.analytics_chip_master());
+		list.push(current.gpus > 0 ? m.analytics_chip_gpu() : m.analytics_chip_cpu());
+		return list;
+	});
+	const rangeKey = $derived(`${start.getTime()}-${end.getTime()}`);
 </script>
 
-<div class="flex flex-col gap-6 pt-4">
+{#snippet heading(label: string, name: string | undefined, chips: string[])}
+	<h2
+		class="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1 pt-3 text-xl leading-7 font-[450] tracking-tight"
+	>
+		{label}
+		{#if name}
+			<span
+				class="min-w-0 truncate font-mono text-sm font-normal text-muted-foreground"
+				title={name}>{name}</span
+			>
+			{#each chips as chip (chip)}
+				<span
+					class="self-center rounded-full bg-muted px-2 py-0.5 text-xs leading-4 font-normal text-muted-foreground"
+				>
+					{chip}
+				</span>
+			{/each}
+		{/if}
+	</h2>
+{/snippet}
+
+{#snippet pending()}
+	<!-- Same footprint as the Now detail, while the ranking or the node map is still loading. -->
+	<div class="grid grid-cols-1 gap-2 @sm:grid-cols-2 @md:gap-3 @2xl:grid-cols-3 @5xl:grid-cols-5">
+		{#each [m.analytics_cpu_usage(), m.analytics_memory_usage(), m.analytics_gpu_memory_allocated(), m.analytics_pods(), m.analytics_file_system()] as label (label)}
+			<Tile {label} state="loading" />
+		{/each}
+	</div>
+	<Skeleton class="h-[40rem] w-full rounded-2xl bg-card shadow-(--card-frame)" />
+{/snippet}
+
+<div class="flex flex-col gap-2 @md:gap-3">
 	{#if view === 'node'}
-		<!-- Section A: per-node ranking (cluster-wide, click to drill in) -->
-		<section class="flex flex-col gap-3">
-			<h2 class="text-lg font-semibold">{m.section_node_ranking()}</h2>
-			<div class="grid w-full items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-4">
-				<NodePressure
-					prometheusDriver={client}
-					resource="cpu"
-					title={m.node_cpu_pressure()}
-					description={m.node_cpu_pressure_description()}
-					tooltip={m.node_cpu_pressure_tooltip()}
-					onNodeClick={handleNodeClick}
-					isReloading={reloading}
-				/>
-				<NodePressure
-					prometheusDriver={client}
-					resource="memory"
-					title={m.node_memory_pressure()}
-					description={m.node_memory_pressure_description()}
-					tooltip={m.node_memory_pressure_tooltip()}
-					onNodeClick={handleNodeClick}
-					isReloading={reloading}
-				/>
-				<NodeRanking
-					prometheusDriver={client}
-					kind="gpu"
-					title={m.gpu_utilization()}
-					description={m.node_gpu_utilization_description()}
-					tooltip={m.node_gpu_utilization_tooltip()}
-					onNodeClick={handleNodeClick}
-					isReloading={reloading}
-				/>
-				<NodeRanking
-					prometheusDriver={client}
-					kind="restart"
-					title={m.node_restart_count()}
-					description={m.node_restart_count_description()}
-					tooltip={m.node_restart_count_tooltip()}
-					onNodeClick={handleNodeClick}
-					isReloading={reloading}
-				/>
-			</div>
-		</section>
-
-		<!-- Section B: selected-node system detail (node_exporter time series) -->
-		<section class="flex flex-col gap-3">
-			<h2 class="text-lg font-semibold">{m.section_node_detail()}</h2>
-			{#if hasNodeSelected}
-				<NodeDetail
-					{client}
-					fqdn={selectedNode ?? ''}
-					nodeName={selectedNodeName}
-					{start}
-					{end}
-					{endIsNow}
-					isReloading={reloading}
-				/>
-				<!-- Keyed so picking another node remounts the table: its fetch runs on mount and on the
-				     reload timer, not on every prop change. -->
-				{#key selectedNodeName}
-					<PodResourceTable
-						{client}
-						node={selectedNodeName}
-						{namespaceToWorkspace}
-						isReloading={reloading}
-					/>
-				{/key}
-			{:else}
-				<PlaceholderCard
-					title={m.section_node_detail()}
-					message={m.select_node_to_view_details()}
-				/>
-			{/if}
-		</section>
+		<NodeRanking
+			{client}
+			{tick}
+			{history}
+			{start}
+			{end}
+			{windowLabel}
+			bind:metric={nodeMetric}
+			selected={selectedNode}
+			onSelect={(node) => (selectedNode = node)}
+			{onNodes}
+		/>
+		{@render heading(m.analytics_node_detail(), selectedNode, nodeChips)}
+		{#if selectedNode && instancesKnown}
+			{#key selectedNode}
+				{#if history}
+					{#key rangeKey}
+						<NodeHistory
+							{client}
+							node={selectedNode}
+							instance={nodeToInstance[selectedNode]}
+							hasGpu={(current?.gpus ?? 0) > 0}
+							{start}
+							{end}
+							{windowLabel}
+							{palette}
+						/>
+					{/key}
+				{:else}
+					<NodeKpis {client} {tick} node={selectedNode} instance={nodeToInstance[selectedNode]} />
+					<Occupancy {client} {tick} node={selectedNode} {palette} />
+				{/if}
+			{/key}
+		{:else if !nodesAnswered || selectedNode}
+			{@render pending()}
+		{/if}
 	{:else}
-		<!-- Section A: namespace ranking (cluster-wide, click to select a namespace) -->
-		<section class="flex flex-col gap-3">
-			<h2 class="text-lg font-semibold">{m.section_namespace_ranking()}</h2>
-			<div class="grid w-full items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-4">
-				<NamespaceRanking
-					prometheusDriver={client}
-					kind="cpu"
-					title={m.namespace_cpu_usage()}
-					description={m.namespace_cpu_usage_description()}
-					tooltip={m.namespace_cpu_usage_tooltip()}
-					onNamespaceClick={handleNamespaceClick}
-					{namespaceToWorkspace}
-					isReloading={reloading}
-				/>
-				<NamespaceRanking
-					prometheusDriver={client}
-					kind="memory"
-					title={m.namespace_memory_usage()}
-					description={m.namespace_memory_usage_description()}
-					tooltip={m.namespace_memory_usage_tooltip()}
-					onNamespaceClick={handleNamespaceClick}
-					{namespaceToWorkspace}
-					isReloading={reloading}
-				/>
-				<NamespaceRanking
-					prometheusDriver={client}
-					kind="gpu"
-					title={m.namespace_gpu_usage()}
-					description={m.namespace_gpu_usage_description()}
-					tooltip={m.namespace_gpu_usage_tooltip()}
-					onNamespaceClick={handleNamespaceClick}
-					{namespaceToWorkspace}
-					isReloading={reloading}
-				/>
-				<NamespaceRanking
-					prometheusDriver={client}
-					kind="restart"
-					title={m.namespace_restart_count()}
-					description={m.namespace_restart_count_description()}
-					tooltip={m.namespace_restart_count_tooltip()}
-					onNamespaceClick={handleNamespaceClick}
-					{namespaceToWorkspace}
-					isReloading={reloading}
-				/>
-			</div>
-		</section>
-
-		<!-- Section B: selected-namespace detail (summary + commitment + pvc + pod table) -->
-		<section class="flex flex-col gap-3">
-			<h2 class="text-lg font-semibold">{m.section_namespace_detail()}</h2>
-			{#if hasNamespaceSelected}
-				{#key selectedNamespace}
-					<WorkloadSummary {client} namespace={selectedNamespace} isReloading={reloading} />
-					<NamespaceCommitment
-						{client}
-						namespace={selectedNamespace}
-						{start}
-						{end}
-						{endIsNow}
-						isReloading={reloading}
-					/>
-					<PodResourceTable {client} namespace={selectedNamespace} isReloading={reloading} />
-					<PvcStorage
-						prometheusDriver={client}
-						namespace={selectedNamespace}
-						isReloading={reloading}
-					/>
-				{/key}
-			{:else}
-				<PlaceholderCard
-					title={m.section_namespace_detail()}
-					message={m.select_namespace_to_view_details()}
-				/>
-			{/if}
-		</section>
+		<NamespaceRanking
+			{client}
+			{tick}
+			{history}
+			{start}
+			{end}
+			{windowLabel}
+			bind:metric={namespaceMetric}
+			selected={selectedNamespace}
+			onSelect={(ns) => (selectedNamespace = ns)}
+			{onNamespaces}
+			{namespaceToWorkspace}
+		/>
+		{@render heading(
+			m.analytics_namespace_detail(),
+			selectedNamespace,
+			selectedNamespace
+				? [
+						namespaceToWorkspace[selectedNamespace]
+							? m.analytics_chip_workspace()
+							: m.analytics_chip_system()
+					]
+				: []
+		)}
+		{#if selectedNamespace}
+			{#key selectedNamespace}
+				{#if history}
+					{#key rangeKey}
+						<NamespaceHistory {client} namespace={selectedNamespace} {start} {end} {windowLabel} />
+					{/key}
+				{:else}
+					<NamespaceNow {client} {tick} namespace={selectedNamespace} />
+				{/if}
+			{/key}
+		{:else if !namespacesAnswered}
+			{@render pending()}
+		{/if}
 	{/if}
 </div>
