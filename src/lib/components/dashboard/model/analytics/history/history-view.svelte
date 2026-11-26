@@ -2,20 +2,20 @@
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { onMount, untrack } from 'svelte';
 
-	import HistoryChart, {
-		type ChartPoint,
-		type ChartSeries
-	} from '$lib/components/dashboard/cluster/analytics/history/history-chart.svelte';
-	import SummaryStrip from '$lib/components/dashboard/cluster/analytics/history/summary-strip.svelte';
 	import {
 		fetchInstant,
 		fetchRange,
 		rangeLiteral,
 		scalar,
 		stepFor
-	} from '$lib/components/dashboard/cluster/analytics/lib/fetch';
-	import { Loader } from '$lib/components/dashboard/cluster/analytics/lib/loader.svelte';
-	import { formatDuration } from '$lib/components/dashboard/cluster/overview/format';
+	} from '$lib/components/dashboard/kit/fetch';
+	import { formatDuration } from '$lib/components/dashboard/kit/format';
+	import HistoryChart, {
+		type ChartPoint,
+		type ChartSeries
+	} from '$lib/components/dashboard/kit/history-chart.svelte';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
+	import SummaryStrip from '$lib/components/dashboard/kit/summary-strip.svelte';
 	import { m } from '$lib/messages';
 	import type { SharedMetrics } from '$lib/prometheus';
 

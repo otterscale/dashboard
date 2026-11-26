@@ -9,11 +9,9 @@
 		fetchRange,
 		rangeLiteral,
 		stepFor
-	} from '$lib/components/dashboard/cluster/analytics/lib/fetch';
-	import { Loader } from '$lib/components/dashboard/cluster/analytics/lib/loader.svelte';
-	import RankingCard, {
-		type RankRow
-	} from '$lib/components/dashboard/cluster/analytics/ranking-card.svelte';
+	} from '$lib/components/dashboard/kit/fetch';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
+	import RankingCard, { type RankRow } from '$lib/components/dashboard/kit/ranking-card.svelte';
 	import { m } from '$lib/messages';
 
 	import {

@@ -11,6 +11,7 @@
 	import { page } from '$app/state';
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import { Meter, Panel, Status, widgetState } from '$lib/components/dashboard/kit';
+	import { CAPACITY_THRESHOLDS, formatDuration } from '$lib/components/dashboard/kit/format';
 	import { formatWithBinarySuffix } from '$lib/components/dynamic-table/utils';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
@@ -35,7 +36,6 @@
 	} from '$lib/prometheus';
 	import { cn } from '$lib/utils';
 
-	import { CAPACITY_THRESHOLDS, formatDuration } from './format';
 	import type { ClusterSignals } from './signals.svelte';
 
 	let {

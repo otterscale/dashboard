@@ -5,8 +5,8 @@
 	import HistoryChart, {
 		type ChartPoint,
 		type ChartSeries
-	} from '$lib/components/dashboard/cluster/analytics/history/history-chart.svelte';
-	import { Loader } from '$lib/components/dashboard/cluster/analytics/lib/loader.svelte';
+	} from '$lib/components/dashboard/kit/history-chart.svelte';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
 	import { m } from '$lib/messages';
 	import type { SharedMetrics } from '$lib/prometheus';
 

@@ -3,11 +3,19 @@
 	import { untrack } from 'svelte';
 
 	import { Meter, NUM, Panel, Tile } from '$lib/components/dashboard/kit';
+	import { byLabel, byPod, fetchInstant, scalar } from '$lib/components/dashboard/kit/fetch';
+	import {
+		DASH,
+		fmt,
+		fmtCores,
+		fmtGiB,
+		fmtPct,
+		pressureText,
+		sum
+	} from '$lib/components/dashboard/kit/format';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
 	import { m } from '$lib/messages';
 
-	import { byLabel, byPod, fetchInstant, scalar } from '../lib/fetch';
-	import { DASH, fmt, fmtCores, fmtGiB, fmtPct, pressureText, sum } from '../lib/format';
-	import { Loader } from '../lib/loader.svelte';
 	import { namespaceNowQueries } from '../lib/promql';
 
 	// Namespace detail, Now: five numbers, its pods, and its volumes. One request feeds all three.

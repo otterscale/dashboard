@@ -3,11 +3,13 @@
 	import { untrack } from 'svelte';
 
 	import { Panel } from '$lib/components/dashboard/kit';
+	import { byPod, fetchInstant, scalar } from '$lib/components/dashboard/kit/fetch';
+	import { fmt, fmtCores, fmtGiB, fmtGpuGiB, sum } from '$lib/components/dashboard/kit/format';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
+	import Segmented from '$lib/components/dashboard/kit/segmented.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
 
-	import { byPod, fetchInstant, scalar } from '../lib/fetch';
-	import { fmt, fmtCores, fmtGiB, fmtGpuGiB, sum } from '../lib/format';
 	import {
 		buildGpuCards,
 		type CardInput,
@@ -15,10 +17,8 @@
 		gpuGrid,
 		type PodShare
 	} from '../lib/gpu-cards';
-	import { Loader } from '../lib/loader.svelte';
 	import { nodePodQueries } from '../lib/promql';
 	import { OTHER_GROUP, SYSTEM_GROUP, type WorkspacePalette } from '../lib/workspaces';
-	import Segmented from '../segmented.svelte';
 	import GpuCardMap from './gpu-card-map.svelte';
 	import OccupancyMap from './occupancy-map.svelte';
 	import OccupancyTable from './occupancy-table.svelte';

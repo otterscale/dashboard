@@ -1,11 +1,6 @@
 <script lang="ts">
-	import {
-		DASH,
-		fmt,
-		fmtCores,
-		fmtGiB
-	} from '$lib/components/dashboard/cluster/analytics/lib/format';
 	import { NUM, Panel, Status, type WidgetState } from '$lib/components/dashboard/kit';
+	import { DASH, fmt, fmtCores, fmtGiB } from '$lib/components/dashboard/kit/format';
 	import { splitTail } from '$lib/components/dashboard/model/analytics/lib/pods';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/messages';

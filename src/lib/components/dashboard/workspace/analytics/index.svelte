@@ -4,9 +4,9 @@
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { getContext, untrack } from 'svelte';
 
-	import { rangeLiteral, type Series } from '$lib/components/dashboard/cluster/analytics/lib/fetch';
-	import { Loader } from '$lib/components/dashboard/cluster/analytics/lib/loader.svelte';
 	import type { WidgetState } from '$lib/components/dashboard/kit';
+	import { rangeLiteral, type Series } from '$lib/components/dashboard/kit/fetch';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
 	import type { SharedMetrics } from '$lib/prometheus';
 
 	import HistoryView from './history-view.svelte';

@@ -1,7 +1,7 @@
 <script lang="ts">
+	import { fmtGpuGiB } from '$lib/components/dashboard/kit/format';
 	import { m } from '$lib/messages';
 
-	import { fmtGpuGiB } from '../lib/format';
 	import { cardItems, type GpuCard, type GpuMeasure } from '../lib/gpu-cards';
 	import { squarify } from '../lib/treemap';
 	import type { Group } from '../lib/workspaces';

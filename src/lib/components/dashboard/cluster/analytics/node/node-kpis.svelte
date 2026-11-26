@@ -3,11 +3,11 @@
 	import { untrack } from 'svelte';
 
 	import { Meter, NUM, Tile } from '$lib/components/dashboard/kit';
+	import { fetchInstant, scalar } from '$lib/components/dashboard/kit/fetch';
+	import { fmt, fmtCores, fmtGiB, GIB, pressureText } from '$lib/components/dashboard/kit/format';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
 	import { m } from '$lib/messages';
 
-	import { fetchInstant, scalar } from '../lib/fetch';
-	import { fmt, fmtCores, fmtGiB, GIB, pressureText } from '../lib/format';
-	import { Loader } from '../lib/loader.svelte';
 	import { nodeKpiQueries } from '../lib/promql';
 
 	// Node detail, Now: five numbers, each a share of what the node can give.

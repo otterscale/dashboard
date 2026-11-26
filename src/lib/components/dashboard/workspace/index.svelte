@@ -14,7 +14,7 @@
 	} from '$lib/components/custom/range-picker';
 	import { AutoRefresh, RefreshControl, reloadNow } from '$lib/components/custom/reloader';
 	import { WidgetGrid } from '$lib/components/custom/widget-grid';
-	import { formatDuration } from '$lib/components/dashboard/cluster/overview/format';
+	import { formatDuration } from '$lib/components/dashboard/kit/format';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/messages';
 	import { dashboardBody, sharedMetrics, workspacePrometheusDriver } from '$lib/prometheus';

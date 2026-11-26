@@ -1,22 +1,15 @@
 <script lang="ts">
-	import HistoryChart, {
-		type ChartSeries
-	} from '$lib/components/dashboard/cluster/analytics/history/history-chart.svelte';
-	import SummaryStrip from '$lib/components/dashboard/cluster/analytics/history/summary-strip.svelte';
-	import type { Series } from '$lib/components/dashboard/cluster/analytics/lib/fetch';
-	import {
-		DASH,
-		fmt,
-		fmtCores,
-		fmtGiB,
-		fmtPct,
-		GIB
-	} from '$lib/components/dashboard/cluster/analytics/lib/format';
 	import {
 		OTHER_COLOR,
 		WORKSPACE_COLORS
 	} from '$lib/components/dashboard/cluster/analytics/lib/workspaces';
 	import type { WidgetState } from '$lib/components/dashboard/kit';
+	import type { Series } from '$lib/components/dashboard/kit/fetch';
+	import { DASH, fmt, fmtCores, fmtGiB, fmtPct, GIB } from '$lib/components/dashboard/kit/format';
+	import HistoryChart, {
+		type ChartSeries
+	} from '$lib/components/dashboard/kit/history-chart.svelte';
+	import SummaryStrip from '$lib/components/dashboard/kit/summary-strip.svelte';
 	import HourlyChart, {
 		type BarPoint
 	} from '$lib/components/dashboard/model/usage/hourly-chart.svelte';

@@ -4,7 +4,7 @@
  * every rule here can be tested with plain objects.
  */
 
-import type { Series } from '$lib/components/dashboard/cluster/analytics/lib/fetch';
+import type { Series } from '$lib/components/dashboard/kit/fetch';
 
 import { daysUntilFull, FULL_SOON_DAYS } from '../../overview/pvc-forecast';
 import {

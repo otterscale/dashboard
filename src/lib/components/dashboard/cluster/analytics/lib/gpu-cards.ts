@@ -1,4 +1,4 @@
-import { MIB } from './format';
+import { MIB } from '$lib/components/dashboard/kit/format';
 
 /**
  * Below this, a gap between DCGM and HAMi is rounding: DCGM reports whole MiB and an idle card

@@ -2,10 +2,9 @@ import { type Client, Code, ConnectError } from '@connectrpc/connect';
 import type { ResourceService } from '@otterscale/api/resource/v1';
 import type { PrometheusDriver } from 'prometheus-query';
 
+import { formatDuration } from '$lib/components/dashboard/kit/format';
 import { m } from '$lib/messages';
 import { fetchCombinedInstantOrNull } from '$lib/prometheus';
-
-import { formatDuration } from './format';
 
 // Platform checks (SPEC 3.7): facts about the platform an admin should not have to go looking
 // for. SPEC planned a backend summary API; until it exists they are read here, the way the entry

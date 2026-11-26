@@ -4,11 +4,11 @@
 	import { onMount } from 'svelte';
 
 	import { NUM, Panel } from '$lib/components/dashboard/kit';
+	import { fetchInstant, fetchRange, rangeLiteral } from '$lib/components/dashboard/kit/fetch';
+	import { fmt } from '$lib/components/dashboard/kit/format';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
 	import { m } from '$lib/messages';
 
-	import { fetchInstant, fetchRange, rangeLiteral } from '../lib/fetch';
-	import { fmt } from '../lib/format';
-	import { Loader } from '../lib/loader.svelte';
 	import { restartBucketsQuery, restartedPodQueries } from '../lib/promql';
 
 	// Restarts in 5-minute bars, and the pods behind them with the reason the last one stopped.

@@ -2,9 +2,9 @@
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { untrack } from 'svelte';
 
-	import { fetchInstant, scalar } from '$lib/components/dashboard/cluster/analytics/lib/fetch';
-	import { Loader } from '$lib/components/dashboard/cluster/analytics/lib/loader.svelte';
 	import type { WidgetState } from '$lib/components/dashboard/kit';
+	import { fetchInstant, scalar } from '$lib/components/dashboard/kit/fetch';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
 	import { m } from '$lib/messages';
 
 	import { FULL_IN_WARN_DAYS, rawLevel } from '../../overview/ceph';

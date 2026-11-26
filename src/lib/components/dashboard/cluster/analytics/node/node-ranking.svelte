@@ -2,13 +2,22 @@
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { untrack } from 'svelte';
 
+	import {
+		byLabel,
+		fetchInstant,
+		fetchRange,
+		rangeLiteral,
+		stepFor
+	} from '$lib/components/dashboard/kit/fetch';
+	import { fmt, fmtPct, pressureText } from '$lib/components/dashboard/kit/format';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
+	import RankingCard, {
+		type RankMetric,
+		type RankRow
+	} from '$lib/components/dashboard/kit/ranking-card.svelte';
 	import { m } from '$lib/messages';
 
-	import { byLabel, fetchInstant, fetchRange, rangeLiteral, stepFor } from '../lib/fetch';
-	import { fmt, fmtPct, pressureText } from '../lib/format';
-	import { Loader } from '../lib/loader.svelte';
 	import { averaged, NODE_FACTS, nodeRankingQueries, nodeTrendQuery } from '../lib/promql';
-	import RankingCard, { type RankMetric, type RankRow } from '../ranking-card.svelte';
 
 	let {
 		client,

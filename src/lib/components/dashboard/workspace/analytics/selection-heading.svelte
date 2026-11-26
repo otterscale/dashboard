@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { fmt, fmtCores, fmtGiB } from '$lib/components/dashboard/cluster/analytics/lib/format';
 	import { Status } from '$lib/components/dashboard/kit';
+	import { fmt, fmtCores, fmtGiB } from '$lib/components/dashboard/kit/format';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
 

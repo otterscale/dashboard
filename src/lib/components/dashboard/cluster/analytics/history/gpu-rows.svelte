@@ -3,14 +3,21 @@
 	import { onMount } from 'svelte';
 
 	import { NUM, Panel } from '$lib/components/dashboard/kit';
+	import {
+		byLabel,
+		fetchInstant,
+		fetchRange,
+		rangeLiteral,
+		stats,
+		stepFor
+	} from '$lib/components/dashboard/kit/fetch';
+	import { fmt, fmtGpuGiB, fmtPct, GIB } from '$lib/components/dashboard/kit/format';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
+	import Sparkline from '$lib/components/dashboard/kit/sparkline.svelte';
 	import { m } from '$lib/messages';
 	import { classifyThreshold, thresholdClasses } from '$lib/prometheus';
 
-	import { byLabel, fetchInstant, fetchRange, rangeLiteral, stats, stepFor } from '../lib/fetch';
-	import { fmt, fmtGpuGiB, fmtPct, GIB } from '../lib/format';
-	import { Loader } from '../lib/loader.svelte';
 	import { nodeGpuHistoryQueries, nodeGpuWindowQueries } from '../lib/promql';
-	import Sparkline from '../sparkline.svelte';
 
 	// History: one row per card. Utilisation and memory as lines, temperature peak and mean power.
 	let {

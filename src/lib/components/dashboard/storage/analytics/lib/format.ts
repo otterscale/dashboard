@@ -1,6 +1,6 @@
+import { formatDuration } from '$lib/components/dashboard/kit/format';
 import { m } from '$lib/messages';
 
-import { formatDuration } from '../../../cluster/overview/format';
 import type { Growth } from '../../overview/ceph';
 import { DASH, fmtBytes } from '../../overview/format';
 

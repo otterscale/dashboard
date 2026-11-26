@@ -2,17 +2,12 @@
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { onMount } from 'svelte';
 
+	import type { WidgetState } from '$lib/components/dashboard/kit';
+	import { fetchRange, stats, stepFor, toPoints } from '$lib/components/dashboard/kit/fetch';
 	import HistoryChart, {
 		type ChartPoint
-	} from '$lib/components/dashboard/cluster/analytics/history/history-chart.svelte';
-	import {
-		fetchRange,
-		stats,
-		stepFor,
-		toPoints
-	} from '$lib/components/dashboard/cluster/analytics/lib/fetch';
-	import { Loader } from '$lib/components/dashboard/cluster/analytics/lib/loader.svelte';
-	import type { WidgetState } from '$lib/components/dashboard/kit';
+	} from '$lib/components/dashboard/kit/history-chart.svelte';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
 	import { m } from '$lib/messages';
 
 	import { fmtIops, fmtMs, fmtPct } from '../../overview/format';

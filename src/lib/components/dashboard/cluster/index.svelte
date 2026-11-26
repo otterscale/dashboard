@@ -14,13 +14,13 @@
 		toNow
 	} from '$lib/components/custom/range-picker';
 	import { AutoRefresh, RefreshControl, reloadNow } from '$lib/components/custom/reloader';
+	import { formatDuration } from '$lib/components/dashboard/kit/format';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/messages';
 	import { clusterPrometheusDriver } from '$lib/prometheus';
 
 	import { Dashboard as AnalyticsDashboard } from './analytics/index';
 	import ClusterFacts from './overview/cluster-facts.svelte';
-	import { formatDuration } from './overview/format';
 	import Overview from './overview/overview.svelte';
 	import { ClusterSignals } from './overview/signals.svelte';
 

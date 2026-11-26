@@ -2,7 +2,7 @@
 // detail read, their sort orders, threshold levels and the joins between PVCs and pools.
 // No PromQL and no strings here; the cards format what these return.
 
-import type { Sample } from '$lib/components/dashboard/cluster/analytics/lib/fetch';
+import type { Sample } from '$lib/components/dashboard/kit/fetch';
 
 import {
 	type Filesystem,

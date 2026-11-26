@@ -2,10 +2,17 @@
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
 
 	import { NUM } from '$lib/components/dashboard/kit';
+	import {
+		DASH,
+		fmt,
+		fmtCores,
+		fmtGiB,
+		fmtGpuGiB,
+		sum
+	} from '$lib/components/dashboard/kit/format';
 	import { m } from '$lib/messages';
 	import { cn } from '$lib/utils';
 
-	import { DASH, fmt, fmtCores, fmtGiB, fmtGpuGiB, sum } from '../lib/format';
 	import { type Measure, type OccupancyPod, podValue, type Resource } from './occupancy-types';
 
 	// Every number the map shows, by workspace. The map is for shape; this is where the values are

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { GIB, MIB } from './format';
+import { GIB, MIB } from '$lib/components/dashboard/kit/format';
+
 import { buildGpuCards, cardItems, cardsPerPod, gpuGrid } from './gpu-cards';
 
 const card = (uuid: string, used: number, index = 0) => ({

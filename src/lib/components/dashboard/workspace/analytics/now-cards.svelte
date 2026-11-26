@@ -1,12 +1,6 @@
 <script lang="ts">
-	import {
-		DASH,
-		fmt,
-		fmtCores,
-		fmtGiB,
-		fmtPct
-	} from '$lib/components/dashboard/cluster/analytics/lib/format';
 	import { NUM, Tile, type WidgetState } from '$lib/components/dashboard/kit';
+	import { DASH, fmt, fmtCores, fmtGiB, fmtPct } from '$lib/components/dashboard/kit/format';
 	import { m } from '$lib/messages';
 	import { cn } from '$lib/utils';
 

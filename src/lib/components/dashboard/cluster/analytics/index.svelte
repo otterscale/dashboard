@@ -6,6 +6,7 @@
 
 	import { page } from '$app/state';
 	import { Tile } from '$lib/components/dashboard/kit';
+	import type { RankMetric } from '$lib/components/dashboard/kit/ranking-card.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
 
@@ -17,7 +18,6 @@
 	import NodeKpis from './node/node-kpis.svelte';
 	import NodeRanking from './node/node-ranking.svelte';
 	import Occupancy from './node/occupancy.svelte';
-	import type { RankMetric } from './ranking-card.svelte';
 
 	// The Analytics tab. Top to bottom: a ranking that is also the picker, then the picked node or
 	// namespace, as it is now or over the chosen window.

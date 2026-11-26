@@ -17,7 +17,7 @@
 		toNow
 	} from '$lib/components/custom/range-picker';
 	import { AutoRefresh, RefreshControl } from '$lib/components/custom/reloader';
-	import { formatDuration } from '$lib/components/dashboard/cluster/overview/format';
+	import { formatDuration } from '$lib/components/dashboard/kit/format';
 	import { Dashboard } from '$lib/components/dashboard/model/analytics';
 	import {
 		type RankTab,

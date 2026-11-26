@@ -7,11 +7,11 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { NUM, Panel } from '$lib/components/dashboard/kit';
+	import { formatDuration } from '$lib/components/dashboard/kit/format';
 	import { m } from '$lib/messages';
 	import { cn } from '$lib/utils';
 
 	import { describeAlert, subjectPod } from './alert-catalog';
-	import { formatDuration } from './format';
 	import type { ClusterSignals, FiringAlert } from './signals.svelte';
 
 	// Firing cluster-level critical and warning alerts (alert-scope.ts), sorted by severity, then

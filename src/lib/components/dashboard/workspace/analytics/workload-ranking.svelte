@@ -1,14 +1,7 @@
 <script lang="ts">
-	import {
-		fmt,
-		fmtCores,
-		fmtGiB,
-		fmtPct
-	} from '$lib/components/dashboard/cluster/analytics/lib/format';
-	import RankingCard, {
-		type RankRow
-	} from '$lib/components/dashboard/cluster/analytics/ranking-card.svelte';
 	import type { WidgetState } from '$lib/components/dashboard/kit';
+	import { fmt, fmtCores, fmtGiB, fmtPct } from '$lib/components/dashboard/kit/format';
+	import RankingCard, { type RankRow } from '$lib/components/dashboard/kit/ranking-card.svelte';
 	import { m } from '$lib/messages';
 
 	import {

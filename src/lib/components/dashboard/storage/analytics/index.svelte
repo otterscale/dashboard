@@ -5,11 +5,9 @@
 	import { getContext, onMount, untrack } from 'svelte';
 
 	import { page } from '$app/state';
-	import { fetchInstant } from '$lib/components/dashboard/cluster/analytics/lib/fetch';
-	import { Loader } from '$lib/components/dashboard/cluster/analytics/lib/loader.svelte';
-	import RankingCard, {
-		type RankRow
-	} from '$lib/components/dashboard/cluster/analytics/ranking-card.svelte';
+	import { fetchInstant } from '$lib/components/dashboard/kit/fetch';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
+	import RankingCard, { type RankRow } from '$lib/components/dashboard/kit/ranking-card.svelte';
 	import { m } from '$lib/messages';
 
 	import { FULL_IN_WARN_DAYS, osdLevel, rawLevel } from '../overview/ceph';

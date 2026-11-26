@@ -1,6 +1,6 @@
+import { formatDuration } from '$lib/components/dashboard/kit/format';
 import { m } from '$lib/messages';
 
-import { formatDuration } from '../../cluster/overview/format';
 import { DAY, FULL_IN_CAP_DAYS, type Level, type Service } from './ceph';
 
 export const DASH = '—';

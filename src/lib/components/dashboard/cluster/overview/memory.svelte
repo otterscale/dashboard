@@ -4,11 +4,11 @@
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import { CommitBars, NUM, Panel, widgetState } from '$lib/components/dashboard/kit';
+	import { CAPACITY_THRESHOLDS } from '$lib/components/dashboard/kit/format';
 	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/messages';
 	import { fetchCombinedInstantOrNull, LIVE_PODS } from '$lib/prometheus';
 
-	import { CAPACITY_THRESHOLDS } from './format';
 	import ScopeLabel from './scope-label.svelte';
 	import { scopedSum } from './signals.svelte';
 

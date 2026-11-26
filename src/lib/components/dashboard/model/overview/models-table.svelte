@@ -1,6 +1,6 @@
 <script lang="ts">
-	import Sparkline from '$lib/components/dashboard/cluster/analytics/sparkline.svelte';
 	import { Meter, NUM, Status, type WidgetState } from '$lib/components/dashboard/kit';
+	import Sparkline from '$lib/components/dashboard/kit/sparkline.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';

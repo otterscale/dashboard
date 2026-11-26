@@ -2,17 +2,26 @@
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { onMount } from 'svelte';
 
+	import {
+		fetchInstant,
+		fetchRange,
+		rangeLiteral,
+		stats,
+		stepFor,
+		toPoints
+	} from '$lib/components/dashboard/kit/fetch';
+	import { fmt, fmtPct, fmtRate, splitRate } from '$lib/components/dashboard/kit/format';
+	import HistoryChart, {
+		type ChartPoint
+	} from '$lib/components/dashboard/kit/history-chart.svelte';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
+	import SummaryStrip from '$lib/components/dashboard/kit/summary-strip.svelte';
 	import { m } from '$lib/messages';
 
-	import { fetchInstant, fetchRange, rangeLiteral, stats, stepFor, toPoints } from '../lib/fetch';
-	import { fmt, fmtPct, fmtRate, splitRate } from '../lib/format';
-	import { Loader } from '../lib/loader.svelte';
 	import { nodeHistoryQueries, restartsByNode } from '../lib/promql';
 	import type { WorkspacePalette } from '../lib/workspaces';
 	import GpuRows from './gpu-rows.svelte';
-	import HistoryChart, { type ChartPoint } from './history-chart.svelte';
 	import RestartsCard from './restarts-card.svelte';
-	import SummaryStrip from './summary-strip.svelte';
 
 	let {
 		client,

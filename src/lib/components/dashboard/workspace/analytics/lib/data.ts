@@ -6,7 +6,7 @@ import {
 	fetchRange,
 	type Sample,
 	type Series
-} from '$lib/components/dashboard/cluster/analytics/lib/fetch';
+} from '$lib/components/dashboard/kit/fetch';
 import type { SharedMetrics } from '$lib/prometheus';
 
 import { type PodNow, type Quota, quotaOf, type Volume } from './model';

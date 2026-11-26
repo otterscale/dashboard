@@ -1,8 +1,5 @@
-import type {
-	ChartPoint,
-	ChartSeries
-} from '$lib/components/dashboard/cluster/analytics/history/history-chart.svelte';
-import type { Series } from '$lib/components/dashboard/cluster/analytics/lib/fetch';
+import type { Series } from '$lib/components/dashboard/kit/fetch';
+import type { ChartPoint, ChartSeries } from '$lib/components/dashboard/kit/history-chart.svelte';
 
 import { colorsFor, finishGroup, type LineSpec } from './chart-style';
 import { shortPod } from './pods';

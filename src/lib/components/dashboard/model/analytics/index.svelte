@@ -6,8 +6,8 @@
 	import { prefersReducedMotion } from 'svelte/motion';
 	import { fade } from 'svelte/transition';
 
-	import { Loader } from '$lib/components/dashboard/cluster/analytics/lib/loader.svelte';
 	import { Tile } from '$lib/components/dashboard/kit';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
 	import type { SharedMetrics } from '$lib/prometheus';

@@ -1,7 +1,7 @@
 <script lang="ts">
-	import Segmented from '$lib/components/dashboard/cluster/analytics/segmented.svelte';
-	import Sparkline from '$lib/components/dashboard/cluster/analytics/sparkline.svelte';
 	import { NUM, type WidgetState } from '$lib/components/dashboard/kit';
+	import Segmented from '$lib/components/dashboard/kit/segmented.svelte';
+	import Sparkline from '$lib/components/dashboard/kit/sparkline.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
 	import { cn } from '$lib/utils';

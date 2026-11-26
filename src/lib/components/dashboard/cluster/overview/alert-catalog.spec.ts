@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
+import { formatDuration } from '$lib/components/dashboard/kit/format';
+
 import { describeAlert, isCatalogued, locatingLabels, subjectPod } from './alert-catalog';
-import { formatDuration } from './format';
 
 describe('describeAlert', () => {
 	it('fills a catalogued alert from its labels', () => {
