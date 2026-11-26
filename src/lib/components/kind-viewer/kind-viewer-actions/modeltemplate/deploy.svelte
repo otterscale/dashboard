@@ -19,7 +19,6 @@
 		onOpenChangeComplete,
 		open = $bindable(false),
 		hideTrigger = false,
-		isPublic = false,
 		apiSchema = 'OpenAI',
 		onBack
 	}: {
@@ -32,8 +31,6 @@
 		open?: boolean;
 		/** Omit the dropdown "Deploy" item when a parent drives `open`. */
 		hideTrigger?: boolean;
-		/** Deploy the service callable without an API key. */
-		isPublic?: boolean;
 		/** Written to maas.phison.com/api-schema; picks the AIServiceBackend. */
 		apiSchema?: string;
 		/** Enables Previous on the first step, to return to the parent's form. */
@@ -53,8 +50,6 @@
 	void open;
 	// svelte-ignore state_referenced_locally
 	void hideTrigger;
-	// svelte-ignore state_referenced_locally
-	void isPublic;
 	// svelte-ignore state_referenced_locally
 	void apiSchema;
 	// svelte-ignore state_referenced_locally
