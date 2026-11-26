@@ -1,12 +1,15 @@
 <script lang="ts">
-	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
+	import type { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
 	import { Panel, Status, widgetState } from '$lib/components/dashboard/kit';
-	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/messages';
 	import { escapePromqlStringLiteral, type SharedMetrics } from '$lib/prometheus';
+
+	import { detailLink, PVC } from './links';
+	import OverviewLink from './overview-link.svelte';
+	import { fillingFirst, type VolumeReading, type VolumeRow } from './pvc-forecast';
 
 	let {
 		prometheusDriver,
@@ -20,63 +23,103 @@
 		isReloading: boolean;
 	} = $props();
 
-	let requestedBytes: SampleValue | undefined = $state(undefined);
-	let usedBytes: SampleValue | undefined = $state(undefined);
-	let clusterTotalBytes: SampleValue | undefined = $state(undefined);
-	let totalCount: SampleValue | undefined = $state(undefined);
-	let boundCount: SampleValue | undefined = $state(undefined);
-	let pendingCount: SampleValue | undefined = $state(undefined);
+	type Snapshot = {
+		requested: number;
+		used: number;
+		count: number;
+		rows: VolumeRow[];
+		/** The cluster's raw capacity, when known: thin provisioning lets requests exceed it. */
+		clusterTotal: number | null;
+	};
 
-	function scalar(v: SampleValue | undefined): number | undefined {
-		if (v?.value === undefined || v?.value === null) return undefined;
-		const n = Number(v.value);
-		return Number.isFinite(n) ? n : undefined;
+	/** `null`: Prometheus has nothing for the namespace. */
+	let snap = $state<Snapshot | null | undefined>(undefined);
+	let hasError = $state(false);
+
+	type Vector = { metric: { labels: Record<string, string> }; value: { value: number } }[];
+
+	async function vector(query: string, evalAt: Date): Promise<Vector> {
+		return (await prometheusDriver.instantQuery(query, evalAt)).result as Vector;
 	}
 
-	async function fetchStorage() {
+	function first(result: Vector): number {
+		const n = Number(result[0]?.value?.value);
+		return Number.isFinite(n) ? n : 0;
+	}
+
+	function byClaim(result: Vector): Map<string, number> {
+		return new Map(
+			result.flatMap((sample) => {
+				const claim = sample.metric?.labels?.persistentvolumeclaim;
+				const value = Number(sample.value?.value);
+				return claim && Number.isFinite(value) ? [[claim, value] as [string, number]] : [];
+			})
+		);
+	}
+
+	async function fetchStorage(): Promise<Snapshot | null> {
 		const ns = escapePromqlStringLiteral(namespace);
 		const evalAt = new Date();
-		const [reqRes, usedRes, clusterTotalRes, totalRes, boundRes, pendingRes] = await Promise.all([
-			prometheusDriver.instantQuery(
+		// Only mounted volumes report usage, and a volume whose pod restarts drops out between
+		// scrapes, so each claim keeps its last reading from the past 5 minutes. Claims that no
+		// longer exist are left out.
+		const live = `and on (persistentvolumeclaim) kube_persistentvolumeclaim_info{namespace="${ns}"}`;
+		const used = `max by (persistentvolumeclaim) (last_over_time(kubelet_volume_stats_used_bytes{namespace="${ns}"}[5m])) ${live}`;
+		// The cluster's raw capacity, best effort: without it the card still shows the Workspace's
+		// own numbers.
+		const clusterCapacity = shared.instant('ceph-total-bytes', undefined, evalAt).then(
+			(result) => first(result.result as Vector) || null,
+			(error) => {
+				console.warn('Failed to fetch cluster storage capacity:', error);
+				return null;
+			}
+		);
+		const [requested, count, usedRes, capacityRes, growthRes, clusterTotal] = await Promise.all([
+			vector(
 				`sum(kube_persistentvolumeclaim_resource_requests_storage_bytes{namespace="${ns}"}) or vector(0)`,
 				evalAt
 			),
-			prometheusDriver.instantQuery(
-				`sum(kubelet_volume_stats_used_bytes{namespace="${ns}"}) or vector(0)`,
+			vector(`count(kube_persistentvolumeclaim_info{namespace="${ns}"}) or vector(0)`, evalAt),
+			vector(used, evalAt),
+			vector(
+				`max by (persistentvolumeclaim) (last_over_time(kubelet_volume_stats_capacity_bytes{namespace="${ns}"}[5m])) ${live}`,
 				evalAt
 			),
-			// The cluster's capacity, to say when requests exceed it. Best effort:
-			// without it the card still shows the Workspace's own numbers.
-			shared.instant('ceph-total-bytes', undefined, evalAt).catch((error) => {
-				console.warn('Failed to fetch cluster storage capacity:', error);
-				return undefined;
-			}),
-			prometheusDriver.instantQuery(
-				`count(kube_persistentvolumeclaim_info{namespace="${ns}"}) or vector(0)`,
+			// Growth per day over the week, for volumes that report usage now.
+			vector(
+				`max by (persistentvolumeclaim) (deriv(kubelet_volume_stats_used_bytes{namespace="${ns}"}[7d])) * 86400 and on (persistentvolumeclaim) (${used})`,
 				evalAt
 			),
-			prometheusDriver.instantQuery(
-				`count(kube_persistentvolumeclaim_status_phase{namespace="${ns}", phase="Bound"} == 1) or vector(0)`,
-				evalAt
-			),
-			prometheusDriver.instantQuery(
-				`count(kube_persistentvolumeclaim_status_phase{namespace="${ns}", phase="Pending"} == 1) or vector(0)`,
-				evalAt
-			)
+			clusterCapacity
 		]);
-		requestedBytes = reqRes.result[0]?.value;
-		usedBytes = usedRes.result[0]?.value;
-		clusterTotalBytes = clusterTotalRes?.result[0]?.value;
-		totalCount = totalRes.result[0]?.value;
-		boundCount = boundRes.result[0]?.value;
-		pendingCount = pendingRes.result[0]?.value;
+		const usedBy = byClaim(usedRes);
+		const capacityBy = byClaim(capacityRes);
+		const growthBy = byClaim(growthRes);
+		const volumes: VolumeReading[] = [...usedBy].flatMap(([name, value]) => {
+			const capacity = capacityBy.get(name);
+			return capacity === undefined
+				? []
+				: [{ name, capacity, used: value, growthPerDay: growthBy.get(name) ?? null }];
+		});
+		// Both end in `or vector(0)`, so a Prometheus that answers always returns a sample.
+		if (requested.length === 0 || count.length === 0) return null;
+		return {
+			requested: first(requested),
+			used: [...usedBy.values()].reduce((sum, value) => sum + value, 0),
+			count: first(count),
+			rows: fillingFirst(volumes),
+			clusterTotal
+		};
 	}
 
 	async function fetch() {
+		if (!namespace) return;
 		try {
-			if (!namespace) return;
-			await fetchStorage();
+			snap = await fetchStorage();
+			hasError = false;
 		} catch (error) {
+			hasError = true;
+			snap = undefined;
 			console.error('Failed to fetch workspace storage metrics:', error);
 		}
 	}
@@ -100,92 +143,102 @@
 		reloadManager.stop();
 	});
 
-	const provisioned = $derived(formatCapacity(scalar(requestedBytes) ?? 0));
-	const used = $derived(formatCapacity(scalar(usedBytes) ?? 0));
-	const clusterTotal = $derived(scalar(clusterTotalBytes) ?? 0);
-	const clusterCapacity = $derived(formatCapacity(clusterTotal));
-	// Thin provisioning lets PVC requests exceed the physical pool; flag that case.
-	const overProvisioned = $derived(
-		clusterTotal > 0 && (scalar(requestedBytes) ?? 0) > clusterTotal
-	);
-	const total = $derived(scalar(totalCount) ?? 0);
-	const bound = $derived(scalar(boundCount) ?? 0);
-	const pending = $derived(scalar(pendingCount) ?? 0);
+	const GIB = 1024 ** 3;
+	function scaleOf(bytes: number): { unit: string; divisor: number } {
+		if (bytes >= 1024 * GIB) return { unit: 'TiB', divisor: 1024 * GIB };
+		if (bytes >= GIB) return { unit: 'GiB', divisor: GIB };
+		return { unit: 'MiB', divisor: 1024 ** 2 };
+	}
+	function amount(bytes: number, divisor: number): string {
+		const v = bytes / divisor;
+		if (v === 0) return '0';
+		return v >= 10 ? String(Math.round(v)) : v.toFixed(1);
+	}
 
-	// PVCs that are neither bound nor pending (lost, or released), so the bar still adds up.
+	const usedScale = $derived(scaleOf(snap?.used ?? 0));
+	const requestedScale = $derived(scaleOf(snap?.requested ?? 0));
+	const percentUsed = $derived(
+		snap && snap.requested > 0 ? Math.min(100, (100 * snap.used) / snap.requested) : 0
+	);
+
+	/** The last two dash-separated parts stay whole; the rest gives way. */
+	function splitTail(name: string): [string, string] {
+		const parts = name.split('-');
+		if (parts.length <= 3) return [name, ''];
+		const tail = `-${parts.slice(-2).join('-')}`;
+		return [name.slice(0, -tail.length), tail];
+	}
+
+	// A volume's share used: 80 % and up a warning, 90 % and up critical.
+	function toneOf(percent: number): string {
+		if (percent >= 90) return 'text-destructive';
+		if (percent >= 80) return 'text-chart-1';
+		return 'text-chart-2';
+	}
 </script>
 
 <Panel
 	title={m.workspace_storage_title()}
 	description={m.workspace_storage_description()}
-	state={namespace ? widgetState(isLoaded, requestedBytes !== undefined) : 'ready'}
-	class="min-h-[16.375rem] @md:min-h-[16.625rem]"
+	state={namespace ? widgetState(isLoaded, !!snap, hasError) : 'ready'}
+	class="min-h-[12.5rem] @2xl:min-h-[25.3125rem]"
 >
 	{#if !namespace}
 		<p class="text-sm text-muted-foreground">{m.workspace_namespace_unresolved()}</p>
-	{:else}
-		<!-- Two equal halves split at the middle, each centred, like the workload card beside it,
-		     so the two dividers line up. -->
-		<div class="flex flex-1 flex-col slashed-zero tabular-nums">
-			<div class="flex flex-1 flex-col justify-center pb-2.5">
-				<div class="grid grid-cols-2 gap-3">
-					<div class="min-w-0">
-						<p class="text-xs leading-4 text-muted-foreground">{m.workspace_pvc_provisioned()}</p>
-						<p class="truncate text-[1.75rem] leading-8 tracking-tight">
-							{provisioned.value}<span class="ml-1 text-sm tracking-normal text-muted-foreground"
-								>{provisioned.unit}</span
+	{:else if snap}
+		<div class="flex flex-1 flex-col gap-2.5 slashed-zero tabular-nums">
+			<p class="flex min-w-0 flex-wrap items-baseline gap-x-2">
+				<span class="text-[1.75rem] leading-[2.125rem] font-[350] tracking-tight"
+					>{amount(snap.used, usedScale.divisor)} {usedScale.unit}</span
+				>
+				<span class="text-sm text-muted-foreground"
+					>{m.workspace_storage_used_of_requested({
+						total: `${amount(snap.requested, requestedScale.divisor)} ${requestedScale.unit}`
+					})}</span
+				>
+			</p>
+			<span class="relative block h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+				<span
+					class="absolute inset-y-0 left-0 rounded-full bg-foreground/80"
+					style:width="{percentUsed}%"
+				></span>
+			</span>
+			{#if snap.clusterTotal !== null && snap.requested > snap.clusterTotal}
+				{@const capacity = scaleOf(snap.clusterTotal)}
+				<Status tone="warn" variant="dot" class="items-start whitespace-normal">
+					{m.workspace_pvc_exceeds_cluster({
+						capacity: `${amount(snap.clusterTotal, capacity.divisor)} ${capacity.unit}`
+					})}
+				</Status>
+			{/if}
+			<p class="text-xs leading-4 text-muted-foreground">
+				{snap.count === 1
+					? m.workspace_storage_pvc_note_one()
+					: m.workspace_storage_pvc_note_many({ count: String(snap.count) })}
+			</p>
+			<!-- The volumes closest to full, each linking to its claim. -->
+			{#if snap.rows.length > 0}
+				<ul class="mt-1">
+					{#each snap.rows as row (row.name)}
+						{@const [head, tail] = splitTail(row.name)}
+						<li
+							class="flex min-h-[2.125rem] items-center justify-between gap-3 border-t border-border text-[0.8125rem]"
+						>
+							<OverviewLink
+								target={detailLink(PVC, namespace, row.name)}
+								names={[row.name]}
+								class="flex min-w-0 font-mono text-[0.8125rem]"
 							>
-						</p>
-					</div>
-					<div class="min-w-0">
-						<p class="text-xs leading-4 text-muted-foreground">{m.workspace_pvc_used()}</p>
-						<p class="truncate text-[1.75rem] leading-8 tracking-tight">
-							{used.value}<span class="ml-1 text-sm tracking-normal text-muted-foreground"
-								>{used.unit}</span
-							>
-						</p>
-						<p class="truncate text-[11px] leading-4 text-muted-foreground">
-							{m.workspace_pvc_used_hint()}
-						</p>
-					</div>
-				</div>
-				{#if overProvisioned}
-					<Status tone="warn" variant="dot" class="mt-2 items-start whitespace-normal">
-						{m.workspace_pvc_exceeds_cluster({
-							capacity: `${clusterCapacity.value} ${clusterCapacity.unit}`
-						})}
-					</Status>
-				{/if}
-			</div>
-			<!-- PVC counts as plain numbers, like every other reading on this card. -->
-			<dl class="grid flex-1 grid-cols-3 content-center gap-3 border-t border-border pt-2.5">
-				<div class="min-w-0">
-					<dt class="truncate text-xs leading-4 text-muted-foreground">
-						{m.workspace_pvc_total_count()}
-					</dt>
-					<dd class="text-xl leading-7 {total === 0 ? 'text-muted-foreground' : ''}">{total}</dd>
-				</div>
-				<div class="min-w-0">
-					<dt class="truncate text-xs leading-4 text-muted-foreground">
-						{m.workspace_pvc_bound_count()}
-					</dt>
-					<dd class="text-xl leading-7 {bound === 0 ? 'text-muted-foreground' : 'text-chart-2'}">
-						{bound}
-					</dd>
-				</div>
-				<div class="min-w-0">
-					<dt class="truncate text-xs leading-4 text-muted-foreground">
-						{m.workspace_pvc_pending()}
-					</dt>
-					<dd class="text-xl leading-7">
-						{#if pending > 0}
-							<Status tone="warn" variant="dot" class="text-xl leading-7">{pending}</Status>
-						{:else}
-							<span class="text-muted-foreground">0</span>
-						{/if}
-					</dd>
-				</div>
-			</dl>
+								<span class="truncate">{head}</span><span class="shrink-0">{tail}</span>
+							</OverviewLink>
+							<span class="shrink-0 {toneOf(row.percent)}">
+								{Math.round(row.percent)}%{#if row.fullInDays !== null}
+									· {m.workspace_storage_full_in({ days: String(row.fullInDays) })}{/if}
+							</span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
 		</div>
 	{/if}
 </Panel>

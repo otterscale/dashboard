@@ -54,11 +54,13 @@
 		})
 	);
 
+	// GPU and Ceph numbers come from the server's named queries, not PromQL of the card's own.
 	const shared = $derived(sharedMetrics(cluster, namespace));
 	const widgets = $derived(
 		workspaceOverviewWidgets.map((w) => ({
 			...w,
-			props: w.key === 'storage' ? { namespace, shared } : { namespace }
+			props:
+				w.key === 'storage' || w.key === 'resource-quota' ? { namespace, shared } : { namespace }
 		}))
 	);
 
