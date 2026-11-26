@@ -1,465 +1,166 @@
 <script lang="ts">
-	import InfoIcon from '@lucide/svelte/icons/info';
-	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
-	import { type InstantVector, PrometheusDriver } from 'prometheus-query';
-	import { onDestroy, onMount } from 'svelte';
+	import type { InstantVector, PrometheusDriver } from 'prometheus-query';
+	import { untrack } from 'svelte';
 
-	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Statistics from '$lib/components/custom/statistics/index';
-	import { buttonVariants } from '$lib/components/ui/button';
-	import * as Tooltip from '$lib/components/ui/tooltip';
+	import { NUM, Panel, type Tone, TONE_TEXT } from '$lib/components/dashboard/kit';
+	import { fetchInstant, scalar } from '$lib/components/dashboard/kit/fetch';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
+	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
-	import {
-		classifyThreshold,
-		escapePromqlStringLiteral,
-		fetchCombinedInstantOrNull,
-		fetchModelNodes,
-		type SharedMetrics,
-		type ThresholdLevel,
-		vllmMetricWithSelector
-	} from '$lib/prometheus';
+	import { classifyThreshold, type SharedMetrics } from '$lib/prometheus';
 	import { cn } from '$lib/utils';
 
+	import { DASH, fmtCount } from '../overview/lib/models';
+	import type { ModelPods } from './lib/model-pods';
+	import { healthQueries, splitKey } from './lib/queries';
+
+	// Health: faults in the last 24 hours across every pod of the model. Zero is healthy, anything
+	// more is worth a look. Preemptions are not faults (vLLM's own back-pressure), so they sit with
+	// the KV cache instead.
 	let {
-		prometheusDriver,
-		namespace,
-		selectedModel,
+		client,
 		shared,
-		isReloading = $bindable()
+		modelKey,
+		model,
+		modelState
 	}: {
-		prometheusDriver: PrometheusDriver;
-		namespace: string | undefined;
-		selectedModel: string;
+		client: PrometheusDriver;
 		shared: SharedMetrics;
-		isReloading: boolean;
+		modelKey: string;
+		model: ModelPods | undefined;
+		modelState: 'loading' | 'ready' | 'error';
 	} = $props();
 
-	type PodEntry = { pod: string; value: number };
-	type GpuEntry = { hostname: string; gpu: string; value: number };
-	type TerminatedInfo = { exitcode: number | null };
+	type Health = {
+		restarts?: number;
+		oom?: number;
+		throttle?: number;
+		shm?: number;
+		/** XID errors on the model's cards; undefined when they could not be read. */
+		xid?: number;
+	};
 
-	let restartTotal = $state(0);
-	let oomTotal = $state(0);
-	let xidTotal = $state(0);
-	let throttlePct = $state(0);
-	let preemptTotal = $state(0);
-	let restartByPod = $state<PodEntry[]>([]);
-	let oomByPod = $state<PodEntry[]>([]);
-	let preemptByPod = $state<PodEntry[]>([]);
-	let terminatedByPod = $state<Record<string, TerminatedInfo>>({});
-	let xidByGpu = $state<GpuEntry[]>([]);
-	let xidUnavailable = $state(false);
-	/** The namespace-scope query failed: restart, OOM, throttle, SHM and preempt are unknown. */
-	let mainUnavailable = $state(false);
-	let nodeCount = $state(0);
-	let isLoaded = $state(false);
-
-	// Join on `container` too so the model container is picked by the vLLM metric's own
-	// `container` label (KServe names it `main`, a raw vLLM Deployment names it `vllm`, etc.).
-	// This also drops pod sidecars (istio/queue-proxy), which never emit vLLM metrics.
-	function modelJoin(): string {
-		return `* on(namespace, pod, container) group_left() group by(namespace, pod, container) (${vllmMetricWithSelector(
-			'vllm:kv_cache_usage_perc',
-			namespace,
-			selectedModel
-		)})`;
-	}
-
-	function containerSelector(): string {
-		const ns = (namespace ?? '').trim();
-		return ns ? `{namespace="${escapePromqlStringLiteral(ns)}"}` : '{}';
-	}
-
-	function scalarFromVectors(vectors: { value?: { value: unknown } }[]): number {
-		const raw = vectors[0]?.value?.value;
-		const num = Number(raw);
-		return Number.isFinite(num) ? num : 0;
-	}
-
-	function perPodFromVectors(
-		vectors: { metric: { labels: object }; value?: { value: unknown } }[]
-	): PodEntry[] {
-		return vectors
-			.map((v) => {
-				const pod = (v.metric.labels as Record<string, string>).pod ?? '(unknown)';
-				const value = Number(v.value?.value);
-				return Number.isFinite(value) ? { pod, value } : null;
-			})
-			.filter((x): x is PodEntry => x !== null)
-			.sort((a, b) => b.value - a.value);
-	}
-
-	// Map each pod to its last-terminated exit code (the metric value). vLLM /dev/shm
-	// exhaustion surfaces here as exit 135 (SIGBUS) — distinct from OOMKilled, which is
-	// the memory-limit path.
-	function terminatedFromVectors(
-		exitVecs: { metric: { labels: object }; value?: { value: unknown } }[]
-	): Record<string, TerminatedInfo> {
-		const map: Record<string, TerminatedInfo> = {};
-		for (const v of exitVecs) {
-			const labels = v.metric.labels as Record<string, string>;
-			const pod = labels.pod;
-			if (!pod) continue;
-			const code = Number(v.value?.value);
-			map[pod] = { exitcode: Number.isFinite(code) ? code : null };
-		}
-		return map;
-	}
-
-	// 135 = 128 + SIGBUS(7): writing to a full /dev/shm tmpfs faults with SIGBUS — the clearest
-	// crash signature of shm exhaustion. 134/SIGABRT is intentionally excluded: it just means
-	// abort() was called (CUDA/NCCL/assert/heap corruption) and rarely points to shm.
-	function isShmLikely(exitcode: number | null): boolean {
-		return exitcode === 135;
-	}
+	type Vec = { metric: { labels: Record<string, string> }; value?: { value: unknown } };
 
 	/**
-	 * XID errors on the GPUs of the nodes the model runs on, from the shared scope;
-	 * null when they could not be asked, which the tile shows as unknown, not as 0.
+	 * XID errors from the shared scope, per card of the model's nodes. When HAMi names the model's
+	 * cards, only those count; otherwise every card of its nodes does.
 	 */
-	async function fetchXid(
-		nodes: string[] | null
-	): Promise<{ total: number; byGpu: GpuEntry[] } | null> {
-		if (nodes === null) return null;
-		if (nodes.length === 0) return { total: 0, byGpu: [] };
-		const params = { hostname: nodes };
+	async function xidErrors(): Promise<number | undefined> {
+		const pods = model?.pods ?? [];
+		const nodes = [...new Set(pods.map((p) => p.node).filter((n): n is string => !!n))];
+		if (nodes.length === 0) return 0;
+		const uuids = new Set(pods.flatMap((p) => p.hami.map((d) => d.uuid)));
 		try {
-			const [totalRes, perGpuRes] = await Promise.all([
-				shared.instant('gpu-xid-total', params),
-				shared.instant('gpu-xid-by-gpu', params)
+			const [byGpu, inventory] = await Promise.all([
+				shared.instant('gpu-xid-by-gpu', { hostname: nodes }),
+				uuids.size > 0 ? shared.instant('gpu-inventory') : Promise.resolve(undefined)
 			]);
-			const total = Math.round(scalarFromVectors(totalRes.result as InstantVector[]));
-			const byGpu = (perGpuRes.result as InstantVector[])
-				.map((v) => {
-					const labels = v.metric.labels as Record<string, string>;
-					const value = Number(v.value?.value);
-					if (!Number.isFinite(value)) return null;
-					return {
-						hostname: labels.hostname ?? '(unknown)',
-						gpu: labels.gpu ?? '?',
-						value
-					};
-				})
-				.filter((x): x is GpuEntry => x !== null)
-				.sort((a, b) => b.value - a.value);
-			return { total, byGpu };
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- built and read in one pass, never reactive
+			const cards = new Set<string>();
+			for (const s of (inventory?.result ?? []) as Vec[]) {
+				const { UUID, hostname, device } = s.metric.labels;
+				if (UUID && uuids.has(UUID) && hostname && device) {
+					cards.add(`${hostname}/${device.replace(/^nvidia/, '')}`);
+				}
+			}
+			let total = 0;
+			for (const s of byGpu.result as InstantVector[]) {
+				const labels = s.metric.labels as Record<string, string>;
+				const value = Number(s.value?.value);
+				if (!Number.isFinite(value)) continue;
+				if (cards.size > 0 && !cards.has(`${labels.hostname}/${labels.gpu}`)) continue;
+				total += value;
+			}
+			return Math.round(total);
 		} catch (error) {
-			console.warn('Failed to fetch XID errors:', error);
-			return null;
+			console.warn('XID errors are unavailable:', error);
+			return undefined;
 		}
 	}
 
-	async function fetch() {
-		const cs = containerSelector();
-		const join = modelJoin();
-
-		// Preemption is a native vLLM metric (it already carries namespace/pod/
-		// llm_inference_service), so it needs no kube join.
-		const preempt = vllmMetricWithSelector('vllm:num_preemptions_total', namespace, selectedModel);
-
-		const mainQueries = {
-			restartTotal: `sum(increase(kube_pod_container_status_restarts_total${cs}[24h]) ${join})`,
-			restartPerPod: `sum by(pod) (increase(kube_pod_container_status_restarts_total${cs}[24h]) ${join}) > 0`,
-			oomTotal: `sum(increase(container_oom_events_total${cs}[24h]) ${join})`,
-			oomPerPod: `sum by(pod) (increase(container_oom_events_total${cs}[24h]) ${join}) > 0`,
-			throttle:
-				`sum(rate(container_cpu_cfs_throttled_periods_total${cs}[5m]) ${join})` +
-				` / sum(rate(container_cpu_cfs_periods_total${cs}[5m]) ${join}) * 100`,
-			lastTermExit: `kube_pod_container_status_last_terminated_exitcode${cs} ${join}`,
-			preemptTotal: `sum(increase(${preempt}[24h]))`,
-			preemptPerPod: `sum by(pod) (increase(${preempt}[24h])) > 0`
-		};
-
-		const nodesPromise = fetchModelNodes(prometheusDriver, namespace, selectedModel);
-
-		// Kick off XID as soon as nodes resolves, in parallel with the main batch — it only needs `nodes`.
-		const xidPromise = nodesPromise.then(fetchXid);
-
-		const [main, nodes, xid] = await Promise.all([
-			fetchCombinedInstantOrNull(prometheusDriver, mainQueries),
-			nodesPromise,
-			xidPromise
+	const loader = new Loader<Health>(async () => {
+		if (!model) return null;
+		const { namespace } = splitKey(modelKey);
+		const names = model.pods.map((p) => p.name);
+		const [r, xid] = await Promise.all([
+			fetchInstant(client, healthQueries(namespace, names, model.container)),
+			xidErrors()
 		]);
-
-		// A failed query clears the last numbers rather than keeping them, and the
-		// tiles show unknown, like XID, not a healthy 0.
-		mainUnavailable = main === null;
-		const slot = (name: keyof typeof mainQueries) => main?.[name] ?? [];
-		restartTotal = Math.round(scalarFromVectors(slot('restartTotal')));
-		restartByPod = perPodFromVectors(slot('restartPerPod'));
-		oomTotal = Math.round(scalarFromVectors(slot('oomTotal')));
-		oomByPod = perPodFromVectors(slot('oomPerPod'));
-		terminatedByPod = terminatedFromVectors(slot('lastTermExit'));
-		const throttleV = scalarFromVectors(slot('throttle'));
-		throttlePct = Number.isFinite(throttleV) ? throttleV : 0;
-		preemptTotal = Math.round(scalarFromVectors(slot('preemptTotal')));
-		preemptByPod = perPodFromVectors(slot('preemptPerPod'));
-		nodeCount = nodes?.length ?? 0;
-		xidUnavailable = xid === null;
-		xidTotal = xid?.total ?? 0;
-		xidByGpu = xid?.byGpu ?? [];
-	}
-
-	const reloadManager = new ReloadManager(fetch);
-
-	onMount(() => {
-		fetch().then(() => (isLoaded = true));
+		if (!r) return null;
+		return {
+			restarts: Math.round(scalar(r.restarts) ?? 0),
+			oom: Math.round(scalar(r.oom) ?? 0),
+			throttle: scalar(r.throttle),
+			shm: Math.round(scalar(r.shm) ?? 0),
+			xid
+		};
 	});
-	onDestroy(() => reloadManager.stop());
 
 	$effect(() => {
-		if (isReloading) reloadManager.restart();
-		else reloadManager.stop();
+		// The pod list is read again on every auto update, so a new list is the cue to refetch.
+		void model;
+		if (model) untrack(() => loader.load());
 	});
 
-	const restartLevel = $derived<ThresholdLevel>(
-		classifyThreshold(restartTotal, { green: 0, orange: 2 })
+	const state = $derived(
+		modelState === 'loading' || (model && loader.state === 'loading')
+			? 'loading'
+			: modelState === 'error'
+				? 'error'
+				: loader.state
 	);
-	const oomLevel = $derived<ThresholdLevel>(oomTotal > 0 ? 'red' : 'green');
-	const xidLevel = $derived<ThresholdLevel>(
-		nodeCount === 0 ? 'green' : xidTotal > 0 ? 'red' : 'green'
-	);
-	const throttleLevel = $derived<ThresholdLevel>(
-		classifyThreshold(throttlePct, { green: 5, orange: 25 })
-	);
-	// 0 over 24h = healthy; any preemption = KV pressure (re-prefill, TTFT spike). Thresholds tunable.
-	const preemptLevel = $derived<ThresholdLevel>(
-		classifyThreshold(preemptTotal, { green: 0, orange: 10 })
-	);
-	// "Last died from SIGBUS" — the closest available signal to /dev/shm exhaustion.
-	// No usage gauge exists for a memory-backed emptyDir, so we count the crash signature instead.
-	const shmCrashPods = $derived(
-		Object.entries(terminatedByPod)
-			.filter(([, t]) => isShmLikely(t.exitcode))
-			.map(([pod, t]) => ({ pod, exitcode: t.exitcode }))
-			.sort((a, b) => a.pod.localeCompare(b.pod))
-	);
-	const shmCrashCount = $derived(shmCrashPods.length);
-	const shmLevel = $derived<ThresholdLevel>(shmCrashCount > 0 ? 'red' : 'green');
+	const h = $derived(loader.data ?? {});
 
-	function valueColorClass(level: ThresholdLevel): string {
-		if (level === 'red') return 'text-destructive';
-		if (level === 'orange') return 'text-chart-1';
-		return 'text-chart-2';
+	function countTone(v: number | undefined): Tone {
+		if (v === undefined) return 'muted';
+		return v > 0 ? 'warn' : 'ok';
+	}
+	function throttleTone(v: number | undefined): Tone {
+		if (v === undefined) return 'muted';
+		const level = classifyThreshold(v, { green: 5, orange: 25 });
+		return level === 'green' ? 'ok' : level === 'orange' ? 'warn' : 'bad';
 	}
 
-	/** Colour of a tile fed by the namespace-scope query: grey while it is unknown. */
-	function mainColorClass(level: ThresholdLevel): string {
-		return mainUnavailable ? 'text-muted-foreground' : valueColorClass(level);
-	}
+	const items = $derived([
+		{
+			label: m.model_analytics_health_restarts(),
+			value: fmtCount(h.restarts),
+			tone: countTone(h.restarts)
+		},
+		{ label: m.model_analytics_health_oom(), value: fmtCount(h.oom), tone: countTone(h.oom) },
+		{ label: m.model_analytics_health_xid(), value: fmtCount(h.xid), tone: countTone(h.xid) },
+		{
+			label: m.model_analytics_health_cpu_throttling(),
+			value: h.throttle === undefined ? DASH : `${h.throttle.toFixed(h.throttle < 10 ? 1 : 0)}%`,
+			tone: throttleTone(h.throttle)
+		},
+		{ label: m.model_analytics_health_shm(), value: fmtCount(h.shm), tone: countTone(h.shm) }
+	]);
 </script>
 
-<Statistics.Root type="count" class="overflow-visible">
-	<Statistics.Header class="flex flex-row items-center gap-2 space-y-0">
-		<div class="grid min-w-0 flex-1 gap-1">
-			<Statistics.Title class="truncate text-base leading-normal text-foreground">
-				{m.pod_hardware_status()}
-			</Statistics.Title>
-			<p class="truncate text-sm text-muted-foreground">
-				{m.llm_dashboard_pod_hardware_status_description()}
-			</p>
-		</div>
-		<Tooltip.Root>
-			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}>
-				<InfoIcon class="size-4 text-muted-foreground" />
-			</Tooltip.Trigger>
-			<Tooltip.Content>
-				<p>{m.llm_dashboard_pod_hardware_status_tooltip()}</p>
-			</Tooltip.Content>
-		</Tooltip.Root>
-	</Statistics.Header>
-	<Statistics.Content class="min-h-16">
-		{#if !isLoaded}
-			<div class="flex h-65 w-full items-center justify-center">
-				<LoaderCircle class="size-12 animate-spin" />
-			</div>
-		{:else}
-			<!-- Six tiles, two per row: the card sits in a quarter-width column, so three abreast
-			     would squeeze the labels. Each tile's colour is its own status; there is no roll-up. -->
-			<div class="grid h-65 grid-cols-2 place-content-center gap-x-2 gap-y-5">
-				<Tooltip.Root>
-					<Tooltip.Trigger>
-						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-2xl font-bold tabular-nums', mainColorClass(restartLevel))}>
-								{mainUnavailable ? '—' : restartTotal}
-							</p>
-							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-								{m.metric_restart()}
-							</p>
-						</div>
-					</Tooltip.Trigger>
-					{#if mainUnavailable}
-						<Tooltip.Content side="bottom">
-							<p class="text-xs">{m.pod_health_unavailable()}</p>
-						</Tooltip.Content>
-					{:else if restartByPod.length > 0}
-						<Tooltip.Content side="bottom">
-							<ul class="flex flex-col gap-1 text-xs">
-								{#each restartByPod as p (p.pod)}
-									<li class="flex items-center gap-3">
-										<span class="truncate" title={p.pod}>{p.pod}</span>
-										<span class="ml-auto font-mono tabular-nums">{Math.round(p.value)}</span>
-									</li>
-								{/each}
-							</ul>
-						</Tooltip.Content>
-					{/if}
-				</Tooltip.Root>
-
-				<Tooltip.Root>
-					<Tooltip.Trigger>
-						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-2xl font-bold tabular-nums', mainColorClass(oomLevel))}>
-								{mainUnavailable ? '—' : oomTotal}
-							</p>
-							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-								{m.metric_oom()}
-							</p>
-						</div>
-					</Tooltip.Trigger>
-					{#if mainUnavailable}
-						<Tooltip.Content side="bottom">
-							<p class="text-xs">{m.pod_health_unavailable()}</p>
-						</Tooltip.Content>
-					{:else if oomByPod.length > 0}
-						<Tooltip.Content side="bottom">
-							<ul class="flex flex-col gap-1 text-xs">
-								{#each oomByPod as p (p.pod)}
-									<li class="flex items-center gap-3">
-										<span class="truncate" title={p.pod}>{p.pod}</span>
-										<span class="ml-auto font-mono tabular-nums">{Math.round(p.value)}</span>
-									</li>
-								{/each}
-							</ul>
-						</Tooltip.Content>
-					{/if}
-				</Tooltip.Root>
-
-				<Tooltip.Root>
-					<Tooltip.Trigger>
-						<div class="flex flex-col items-center gap-1">
-							<p
-								class={cn(
-									'text-2xl font-bold tabular-nums',
-									xidUnavailable ? 'text-muted-foreground' : valueColorClass(xidLevel)
-								)}
-							>
-								{nodeCount === 0 || xidUnavailable ? '—' : xidTotal}
-							</p>
-							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-								{m.metric_xid()}
-							</p>
-						</div>
-					</Tooltip.Trigger>
-					{#if xidUnavailable}
-						<Tooltip.Content side="bottom">
-							<p class="text-xs">{m.xid_unavailable()}</p>
-						</Tooltip.Content>
-					{:else if nodeCount === 0}
-						<Tooltip.Content side="bottom">
-							<p class="text-xs">{m.no_gpu_for_model()}</p>
-						</Tooltip.Content>
-					{:else if xidByGpu.length > 0}
-						<Tooltip.Content side="bottom">
-							<ul class="flex max-h-40 flex-col gap-1 overflow-y-auto text-xs">
-								{#each xidByGpu as g (g.hostname + g.gpu)}
-									<li class="flex items-center gap-2">
-										<span class="truncate" title={g.hostname}>{g.hostname}</span>
-										<span class="text-muted-foreground">GPU{g.gpu}</span>
-										<span class="ml-auto font-mono tabular-nums">{Math.round(g.value)}</span>
-									</li>
-								{/each}
-							</ul>
-						</Tooltip.Content>
-					{/if}
-				</Tooltip.Root>
-
-				<Tooltip.Root>
-					<Tooltip.Trigger>
-						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-2xl font-bold tabular-nums', mainColorClass(throttleLevel))}>
-								{mainUnavailable ? '—' : `${throttlePct.toFixed(1)}%`}
-							</p>
-							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-								{m.metric_cpu_throttle()}
-							</p>
-						</div>
-					</Tooltip.Trigger>
-					<Tooltip.Content side="bottom" class="max-w-xs">
-						<p class="text-xs">
-							{mainUnavailable ? m.pod_health_unavailable() : m.llm_dashboard_cpu_throttle_hint()}
-						</p>
-					</Tooltip.Content>
-				</Tooltip.Root>
-
-				<Tooltip.Root>
-					<Tooltip.Trigger>
-						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-2xl font-bold tabular-nums', mainColorClass(shmLevel))}>
-								{mainUnavailable ? '—' : shmCrashCount}
-							</p>
-							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-								{m.metric_shm_crash()}
-							</p>
-						</div>
-					</Tooltip.Trigger>
-					<Tooltip.Content side="bottom" class="max-w-sm">
-						{#if mainUnavailable}
-							<p class="text-xs">{m.pod_health_unavailable()}</p>
-						{:else if shmCrashPods.length === 0}
-							<p class="text-xs">{m.llm_dashboard_shm_crash_hint()}</p>
-						{:else}
-							<div class="flex flex-col gap-1">
-								<ul class="flex max-h-40 flex-col gap-1 overflow-y-auto text-xs">
-									{#each shmCrashPods as p (p.pod)}
-										<li class="flex items-center gap-3">
-											<span class="truncate" title={p.pod}>{p.pod}</span>
-											<span class="ml-auto font-mono tabular-nums">exit {p.exitcode}</span>
-										</li>
-									{/each}
-								</ul>
-								<p class="mt-1 border-t pt-2 text-[0.7rem] leading-snug">
-									{m.llm_dashboard_shm_crash_hint()}
-								</p>
-							</div>
-						{/if}
-					</Tooltip.Content>
-				</Tooltip.Root>
-
-				<Tooltip.Root>
-					<Tooltip.Trigger>
-						<div class="flex flex-col items-center gap-1">
-							<p class={cn('text-2xl font-bold tabular-nums', mainColorClass(preemptLevel))}>
-								{mainUnavailable ? '—' : preemptTotal}
-							</p>
-							<p class="text-xs font-medium tracking-wider text-muted-foreground uppercase">
-								{m.metric_preempt()}
-							</p>
-						</div>
-					</Tooltip.Trigger>
-					<Tooltip.Content side="bottom" class="max-w-xs">
-						{#if mainUnavailable}
-							<p class="text-xs">{m.pod_health_unavailable()}</p>
-						{:else if preemptByPod.length === 0}
-							<p class="text-xs">{m.llm_dashboard_preempt_hint()}</p>
-						{:else}
-							<div class="flex flex-col gap-1">
-								<ul class="flex max-h-40 flex-col gap-1 overflow-y-auto text-xs">
-									{#each preemptByPod as p (p.pod)}
-										<li class="flex items-center gap-3">
-											<span class="truncate" title={p.pod}>{p.pod}</span>
-											<span class="ml-auto font-mono tabular-nums">{Math.round(p.value)}</span>
-										</li>
-									{/each}
-								</ul>
-								<p class="mt-1 border-t pt-2 text-[0.7rem] leading-snug">
-									{m.llm_dashboard_preempt_hint()}
-								</p>
-							</div>
-						{/if}
-					</Tooltip.Content>
-				</Tooltip.Root>
-			</div>
-		{/if}
-	</Statistics.Content>
-</Statistics.Root>
+<!-- Five rows of 36px, like the configuration beside it, so the two cards are the same height. -->
+<Panel
+	title={m.model_analytics_health()}
+	state={state === 'loading' ? 'ready' : state}
+	class="h-full"
+>
+	{#snippet actions()}
+		<span class="mt-1 mr-1.5 text-right text-xs text-muted-foreground">
+			{m.model_analytics_health_note()}
+		</span>
+	{/snippet}
+	<ul class="flex flex-col text-[0.8125rem]">
+		{#each items as item (item.label)}
+			<li class="flex h-9 items-center justify-between gap-3 border-b">
+				<span class="min-w-0 truncate">{item.label}</span>
+				{#if state === 'loading'}
+					<Skeleton class="h-3 w-8" />
+				{:else}
+					<!-- The number's colour is the status: healthy at 0, a warning above. -->
+					<span class={cn('text-[0.8125rem]', NUM, TONE_TEXT[item.tone])}>{item.value}</span>
+				{/if}
+			</li>
+		{/each}
+	</ul>
+</Panel>

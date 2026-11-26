@@ -19,6 +19,7 @@ type LLMInferenceServiceObject = {
 		name?: string;
 		namespace?: string;
 		creationTimestamp?: string;
+		annotations?: Record<string, string>;
 	};
 	spec?: {
 		model?: {

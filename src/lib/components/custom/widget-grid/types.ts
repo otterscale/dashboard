@@ -5,9 +5,9 @@ import type { Component } from 'svelte';
 export type WidgetBaseProps = {
 	prometheusDriver: PrometheusDriver;
 	isReloading: boolean;
-	/** Query range start time, driven by the DatetimePicker. Defaults to 1 hour ago. */
+	/** Query range start time, driven by the RangePicker. Defaults to 1 hour ago. */
 	start?: Date;
-	/** Query range end time, driven by the DatetimePicker. Defaults to now. */
+	/** Query range end time, driven by the RangePicker. Defaults to now. */
 	end?: Date;
 	/** When true, each range query uses the current time as the end bound (live window). */
 	endIsNow?: boolean;

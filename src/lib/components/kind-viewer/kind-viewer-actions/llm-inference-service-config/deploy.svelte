@@ -216,7 +216,9 @@
 								name: lodash.get(formValue, ['name'], ''),
 								namespace,
 								labels: lodash.get(object, ['metadata', 'labels'], {}),
-								annotations: lodash.get(object, ['metadata', 'annotations'], {})
+								annotations: {
+									...lodash.get(object, ['metadata', 'annotations'], {})
+								}
 							});
 
 							lodash.set(

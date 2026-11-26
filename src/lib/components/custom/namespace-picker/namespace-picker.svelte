@@ -23,7 +23,8 @@
 		cluster,
 		currentWorkspace = '',
 		namespace = $bindable(),
-		isClusterAdmin = false
+		isClusterAdmin = false,
+		defaultAll = false
 	}: {
 		cluster: string;
 		/** Name of the currently active workspace (used as default selection) */
@@ -31,6 +32,8 @@
 		/** Bindable: resolved namespace for Prometheus/API filters; '' = all namespaces */
 		namespace: string | undefined;
 		isClusterAdmin?: boolean;
+		/** Start on all namespaces instead of the current Workspace's. */
+		defaultAll?: boolean;
 	} = $props();
 
 	const transport: Transport = getContext('transport');
@@ -115,7 +118,7 @@
 		workspaceOptions.set(options);
 
 		// Default to current workspace's namespace; fall back to "all"
-		namespace = currentWorkspace ? (nameToNs.get(currentWorkspace) ?? '') : '';
+		namespace = !defaultAll && currentWorkspace ? (nameToNs.get(currentWorkspace) ?? '') : '';
 
 		isLoaded = true;
 	});

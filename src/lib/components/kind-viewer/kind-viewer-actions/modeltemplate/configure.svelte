@@ -99,9 +99,12 @@
 		$state(undefined);
 	let pendingAction: ConfigureAction | undefined = $state(undefined);
 	let handoffOpen = $state(false);
+	let apiSchema = $state('OpenAI');
+	/** Set when the deploy wizard hands back, so reopening keeps the choices. */
+	let returning = false;
 
 	async function listTemplates(): Promise<ModelTemplateObject[]> {
-		const modelLabel = entry.metadata?.labels?.['template.otterscale.io/model'];
+		const modelLabel = entry.metadata?.labels?.['template.phison.com/model'];
 		if (!modelLabel) return [];
 		const items: ModelTemplateObject[] = [];
 		let continueToken: string | undefined = undefined;
@@ -112,7 +115,7 @@
 				group,
 				version,
 				resource,
-				labelSelector: `template.otterscale.io/template-role=deployment,template.otterscale.io/model=${modelLabel}`,
+				labelSelector: `template.phison.com/template-role=deployment,template.phison.com/model=${modelLabel}`,
 				continue: continueToken
 			} as ListRequest);
 			continueToken = response.continue;
@@ -144,6 +147,10 @@
 	$effect(() => {
 		if (!open) return;
 		untrack(() => {
+			if (returning) {
+				returning = false;
+				return;
+			}
 			templates = [];
 			selection = {
 				workload: '',
@@ -153,6 +160,7 @@
 				kvOffload: 'false',
 				routing: 'false'
 			};
+			apiSchema = 'OpenAI';
 			loadTemplates();
 		});
 	});
@@ -404,6 +412,28 @@
 						disabled={!(routingOn && routingOff)}
 					/>
 				</Field.Field>
+
+				{#if action === 'deploy'}
+					<Field.Field orientation="horizontal">
+						<Field.Content>
+							<Field.Label for="api-schema">API schema</Field.Label>
+							<Field.Description>
+								The API the gateway serves this model with. Rerankers need Cohere.
+							</Field.Description>
+						</Field.Content>
+						<Select.Root
+							type="single"
+							value={apiSchema}
+							onValueChange={(value) => (apiSchema = value)}
+						>
+							<Select.Trigger id="api-schema" class="w-32 shrink-0">{apiSchema}</Select.Trigger>
+							<Select.Content align="end">
+								<Select.Item value="OpenAI" label="OpenAI" />
+								<Select.Item value="Cohere" label="Cohere" />
+							</Select.Content>
+						</Select.Root>
+					</Field.Field>
+				{/if}
 			</Field.Group>
 
 			<div class="rounded-lg bg-muted p-4">
@@ -530,9 +560,16 @@
 		{cluster}
 		{namespace}
 		{schema}
+		{apiSchema}
+		onBack={() => {
+			returning = true;
+			handoffOpen = false;
+		}}
 		object={pendingObject}
 		onOpenChangeComplete={(isOpen) => {
-			if (!isOpen) pendingTemplate = undefined;
+			if (isOpen) return;
+			pendingTemplate = undefined;
+			if (returning) open = true;
 		}}
 	/>
 {/if}

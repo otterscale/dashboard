@@ -1,242 +1,209 @@
 <script lang="ts">
-	import ChartBar from '@lucide/svelte/icons/chart-bar';
-	import Gauge from '@lucide/svelte/icons/gauge';
-	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
-	import { ArcChart, Text } from 'layerchart';
+	import { createClient, type Transport } from '@connectrpc/connect';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { type PrometheusDriver, ResponseType } from 'prometheus-query';
-	import { onDestroy, onMount } from 'svelte';
+	import { getContext, onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Statistics from '$lib/components/custom/statistics/index';
-	import { Button } from '$lib/components/ui/button/index.js';
-	import * as ButtonGroup from '$lib/components/ui/button-group/index.js';
-	import * as Card from '$lib/components/ui/card';
-	import * as Chart from '$lib/components/ui/chart/index.js';
-	import { formatCapacity, formatPercentage } from '$lib/formatter';
+	import {
+		Meter,
+		NUM,
+		Panel,
+		Segmented,
+		type Tone,
+		TONE_TEXT,
+		widgetState
+	} from '$lib/components/dashboard/kit';
 	import { m } from '$lib/messages';
-	import { escapePromqlStringLiteral, LIVE_PODS } from '$lib/prometheus';
+	import { LIVE_PODS, type SharedMetrics } from '$lib/prometheus';
+	import { cn } from '$lib/utils';
 
-	import { resourceQuotaPresence } from './resource-quota';
+	import { amount, byCard, byteScale, type Scale, shareTone } from '../lib/format';
+	import { cpuUsage, inNamespace, memoryUsage, pvcUsed } from '../lib/queries';
+	import { listAll } from '../lib/resources';
+	import { gpuMemory } from './gpu-memory';
+	import { POD } from './links';
+	import { assertNamespaceSeen } from './resource-quota';
 
 	let {
 		prometheusDriver,
+		cluster,
 		namespace,
+		shared,
 		isReloading = $bindable()
 	}: {
 		prometheusDriver: PrometheusDriver;
+		cluster: string;
 		namespace: string;
+		shared: SharedMetrics;
 		isReloading: boolean;
 	} = $props();
 
-	const UNLIMITED = '∞';
+	const transport: Transport = getContext('transport');
+	const resourceClient = createClient(ResourceService, transport);
 
-	/**
-	 * No ResourceQuota exists for the namespace (the workspace was created without
-	 * `spec.resourceQuota.hard`), so `kube_resourcequota` reports nothing at all — neither `hard`
-	 * nor `used`. Detected from Prometheus on every fetch; the tile then renders `used / ∞` from
-	 * pod-level requests/limits instead of a ratio.
-	 */
-	let quotaUnlimited = $state(false);
-
-	/** Which ResourceQuota resource keys to visualize (requests.* vs limits.*). */
+	/** Which side of the ResourceQuota to compare: `requests.*` or `limits.*`. */
 	let quotaView = $state<'requests' | 'limits'>('requests');
 
-	let cpuUsedReq = $state<number | null>(null);
-	let cpuHardReq = $state<number | null>(null);
-	let cpuUsedLim = $state<number | null>(null);
-	let cpuHardLim = $state<number | null>(null);
-	let memUsedReq = $state<number | null>(null);
-	let memHardReq = $state<number | null>(null);
-	let memUsedLim = $state<number | null>(null);
-	let memHardLim = $state<number | null>(null);
-	let gpuMemUsed = $state<number | null>(null);
-	let gpuMemHard = $state<number | null>(null);
+	/**
+	 * One reading per resource. `requests`/`limits` are what the pods ask for (the quota's `used`
+	 * counter when a quota tracks it, else summed from the pods); `hard` is the quota, `null` when
+	 * none is set; `usage` is what is actually in use.
+	 */
+	type Reading = {
+		requests: number | null;
+		limits: number | null;
+		hardRequests: number | null;
+		hardLimits: number | null;
+		usage: number | null;
+	};
+	type Snapshot = {
+		cpu: Reading;
+		memory: Reading;
+		gpu: Reading & { cards: number; sharedCards: number };
+		storage: Reading;
+	};
+
+	let snap = $state.raw<Snapshot | undefined>(undefined);
 	let hasError = $state(false);
-
-	const cpuUsed = $derived(quotaView === 'requests' ? cpuUsedReq : cpuUsedLim);
-	const cpuHard = $derived(quotaView === 'requests' ? cpuHardReq : cpuHardLim);
-	const memUsed = $derived(quotaView === 'requests' ? memUsedReq : memUsedLim);
-	const memHard = $derived(quotaView === 'requests' ? memHardReq : memHardLim);
-
-	function finiteOrNull(v: unknown): number | null {
-		const n = Number(v);
-		return Number.isFinite(n) ? n : null;
-	}
-
-	function extractValue(raw: unknown): unknown {
-		if (Array.isArray(raw) && raw.length >= 2) return raw[1];
-		if (typeof raw === 'object' && raw !== null && 'value' in raw)
-			return (raw as Record<string, unknown>).value;
-		return raw;
-	}
 
 	function instantScalar(r: Awaited<ReturnType<PrometheusDriver['instantQuery']>>): number | null {
 		const res = r.result;
 		if (!Array.isArray(res) || res.length === 0) return null;
-
-		if (r.resultType === ResponseType.SCALAR || r.resultType === ResponseType.STRING) {
-			return finiteOrNull(res[1]);
-		}
-
-		const raw = (res[0] as { value?: unknown })?.value;
-		return raw == null ? null : finiteOrNull(extractValue(raw));
+		const raw =
+			r.resultType === ResponseType.SCALAR
+				? (res as unknown[])[1]
+				: (res[0] as { value?: { value?: unknown } })?.value?.value;
+		const n = Number(raw);
+		return Number.isFinite(n) ? n : null;
 	}
 
-	function rqSum(resource: string, t: 'used' | 'hard') {
-		const ns = escapePromqlStringLiteral(namespace);
-		const base = `kube_resourcequota{namespace="${ns}"`;
-		return `sum(${base}, type="${t}", resource="${resource}"})`;
-	}
-
-	/** Number of ResourceQuota series KSM exports for the namespace; empty when none exists. */
-	function rqCount() {
-		const ns = escapePromqlStringLiteral(namespace);
-		return `count(kube_resourcequota{namespace="${ns}", type="hard"})`;
-	}
-
-	/**
-	 * Liveness probe for kube-state-metrics: the namespace collector emits exactly one series per
-	 * namespace, from the same scrape that produces `kube_resourcequota`. Empty means KSM is not
-	 * being scraped right now (or the namespace does not exist yet).
-	 */
-	function nsCount() {
-		const ns = escapePromqlStringLiteral(namespace);
-		return `count(kube_namespace_created{namespace="${ns}"})`;
-	}
-
-	/**
-	 * Pod-level stand-in for ResourceQuota's `used` counter, for namespaces that have no
-	 * ResourceQuota at all. Restricted to non-terminated pods, the same set the quota counts.
-	 */
-	function podResourceSum(kind: 'requests' | 'limits', resource: 'cpu' | 'memory'): string {
-		const nsLit = escapePromqlStringLiteral(namespace);
-		const unit = resource === 'cpu' ? 'core' : 'byte';
-		return (
-			`sum(kube_pod_container_resource_${kind}` +
-			`{namespace="${nsLit}",resource="${resource}",unit="${unit}"} ${LIVE_PODS}) or vector(0)`
-		);
-	}
-
-	/** KSM `resource` label on `kube_pod_container_resource_limits` (dots → underscores). */
-	const KSM_POD_RES_NVIDIA_GPU = 'nvidia_com_gpu';
-	const KSM_POD_RES_NVIDIA_GPUMEM = 'nvidia_com_gpumem';
-
-	/**
-	 * gpumem (nvidia.com/gpumem) is a per-GPU value, so total used memory =
-	 * sum over containers of (gpu_count × gpumem_per_gpu).
-	 */
-	function podContainerReadyGpuMemTotalSum(ns: string): string {
-		const nsLit = escapePromqlStringLiteral(ns);
-		const gpuRes = escapePromqlStringLiteral(KSM_POD_RES_NVIDIA_GPU);
-		const memRes = escapePromqlStringLiteral(KSM_POD_RES_NVIDIA_GPUMEM);
-		const ready = `kube_pod_container_status_ready{namespace="${nsLit}"} == 1`;
-		const gpu = `kube_pod_container_resource_limits{namespace="${nsLit}",resource="${gpuRes}"}`;
-		const mem = `kube_pod_container_resource_limits{namespace="${nsLit}",resource="${memRes}"}`;
-		return `sum((${gpu} * on (namespace, pod, container) ${mem}) and on (namespace, pod, container) ${ready})`;
-	}
-
-	async function queryScalar(q: string): Promise<number | null> {
+	async function scalar(query: string): Promise<number | null> {
 		try {
-			const r = await prometheusDriver.instantQuery(q, new Date());
-			return instantScalar(r);
+			return instantScalar(await prometheusDriver.instantQuery(query, new Date()));
 		} catch {
 			return null;
 		}
 	}
 
-	/** No ResourceQuota to read: only the numerators exist, and they come from the pods. */
-	async function fetchUnlimitedUsage() {
-		const [cpuReqU, cpuLimU, memReqU, memLimU, gpuMemUsedFromPods] = await Promise.all([
-			queryScalar(podResourceSum('requests', 'cpu')),
-			queryScalar(podResourceSum('limits', 'cpu')),
-			queryScalar(podResourceSum('requests', 'memory')),
-			queryScalar(podResourceSum('limits', 'memory')),
-			queryScalar(podContainerReadyGpuMemTotalSum(namespace))
-		]);
+	const ns = $derived(inNamespace(namespace));
 
-		cpuUsedReq = cpuReqU;
-		cpuUsedLim = cpuLimU;
-		memUsedReq = memReqU;
-		memUsedLim = memLimU;
-		gpuMemUsed = gpuMemUsedFromPods ?? 0;
-		cpuHardReq = cpuHardLim = memHardReq = memHardLim = gpuMemHard = null;
+	function quota(resource: string, type: 'used' | 'hard'): string {
+		return `sum(kube_resourcequota{${ns}, type="${type}", resource="${resource}"})`;
 	}
 
-	async function fetchQuota() {
-		const [
-			cpuReqU,
-			cpuReqH,
-			cpuLimU,
-			cpuLimH,
-			memReqU,
-			memReqH,
-			memLimU,
-			memLimH,
-			gpuMemUsedFromPods,
-			gpuMemHardFromRq
-		] = await Promise.all([
-			queryScalar(rqSum('requests.cpu', 'used')),
-			queryScalar(rqSum('requests.cpu', 'hard')),
-			queryScalar(rqSum('limits.cpu', 'used')),
-			queryScalar(rqSum('limits.cpu', 'hard')),
-			queryScalar(rqSum('requests.memory', 'used')),
-			queryScalar(rqSum('requests.memory', 'hard')),
-			queryScalar(rqSum('limits.memory', 'used')),
-			queryScalar(rqSum('limits.memory', 'hard')),
-			queryScalar(podContainerReadyGpuMemTotalSum(namespace)),
-			queryScalar(rqSum('limits.nvidia.com/gpumem', 'hard'))
-		]);
-
-		cpuUsedReq = cpuReqU;
-		cpuHardReq = cpuReqH;
-		cpuUsedLim = cpuLimU;
-		cpuHardLim = cpuLimH;
-		memUsedReq = memReqU;
-		memHardReq = memReqH;
-		memUsedLim = memLimU;
-		memHardLim = memLimH;
-		gpuMemUsed = gpuMemUsedFromPods ?? 0;
-		gpuMemHard = gpuMemHardFromRq ?? 0;
-	}
-
-	function resetQuotaState() {
-		cpuUsedReq = cpuHardReq = cpuUsedLim = cpuHardLim = null;
-		memUsedReq = memHardReq = memUsedLim = memHardLim = null;
-		gpuMemUsed = gpuMemHard = null;
-	}
-
-	async function countScalar(q: string): Promise<number> {
-		const r = await prometheusDriver.instantQuery(q, new Date());
-		return instantScalar(r) ?? 0;
+	/** What the live pods ask for, for a resource no quota counts. */
+	function podSum(kind: 'requests' | 'limits', resource: 'cpu' | 'memory'): string {
+		const unit = resource === 'cpu' ? 'core' : 'byte';
+		return `sum(kube_pod_container_resource_${kind}{${ns}, resource="${resource}", unit="${unit}"} ${LIVE_PODS}) or vector(0)`;
 	}
 
 	/**
-	 * Whether the namespace has a ResourceQuota, per Prometheus:
-	 *  1. `kube_namespace_created` has a series → KSM is live and sees this namespace
-	 *  2. `kube_resourcequota` has a series      → a ResourceQuota object exists
-	 * Without (1) this throws, so the tile shows an error rather than a misleading `used / ∞`.
-	 * Any query failure also throws, never read as "no quota".
-	 *
-	 * The resourcequota collector's state is not checked: Prometheus keeps no metadata for a KSM
-	 * family without series (measured on KSM v2.20.0 + Prometheus v3.14: `kube_resourcequota`
-	 * has 0 series and no metadata when the cluster has no quota), so it cannot be told from
-	 * metadata. The cost is `∞` instead of an error if the collector is disabled; the chart
-	 * decides that, and OtterScale's prometheus-stack enables it by default.
+	 * Whether kube-state-metrics sees the namespace. Without it every quota reads as missing, so
+	 * the card shows an error rather than "No quota set".
 	 */
-	async function hasResourceQuota(): Promise<boolean> {
-		const [nsSeen, rqSeries] = await Promise.all([countScalar(nsCount()), countScalar(rqCount())]);
-		return resourceQuotaPresence(nsSeen, rqSeries);
+	async function checkKubeStateMetrics() {
+		assertNamespaceSeen(
+			instantScalar(
+				await prometheusDriver.instantQuery(`count(kube_namespace_created{${ns}})`, new Date())
+			) ?? 0
+		);
+	}
+
+	/**
+	 * GPU memory: what the HAMi scheduler booked on each pod, and what is in use on the cards this
+	 * namespace has to itself. Usage is best effort; without it the row still shows the booking.
+	 */
+	async function fetchGpu() {
+		const [pods, used, tenants] = await Promise.all([
+			listAll(resourceClient, cluster, namespace, POD),
+			shared.instant('vgpu-memory-used').catch(() => undefined),
+			shared.instant('gpu-shared-count').catch(() => undefined)
+		]);
+		return gpuMemory(pods as Parameters<typeof gpuMemory>[0], byCard(used), byCard(tenants));
+	}
+
+	async function fetchAll(): Promise<Snapshot> {
+		// The namespace check runs beside the readings rather than before them; if it fails, the
+		// card fails whatever the others answered.
+		const readings = Promise.all([
+			// CPU: quota used / hard, pod sums, usage
+			scalar(quota('requests.cpu', 'used')),
+			scalar(quota('limits.cpu', 'used')),
+			scalar(quota('requests.cpu', 'hard')),
+			scalar(quota('limits.cpu', 'hard')),
+			scalar(podSum('requests', 'cpu')),
+			scalar(podSum('limits', 'cpu')),
+			scalar(`sum(${cpuUsage(namespace)}) or vector(0)`),
+			// Memory
+			scalar(quota('requests.memory', 'used')),
+			scalar(quota('limits.memory', 'used')),
+			scalar(quota('requests.memory', 'hard')),
+			scalar(quota('limits.memory', 'hard')),
+			scalar(podSum('requests', 'memory')),
+			scalar(podSum('limits', 'memory')),
+			scalar(`sum(${memoryUsage(namespace)}) or vector(0)`),
+			// nvidia.com/gpumem counts MiB.
+			scalar(quota('limits.nvidia.com/gpumem', 'hard')),
+			// Storage
+			scalar(quota('requests.storage', 'used')),
+			scalar(quota('requests.storage', 'hard')),
+			scalar(`sum(kube_persistentvolumeclaim_resource_requests_storage_bytes{${ns}}) or vector(0)`),
+			// The same reading as the Storage card: each claim's last value in 5 minutes, since a
+			// volume drops out while its pod restarts.
+			scalar(`sum(${pvcUsed(namespace)}) or vector(0)`)
+		]);
+		const [q, gpu] = await Promise.all([readings, fetchGpu(), checkKubeStateMetrics()]);
+		const [cpuRqReq, cpuRqLim, cpuHardReq, cpuHardLim, cpuPodReq, cpuPodLim, cpuUse] = q;
+		const [memRqReq, memRqLim, memHardReq, memHardLim, memPodReq, memPodLim, memUse] = q.slice(7);
+		const [gpuHardMiB] = q.slice(14);
+		const [stRqReq, stHard, stPvc, stUse] = q.slice(15);
+
+		const gpuHard = gpuHardMiB === null ? null : gpuHardMiB * 1024 * 1024;
+		return {
+			cpu: {
+				requests: cpuRqReq ?? cpuPodReq,
+				limits: cpuRqLim ?? cpuPodLim,
+				hardRequests: cpuHardReq,
+				hardLimits: cpuHardLim,
+				usage: cpuUse
+			},
+			memory: {
+				requests: memRqReq ?? memPodReq,
+				limits: memRqLim ?? memPodLim,
+				hardRequests: memHardReq,
+				hardLimits: memHardLim,
+				usage: memUse
+			},
+			gpu: {
+				// HAMi allocates one amount per card; requests and limits are the same here.
+				requests: gpu.allocated,
+				limits: gpu.allocated,
+				hardRequests: gpuHard,
+				hardLimits: gpuHard,
+				usage: gpu.used,
+				cards: gpu.cards,
+				sharedCards: gpu.sharedCards
+			},
+			storage: {
+				// PVCs have no limits: both views show the requests.
+				requests: stRqReq ?? stPvc,
+				limits: stRqReq ?? stPvc,
+				hardRequests: stHard,
+				hardLimits: stHard,
+				usage: stUse
+			}
+		};
 	}
 
 	async function fetch() {
+		if (!namespace) return;
 		try {
+			snap = await fetchAll();
 			hasError = false;
-			if (!namespace) return;
-			quotaUnlimited = !(await hasResourceQuota());
-			await (quotaUnlimited ? fetchUnlimitedUsage() : fetchQuota());
 		} catch (error) {
 			hasError = true;
-			resetQuotaState();
+			snap = undefined;
 			console.error('Failed to fetch workspace resource quota:', error);
 		}
 	}
@@ -260,353 +227,156 @@
 		reloadManager.stop();
 	});
 
-	function formatCpuCores(n: number): string {
-		return Number.isInteger(n) ? String(n) : n.toFixed(2);
+	type Row = {
+		label: string;
+		/** `—` when there is nothing to show. */
+		value: string;
+		/** `of 16 cores`, or the unit alone when no quota is set. */
+		of: string;
+		/** Left out when there is no quota to judge against. */
+		tone?: Tone;
+		/** Bar widths in %: the lighter layer is what is requested, the darker what is in use. */
+		soft: number;
+		solid: number;
+		bar: boolean;
+		line: string;
+	};
+
+	function share(part: number | null, whole: number | null): number {
+		if (part === null || whole === null || whole <= 0) return 0;
+		return Math.min(100, Math.max(0, (100 * part) / whole));
 	}
 
-	/** `nvidia.com/gpumem` values are reported in MiB; convert to bytes so `formatCapacity` can
-	 *  pick the best-fit unit (KB/MB/GB/TB), same as the CPU/RAM cards. */
-	function formatGpuMem(nMb: number): { value: number; unit: string } {
-		return formatCapacity(nMb * 1024 * 1024);
+	function row(
+		label: string,
+		reading: Reading,
+		scale: Scale,
+		unitWord: string,
+		extra?: string
+	): Row {
+		const asked = quotaView === 'requests' ? reading.requests : reading.limits;
+		const hard = quotaView === 'requests' ? reading.hardRequests : reading.hardLimits;
+		if (asked === null) {
+			return { label, value: '—', of: '', soft: 0, solid: 0, bar: false, line: '' };
+		}
+		const hasQuota = hard !== null && hard > 0;
+		const unitOnly =
+			quotaView === 'requests'
+				? m.workspace_quota_requested_unit({ unit: unitWord })
+				: m.workspace_quota_limits_unit({ unit: unitWord });
+		const parts = [
+			reading.usage === null
+				? null
+				: m.workspace_quota_in_use({ amount: `${amount(reading.usage, scale)} ${unitWord}` }),
+			extra ?? null,
+			hasQuota ? null : m.dashboard_no_quota()
+		].filter(Boolean);
+		return {
+			label,
+			value: amount(asked, scale),
+			of: hasQuota
+				? m.dashboard_of_total({ total: `${amount(hard, scale)} ${unitWord}` })
+				: unitOnly,
+			tone: hasQuota ? shareTone((100 * asked) / hard) : undefined,
+			soft: hasQuota ? share(asked, hard) : asked > 0 ? 100 : 0,
+			solid: hasQuota ? share(reading.usage, hard) : share(reading.usage, asked),
+			bar: true,
+			line: parts.join(' · ')
+		};
 	}
+
+	const rows = $derived.by((): Row[] => {
+		const s = snap;
+		if (!s) return [];
+		const cores: Scale = { unit: m.cores(), divisor: 1 };
+		const memScale = byteScale(s.memory.requests, s.memory.limits, s.memory.hardLimits);
+		const gpuScale = byteScale(s.gpu.requests, s.gpu.hardRequests);
+		const stScale = byteScale(s.storage.requests, s.storage.hardRequests);
+		const gpuRow: Row =
+			(s.gpu.requests ?? 0) > 0
+				? row(
+						m.gpu_memory(),
+						s.gpu,
+						gpuScale,
+						gpuScale.unit,
+						[
+							s.gpu.cards === 1
+								? m.workspace_quota_gpu_on_one()
+								: m.workspace_quota_gpu_on_many({ count: String(s.gpu.cards) }),
+							// A shared card's usage belongs to several workloads and is left out.
+							s.gpu.sharedCards > 0
+								? m.workspace_quota_gpu_shared_excluded({ count: String(s.gpu.sharedCards) })
+								: null
+						]
+							.filter(Boolean)
+							.join(' · ')
+					)
+				: {
+						label: m.gpu_memory(),
+						value: '—',
+						of: '',
+						soft: 0,
+						solid: 0,
+						bar: false,
+						line: m.workspace_quota_no_gpu()
+					};
+		return [
+			row(m.cpu(), s.cpu, cores, cores.unit),
+			row(m.memory(), s.memory, memScale, memScale.unit),
+			gpuRow,
+			row(m.storage(), s.storage, stScale, stScale.unit)
+		];
+	});
 </script>
 
-<!-- No hard limit to divide by: keep the gauge shape but leave the track empty, and report the
-	 raw usage against ∞. `used === null` means the usage query itself failed. -->
-{#snippet unlimitedGauge(used: string | null)}
-	{#if used === null}
-		<div class="flex h-[168px] w-full flex-col items-center justify-center">
-			<ChartBar class="size-16 animate-pulse text-muted-foreground" />
-			<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
-		</div>
-	{:else}
-		{@const chartConfig = { data: { color: 'var(--chart-3)' } } satisfies Chart.ChartConfig}
-		<Chart.Container
-			config={chartConfig}
-			class="mx-auto my-auto aspect-square h-[168px] w-full max-w-[220px]"
-		>
-			<ArcChart
-				data={[{ value: 0 }]}
-				innerRadius={-15}
-				cornerRadius={15}
-				range={[-120, 120]}
-				maxValue={1}
-				series={[{ key: 'data', color: chartConfig.data.color }]}
-				props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
-				tooltipContext={false}
-			>
-				{#snippet aboveMarks()}
-					<Text
-						value={UNLIMITED}
-						textAnchor="middle"
-						verticalAnchor="middle"
-						class="fill-foreground text-3xl! font-bold"
-						dy={-15}
-					/>
-					<Text
-						value={`${used} / ${UNLIMITED}`}
-						textAnchor="middle"
-						verticalAnchor="middle"
-						class="text-md! text-muted-foreground"
-						dy={15}
-					/>
-				{/snippet}
-			</ArcChart>
-		</Chart.Container>
-	{/if}
-{/snippet}
-
-<Card.Root class="group relative h-full min-h-[160px] gap-2 overflow-hidden">
-	<Gauge
-		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"
-		aria-hidden="true"
-	/>
-	<Card.Header class="space-y-3">
-		<div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-			<div class="min-w-0 flex-1 space-y-1.5">
-				<Card.Title>{m.workspace_quota_usage_title()}</Card.Title>
-				<Card.Description class="text-md flex min-h-6 items-center">
-					{m.workspace_quota_usage_description()}
-				</Card.Description>
-			</div>
-			<ButtonGroup.Root
-				class="shrink-0 self-stretch sm:self-auto"
-				aria-label={m.workspace_quota_toggle_aria()}
-			>
-				<Button
-					type="button"
-					size="sm"
-					variant={quotaView === 'requests' ? 'secondary' : 'outline'}
-					class="min-w-[5.5rem]"
-					onclick={() => (quotaView = 'requests')}
-				>
-					{m.workspace_quota_toggle_requests()}
-				</Button>
-				<Button
-					type="button"
-					size="sm"
-					variant={quotaView === 'limits' ? 'secondary' : 'outline'}
-					class="min-w-[5.5rem]"
-					onclick={() => (quotaView = 'limits')}
-				>
-					{m.workspace_quota_toggle_limits()}
-				</Button>
-			</ButtonGroup.Root>
-		</div>
-	</Card.Header>
+<Panel
+	title={m.workspace_quota_usage_title()}
+	description={m.workspace_quota_usage_description()}
+	state={namespace ? widgetState(isLoaded, rows.length > 0, hasError) : 'ready'}
+	class="min-h-[22.9375rem] @md:min-h-[23.1875rem] @5xl:min-h-[25.3125rem]"
+>
+	{#snippet actions()}
+		<Segmented
+			options={[
+				{ value: 'requests', label: m.workspace_quota_toggle_requests() },
+				{ value: 'limits', label: m.workspace_quota_toggle_limits() }
+			]}
+			bind:value={quotaView}
+			label={m.workspace_quota_toggle_aria()}
+			size="xs"
+		/>
+	{/snippet}
 	{#if !namespace}
-		<Card.Content class="text-sm text-muted-foreground"
-			>{m.workspace_namespace_unresolved()}</Card.Content
-		>
-	{:else if !isLoaded}
-		<div class="flex h-9 w-full items-center justify-center">
-			<LoaderCircle class="size-10 animate-spin text-muted-foreground" />
-		</div>
+		<p class="text-sm text-muted-foreground">{m.workspace_namespace_unresolved()}</p>
 	{:else}
-		<Card.Content class="grid gap-4 md:grid-cols-2">
-			<!-- CPU: same pattern as cluster analytics usage-rate-chart-cpu -->
-			<Statistics.Root
-				type="ratio"
-				class="overflow-visible border-0 bg-transparent p-0 shadow-none"
-			>
-				<Statistics.Header>
-					<div class="flex justify-between gap-4">
-						<Statistics.Title>{m.cpu()}</Statistics.Title>
-						{#if quotaUnlimited}
-							<div class="flex items-center gap-1 text-xl">
-								<p class="font-bold">{UNLIMITED}</p>
-							</div>
-						{:else if cpuHard !== null}
-							<div class="flex items-center gap-1 text-xl">
-								<p class="font-bold">{formatCpuCores(cpuHard)}</p>
-							</div>
-						{/if}
+		<!-- Each row: the name and what is asked for against the quota, a two-layer bar (requested
+		     lighter, in use darker, both as a share of the quota), then one line in small type. -->
+		<ul class={cn('flex flex-1 flex-col', NUM)}>
+			{#each rows as r (r.label)}
+				<li
+					class="flex flex-1 flex-col justify-center gap-1.5 border-t border-border py-2.5 first:border-t-0 first:pt-0 last:pb-0"
+				>
+					<div class="flex items-baseline justify-between gap-3">
+						<p class="min-w-0 truncate text-sm font-medium">{r.label}</p>
+						<p class="shrink-0 text-right">
+							<span
+								class={cn(
+									'text-lg leading-6 tracking-tight',
+									r.value === '—' ? 'text-muted-foreground' : r.tone && TONE_TEXT[r.tone]
+								)}>{r.value}</span
+							>
+							{#if r.of}<span class="ml-0.5 text-xs text-muted-foreground">{r.of}</span>{/if}
+						</p>
 					</div>
-				</Statistics.Header>
-				<Statistics.Content class="min-h-20">
-					{#if quotaUnlimited}
-						{@render unlimitedGauge(hasError || cpuUsed === null ? null : formatCpuCores(cpuUsed))}
-					{:else if hasError || cpuUsed === null || cpuHard === null || cpuHard === 0 || formatPercentage(cpuUsed, cpuHard, 1) === null}
-						<div class="flex h-[168px] w-full flex-col items-center justify-center">
-							<ChartBar class="size-16 animate-pulse text-muted-foreground" />
-							<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
-						</div>
-					{:else}
-						{@const chartConfig = { data: { color: 'var(--chart-3)' } } satisfies Chart.ChartConfig}
-						{@const ratio = cpuUsed / cpuHard}
-						{@const data = [{ value: ratio }]}
-						<Chart.Container
-							config={chartConfig}
-							class="mx-auto my-auto aspect-square h-[168px] w-full max-w-[220px]"
-						>
-							<ArcChart
-								{data}
-								innerRadius={-15}
-								cornerRadius={15}
-								range={[-120, 120]}
-								maxValue={1}
-								series={[{ key: 'data', color: chartConfig.data.color }]}
-								props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
-								tooltipContext={false}
-							>
-								{#snippet aboveMarks()}
-									{@const percentage = formatPercentage(cpuUsed!, cpuHard!, 1)}
-									<Text
-										value={`${percentage} %`}
-										textAnchor="middle"
-										verticalAnchor="middle"
-										class="fill-foreground text-3xl! font-bold"
-										dy={-12}
-									/>
-									<Text
-										value={`${formatCpuCores(cpuUsed!)} / ${formatCpuCores(cpuHard!)}`}
-										textAnchor="middle"
-										verticalAnchor="middle"
-										class="text-md! font-normal text-muted-foreground"
-										dy={14}
-									/>
-								{/snippet}
-							</ArcChart>
-						</Chart.Container>
-					{/if}
-				</Statistics.Content>
-			</Statistics.Root>
-
-			<!-- Memory: same pattern as cluster analytics usage-rate-chart-ram -->
-			<Statistics.Root
-				type="ratio"
-				class="overflow-visible border-0 bg-transparent p-0 shadow-none"
-			>
-				<Statistics.Header>
-					<div class="flex justify-between gap-4">
-						<Statistics.Title>{m.ram()}</Statistics.Title>
-						{#if quotaUnlimited}
-							<div class="flex items-center gap-1 text-xl">
-								<p class="font-bold">{UNLIMITED}</p>
-							</div>
-						{:else if memHard !== null}
-							{@const { value, unit } = formatCapacity(memHard)}
-							<div class="flex items-center gap-1 text-xl">
-								<p class="font-bold">{value} {unit}</p>
-							</div>
-						{/if}
-					</div>
-				</Statistics.Header>
-				<Statistics.Content class="min-h-20">
-					{#if quotaUnlimited}
-						{@const used = memUsed === null ? null : formatCapacity(memUsed)}
-						{@render unlimitedGauge(
-							hasError || used === null ? null : `${used.value} ${used.unit}`
-						)}
-					{:else if hasError || memUsed === null || memHard === null || memHard === 0 || formatPercentage(memUsed, memHard, 1) === null}
-						<div class="flex h-[168px] w-full flex-col items-center justify-center">
-							<ChartBar class="size-16 animate-pulse text-muted-foreground" />
-							<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
-						</div>
-					{:else}
-						{@const chartConfig = { data: { color: 'var(--chart-3)' } } satisfies Chart.ChartConfig}
-						{@const ratio = memUsed / memHard}
-						{@const data = [{ value: ratio }]}
-						<Chart.Container
-							config={chartConfig}
-							class="mx-auto my-auto aspect-square h-[168px] w-full max-w-[220px]"
-						>
-							<ArcChart
-								{data}
-								innerRadius={-15}
-								cornerRadius={15}
-								range={[-120, 120]}
-								maxValue={1}
-								series={[{ key: 'data', color: chartConfig.data.color }]}
-								props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
-								tooltipContext={false}
-							>
-								{#snippet aboveMarks()}
-									{@const percentage = formatPercentage(memUsed!, memHard!, 1)}
-									{@const { value: usingValue, unit: usingUnit } = formatCapacity(memUsed!)}
-									{@const { value: totalValue, unit: totalUnit } = formatCapacity(memHard!)}
-									<Text
-										value={`${percentage} %`}
-										textAnchor="middle"
-										verticalAnchor="middle"
-										class="fill-foreground text-3xl! font-bold"
-										dy={-15}
-									/>
-									<Text
-										value={`${usingValue} ${usingUnit}/${totalValue} ${totalUnit}`}
-										textAnchor="middle"
-										verticalAnchor="middle"
-										class="text-md! text-muted-foreground"
-										dy={15}
-									/>
-								{/snippet}
-							</ArcChart>
-						</Chart.Container>
-					{/if}
-				</Statistics.Content>
-			</Statistics.Root>
-
-			<!-- GPU Memory: nvidia.com/gpumem -->
-			<Statistics.Root
-				type="ratio"
-				class="overflow-visible border-0 bg-transparent p-0 shadow-none"
-			>
-				<Statistics.Header>
-					<div class="flex justify-between gap-4">
-						<Statistics.Title>GPU Memory</Statistics.Title>
-						{#if quotaUnlimited}
-							<div class="flex items-center gap-1 text-xl">
-								<p class="font-bold">{UNLIMITED}</p>
-							</div>
-						{:else if gpuMemHard !== null}
-							{@const { value, unit } = formatGpuMem(gpuMemHard)}
-							<div class="flex items-center gap-1 text-xl">
-								<p class="font-bold">{value} {unit}</p>
-							</div>
-						{/if}
-					</div>
-				</Statistics.Header>
-				<Statistics.Content class="min-h-20">
-					{#if quotaUnlimited}
-						{@const used = gpuMemUsed === null ? null : formatGpuMem(gpuMemUsed)}
-						{@render unlimitedGauge(
-							hasError || used === null ? null : `${used.value} ${used.unit}`
-						)}
-					{:else if hasError || gpuMemUsed === null || gpuMemHard === null}
-						<div class="flex h-[168px] w-full flex-col items-center justify-center">
-							<ChartBar class="size-16 animate-pulse text-muted-foreground" />
-							<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
-						</div>
-					{:else if gpuMemHard === 0}
-						{@const chartConfig = { data: { color: 'var(--chart-3)' } } satisfies Chart.ChartConfig}
-						{@const data = [{ value: 0 }]}
-						<Chart.Container
-							config={chartConfig}
-							class="mx-auto my-auto aspect-square h-[168px] w-full max-w-[220px]"
-						>
-							<ArcChart
-								{data}
-								innerRadius={-15}
-								cornerRadius={15}
-								range={[-120, 120]}
-								maxValue={1}
-								series={[{ key: 'data', color: chartConfig.data.color }]}
-								props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
-								tooltipContext={false}
-							>
-								{#snippet aboveMarks()}
-									<Text
-										value="0 / 0"
-										textAnchor="middle"
-										verticalAnchor="middle"
-										class="fill-foreground text-3xl! font-bold"
-										dy={0}
-									/>
-								{/snippet}
-							</ArcChart>
-						</Chart.Container>
-					{:else}
-						{@const chartConfig = { data: { color: 'var(--chart-3)' } } satisfies Chart.ChartConfig}
-						{@const ratio = gpuMemUsed / gpuMemHard}
-						{@const data = [{ value: ratio }]}
-						<Chart.Container
-							config={chartConfig}
-							class="mx-auto my-auto aspect-square h-[168px] w-full max-w-[220px]"
-						>
-							<ArcChart
-								{data}
-								innerRadius={-15}
-								cornerRadius={15}
-								range={[-120, 120]}
-								maxValue={1}
-								series={[{ key: 'data', color: chartConfig.data.color }]}
-								props={{ arc: { track: { fill: 'var(--muted)' }, motion: 'tween' } }}
-								tooltipContext={false}
-							>
-								{#snippet aboveMarks()}
-									{@const percentage = formatPercentage(gpuMemUsed!, gpuMemHard!, 1)}
-									{@const { value: usingValue, unit: usingUnit } = formatGpuMem(gpuMemUsed!)}
-									{@const { value: totalValue, unit: totalUnit } = formatGpuMem(gpuMemHard!)}
-									<Text
-										value={`${percentage} %`}
-										textAnchor="middle"
-										verticalAnchor="middle"
-										class="fill-foreground text-3xl! font-bold"
-										dy={-15}
-									/>
-									<Text
-										value={`${usingValue} ${usingUnit}/${totalValue} ${totalUnit}`}
-										textAnchor="middle"
-										verticalAnchor="middle"
-										class="text-md! text-muted-foreground"
-										dy={15}
-									/>
-								{/snippet}
-							</ArcChart>
-						</Chart.Container>
-					{/if}
-				</Statistics.Content>
-			</Statistics.Root>
-		</Card.Content>
+					<!-- An empty track when there is nothing to draw, so the rows keep their height. -->
+					<Meter
+						value={r.bar ? r.solid : 0}
+						soft={r.bar ? r.soft : undefined}
+						class="flex-none text-foreground/80"
+					/>
+					<p class="truncate text-xs leading-4 text-muted-foreground">{r.line || ' '}</p>
+				</li>
+			{/each}
+		</ul>
 	{/if}
-</Card.Root>
+</Panel>

@@ -1,9 +1,6 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import ChartColumnIcon from '@lucide/svelte/icons/chart-column';
 	import ChevronRightIcon from '@lucide/svelte/icons/chevron-right';
-	import InfoIcon from '@lucide/svelte/icons/info';
-	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import Maximize2Icon from '@lucide/svelte/icons/maximize-2';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import { ResourceService } from '@otterscale/api/resource/v1';
@@ -13,7 +10,8 @@
 
 	import { page } from '$app/state';
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Statistics from '$lib/components/custom/statistics/index';
+	import { Chip, Meter, NUM, Panel, Status, widgetState } from '$lib/components/dashboard/kit';
+	import { CAPACITY_THRESHOLDS, formatDuration } from '$lib/components/dashboard/kit/format';
 	import { formatWithBinarySuffix } from '$lib/components/dynamic-table/utils';
 	import { buttonVariants } from '$lib/components/ui/button';
 	import { ScrollArea } from '$lib/components/ui/scroll-area';
@@ -30,23 +28,31 @@
 		DCGM_GPU_MEMORY_TOTAL_BYTES,
 		DCGM_GPU_MEMORY_USED_BYTES,
 		deviceClassLabel,
-		fetchCombinedInstant,
+		fetchCombinedInstantOrNull,
 		type GpuGovernance,
 		LIVE_PODS,
 		thresholdClasses
 	} from '$lib/prometheus';
 	import { cn } from '$lib/utils';
 
+	import { Clock } from './clock';
+	import type { ClusterSignals } from './signals.svelte';
+
 	let {
 		prometheusDriver,
-		isReloading = $bindable()
-	}: { prometheusDriver: PrometheusDriver; isReloading: boolean } = $props();
+		isReloading = $bindable(),
+		signals
+	}: {
+		prometheusDriver: PrometheusDriver;
+		isReloading: boolean;
+		signals: ClusterSignals;
+	} = $props();
 
 	const transport = getContext<Transport>('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
 	// namespace → workspace name (Workspace CRD owns one namespace via `spec.namespace`).
-	let namespaceToWorkspace = $state<Record<string, string>>({});
+	let namespaceToWorkspace = $state.raw<Record<string, string>>({});
 
 	async function fetchWorkspaceMap() {
 		try {
@@ -190,8 +196,10 @@
 		consumers: 'hami_vgpu_memory_allocated_bytes'
 	};
 
-	let rows = $state<NodeRow[]>([]);
+	// What Prometheus last answered with, most saturated first. Replaced whole by each fetch.
+	let rows = $state.raw<NodeRow[]>([]);
 	let isLoaded = $state(false);
+	let failed = $state(false);
 
 	// Sum a GPU field across a node's devices; undefined when none report it (cell renders "—").
 	function sumGpuField(gpus: GpuDevice[], key: 'allocated' | 'used' | 'total'): number | undefined {
@@ -247,95 +255,102 @@
 	}
 
 	// Fetch GPU devices, grouped by node name (DCGM's `hostname` label == the K8s node name).
-	async function fetchGpusByNode(): Promise<Record<string, GpuDevice[]>> {
-		try {
-			const r = await fetchCombinedInstant(prometheusDriver, GPU_QUERIES);
+	// Null when the request failed, so a failed poll is not read as "no GPUs".
+	async function fetchGpusByNode(): Promise<Record<string, GpuDevice[]> | null> {
+		const r = await fetchCombinedInstantOrNull(prometheusDriver, GPU_QUERIES);
+		if (!r) return null;
 
-			// DCGM keys its cards on `UUID`, HAMi on `device_uuid` — same value, different label.
-			const used = numbersByLabel(r.used, 'UUID');
-			const util = numbersByLabel(r.util, 'UUID');
-			const smClock = numbersByLabel(r.smClock, 'UUID');
-			const temperature = numbersByLabel(r.temperature, 'UUID');
-			const power = numbersByLabel(r.power, 'UUID');
-			const remappedUncorrectable = numbersByLabel(r.remappedUncorrectable, 'UUID');
-			const remapFailure = numbersByLabel(r.remapFailure, 'UUID');
-			const pcieReplay = numbersByLabel(r.pcieReplay, 'UUID');
-			const allocated = numbersByLabel(r.allocated, 'device_uuid');
+		// DCGM keys its cards on `UUID`, HAMi on `device_uuid` — same value, different label.
+		const used = numbersByLabel(r.used, 'UUID');
+		const util = numbersByLabel(r.util, 'UUID');
+		const smClock = numbersByLabel(r.smClock, 'UUID');
+		const temperature = numbersByLabel(r.temperature, 'UUID');
+		const power = numbersByLabel(r.power, 'UUID');
+		const remappedUncorrectable = numbersByLabel(r.remappedUncorrectable, 'UUID');
+		const remapFailure = numbersByLabel(r.remapFailure, 'UUID');
+		const pcieReplay = numbersByLabel(r.pcieReplay, 'UUID');
+		const allocated = numbersByLabel(r.allocated, 'device_uuid');
 
-			// Fold the per-pod allocation series into deduped consumers (same ns/pod summed).
-			const consumersByUuid: Record<string, Record<string, GpuConsumer>> = {};
-			for (const series of r.consumers) {
-				const labels = series.metric.labels as Record<string, string>;
-				const uuid = labels.device_uuid;
-				if (!uuid) continue;
-				const value = Number(series.value?.value);
-				const consumed = Number.isFinite(value) ? value : undefined;
-				// The exporter's own `namespace`/`pod` labels win the scrape, so HAMi's workload
-				// labels arrive prefixed; fall back to the bare names for scrapes without honor_labels.
-				const namespace = labels.exported_namespace ?? labels.namespace ?? '';
-				const pod = labels.exported_pod ?? labels.pod ?? '';
-				if (!namespace && !pod) continue;
-				const byKey = (consumersByUuid[uuid] ??= {});
-				const key = `${namespace}/${pod}`;
-				const existing = byKey[key];
-				if (existing) {
-					if (consumed !== undefined) existing.allocated = (existing.allocated ?? 0) + consumed;
-				} else {
-					byKey[key] = { namespace, pod, allocated: consumed };
-				}
+		// Fold the per-pod allocation series into deduped consumers (same ns/pod summed).
+		const consumersByUuid: Record<string, Record<string, GpuConsumer>> = {};
+		for (const series of r.consumers) {
+			const labels = series.metric.labels as Record<string, string>;
+			const uuid = labels.device_uuid;
+			if (!uuid) continue;
+			const value = Number(series.value?.value);
+			const consumed = Number.isFinite(value) ? value : undefined;
+			// The exporter's own `namespace`/`pod` labels win the scrape, so HAMi's workload
+			// labels arrive prefixed; fall back to the bare names for scrapes without honor_labels.
+			const namespace = labels.exported_namespace ?? labels.namespace ?? '';
+			const pod = labels.exported_pod ?? labels.pod ?? '';
+			if (!namespace && !pod) continue;
+			const byKey = (consumersByUuid[uuid] ??= {});
+			const key = `${namespace}/${pod}`;
+			const existing = byKey[key];
+			if (existing) {
+				if (consumed !== undefined) existing.allocated = (existing.allocated ?? 0) + consumed;
+			} else {
+				byKey[key] = { namespace, pod, allocated: consumed };
 			}
-
-			const byNode: Record<string, GpuDevice[]> = {};
-			for (const series of r.total) {
-				const labels = series.metric.labels as Record<string, string>;
-				const host = labels.hostname;
-				if (!host) continue;
-				const uuid = labels.UUID ?? '';
-				const total = Number(series.value?.value);
-				(byNode[host] ??= []).push({
-					uuid,
-					modelName: labels.modelName ?? '',
-					device: labels.device ?? '',
-					total: Number.isFinite(total) ? total : undefined,
-					allocated: allocated[uuid],
-					used: used[uuid],
-					util: util[uuid],
-					smClock: smClock[uuid],
-					temperature: temperature[uuid],
-					power: power[uuid],
-					remappedUncorrectable: remappedUncorrectable[uuid],
-					remapFailure: remapFailure[uuid],
-					pcieReplay: pcieReplay[uuid],
-					consumers: Object.values(consumersByUuid[uuid] ?? {}),
-					governance: classifyGpuGovernance(allocated[uuid], used[uuid])
-				});
-			}
-			return byNode;
-		} catch (error) {
-			console.error('Failed to fetch GPU resources:', error);
-			return {};
 		}
+
+		const byNode: Record<string, GpuDevice[]> = {};
+		for (const series of r.total) {
+			const labels = series.metric.labels as Record<string, string>;
+			const host = labels.hostname;
+			if (!host) continue;
+			const uuid = labels.UUID ?? '';
+			const total = Number(series.value?.value);
+			(byNode[host] ??= []).push({
+				uuid,
+				modelName: labels.modelName ?? '',
+				device: labels.device ?? '',
+				total: Number.isFinite(total) ? total : undefined,
+				allocated: allocated[uuid],
+				used: used[uuid],
+				util: util[uuid],
+				smClock: smClock[uuid],
+				temperature: temperature[uuid],
+				power: power[uuid],
+				remappedUncorrectable: remappedUncorrectable[uuid],
+				remapFailure: remapFailure[uuid],
+				pcieReplay: pcieReplay[uuid],
+				consumers: Object.values(consumersByUuid[uuid] ?? {}),
+				governance: classifyGpuGovernance(allocated[uuid], used[uuid])
+			});
+		}
+		return byNode;
 	}
+
+	// A node nothing has been reported for yet.
+	function emptyRow(node: string): NodeRow {
+		return {
+			node,
+			cpuUse: 0,
+			cpuReq: 0,
+			cpuLim: 0,
+			memUse: 0,
+			memReq: 0,
+			memLim: 0,
+			gpus: [],
+			disks: {}
+		};
+	}
+
+	// The cards of the last GPU answer, kept through a failed one.
+	let lastGpusByNode: Record<string, GpuDevice[]> = {};
 
 	async function fetch() {
 		try {
-			const [result, gpusByNode] = await Promise.all([
-				fetchCombinedInstant(prometheusDriver, queries),
+			const [result, gpus] = await Promise.all([
+				fetchCombinedInstantOrNull(prometheusDriver, queries),
 				fetchGpusByNode()
 			]);
+			failed = result === null;
+			if (!result) return;
+			const gpusByNode = (lastGpusByNode = gpus ?? lastGpusByNode);
 			const byNode: Record<string, NodeRow> = {};
-			const ensure = (node: string): NodeRow =>
-				(byNode[node] ??= {
-					node,
-					cpuUse: 0,
-					cpuReq: 0,
-					cpuLim: 0,
-					memUse: 0,
-					memReq: 0,
-					memLim: 0,
-					gpus: [],
-					disks: {}
-				});
+			const ensure = (node: string): NodeRow => (byNode[node] ??= emptyRow(node));
 			for (const [key, vectors] of Object.entries(result)) {
 				for (const v of vectors) {
 					const labels = v.metric.labels as Record<string, string>;
@@ -377,13 +392,54 @@
 	}
 
 	// Worst reservation pressure on a node (CPU/Mem/GPU booking) — what blocks scheduling.
+	// Limits are left out: summed limits above allocatable are ordinary and block nothing.
 	function pressure(row: NodeRow): number {
-		return Math.max(row.cpuReq, row.cpuLim, row.memReq, row.memLim, row.gpuAllocPct ?? 0);
+		return Math.max(row.cpuReq, row.memReq, row.gpuAllocPct ?? 0);
 	}
 
 	function pctClass(value: number): string {
-		return thresholdClasses(classifyThreshold(value, { green: 70, orange: 90 })).text;
+		return thresholdClasses(classifyThreshold(value, CAPACITY_THRESHOLDS)).text;
 	}
+
+	// A row and what `signals` knows about its node, worked out once for both layouts.
+	type NodeView = {
+		row: NodeRow;
+		// A node that is not Ready reports stale or no numbers, so its cells read "—" instead.
+		down: boolean;
+		master: boolean;
+		// Has cards, or advertises nvidia.com/gpu: such a row opens onto its per-card detail.
+		gpuNode: boolean;
+		saturated: boolean;
+		gpuModel: string;
+	};
+
+	// Every known node gets a row: one that stopped reporting has no usage series but is the row
+	// that matters. They are joined here rather than in fetch(), so the row is there whichever of
+	// the two requests answers first. Nodes that are down first, then the most saturated.
+	const views = $derived.by<NodeView[]>(() => {
+		const known = new Map(signals.nodes.map((node) => [node.name, node]));
+		const reported = new Set(rows.map((row) => row.node));
+		const unreported = signals.nodes
+			.filter((node) => !reported.has(node.name))
+			.map((node) => emptyRow(node.name));
+		return [...rows, ...unreported]
+			.map((row) => {
+				const node = known.get(row.node);
+				const down = node?.ready === false;
+				return {
+					row,
+					down,
+					master: node?.isMaster === true,
+					gpuNode: row.gpus.length > 0 || node?.hasGpu === true,
+					saturated: !down && pressure(row) >= 100,
+					gpuModel:
+						[...new Set(row.gpus.map((gpu) => gpu.modelName).filter(Boolean))].join(', ') || 'GPU'
+				};
+			})
+			.sort((a, b) => Number(b.down) - Number(a.down));
+	});
+
+	const clock = new Clock();
 
 	const reloadManager = new ReloadManager(fetch);
 
@@ -404,19 +460,24 @@
 	});
 
 	// Sub-columns of the full view, grouped under a spanning header per resource.
-	const CPU_COLUMNS: { key: PressureKey; label: string }[] = [
+	// Limit has no column: summed limits past allocatable are ordinary and block nothing, so it
+	// rides on Request as a tooltip (`limit`).
+	type PressureColumn = { key: PressureKey; label: string; limit?: PressureKey };
+	const CPU_COLUMNS: PressureColumn[] = [
 		{ key: 'cpuUse', label: m.usage() },
-		{ key: 'cpuReq', label: m.request() },
-		{ key: 'cpuLim', label: m.limit() }
+		{ key: 'cpuReq', label: m.request(), limit: 'cpuLim' }
 	];
-	const MEM_COLUMNS: { key: PressureKey; label: string }[] = [
+	const MEM_COLUMNS: PressureColumn[] = [
 		{ key: 'memUse', label: m.usage() },
-		{ key: 'memReq', label: m.request() },
-		{ key: 'memLim', label: m.limit() }
+		{ key: 'memReq', label: m.request(), limit: 'memLim' }
 	];
 
-	// GPU columns/rows only render when at least one node reports a GPU.
-	const hasGpu = $derived(rows.some((row) => row.gpus.length > 0));
+	function limitHint(row: NodeRow, col: PressureColumn): string | undefined {
+		return col.limit ? `${m.limit()} ${formatPct(row[col.limit])}` : undefined;
+	}
+
+	// GPU columns/rows only render when at least one node has a GPU.
+	const hasGpu = $derived(views.some((view) => view.gpuNode));
 
 	// One disk column per TopoLVM device class actually reported; none on clusters without the
 	// phison-topolvm module.
@@ -492,6 +553,15 @@
 
 	// Beyond this many rows the table moves into a fixed-height ScrollArea instead of growing.
 	const SCROLL_AFTER = 5;
+
+	const GROUP_HEAD = 'h-8 border-l px-2.5 text-left text-sm font-[550] whitespace-nowrap';
+	const SUBHEAD =
+		'h-8 px-2.5 text-right text-xs font-[450] whitespace-nowrap text-muted-foreground';
+	// The per-card table nests inside a node row, so it is set no taller than the row that owns
+	// it: the node table's sub-column header style, and cells one text line high.
+	const DETAIL_HEAD = 'h-8 px-2.5 text-xs font-[450] text-muted-foreground';
+	const DETAIL_CELL = 'px-2.5 py-1.5';
+	const DETAIL_NUM = cn(DETAIL_CELL, 'text-right font-mono tabular-nums');
 </script>
 
 <!-- Extra detail on an inline value. Tooltip.Trigger renders a <button>, which a table cell
@@ -535,19 +605,34 @@
 	</Tooltip.Root>
 {/snippet}
 
-{#snippet pctCell(value: number | undefined, colored = true)}
-	<Table.Cell
-		class={cn(
-			'text-right font-mono tabular-nums',
-			colored && value !== undefined && pctClass(value)
-		)}
-	>
-		{formatPct(value)}
+{#snippet pctCell(value: number | undefined, colored = true, note?: string)}
+	<Table.Cell class="px-2.5 text-right slashed-zero tabular-nums">
+		<span class={cn(colored && value !== undefined && pctClass(value))}>
+			{#if note}{@render hint(formatPct(value), note)}{:else}{formatPct(value)}{/if}
+		</span>
+		<!-- The higher the value, the darker its bar; the part past 100 % cannot fit and is left
+		     to the number and its colour. -->
+		<span
+			class="mt-1 flex"
+			style:opacity={value === undefined ? 0.35 : 0.35 + Math.min(value, 100) / 154}
+		>
+			<Meter {value} size="sm" />
+		</span>
 	</Table.Cell>
 {/snippet}
 
-<!-- Fixed width at every value so the column doesn't resize on each reload: a 4ch slot absorbs
-     the mantissa's swing (`123` vs `1024`), then one gap character and a three-character unit. -->
+<!-- One labelled value of a node card (the narrow layout). -->
+{#snippet stat(label: string, value: number | undefined, colored = true, note?: string)}
+	<span class="min-w-0">
+		<span class="block truncate text-[0.6875rem] leading-4 text-muted-foreground">{label}</span>
+		<span
+			class={cn('slashed-zero tabular-nums', colored && value !== undefined && pctClass(value))}
+		>
+			{#if note}{@render hint(formatPct(value), note)}{:else}{formatPct(value)}{/if}
+		</span>
+	</span>
+{/snippet}
+
 <!-- The workloads sharing one card, as a count — listing them inline made a row as tall as the
      card had pods. `?` marks memory in use that HAMi never booked; it rides alongside the count
      rather than replacing it, because a card can carry scheduled pods and an escapee at once. -->
@@ -558,7 +643,7 @@
 		unattributed === undefined
 			? undefined
 			: m.gpu_unattributed_pods({ amount: formatBytes(unattributed) })}
-	<Table.Cell class="text-right font-mono tabular-nums">
+	<Table.Cell class={DETAIL_NUM}>
 		{#if consumers.length === 0 && unattributed === undefined}
 			—
 		{:else}
@@ -621,9 +706,11 @@
 	</Table.Cell>
 {/snippet}
 
+<!-- Fixed width at every value so the column doesn't resize on each reload: a 4ch slot absorbs
+     the mantissa's swing (`123` vs `1024`), then one gap character and a three-character unit. -->
 {#snippet rateCell(value: number | undefined)}
 	{@const io = value !== undefined && Number.isFinite(value) ? formatIO(Number(value)) : undefined}
-	<Table.Cell class="text-right font-mono whitespace-nowrap tabular-nums">
+	<Table.Cell class="px-2.5 text-right whitespace-nowrap slashed-zero tabular-nums">
 		{#if io}
 			<span class="inline-block w-[4ch] text-right">{rateMantissa(io.value)}</span><span
 				class="ml-[1ch] text-muted-foreground">{SHORT_RATE_UNITS[io.unit] ?? io.unit}</span
@@ -637,7 +724,7 @@
 {#snippet diskCell(pool: DiskPool | undefined)}
 	<Table.Cell
 		class={cn(
-			'text-right font-mono tabular-nums',
+			'px-2.5 text-right slashed-zero tabular-nums',
 			pool?.usePct !== undefined && pctClass(pool.usePct)
 		)}
 	>
@@ -653,182 +740,158 @@
 {/snippet}
 
 {#snippet table()}
-	{@const showGpu = hasGpu}
 	{@const colSpan =
-		7 + (showGpu ? 3 : 0) + diskClasses.reduce((total, c) => total + diskColumns(c), 0)}
+		1 +
+		CPU_COLUMNS.length +
+		MEM_COLUMNS.length +
+		(hasGpu ? 3 : 0) +
+		diskClasses.reduce((total, c) => total + diskColumns(c), 0)}
 	<Table.Root>
 		<Table.Header>
 			<!-- Four blocks instead of a dozen flat columns. Allocated and Usage sit under GPU
 			     because Utilization beside them is what stops them reading as compute. -->
-			<Table.Row class="hover:bg-transparent">
-				<Table.Head></Table.Head>
-				<Table.Head colspan={3} class="border-l text-center whitespace-nowrap">
+			<Table.Row class="border-none hover:bg-transparent">
+				<Table.Head class="sticky left-0 z-10 h-8 bg-card"></Table.Head>
+				<Table.Head colspan={CPU_COLUMNS.length} class={GROUP_HEAD}>
 					{m.cpu()}
 				</Table.Head>
-				<Table.Head colspan={3} class="border-l text-center whitespace-nowrap">
+				<Table.Head colspan={MEM_COLUMNS.length} class={GROUP_HEAD}>
 					{m.memory()}
 				</Table.Head>
-				{#if showGpu}
-					<Table.Head colspan={3} class="border-l text-center whitespace-nowrap">
+				{#if hasGpu}
+					<Table.Head colspan={3} class={GROUP_HEAD}>
 						{m.gpu()}
 					</Table.Head>
 				{/if}
 				{#each diskClasses as deviceClass (deviceClass)}
-					<Table.Head
-						colspan={diskColumns(deviceClass)}
-						class="border-l text-center whitespace-nowrap"
-					>
+					<Table.Head colspan={diskColumns(deviceClass)} class={GROUP_HEAD}>
 						{deviceClassLabel(deviceClass)}
 					</Table.Head>
 				{/each}
 			</Table.Row>
 			<Table.Row>
-				<Table.Head>{m.node()}</Table.Head>
+				<Table.Head
+					class="sticky left-0 z-10 h-8 bg-card pl-0 text-xs font-[450] text-muted-foreground"
+					>{m.node()}</Table.Head
+				>
 				{#each CPU_COLUMNS as col, index (col.key)}
-					<Table.Head class={cn('text-right whitespace-nowrap', index === 0 && 'border-l')}>
+					<Table.Head class={cn(SUBHEAD, index === 0 && 'border-l')}>
 						{col.label}
 					</Table.Head>
 				{/each}
 				{#each MEM_COLUMNS as col, index (col.key)}
-					<Table.Head class={cn('text-right whitespace-nowrap', index === 0 && 'border-l')}>
+					<Table.Head class={cn(SUBHEAD, index === 0 && 'border-l')}>
 						{col.label}
 					</Table.Head>
 				{/each}
-				{#if showGpu}
-					<Table.Head class="border-l text-right whitespace-nowrap">
+				{#if hasGpu}
+					<Table.Head class={cn(SUBHEAD, 'border-l')}>
 						{m.gpu_allocated()}
 					</Table.Head>
-					<Table.Head class="text-right whitespace-nowrap">{m.usage()}</Table.Head>
-					<Table.Head class="text-right whitespace-nowrap">{m.utilization()}</Table.Head>
+					<Table.Head class={SUBHEAD}>{m.usage()}</Table.Head>
+					<Table.Head class={SUBHEAD}>{m.utilization()}</Table.Head>
 				{/if}
 				{#each diskClasses as deviceClass (deviceClass)}
 					{#if deviceClass === AIDAPTIV_CACHE_DEVICE_CLASS}
-						<Table.Head class="border-l text-right whitespace-nowrap">
+						<Table.Head class={cn(SUBHEAD, 'border-l')}>
 							{m.disk_write()}
 						</Table.Head>
-						<Table.Head class="text-right whitespace-nowrap">{m.disk_read()}</Table.Head>
-						<Table.Head class="text-right whitespace-nowrap">{m.usage()}</Table.Head>
+						<Table.Head class={SUBHEAD}>{m.disk_read()}</Table.Head>
+						<Table.Head class={SUBHEAD}>{m.usage()}</Table.Head>
 					{:else}
-						<Table.Head class="border-l text-right whitespace-nowrap">{m.usage()}</Table.Head>
+						<Table.Head class={cn(SUBHEAD, 'border-l')}>{m.usage()}</Table.Head>
 					{/if}
 				{/each}
 			</Table.Row>
 		</Table.Header>
 		<Table.Body>
-			{#each rows as row (row.node)}
-				{@const saturated = pressure(row) >= 100}
-				{@const expandable = showGpu && row.gpus.length > 0}
+			{#each views as view (view.row.node)}
+				{@const { row, down, saturated, gpuNode: expandable, gpuModel } = view}
 				{@const open = expandedNodes.has(row.node)}
-				{@const gpuModel =
-					[...new Set(row.gpus.map((gpu) => gpu.modelName).filter(Boolean))].join(', ') || 'GPU'}
 				<Table.Row
-					class={cn(saturated && 'bg-destructive/5', expandable && 'cursor-pointer')}
+					class={cn('group/row h-14', expandable && 'cursor-pointer')}
 					onclick={expandable ? () => toggleNode(row.node) : undefined}
 				>
-					<Table.Cell class="font-medium">
-						{#if expandable}
-							<div class="flex items-center gap-1.5 whitespace-nowrap">
-								<ChevronRightIcon
-									class={cn(
-										'size-4 shrink-0 text-muted-foreground transition-transform',
-										open && 'rotate-90'
-									)}
-								/>
-								<span>{row.node}</span>
-								<span class="text-xs text-muted-foreground">
-									({row.gpus.length} × {gpuModel} · {formatBytes(row.gpuTotal, 0)})
-								</span>
+					<Table.Cell
+						class="sticky left-0 z-10 bg-card py-2 pl-0 group-hover/row:bg-[color-mix(in_oklab,var(--muted)_50%,var(--card))]"
+					>
+						<div class="flex items-center gap-2 whitespace-nowrap">
+							{#if expandable}
+								<!-- The row's click is a pointer convenience; this is the control a keyboard
+								     or a screen reader reaches. It stops the click so the row does not undo it. -->
+								<button
+									type="button"
+									class="shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									aria-expanded={open}
+									aria-label={row.node}
+									onclick={(event) => {
+										event.stopPropagation();
+										toggleNode(row.node);
+									}}
+								>
+									<ChevronRightIcon
+										class={cn(
+											'size-4 text-muted-foreground transition-transform',
+											open && 'rotate-90'
+										)}
+									/>
+								</button>
+							{/if}
+							<div class="min-w-0">
+								<p class="flex items-center gap-2 font-mono text-[0.8125rem] leading-5">
+									<!-- Long generated names (56 characters on one test node) would widen the
+									     column and push the numbers off the card; the full name is on hover. -->
+									<span class="max-w-[18rem] truncate" title={row.node}>{row.node}</span>
+									{@render roleBadges(view)}
+									<!-- A word and an icon, not a tinted row. -->
+									{#if saturated}
+										<Status tone="bad" variant="pill" class="font-sans"
+											>{m.dashboard_overcommitted()}</Status
+										>
+									{/if}
+								</p>
+								{#if down}
+									{@render notResponding(row)}
+								{:else if expandable && row.gpus.length > 0}
+									<p class="text-[0.6875rem] leading-4 text-muted-foreground">
+										{row.gpus.length} × {gpuModel}, {formatBytes(row.gpuTotal, 0)}
+									</p>
+								{/if}
 							</div>
-						{:else}
-							{row.node}
-						{/if}
+						</div>
 					</Table.Cell>
 					{#each CPU_COLUMNS as col (col.key)}
-						{@render pctCell(row[col.key])}
+						{@render pctCell(
+							down ? undefined : row[col.key],
+							true,
+							down ? undefined : limitHint(row, col)
+						)}
 					{/each}
 					{#each MEM_COLUMNS as col (col.key)}
-						{@render pctCell(row[col.key])}
+						{@render pctCell(
+							down ? undefined : row[col.key],
+							true,
+							down ? undefined : limitHint(row, col)
+						)}
 					{/each}
-					{#if showGpu}
-						{@render pctCell(row.gpuAllocPct)}
-						{@render pctCell(row.gpuUsedPct)}
+					{#if hasGpu}
+						{@render pctCell(down ? undefined : row.gpuAllocPct)}
+						{@render pctCell(down ? undefined : row.gpuUsedPct)}
 						<!-- Utilization is not pressure: a busy GPU is the goal, so it stays uncolored. -->
-						{@render pctCell(row.gpuUtil, false)}
+						{@render pctCell(down ? undefined : row.gpuUtil, false)}
 					{/if}
 					{#each diskClasses as deviceClass (deviceClass)}
 						{#if deviceClass === AIDAPTIV_CACHE_DEVICE_CLASS}
-							{@render rateCell(row.diskWrite)}
-							{@render rateCell(row.diskRead)}
+							{@render rateCell(down ? undefined : row.diskWrite)}
+							{@render rateCell(down ? undefined : row.diskRead)}
 						{/if}
-						{@render diskCell(row.disks[deviceClass])}
+						{@render diskCell(down ? undefined : row.disks[deviceClass])}
 					{/each}
 				</Table.Row>
 				{#if expandable && open}
 					<Table.Row class="hover:bg-transparent">
-						<Table.Cell colspan={colSpan} class="bg-muted/30 p-3">
-							<Table.Root>
-								<Table.Header>
-									<Table.Row class="hover:bg-transparent">
-										<Table.Head>{m.type()}</Table.Head>
-										<!-- UUID rides on hover: at 40 characters it was what pushed this table too wide. -->
-										<Table.Head>{m.device()}</Table.Head>
-										<!-- Count only: listing pods inline made this row as tall as the card had pods. -->
-										<Table.Head class="text-right">{m.pods()}</Table.Head>
-										<Table.Head class="text-right">{m.gpu_allocated()}</Table.Head>
-										<Table.Head class="text-right">{m.usage()}</Table.Head>
-										<Table.Head class="text-right">{m.total()}</Table.Head>
-										<Table.Head class="text-right">{m.utilization()}</Table.Head>
-										<Table.Head class="text-right">{m.clock()}</Table.Head>
-										<Table.Head class="text-right">{m.temperature()}</Table.Head>
-										<Table.Head class="text-right">{m.power()}</Table.Head>
-									</Table.Row>
-								</Table.Header>
-								<Table.Body>
-									{#each row.gpus as gpu, index (gpu.uuid || index)}
-										{@const faults = gpuFaults(gpu)}
-										<Table.Row class="border-none">
-											<Table.Cell class="whitespace-nowrap">{gpu.modelName || '—'}</Table.Cell>
-											<Table.Cell class="font-mono whitespace-nowrap">
-												<span class="inline-flex items-center gap-1.5">
-													{#if faults.length}
-														{@render faultMark(faults)}
-													{/if}
-													{#if gpu.uuid}
-														{@render hint(gpu.device || '—', gpu.uuid)}
-													{:else}
-														{gpu.device || '—'}
-													{/if}
-												</span>
-											</Table.Cell>
-											{@render consumersCell(gpu)}
-											<!-- No warning here: a booking runs ahead of usage for as long as a model takes to load its
-											     weights, so flagging the gap fired on every startup. Usage outrunning the booking shows
-											     as the `?` in Pods instead. -->
-											<Table.Cell class="text-right font-mono tabular-nums">
-												{formatBytes(gpu.allocated)}
-											</Table.Cell>
-											<Table.Cell class="text-right font-mono tabular-nums">
-												{formatBytes(gpu.used)}
-											</Table.Cell>
-											<Table.Cell class="text-right font-mono tabular-nums">
-												{formatBytes(gpu.total)}
-											</Table.Cell>
-											<Table.Cell class="text-right font-mono tabular-nums">
-												{formatPct(gpu.util)}
-											</Table.Cell>
-											<Table.Cell class="text-right font-mono tabular-nums">
-												{formatUnit(gpu.smClock, 'MHz')}
-											</Table.Cell>
-											<Table.Cell class="text-right font-mono tabular-nums">
-												{formatUnit(gpu.temperature, '°C')}
-											</Table.Cell>
-											<Table.Cell class="text-right font-mono tabular-nums">
-												{formatUnit(gpu.power, 'W', 1)}
-											</Table.Cell>
-										</Table.Row>
-									{/each}
-								</Table.Body>
-							</Table.Root>
+						<Table.Cell colspan={colSpan} class="rounded-lg bg-muted/50 px-3 py-2">
+							{@render gpuDetail(row, down)}
 						</Table.Cell>
 					</Table.Row>
 				{/if}
@@ -837,18 +900,217 @@
 	</Table.Root>
 {/snippet}
 
-<Statistics.Root type="count" class="overflow-visible">
-	<Statistics.Header class="flex flex-row items-center gap-2 space-y-0">
-		<div class="grid flex-1 gap-1">
-			<Statistics.Title class="text-base leading-normal text-foreground">
-				{m.node_resource_pressure()}
-			</Statistics.Title>
-			<p class="text-sm text-muted-foreground">
-				{m.cluster_dashboard_node_pressure_description()}
-			</p>
-		</div>
+<!-- What a node is: Master from its node-role label, GPU when it advertises nvidia.com/gpu,
+     CPU otherwise. A master with GPUs is both. -->
+{#snippet roleBadges(view: NodeView)}
+	{@const { master, gpuNode: gpu } = view}
+	{#each [...(master ? [m.node_role_master()] : []), ...(gpu ? [m.node_role_gpu()] : []), ...(!master && !gpu ? [m.node_role_cpu()] : [])] as role (role)}
+		<Chip class="font-sans text-[0.6875rem] leading-4">{role}</Chip>
+	{/each}
+{/snippet}
+
+<!-- A not-Ready node, with how long KubeNodeNotReady has fired when that is known. -->
+{#snippet notResponding(row: NodeRow)}
+	{@const since = signals.notReadySince(row.node)}
+	<Status tone="bad" variant="pill" class="mt-0.5 text-[0.6875rem]">
+		{m.node_not_responding()}{#if since !== undefined}{` · ${formatDuration(clock.now / 1000 - since)}`}{/if}
+	</Status>
+{/snippet}
+
+{#snippet gpuDetail(row: NodeRow, down: boolean)}
+	{#if down || row.gpus.length === 0}
+		<p class="px-1 py-1.5 text-xs text-muted-foreground">
+			{down ? m.gpu_no_data_not_responding() : m.no_data_display()}
+		</p>
+	{:else}
+		{@render gpuTable(row)}
+	{/if}
+{/snippet}
+
+<!-- Per-card detail of one node; shared by the table's expanded row and the node card. -->
+{#snippet gpuTable(row: NodeRow)}
+	<Table.Root>
+		<Table.Header>
+			<Table.Row class="hover:bg-transparent">
+				<Table.Head class={DETAIL_HEAD}>{m.type()}</Table.Head>
+				<!-- UUID rides on hover: at 40 characters it was what pushed this table too wide. -->
+				<Table.Head class={DETAIL_HEAD}>{m.device()}</Table.Head>
+				<!-- Count only: listing pods inline made this row as tall as the card had pods. -->
+				<Table.Head class={cn(DETAIL_HEAD, 'text-right')}>{m.pods()}</Table.Head>
+				<Table.Head class={cn(DETAIL_HEAD, 'text-right')}>{m.gpu_allocated()}</Table.Head>
+				<Table.Head class={cn(DETAIL_HEAD, 'text-right')}>{m.usage()}</Table.Head>
+				<Table.Head class={cn(DETAIL_HEAD, 'text-right')}>{m.total()}</Table.Head>
+				<Table.Head class={cn(DETAIL_HEAD, 'text-right')}>{m.utilization()}</Table.Head>
+				<Table.Head class={cn(DETAIL_HEAD, 'text-right')}>{m.clock()}</Table.Head>
+				<Table.Head class={cn(DETAIL_HEAD, 'text-right')}>{m.temperature()}</Table.Head>
+				<Table.Head class={cn(DETAIL_HEAD, 'text-right')}>{m.power()}</Table.Head>
+			</Table.Row>
+		</Table.Header>
+		<Table.Body>
+			{#each row.gpus as gpu, index (gpu.uuid || index)}
+				{@const faults = gpuFaults(gpu)}
+				<Table.Row class="border-none">
+					<Table.Cell class={DETAIL_CELL}>{gpu.modelName || '—'}</Table.Cell>
+					<Table.Cell class={cn(DETAIL_CELL, 'font-mono')}>
+						<span class="inline-flex items-center gap-1.5">
+							{#if faults.length}
+								{@render faultMark(faults)}
+							{/if}
+							{#if gpu.uuid}
+								{@render hint(gpu.device || '—', gpu.uuid)}
+							{:else}
+								{gpu.device || '—'}
+							{/if}
+						</span>
+					</Table.Cell>
+					{@render consumersCell(gpu)}
+					<!-- No warning here: a booking runs ahead of usage for as long as a model takes to load its
+											     weights, so flagging the gap fired on every startup. Usage outrunning the booking shows
+											     as the `?` in Pods instead. -->
+					<Table.Cell class={DETAIL_NUM}>
+						{formatBytes(gpu.allocated)}
+					</Table.Cell>
+					<Table.Cell class={DETAIL_NUM}>
+						{formatBytes(gpu.used)}
+					</Table.Cell>
+					<Table.Cell class={DETAIL_NUM}>
+						{formatBytes(gpu.total)}
+					</Table.Cell>
+					<Table.Cell class={DETAIL_NUM}>
+						{formatPct(gpu.util)}
+					</Table.Cell>
+					<Table.Cell class={DETAIL_NUM}>
+						{formatUnit(gpu.smClock, 'MHz')}
+					</Table.Cell>
+					<Table.Cell class={DETAIL_NUM}>
+						{formatUnit(gpu.temperature, '°C')}
+					</Table.Cell>
+					<Table.Cell class={DETAIL_NUM}>
+						{formatUnit(gpu.power, 'W', 1)}
+					</Table.Cell>
+				</Table.Row>
+			{/each}
+		</Table.Body>
+	</Table.Root>
+{/snippet}
+
+<!-- Below this width ten numeric columns stop being a table: one card per node instead. -->
+{#snippet cards()}
+	<!-- `minmax(0, 1fr)`: an expanded card's GPU table scrolls inside the card instead of widening
+	     the column, and with it every card, past the panel. -->
+	<ul class="grid grid-cols-[minmax(0,1fr)] gap-2">
+		{#each views as view (view.row.node)}
+			{@const { row, down, saturated, gpuNode: expandable, gpuModel } = view}
+			{@const open = expandedNodes.has(row.node)}
+			<li class="rounded-lg bg-muted/60 p-3">
+				<button
+					type="button"
+					class="flex w-full items-center justify-between gap-2 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default"
+					disabled={!expandable}
+					aria-expanded={expandable ? open : undefined}
+					onclick={() => toggleNode(row.node)}
+				>
+					<span class="min-w-0">
+						<span class="flex min-w-0 items-center gap-2">
+							<span class="truncate font-mono text-[0.8125rem] leading-5" title={row.node}>
+								{row.node}
+							</span>
+							{@render roleBadges(view)}
+						</span>
+						{#if down}
+							{@render notResponding(row)}
+						{:else if expandable && row.gpus.length > 0}
+							<span class="block truncate text-[0.6875rem] leading-4 text-muted-foreground">
+								{row.gpus.length} × {gpuModel}, {formatBytes(row.gpuTotal, 0)}
+							</span>
+						{/if}
+					</span>
+					{#if expandable}
+						<ChevronRightIcon
+							class={cn(
+								'size-4 shrink-0 text-muted-foreground transition-transform',
+								open && 'rotate-90'
+							)}
+						/>
+					{/if}
+				</button>
+				<div
+					class="mt-2 grid grid-cols-[4rem_repeat(3,minmax(0,1fr))] items-baseline gap-x-2 gap-y-1.5 text-sm"
+				>
+					<span class="font-[550]">{m.cpu()}</span>
+					{#each CPU_COLUMNS as col (col.key)}
+						{@render stat(
+							col.label,
+							down ? undefined : row[col.key],
+							true,
+							down ? undefined : limitHint(row, col)
+						)}
+					{/each}
+					<!-- Two stats in a three-column row: hold the GPU row's third slot. -->
+					<span></span>
+					<span class="font-[550]">{m.memory()}</span>
+					{#each MEM_COLUMNS as col (col.key)}
+						{@render stat(
+							col.label,
+							down ? undefined : row[col.key],
+							true,
+							down ? undefined : limitHint(row, col)
+						)}
+					{/each}
+					<!-- Two stats in a three-column row: hold the GPU row's third slot. -->
+					<span></span>
+					{#if hasGpu}
+						<span class="font-[550]">{m.gpu()}</span>
+						{@render stat(m.gpu_allocated(), down ? undefined : row.gpuAllocPct)}
+						{@render stat(m.usage(), down ? undefined : row.gpuUsedPct)}
+						{@render stat(m.utilization(), down ? undefined : row.gpuUtil, false)}
+					{/if}
+					{#each diskClasses as deviceClass (deviceClass)}
+						<span class="truncate font-[550]" title={deviceClassLabel(deviceClass)}>
+							{deviceClassLabel(deviceClass)}
+						</span>
+						{@render stat(m.usage(), down ? undefined : row.disks[deviceClass]?.usePct)}
+						<span></span>
+						<span></span>
+					{/each}
+				</div>
+				{#if saturated}
+					<Status tone="bad" variant="pill" class="mt-2">{m.dashboard_overcommitted()}</Status>
+				{/if}
+				{#if expandable && open}
+					<div class="mt-2 rounded-md bg-card p-2">
+						{@render gpuDetail(row, down)}
+					</div>
+				{/if}
+			</li>
+		{/each}
+	</ul>
+{/snippet}
+
+<Panel
+	title={m.node_resource_pressure()}
+	description={m.cluster_dashboard_node_pressure_description()}
+	tooltip={m.cluster_dashboard_node_pressure_tooltip()}
+	state={widgetState(isLoaded, views.length > 0, failed && rows.length === 0)}
+	class="h-auto"
+	bodyClass="min-h-[14.8125rem] @[39rem]/panel:min-h-[8.3125rem]"
+>
+	{#snippet badge()}
+		{#if signals.status === 'ready'}
+			<Chip class={NUM}>
+				{m.nodes_ready_of_total({
+					ready: String(signals.readyCount),
+					total: String(signals.nodes.length)
+				})}
+			</Chip>
+		{/if}
+	{/snippet}
+	{#snippet actions()}
 		<Sheet.Root>
-			<Sheet.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}>
+			<Sheet.Trigger
+				class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}
+				aria-label={m.node_resource_pressure()}
+			>
 				<Maximize2Icon class="size-4 text-muted-foreground" />
 			</Sheet.Trigger>
 			<Sheet.Content class="flex min-w-[77vw] flex-col gap-4 overflow-auto p-8">
@@ -859,26 +1121,12 @@
 				{@render table()}
 			</Sheet.Content>
 		</Sheet.Root>
-		<Tooltip.Root>
-			<Tooltip.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}>
-				<InfoIcon class="size-4 text-muted-foreground" />
-			</Tooltip.Trigger>
-			<Tooltip.Content class="max-w-xs">
-				<p>{m.cluster_dashboard_node_pressure_tooltip()}</p>
-			</Tooltip.Content>
-		</Tooltip.Root>
-	</Statistics.Header>
-	<Statistics.Content class="min-h-16">
-		{#if !isLoaded}
-			<div class="flex h-50 w-full items-center justify-center">
-				<LoaderCircle class="size-12 animate-spin" />
-			</div>
-		{:else if rows.length === 0}
-			<div class="flex h-50 w-full flex-col items-center justify-center">
-				<ChartColumnIcon class="size-12 animate-pulse text-muted-foreground" />
-				<p class="text-base text-muted-foreground">{m.no_data_display()}</p>
-			</div>
-		{:else if rows.length > SCROLL_AFTER}
+	{/snippet}
+	<div class="@[39rem]/panel:hidden">
+		{@render cards()}
+	</div>
+	<div class="hidden @[39rem]/panel:block">
+		{#if views.length > SCROLL_AFTER}
 			<ScrollArea
 				class={cn('w-full transition-[height] duration-200', anyExpanded ? 'h-[40rem]' : 'h-80')}
 			>
@@ -887,5 +1135,5 @@
 		{:else}
 			{@render table()}
 		{/if}
-	</Statistics.Content>
-</Statistics.Root>
+	</div>
+</Panel>

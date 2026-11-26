@@ -1,60 +1,144 @@
 <script lang="ts">
-	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
 	import type { PrometheusDriver } from 'prometheus-query';
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy } from 'svelte';
 
+	import { afterNavigate, replaceState } from '$app/navigation';
+	import { page } from '$app/state';
 	import {
-		CalendarDateTime,
-		DatetimePicker,
-		getLocalTimeZone,
-		minutesAgoCDT,
-		nowCDT
-	} from '$lib/components/custom/datetime-picker';
-	import { Reloader } from '$lib/components/custom/reloader';
-	import { WidgetGrid } from '$lib/components/custom/widget-grid';
-	import * as Item from '$lib/components/ui/item';
+		formatSpan,
+		rangeFromParams,
+		RangePicker,
+		rangeToParams,
+		resolveRange,
+		type TimeRange,
+		toNow
+	} from '$lib/components/custom/range-picker';
+	import { AutoRefresh, RefreshControl, reloadNow } from '$lib/components/custom/reloader';
+	import { TAB_LIST, TAB_TRIGGER } from '$lib/components/dashboard/kit';
+	import { formatDuration } from '$lib/components/dashboard/kit/format';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/messages';
 	import { clusterPrometheusDriver } from '$lib/prometheus';
+	import { cn } from '$lib/utils';
 
 	import { Dashboard as AnalyticsDashboard } from './analytics/index';
-	import NamespacePicker from './analytics/namespace/namespace-picker.svelte';
-	import NodePicker from './analytics/node/node-picker.svelte';
-	import NodePressure from './overview/node-pressure.svelte';
-	import { widgets } from './overview/widgets';
+	import ClusterFacts from './overview/cluster-facts.svelte';
+	import Overview from './overview/overview.svelte';
+	import { ClusterSignals } from './overview/signals.svelte';
 
 	let { cluster }: { cluster: string } = $props();
 
 	let isReloading = $state(true);
-	let prometheusDriver = $state<PrometheusDriver | null>(null);
-	let selectedTab = $state('overview');
-	// Analytics splits by altitude: `node` shows per-node pressure + detail (Sections A+B),
-	// `namespace` shows namespace / pod consumption (Section C). The toolbar pickers follow suit.
-	let analyticsView = $state<'node' | 'namespace'>('node');
-	// Analytics drill-down filters. `selectedNode` holds the node_exporter `instance`;
-	// `.*` is the "all" sentinel for namespace / pod / container.
-	let selectedNode = $state<string | undefined>(undefined);
-	let selectedNamespace = $state<string | undefined>(undefined);
-
-	let pickerFrom = $state<CalendarDateTime>(minutesAgoCDT(60));
-	let pickerTo = $state<CalendarDateTime>(nowCDT());
-	let pickerToIsNow = $state(true);
-
-	const start = $derived(pickerFrom.toDate(getLocalTimeZone()));
-	const end = $derived(pickerToIsNow ? new Date() : pickerTo.toDate(getLocalTimeZone()));
-
-	const dashboardTimeRangeKey = $derived(
-		`${pickerFrom.toDate(getLocalTimeZone()).getTime()}-${
-			pickerToIsNow ? 'now' : pickerTo.toDate(getLocalTimeZone()).getTime()
-		}-${pickerToIsNow}`
-	);
-
-	onMount(async () => {
+	// Made while the component is created, on the server too: it only holds where to ask, and asks
+	// nothing until a card loads in the browser. The server then sends the cards' own loading state,
+	// so the page does not change between that first paint and the browser taking over.
+	function createDriver(): PrometheusDriver | null {
+		if (!cluster) return null;
 		try {
-			prometheusDriver = clusterPrometheusDriver(cluster);
+			return clusterPrometheusDriver(cluster);
 		} catch (error) {
 			console.error('Failed to initialize Prometheus driver:', error);
+			return null;
 		}
+	}
+	const prometheusDriver = createDriver();
+
+	// Analytics state lives in the URL (`?tab=analytics&view=node&mode=history&node=…`), so a
+	// reload or a shared link opens the same node or namespace in the same mode.
+	const initial = page.url.searchParams;
+	const linksAnalytics = ['view', 'mode', 'node', 'namespace'].some((k) => initial.has(k));
+	let selectedTab = $state(
+		initial.get('tab') === 'analytics' || linksAnalytics ? 'analytics' : 'overview'
+	);
+	let analyticsView = $state<'node' | 'namespace'>(
+		initial.get('view') === 'namespace' ? 'namespace' : 'node'
+	);
+	let analyticsMode = $state<'now' | 'history'>(
+		initial.get('mode') === 'history' ? 'history' : 'now'
+	);
+	// Kubernetes node name and namespace picked in the rankings; kept while switching view or mode.
+	let selectedNode = $state<string | undefined>(initial.get('node') ?? undefined);
+	let selectedNamespace = $state<string | undefined>(initial.get('namespace') ?? undefined);
+
+	// History's window. A quick range ends at `anchor`, which moves to now when History is entered
+	// or the range is picked or refreshed; a fixed range stays where it was set.
+	let historyRange = $state<TimeRange>(rangeFromParams(initial));
+	let anchor = $state(Date.now());
+
+	// The URL is read once, above; from here on it only follows the state.
+	// replaceState throws until the router has started; afterNavigate runs once it has.
+	let routerReady = $state(false);
+	afterNavigate(() => (routerReady = true));
+	$effect(() => {
+		if (!routerReady) return;
+		const url = new URL(page.url);
+		for (const key of ['tab', 'view', 'mode', 'node', 'namespace', 'range', 'from', 'to']) {
+			url.searchParams.delete(key);
+		}
+		if (selectedTab === 'analytics') {
+			url.searchParams.set('tab', 'analytics');
+			url.searchParams.set('view', analyticsView);
+			if (analyticsMode === 'history') {
+				url.searchParams.set('mode', 'history');
+				for (const [k, v] of Object.entries(rangeToParams(historyRange)))
+					url.searchParams.set(k, v);
+			}
+			if (analyticsView === 'node' && selectedNode) url.searchParams.set('node', selectedNode);
+			if (analyticsView === 'namespace' && selectedNamespace) {
+				url.searchParams.set('namespace', selectedNamespace);
+			}
+		}
+		// eslint-disable-next-line svelte/no-navigation-without-resolve -- same route, only the query changes
+		if (url.search !== page.url.search) replaceState(url, page.state);
+	});
+
+	const resolved = $derived(resolveRange(historyRange, anchor));
+	const start = $derived(new Date(resolved.start));
+	const end = $derived(new Date(resolved.end));
+	const windowLabel = $derived(
+		historyRange.kind === 'relative'
+			? m.analytics_window_last({ duration: formatDuration(historyRange.minutes * 60) })
+			: formatSpan(resolved.start, resolved.end)
+	);
+
+	function setMode(mode: 'now' | 'history') {
+		if (mode === 'history' && historyRange.kind === 'relative') anchor = Date.now();
+		analyticsMode = mode;
+	}
+
+	// Now mode: auto update bumps `tick` every 10 s and every Now card refetches on it.
+	const clock = new AutoRefresh();
+	const nowMode = $derived(selectedTab === 'analytics' && analyticsMode === 'now');
+	$effect(() => {
+		if (nowMode) return clock.run(isReloading);
+	});
+	const inHistory = $derived(selectedTab === 'analytics' && analyticsMode === 'history');
+
+	// ↻: the overview's cards and the header's signals fetch once (auto update stays as it was),
+	// Now cards refetch on `tick`, and History moves its window to now.
+	function refresh() {
+		if (inHistory) {
+			anchor = Date.now();
+			return;
+		}
+		reloadNow(
+			() => isReloading,
+			(value) => (isReloading = value)
+		);
+		clock.mark();
+	}
+	function historyToNow() {
+		historyRange = toNow(historyRange);
+		anchor = Date.now();
+	}
+
+	// Node readiness, roles and firing alerts, shared by the header and the overview's cards. They
+	// belong to the page, not to the Overview tab: the header's facts stay current on Analytics too.
+	const signals = prometheusDriver ? new ClusterSignals(prometheusDriver) : null;
+	$effect(() => {
+		if (!signals) return;
+		signals.setReloading(isReloading);
+		return () => signals.stop();
 	});
 
 	onDestroy(() => {
@@ -62,87 +146,114 @@
 	});
 </script>
 
-<div class="space-y-4">
-	<div class="flex items-end justify-between gap-4">
-		<Item.Root class="p-0">
-			<Item.Content class="text-left">
-				<Item.Title class="text-xl font-bold">
-					{m.cluster_status()}
-				</Item.Title>
-				<Item.Description class="text-base">
-					{m.k8s_overview_description()}
-				</Item.Description>
-			</Item.Content>
-		</Item.Root>
-	</div>
-	{#if prometheusDriver}
-		<div class="mx-auto grid w-full gap-6">
+<!-- `@container`: every layout below follows this element's width, not the viewport's. -->
+<div class="@container pb-8">
+	<header>
+		<h1 class="text-3xl leading-9 font-[350] tracking-tight">{m.cluster_status()}</h1>
+		<!-- Wraps between facts, never inside one; a fact too long for the line truncates. -->
+		<p
+			class="mt-0.5 flex min-h-5 min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm text-muted-foreground"
+		>
+			<span class="flex max-w-full min-w-0 items-baseline gap-1.5">
+				<span class="shrink-0">{m.cluster()}</span>
+				<span class="min-w-0 truncate font-mono text-[0.8125rem] text-foreground" title={cluster}>
+					{cluster}
+				</span>
+			</span>
+			{#if signals}
+				<ClusterFacts {signals} />
+			{/if}
+		</p>
+	</header>
+	{#if prometheusDriver && signals}
+		<div class="mt-4 w-full">
 			<Tabs.Root bind:value={selectedTab}>
-				<div class="flex justify-between gap-2">
-					<Tabs.List>
-						<Tabs.Trigger value="overview">{m.overview()}</Tabs.Trigger>
-						<Tabs.Trigger value="analytics">{m.analytics()}</Tabs.Trigger>
+				<div class="flex flex-wrap items-center justify-between gap-2">
+					<Tabs.List class={TAB_LIST}>
+						<Tabs.Trigger value="overview" class={TAB_TRIGGER}>{m.overview()}</Tabs.Trigger>
+						<Tabs.Trigger value="analytics" class={TAB_TRIGGER}>{m.analytics()}</Tabs.Trigger>
 					</Tabs.List>
 					<div class="flex flex-wrap items-center justify-end gap-2">
 						<div
-							class="flex flex-wrap items-center justify-end gap-2 {selectedTab !== 'analytics'
-								? 'pointer-events-none invisible select-none'
-								: ''}"
+							class={cn(
+								'flex-wrap items-center justify-end gap-2',
+								selectedTab !== 'analytics'
+									? 'pointer-events-none hidden select-none **:transition-none @5xl:invisible @5xl:flex'
+									: 'flex'
+							)}
 							aria-hidden={selectedTab !== 'analytics'}
 						>
-							<Tabs.Root bind:value={analyticsView}>
-								<Tabs.List>
-									<Tabs.Trigger value="node">{m.node()}</Tabs.Trigger>
-									<Tabs.Trigger value="namespace">{m.namespace()}</Tabs.Trigger>
-								</Tabs.List>
-							</Tabs.Root>
-							{#if analyticsView === 'node'}
-								<div class="flex min-h-9 min-w-40 shrink-0 items-center justify-end">
-									<NodePicker {prometheusDriver} bind:selectedNode />
-								</div>
-							{:else}
-								<div class="flex min-h-9 min-w-40 shrink-0 items-center justify-end">
-									<NamespacePicker {prometheusDriver} bind:selectedNamespace />
+							<!-- History's window sits first, so it never pushes the switches aside; where
+							     the row has no room for it (under 66rem), it takes a row of its own below.
+							     Only the refresh control's own width still changes between the modes. -->
+							{#if analyticsMode === 'history'}
+								<div class="hidden @[66rem]:flex">
+									<RangePicker bind:range={historyRange} bind:anchor />
 								</div>
 							{/if}
-							<DatetimePicker
-								bind:from={pickerFrom}
-								bind:to={pickerTo}
-								bind:toIsNow={pickerToIsNow}
-							/>
+							<Tabs.Root bind:value={analyticsView}>
+								<Tabs.List class={TAB_LIST}>
+									<Tabs.Trigger value="node" class={TAB_TRIGGER}>{m.node()}</Tabs.Trigger>
+									<Tabs.Trigger value="namespace" class={TAB_TRIGGER}>{m.namespace()}</Tabs.Trigger>
+								</Tabs.List>
+							</Tabs.Root>
+							<Tabs.Root
+								value={analyticsMode}
+								onValueChange={(v) => setMode(v === 'history' ? 'history' : 'now')}
+							>
+								<Tabs.List class={TAB_LIST}>
+									<Tabs.Trigger value="now" class={TAB_TRIGGER}>{m.analytics_now()}</Tabs.Trigger>
+									<Tabs.Trigger value="history" class={TAB_TRIGGER}
+										>{m.analytics_history()}</Tabs.Trigger
+									>
+								</Tabs.List>
+							</Tabs.Root>
 						</div>
-						<Reloader bind:checked={isReloading} />
+						{#if inHistory}
+							<!-- History only updates on demand: ↻ moves its window to now. -->
+							<RefreshControl
+								updatedAt={historyRange.kind === 'relative' ? anchor : undefined}
+								past={historyRange.kind !== 'relative'}
+								onrefresh={refresh}
+								onnow={historyToNow}
+							/>
+						{:else}
+							<RefreshControl
+								bind:live={isReloading}
+								updatedAt={nowMode ? clock.updatedAt : signals.updatedAt}
+								onrefresh={refresh}
+							/>
+						{/if}
 					</div>
 				</div>
-				<Tabs.Content value="overview">
-					<div
-						class="grid auto-rows-[minmax(140px,auto)] grid-cols-2 gap-4 pt-4 md:gap-6 lg:grid-cols-1 2xl:grid-cols-4"
-					>
-						<WidgetGrid {cluster} {widgets} {prometheusDriver} bind:isReloading />
+				{#if inHistory}
+					<div class="mt-2 flex justify-end @[66rem]:hidden">
+						<RangePicker bind:range={historyRange} bind:anchor />
 					</div>
-					<div class="w-full pt-4 md:pt-6">
-						<NodePressure {prometheusDriver} bind:isReloading />
-					</div>
+				{/if}
+				<!-- Tabs keep both panels in the page; only the shown one is mounted, so the hidden one
+				     does not keep polling Prometheus. -->
+				<Tabs.Content value="overview" class="pt-3">
+					{#if selectedTab === 'overview'}
+						<Overview {prometheusDriver} {signals} bind:isReloading />
+					{/if}
 				</Tabs.Content>
-				<Tabs.Content value="analytics">
-					{#key dashboardTimeRangeKey}
+				<Tabs.Content value="analytics" class="pt-3">
+					{#if selectedTab === 'analytics'}
 						<AnalyticsDashboard
 							client={prometheusDriver}
 							view={analyticsView}
+							history={analyticsMode === 'history'}
 							bind:selectedNode
 							bind:selectedNamespace
 							{start}
 							{end}
-							endIsNow={pickerToIsNow}
-							bind:isReloading
+							{windowLabel}
+							tick={clock.tick}
 						/>
-					{/key}
+					{/if}
 				</Tabs.Content>
 			</Tabs.Root>
-		</div>
-	{:else if cluster}
-		<div class="flex min-h-[400px] w-full items-center justify-center">
-			<LoaderCircle class="size-12 animate-spin text-muted-foreground" />
 		</div>
 	{:else}
 		<div class="flex min-h-[400px] w-full items-center justify-center text-muted-foreground">

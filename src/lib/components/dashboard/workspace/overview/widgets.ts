@@ -9,23 +9,24 @@ import WorkloadHealth from './workload-health.svelte';
 export const workspaceOverviewWidgets = [
 	{
 		key: 'resource-quota',
-		class: 'col-span-2 row-span-1 md:col-span-2 lg:col-span-4',
-		component: ResourceQuota
+		class: 'col-span-12 @5xl:col-span-4',
+		component: ResourceQuota,
+		needsCluster: true
 	},
 	{
 		key: 'workload-health',
-		class: 'col-span-2 row-span-1 md:col-span-2 lg:col-span-4',
+		class: 'col-span-12 @2xl:col-span-6 @5xl:col-span-4',
 		component: WorkloadHealth,
 		needsCluster: true
 	},
 	{
 		key: 'storage',
-		class: 'col-span-2 row-span-1 md:col-span-2 lg:col-span-4',
+		class: 'col-span-12 @2xl:col-span-6 @5xl:col-span-4',
 		component: Storage
 	},
 	{
 		key: 'pod-rollout-health',
-		class: 'col-span-2 row-span-1 md:col-span-2 lg:col-span-12',
+		class: 'col-span-12',
 		component: PodRolloutHealth
 	}
 ] as unknown as WidgetDefinition[];

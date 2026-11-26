@@ -1,42 +1,46 @@
 <script lang="ts">
-	import type { JsonObject } from '@bufbuild/protobuf';
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import HeartPulse from '@lucide/svelte/icons/heart-pulse';
-	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
-	import {
-		type ListRequest,
-		type ListResponse,
-		type Resource,
-		ResourceService
-	} from '@otterscale/api/resource/v1';
-	import type { PrometheusDriver } from 'prometheus-query';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext, onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Card from '$lib/components/ui/card';
-	import { Progress } from '$lib/components/ui/progress';
+	import {
+		NUM,
+		Panel,
+		Status,
+		TONE_DOT,
+		TONE_TEXT,
+		widgetState
+	} from '$lib/components/dashboard/kit';
+	import { Button } from '$lib/components/ui/button';
 	import { m } from '$lib/messages';
+	import { cn } from '$lib/utils';
 
-	type WorkloadListSpec = {
-		group: string;
-		version: string;
-		resource: string;
-	};
+	import { listWorkspaceObjects } from '../lib/resources';
+	import {
+		DEPLOYMENT,
+		detailLink,
+		HELM_RELEASE,
+		type LinkTarget,
+		LLM_INFERENCE_SERVICE,
+		STATEFUL_SET
+	} from './links';
+	import OverviewLink from './overview-link.svelte';
+	import {
+		classifyWorkloads,
+		notReady,
+		summarize,
+		type Workload,
+		type WorkloadKind
+	} from './workload-status';
 
-	/** Same GVR as console nav / model.svelte (ResourceService.list). */
-	const WORKLOAD_SPECS: WorkloadListSpec[] = [
-		{ group: 'serving.kserve.io', version: 'v1alpha2', resource: 'llminferenceservices' },
-		{ group: 'kro.run', version: 'v1alpha1', resource: 'applications' },
-		{ group: 'helm.toolkit.fluxcd.io', version: 'v2', resource: 'helmreleases' }
-	];
-
+	// widget-grid also passes `prometheusDriver` to every tile; this one reads the Resource API
+	// only, so it does not take it.
 	let {
-		prometheusDriver,
 		cluster,
 		namespace,
 		isReloading = $bindable()
 	}: {
-		prometheusDriver: PrometheusDriver;
 		cluster: string;
 		namespace: string;
 		isReloading: boolean;
@@ -45,87 +49,29 @@
 	const transport: Transport = getContext('transport');
 	const resourceClient = createClient(ResourceService, transport);
 
-	const workloadLabels = $derived([m.model(), m.application(), m.release()]);
+	/**
+	 * Not-ready workloads shown before "Show all". While the cards sit side by side their
+	 * min-height is this card with four of them and the toggle, so a long list does not make the
+	 * row grow; stacked, each card keeps its own height.
+	 */
+	const CAP = 4;
 
-	let rows: { label: string; ready: number; total: number }[] = $state([]);
-
-	function hasReadyConditionTrue(obj: JsonObject | undefined): boolean {
-		if (!obj || typeof obj !== 'object') return false;
-		const status = (obj as Record<string, unknown>)['status'];
-		if (!status || typeof status !== 'object') return false;
-		const conditions = (status as Record<string, unknown>)['conditions'];
-		if (!Array.isArray(conditions)) return false;
-		for (const c of conditions) {
-			if (!c || typeof c !== 'object') continue;
-			const row = c as { type?: unknown; status?: unknown };
-			if (row.type === 'Ready' && row.status === 'True') return true;
-		}
-		return false;
-	}
-
-	function totalsFromItems(items: Resource[]): { ready: number; total: number } {
-		let ready = 0;
-		for (const item of items) {
-			if (hasReadyConditionTrue(item.object)) ready++;
-		}
-		return { ready, total: items.length };
-	}
-
-	async function listAllInNamespace(spec: WorkloadListSpec, ns: string): Promise<Resource[]> {
-		const out: Resource[] = [];
-		let continueToken: string | undefined = undefined;
-		for (;;) {
-			const response: ListResponse = await resourceClient.list({
-				cluster,
-				namespace: ns,
-				group: spec.group,
-				version: spec.version,
-				resource: spec.resource,
-				limit: BigInt(500),
-				continue: continueToken
-			} as ListRequest);
-			out.push(...response.items);
-			continueToken = response.continue || undefined;
-			if (!continueToken) break;
-		}
-		return out;
-	}
-
-	async function fetchWorkloadSafe(
-		spec: WorkloadListSpec,
-		label: string,
-		ns: string
-	): Promise<{ label: string; ready: number; total: number }> {
-		try {
-			const items = await listAllInNamespace(spec, ns);
-			const { ready, total } = totalsFromItems(items);
-			return { label, ready, total };
-		} catch (error) {
-			console.error(
-				`Failed to list ${spec.group}/${spec.version}/${spec.resource} in namespace ${ns}:`,
-				error
-			);
-			return { label, ready: 0, total: 0 };
-		}
-	}
+	let workloads = $state.raw<Workload[] | undefined>(undefined);
+	let hasError = $state(false);
+	let expanded = $state(false);
 
 	async function fetch() {
-		if (!namespace || !cluster) {
-			rows = [];
-			return;
-		}
-		const labels = workloadLabels;
+		if (!namespace || !cluster) return;
 		try {
-			rows = await Promise.all(
-				WORKLOAD_SPECS.map((w, i) => fetchWorkloadSafe(w, labels[i]!, namespace))
+			workloads = classifyWorkloads(
+				await listWorkspaceObjects(resourceClient, cluster, namespace),
+				Date.now()
 			);
+			hasError = false;
 		} catch (error) {
+			hasError = true;
+			workloads = undefined;
 			console.error('Failed to fetch workspace workload health:', error);
-			rows = WORKLOAD_SPECS.map((_, i) => ({
-				label: labels[i]!,
-				ready: 0,
-				total: 0
-			}));
 		}
 	}
 
@@ -139,60 +85,121 @@
 		}
 	});
 
-	$effect(() => {
-		void cluster;
-		void namespace;
-		if (isLoaded) fetch();
-	});
-
 	let isLoaded = $state(false);
 	onMount(async () => {
-		// widget-grid passes prometheusDriver to every tile; this widget uses Resource API only.
-		void prometheusDriver;
 		await fetch();
 		isLoaded = true;
 	});
 	onDestroy(() => {
 		reloadManager.stop();
 	});
+
+	const KINDS: { kind: WorkloadKind; label: () => string }[] = [
+		{ kind: 'model', label: () => m.models() },
+		{ kind: 'release', label: () => m.workspace_workload_releases() },
+		{ kind: 'other', label: () => m.workspace_workload_other() }
+	];
+
+	const summaries = $derived(
+		KINDS.map(({ kind, label }) => ({ kind, label: label(), ...summarize(workloads ?? [], kind) }))
+	);
+	const problems = $derived(notReady(workloads ?? []));
+	// Expanded only while there is more to show than the cap.
+	const showAll = $derived(expanded && problems.length > CAP);
+	const shown = $derived(showAll ? problems : problems.slice(0, CAP));
+
+	function linkOf(workload: Workload): LinkTarget {
+		if (workload.kind === 'model')
+			return detailLink(LLM_INFERENCE_SERVICE, namespace, workload.name);
+		if (workload.kind === 'release') return detailLink(HELM_RELEASE, namespace, workload.name);
+		return detailLink(
+			workload.resource === 'statefulsets' ? STATEFUL_SET : DEPLOYMENT,
+			namespace,
+			workload.name
+		);
+	}
+
+	const stateTone = (workload: Workload) => (workload.state === 'failing' ? 'bad' : 'warn');
 </script>
 
-<Card.Root class="group relative h-full min-h-[280px] gap-2 overflow-hidden">
-	<HeartPulse
-		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"
-		aria-hidden="true"
-	/>
-	<Card.Header>
-		<Card.Title>{m.workspace_workload_health_title()}</Card.Title>
-		<Card.Description class="text-md flex min-h-6 items-center">
-			{m.workspace_workload_health_description()}
-		</Card.Description>
-	</Card.Header>
+<Panel
+	title={m.workspace_workload_health_title()}
+	description={m.workspace_workload_health_description()}
+	state={namespace ? widgetState(isLoaded, workloads !== undefined, hasError) : 'ready'}
+	class="min-h-[14.5rem] @2xl:min-h-[25.3125rem]"
+>
 	{#if !namespace}
-		<Card.Content class="text-sm text-muted-foreground"
-			>{m.workspace_namespace_unresolved()}</Card.Content
-		>
-	{:else if !isLoaded}
-		<div class="flex h-9 w-full items-center justify-center">
-			<LoaderCircle class="size-10 animate-spin text-muted-foreground" />
-		</div>
+		<p class="text-sm text-muted-foreground">{m.workspace_namespace_unresolved()}</p>
 	{:else}
-		<Card.Content class="space-y-2.5">
-			{#each rows as row (row.label)}
-				{@const pct = row.total > 0 ? Math.min(100, Math.round((100 * row.ready) / row.total)) : 0}
-				<div class="flex flex-col gap-2 rounded-lg border border-border/60 bg-muted/15 px-3 py-2.5">
-					<div class="flex items-center justify-between gap-2">
-						<span class="text-sm font-medium">{row.label}</span>
-						<span class="shrink-0 text-sm text-muted-foreground tabular-nums">
-							{m.workspace_workload_ready_ratio({
-								ready: String(row.ready),
-								total: String(row.total)
-							})}
-						</span>
-					</div>
-					<Progress value={pct} max={100} class="h-1.5 bg-muted/80" />
+		<div class={cn('flex flex-1 flex-col', NUM)}>
+			<!-- One row per kind: its name and how many are ready, the dot in the worst state's colour. -->
+			<ul>
+				{#each summaries as row (row.kind)}
+					<li
+						class="flex min-h-[3.25rem] items-center justify-between gap-3 border-t border-border first:border-t-0"
+					>
+						<p class="min-w-0 truncate text-sm font-medium">{row.label}</p>
+						{#if row.total === 0}
+							<!-- Nothing of this kind is deployed: not a zero to read, so a word. -->
+							<p class="shrink-0 text-sm text-muted-foreground">{m.dashboard_none()}</p>
+						{:else}
+							<p class={cn('flex shrink-0 items-center gap-1.5', TONE_TEXT[row.tone])}>
+								<span class={cn('size-2 rounded-full', TONE_DOT[row.tone])} aria-hidden="true"
+								></span>
+								<span class="text-lg leading-6 tracking-tight"
+									>{m.workspace_workload_ready_ratio({
+										ready: String(row.ready),
+										total: String(row.total)
+									})}</span
+								>
+								<span class="text-xs text-muted-foreground">{m.ready()}</span>
+							</p>
+						{/if}
+					</li>
+				{/each}
+			</ul>
+			<!-- What is not ready, failing first; nothing at all while everything is. -->
+			{#if problems.length > 0}
+				<div class="flex flex-col border-t border-border pt-2">
+					<ul>
+						{#each shown as workload (workload.kind + '/' + workload.name)}
+							{@const tone = stateTone(workload)}
+							<li
+								class="grid min-h-8 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-[0.8125rem]"
+							>
+								<!-- The dot is the state's colour; the name beside it stays the text colour. -->
+								<Status
+									{tone}
+									variant="dot"
+									class="flex min-w-0 gap-2 text-[0.8125rem] text-foreground"
+								>
+									<OverviewLink
+										target={linkOf(workload)}
+										names={[workload.name]}
+										class="truncate font-mono text-[0.8125rem]"
+									>
+										{workload.name}
+									</OverviewLink>
+								</Status>
+								<span class={cn('whitespace-nowrap', TONE_TEXT[tone])}>{workload.reason}</span>
+							</li>
+						{/each}
+					</ul>
+					{#if problems.length > CAP}
+						<Button
+							variant="link"
+							size="sm"
+							class="mt-1 self-start px-0 text-[0.8125rem] text-muted-foreground underline decoration-border underline-offset-[3px] hover:text-foreground hover:decoration-current"
+							aria-expanded={showAll}
+							onclick={() => (expanded = !showAll)}
+						>
+							{showAll
+								? m.workspace_workload_show_fewer()
+								: m.workspace_workload_show_all({ count: String(problems.length) })}
+						</Button>
+					{/if}
 				</div>
-			{/each}
-		</Card.Content>
+			{/if}
+		</div>
 	{/if}
-</Card.Root>
+</Panel>

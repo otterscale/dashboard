@@ -309,15 +309,20 @@
 							fieldSelector: 'metadata.namespace!=kserve,metadata.namespace!=otterscale-system'
 						})
 					},
-					{
-						title: m.model_template(),
-						url: page.params.workspace
-							? resolve('/(auth)/[cluster]/[workspace]/model-templates', {
-									cluster: activeCluster,
-									workspace: page.params.workspace
-								})
-							: ''
-					},
+					// Model templates are a licensed feature: only show with a valid license.
+					...(page.data.isRestricted
+						? []
+						: [
+								{
+									title: m.model_template(),
+									url: page.params.workspace
+										? resolve('/(auth)/[cluster]/[workspace]/model-templates', {
+												cluster: activeCluster,
+												workspace: page.params.workspace
+											})
+										: ''
+								}
+							]),
 					{
 						title: m.api_key(),
 						url: resourceUrl({
@@ -764,7 +769,10 @@
 		</Sidebar.Footer>
 		<Sidebar.Rail />
 	</Sidebar.Root>
-	<Sidebar.Inset class="min-w-0 overflow-hidden">
+	<!-- Light: page and sidebar are nearly the same white, so a hairline sets the page apart. -->
+	<Sidebar.Inset
+		class="min-w-0 overflow-hidden md:peer-data-[variant=inset]:shadow-none md:peer-data-[variant=inset]:ring-1 md:peer-data-[variant=inset]:ring-sidebar-border dark:md:peer-data-[variant=inset]:shadow-sm dark:md:peer-data-[variant=inset]:ring-0"
+	>
 		<header
 			class="flex h-16 shrink-0 items-center justify-between gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12"
 		>

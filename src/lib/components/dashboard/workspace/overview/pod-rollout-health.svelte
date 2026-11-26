@@ -1,18 +1,36 @@
 <script lang="ts">
-	import BriefcaseMedical from '@lucide/svelte/icons/briefcase-medical';
-	import ChartBar from '@lucide/svelte/icons/chart-bar';
-	import LayoutGrid from '@lucide/svelte/icons/layout-grid';
-	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
-	import OctagonAlert from '@lucide/svelte/icons/octagon-alert';
-	import Rocket from '@lucide/svelte/icons/rocket';
-	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
+	import CircleAlertIcon from '@lucide/svelte/icons/circle-alert';
+	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
+	import RocketIcon from '@lucide/svelte/icons/rocket';
+	import type { PrometheusDriver } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Card from '$lib/components/ui/card';
+	import {
+		NUM,
+		Panel,
+		Status,
+		type Tone,
+		TONE_TEXT,
+		widgetState
+	} from '$lib/components/dashboard/kit';
 	import { m } from '$lib/messages';
-	import { escapePromqlStringLiteral } from '$lib/prometheus';
 	import { cn } from '$lib/utils';
+
+	import { inNamespace } from '../lib/queries';
+	import {
+		DEPLOYMENT,
+		JOB,
+		type LinkTarget,
+		namesLink,
+		namesListLink,
+		phaseListLink,
+		POD,
+		PVC,
+		STATEFUL_SET
+	} from './links';
+	import OverviewLink from './overview-link.svelte';
+	import { type Count, type PodSignals, podSignals } from './pod-signals';
 
 	let {
 		prometheusDriver,
@@ -24,95 +42,147 @@
 		isReloading: boolean;
 	} = $props();
 
-	type PodRolloutSnapshot = {
-		running: number;
-		unknown: number;
-		notReady: number;
-		succeeded: number;
-		crashLoop: number;
-		imagePull: number;
-		configError: number;
-		deployReady: number;
-		deployDesired: number;
-		stsReady: number;
-		stsDesired: number;
-		dsReady: number;
-		dsDesired: number;
-		pvcPending: number;
-		jobFailed: number;
-		oomKilled: number;
+	type Rollout = { ready: number; desired: number; notReady: string[] };
+	type Snapshot = {
+		pods: PodSignals;
+		deployments: Rollout;
+		statefulSets: Rollout;
+		daemonSets: { ready: number; desired: number };
+		pendingClaims: string[];
+		failedJobs: { value: number; names: string[] };
 	};
 
-	let snap: PodRolloutSnapshot | undefined = $state(undefined);
+	/** `null`: Prometheus has nothing for the namespace. */
+	let snap = $state.raw<Snapshot | null | undefined>(undefined);
+	let hasError = $state(false);
 
-	function num(v: SampleValue | undefined): number {
-		if (v?.value === undefined || v?.value === null) return 0;
-		const n = Number(v.value);
-		return Number.isFinite(n) ? Math.round(n) : 0;
-	}
+	type Sample = { metric: { labels: Record<string, string> }; value: { value: number } };
 
-	const containerIssueTotal = $derived.by(() => {
-		const s = snap;
-		if (s === undefined) return 0;
-		return s.crashLoop + s.imagePull + s.configError + s.oomKilled;
-	});
-
-	async function fetchAll(ns: string) {
-		const n = escapePromqlStringLiteral(ns);
-		const base = `namespace="${n}"`;
-
-		const q = [
-			`sum(kube_pod_status_phase{${base}, phase="Running", container!=""})`,
-			`sum(kube_pod_status_phase{${base}, phase="Unknown", container!=""})`,
-			`sum(kube_pod_status_condition{${base}, condition="Ready", status="false"}) or vector(0)`,
-			`sum(kube_pod_status_phase{${base}, phase="Succeeded", container!=""})`,
-			`sum(kube_pod_container_status_waiting_reason{${base}, reason="CrashLoopBackOff"}) or vector(0)`,
-			`sum(kube_pod_container_status_waiting_reason{${base}, reason="ImagePullBackOff"}) or vector(0)`,
-			`sum(kube_pod_container_status_waiting_reason{${base}, reason="CreateContainerConfigError"}) or vector(0)`,
-			`sum(kube_deployment_status_replicas_available{${base}}) or vector(0)`,
-			`sum(kube_deployment_spec_replicas{${base}}) or vector(0)`,
-			`sum(kube_statefulset_status_replicas_ready{${base}}) or vector(0)`,
-			`sum(kube_statefulset_replicas{${base}}) or vector(0)`,
-			`sum(kube_daemonset_status_number_ready{${base}}) or vector(0)`,
-			`sum(kube_daemonset_status_desired_number_scheduled{${base}}) or vector(0)`,
-			`count(kube_persistentvolumeclaim_status_phase{${base}, phase="Pending"} == 1) or vector(0)`,
-			`sum(kube_job_status_failed{${base}}) or vector(0)`,
-			`sum(kube_pod_container_status_last_terminated_reason{${base}, reason="OOMKilled"}) or vector(0)`
-		];
-
+	async function fetchAll(): Promise<Snapshot | null> {
+		const ns = inNamespace(namespace);
 		const evalAt = new Date();
-		const results = await Promise.all(
-			q.map((query) => prometheusDriver.instantQuery(query, evalAt))
-		);
+		const ask = async (query: string) =>
+			(await prometheusDriver.instantQuery(query, evalAt)).result as Sample[];
+		const label = (samples: Sample[], key: string) =>
+			samples.map((s) => s.metric?.labels?.[key]).filter((v): v is string => !!v);
+		const total = (samples: Sample[]) =>
+			Math.round(samples.reduce((sum, s) => sum + (Number(s.value?.value) || 0), 0));
 
-		snap = {
-			running: num(results[0]?.result[0]?.value),
-			unknown: num(results[1]?.result[0]?.value),
-			notReady: num(results[2]?.result[0]?.value),
-			succeeded: num(results[3]?.result[0]?.value),
-			crashLoop: num(results[4]?.result[0]?.value),
-			imagePull: num(results[5]?.result[0]?.value),
-			configError: num(results[6]?.result[0]?.value),
-			deployReady: num(results[7]?.result[0]?.value),
-			deployDesired: num(results[8]?.result[0]?.value),
-			stsReady: num(results[9]?.result[0]?.value),
-			stsDesired: num(results[10]?.result[0]?.value),
-			dsReady: num(results[11]?.result[0]?.value),
-			dsDesired: num(results[12]?.result[0]?.value),
-			pvcPending: num(results[13]?.result[0]?.value),
-			jobFailed: num(results[14]?.result[0]?.value),
-			oomKilled: num(results[15]?.result[0]?.value)
+		// Each query names its pods, so a count can list them and link to them.
+		const recent = (metric: string, seconds: number) =>
+			`(time() - ${metric}_last_terminated_timestamp{${ns}} < ${seconds})`;
+		const [
+			phases,
+			notReady,
+			waiting,
+			initWaiting,
+			crashLooping,
+			oomLastExit,
+			oomRecent,
+			restarts,
+			initRestarts,
+			deployReady,
+			deployDesired,
+			deployShort,
+			stsReady,
+			stsDesired,
+			stsShort,
+			dsReady,
+			dsDesired,
+			pendingClaims,
+			failedJobs,
+			namespaceSeen
+		] = await Promise.all([
+			ask(`max by (pod, phase) (kube_pod_status_phase{${ns}} == 1)`),
+			ask(
+				`max by (pod) (kube_pod_status_ready{${ns}, condition="false"} == 1) unless on (pod) max by (pod) (kube_pod_status_phase{${ns}, phase=~"Succeeded|Failed"} == 1)`
+			),
+			ask(`max by (pod, reason) (kube_pod_container_status_waiting_reason{${ns}} == 1)`),
+			ask(`max by (pod, reason) (kube_pod_init_container_status_waiting_reason{${ns}} == 1)`),
+			// Restarted before and crashed in the last 10 minutes: crash-looping, even while the
+			// container runs between two back-offs.
+			ask(
+				`max by (pod) ((kube_pod_container_status_restarts_total{${ns}} >= 2) and on (namespace, pod, container) ${recent('kube_pod_container_status', 600)}) or max by (pod) ((kube_pod_init_container_status_restarts_total{${ns}} >= 2) and on (namespace, pod, container) ${recent('kube_pod_init_container_status', 600)})`
+			),
+			ask(
+				`max by (pod) (kube_pod_container_status_last_terminated_reason{${ns}, reason="OOMKilled"} == 1) or max by (pod) (kube_pod_init_container_status_last_terminated_reason{${ns}, reason="OOMKilled"} == 1)`
+			),
+			ask(
+				`max by (pod) ((kube_pod_container_status_last_terminated_reason{${ns}, reason="OOMKilled"} == 1) and on (namespace, pod, container) ${recent('kube_pod_container_status', 3600)}) or max by (pod) ((kube_pod_init_container_status_last_terminated_reason{${ns}, reason="OOMKilled"} == 1) and on (namespace, pod, container) ${recent('kube_pod_init_container_status', 3600)})`
+			),
+			ask(`sum by (pod) (increase(kube_pod_container_status_restarts_total{${ns}}[24h]))`),
+			ask(`sum by (pod) (increase(kube_pod_init_container_status_restarts_total{${ns}}[24h]))`),
+			ask(`sum(kube_deployment_status_replicas_available{${ns}})`),
+			ask(`sum(kube_deployment_spec_replicas{${ns}})`),
+			ask(
+				`max by (deployment) (kube_deployment_spec_replicas{${ns}} > kube_deployment_status_replicas_available{${ns}})`
+			),
+			ask(`sum(kube_statefulset_status_replicas_ready{${ns}})`),
+			ask(`sum(kube_statefulset_replicas{${ns}})`),
+			ask(
+				`max by (statefulset) (kube_statefulset_replicas{${ns}} > kube_statefulset_status_replicas_ready{${ns}})`
+			),
+			ask(`sum(kube_daemonset_status_number_ready{${ns}})`),
+			ask(`sum(kube_daemonset_status_desired_number_scheduled{${ns}})`),
+			ask(
+				`max by (persistentvolumeclaim) (kube_persistentvolumeclaim_status_phase{${ns}, phase="Pending"} == 1)`
+			),
+			ask(`max by (job_name) (kube_job_status_failed{${ns}} > 0)`),
+			// kube-state-metrics sees the namespace: with no pods every query above is empty, and
+			// this tells "no pods" from "no data".
+			ask(`count(kube_namespace_created{${ns}})`)
+		]);
+
+		// Containers and init containers restart separately; a pod's count is both.
+		const restartsByPod: Record<string, number> = {};
+		for (const s of [...restarts, ...initRestarts]) {
+			const pod = s.metric?.labels?.pod;
+			if (pod) restartsByPod[pod] = (restartsByPod[pod] ?? 0) + (Number(s.value?.value) || 0);
+		}
+
+		if (namespaceSeen.length === 0) return null;
+		return {
+			pods: podSignals({
+				phases: phases.flatMap((s) =>
+					s.metric?.labels?.pod && s.metric.labels.phase
+						? [{ pod: s.metric.labels.pod, phase: s.metric.labels.phase }]
+						: []
+				),
+				notReady: label(notReady, 'pod'),
+				waiting: [...waiting, ...initWaiting].flatMap((s) =>
+					s.metric?.labels?.pod && s.metric.labels.reason
+						? [{ pod: s.metric.labels.pod, reason: s.metric.labels.reason }]
+						: []
+				),
+				crashLooping: label(crashLooping, 'pod'),
+				oomLastExit: label(oomLastExit, 'pod'),
+				oomRecent: label(oomRecent, 'pod'),
+				restarts: Object.entries(restartsByPod).map(([pod, count]) => ({ pod, count }))
+			}),
+			deployments: {
+				ready: total(deployReady),
+				desired: total(deployDesired),
+				notReady: label(deployShort, 'deployment')
+			},
+			statefulSets: {
+				ready: total(stsReady),
+				desired: total(stsDesired),
+				notReady: label(stsShort, 'statefulset')
+			},
+			daemonSets: { ready: total(dsReady), desired: total(dsDesired) },
+			pendingClaims: label(pendingClaims, 'persistentvolumeclaim'),
+			failedJobs: { value: total(failedJobs), names: label(failedJobs, 'job_name') }
 		};
 	}
 
 	async function fetch() {
+		if (!namespace) return;
 		try {
-			if (!namespace) {
-				snap = undefined;
-				return;
-			}
-			await fetchAll(namespace);
+			snap = await fetchAll();
+			hasError = false;
 		} catch (error) {
+			hasError = true;
+			snap = undefined;
 			console.error('Failed to fetch namespace pod & rollout health:', error);
 		}
 	}
@@ -136,192 +206,296 @@
 		reloadManager.stop();
 	});
 
-	function ratio(ready: number, desired: number): string {
-		return m.workspace_workload_ready_ratio({
-			ready: String(ready),
-			total: String(desired)
-		});
+	/**
+	 * `bad` for a count of errors, `warn` for one that needs a look, `ok` for one that is good
+	 * news; any of them is quiet at zero. `plain` is a count with no judgement in it.
+	 */
+	type RowTone = Exclude<Tone, 'muted'> | 'plain';
+	const toneText = (tone: RowTone) => (tone === 'plain' ? undefined : TONE_TEXT[tone]);
+
+	type Row = {
+		label: string;
+		/** What is shown; a number, or `ready / desired`. */
+		text: string;
+		/** Zero, `None`: quiet and no link. */
+		quiet: boolean;
+		tone: RowTone;
+		target: LinkTarget | null;
+		names: string[];
+	};
+
+	function countRow(label: string, c: Count, tone: RowTone, target: LinkTarget | null): Row {
+		return {
+			label,
+			text: String(c.value),
+			quiet: c.value === 0,
+			tone,
+			target: c.value > 0 ? target : null,
+			names: c.names
+		};
 	}
 
-	type Kpi = { label: string; value: number; tone: 'default' | 'success' | 'warn' | 'danger' };
-	const kpis = $derived.by((): Kpi[] => {
-		if (!snap) return [];
+	function rolloutRow(label: string, r: Rollout, kind: typeof DEPLOYMENT): Row {
+		if (r.desired === 0) {
+			return {
+				label,
+				text: m.dashboard_none(),
+				quiet: true,
+				tone: 'plain',
+				target: null,
+				names: []
+			};
+		}
+		const short = r.notReady.length > 0 || r.ready < r.desired;
+		return {
+			label,
+			text: m.workspace_workload_ready_ratio({ ready: String(r.ready), total: String(r.desired) }),
+			quiet: false,
+			tone: short ? 'warn' : 'plain',
+			target: short ? namesLink(kind, namespace, r.notReady) : null,
+			names: r.notReady
+		};
+	}
+
+	const columns = $derived.by(() => {
+		const s = snap;
+		if (!s) return [];
+		const p = s.pods;
+		const pods = (names: string[]) => namesLink(POD, namespace, names);
 		return [
-			{ label: m.workspace_pods_running(), value: snap.running, tone: 'success' },
 			{
-				label: m.workspace_pods_not_ready(),
-				value: snap.notReady,
-				tone: snap.notReady > 0 ? 'warn' : 'default'
+				title: m.workspace_health_section_pods(),
+				icon: LayoutGridIcon,
+				rows: [
+					countRow(
+						m.workspace_pods_running(),
+						p.running,
+						'ok',
+						phaseListLink(POD, namespace, 'Running')
+					),
+					countRow(
+						m.workspace_pods_pending(),
+						p.pending,
+						'warn',
+						phaseListLink(POD, namespace, 'Pending')
+					),
+					countRow(m.workspace_pods_not_ready(), p.notReady, 'warn', pods(p.notReady.names)),
+					countRow(
+						m.workspace_pods_unknown(),
+						p.unknown,
+						'bad',
+						phaseListLink(POD, namespace, 'Unknown')
+					),
+					countRow(
+						m.workspace_pods_succeeded(),
+						p.succeeded,
+						'plain',
+						phaseListLink(POD, namespace, 'Succeeded')
+					)
+				]
 			},
 			{
-				label: m.workspace_pod_rollout_kpi_issues(),
-				value: containerIssueTotal,
-				tone: containerIssueTotal > 0 ? 'danger' : 'default'
+				title: m.workspace_health_section_containers(),
+				icon: CircleAlertIcon,
+				rows: [
+					countRow(m.workspace_containers_crashloop(), p.crashLoop, 'bad', pods(p.crashLoop.names)),
+					countRow(
+						m.workspace_containers_image_pull(),
+						p.imagePull,
+						'bad',
+						pods(p.imagePull.names)
+					),
+					countRow(
+						m.workspace_containers_config_error(),
+						p.configError,
+						'bad',
+						pods(p.configError.names)
+					),
+					countRow(
+						m.workspace_containers_oom_killed(),
+						p.oomKilled,
+						'bad',
+						pods(p.oomKilled.names)
+					),
+					countRow(
+						m.workspace_containers_restarts_24h(),
+						p.restarts,
+						'warn',
+						pods(p.restarts.names)
+					)
+				]
 			},
-			{ label: m.workspace_pods_succeeded(), value: snap.succeeded, tone: 'default' }
+			{
+				title: m.workspace_health_section_rollouts(),
+				icon: RocketIcon,
+				rows: [
+					rolloutRow(m.deployment(), s.deployments, DEPLOYMENT),
+					rolloutRow(m.stateful_set(), s.statefulSets, STATEFUL_SET),
+					s.daemonSets.desired === 0
+						? {
+								label: m.daemon_set(),
+								text: m.dashboard_none(),
+								quiet: true,
+								tone: 'plain' as RowTone,
+								target: null,
+								names: []
+							}
+						: {
+								label: m.daemon_set(),
+								text: m.workspace_workload_ready_ratio({
+									ready: String(s.daemonSets.ready),
+									total: String(s.daemonSets.desired)
+								}),
+								quiet: false,
+								tone: (s.daemonSets.ready < s.daemonSets.desired ? 'warn' : 'plain') as RowTone,
+								target: null,
+								names: []
+							},
+					countRow(
+						m.workspace_pvc_pending(),
+						{ value: s.pendingClaims.length, names: s.pendingClaims },
+						'warn',
+						phaseListLink(PVC, namespace, 'Pending')
+					),
+					countRow(
+						m.workspace_job_failed_pods(),
+						s.failedJobs,
+						'bad',
+						s.failedJobs.names.length > 0 ? namesListLink(JOB, namespace, s.failedJobs.names) : null
+					)
+				]
+			}
 		];
 	});
 
-	const toneClass: Record<Kpi['tone'], string> = {
-		default: 'text-foreground',
-		success: 'text-emerald-600 dark:text-emerald-400',
-		warn: 'text-amber-600 dark:text-amber-400',
-		danger: 'text-destructive'
-	};
+	/** The strip under the title: the verdict, then the counts behind it. */
+	const tiles = $derived.by(() => {
+		const s = snap;
+		if (!s) return [];
+		const p = s.pods;
+		const failing =
+			p.attention.names.length > 0 ? namesListLink(POD, namespace, p.attention.names) : null;
+		return [
+			countRow(
+				m.workspace_pods_running(),
+				p.running,
+				'ok',
+				phaseListLink(POD, namespace, 'Running')
+			),
+			countRow(
+				m.workspace_pods_not_ready(),
+				p.notReady,
+				'warn',
+				namesLink(POD, namespace, p.notReady.names)
+			),
+			countRow(m.workspace_pod_rollout_kpi_issues(), p.attention, 'bad', failing),
+			countRow(
+				m.workspace_pods_succeeded(),
+				p.succeeded,
+				'plain',
+				phaseListLink(POD, namespace, 'Succeeded')
+			)
+		];
+	});
+
+	const attention = $derived(snap?.pods.attention);
+	const attentionTarget = $derived(
+		attention && attention.value > 0 ? namesListLink(POD, namespace, attention.names) : null
+	);
 </script>
 
-<Card.Root
-	class="group relative overflow-hidden border-border/80 bg-card/50 shadow-sm ring-1 ring-border/40"
->
-	<BriefcaseMedical
-		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"
-		aria-hidden="true"
-	/>
-	<Card.Header class="relative space-y-2 pb-2">
-		<Card.Title class="text-lg font-semibold tracking-tight md:text-xl">
-			{m.workspace_pod_rollout_health_title()}
-		</Card.Title>
-		<Card.Description class="max-w-3xl text-sm leading-relaxed text-muted-foreground">
-			{m.workspace_pod_rollout_health_description()}
-		</Card.Description>
-	</Card.Header>
-	{#if !namespace}
-		<Card.Content class="text-sm text-muted-foreground"
-			>{m.workspace_namespace_unresolved()}</Card.Content
-		>
-	{:else if !isLoaded}
-		<div class="flex min-h-[200px] w-full items-center justify-center py-10">
-			<LoaderCircle class="size-10 animate-spin text-muted-foreground" />
-		</div>
-	{:else if !snap}
-		<div class="flex flex-col items-center justify-center gap-2 py-12">
-			<ChartBar class="size-8 text-muted-foreground/80" />
-			<p class="text-sm text-muted-foreground">{m.no_data_display()}</p>
-		</div>
+{#snippet value(row: Row, cls: string)}
+	{#if row.quiet}
+		<span class={cn(cls, 'text-muted-foreground')}>{row.text}</span>
 	{:else}
-		<Card.Content class="relative space-y-6 px-4 pt-0 pb-6 sm:px-6">
-			<!-- Quick scan: headline metrics -->
-			<div class="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-				{#each kpis as k (k.label)}
-					<div
-						class="flex flex-col gap-1 rounded-xl border border-border/60 bg-muted/25 px-3 py-3 shadow-sm backdrop-blur-sm transition-colors hover:bg-muted/35"
+		<OverviewLink target={row.target} names={row.names} class={cn(cls, toneText(row.tone))}>
+			{row.text}
+		</OverviewLink>
+	{/if}
+{/snippet}
+
+<Panel
+	title={m.workspace_pod_rollout_health_title()}
+	description={m.workspace_pod_rollout_health_description()}
+	state={namespace ? widgetState(isLoaded, !!snap, hasError) : 'ready'}
+	class="min-h-[61.5625rem] @md:min-h-[61.8125rem] @min-[44.5rem]:min-h-[24.3125rem]"
+>
+	{#if !namespace}
+		<p class="text-sm text-muted-foreground">{m.workspace_namespace_unresolved()}</p>
+	{:else if snap && attention}
+		<div class={cn('flex flex-col gap-3', NUM)}>
+			<!-- The verdict first, its colour the state: mint while nothing needs a look, the
+			     attention colour once something does. The rest are the counts behind it. A tile with
+			     something to open opens as a whole. Two columns with the verdict on its own row, or
+			     one row; the min-heights above follow these two layouts (`@min-[44.5rem]` is the
+			     panel's `@2xl` plus its 2 × 20px padding). -->
+			<div class="grid grid-cols-2 gap-2 @2xl/panel:grid-cols-6">
+				<OverviewLink
+					target={attentionTarget}
+					names={attention.names}
+					block
+					class={cn(
+						'col-span-2 rounded-lg px-3 py-2.5',
+						attention.value === 0
+							? 'bg-mint text-mint-foreground'
+							: 'bg-attention text-attention-foreground'
+					)}
+				>
+					<span class="block truncate text-xs leading-4 opacity-70"
+						>{m.dashboard_pods_need_attention()}</span
 					>
-						<span class="text-[11px] font-medium tracking-wider text-muted-foreground uppercase"
-							>{k.label}</span
+					<!-- Only the dot takes the state's colour; the number keeps the tile's own. -->
+					<Status
+						tone={attention.value === 0 ? 'ok' : 'warn'}
+						variant="dot"
+						class="mt-1 flex gap-2 text-2xl leading-8 tracking-tight text-current"
+					>
+						<span class="group-hover/link:underline group-hover/link:underline-offset-4"
+							>{attention.value === 0 ? m.dashboard_all_clear() : attention.value}</span
 						>
-						<span class={cn('text-2xl font-semibold tabular-nums sm:text-3xl', toneClass[k.tone])}
-							>{k.value}</span
+					</Status>
+				</OverviewLink>
+				{#each tiles as tile (tile.label)}
+					<OverviewLink
+						target={tile.quiet ? null : tile.target}
+						names={tile.names}
+						block
+						class="block border-l border-border py-1 pl-3"
+					>
+						<span class="block truncate text-xs leading-4 text-muted-foreground">{tile.label}</span>
+						<span
+							class={cn(
+								'mt-1 block text-2xl leading-8 tracking-tight group-hover/link:underline group-hover/link:underline-offset-4',
+								tile.quiet ? 'text-muted-foreground' : toneText(tile.tone)
+							)}>{tile.text}</span
 						>
-					</div>
+					</OverviewLink>
 				{/each}
 			</div>
-
-			<!-- Detail panels -->
-			<div class="grid gap-4 lg:grid-cols-3 lg:gap-5">
-				<section
-					class="flex min-w-0 flex-col rounded-2xl border border-border/70 bg-background/80 p-4 shadow-sm ring-1 ring-border/30"
-				>
-					<div class="mb-3 flex items-center gap-2.5">
-						<span
-							class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-chart-2/15 text-chart-2"
-						>
-							<LayoutGrid class="size-5" />
-						</span>
-						<h3 class="text-sm leading-none font-semibold">{m.workspace_health_section_pods()}</h3>
-					</div>
-					<ul class="divide-y divide-border/50 text-sm">
-						<li class="flex items-center justify-between gap-3 py-2.5 first:pt-0">
-							<span class="min-w-0 text-muted-foreground">{m.workspace_pods_running()}</span>
-							<span class="shrink-0 font-medium text-chart-2 tabular-nums">{snap.running}</span>
-						</li>
-						<li class="flex items-center justify-between gap-3 py-2.5">
-							<span class="min-w-0 text-muted-foreground">{m.workspace_pods_unknown()}</span>
-							<span class="shrink-0 font-medium tabular-nums">{snap.unknown}</span>
-						</li>
-						<li class="flex items-center justify-between gap-3 py-2.5">
-							<span class="min-w-0 text-muted-foreground">{m.workspace_pods_not_ready()}</span>
-							<span class="shrink-0 font-semibold text-amber-600 tabular-nums dark:text-amber-400"
-								>{snap.notReady}</span
+			<!-- Each row is a name and a number; the names behind a number are in its tooltip. -->
+			<div class="grid gap-x-8 gap-y-4 border-t border-border pt-3 @2xl/panel:grid-cols-3">
+				{#each columns as column (column.title)}
+					{@const Icon = column.icon}
+					<section class="min-w-0">
+						<h3 class="flex items-center gap-2 text-sm font-[550]">
+							<span
+								class="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
 							>
-						</li>
-						<li class="flex items-center justify-between gap-3 py-2.5">
-							<span class="min-w-0 text-muted-foreground">{m.workspace_pods_succeeded()}</span>
-							<span class="shrink-0 font-medium tabular-nums">{snap.succeeded}</span>
-						</li>
-					</ul>
-				</section>
-
-				<section
-					class="flex min-w-0 flex-col rounded-2xl border border-border/70 bg-background/80 p-4 shadow-sm ring-1 ring-border/30"
-				>
-					<div class="mb-3 flex items-center gap-2.5">
-						<span
-							class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-destructive/15 text-destructive"
-						>
-							<OctagonAlert class="size-5" />
-						</span>
-						<h3 class="text-sm leading-none font-semibold">
-							{m.workspace_health_section_containers()}
+								<Icon class="size-4" aria-hidden="true" />
+							</span>
+							{column.title}
 						</h3>
-					</div>
-					<ul class="divide-y divide-border/50 text-sm">
-						{#each [{ label: m.workspace_containers_crashloop(), value: snap.crashLoop }, { label: m.workspace_containers_image_pull(), value: snap.imagePull }, { label: m.workspace_containers_config_error(), value: snap.configError }, { label: m.workspace_containers_oom_killed(), value: snap.oomKilled }] as row (row.label)}
-							<li class="flex items-center justify-between gap-3 py-2.5 first:pt-0">
-								<span class="min-w-0 truncate text-muted-foreground">{row.label}</span>
-								<span class="shrink-0 font-semibold text-destructive tabular-nums">{row.value}</span
-								>
-							</li>
-						{/each}
-					</ul>
-				</section>
-
-				<section
-					class="flex min-w-0 flex-col rounded-2xl border border-border/70 bg-background/80 p-4 shadow-sm ring-1 ring-border/30"
-				>
-					<div class="mb-3 flex items-center gap-2.5">
-						<span
-							class="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary"
-						>
-							<Rocket class="size-5" />
-						</span>
-						<h3 class="text-sm leading-none font-semibold">
-							{m.workspace_health_section_rollouts()}
-						</h3>
-					</div>
-					<ul class="divide-y divide-border/50 text-sm">
-						<li class="flex items-center justify-between gap-3 py-2.5 first:pt-0">
-							<span class="min-w-0 text-muted-foreground">{m.deployment()}</span>
-							<span class="shrink-0 font-medium tabular-nums"
-								>{ratio(snap.deployReady, snap.deployDesired)}</span
-							>
-						</li>
-						<li class="flex items-center justify-between gap-3 py-2.5">
-							<span class="min-w-0 text-muted-foreground">{m.stateful_set()}</span>
-							<span class="shrink-0 font-medium tabular-nums"
-								>{ratio(snap.stsReady, snap.stsDesired)}</span
-							>
-						</li>
-						<li class="flex items-center justify-between gap-3 py-2.5">
-							<span class="min-w-0 text-muted-foreground">{m.daemon_set()}</span>
-							<span class="shrink-0 font-medium tabular-nums"
-								>{ratio(snap.dsReady, snap.dsDesired)}</span
-							>
-						</li>
-						<li class="flex items-center justify-between gap-3 py-2.5">
-							<span class="min-w-0 text-muted-foreground">{m.workspace_pvc_pending()}</span>
-							<span class="shrink-0 font-semibold text-amber-600 tabular-nums dark:text-amber-400"
-								>{snap.pvcPending}</span
-							>
-						</li>
-						<li class="flex items-center justify-between gap-3 py-2.5">
-							<span class="min-w-0 text-muted-foreground">{m.workspace_job_failed_pods()}</span>
-							<span class="shrink-0 font-semibold text-destructive tabular-nums"
-								>{snap.jobFailed}</span
-							>
-						</li>
-					</ul>
-				</section>
+						<ul class="mt-2 divide-y divide-border text-sm">
+							{#each column.rows as row (row.label)}
+								<li class="flex h-9 items-center justify-between gap-3">
+									<span class="min-w-0 truncate">{row.label}</span>
+									{@render value(row, 'shrink-0 font-medium')}
+								</li>
+							{/each}
+						</ul>
+					</section>
+				{/each}
 			</div>
-		</Card.Content>
+		</div>
 	{/if}
-</Card.Root>
+</Panel>
