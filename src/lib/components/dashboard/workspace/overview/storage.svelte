@@ -1,20 +1,12 @@
 <script lang="ts">
-	import CheckCircle from '@lucide/svelte/icons/check-circle';
-	import Clock from '@lucide/svelte/icons/clock';
-	import Database from '@lucide/svelte/icons/database';
-	import HardDrive from '@lucide/svelte/icons/hard-drive';
-	import LoaderCircle from '@lucide/svelte/icons/loader-circle';
-	import TriangleAlert from '@lucide/svelte/icons/triangle-alert';
 	import type { PrometheusDriver, SampleValue } from 'prometheus-query';
 	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import * as Card from '$lib/components/ui/card';
-	import { Progress } from '$lib/components/ui/progress';
+	import { Panel, Status, widgetState } from '$lib/components/dashboard/kit';
 	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/messages';
 	import { escapePromqlStringLiteral, type SharedMetrics } from '$lib/prometheus';
-	import { cn } from '$lib/utils';
 
 	let {
 		prometheusDriver,
@@ -120,153 +112,80 @@
 	const bound = $derived(scalar(boundCount) ?? 0);
 	const pending = $derived(scalar(pendingCount) ?? 0);
 
-	const boundPercent = $derived(total > 0 ? Math.min(100, Math.round((100 * bound) / total)) : 0);
+	// PVCs that are neither bound nor pending (lost, or released), so the bar still adds up.
 </script>
 
-<!-- Shell matches Workload health; content keeps KPI + mount status blocks. -->
-<Card.Root class="group relative h-full min-h-[280px] gap-2 overflow-hidden">
-	<HardDrive
-		class="absolute -right-8 bottom-0 size-32 text-7xl tracking-tight text-nowrap text-primary/[0.06] transition-opacity group-hover:text-primary/[0.09] md:size-40"
-		aria-hidden="true"
-	/>
-	<Card.Header>
-		<Card.Title>{m.workspace_storage_title()}</Card.Title>
-		<Card.Description class="text-md flex min-h-6 items-center">
-			{m.workspace_storage_description()}
-		</Card.Description>
-	</Card.Header>
+<Panel
+	title={m.workspace_storage_title()}
+	description={m.workspace_storage_description()}
+	state={namespace ? widgetState(isLoaded, requestedBytes !== undefined) : 'ready'}
+	class="min-h-[16.375rem] @md:min-h-[16.625rem]"
+>
 	{#if !namespace}
-		<Card.Content class="text-sm text-muted-foreground"
-			>{m.workspace_namespace_unresolved()}</Card.Content
-		>
-	{:else if !isLoaded}
-		<div class="flex h-9 w-full items-center justify-center">
-			<LoaderCircle class="size-10 animate-spin text-muted-foreground" />
-		</div>
+		<p class="text-sm text-muted-foreground">{m.workspace_namespace_unresolved()}</p>
 	{:else}
-		<Card.Content class="relative space-y-4 px-4 pt-0 pb-5 sm:px-5">
-			<div
-				class={cn(
-					'space-y-2 rounded-xl border px-4 py-3.5 ring-1',
-					overProvisioned
-						? 'border-amber-500/30 bg-amber-500/5 ring-amber-500/20'
-						: 'border-border/70 bg-muted/20 ring-border/30'
-				)}
-			>
-				<div class="flex items-start justify-between gap-3">
-					<div class="grid min-w-0 grow grid-cols-2 gap-3">
-						<div class="min-w-0 space-y-1">
-							<p class="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-								{m.workspace_pvc_provisioned()}
-							</p>
-							<p
-								class={cn(
-									'text-3xl font-semibold tracking-tight tabular-nums',
-									overProvisioned ? 'text-amber-700 dark:text-amber-400' : 'text-foreground'
-								)}
+		<!-- Two equal halves split at the middle, each centred, like the workload card beside it,
+		     so the two dividers line up. -->
+		<div class="flex flex-1 flex-col slashed-zero tabular-nums">
+			<div class="flex flex-1 flex-col justify-center pb-2.5">
+				<div class="grid grid-cols-2 gap-3">
+					<div class="min-w-0">
+						<p class="text-xs leading-4 text-muted-foreground">{m.workspace_pvc_provisioned()}</p>
+						<p class="truncate text-[1.75rem] leading-8 tracking-tight">
+							{provisioned.value}<span class="ml-1 text-sm tracking-normal text-muted-foreground"
+								>{provisioned.unit}</span
 							>
-								{provisioned.value}
-								<span class="text-lg font-medium text-muted-foreground">{provisioned.unit}</span>
-							</p>
-						</div>
-						<div class="min-w-0 space-y-1">
-							<p class="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-								{m.workspace_pvc_used()}
-							</p>
-							<p class="text-3xl font-semibold tracking-tight text-foreground tabular-nums">
-								{used.value}
-								<span class="text-lg font-medium text-muted-foreground">{used.unit}</span>
-							</p>
-							<p class="text-[11px] text-muted-foreground">{m.workspace_pvc_used_hint()}</p>
-						</div>
+						</p>
 					</div>
-					<span
-						class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-chart-3/15 text-chart-3"
-						aria-hidden="true"
-					>
-						<Database class="size-5" />
-					</span>
+					<div class="min-w-0">
+						<p class="text-xs leading-4 text-muted-foreground">{m.workspace_pvc_used()}</p>
+						<p class="truncate text-[1.75rem] leading-8 tracking-tight">
+							{used.value}<span class="ml-1 text-sm tracking-normal text-muted-foreground"
+								>{used.unit}</span
+							>
+						</p>
+						<p class="truncate text-[11px] leading-4 text-muted-foreground">
+							{m.workspace_pvc_used_hint()}
+						</p>
+					</div>
 				</div>
 				{#if overProvisioned}
-					<p class="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-400">
-						<TriangleAlert class="size-3.5 shrink-0" aria-hidden="true" />
+					<Status tone="warn" variant="dot" class="mt-2 items-start whitespace-normal">
 						{m.workspace_pvc_exceeds_cluster({
 							capacity: `${clusterCapacity.value} ${clusterCapacity.unit}`
 						})}
-					</p>
+					</Status>
 				{/if}
 			</div>
-
-			<div class="space-y-3">
-				<p class="text-[11px] font-medium tracking-wider text-muted-foreground uppercase">
-					{m.workspace_pvc_volume_status()}
-				</p>
-
-				<div class="flex items-end justify-between gap-2">
-					<div>
-						<p class="text-2xl leading-none font-semibold tabular-nums">{total}</p>
-						<p class="mt-1 text-xs text-muted-foreground">{m.workspace_pvc_total_count()}</p>
-					</div>
-					{#if total > 0}
-						<p class="max-w-[55%] text-right text-xs leading-snug text-muted-foreground">
-							{m.workspace_pvc_bound_of_total({
-								bound: String(bound),
-								total: String(total)
-							})}
-						</p>
-					{/if}
+			<!-- PVC counts as plain numbers, like every other reading on this card. -->
+			<dl class="grid flex-1 grid-cols-3 content-center gap-3 border-t border-border pt-2.5">
+				<div class="min-w-0">
+					<dt class="truncate text-xs leading-4 text-muted-foreground">
+						{m.workspace_pvc_total_count()}
+					</dt>
+					<dd class="text-xl leading-7 {total === 0 ? 'text-muted-foreground' : ''}">{total}</dd>
 				</div>
-
-				{#if total > 0}
-					<Progress value={boundPercent} max={100} class="h-2 bg-muted/80" />
-				{/if}
-
-				<div class="grid grid-cols-2 gap-2 sm:gap-3">
-					<div
-						class="flex items-center gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-3 py-2.5"
-					>
-						<span
-							class="flex size-8 shrink-0 items-center justify-center rounded-md bg-emerald-500/15 text-emerald-700 dark:text-emerald-400"
-						>
-							<CheckCircle class="size-4" />
-						</span>
-						<div class="min-w-0">
-							<p class="text-lg leading-none font-semibold tabular-nums">{bound}</p>
-							<p class="truncate text-[11px] text-muted-foreground">
-								{m.workspace_pvc_bound_count()}
-							</p>
-						</div>
-					</div>
-					<div
-						class={cn(
-							'flex items-center gap-2 rounded-lg border px-3 py-2.5',
-							pending > 0 ? 'border-amber-500/30 bg-amber-500/10' : 'border-border/60 bg-muted/15'
-						)}
-					>
-						<span
-							class={cn(
-								'flex size-8 shrink-0 items-center justify-center rounded-md',
-								pending > 0
-									? 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
-									: 'bg-muted text-muted-foreground'
-							)}
-						>
-							<Clock class="size-4" />
-						</span>
-						<div class="min-w-0">
-							<p
-								class={cn(
-									'text-lg leading-none font-semibold tabular-nums',
-									pending > 0 && 'text-amber-700 dark:text-amber-400'
-								)}
-							>
-								{pending}
-							</p>
-							<p class="truncate text-[11px] text-muted-foreground">{m.workspace_pvc_pending()}</p>
-						</div>
-					</div>
+				<div class="min-w-0">
+					<dt class="truncate text-xs leading-4 text-muted-foreground">
+						{m.workspace_pvc_bound_count()}
+					</dt>
+					<dd class="text-xl leading-7 {bound === 0 ? 'text-muted-foreground' : 'text-chart-2'}">
+						{bound}
+					</dd>
 				</div>
-			</div>
-		</Card.Content>
+				<div class="min-w-0">
+					<dt class="truncate text-xs leading-4 text-muted-foreground">
+						{m.workspace_pvc_pending()}
+					</dt>
+					<dd class="text-xl leading-7">
+						{#if pending > 0}
+							<Status tone="warn" variant="dot" class="text-xl leading-7">{pending}</Status>
+						{:else}
+							<span class="text-muted-foreground">0</span>
+						{/if}
+					</dd>
+				</div>
+			</dl>
+		</div>
 	{/if}
-</Card.Root>
+</Panel>

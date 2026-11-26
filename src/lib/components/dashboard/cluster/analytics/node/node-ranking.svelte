@@ -1,109 +1,226 @@
 <script lang="ts">
 	import type { PrometheusDriver } from 'prometheus-query';
-	import { onDestroy, onMount } from 'svelte';
+	import { untrack } from 'svelte';
 
-	import { ReloadManager } from '$lib/components/custom/reloader';
-	import { type TopBar, TopBarList } from '$lib/components/custom/top-bar-list';
-	import { classifyThreshold, type ThresholdLevel } from '$lib/prometheus';
+	import { m } from '$lib/messages';
 
-	// Single-value node rankings complementing the CPU/Memory pressure cards. `pods` and
-	// `restart` are kube-state-metrics joined to `kube_pod_info` for the `node` label;
-	// `gpu` ranks by avg GPU utilisation, keyed by DCGM `hostname` (== node name). All three
-	// label values feed the same node drill-in click.
+	import { byLabel, fetchInstant, fetchRange, rangeLiteral, stepFor } from '../lib/fetch';
+	import { fmt, fmtPct, pressureText } from '../lib/format';
+	import { Loader } from '../lib/loader.svelte';
+	import { averaged, NODE_FACTS, nodeRankingQueries, nodeTrendQuery } from '../lib/promql';
+	import RankingCard, { type RankMetric, type RankRow } from '../ranking-card.svelte';
+
 	let {
-		prometheusDriver,
-		kind,
-		title,
-		description,
-		tooltip,
-		onNodeClick,
-		isReloading = $bindable()
+		client,
+		tick,
+		history,
+		start,
+		end,
+		windowLabel,
+		metric = $bindable(),
+		selected,
+		onSelect,
+		onNodes
 	}: {
-		prometheusDriver: PrometheusDriver;
-		kind: 'pods' | 'restart' | 'gpu';
-		title: string;
-		description: string;
-		tooltip: string;
-		onNodeClick?: (node: string) => void;
-		isReloading?: boolean;
+		client: PrometheusDriver;
+		tick: number;
+		history: boolean;
+		start: Date;
+		end: Date;
+		windowLabel: string;
+		metric: RankMetric;
+		selected: string | undefined;
+		onSelect: (node: string) => void;
+		/** The node list in ranking order, so the page can pick a default. */
+		onNodes: (nodes: { name: string; roles: string[]; gpus: number }[]) => void;
 	} = $props();
 
-	const query = $derived.by(() => {
-		switch (kind) {
-			case 'pods':
-				return `100 * sum(kube_pod_status_phase{phase="Running"} * on(namespace,pod) group_left(node) kube_pod_info) by (node) / sum(kube_node_status_allocatable{resource="pods"}) by (node)`;
-			case 'restart':
-				// `> 0` keeps the chart to nodes that actually had restarts — empty is the healthy state.
-				return `sum(increase(kube_pod_container_status_restarts_total[1h]) * on(namespace,pod) group_left(node) kube_pod_info) by (node) > 0`;
-			case 'gpu':
-				return `avg by(hostname) (DCGM_FI_DEV_GPU_UTIL)`;
-		}
+	type Node = {
+		name: string;
+		roles: string[];
+		gpus: number;
+		cpu: [number?, number?, number?];
+		memory: [number?, number?, number?];
+		gpuUtil?: number;
+		gpuAlloc?: number;
+		restarts: number;
+	};
+
+	const values = new Loader<Node[]>(
+		async () => {
+			const range = rangeLiteral(start, end);
+			const queries: Record<string, string> = history
+				? { ...averaged(nodeRankingQueries(range), range, stepFor(start, end)), ...NODE_FACTS }
+				: { ...nodeRankingQueries('1h'), ...NODE_FACTS };
+			const r = await fetchInstant(client, queries, history ? end : undefined);
+			if (!r) return null;
+			const get = (k: string) => byLabel(r[k], 'node');
+			const [cpuUse, cpuReq, cpuLim, memUse, memReq, memLim] = [
+				'cpuUse',
+				'cpuReq',
+				'cpuLim',
+				'memUse',
+				'memReq',
+				'memLim'
+			].map(get);
+			const gpuUtil = get('gpuUtil');
+			const gpuAlloc = get('gpuAlloc');
+			const restarts = get('restarts');
+			const gpus = get('gpus');
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity -- built and read in one pass, never reactive
+			const roles = new Map<string, string[]>();
+			for (const s of r.roles) {
+				const list = roles.get(s.labels.node) ?? [];
+				list.push(s.labels.role);
+				roles.set(s.labels.node, list);
+			}
+			return r.nodes.map(({ labels: { node } }) => ({
+				name: node,
+				roles: roles.get(node) ?? [],
+				gpus: gpus.get(node) ?? 0,
+				cpu: [cpuUse.get(node), cpuReq.get(node), cpuLim.get(node)],
+				memory: [memUse.get(node), memReq.get(node), memLim.get(node)],
+				gpuUtil: gpuUtil.get(node),
+				gpuAlloc: gpuAlloc.get(node),
+				restarts: Math.round(restarts.get(node) ?? 0)
+			}));
+		},
+		(nodes) => nodes.length === 0
+	);
+
+	const trends = new Loader<Map<string, number[]>>(async () => {
+		const r = await fetchRange(
+			client,
+			{ trend: nodeTrendQuery(metric) },
+			start,
+			end,
+			stepFor(start, end, 40)
+		);
+		if (!r) return null;
+		return new Map(r.trend.map((s) => [s.labels.node, s.points.map((p) => p.v)]));
 	});
-	const labelKey = $derived(kind === 'gpu' ? 'hostname' : 'node');
 
-	let bars = $state<TopBar[]>([]);
-	let isLoaded = $state(false);
-
-	function displayValue(value: number): string {
-		return kind === 'restart' ? `${Math.round(value)}` : `${Math.round(value)}%`;
+	// After each answer, tell the page the order so it can preselect the first node.
+	async function refresh() {
+		await values.load();
+		const data = values.data;
+		if (!data) return;
+		onNodes(
+			rows
+				.map((r) => data.find((n) => n.name === r.id))
+				.filter((n): n is Node => !!n)
+				.map((n) => ({ name: n.name, roles: n.roles, gpus: n.gpus }))
+		);
 	}
-	// Pods/restarts carry a health meaning, so colour those bars by threshold. Pod density
-	// reads as scheduling pressure (green ≤70%, orange ≤90%, red above). Restarts only ever
-	// list nodes with ≥1 restart, so green never shows — 1–10/h is orange, >10/h (sustained
-	// crash-looping) turns red. GPU utilisation is the opposite — high is the desired state —
-	// so it gets one calm colour and lets the descending rank surface idle nodes instead.
-	function classes(value: number): { barClass?: string; textClass?: string } {
-		if (kind === 'gpu') return { barClass: 'bg-chart-2' };
-		const level: ThresholdLevel =
-			kind === 'pods'
-				? classifyThreshold(value, { green: 70, orange: 90 })
-				: classifyThreshold(value, { green: 0, orange: 10 });
+
+	$effect(() => {
+		void [tick, history, start.getTime(), end.getTime()];
+		untrack(refresh);
+	});
+	$effect(() => {
+		if (!history) return;
+		void [metric, start.getTime(), end.getTime()];
+		untrack(() => trends.load());
+	});
+
+	const isMaster = (roles: string[]) => roles.some((r) => r === 'control-plane' || r === 'master');
+
+	function chips(node: Node): string[] {
+		const list: string[] = [];
+		if (isMaster(node.roles)) list.push(m.analytics_chip_master());
+		list.push(node.gpus > 0 ? m.analytics_chip_gpu() : m.analytics_chip_cpu());
+		return list;
+	}
+
+	function row(node: Node): RankRow {
+		const base = {
+			id: node.name,
+			label: node.name,
+			chips: chips(node),
+			trend: trends.data?.get(node.name)
+		};
+		if (metric === 'cpu' || metric === 'memory') {
+			const [use, req, lim] = node[metric];
+			return {
+				...base,
+				bar: { solid: use ?? 0, soft: req, over: (req ?? 0) > 100 },
+				values: [
+					{ text: fmtPct(use) },
+					{ text: fmtPct(req), class: pressureText(req) },
+					{ text: fmtPct(lim), class: 'text-muted-foreground', minor: true }
+				],
+				// Requests are what fills a node, so they set the order; usage is read against them.
+				sortKey: req ?? -1
+			};
+		}
+		if (metric === 'gpu') {
+			if (node.gpus === 0) {
+				return { ...base, note: m.analytics_no_gpu(), values: [], sortKey: -Infinity };
+			}
+			return {
+				...base,
+				bar: { solid: node.gpuUtil ?? 0, soft: node.gpuAlloc },
+				values: [
+					{ text: fmtPct(node.gpuUtil) },
+					{ text: fmtPct(node.gpuAlloc), class: pressureText(node.gpuAlloc) }
+				],
+				sortKey: node.gpuAlloc ?? -1
+			};
+		}
 		return {
-			barClass:
-				level === 'red' ? 'bg-destructive' : level === 'orange' ? 'bg-chart-1' : 'bg-chart-2',
-			textClass: level === 'red' ? 'text-destructive' : ''
+			...base,
+			bar: { solid: 0 },
+			values: [{ text: fmt(node.restarts) }],
+			sortKey: node.restarts
 		};
 	}
 
-	async function fetch() {
-		try {
-			const response = await prometheusDriver.instantQuery(query);
-			const series = (response.result ?? []) as {
-				metric: { labels: Record<string, string> };
-				value?: { value: unknown };
-			}[];
-			bars = series
-				.map((s) => {
-					const node = s.metric?.labels?.[labelKey] ?? '';
-					const value = Number(s.value?.value);
-					return node && Number.isFinite(value)
-						? { label: node, value, displayValue: displayValue(value), ...classes(value) }
-						: null;
-				})
-				.filter((b): b is TopBar => b !== null)
-				.sort((a, b) => b.value - a.value);
-		} catch (error) {
-			console.error('Failed to fetch node ranking:', error);
+	const rows = $derived.by(() => {
+		const list = (values.data ?? []).map(row).sort((a, b) => b.sortKey - a.sortKey);
+		if (metric === 'restarts') {
+			const top = Math.max(1, ...list.map((r) => r.sortKey));
+			for (const r of list) r.bar = { solid: (r.sortKey / top) * 100 };
 		}
-	}
-
-	const reloadManager = new ReloadManager(fetch);
-
-	$effect(() => {
-		if (isReloading) {
-			reloadManager.restart();
-		} else {
-			reloadManager.stop();
-		}
+		return list;
 	});
 
-	onMount(async () => {
-		await fetch();
-		isLoaded = true;
-	});
-	onDestroy(() => {
-		reloadManager.stop();
-	});
+	const headers = $derived(
+		metric === 'gpu'
+			? [{ text: m.analytics_util() }, { text: m.analytics_allocated() }]
+			: metric === 'restarts'
+				? [{ text: history ? m.analytics_in_range() : m.analytics_last_hour() }]
+				: [
+						{ text: m.analytics_usage() },
+						{ text: m.analytics_request() },
+						{ text: m.analytics_limit(), minor: true }
+					]
+	);
+	const legend = $derived<[string, string?]>(
+		metric === 'gpu'
+			? [m.analytics_utilization(), m.analytics_allocated()]
+			: metric === 'restarts'
+				? [m.analytics_restarts()]
+				: [m.analytics_usage(), m.analytics_request()]
+	);
 </script>
 
-<TopBarList {title} {description} {tooltip} {bars} {isLoaded} onBarClick={onNodeClick} scrollable />
+<RankingCard
+	title={m.analytics_node_ranking()}
+	subtitle={history
+		? m.analytics_ranking_history_hint({ window: windowLabel })
+		: m.analytics_ranking_now_hint()}
+	bind:metric
+	axisLabel={metric === 'restarts'
+		? m.analytics_restart_count()
+		: metric === 'gpu'
+			? m.analytics_pct_of_gpu()
+			: m.analytics_pct_of_allocatable()}
+	{legend}
+	{headers}
+	{rows}
+	state={values.state}
+	{selected}
+	{onSelect}
+	{history}
+	trendMax={metric === 'restarts' ? undefined : 100}
+/>
