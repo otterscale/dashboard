@@ -12,8 +12,6 @@
 
 	const transport: Transport = getContext('transport');
 
-	let hasRookCeph = $state(false);
-
 	// Set breadcrumbs navigation
 	breadcrumbs.set([
 		{
@@ -25,6 +23,8 @@
 		}
 	]);
 
+	// The page draws its loading cards at once, on the server too; a cluster without Rook Ceph
+	// sends the viewer to the overview as soon as discovery says so.
 	onMount(async () => {
 		const exists = await hasRookCephCRD(transport, page.params.cluster!);
 		if (!exists) {
@@ -34,14 +34,10 @@
 					workspace: page.params.workspace!
 				})
 			);
-			return;
 		}
-		hasRookCeph = true;
 	});
 </script>
 
-{#if hasRookCeph}
-	{#key page.params.cluster!}
-		<Dashboard cluster={page.params.cluster!} />
-	{/key}
-{/if}
+{#key page.params.cluster!}
+	<Dashboard cluster={page.params.cluster!} />
+{/key}

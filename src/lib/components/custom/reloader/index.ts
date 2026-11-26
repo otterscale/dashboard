@@ -1,4 +1,5 @@
-import { default as Reloader } from './reloader.svelte';
+import { AutoRefresh, reloadNow } from './auto-refresh.svelte';
+import { default as RefreshControl } from './refresh-control.svelte';
 import { ReloadManager } from './utils.svelte';
 
-export { Reloader, ReloadManager, Reloader as Root };
+export { AutoRefresh, RefreshControl, ReloadManager, reloadNow };
