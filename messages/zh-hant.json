@@ -999,6 +999,7 @@
 	"no_failover": "無容錯移轉",
 	"platform_checks": "平台檢查",
 	"platform_checks_tooltip": "每分鐘從叢集讀取一次。模組是 OtterScale 安裝的 Flux HelmRelease；備份是 Velero；憑證是 cert-manager 管理的憑證，自行提供的憑證不在檢查範圍；告警通知表示 Alertmanager 有沒有把告警送到任何地方。",
+	"platform_checks_tooltip_ee": "每分鐘從叢集讀取一次。模組是 OtterScale 安裝的 Flux HelmRelease；備份是 Velero；憑證是 cert-manager 管理的憑證，自行提供的憑證不在檢查範圍；告警通知表示 Alertmanager 有沒有把告警送到任何地方。授權是叢集授權的狀態、距離到期的天數，以及未獲授權的節點。",
 	"check_title_modules": "模組",
 	"check_title_backup": "備份",
 	"check_title_certificates": "憑證",
