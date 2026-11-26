@@ -999,6 +999,7 @@
 	"no_failover": "No failover",
 	"platform_checks": "Platform checks",
 	"platform_checks_tooltip": "Read from the cluster every minute. Modules are the Flux HelmReleases OtterScale installs. Backup is Velero. Certificates are the ones cert-manager manages; a certificate you supplied yourself is not checked. Notifications says whether Alertmanager sends alerts anywhere.",
+	"platform_checks_tooltip_ee": "Read from the cluster every minute. Modules are the Flux HelmReleases OtterScale installs. Backup is Velero. Certificates are the ones cert-manager manages; a certificate you supplied yourself is not checked. Notifications says whether Alertmanager sends alerts anywhere. License is the cluster's license: its state, the days left before it expires, and any node it does not cover.",
 	"check_title_modules": "Modules",
 	"check_title_backup": "Backup",
 	"check_title_certificates": "Certificates",
