@@ -2,7 +2,7 @@ import type { Client } from '@connectrpc/connect';
 import type { ResourceService } from '@otterscale/api/resource/v1';
 import type { PrometheusDriver } from 'prometheus-query';
 
-import { fetchInstant } from '$lib/components/dashboard/cluster/analytics/lib/fetch';
+import { fetchInstant } from '$lib/components/dashboard/kit/fetch';
 
 import { podFromObject, type PodInfo } from './pods';
 import { modelMetric, splitKey } from './queries';

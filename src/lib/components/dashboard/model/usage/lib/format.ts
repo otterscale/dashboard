@@ -1,10 +1,14 @@
-/** An em dash: the value for "nothing to show here". */
-export const DASH = '—';
+import { DASH } from '$lib/components/dashboard/kit/format';
+
+export { DASH };
 
 const grouped = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 
-/** Whole numbers with grouping, e.g. requests: `4,812`. */
-export function fmtCount(value: number | undefined): string {
+/**
+ * Whole numbers with grouping, e.g. requests: `4,812`. Overview's `fmtCount` has no grouping: its
+ * counts are replicas and queued requests.
+ */
+export function fmtGrouped(value: number | undefined): string {
 	if (value === undefined || !Number.isFinite(value)) return DASH;
 	return grouped.format(Math.round(value));
 }
@@ -35,7 +39,8 @@ export function fmtShare(part: number, whole: number): string {
 	return `${Math.round((part / whole) * 100)}%`;
 }
 
-export function fmtPercent(part: number, whole: number): string {
+/** A part of a whole as a percent, one decimal under 10 %; Overview's `fmtPercent` takes a percent. */
+export function fmtPercentOf(part: number, whole: number): string {
 	if (!(whole > 0)) return '0%';
 	const p = (part / whole) * 100;
 	return `${p > 0 && p < 10 ? p.toFixed(1) : Math.round(p)}%`;
@@ -49,8 +54,11 @@ export function fmtDay(iso: string | undefined, locale: string): string {
 	return d.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 }
 
-/** A round top for the y axis whose half is round too: 6 → 6, 201 → 240, 0 → 0. */
-export function niceTop(max: number): number {
+/**
+ * A round top for a y axis of whole counts, whose half is round too: 6 → 6, 201 → 240, 0 → 0.
+ * Overview's `niceTop` is for rates: it never answers 0 and steps by tenths under 1.
+ */
+export function niceCountTop(max: number): number {
 	if (!(max > 0)) return 0;
 	if (max <= 10) return Math.max(2, Math.ceil(max / 2) * 2);
 	const p = 10 ** Math.floor(Math.log10(max));

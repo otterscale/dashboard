@@ -10,7 +10,8 @@ export const workspaceOverviewWidgets = [
 	{
 		key: 'resource-quota',
 		class: 'col-span-12 @5xl:col-span-4',
-		component: ResourceQuota
+		component: ResourceQuota,
+		needsCluster: true
 	},
 	{
 		key: 'workload-health',

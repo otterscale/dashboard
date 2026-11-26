@@ -1,14 +1,15 @@
 <script lang="ts">
 	import CheckIcon from '@lucide/svelte/icons/check';
 	import type { PrometheusDriver } from 'prometheus-query';
-	import { onMount } from 'svelte';
+	import { untrack } from 'svelte';
 
 	import { NUM, Panel } from '$lib/components/dashboard/kit';
+	import { fetchInstant, fetchRange, rangeLiteral } from '$lib/components/dashboard/kit/fetch';
+	import { fmt } from '$lib/components/dashboard/kit/format';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
 	import { m } from '$lib/messages';
+	import { cn } from '$lib/utils';
 
-	import { fetchInstant, fetchRange, rangeLiteral } from '../lib/fetch';
-	import { fmt } from '../lib/format';
-	import { Loader } from '../lib/loader.svelte';
 	import { restartBucketsQuery, restartedPodQueries } from '../lib/promql';
 
 	// Restarts in 5-minute bars, and the pods behind them with the reason the last one stopped.
@@ -21,7 +22,8 @@
 		describe
 	}: {
 		client: PrometheusDriver;
-		scope: { node: string } | { namespace: string };
+		/** Left out while the page has no node or namespace yet: the card then waits in its loading state. */
+		scope: { node: string } | { namespace: string } | undefined;
 		start: Date;
 		end: Date;
 		windowLabel: string;
@@ -40,6 +42,7 @@
 	);
 
 	const loader = new Loader<Data>(async () => {
+		if (!scope) return null;
 		// Buckets end on the window's end, so the last bar is the latest five minutes.
 		const firstEnd = new Date(start.getTime() + STEP * 1000);
 		const [range, list] = await Promise.all([
@@ -75,8 +78,14 @@
 		return { buckets, pods };
 	});
 
-	onMount(() => {
-		loader.load();
+	// A new window starts from the loading card; the page remounts this for a new node or namespace.
+	$effect(() => {
+		void [start.getTime(), end.getTime()];
+		if (!scope) return;
+		untrack(() => {
+			loader.reset();
+			loader.load();
+		});
 	});
 
 	const total = $derived((loader.data?.pods ?? []).reduce((s, p) => s + p.count, 0));
@@ -113,13 +122,16 @@
 				<div class="flex h-24 items-end gap-[3px]" aria-hidden="true">
 					{#each loader.data?.buckets ?? [] as bucket (bucket.t)}
 						<span
-							class="min-w-px flex-1 rounded-t-[2px] {bucket.v > 0 ? 'bg-chart-4' : 'bg-muted'}"
+							class={cn(
+								'min-w-px flex-1 rounded-t-[2px]',
+								bucket.v > 0 ? 'bg-chart-4' : 'bg-muted'
+							)}
 							style:height="{bucket.v > 0 ? Math.max(8, (bucket.v / max) * 100) : 2}%"
 							title="{time(bucket.t)} · {bucket.v}"
 						></span>
 					{/each}
 				</div>
-				<div class="mt-2 flex justify-between text-[11px] text-muted-foreground {NUM}">
+				<div class={cn('mt-2 flex justify-between text-[11px] text-muted-foreground', NUM)}>
 					{#each ticks as tick (tick.t)}
 						<span>{time(tick.t)}</span>
 					{/each}
@@ -140,7 +152,7 @@
 										: ''}
 								</span>
 							</span>
-							<span class="shrink-0 text-sm font-[550] {NUM}">{fmt(pod.count)}</span>
+							<span class={cn('shrink-0 text-sm font-[550]', NUM)}>{fmt(pod.count)}</span>
 						</li>
 					{/each}
 				</ul>

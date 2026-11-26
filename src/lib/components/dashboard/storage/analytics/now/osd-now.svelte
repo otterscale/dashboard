@@ -2,13 +2,9 @@
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { untrack } from 'svelte';
 
-	import {
-		fetchInstant,
-		type Sample,
-		scalar
-	} from '$lib/components/dashboard/cluster/analytics/lib/fetch';
-	import { Loader } from '$lib/components/dashboard/cluster/analytics/lib/loader.svelte';
 	import type { WidgetState } from '$lib/components/dashboard/kit';
+	import { fetchInstant, type Sample, scalar } from '$lib/components/dashboard/kit/fetch';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
 	import { m } from '$lib/messages';
 
 	import { osdLevel } from '../../overview/ceph';
@@ -118,7 +114,7 @@
 		label={m.storage_pgs()}
 		state={ready}
 		value={fmtWhole(osd?.pgs)}
-		tone={manyPgs(osd?.pgs, cluster.avgPgs) ? 'text-chart-1' : ''}
+		tone={manyPgs(osd?.pgs, cluster.avgPgs) ? 'text-chart-1' : undefined}
 		note={m.storage_an_pg_avg({ avg: fmtWhole(cluster.avgPgs) })}
 	/>
 	<Kpi
@@ -132,7 +128,7 @@
 		label={m.storage_an_write_p95()}
 		state={ready}
 		value={fmtMs(osd?.writeP95)}
-		tone={slowWrites(osd?.writeP95, cluster.writeP95) ? 'text-chart-1' : ''}
+		tone={slowWrites(osd?.writeP95, cluster.writeP95) ? 'text-chart-1' : undefined}
 		note={m.storage_an_cluster_p95({ value: fmtMs(cluster.writeP95) })}
 		tooltip={m.storage_an_p95_tooltip()}
 	/>

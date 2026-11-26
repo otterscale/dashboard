@@ -1,6 +1,7 @@
 <script lang="ts">
 	import InfoIcon from '@lucide/svelte/icons/info';
 
+	import { Chip } from '$lib/components/dashboard/kit';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 
 	// The picked pool, OSD or PVC: what kind it is, its name, a chip and a line of facts. A note
@@ -34,9 +35,7 @@
 		{/if}
 	</h2>
 	{#if name && chip}
-		<span class="rounded-full bg-muted px-2 py-0.5 text-xs leading-4 text-muted-foreground">
-			{chip}
-		</span>
+		<Chip class="leading-4">{chip}</Chip>
 	{/if}
 	{#if name && line}
 		<span class="text-[0.8125rem] text-muted-foreground">{line}</span>

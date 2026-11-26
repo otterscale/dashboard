@@ -2,6 +2,7 @@
 	import type { PrometheusDriver } from 'prometheus-query';
 
 	import { m } from '$lib/messages';
+	import { cn } from '$lib/utils';
 
 	import Capacity from './capacity.svelte';
 	import Daemons from './daemons.svelte';
@@ -31,7 +32,9 @@
 	<Capacity {client} bind:isReloading />
 	<Daemons {client} bind:isReloading />
 	<PlacementGroups {client} bind:isReloading />
-	<h2 class="{LAYOUT.full} mt-5 mb-1 text-base leading-6 font-[550]">{m.storage_performance()}</h2>
+	<h2 class={cn(LAYOUT.full, 'mt-5 mb-1 text-base leading-6 font-[550]')}>
+		{m.storage_performance()}
+	</h2>
 	<Performance {client} {start} {end} />
 	<Pools {client} bind:isReloading />
 </div>

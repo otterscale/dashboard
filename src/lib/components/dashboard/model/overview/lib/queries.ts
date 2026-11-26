@@ -1,3 +1,4 @@
+import type { Sample } from '$lib/components/dashboard/kit/fetch';
 import { escapePromqlStringLiteral, vllmMetricWithSelector } from '$lib/prometheus';
 
 import { modelKey, modelKeyFromLabels, type ModelRow } from './models';
@@ -80,8 +81,7 @@ export function desiredQuery(namespace: string, deployments: string[]): string |
 	return `max by (namespace, deployment) (kube_deployment_spec_replicas{${parts.join(',')}})`;
 }
 
-/** A sample from an instant vector: its labels and its value. */
-export type Sample = { labels: Record<string, string>; value: number };
+export type { Sample };
 
 /** Fold samples into one value per model key; NaN (an idle histogram) counts as no value. */
 export function byModel(samples: Sample[], combine: 'sum' | 'max'): Map<string, number> {
@@ -205,4 +205,33 @@ export function workspaceByNamespace(objects: unknown[]): Record<string, string>
 		if (typeof name === 'string' && name && typeof ns === 'string' && ns) out[ns] = name;
 	}
 	return out;
+}
+
+/** The least of the Resource API this page needs, so the listing is tested without a transport. */
+type ResourceLister = {
+	list(request: {
+		cluster: string;
+		group: string;
+		version: string;
+		resource: string;
+		namespace: string;
+	}): Promise<{ items: { object?: unknown }[] }>;
+};
+
+/** The LLMInferenceServices of a namespace ('' for all); rejects when the list cannot be read. */
+export async function listManagedModels(
+	client: ResourceLister,
+	cluster: string,
+	namespace: string
+): Promise<ManagedModel[]> {
+	const response = await client.list({
+		cluster,
+		group: 'serving.kserve.io',
+		version: 'v1alpha2',
+		resource: 'llminferenceservices',
+		namespace
+	});
+	return response.items
+		.map((item) => managedModelFromObject(item.object))
+		.filter((x): x is ManagedModel => x !== undefined);
 }

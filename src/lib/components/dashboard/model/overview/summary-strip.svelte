@@ -1,11 +1,11 @@
 <script lang="ts" module>
-	import type { Tone } from './lib/models';
+	import type { Tone } from '$lib/components/dashboard/kit';
 
 	export type SummaryItem = { label: string; value: string; note?: string; tone?: Tone };
 </script>
 
 <script lang="ts">
-	import { NUM, type WidgetState } from '$lib/components/dashboard/kit';
+	import { NUM, TONE_TEXT, type WidgetState } from '$lib/components/dashboard/kit';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
 	import { cn } from '$lib/utils';
@@ -14,13 +14,6 @@
 	// it asks for a look; the line under it says why.
 	let { items, state, label }: { items: SummaryItem[]; state: WidgetState; label: string } =
 		$props();
-
-	const toneClass: Record<Tone, string> = {
-		ok: 'text-chart-2',
-		warn: 'text-chart-1',
-		bad: 'text-destructive',
-		muted: 'text-muted-foreground'
-	};
 </script>
 
 <section
@@ -49,7 +42,7 @@
 					class={cn(
 						'mt-1 truncate text-[1.75rem] leading-8 font-[350] tracking-tight',
 						NUM,
-						item.tone && toneClass[item.tone]
+						item.tone && TONE_TEXT[item.tone]
 					)}
 				>
 					{item.value}

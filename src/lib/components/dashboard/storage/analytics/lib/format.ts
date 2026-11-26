@@ -1,18 +1,11 @@
+import { formatDuration } from '$lib/components/dashboard/kit/format';
 import { m } from '$lib/messages';
 
-import { formatDuration } from '../../../cluster/overview/format';
 import type { Growth } from '../../overview/ceph';
-import { DASH, fmtBytes } from '../../overview/format';
+import { DASH, fmtBytes, fmtCount, fmtGrowth } from '../../overview/format';
 
-export { formatDuration as fmtAgo };
-
-/** "+18.0 GiB/day", "Flat", or a dash when there is no estimate. */
-export function fmtGrowth(growth: Growth | undefined): string {
-	if (!growth) return DASH;
-	if (growth.kind === 'flat') return m.storage_growth_flat();
-	const sign = growth.kind === 'growing' ? '+' : '';
-	return m.storage_per_day({ value: `${sign}${fmtBytes(growth.perDay)}` });
-}
+// The same formats under the names Analytics reads them by.
+export { formatDuration as fmtAgo, fmtGrowth, fmtCount as fmtWhole };
 
 /** The growth without "/day", for a card that says "per day" underneath. */
 export function fmtGrowthAmount(growth: Growth): string {
@@ -30,12 +23,6 @@ const NAMES: Record<string, string> = {
 export function cephName(value: string | undefined): string {
 	if (!value) return DASH;
 	return NAMES[value.toLowerCase()] ?? value;
-}
-
-/** A count with thousands separators and no decimals. */
-export function fmtWhole(value: number | undefined): string {
-	if (value === undefined || !Number.isFinite(value)) return DASH;
-	return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value);
 }
 
 /** "Oct 28", with the year when it is not this year. */

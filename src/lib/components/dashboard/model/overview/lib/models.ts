@@ -3,8 +3,11 @@
  * (status, order, colours, number formats) are tested without a browser.
  */
 
-/** An em dash: the value for "nothing to show here". */
-export const DASH = '—';
+import { DASH } from '$lib/components/dashboard/kit/format';
+import type { Tone } from '$lib/components/dashboard/kit/tone';
+
+export { DASH };
+export type { Tone };
 
 /** KV cache levels, in percent of the busiest pod. */
 export const KV_WARN = 80;
@@ -66,7 +69,6 @@ export type ModelRow = {
 };
 
 export type ModelState = 'starting' | 'queueing' | 'idle' | 'serving';
-export type Tone = 'ok' | 'warn' | 'bad' | 'muted';
 
 export type ModelStatus = { state: ModelState; tone: Tone };
 

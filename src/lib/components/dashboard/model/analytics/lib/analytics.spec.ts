@@ -7,7 +7,7 @@ import {
 	byNode,
 	commandWords,
 	engineVersion,
-	fmtTokens,
+	fmtContextTokens,
 	imageText,
 	nodeTags,
 	parseHamiAllocation,
@@ -167,10 +167,10 @@ describe('pods', () => {
 	});
 
 	it('formats token counts and GPU names', () => {
-		expect(fmtTokens('32768')).toBe('32K');
-		expect(fmtTokens('262144')).toBe('256K');
-		expect(fmtTokens('8000')).toBe('8K');
-		expect(fmtTokens('None')).toBeUndefined();
+		expect(fmtContextTokens('32768')).toBe('32K');
+		expect(fmtContextTokens('262144')).toBe('256K');
+		expect(fmtContextTokens('8000')).toBe('8K');
+		expect(fmtContextTokens('None')).toBeUndefined();
 		expect(shortGpuName('NVIDIA RTX PRO 6000 Blackwell Server Edition')).toBe(
 			'RTX PRO 6000 Blackwell'
 		);

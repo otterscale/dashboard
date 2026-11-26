@@ -2,18 +2,17 @@
 	import type { InstantVector, PrometheusDriver } from 'prometheus-query';
 	import { untrack } from 'svelte';
 
-	import { fetchInstant, scalar } from '$lib/components/dashboard/cluster/analytics/lib/fetch';
-	import { Loader } from '$lib/components/dashboard/cluster/analytics/lib/loader.svelte';
-	import { NUM, Panel } from '$lib/components/dashboard/kit';
+	import { NUM, Panel, type Tone, TONE_TEXT } from '$lib/components/dashboard/kit';
+	import { fetchInstant, scalar } from '$lib/components/dashboard/kit/fetch';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
 	import { classifyThreshold, type SharedMetrics } from '$lib/prometheus';
 	import { cn } from '$lib/utils';
 
-	import { DASH, fmtCount, type Tone } from '../overview/lib/models';
+	import { DASH, fmtCount } from '../overview/lib/models';
 	import type { ModelPods } from './lib/model-pods';
 	import { healthQueries, splitKey } from './lib/queries';
-	import { TONE_TEXT } from './lib/ranking';
 
 	// Health: faults in the last 24 hours across every pod of the model. Zero is healthy, anything
 	// more is worth a look. Preemptions are not faults (vLLM's own back-pressure), so they sit with

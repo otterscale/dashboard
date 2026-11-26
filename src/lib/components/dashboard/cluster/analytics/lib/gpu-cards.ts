@@ -1,10 +1,15 @@
-import { MIB } from './format';
+import { MIB } from '$lib/components/dashboard/kit/format';
 
 /**
  * Below this, a gap between DCGM and HAMi is rounding: DCGM reports whole MiB and an idle card
  * shows a few MiB used by the driver. Same tolerance as the overview's GPU governance check.
  */
 export const OUTSIDE_TOLERANCE_BYTES = 256 * MIB;
+
+/** DCGM's `modelName` without the vendor, which every card on the page shares. */
+export function gpuModelName(model: string | undefined): string {
+	return (model ?? '').replace(/^NVIDIA\s+/, '');
+}
 
 export type CardInput = {
 	uuid: string;

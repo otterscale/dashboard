@@ -4,16 +4,15 @@
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { getContext, untrack } from 'svelte';
 
+	import { TONE_TEXT } from '$lib/components/dashboard/kit';
 	import {
 		fetchInstant,
 		fetchRange,
 		rangeLiteral,
 		stepFor
-	} from '$lib/components/dashboard/cluster/analytics/lib/fetch';
-	import { Loader } from '$lib/components/dashboard/cluster/analytics/lib/loader.svelte';
-	import RankingCard, {
-		type RankRow
-	} from '$lib/components/dashboard/cluster/analytics/ranking-card.svelte';
+	} from '$lib/components/dashboard/kit/fetch';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
+	import RankingCard, { type RankRow } from '$lib/components/dashboard/kit/ranking-card.svelte';
 	import { m } from '$lib/messages';
 
 	import {
@@ -28,8 +27,8 @@
 		byModel,
 		desiredByDeployment,
 		desiredQuery,
-		type ManagedModel,
-		managedModelFromObject
+		listManagedModels,
+		type ManagedModel
 	} from '../overview/lib/queries';
 	import EmptyState from './empty-state.svelte';
 	import {
@@ -48,7 +47,6 @@
 		rankModels,
 		type RankTab,
 		rankValue,
-		TONE_TEXT,
 		waitingClass
 	} from './lib/ranking';
 
@@ -94,16 +92,7 @@
 
 	async function listManaged(): Promise<ManagedModel[] | undefined> {
 		try {
-			const response = await resources.list({
-				cluster,
-				group: 'serving.kserve.io',
-				version: 'v1alpha2',
-				resource: 'llminferenceservices',
-				namespace
-			});
-			return response.items
-				.map((item) => managedModelFromObject(item.object))
-				.filter((x): x is ManagedModel => x !== undefined);
+			return await listManagedModels(resources, cluster, namespace);
 		} catch (error) {
 			console.error('Failed to list LLMInferenceServices:', error);
 			return undefined;
@@ -182,7 +171,7 @@
 		void [tick, history, start.getTime(), end.getTime()];
 		untrack(async () => {
 			await values.load();
-			if (values.data) onRows(rankModels(values.data, tab));
+			if (values.data) onRows(ranked);
 		});
 	});
 	$effect(() => {

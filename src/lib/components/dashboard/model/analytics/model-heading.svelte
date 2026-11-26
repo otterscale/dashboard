@@ -1,12 +1,14 @@
 <script lang="ts">
 	import InfoIcon from '@lucide/svelte/icons/info';
 
+	import { Chip, TONE_TEXT } from '$lib/components/dashboard/kit';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
 	import { cn } from '$lib/utils';
 
-	import { fmtReplicas, type ModelState, modelStatus } from '../overview/lib/models';
-	import { quietState, type RankedModel, TONE_TEXT } from './lib/ranking';
+	import { STATE_LABEL } from '../overview/lib/labels';
+	import { fmtReplicas, modelStatus } from '../overview/lib/models';
+	import { quietState, type RankedModel } from './lib/ranking';
 
 	// The picked model: its name, namespace, status (Overview's rules and colours) and engine.
 	// A model that is still starting, or has had no request, says why at the end of the line: an
@@ -22,12 +24,6 @@
 		versionLoading?: boolean;
 	} = $props();
 
-	const stateLabel: Record<ModelState, () => string> = {
-		starting: m.model_overview_state_starting,
-		queueing: m.model_overview_state_queueing,
-		idle: m.model_overview_state_idle,
-		serving: m.model_overview_state_serving
-	};
 	const status = $derived(modelStatus(row));
 	const quiet = $derived(quietState(row));
 </script>
@@ -37,11 +33,9 @@
 		<span class="min-w-0 truncate font-mono text-xl leading-7 tracking-tight">
 			{row.name}
 		</span>
-		<span class="rounded-full bg-muted px-2 py-0.5 text-xs leading-4 text-muted-foreground">
-			{row.namespace}
-		</span>
+		<Chip>{row.namespace}</Chip>
 		<span class={cn('text-[0.8125rem] font-medium', TONE_TEXT[status.tone])}>
-			{stateLabel[status.state]()}
+			{STATE_LABEL[status.state]()}
 			{#if row.desired !== undefined}
 				<span class="tabular-nums">· {fmtReplicas(row)}</span>
 			{/if}

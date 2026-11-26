@@ -1,6 +1,6 @@
-// Spans of the overview grid, shared by the loaded page and its page-stage placeholder so the
-// two cannot drift apart. They follow the dashboard's width (a container query), not the
-// viewport's: with the sidebar open the content is narrower than the window.
+// Spans of the overview grid, kept in one place because a card that draws its own cell
+// (platform checks) needs them too. They follow the dashboard's width (a container query), not
+// the viewport's: with the sidebar open the content is narrower than the window.
 export const LAYOUT = {
 	grid: 'grid grid-cols-12 gap-2 @md:gap-3',
 	// 4 : 8 from @5xl; stacked below.

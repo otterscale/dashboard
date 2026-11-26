@@ -2,20 +2,19 @@
 	import { createClient, type Transport } from '@connectrpc/connect';
 	import { ResourceService } from '@otterscale/api/resource/v1';
 	import type { PrometheusDriver } from 'prometheus-query';
-	import { getContext, onMount } from 'svelte';
+	import { getContext, onMount, untrack } from 'svelte';
 
-	import type { WidgetState } from '$lib/components/dashboard/kit';
-	import { NUM } from '$lib/components/dashboard/kit';
+	import { Chip, Loader, NUM, type WidgetState } from '$lib/components/dashboard/kit';
 	import { m } from '$lib/messages';
 	import { getLocale } from '$lib/paraglide/runtime';
 	import { cn } from '$lib/utils';
 
 	import BreakdownTable from './breakdown-table.svelte';
 	import EmptyCard from './empty-card.svelte';
-	import HourlyChart, { type BarPoint, SOFT_FILL } from './hourly-chart.svelte';
+	import HourlyChart, { type BarPoint, type BarSeries, SOFT_FILL } from './hourly-chart.svelte';
 	import { loadDirectory } from './lib/directory';
 	import { displayRow, kindLabel, viewLabel, workspaceName } from './lib/display';
-	import { DASH, fmtCount, fmtDay, fmtPercent, fmtTokens, fmtTokensOrDash } from './lib/format';
+	import { DASH, fmtDay, fmtGrouped, fmtPercentOf, fmtTokens, fmtTokensOrDash } from './lib/format';
 	import type { UsageParams } from './lib/params';
 	import {
 		bucketSeconds,
@@ -106,56 +105,36 @@
 	// Prometheus: totals for the window, per-bucket series, and (cluster scope) whether the
 	// gateway is scraped at all. Each part fails on its own. No auto update: a new window or the
 	// refresh control's ↻ (which moves the window's end) fetches again.
-	let facts = $state.raw<UsageFact[]>([]);
-	let factsState = $state<WidgetState>('loading');
-	let series = $state.raw<SeriesFact[]>([]);
-	let seriesState = $state<WidgetState>('loading');
-	let collected = $state<boolean | undefined>(undefined);
-	let seq = 0;
-
+	const totals = new Loader<UsageFact[]>(() => fetchFacts(client, matchers, start, end));
+	const perBucket = new Loader<SeriesFact[]>(() => fetchSeries(client, matchers, buckets, step));
+	// A probe that fails answers "unknown", which reads as collected.
+	const probe = new Loader<{ collected: boolean | undefined }>(() =>
+		fetchCollected(client).then(
+			(collected) => ({ collected }),
+			() => ({ collected: undefined })
+		)
+	);
+	// Which fetch is the newest, so an older one finishing late does not end "updating".
+	let run = 0;
 	$effect(() => {
-		const id = ++seq;
-		const sel = matchers;
-		const s = start;
-		const e = end;
-		const st = step;
-		const bs = buckets;
-		factsState = 'loading';
-		seriesState = 'loading';
-		onfetching?.(true);
-		const totals = fetchFacts(client, sel, s, e)
-			.then((r) => {
-				if (id !== seq) return;
-				facts = r;
-				factsState = 'ready';
-			})
-			.catch((error) => {
-				console.warn('Usage: totals failed:', error);
-				if (id === seq) factsState = 'error';
+		void [matchers, start, end, step, buckets];
+		const probing = clusterScope;
+		untrack(() => {
+			const id = ++run;
+			totals.reset();
+			perBucket.reset();
+			onfetching?.(true);
+			void Promise.all([totals.load(), perBucket.load()]).then(() => {
+				if (id === run) onfetching?.(false);
 			});
-		const perBucket = fetchSeries(client, sel, bs, st)
-			.then((r) => {
-				if (id !== seq) return;
-				series = r;
-				seriesState = 'ready';
-			})
-			.catch((error) => {
-				console.warn('Usage: series failed:', error);
-				if (id === seq) seriesState = 'error';
-			});
-		Promise.allSettled([totals, perBucket]).then(() => {
-			if (id === seq) onfetching?.(false);
+			if (probing) void probe.load();
 		});
-		if (clusterScope) {
-			fetchCollected(client)
-				.then((c) => {
-					if (id === seq) collected = c;
-				})
-				.catch(() => {
-					if (id === seq) collected = undefined;
-				});
-		}
 	});
+	const facts = $derived(totals.data ?? []);
+	const factsState = $derived<WidgetState>(totals.state);
+	const series = $derived(perBucket.data ?? []);
+	const seriesState = $derived<WidgetState>(perBucket.state);
+	const collected = $derived(probe.data?.collected);
 
 	const summary = $derived(summarize(facts, directory, namespace));
 	const nothing = $derived(factsState === 'ready' && summary.keysUsed === 0);
@@ -237,16 +216,14 @@
 				? { tokens: m.usage_tokens_per_hour(), requests: m.usage_requests_per_hour() }
 				: { tokens: m.usage_tokens_per_5m(), requests: m.usage_requests_per_5m() }
 	);
-	const TOKEN_SERIES = $derived([
+	const TOKEN_SERIES = $derived<[BarSeries, BarSeries]>([
 		{ key: 'input', label: m.usage_input(), color: 'var(--chart-3)' },
 		{ key: 'output', label: m.usage_output(), color: SOFT_FILL }
-	] as [BarPointSeries, BarPointSeries]);
-	const REQUEST_SERIES = $derived([
+	]);
+	const REQUEST_SERIES = $derived<[BarSeries, BarSeries]>([
 		{ key: 'succeeded', label: m.usage_succeeded(), color: 'var(--chart-3)' },
 		{ key: 'failed', label: m.usage_failed(), color: 'var(--destructive)' }
-	] as [BarPointSeries, BarPointSeries]);
-	type BarPointSeries = { key: string; label: string; color: string };
-	const fmtRequests = (v: number) => fmtCount(v);
+	]);
 
 	const summaryItems = $derived.by(() => {
 		const t = summary.totals;
@@ -254,23 +231,23 @@
 			everywhere && !namespace
 				? {
 						label: m.usage_workspaces(),
-						value: fmtCount(summary.workspaces),
+						value: fmtGrouped(summary.workspaces),
 						note: m.usage_workspaces_note()
 					}
 				: {
 						label: m.usage_models_used(),
-						value: fmtCount(summary.models),
+						value: fmtGrouped(summary.models),
 						note: m.usage_models_note({ workspace: workspaceName(directory, namespace) })
 					};
 		return [
 			{
 				label: m.usage_requests(),
-				value: fmtCount(t.requests),
+				value: fmtGrouped(t.requests),
 				note:
 					t.requests > 0
 						? m.usage_failed_note({
-								count: fmtCount(t.failed),
-								percent: fmtPercent(t.failed, t.requests)
+								count: fmtGrouped(t.failed),
+								percent: fmtPercentOf(t.failed, t.requests)
 							})
 						: m.usage_no_requests(),
 				noteClass: failedIsHigh(t) ? 'text-chart-1' : undefined
@@ -287,12 +264,12 @@
 			},
 			{
 				label: m.usage_api_keys_used(),
-				value: fmtCount(summary.keysUsed),
+				value: fmtGrouped(summary.keysUsed),
 				note:
 					summary.keysTotal === null
 						? usersLabel(summary.users)
 						: m.usage_keys_note({
-								total: fmtCount(summary.keysTotal),
+								total: fmtGrouped(summary.keysTotal),
 								users: usersLabel(summary.users)
 							})
 			},
@@ -304,14 +281,14 @@
 	const detailItems = $derived(
 		selTotals
 			? [
-					{ label: m.usage_requests(), value: fmtCount(selTotals.requests) },
+					{ label: m.usage_requests(), value: fmtGrouped(selTotals.requests) },
 					{ label: m.usage_input_tokens(), value: fmtTokensOrDash(selTotals.input) },
 					{ label: m.usage_cached_input(), value: fmtTokensOrDash(selTotals.cached) },
 					{ label: m.usage_output_tokens(), value: fmtTokensOrDash(selTotals.output) },
 					{ label: m.usage_reasoning(), value: fmtTokensOrDash(selTotals.reasoning) },
 					{
 						label: m.usage_failed(),
-						value: selTotals.failed > 0 ? fmtCount(selTotals.failed) : DASH
+						value: selTotals.failed > 0 ? fmtGrouped(selTotals.failed) : DASH
 					}
 				]
 			: []
@@ -337,7 +314,7 @@
 				: m.usage_empty_title_range()
 	);
 	function usersLabel(n: number): string {
-		return n === 1 ? m.usage_user_count_one() : m.usage_user_count({ count: fmtCount(n) });
+		return n === 1 ? m.usage_user_count_one() : m.usage_user_count({ count: fmtGrouped(n) });
 	}
 	function spanLabel(min: number): string {
 		if (min <= 48 * 60 && min % 60 === 0) {
@@ -352,9 +329,34 @@
 		}
 		return m.time_range_span_minutes({ count: String(min) });
 	}
-
-	const chartsGrid = 'grid gap-3 @4xl:grid-cols-5';
 </script>
+
+<!-- Tokens and requests per bucket, for everything in view and again for the selected row. -->
+{#snippet charts(data: { tokens: BarPoint[]; requests: BarPoint[] })}
+	<div class="grid gap-3 @4xl:grid-cols-5">
+		<div class="min-w-0 @4xl:col-span-3">
+			<HourlyChart
+				title={titles.tokens}
+				tooltip={m.usage_note_tokens()}
+				data={data.tokens}
+				series={TOKEN_SERIES}
+				format={fmtTokens}
+				state={seriesState}
+				bucketSeconds={step}
+			/>
+		</div>
+		<div class="min-w-0 @4xl:col-span-2">
+			<HourlyChart
+				title={titles.requests}
+				data={data.requests}
+				series={REQUEST_SERIES}
+				format={fmtGrouped}
+				state={seriesState}
+				bucketSeconds={step}
+			/>
+		</div>
+	</div>
+{/snippet}
 
 <!-- `@container`: the layout follows this element's width, not the viewport's. -->
 <div class="@container flex flex-col gap-3 pb-8">
@@ -368,29 +370,7 @@
 			onLonger={onLongerRange}
 		/>
 	{:else}
-		<div class={chartsGrid}>
-			<div class="min-w-0 @4xl:col-span-3">
-				<HourlyChart
-					title={titles.tokens}
-					tooltip={m.usage_note_tokens()}
-					data={allCharts.tokens}
-					series={TOKEN_SERIES}
-					format={fmtTokens}
-					state={seriesState}
-					bucketSeconds={step}
-				/>
-			</div>
-			<div class="min-w-0 @4xl:col-span-2">
-				<HourlyChart
-					title={titles.requests}
-					data={allCharts.requests}
-					series={REQUEST_SERIES}
-					format={fmtRequests}
-					state={seriesState}
-					bucketSeconds={step}
-				/>
-			</div>
-		</div>
+		{@render charts(allCharts)}
 
 		<UsageRanking
 			{views}
@@ -417,9 +397,7 @@
 						{selected.label}
 					</h2>
 					{#each selected.chips as chip (chip)}
-						<span class="rounded-full bg-muted px-2 py-0.5 text-xs leading-4 text-muted-foreground">
-							{chip}
-						</span>
+						<Chip>{chip}</Chip>
 					{/each}
 					<span class="min-w-0 truncate text-sm text-muted-foreground">{selected.sub}</span>
 				</div>
@@ -447,29 +425,7 @@
 					</dl>
 				{/if}
 
-				<div class={chartsGrid}>
-					<div class="min-w-0 @4xl:col-span-3">
-						<HourlyChart
-							title={titles.tokens}
-							tooltip={m.usage_note_tokens()}
-							data={selCharts.tokens}
-							series={TOKEN_SERIES}
-							format={fmtTokens}
-							state={seriesState}
-							bucketSeconds={step}
-						/>
-					</div>
-					<div class="min-w-0 @4xl:col-span-2">
-						<HourlyChart
-							title={titles.requests}
-							data={selCharts.requests}
-							series={REQUEST_SERIES}
-							format={fmtRequests}
-							state={seriesState}
-							bucketSeconds={step}
-						/>
-					</div>
-				</div>
+				{@render charts(selCharts)}
 
 				{#each breakdowns as table (table.by)}
 					<BreakdownTable

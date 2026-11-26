@@ -5,11 +5,9 @@
 	import { getContext, onMount, untrack } from 'svelte';
 
 	import { page } from '$app/state';
-	import { fetchInstant } from '$lib/components/dashboard/cluster/analytics/lib/fetch';
-	import { Loader } from '$lib/components/dashboard/cluster/analytics/lib/loader.svelte';
-	import RankingCard, {
-		type RankRow
-	} from '$lib/components/dashboard/cluster/analytics/ranking-card.svelte';
+	import { fetchInstant } from '$lib/components/dashboard/kit/fetch';
+	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
+	import RankingCard, { type RankRow } from '$lib/components/dashboard/kit/ranking-card.svelte';
 	import { m } from '$lib/messages';
 
 	import { FULL_IN_WARN_DAYS, osdLevel, rawLevel } from '../overview/ceph';
@@ -275,16 +273,19 @@
 		};
 	});
 
-	// A pick that is not in the list (gone, or from an old link) falls back to the first row.
-	$effect(() => {
-		const ids = view.rows.map((row) => row.id);
-		const current = untrack(() => selected[dim]);
-		if (ids.length > 0 && (!current || !ids.includes(current))) selected[dim] = ids[0];
+	// What is shown as picked. A pick that is not in the list (none yet, gone, or from an old
+	// link) falls back to the first row; `selected` keeps only what the viewer or the link chose.
+	const pickFrom = (rows: RankRow[], wanted: string | undefined) =>
+		rows.length === 0 || rows.some((row) => row.id === wanted) ? wanted : rows[0].id;
+	const picked = $derived<Record<Dim, string | undefined>>({
+		pool: pickFrom(poolRows, selected.pool),
+		osd: pickFrom(osdRows, selected.osd),
+		pvc: pickFrom(pvcRows, selected.pvc)
 	});
 
-	const pool = $derived(poolList.find((p) => p.name === selected.pool));
-	const osd = $derived(osdList.find((o) => o.id === selected.osd));
-	const pvc = $derived(pvcList.find((p) => p.key === selected.pvc));
+	const pool = $derived(poolList.find((p) => p.name === picked.pool));
+	const osd = $derived(osdList.find((o) => o.id === picked.osd));
+	const pvc = $derived(pvcList.find((p) => p.key === picked.pvc));
 	const poolPvcs = $derived(pool ? pvcList.filter((p) => p.poolId === pool.id) : []);
 
 	const heading = $derived.by(() => {
@@ -330,7 +331,6 @@
 		};
 	});
 
-	const rangeKey = $derived(`${start.getTime()}-${end.getTime()}`);
 	const noRows = $derived(view.state !== 'loading' && view.rows.length === 0);
 </script>
 
@@ -348,7 +348,7 @@
 		headers={view.headers}
 		rows={view.rows}
 		state={view.state}
-		selected={selected[dim]}
+		selected={picked[dim]}
 		onSelect={(id) => (selected[dim] = id)}
 		history={false}
 		limit={view.rows.length > 12 ? 10 : undefined}
@@ -360,18 +360,9 @@
 	{#if !noRows}
 		<Heading {...heading} />
 		{#if dim === 'pool'}
-			{#key selected.pool}
+			{#key picked.pool}
 				{#if history}
-					{#key rangeKey}
-						<PoolHistory
-							{client}
-							poolId={pool?.id}
-							state={pools.state}
-							{start}
-							{end}
-							{windowLabel}
-						/>
-					{/key}
+					<PoolHistory {client} poolId={pool?.id} state={pools.state} {start} {end} {windowLabel} />
 				{:else}
 					<PoolNow
 						{client}
@@ -386,30 +377,26 @@
 				{/if}
 			{/key}
 		{:else if dim === 'osd'}
-			{#key selected.osd}
+			{#key picked.osd}
 				{#if history}
-					{#key rangeKey}
-						<OsdHistory
-							{client}
-							osd={osd?.id}
-							cluster={osdCluster}
-							osdCount={osdList.length}
-							state={osds.state}
-							{start}
-							{end}
-							{windowLabel}
-						/>
-					{/key}
+					<OsdHistory
+						{client}
+						osd={osd?.id}
+						cluster={osdCluster}
+						osdCount={osdList.length}
+						state={osds.state}
+						{start}
+						{end}
+						{windowLabel}
+					/>
 				{:else}
 					<OsdNow {client} {tick} {osd} cluster={osdCluster} state={osds.state} />
 				{/if}
 			{/key}
 		{:else}
-			{#key selected.pvc}
+			{#key picked.pvc}
 				{#if history}
-					{#key rangeKey}
-						<PvcHistory {client} {pvc} state={pvcs.state} {start} {end} {windowLabel} />
-					{/key}
+					<PvcHistory {client} {pvc} state={pvcs.state} {start} {end} {windowLabel} />
 				{:else}
 					<PvcNow
 						{pvc}

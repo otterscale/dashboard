@@ -31,8 +31,8 @@
 		type InstantField,
 		instantQueries,
 		kvQuery,
+		listManagedModels,
 		type ManagedModel,
-		managedModelFromObject,
 		rpsQuery,
 		type Sample,
 		workspaceByNamespace
@@ -76,7 +76,7 @@
 	const SPARK_STEP = 120;
 
 	let loaded = $state(false);
-	let managed = $state<ManagedModel[] | undefined>(undefined);
+	let managed = $state.raw<ManagedModel[] | undefined>(undefined);
 	let apiFailed = $state(false);
 	let metrics = $state.raw<Partial<Record<InstantField, Map<string, number>>>>({});
 	let promFailed = $state(false);
@@ -99,19 +99,6 @@
 				.map((v) => ({ time: new Date(v.time).getTime(), value: Number(v.value) }))
 				.filter((p) => Number.isFinite(p.value))
 		}));
-	}
-
-	async function listManaged(): Promise<ManagedModel[]> {
-		const response = await client.list({
-			cluster,
-			group: 'serving.kserve.io',
-			version: 'v1alpha2',
-			resource: 'llminferenceservices',
-			namespace
-		});
-		return response.items
-			.map((item) => managedModelFromObject(item.object))
-			.filter((x): x is ManagedModel => x !== undefined);
 	}
 
 	// With every namespace in view, each row says which Workspace it belongs to. Anywhere else the
@@ -149,7 +136,7 @@
 		const step = computeStep(startMs, endMs);
 
 		const [api, rps, kv, spark, ...instant] = await Promise.allSettled([
-			listManaged(),
+			listManagedModels(client, cluster, namespace),
 			prometheusDriver.rangeQuery(rpsQuery(namespace), startMs, endMs, step),
 			prometheusDriver.rangeQuery(kvQuery(namespace), startMs, endMs, step),
 			prometheusDriver.rangeQuery(rpsQuery(namespace), endMs - HOUR, endMs, SPARK_STEP),

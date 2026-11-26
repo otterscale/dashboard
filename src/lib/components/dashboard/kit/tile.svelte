@@ -8,7 +8,7 @@
 	import { m } from '$lib/messages';
 	import { cn } from '$lib/utils';
 
-	import type { WidgetState } from './index';
+	import { NUM, type WidgetState } from './index';
 
 	// One key number: a small label, the number, and a line of context. Fixed height, so the
 	// loading and empty states take exactly the room the number will.
@@ -69,7 +69,7 @@
 			<Tooltip.Root>
 				<Tooltip.Trigger
 					class="-my-1 shrink-0 rounded-sm text-current opacity-60 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-					aria-label={label}
+					aria-label="{m.information()}: {label}"
 				>
 					<InfoIcon class="size-3.5" />
 				</Tooltip.Trigger>
@@ -98,7 +98,8 @@
 		{:else}
 			<div
 				class={cn(
-					'truncate tracking-tight slashed-zero tabular-nums',
+					'truncate tracking-tight',
+					NUM,
 					sm
 						? 'text-xl leading-7'
 						: tone !== 'default'

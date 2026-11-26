@@ -91,7 +91,9 @@
 		label={m.storage_col_full_in()}
 		state={ready}
 		value={fullInKpi.value}
-		tone={pvc?.fullIn !== undefined && pvc.fullIn < PVC_FULL_IN_WARN_DAYS ? 'text-chart-1' : ''}
+		tone={pvc?.fullIn !== undefined && pvc.fullIn < PVC_FULL_IN_WARN_DAYS
+			? 'text-chart-1'
+			: undefined}
 		note={fullInKpi.note}
 	/>
 	<Kpi
@@ -100,7 +102,7 @@
 		value={files.kind === 'count' ? fmtWhole(files.used) : DASH}
 		tone={files.kind === 'count' && files.pct !== undefined && filesLevel(files.pct) !== 'green'
 			? LEVEL_TEXT[filesLevel(files.pct)]
-			: ''}
+			: undefined}
 		note={files.kind === 'count'
 			? files.total !== undefined && files.pct !== undefined
 				? m.storage_an_files_note({ pct: fmtPct(files.pct), total: fmtWhole(files.total) })

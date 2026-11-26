@@ -1,7 +1,8 @@
+import { formatDuration } from '$lib/components/dashboard/kit/format';
+import { TONE_DOT, TONE_TEXT } from '$lib/components/dashboard/kit/tone';
 import { m } from '$lib/messages';
 
-import { formatDuration } from '../../cluster/overview/format';
-import { DAY, FULL_IN_CAP_DAYS, type Level, type Service } from './ceph';
+import { FULL_IN_CAP_DAYS, type Growth, type Level, type Service } from './ceph';
 
 export const DASH = '—';
 
@@ -57,6 +58,14 @@ export function niceTop(max: number): number {
 	return 2 * step * magnitude;
 }
 
+/** "+18.0 GiB/day", "Flat", or a dash when there is no estimate. */
+export function fmtGrowth(growth: Growth | undefined): string {
+	if (!growth) return DASH;
+	if (growth.kind === 'flat') return m.storage_growth_flat();
+	const sign = growth.kind === 'growing' ? '+' : '';
+	return m.storage_per_day({ value: `${sign}${fmtBytes(growth.perDay)}` });
+}
+
 /** A percentage with as many decimals as it takes to not read 0 for a sliver. */
 export function fmtPct(value: number | undefined): string {
 	if (value === undefined || !Number.isFinite(value)) return DASH;
@@ -104,20 +113,17 @@ export function fmtLeft(seconds: number): string {
 	return formatDuration(Math.max(60, seconds));
 }
 
-export function secondsToDays(seconds: number): number {
-	return seconds / DAY;
-}
-
+// Ceph's levels in the dashboards' one status scale, so the classes are named once, in the kit.
 export const LEVEL_TEXT: Record<Level, string> = {
-	green: 'text-chart-2',
-	orange: 'text-chart-1',
-	red: 'text-destructive'
+	green: TONE_TEXT.ok,
+	orange: TONE_TEXT.warn,
+	red: TONE_TEXT.bad
 };
 
 export const LEVEL_BG: Record<Level, string> = {
-	green: 'bg-chart-2',
-	orange: 'bg-chart-1',
-	red: 'bg-destructive'
+	green: TONE_DOT.ok,
+	orange: TONE_DOT.warn,
+	red: TONE_DOT.bad
 };
 
 export function serviceLabel(service: Service): string {

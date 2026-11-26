@@ -2,38 +2,25 @@
 	import CircleCheckIcon from '@lucide/svelte/icons/circle-check';
 	import CircleXIcon from '@lucide/svelte/icons/circle-x';
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
-	import { onDestroy, onMount } from 'svelte';
 
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { NUM, Panel } from '$lib/components/dashboard/kit';
+	import { Chip, NUM, Panel } from '$lib/components/dashboard/kit';
+	import { formatDuration } from '$lib/components/dashboard/kit/format';
 	import { m } from '$lib/messages';
 	import { cn } from '$lib/utils';
 
 	import { describeAlert, subjectPod } from './alert-catalog';
-	import { formatDuration } from './format';
-	import type { ClusterSignals, FiringAlert } from './signals.svelte';
+	import { Clock } from './clock';
+	import { alertKey, type ClusterSignals, type FiringAlert } from './signals.svelte';
 
 	// Firing cluster-level critical and warning alerts (alert-scope.ts), sorted by severity, then
 	// oldest first. Workload alerts belong to the workspace pages.
 	let { signals }: { signals: ClusterSignals } = $props();
 
-	let now = $state(Date.now());
-	let timer: ReturnType<typeof setInterval> | undefined;
-	onMount(() => {
-		timer = setInterval(() => (now = Date.now()), 15_000);
-	});
-	onDestroy(() => clearInterval(timer));
+	const clock = new Clock();
 
-	const cardState = $derived(
-		signals.status === 'loading'
-			? 'loading'
-			: signals.status === 'error'
-				? 'error'
-				: signals.status === 'empty'
-					? 'empty'
-					: 'ready'
-	);
+	const cardState = $derived(signals.status);
 
 	type Action = { label: string; href: string };
 
@@ -102,6 +89,8 @@
 	const items = $derived(
 		signals.alerts.map((alert) => ({
 			alert,
+			// One series per label set in ALERTS, so the labels name the row across reloads.
+			key: alertKey(alert.labels),
 			...describeAlert(alert),
 			action: actionOf(alert)
 		}))
@@ -116,11 +105,7 @@
 >
 	{#snippet badge()}
 		{#if cardState === 'ready'}
-			<span
-				class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-xs text-muted-foreground {NUM}"
-			>
-				{items.length}
-			</span>
+			<Chip class={cn('min-w-5 px-1.5', NUM)}>{items.length}</Chip>
 		{/if}
 	{/snippet}
 	{#if items.length === 0}
@@ -136,7 +121,7 @@
 	{:else}
 		<!-- Long lists scroll inside the card so the state card beside it keeps its height. -->
 		<ul class="-mx-1 max-h-[17.5rem] overflow-y-auto px-1">
-			{#each items as item, index (index)}
+			{#each items as item (item.key)}
 				{@const severity = item.alert.severity}
 				<li class="flex gap-3 border-b py-2.5 last:border-b-0">
 					{#if severity === 'critical'}
@@ -160,7 +145,7 @@
 					>
 						{#if item.alert.activeAt !== undefined}
 							<span class={cn('whitespace-nowrap text-muted-foreground', NUM)}>
-								{formatDuration(now / 1000 - item.alert.activeAt)}
+								{formatDuration(clock.now / 1000 - item.alert.activeAt)}
 							</span>
 						{/if}
 						{#if item.action}

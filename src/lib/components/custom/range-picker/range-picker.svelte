@@ -15,7 +15,6 @@
 	import * as Popover from '$lib/components/ui/popover';
 	import { m } from '$lib/messages';
 	import { getLocale } from '$lib/paraglide/runtime';
-	import { cn } from '$lib/utils';
 
 	import {
 		formatSpan,
@@ -46,7 +45,11 @@
 	const minutes = $derived(rangeMinutes(range));
 	const atNow = $derived(range.kind === 'relative');
 	const zone = getLocalTimeZone();
-	const today = todayIn(zone);
+	// Read when the popover opens: a page left open past midnight can still pick the new day.
+	const today = $derived.by(() => {
+		void open;
+		return todayIn(zone);
+	});
 
 	function lengthLabel(min: number): string {
 		if (min === 1440) return m.time_range_span_one_day();
@@ -121,17 +124,16 @@
 						{#each PRESET_MINUTES as min (min)}
 							{@const on = minutes === min}
 							<li>
-								<button
-									type="button"
+								<!-- The picked span and the hovered one share the accent ground in both modes;
+								     the ghost variant's dark hover has to be named to be beaten. -->
+								<Button
+									variant="ghost"
 									aria-pressed={on}
-									class={cn(
-										'flex min-h-9 w-full items-center rounded-md px-2 text-left text-sm transition-colors hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none',
-										on && 'bg-accent font-medium'
-									)}
+									class="w-full justify-start px-2 font-normal hover:bg-accent aria-pressed:bg-accent aria-pressed:font-medium dark:hover:bg-accent"
 									onclick={() => pickLength(min)}
 								>
 									{lengthLabel(min)}
-								</button>
+								</Button>
 							</li>
 						{/each}
 					</ul>
@@ -144,6 +146,7 @@
 						onValueChange={pickDay}
 						locale={getLocale()}
 						maxValue={today}
+						preventDeselect
 						class="px-2 pt-0 pb-1 [--cell-size:--spacing(8)]"
 					/>
 					<p class="px-2 pb-1 text-xs text-muted-foreground">

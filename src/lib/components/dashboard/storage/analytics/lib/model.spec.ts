@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Sample } from '$lib/components/dashboard/cluster/analytics/lib/fetch';
+import type { Sample } from '$lib/components/dashboard/kit/fetch';
 
 import { DAY, GIB, MIB } from '../../overview/ceph';
 import {

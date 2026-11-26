@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { PrometheusDriver } from 'prometheus-query';
-	import { onDestroy } from 'svelte';
 
 	import { afterNavigate, replaceState } from '$app/navigation';
 	import { page } from '$app/state';
@@ -16,6 +15,7 @@
 		toNow
 	} from '$lib/components/custom/range-picker';
 	import { AutoRefresh, RefreshControl, reloadNow } from '$lib/components/custom/reloader';
+	import { TAB_LIST, TAB_TRIGGER } from '$lib/components/dashboard/kit';
 	import { Overview } from '$lib/components/dashboard/storage/overview';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/messages';
@@ -82,14 +82,16 @@
 	let historyAnchor = $state(Date.now());
 
 	// replaceState throws until the router has started; afterNavigate runs once it has. A link to
-	// this page (Overview's pool names) changes only the query, so its state is read here too.
+	// this page (Overview's pool names) changes only the query, so its state is read here too;
+	// so is Back from that link, whose plain URL means Overview.
 	let routerReady = $state(false);
 	afterNavigate(({ type, to }) => {
 		routerReady = true;
 		if (type === 'enter' || !to) return;
 		const next = fromUrl(to.url.searchParams);
+		selectedTab = next.tab;
+		// An Overview URL says nothing about Analytics; the view, mode and picks stay as they were.
 		if (next.tab !== 'analytics') return;
-		selectedTab = 'analytics';
 		dim = next.dim;
 		mode = next.mode;
 		if (next.sel) selected[next.dim] = next.sel;
@@ -174,13 +176,6 @@
 		historyRange = toNow(historyRange);
 		historyAnchor = Date.now();
 	}
-
-	const TAB_LIST = 'rounded-full';
-	const TAB_TRIGGER = 'rounded-full px-3 data-active:bg-card dark:data-active:bg-card';
-
-	onDestroy(() => {
-		isReloading = false;
-	});
 </script>
 
 <!-- `@container`: every layout below follows this element's width, not the viewport's. -->
