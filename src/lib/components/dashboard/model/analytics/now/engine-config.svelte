@@ -10,7 +10,7 @@
 
 	import { DASH } from '../../overview/lib/models';
 	import type { ModelPods } from '../lib/model-pods';
-	import { argValue, engineVersion, fmtTokens, imageText, shortGpuName } from '../lib/pods';
+	import { argValue, engineVersion, fmtContextTokens, imageText, shortGpuName } from '../lib/pods';
 	import { engineConfigQueries } from '../lib/queries';
 
 	// The engine and how it is set up: the version and image from the pod spec, parallelism and
@@ -90,7 +90,7 @@
 		{ label: m.model_analytics_gpus_per_replica(), value: gpusText() },
 		{
 			label: m.model_analytics_max_model_len(),
-			value: (pod && fmtTokens(argValue(pod.argv, '--max-model-len'))) ?? DASH
+			value: (pod && fmtContextTokens(argValue(pod.argv, '--max-model-len'))) ?? DASH
 		},
 		{
 			label: m.model_analytics_prefix_caching(),

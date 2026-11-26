@@ -14,13 +14,23 @@
 		sum
 	} from '$lib/components/dashboard/kit/format';
 	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
+	import * as Table from '$lib/components/ui/table';
 	import { m } from '$lib/messages';
+	import { cn } from '$lib/utils';
 
 	import { namespaceNowQueries } from '../lib/promql';
 
 	// Namespace detail, Now: five numbers, its pods, and its volumes. One request feeds all three.
-	let { client, tick, namespace }: { client: PrometheusDriver; tick: number; namespace: string } =
-		$props();
+	let {
+		client,
+		tick,
+		namespace
+	}: {
+		client: PrometheusDriver;
+		tick: number;
+		/** Left out while the page has no namespace yet: the cards then wait in their loading state. */
+		namespace: string | undefined;
+	} = $props();
 
 	type Pod = {
 		pod: string;
@@ -45,6 +55,7 @@
 	};
 
 	const loader = new Loader<Data>(async () => {
+		if (!namespace) return null;
 		const r = await fetchInstant(client, namespaceNowQueries(namespace));
 		if (!r) return null;
 		const maps = (
@@ -86,6 +97,7 @@
 
 	$effect(() => {
 		void tick;
+		if (!namespace) return;
 		untrack(() => loader.load());
 	});
 
@@ -99,11 +111,15 @@
 	const podsState = $derived(
 		loader.state === 'ready' && (d?.pods.length ?? 0) === 0 ? 'empty' : loader.state
 	);
-	const cell = 'px-2.5 py-2.5 text-right whitespace-nowrap';
+	// The vendored table at this card's density: 13px, tighter rows, no row hover.
+	const ROW = 'border-border/60 hover:bg-transparent';
+	const HEAD = 'h-auto px-2.5 py-2 text-right whitespace-normal text-muted-foreground';
+	const CELL = 'px-2.5 py-2.5 text-right';
+	const DIVIDED = 'border-l border-border';
 </script>
 
 {#snippet figure(value: string, unit: string, note: string)}
-	<p class="truncate text-[1.75rem] leading-8 tracking-tight {NUM}">
+	<p class={cn('truncate text-[1.75rem] leading-8 tracking-tight', NUM)}>
 		{value}<span class="ml-1 text-sm tracking-normal text-muted-foreground">{unit}</span>
 	</p>
 	<p class="mt-1 truncate text-xs leading-4 text-muted-foreground" title={note}>{note}</p>
@@ -175,56 +191,49 @@
 		{#snippet actions()}
 			<span class="mt-1.5 mr-1 text-xs text-muted-foreground">{m.analytics_pods_units()}</span>
 		{/snippet}
-		<div class="-mx-1 overflow-x-auto px-1">
-			<table class="w-full min-w-[36rem] border-collapse text-[0.8125rem] {NUM}">
-				<thead class="text-xs text-muted-foreground">
-					<tr class="border-b border-border">
-						<th class="px-2.5 py-2 text-left font-medium">{m.analytics_pod()}</th>
-						<th class="px-2.5 py-2 text-left font-medium">{m.analytics_node()}</th>
-						<th class="border-l border-border px-2.5 py-2 text-right font-medium"
-							>{m.analytics_cpu()}</th
-						>
-						<th class="px-2.5 py-2 text-right font-medium">{m.analytics_req()}</th>
-						<th class="px-2.5 py-2 text-right font-medium">{m.analytics_lim()}</th>
-						<th class="border-l border-border px-2.5 py-2 text-right font-medium"
-							>{m.analytics_mem()}</th
-						>
-						<th class="px-2.5 py-2 text-right font-medium">{m.analytics_req()}</th>
-						<th class="px-2.5 py-2 text-right font-medium">{m.analytics_lim()}</th>
-						<th class="border-l border-border px-2.5 py-2 text-right font-medium"
-							>{m.analytics_gpus()}</th
-						>
-					</tr>
-				</thead>
-				<tbody>
-					{#each d?.pods ?? [] as pod (pod.pod)}
-						<tr class="border-b border-border/60 last:border-b-0">
-							<td class="max-w-[14rem] px-2.5 py-2.5">
-								<span class="block truncate font-mono text-xs" title={pod.pod}>{pod.pod}</span>
-							</td>
-							<td class="max-w-[8rem] px-2.5 py-2.5">
-								<span
-									class="block truncate font-mono text-xs text-muted-foreground"
-									title={pod.node}>{pod.node || DASH}</span
-								>
-							</td>
-							<td class="{cell} border-l border-border">{fmtCores(pod.cpu[0])}</td>
-							<td class={cell}>{fmtCores(pod.cpu[1])}</td>
-							<td class={cell}>{fmtCores(pod.cpu[2])}</td>
-							<td class="{cell} border-l border-border">{fmtGiB(pod.memory[0])}</td>
-							<td class={cell}>{fmtGiB(pod.memory[1])}</td>
-							<td class={cell}>{fmtGiB(pod.memory[2])}</td>
-							<td class="{cell} border-l border-border">{pod.gpus > 0 ? fmt(pod.gpus) : DASH}</td>
-						</tr>
-					{/each}
-				</tbody>
-			</table>
-		</div>
+		<Table.Root class={cn('min-w-[36rem] border-collapse text-[0.8125rem]', NUM)}>
+			<Table.Header class="text-xs">
+				<Table.Row class="hover:bg-transparent">
+					<Table.Head class={cn(HEAD, 'text-left')}>{m.analytics_pod()}</Table.Head>
+					<Table.Head class={cn(HEAD, 'text-left')}>{m.analytics_node()}</Table.Head>
+					<Table.Head class={cn(HEAD, DIVIDED)}>{m.analytics_cpu()}</Table.Head>
+					<Table.Head class={HEAD}>{m.analytics_req()}</Table.Head>
+					<Table.Head class={HEAD}>{m.analytics_lim()}</Table.Head>
+					<Table.Head class={cn(HEAD, DIVIDED)}>{m.analytics_mem()}</Table.Head>
+					<Table.Head class={HEAD}>{m.analytics_req()}</Table.Head>
+					<Table.Head class={HEAD}>{m.analytics_lim()}</Table.Head>
+					<Table.Head class={cn(HEAD, DIVIDED)}>{m.analytics_gpus()}</Table.Head>
+				</Table.Row>
+			</Table.Header>
+			<Table.Body>
+				{#each d?.pods ?? [] as pod (pod.pod)}
+					<Table.Row class={ROW}>
+						<Table.Cell class="max-w-[14rem] px-2.5 py-2.5">
+							<span class="block truncate font-mono text-xs" title={pod.pod}>{pod.pod}</span>
+						</Table.Cell>
+						<Table.Cell class="max-w-[8rem] px-2.5 py-2.5">
+							<span class="block truncate font-mono text-xs text-muted-foreground" title={pod.node}
+								>{pod.node || DASH}</span
+							>
+						</Table.Cell>
+						<Table.Cell class={cn(CELL, DIVIDED)}>{fmtCores(pod.cpu[0])}</Table.Cell>
+						<Table.Cell class={CELL}>{fmtCores(pod.cpu[1])}</Table.Cell>
+						<Table.Cell class={CELL}>{fmtCores(pod.cpu[2])}</Table.Cell>
+						<Table.Cell class={cn(CELL, DIVIDED)}>{fmtGiB(pod.memory[0])}</Table.Cell>
+						<Table.Cell class={CELL}>{fmtGiB(pod.memory[1])}</Table.Cell>
+						<Table.Cell class={CELL}>{fmtGiB(pod.memory[2])}</Table.Cell>
+						<Table.Cell class={cn(CELL, DIVIDED)}>
+							{pod.gpus > 0 ? fmt(pod.gpus) : DASH}
+						</Table.Cell>
+					</Table.Row>
+				{/each}
+			</Table.Body>
+		</Table.Root>
 	</Panel>
 
 	<Panel title={m.analytics_storage()} state={loader.state} class="min-h-72">
 		{#if (d?.volumes.length ?? 0) === 0}
-			<p class="text-[1.75rem] leading-8 text-muted-foreground" aria-hidden="true">—</p>
+			<p class="text-[1.75rem] leading-8 text-muted-foreground" aria-hidden="true">{DASH}</p>
 			<p class="text-xs leading-4 text-muted-foreground">{m.analytics_no_volumes()}</p>
 		{:else}
 			<ul class="flex flex-col gap-4">
@@ -241,10 +250,10 @@
 									>{volume.storageClass}</span
 								>
 							</span>
-							<span class="shrink-0 font-[550] {NUM} {pressureText(pct)}">{fmtPct(pct)}</span>
+							<span class={cn('shrink-0 font-[550]', NUM, pressureText(pct))}>{fmtPct(pct)}</span>
 						</div>
 						<Meter value={pct} class="mt-1.5" />
-						<p class="mt-1.5 text-xs text-muted-foreground {NUM}">
+						<p class={cn('mt-1.5 text-xs text-muted-foreground', NUM)}>
 							{volume.used !== undefined
 								? m.analytics_x_of_y_gib({ x: fmtGiB(volume.used), y: fmtGiB(volume.capacity) })
 								: m.analytics_not_mounted({ size: fmtGiB(volume.requested) })}

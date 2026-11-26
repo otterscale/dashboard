@@ -8,7 +8,9 @@
 	import { formatCapacity } from '$lib/formatter';
 	import { m } from '$lib/messages';
 	import { fetchCombinedInstantOrNull, LIVE_PODS } from '$lib/prometheus';
+	import { cn } from '$lib/utils';
 
+	import { firstNumber } from './instant';
 	import ScopeLabel from './scope-label.svelte';
 	import { scopedSum } from './signals.svelte';
 
@@ -34,7 +36,12 @@
 
 	// All four scalars come back in a single HTTP request (one `or`-unioned instant query)
 	// to keep Prometheus request fan-out low.
+	// The scope can change while a request is out, and the two answers can land in either
+	// order: one older than what is on screen is dropped.
+	let sent = 0;
+	let shown = 0;
 	async function fetch() {
+		const request = ++sent;
 		const allocatable = scopedSum(
 			'kube_node_status_allocatable{resource="memory", unit="byte"}',
 			readyOnly
@@ -45,16 +52,14 @@
 			limit: `100 * ${scopedSum(`kube_pod_container_resource_limits{resource="memory", unit="byte"} ${LIVE_PODS}`, readyOnly)} / ${allocatable}`,
 			allocatable
 		});
+		if (request < shown) return;
+		shown = request;
 		failed = r === null;
 		if (!r) return;
-		const pick = (key: string) => {
-			const value = r[key][0]?.value?.value;
-			return value === undefined ? undefined : Number(value);
-		};
-		memoryUsage = pick('usage');
-		memoryRequest = pick('request');
-		memoryLimit = pick('limit');
-		allocatableMemory = pick('allocatable');
+		memoryUsage = firstNumber(r.usage);
+		memoryRequest = firstNumber(r.request);
+		memoryLimit = firstNumber(r.limit);
+		allocatableMemory = firstNumber(r.allocatable);
 	}
 
 	const reloadManager = new ReloadManager(fetch);
@@ -99,7 +104,7 @@
 		<ScopeLabel {readyOnly} />
 	{/snippet}
 	{@const total = formatCapacity(allocatableMemory ?? 0)}
-	<p class="text-[1.75rem] leading-8 tracking-tight {NUM}">
+	<p class={cn('text-[1.75rem] leading-8 tracking-tight', NUM)}>
 		{total.value}<span class="ml-1.5 text-sm tracking-normal text-muted-foreground"
 			>{m.cluster_allocatable_unit({ unit: total.unit })}</span
 		>

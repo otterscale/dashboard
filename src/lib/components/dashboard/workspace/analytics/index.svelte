@@ -122,35 +122,58 @@
 		fetchVolumeHistory(client, namespace, start, end, step)
 	);
 
-	// The cards to ask about come with the workloads, so GPU follows that answer.
-	function loadNow() {
-		workloads.load().then(() => gpu.load());
-		pods.load();
-		volumes.load();
-	}
-	$effect(() => {
-		void [tick, history];
-		if (!history) untrack(loadNow);
-	});
-	$effect(() => {
-		void [start.getTime(), end.getTime()];
-		if (!history) return;
-		untrack(() => {
-			loadNow();
-			usageHistory.load();
-			restartHistory.load();
-			volumeHistory.load();
-		});
-	});
-
 	const entries = $derived(entriesOf(namespace, workloads.data?.workloads ?? []));
 	// A link to a workload that is gone shows the workspace, and the URL follows.
-	$effect(() => {
+	function dropMissingSelection() {
 		if (workloads.state !== 'ready' || selected === undefined) return;
 		if (selected === WORKSPACE_ID || !entries.some((entry) => entry.id === selected)) {
 			selected = undefined;
 		}
+	}
+
+	// The cards to ask about come with the workloads, so GPU follows that answer.
+	function loadNow() {
+		workloads.load().then(() => {
+			dropMissingSelection();
+			gpu.load();
+		});
+		pods.load();
+		volumes.load();
+	}
+	function loadHistory() {
+		usageHistory.load();
+		restartHistory.load();
+		volumeHistory.load();
+	}
+
+	// What the cards are asked about: now, or one window. `pods` and `volumes` answer for both, so
+	// when this changes every loader that depends on it goes back to loading; one mode's numbers
+	// never sit under the other's labels. The workload list and the GPU cards are always the
+	// present, and stay.
+	const request = $derived(history ? `history:${start.getTime()}:${end.getTime()}` : 'now');
+	let asked: string | undefined;
+	$effect(() => {
+		// Now refetches on every tick; a window is fetched once.
+		void tick;
+		const next = request;
+		// Untracked: the fetchers read props and the loaders write their own state, and none of
+		// that should re-run this effect.
+		untrack(() => {
+			const changed = next !== asked;
+			if (changed && asked !== undefined) {
+				for (const loader of [pods, volumes, usageHistory, restartHistory, volumeHistory]) {
+					loader.reset();
+				}
+			}
+			asked = next;
+			if (!history) loadNow();
+			else if (changed) {
+				loadNow();
+				loadHistory();
+			}
+		});
 	});
+
 	const entry = $derived(entries.find((e) => e.id === selected) ?? entries[0]);
 
 	const podsNow = $derived<PodNow[]>(

@@ -146,3 +146,13 @@ export function bucketFor(start: Date, end: Date, points: number, unit: number):
 	const seconds = (end.getTime() - start.getTime()) / 1000;
 	return Math.max(unit, Math.round(seconds / points / unit) * unit);
 }
+
+/** A count that may be an average: a whole number as it is, anything else to one decimal. */
+export function fmtDecimal(v: number): string {
+	return Number.isInteger(v) ? String(v) : v.toFixed(1);
+}
+
+/** A window over a day and a half reads by date, a shorter one by time. */
+export function isLongSpan(ms: number): boolean {
+	return ms > 36 * 3600_000;
+}

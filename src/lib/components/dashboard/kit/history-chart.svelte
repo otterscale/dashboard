@@ -1,4 +1,6 @@
 <script lang="ts" module>
+	import type { ChartPoint as Point } from './fetch';
+
 	export type LineStyle = 'area' | 'line' | 'dashed' | 'dotted';
 	export type ChartSeries = {
 		key: string;
@@ -10,7 +12,8 @@
 		/** Leave out of the legend, e.g. a reference level the title already names. */
 		hideLegend?: boolean;
 	};
-	export type ChartPoint = { date: Date } & Record<string, number | Date>;
+	// Defined beside `toPoints`, which builds these rows; re-exported for the chart's callers.
+	export type ChartPoint = Point;
 </script>
 
 <script lang="ts">
@@ -18,9 +21,10 @@
 	import { curveMonotoneX } from 'd3-shape';
 	import { Area, AreaChart, Circle, LinearGradient } from 'layerchart';
 
-	import { Panel, type WidgetState } from '$lib/components/dashboard/kit';
 	import * as Chart from '$lib/components/ui/chart/index.js';
-	import { Skeleton } from '$lib/components/ui/skeleton';
+
+	import { formatClock } from './format';
+	import { Panel, type WidgetState } from './index';
 
 	// History line chart: one y axis, three y ticks, five time ticks, the newest point marked.
 	// Usage is a line over a faint wash; request a thin line, limit dashed, allocatable dotted.
@@ -75,8 +79,6 @@
 		dashed: '4 3',
 		dotted: '1 3'
 	};
-	const timeFormat = (d: Date) =>
-		d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 	const span = $derived(
 		data.length > 1
 			? (data[data.length - 1].date as Date).getTime() - (data[0].date as Date).getTime()
@@ -85,12 +87,14 @@
 	const xFormat = (d: Date) =>
 		span > 36 * 3600 * 1000
 			? d.toLocaleDateString([], { month: 'short', day: 'numeric' })
-			: timeFormat(d);
+			: formatClock(d);
 	const xTicks = $derived.by(() => {
 		if (!evenTicks || data.length < 2) return 5;
 		const first = (data[0].date as Date).getTime();
 		return Array.from({ length: 5 }, (_, i) => new Date(first + (span * i) / 4));
 	});
+	// A window that answered with no series is empty, not a chart with nothing drawn.
+	const shown = $derived<WidgetState>(state === 'ready' && data.length === 0 ? 'empty' : state);
 	const areaProps = { curve: curveMonotoneX, motion: 'none' } as const;
 </script>
 
@@ -98,91 +102,86 @@
 	{title}
 	description={subtitle}
 	showDescription={subtitle !== undefined}
-	{state}
+	state={shown}
 	class="min-h-[18rem]"
 	bodyClass="pt-2"
 >
 	{#snippet actions()}
-		{#if peak && state === 'ready'}
+		{#if peak && shown === 'ready'}
 			<span class="mt-1.5 mr-1 text-xs whitespace-nowrap text-muted-foreground tabular-nums"
 				>{peak}</span
 			>
 		{/if}
 	{/snippet}
 	<div style:height="{height}px">
-		{#if data.length === 0}
-			<Skeleton class="h-full w-full rounded-lg" />
-		{:else}
-			<Chart.Container
-				{config}
-				class="aspect-auto h-full w-full [&_.lc-axis-tick-label]:fill-muted-foreground [&_.lc-grid-y-line]:stroke-border [&_.lc-text]:text-[11px]"
+		<Chart.Container
+			{config}
+			class="aspect-auto size-full [&_.lc-axis-tick-label]:fill-muted-foreground [&_.lc-grid-y-line]:stroke-border [&_.lc-text]:text-[11px]"
+		>
+			<AreaChart
+				{data}
+				x="date"
+				xScale={scaleUtc()}
+				yDomain={[0, top]}
+				seriesLayout="overlap"
+				padding={{ top: 6, right: 6, bottom: 22, left: 64 }}
+				series={colored.map((s) => ({ key: s.key, label: s.label, color: s.color }))}
+				props={{
+					area: areaProps,
+					xAxis: { ticks: xTicks, format: xFormat },
+					yAxis: { ticks: 3, format },
+					grid: { yTicks: 3 }
+				}}
 			>
-				<AreaChart
-					{data}
-					x="date"
-					xScale={scaleUtc()}
-					yDomain={[0, top]}
-					seriesLayout="overlap"
-					padding={{ top: 6, right: 6, bottom: 22, left: 64 }}
-					series={colored.map((s) => ({ key: s.key, label: s.label, color: s.color }))}
-					props={{
-						area: areaProps,
-						xAxis: { ticks: xTicks, format: xFormat },
-						yAxis: { ticks: 3, format },
-						grid: { yTicks: 3 }
-					}}
-				>
-					{#snippet marks({ context })}
-						{#each colored as s (s.key)}
-							{@const line = {
-								stroke: s.color,
-								'stroke-width': s.width ?? (s.style === 'area' ? 1.5 : 1),
-								'stroke-dasharray': dash[s.style]
-							}}
-							{#if s.style === 'area'}
-								<LinearGradient
-									stops={[
-										`color-mix(in oklab, ${s.color} 14%, transparent)`,
-										`color-mix(in oklab, ${s.color} 2%, transparent)`
-									]}
-									vertical
-								>
-									{#snippet children({ gradient })}
-										<Area seriesKey={s.key} {...areaProps} fill={gradient} {line} />
-									{/snippet}
-								</LinearGradient>
-							{:else}
-								<Area seriesKey={s.key} {...areaProps} fill="transparent" {line} />
-							{/if}
-						{/each}
-						{#if last && lead && typeof last[lead.key] === 'number'}
-							<Circle
-								cx={context.xScale(last.date)}
-								cy={context.yScale(last[lead.key])}
-								r={3}
-								fill={lead.color}
-							/>
+				{#snippet marks({ context })}
+					{#each colored as s (s.key)}
+						{@const line = {
+							stroke: s.color,
+							'stroke-width': s.width ?? (s.style === 'area' ? 1.5 : 1),
+							'stroke-dasharray': dash[s.style]
+						}}
+						{#if s.style === 'area'}
+							<LinearGradient
+								stops={[
+									`color-mix(in oklab, ${s.color} 14%, transparent)`,
+									`color-mix(in oklab, ${s.color} 2%, transparent)`
+								]}
+								vertical
+							>
+								{#snippet children({ gradient })}
+									<Area seriesKey={s.key} {...areaProps} fill={gradient} {line} />
+								{/snippet}
+							</LinearGradient>
+						{:else}
+							<Area seriesKey={s.key} {...areaProps} fill="transparent" {line} />
 						{/if}
-					{/snippet}
-					{#snippet tooltip()}
-						<Chart.Tooltip
-							indicator="line"
-							labelFormatter={(v: Date) => v.toLocaleString([], { hour12: false })}
-						>
-							{#snippet formatter({ item, name, value })}
-								<span class="size-2.5 shrink-0 rounded-[2px]" style:background={item.color}></span>
-								<span class="flex flex-1 items-center justify-between gap-3 leading-none">
-									<span class="text-muted-foreground">{name}</span>
-									<span class="font-medium text-foreground tabular-nums"
-										>{format(Number(value))}</span
-									>
-								</span>
-							{/snippet}
-						</Chart.Tooltip>
-					{/snippet}
-				</AreaChart>
-			</Chart.Container>
-		{/if}
+					{/each}
+					{#if last && lead && typeof last[lead.key] === 'number'}
+						<Circle
+							cx={context.xScale(last.date)}
+							cy={context.yScale(last[lead.key])}
+							r={3}
+							fill={lead.color}
+						/>
+					{/if}
+				{/snippet}
+				{#snippet tooltip()}
+					<Chart.Tooltip
+						indicator="line"
+						labelFormatter={(v: Date) => v.toLocaleString([], { hour12: false })}
+					>
+						{#snippet formatter({ item, name, value })}
+							<span class="size-2.5 shrink-0 rounded-[2px]" style:background={item.color}></span>
+							<span class="flex flex-1 items-center justify-between gap-3 leading-none">
+								<span class="text-muted-foreground">{name}</span>
+								<span class="font-medium text-foreground tabular-nums">{format(Number(value))}</span
+								>
+							</span>
+						{/snippet}
+					</Chart.Tooltip>
+				{/snippet}
+			</AreaChart>
+		</Chart.Container>
 	</div>
 	<ul
 		class="mt-3 flex min-h-5 flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground"

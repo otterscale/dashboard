@@ -112,12 +112,12 @@ export function rangeLiteral(start: Date, end: Date): string {
 	return `${Math.max(60, Math.round((end.getTime() - start.getTime()) / 1000))}s`;
 }
 
+/** One row of a history chart: a time, and each series' value at it under the series' key. */
+export type ChartPoint = { date: Date } & Record<string, number | Date>;
+
 /** Merge the first series of each named query into rows keyed by time, for one chart. */
-export function toPoints<K extends string>(
-	result: Record<K, Series[]>,
-	keys: K[]
-): ({ date: Date } & Record<string, number | Date>)[] {
-	const rows = new Map<number, { date: Date } & Record<string, number | Date>>();
+export function toPoints<K extends string>(result: Record<K, Series[]>, keys: K[]): ChartPoint[] {
+	const rows = new Map<number, ChartPoint>();
 	for (const key of keys) {
 		for (const p of result[key]?.[0]?.points ?? []) {
 			const row = rows.get(p.t) ?? { date: new Date(p.t) };

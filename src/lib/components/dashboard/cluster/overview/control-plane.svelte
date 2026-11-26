@@ -57,35 +57,33 @@
 
 	const reloadManager = new ReloadManager(fetch);
 
-	$effect(() => {
-		if (isReloading) {
-			reloadManager.restart();
-		} else {
-			reloadManager.stop();
-		}
-	});
-
-	let isLoaded = $state(false);
-	onMount(async () => {
-		await fetch();
-		isLoaded = true;
-	});
-	onDestroy(() => {
-		reloadManager.stop();
-	});
-
+	// The entry points poll on the same switch, at their own slower pace.
 	const entrySource = new EntryPointsSource(
 		createClient(ResourceService, getContext<Transport>('transport')),
 		page.params.cluster ?? '',
 		(node) => signals.isNodeReady(node)
 	);
+
 	$effect(() => {
-		if (isReloading) entrySource.start();
-		else entrySource.stop();
-		return () => entrySource.stop();
+		if (isReloading) {
+			reloadManager.restart();
+			entrySource.start();
+		} else {
+			reloadManager.stop();
+			entrySource.stop();
+		}
 	});
-	onMount(() => {
+
+	let isLoaded = $state(false);
+	onMount(async () => {
+		// Starting the poll already read them; read here only while auto update is off.
 		if (!isReloading) void entrySource.refresh();
+		await fetch();
+		isLoaded = true;
+	});
+	onDestroy(() => {
+		reloadManager.stop();
+		entrySource.stop();
 	});
 	const entryPoints = $derived(entrySource.entryPoints);
 
@@ -107,7 +105,7 @@
 	<div class="min-w-0">
 		<p class="truncate text-xs leading-4 text-muted-foreground">{label}</p>
 		<div class="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1">
-			<span class="text-2xl leading-8 tracking-tight whitespace-nowrap {NUM}">
+			<span class={cn('text-2xl leading-8 tracking-tight whitespace-nowrap', NUM)}>
 				{value ? `${value.ready} / ${value.total}` : '—'}
 			</span>
 			{#if value}
@@ -159,14 +157,14 @@
 	{#if entryPoints}
 		<!-- Rows share whatever height the card has, like the platform services table beside it. -->
 		<div class="mt-4 hidden flex-1 flex-col text-sm @lg/panel:flex">
-			<div class="{ENTRY_GRID} border-b pb-2 text-xs leading-4 text-muted-foreground">
+			<div class={cn(ENTRY_GRID, 'border-b pb-2 text-xs leading-4 text-muted-foreground')}>
 				<span>{m.entry_point()}</span>
 				<span>{m.entry_address()}</span>
 				<span>{m.entry_active_on()}</span>
 				<span>{m.status()}</span>
 			</div>
 			{#each entryPoints as entry (entry.id)}
-				<div class="{ENTRY_GRID} min-h-10 flex-1 items-center border-b last:border-b-0">
+				<div class={cn(ENTRY_GRID, 'min-h-10 flex-1 items-center border-b last:border-b-0')}>
 					<span class="truncate font-[550]" title={entry.gateway}>{ENTRY_NAMES[entry.id]()}</span>
 					<span
 						class={cn(

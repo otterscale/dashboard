@@ -6,6 +6,7 @@
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
 
+	import { kindLabel } from './lib/labels';
 	import type { Entry, Quota, Totals } from './lib/model';
 
 	// What the cards below are about: its kind, name, state and one line of facts.
@@ -26,17 +27,7 @@
 		loading: boolean;
 	} = $props();
 
-	const kind = $derived(
-		entry.kind === 'workspace'
-			? m.workspace()
-			: entry.kind === 'model'
-				? m.model()
-				: entry.kind === 'release'
-					? m.release()
-					: entry.resource === 'statefulsets'
-						? m.ws_analytics_statefulset()
-						: m.deployment()
-	);
+	const kind = $derived(entry.kind === 'workspace' ? m.workspace() : kindLabel(entry));
 	const tone = $derived(
 		entry.state === 'failing' ? 'bad' : entry.state === 'starting' ? 'warn' : 'ok'
 	);

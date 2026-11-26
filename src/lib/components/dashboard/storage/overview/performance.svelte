@@ -15,7 +15,8 @@
 	// refetches while the last answer stays on screen.
 	let { client, start, end }: { client: PrometheusDriver; start: Date; end: Date } = $props();
 
-	let data = $state<DataPoint[]>([]);
+	// Replaced whole on every answer and handed to the charts as is.
+	let data = $state.raw<DataPoint[]>([]);
 	let loaded = $state(false);
 	let failed = $state(false);
 	let request = 0;

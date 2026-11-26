@@ -2,6 +2,7 @@
 	import { NUM, Panel, Status, type WidgetState } from '$lib/components/dashboard/kit';
 	import { DASH, fmt, fmtCores, fmtGiB } from '$lib/components/dashboard/kit/format';
 	import { splitTail } from '$lib/components/dashboard/model/analytics/lib/pods';
+	import * as Table from '$lib/components/ui/table';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/messages';
 	import { cn } from '$lib/utils';
@@ -24,8 +25,9 @@
 	} = $props();
 
 	const sorted = $derived(sortPods(pods));
-	const th = 'px-2.5 py-2 font-medium whitespace-nowrap';
-	const td = 'px-2.5 py-2.5 whitespace-nowrap';
+	// The vendored table's density, tightened to this card's: shorter header, 13px rows.
+	const th = 'h-auto px-2.5 py-2 text-muted-foreground';
+	const td = 'px-2.5 py-2.5';
 	// Neither number known, a pod still in its init containers for example: one dash, not two.
 	const pair = (used: string, of: string, unit = '') =>
 		used === DASH && of === DASH ? DASH : `${used} / ${of}${unit ? ` ${unit}` : ''}`;
@@ -58,58 +60,58 @@
 		</span>
 	{/snippet}
 	<!-- Too many columns for a narrow card: the table scrolls sideways inside it. -->
-	<div class="-mx-1 overflow-x-auto px-1">
-		<table class="w-full min-w-[54rem] border-collapse text-[0.8125rem] {NUM}">
-			<thead class="text-xs text-muted-foreground">
-				<tr class="border-b border-border">
-					<th class="{th} pl-0 text-left">{m.analytics_pod()}</th>
-					<th class="{th} text-left">{m.analytics_node()}</th>
-					<th class="{th} text-left">{m.status()}</th>
-					<th class="{th} text-right">{m.analytics_restarts()}</th>
-					<th class="{th} text-right">{m.ws_analytics_col_cpu()}</th>
-					<th class="{th} text-right">{m.ws_analytics_col_memory()}</th>
-					<th class="{th} pr-0 text-right">{m.ws_analytics_col_gpu()}</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each sorted as pod (pod.pod)}
-					{@const status = podStatus(pod)}
-					{@const restarts = Math.round(pod.restarts)}
-					<tr class="border-b border-border/60 last:border-b-0">
-						<td class="{td} pl-0">
-							<OverviewLink target={detailLink(POD, namespace, pod.pod)} class="block w-fit">
-								{@render name(pod.pod, 'max-w-[19rem]', '')}
-							</OverviewLink>
-						</td>
-						<td class={td}>
-							{#if pod.node}
-								{@render name(pod.node, 'max-w-[9rem]', 'text-muted-foreground')}
-							{:else}
-								<span class="text-muted-foreground">{DASH}</span>
-							{/if}
-						</td>
-						<td class={td}>
-							<Status tone={status.tone} variant="dot" class="text-[0.8125rem]">
-								{status.text}
-							</Status>
-						</td>
-						<td class={cn(td, 'text-right', restarts > 0 && 'text-chart-1')}>{fmt(restarts)}</td>
-						<td class="{td} text-right">
-							{pair(fmtCores(pod.cpu.used), fmtCores(pod.cpu.requested))}
-						</td>
-						<td class="{td} text-right">
-							{pair(fmtGiB(pod.memory.used), fmtGiB(pod.memory.requested), m.analytics_unit_gib())}
-						</td>
-						<td class="{td} pr-0 text-right">
-							{#if pod.gpu}
-								{pair(fmtGiB(pod.gpu.used), fmtGiB(pod.gpu.allocated), m.analytics_unit_gib())}
-							{:else}
-								<span class="text-muted-foreground">{DASH}</span>
-							{/if}
-						</td>
-					</tr>
-				{/each}
-			</tbody>
-		</table>
-	</div>
+	<Table.Root class={cn('min-w-[54rem] text-[0.8125rem]', NUM)}>
+		<Table.Header class="text-xs">
+			<Table.Row class="border-border hover:bg-transparent">
+				<Table.Head class={cn(th, 'pl-0')}>{m.analytics_pod()}</Table.Head>
+				<Table.Head class={th}>{m.analytics_node()}</Table.Head>
+				<Table.Head class={th}>{m.status()}</Table.Head>
+				<Table.Head class={cn(th, 'text-right')}>{m.analytics_restarts()}</Table.Head>
+				<Table.Head class={cn(th, 'text-right')}>{m.ws_analytics_col_cpu()}</Table.Head>
+				<Table.Head class={cn(th, 'text-right')}>{m.ws_analytics_col_memory()}</Table.Head>
+				<Table.Head class={cn(th, 'pr-0 text-right')}>{m.ws_analytics_col_gpu()}</Table.Head>
+			</Table.Row>
+		</Table.Header>
+		<Table.Body>
+			{#each sorted as pod (pod.pod)}
+				{@const status = podStatus(pod)}
+				{@const restarts = Math.round(pod.restarts)}
+				<Table.Row class="border-border/60 hover:bg-transparent">
+					<Table.Cell class={cn(td, 'pl-0')}>
+						<OverviewLink target={detailLink(POD, namespace, pod.pod)} class="block w-fit">
+							{@render name(pod.pod, 'max-w-[19rem]', '')}
+						</OverviewLink>
+					</Table.Cell>
+					<Table.Cell class={td}>
+						{#if pod.node}
+							{@render name(pod.node, 'max-w-[9rem]', 'text-muted-foreground')}
+						{:else}
+							<span class="text-muted-foreground">{DASH}</span>
+						{/if}
+					</Table.Cell>
+					<Table.Cell class={td}>
+						<Status tone={status.tone} variant="dot" class="text-[0.8125rem]">
+							{status.text}
+						</Status>
+					</Table.Cell>
+					<Table.Cell class={cn(td, 'text-right', restarts > 0 && 'text-chart-1')}>
+						{fmt(restarts)}
+					</Table.Cell>
+					<Table.Cell class={cn(td, 'text-right')}>
+						{pair(fmtCores(pod.cpu.used), fmtCores(pod.cpu.requested))}
+					</Table.Cell>
+					<Table.Cell class={cn(td, 'text-right')}>
+						{pair(fmtGiB(pod.memory.used), fmtGiB(pod.memory.requested), m.analytics_unit_gib())}
+					</Table.Cell>
+					<Table.Cell class={cn(td, 'pr-0 text-right')}>
+						{#if pod.gpu}
+							{pair(fmtGiB(pod.gpu.used), fmtGiB(pod.gpu.allocated), m.analytics_unit_gib())}
+						{:else}
+							<span class="text-muted-foreground">{DASH}</span>
+						{/if}
+					</Table.Cell>
+				</Table.Row>
+			{/each}
+		</Table.Body>
+	</Table.Root>
 </Panel>

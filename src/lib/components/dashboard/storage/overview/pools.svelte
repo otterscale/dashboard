@@ -6,7 +6,7 @@
 
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { Meter, NUM } from '$lib/components/dashboard/kit';
+	import { Chip, Meter, NUM } from '$lib/components/dashboard/kit';
 	import * as Card from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import * as Table from '$lib/components/ui/table';
@@ -34,6 +34,7 @@
 		fmtBytes,
 		fmtDaysAhead,
 		fmtFullIn,
+		fmtGrowth,
 		fmtPct,
 		LEVEL_TEXT,
 		serviceLabel
@@ -111,13 +112,6 @@
 	function toggle(id: string) {
 		if (open.has(id)) open.delete(id);
 		else open.add(id);
-	}
-
-	function growthText(row: PoolRow): string {
-		if (!row.growth) return DASH;
-		if (row.growth.kind === 'flat') return m.storage_growth_flat();
-		const sign = row.growth.kind === 'growing' ? '+' : '';
-		return m.storage_per_day({ value: `${sign}${fmtBytes(row.growth.perDay)}` });
 	}
 
 	// A pool's name opens it in Analytics.
@@ -269,11 +263,7 @@
 		</Table.Cell>
 		<Table.Cell class={CELL}>
 			{#if !nested}
-				<span
-					class="inline-flex h-5 items-center rounded-full bg-muted px-2 text-[11px] leading-4 text-muted-foreground"
-				>
-					{serviceLabel(row.service)}
-				</span>
+				<Chip class="text-[11px] leading-4">{serviceLabel(row.service)}</Chip>
 			{/if}
 		</Table.Cell>
 		<Table.Cell class={NUM_CELL}>{row.copiesLabel ?? DASH}</Table.Cell>
@@ -287,7 +277,7 @@
 				</span>
 			</span>
 		</Table.Cell>
-		<Table.Cell class={NUM_CELL}>{growthText(row)}</Table.Cell>
+		<Table.Cell class={NUM_CELL}>{fmtGrowth(row.growth)}</Table.Cell>
 		<Table.Cell class={cn(NUM_CELL, warn && 'text-chart-1')}>{fmtFullIn(row.fullIn)}</Table.Cell>
 		<Table.Cell class={cn(NUM_CELL, 'pr-0')}>{row.pvcs > 0 ? row.pvcs : DASH}</Table.Cell>
 	</Table.Row>

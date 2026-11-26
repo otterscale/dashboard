@@ -2,6 +2,7 @@
 	import { NUM, type WidgetState } from '$lib/components/dashboard/kit';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
+	import { cn } from '$lib/utils';
 
 	// History: five numbers for the window in one strip, 1px rules between them.
 	let {
@@ -20,9 +21,10 @@
 >
 	{#each items as item, i (i)}
 		<div
-			class="min-w-0 bg-card px-4 py-3.5 @md:px-5 {i === items.length - 1
-				? 'col-span-2 @5xl:col-span-1'
-				: ''}"
+			class={cn(
+				'min-w-0 bg-card px-4 py-3.5 @md:px-5',
+				i === items.length - 1 && 'col-span-2 @5xl:col-span-1'
+			)}
 		>
 			<p class="truncate text-xs leading-4 text-muted-foreground">{item.label}</p>
 			{#if state === 'loading'}
@@ -33,8 +35,7 @@
 				<p class="text-xs leading-4 text-muted-foreground">{m.dashboard_couldnt_load()}</p>
 			{:else}
 				<p
-					class="mt-1 truncate text-[1.75rem] leading-8 tracking-tight {NUM} {item.valueClass ??
-						''}"
+					class={cn('mt-1 truncate text-[1.75rem] leading-8 tracking-tight', NUM, item.valueClass)}
 				>
 					{item.value}
 				</p>

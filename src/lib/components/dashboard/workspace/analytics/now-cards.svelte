@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { NUM, Tile, type WidgetState } from '$lib/components/dashboard/kit';
+	import { Meter, NUM, Tile, type WidgetState } from '$lib/components/dashboard/kit';
 	import { DASH, fmt, fmtCores, fmtGiB, fmtPct } from '$lib/components/dashboard/kit/format';
 	import { m } from '$lib/messages';
 	import { cn } from '$lib/utils';
@@ -114,20 +114,7 @@
 		{value}{#if unit}<span class="ml-1.5 text-xl tracking-normal">{unit}</span>{/if}
 	</p>
 	{#if bar}
-		<span
-			class="relative mt-2 block h-1.5 overflow-hidden rounded-full bg-muted"
-			aria-hidden="true"
-		>
-			{#if bar.soft !== undefined}
-				<span class="absolute inset-y-0 left-0 rounded-full bg-chart-3/28" style:width="{bar.soft}%"
-				></span>
-			{:else}
-				<!-- No bar to draw: its room stays, so the five notes sit on one line. -->
-				<span class="mt-2 block h-1.5" aria-hidden="true"></span>
-			{/if}
-			<span class="absolute inset-y-0 left-0 rounded-full bg-chart-3" style:width="{bar.solid}%"
-			></span>
-		</span>
+		<Meter value={bar.solid} soft={bar.soft} class="mt-2" />
 	{:else}
 		<!-- No bar to draw: its room stays, so the five notes sit on one line. -->
 		<span class="mt-2 block h-1.5" aria-hidden="true"></span>

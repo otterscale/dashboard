@@ -11,7 +11,9 @@
 		DCGM_GPU_MEMORY_USED_BYTES,
 		fetchCombinedInstantOrNull
 	} from '$lib/prometheus';
+	import { cn } from '$lib/utils';
 
+	import { firstNumber } from './instant';
 	import ScopeLabel from './scope-label.svelte';
 	import { READY_NODES } from './signals.svelte';
 
@@ -49,7 +51,12 @@
 	// booking is counted only for cards DCGM reports, so a card on a lost node cannot inflate it.
 	// No `or vector(0)` on the booking: an absent sum means HAMi is not deployed, and a
 	// substituted 0 would read as "0% allocated" on a cluster that simply has no HAMi.
+	// The scope can change while a request is out, and the two answers can land in either
+	// order: one older than what is on screen is dropped.
+	let sent = 0;
+	let shown = 0;
 	async function fetch() {
+		const request = ++sent;
 		const total = `sum(${dcgm(DCGM_GPU_MEMORY_TOTAL_BYTES)})`;
 		const r = await fetchCombinedInstantOrNull(prometheusDriver, {
 			cardCount: `count(count by (UUID) (${dcgm('DCGM_FI_DEV_FB_USED')}))`,
@@ -57,16 +64,14 @@
 			usedPct: `100 * sum(${dcgm(DCGM_GPU_MEMORY_USED_BYTES)}) / ${total}`,
 			utilizationPct: `avg(${dcgm('DCGM_FI_DEV_GPU_UTIL')})`
 		});
+		if (request < shown) return;
+		shown = request;
 		failed = r === null;
 		if (!r) return;
-		const pick = (key: string) => {
-			const value = r[key][0]?.value?.value;
-			return value === undefined ? undefined : Number(value);
-		};
-		cardCount = pick('cardCount');
-		allocatedPct = pick('allocatedPct');
-		usedPct = pick('usedPct');
-		utilizationPct = pick('utilizationPct');
+		cardCount = firstNumber(r.cardCount);
+		allocatedPct = firstNumber(r.allocatedPct);
+		usedPct = firstNumber(r.usedPct);
+		utilizationPct = firstNumber(r.utilizationPct);
 	}
 
 	const reloadManager = new ReloadManager(fetch);
@@ -108,7 +113,7 @@
 	{#snippet actions()}
 		<ScopeLabel {readyOnly} />
 	{/snippet}
-	<p class="text-[1.75rem] leading-8 tracking-tight {NUM}">
+	<p class={cn('text-[1.75rem] leading-8 tracking-tight', NUM)}>
 		{cardCount ?? '—'}<span class="ml-1.5 text-sm tracking-normal text-muted-foreground"
 			>{m.cluster_gpus()}</span
 		>

@@ -1,5 +1,6 @@
 import type { PrometheusDriver } from 'prometheus-query';
 
+import type { Sample } from '$lib/components/dashboard/kit/fetch';
 import { escapePromqlStringLiteral } from '$lib/prometheus';
 
 import { emptyTotals, type SeriesFact, type Totals, type UsageFact } from './usage';
@@ -56,7 +57,7 @@ export function seriesQueries(matchers: string[], step: number) {
 /** Whether the gateway has reported anything in the retention window; cluster scope only. */
 export const COLLECTED_PROBE = `count(last_over_time(${REQUESTS}[30d]))`;
 
-export type Sample = { labels: Record<string, string>; value: number };
+export type { Sample };
 export type SampleSeries = {
 	labels: Record<string, string>;
 	values: { time: number; value: number }[];

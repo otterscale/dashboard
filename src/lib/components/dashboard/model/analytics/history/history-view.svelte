@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PrometheusDriver } from 'prometheus-query';
-	import { onMount, untrack } from 'svelte';
+	import { untrack } from 'svelte';
 
 	import {
 		fetchInstant,
@@ -35,6 +35,7 @@
 		bucketFor,
 		finishBuckets,
 		type FinishPoint,
+		fmtDecimal,
 		lengthGrid,
 		line,
 		mergeNamed,
@@ -42,7 +43,7 @@
 		withLevel
 	} from '../lib/history';
 	import type { ModelPods } from '../lib/model-pods';
-	import { fmtGiB } from '../lib/pods';
+	import { fmtPodGiB } from '../lib/pods';
 	import {
 		activeQueries,
 		cacheTierQueries,
@@ -62,7 +63,7 @@
 	import LengthHeatmap from './length-heatmap.svelte';
 
 	// History: the window's summary, then four questions: is it slow, is it busy, why, and is the
-	// hardware fine. Each chart loads on its own; a new window remounts the view.
+	// hardware fine. Each chart loads on its own, and again when the window changes.
 	let {
 		client,
 		shared,
@@ -116,6 +117,12 @@
 		return Object.fromEntries(Object.entries(r).map(([k, v]) => [k, scalar(v)]));
 	});
 
+	const tierLine = (i: number) => ({
+		color: CATEGORY_COLORS[i],
+		width: 1.5,
+		style: 'line' as const
+	});
+
 	const ttft = percentiles(LATENCY.ttft);
 	const tpot = percentiles(LATENCY.tpot);
 	const e2e = percentiles(LATENCY.e2e);
@@ -140,34 +147,10 @@
 	const tiers = named(
 		() => cacheTierQueries(modelKey, rateSpan),
 		() => [
-			{
-				key: 'gpu',
-				label: m.model_analytics_tier_gpu(),
-				color: CATEGORY_COLORS[0],
-				width: 1.5,
-				style: 'line'
-			},
-			{
-				key: 'cpu',
-				label: m.model_analytics_tier_cpu(),
-				color: CATEGORY_COLORS[1],
-				width: 1.5,
-				style: 'line'
-			},
-			{
-				key: 'disk',
-				label: m.model_analytics_tier_disk(),
-				color: CATEGORY_COLORS[2],
-				width: 1.5,
-				style: 'line'
-			},
-			{
-				key: 'p2p',
-				label: m.model_analytics_tier_p2p(),
-				color: CATEGORY_COLORS[3],
-				width: 1.5,
-				style: 'line'
-			}
+			line('gpu', m.model_analytics_tier_gpu(), tierLine(0)),
+			line('cpu', m.model_analytics_tier_cpu(), tierLine(1)),
+			line('disk', m.model_analytics_tier_disk(), tierLine(2)),
+			line('p2p', m.model_analytics_tier_p2p(), tierLine(3))
 		]
 	);
 
@@ -190,8 +173,10 @@
 	});
 	const gen = podLines(() => genPerPodQuery(modelKey, rateSpan));
 
+	// Memory needs the engine container's name, which comes with the pod list.
+	const container = $derived(model?.container);
 	const memory = new Loader<Chart & { limit?: number }>(async () => {
-		const q = memoryPerPodQueries(modelKey, model?.container ?? 'main');
+		const q = memoryPerPodQueries(modelKey, container ?? 'main');
 		const r = await fetchRange(client, q, start, end, step);
 		if (!r) return null;
 		const { data, series } = perPod(r.used);
@@ -241,28 +226,39 @@
 	const promptLength = heatmap('vllm:request_prompt_tokens_bucket');
 	const generationLength = heatmap('vllm:request_generation_tokens_bucket');
 
-	onMount(() => {
-		for (const l of [
-			summary,
-			ttft,
-			tpot,
-			e2e,
-			throughput,
-			active,
-			kv,
-			prefill,
-			tiers,
-			gen,
-			finish,
-			promptLength,
-			generationLength
-		]) {
-			void l.load();
-		}
-	});
-	// Memory needs the engine container's name, which comes with the pod list.
+	const charts = [
+		summary,
+		ttft,
+		tpot,
+		e2e,
+		throughput,
+		active,
+		kv,
+		prefill,
+		tiers,
+		gen,
+		finish,
+		promptLength,
+		generationLength
+	];
+	// A new window starts every chart over: back to loading, and an answer for the last window
+	// that is still on its way is dropped.
 	$effect(() => {
-		if (model) untrack(() => void memory.load());
+		void [start.getTime(), end.getTime()];
+		untrack(() => {
+			for (const l of charts) {
+				l.reset();
+				void l.load();
+			}
+		});
+	});
+	$effect(() => {
+		void [start.getTime(), end.getTime()];
+		if (!container) return;
+		untrack(() => {
+			memory.reset();
+			void memory.load();
+		});
 	});
 
 	const s = $derived(summary.data ?? {});
@@ -295,8 +291,7 @@
 	]);
 
 	const tokens = (v: number) => fmtRate(v);
-	const count = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
-	const gib = (v: number) => `${fmtGiB(v)} GiB`;
+	const gib = (v: number) => `${fmtPodGiB(v)} GiB`;
 	const H = 180;
 </script>
 
@@ -350,7 +345,7 @@
 			title={m.model_analytics_active_requests()}
 			data={active.data?.data ?? []}
 			series={active.data?.series ?? []}
-			format={count}
+			format={fmtDecimal}
 			state={active.state}
 			height={H}
 		/>
@@ -423,9 +418,9 @@
 			data={memory.data?.data ?? []}
 			series={memory.data?.series ?? []}
 			format={gib}
-			state={model ? memory.state : 'loading'}
+			state={container ? memory.state : 'loading'}
 			height={H}
 		/>
-		<BGpuMemory {shared} {model} {start} {end} />
+		<BGpuMemory {shared} {model} {start} {end} height={H} />
 	</div>
 </div>

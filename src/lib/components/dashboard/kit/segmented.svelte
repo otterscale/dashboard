@@ -13,7 +13,8 @@
 		options: { value: T; label: string }[];
 		value: T;
 		label: string;
-		size?: 'default' | 'sm';
+		/** `xs` sits in a card's title row, beside the info button. */
+		size?: 'default' | 'sm' | 'xs';
 		class?: string;
 	} = $props();
 </script>
@@ -23,7 +24,7 @@
 	aria-label={label}
 	class={cn(
 		'inline-flex w-fit shrink-0 items-center rounded-full bg-muted p-[3px]',
-		size === 'sm' ? 'h-8' : 'h-9',
+		size === 'xs' ? 'h-7 p-0.5' : size === 'sm' ? 'h-8' : 'h-9',
 		className
 	)}
 >
@@ -33,8 +34,8 @@
 			aria-pressed={value === option.value}
 			onclick={() => (value = option.value)}
 			class={cn(
-				'inline-flex h-full items-center rounded-full px-3 font-medium whitespace-nowrap text-foreground/60 transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none aria-pressed:bg-card aria-pressed:text-foreground aria-pressed:shadow-sm dark:text-muted-foreground dark:aria-pressed:text-foreground',
-				size === 'sm' ? 'text-[0.8125rem]' : 'text-sm'
+				'inline-flex h-full items-center rounded-full font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none aria-pressed:bg-card aria-pressed:text-foreground aria-pressed:shadow-sm',
+				size === 'xs' ? 'px-2 text-xs' : size === 'sm' ? 'px-3 text-[0.8125rem]' : 'px-3 text-sm'
 			)}
 		>
 			{option.label}

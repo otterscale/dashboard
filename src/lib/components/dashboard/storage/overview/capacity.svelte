@@ -76,7 +76,7 @@
 		{#snippet body()}
 			{#if result}
 				<p class={cn(BIG, LEVEL_TEXT[rawLevel(result.raw.pct)])}>{fmtPct(result.raw.pct)}</p>
-				<Meter class="mt-3 flex" value={result.raw.pct} />
+				<Meter class="mt-3" value={result.raw.pct} />
 				<p class={NOTE}>
 					{m.storage_raw_note({
 						used: fmtBytes(result.raw.used),
@@ -99,7 +99,7 @@
 		{#snippet body()}
 			{#if result}
 				<p class={BIG}>{fmtBytes(result.stored)}</p>
-				<Meter class="mt-3 flex" value={result.storedPct} />
+				<Meter class="mt-3" value={result.storedPct} />
 				<p class={NOTE}>
 					{m.storage_writable_note({
 						free: fmtBytes(result.writable),
@@ -123,7 +123,7 @@
 				<p class={cn(BIG, LEVEL_TEXT[promisedLevel(result.promised.pct)])}>
 					{fmtPct(result.promised.pct)}
 				</p>
-				<Meter class="mt-3 flex" value={result.promised.pct} />
+				<Meter class="mt-3" value={result.promised.pct} />
 				<p class={NOTE}>
 					{m.storage_promised_note({
 						requested: fmtBytes(result.promised.requested),
@@ -155,17 +155,12 @@
 				>
 					{fmtPct(fullest.pct)}
 				</p>
-				<div class="relative mt-3 flex">
-					<Meter class="flex" value={fullest.pct} />
-					{#if nearfull !== undefined}
-						<!-- The nearfull ratio, where Ceph starts to warn. -->
-						<span
-							class="absolute -top-1 h-3.5 w-0.5 -translate-x-1/2 rounded-full bg-foreground"
-							style:left="{nearfull * 100}%"
-							aria-hidden="true"
-						></span>
-					{/if}
-				</div>
+				<!-- The mark is the nearfull ratio, where Ceph starts to warn. -->
+				<Meter
+					class="mt-3"
+					value={fullest.pct}
+					mark={nearfull === undefined ? undefined : nearfull * 100}
+				/>
 				<p class={cn(NOTE, 'break-words')}>
 					{m.storage_fullest_note({
 						osd: fullest.id,

@@ -1,9 +1,10 @@
 <script lang="ts">
-	import type { WidgetState } from '$lib/components/dashboard/kit';
+	import { TONE_TEXT, type WidgetState } from '$lib/components/dashboard/kit';
 	import { fmt, fmtCores, fmtGiB, fmtPct } from '$lib/components/dashboard/kit/format';
 	import RankingCard, { type RankRow } from '$lib/components/dashboard/kit/ranking-card.svelte';
 	import { m } from '$lib/messages';
 
+	import { kindLabel } from './lib/labels';
 	import {
 		barScale,
 		barShares,
@@ -52,17 +53,13 @@
 			: 0
 	);
 
-	function chip(entry: Entry): string {
-		if (entry.kind === 'workspace') return m.ws_analytics_chip_whole();
-		if (entry.kind === 'model') return m.model();
-		if (entry.kind === 'release') return m.release();
-		return entry.resource === 'statefulsets' ? m.ws_analytics_statefulset() : m.deployment();
-	}
+	const chip = (entry: Entry) =>
+		entry.kind === 'workspace' ? m.ws_analytics_chip_whole() : kindLabel(entry);
 
 	const STATE_CLASS = {
-		failing: 'text-destructive',
-		starting: 'text-chart-1',
-		ready: 'text-chart-2'
+		failing: TONE_TEXT.bad,
+		starting: TONE_TEXT.warn,
+		ready: TONE_TEXT.ok
 	};
 
 	function status(entry: Entry): string {

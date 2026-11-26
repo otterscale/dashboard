@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { NUM, Tile, type WidgetState } from '$lib/components/dashboard/kit';
+	import { Meter, NUM, Tile, type WidgetState } from '$lib/components/dashboard/kit';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { cn } from '$lib/utils';
 
@@ -48,18 +48,8 @@
 	{#if bar === undefined}
 		<span class="mt-2.5 block h-1.5" aria-hidden="true"></span>
 	{:else}
-		<span class="relative mt-2.5 block h-1.5 rounded-full bg-muted" aria-hidden="true">
-			<span
-				class="absolute inset-y-0 left-0 rounded-full bg-chart-3"
-				style:width="{Math.min(100, Math.max(0.6, bar))}%"
-			></span>
-			{#if mark !== undefined}
-				<span
-					class="absolute -inset-y-0.75 -ml-px w-0.5 rounded-full bg-foreground"
-					style:left="{Math.min(100, mark)}%"
-				></span>
-			{/if}
-		</span>
+		<!-- A sliver is kept for a value near zero, so the bar never reads as missing. -->
+		<Meter class="mt-2.5" value={Math.max(0.6, bar)} {mark} />
 	{/if}
 	<!-- Two lines held for every note, so the values line up whatever the notes say. -->
 	<p class="mt-2 line-clamp-2 min-h-8 text-xs leading-4 text-muted-foreground" title={note}>

@@ -3,13 +3,21 @@
 	import LayoutGridIcon from '@lucide/svelte/icons/layout-grid';
 	import RocketIcon from '@lucide/svelte/icons/rocket';
 	import type { PrometheusDriver } from 'prometheus-query';
-	import { onDestroy, onMount, type Snippet } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import { Panel, widgetState } from '$lib/components/dashboard/kit';
+	import {
+		NUM,
+		Panel,
+		Status,
+		type Tone,
+		TONE_TEXT,
+		widgetState
+	} from '$lib/components/dashboard/kit';
 	import { m } from '$lib/messages';
-	import { escapePromqlStringLiteral } from '$lib/prometheus';
+	import { cn } from '$lib/utils';
 
+	import { inNamespace } from '../lib/queries';
 	import {
 		DEPLOYMENT,
 		JOB,
@@ -45,14 +53,13 @@
 	};
 
 	/** `null`: Prometheus has nothing for the namespace. */
-	let snap = $state<Snapshot | null | undefined>(undefined);
+	let snap = $state.raw<Snapshot | null | undefined>(undefined);
 	let hasError = $state(false);
 
 	type Sample = { metric: { labels: Record<string, string> }; value: { value: number } };
 
 	async function fetchAll(): Promise<Snapshot | null> {
-		const n = escapePromqlStringLiteral(namespace);
-		const ns = `namespace="${n}"`;
+		const ns = inNamespace(namespace);
 		const evalAt = new Date();
 		const ask = async (query: string) =>
 			(await prometheusDriver.instantQuery(query, evalAt)).result as Sample[];
@@ -201,15 +208,10 @@
 
 	/**
 	 * `bad` for a count of errors, `warn` for one that needs a look, `ok` for one that is good
-	 * news; any of them is quiet at zero.
+	 * news; any of them is quiet at zero. `plain` is a count with no judgement in it.
 	 */
-	type Tone = 'ok' | 'warn' | 'bad' | 'plain';
-	const TONE_TEXT: Record<Tone, string> = {
-		ok: 'text-chart-2',
-		warn: 'text-chart-1',
-		bad: 'text-destructive',
-		plain: ''
-	};
+	type RowTone = Exclude<Tone, 'muted'> | 'plain';
+	const toneText = (tone: RowTone) => (tone === 'plain' ? undefined : TONE_TEXT[tone]);
 
 	type Row = {
 		label: string;
@@ -217,12 +219,12 @@
 		text: string;
 		/** Zero, `None`: quiet and no link. */
 		quiet: boolean;
-		tone: Tone;
+		tone: RowTone;
 		target: LinkTarget | null;
 		names: string[];
 	};
 
-	function countRow(label: string, c: Count, tone: Tone, target: LinkTarget | null): Row {
+	function countRow(label: string, c: Count, tone: RowTone, target: LinkTarget | null): Row {
 		return {
 			label,
 			text: String(c.value),
@@ -334,7 +336,7 @@
 								label: m.daemon_set(),
 								text: m.dashboard_none(),
 								quiet: true,
-								tone: 'plain' as Tone,
+								tone: 'plain' as RowTone,
 								target: null,
 								names: []
 							}
@@ -345,7 +347,7 @@
 									total: String(s.daemonSets.desired)
 								}),
 								quiet: false,
-								tone: (s.daemonSets.ready < s.daemonSets.desired ? 'warn' : 'plain') as Tone,
+								tone: (s.daemonSets.ready < s.daemonSets.desired ? 'warn' : 'plain') as RowTone,
 								target: null,
 								names: []
 							},
@@ -404,39 +406,24 @@
 
 {#snippet value(row: Row, cls: string)}
 	{#if row.quiet}
-		<span class="{cls} text-muted-foreground">{row.text}</span>
+		<span class={cn(cls, 'text-muted-foreground')}>{row.text}</span>
 	{:else}
-		<OverviewLink target={row.target} names={row.names} class="{cls} {TONE_TEXT[row.tone]}">
+		<OverviewLink target={row.target} names={row.names} class={cn(cls, toneText(row.tone))}>
 			{row.text}
 		</OverviewLink>
 	{/if}
 {/snippet}
 
-{#snippet section(title: string, icon: typeof LayoutGridIcon, body: Snippet)}
-	{@const Icon = icon}
-	<section class="min-w-0">
-		<h3 class="flex items-center gap-2 text-sm font-[550]">
-			<span
-				class="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
-			>
-				<Icon class="size-4" aria-hidden="true" />
-			</span>
-			{title}
-		</h3>
-		<ul class="mt-2 divide-y divide-border text-sm">
-			{@render body()}
-		</ul>
-	</section>
-{/snippet}
-
 <Panel
 	title={m.workspace_pod_rollout_health_title()}
 	description={m.workspace_pod_rollout_health_description()}
-	state={namespace ? widgetState(isLoaded, !!snap, hasError) : 'empty'}
+	state={namespace ? widgetState(isLoaded, !!snap, hasError) : 'ready'}
 	class="min-h-[61.5625rem] @md:min-h-[61.8125rem] @min-[44.5rem]:min-h-[24.3125rem]"
 >
-	{#if snap && attention}
-		<div class="flex flex-col gap-3 slashed-zero tabular-nums">
+	{#if !namespace}
+		<p class="text-sm text-muted-foreground">{m.workspace_namespace_unresolved()}</p>
+	{:else if snap && attention}
+		<div class={cn('flex flex-col gap-3', NUM)}>
 			<!-- The verdict first, its colour the state: mint while nothing needs a look, the
 			     attention colour once something does. The rest are the counts behind it. A tile with
 			     something to open opens as a whole. Two columns with the verdict on its own row, or
@@ -447,24 +434,26 @@
 					target={attentionTarget}
 					names={attention.names}
 					block
-					class="col-span-2 rounded-lg px-3 py-2.5 {attention.value === 0
-						? 'bg-mint text-mint-foreground'
-						: 'bg-attention text-attention-foreground'}"
+					class={cn(
+						'col-span-2 rounded-lg px-3 py-2.5',
+						attention.value === 0
+							? 'bg-mint text-mint-foreground'
+							: 'bg-attention text-attention-foreground'
+					)}
 				>
 					<span class="block truncate text-xs leading-4 opacity-70"
 						>{m.dashboard_pods_need_attention()}</span
 					>
-					<span class="mt-1 flex items-center gap-2 text-2xl leading-8 tracking-tight">
-						<span
-							class="size-2 shrink-0 rounded-full {attention.value === 0
-								? 'bg-chart-2'
-								: 'bg-chart-1'}"
-							aria-hidden="true"
-						></span>
+					<!-- Only the dot takes the state's colour; the number keeps the tile's own. -->
+					<Status
+						tone={attention.value === 0 ? 'ok' : 'warn'}
+						variant="dot"
+						class="mt-1 flex gap-2 text-2xl leading-8 tracking-tight text-current"
+					>
 						<span class="group-hover/link:underline group-hover/link:underline-offset-4"
 							>{attention.value === 0 ? m.dashboard_all_clear() : attention.value}</span
 						>
-					</span>
+					</Status>
 				</OverviewLink>
 				{#each tiles as tile (tile.label)}
 					<OverviewLink
@@ -475,9 +464,10 @@
 					>
 						<span class="block truncate text-xs leading-4 text-muted-foreground">{tile.label}</span>
 						<span
-							class="mt-1 block text-2xl leading-8 tracking-tight group-hover/link:underline group-hover/link:underline-offset-4 {tile.quiet
-								? 'text-muted-foreground'
-								: TONE_TEXT[tile.tone]}">{tile.text}</span
+							class={cn(
+								'mt-1 block text-2xl leading-8 tracking-tight group-hover/link:underline group-hover/link:underline-offset-4',
+								tile.quiet ? 'text-muted-foreground' : toneText(tile.tone)
+							)}>{tile.text}</span
 						>
 					</OverviewLink>
 				{/each}
@@ -485,15 +475,25 @@
 			<!-- Each row is a name and a number; the names behind a number are in its tooltip. -->
 			<div class="grid gap-x-8 gap-y-4 border-t border-border pt-3 @2xl/panel:grid-cols-3">
 				{#each columns as column (column.title)}
-					{#snippet rows()}
-						{#each column.rows as row (row.label)}
-							<li class="flex h-9 items-center justify-between gap-3">
-								<span class="min-w-0 truncate">{row.label}</span>
-								{@render value(row, 'shrink-0 font-medium')}
-							</li>
-						{/each}
-					{/snippet}
-					{@render section(column.title, column.icon, rows)}
+					{@const Icon = column.icon}
+					<section class="min-w-0">
+						<h3 class="flex items-center gap-2 text-sm font-[550]">
+							<span
+								class="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
+							>
+								<Icon class="size-4" aria-hidden="true" />
+							</span>
+							{column.title}
+						</h3>
+						<ul class="mt-2 divide-y divide-border text-sm">
+							{#each column.rows as row (row.label)}
+								<li class="flex h-9 items-center justify-between gap-3">
+									<span class="min-w-0 truncate">{row.label}</span>
+									{@render value(row, 'shrink-0 font-medium')}
+								</li>
+							{/each}
+						</ul>
+					</section>
 				{/each}
 			</div>
 		</div>

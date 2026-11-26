@@ -1,7 +1,7 @@
 <script lang="ts">
-	import type { InstantVector } from 'prometheus-query';
 	import { untrack } from 'svelte';
 
+	import { GIB, MIB } from '$lib/components/dashboard/kit/format';
 	import HistoryChart, {
 		type ChartPoint,
 		type ChartSeries
@@ -12,7 +12,7 @@
 
 	import { colorsFor, LIMIT } from './lib/chart-style';
 	import type { ModelPods } from './lib/model-pods';
-	import { fmtGiB, shortPod } from './lib/pods';
+	import { byDeviceUuid, fmtPodGiB, shortPod } from './lib/pods';
 
 	// GPU memory per pod over the window, against its HAMi allocation. The shared scope answers per
 	// card and only at an instant, so the line is sampled at even points across the window. A card's
@@ -22,35 +22,23 @@
 		model,
 		start,
 		end,
-		points = 20
+		points = 20,
+		height = 180
 	}: {
 		shared: SharedMetrics;
 		model: ModelPods | undefined;
 		start: Date;
 		end: Date;
 		points?: number;
+		height?: number;
 	} = $props();
 
-	const GIB = 1024 ** 3;
-	const MIB = 1024 ** 2;
-
 	type Data = { data: ChartPoint[]; series: ChartSeries[]; quota?: number };
-
-	function index(result: { result: unknown[] }): Map<string, number> {
-		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- built and read in one pass, never reactive
-		const out = new Map<string, number>();
-		for (const s of result.result as InstantVector[]) {
-			const uuid = (s.metric.labels as Record<string, string>).device_uuid;
-			const v = Number(s.value?.value);
-			if (uuid && Number.isFinite(v)) out.set(uuid, v);
-		}
-		return out;
-	}
 
 	const loader = new Loader<Data>(
 		async () => {
 			if (!model) return null;
-			const tenants = index(await shared.instant('gpu-shared-count'));
+			const tenants = byDeviceUuid(await shared.instant('gpu-shared-count'));
 			const pods = model.pods.filter(
 				(p) => p.hami.length > 0 && p.hami.every((d) => (tenants.get(d.uuid) ?? 1) <= 1)
 			);
@@ -59,7 +47,7 @@
 			const t0 = start.getTime();
 			const span = end.getTime() - t0;
 			const times = Array.from({ length: points }, (_, i) =>
-				Math.round(t0 + (span * i) / (points - 1))
+				Math.round(t0 + (span * i) / Math.max(1, points - 1))
 			);
 			// A few requests at a time: the browser has six connections for the whole page.
 			const samples: (Map<string, number> | undefined)[] = [];
@@ -68,7 +56,7 @@
 					times.slice(i, i + 4).map((t) =>
 						shared
 							.instant('vgpu-memory-used', undefined, new Date(t))
-							.then(index)
+							.then(byDeviceUuid)
 							.catch(() => undefined)
 					)
 				);
@@ -116,20 +104,29 @@
 		(d) => d.data.length === 0
 	);
 
+	// A new window starts the chart over; a new pod list (the same window) only refreshes it.
+	let shownWindow: string | undefined;
 	$effect(() => {
-		void [model, start.getTime(), end.getTime()];
-		if (model) untrack(() => loader.load());
+		const window = `${start.getTime()}-${end.getTime()}`;
+		if (!model) return;
+		untrack(() => {
+			if (window !== shownWindow) {
+				shownWindow = window;
+				loader.reset();
+			}
+			void loader.load();
+		});
 	});
 </script>
 
 <HistoryChart
 	title={m.model_analytics_gpu_memory_per_pod()}
 	peak={loader.data?.quota !== undefined
-		? m.model_analytics_used_vs_hami({ quota: fmtGiB(loader.data.quota * GIB) })
+		? m.model_analytics_used_vs_hami({ quota: fmtPodGiB(loader.data.quota * GIB) })
 		: undefined}
 	data={loader.data?.data ?? []}
 	series={loader.data?.series ?? []}
-	format={(v) => `${fmtGiB(v * GIB)} GiB`}
+	format={(v) => `${fmtPodGiB(v * GIB)} GiB`}
 	state={loader.state}
-	height={180}
+	{height}
 />

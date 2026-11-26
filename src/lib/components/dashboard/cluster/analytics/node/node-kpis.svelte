@@ -4,10 +4,19 @@
 
 	import { Meter, NUM, Tile } from '$lib/components/dashboard/kit';
 	import { fetchInstant, scalar } from '$lib/components/dashboard/kit/fetch';
-	import { fmt, fmtCores, fmtGiB, GIB, pressureText } from '$lib/components/dashboard/kit/format';
+	import {
+		DASH,
+		fmt,
+		fmtCores,
+		fmtGiB,
+		GIB,
+		pressureText
+	} from '$lib/components/dashboard/kit/format';
 	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
 	import { m } from '$lib/messages';
+	import { cn } from '$lib/utils';
 
+	import { gpuModelName } from '../lib/gpu-cards';
 	import { nodeKpiQueries } from '../lib/promql';
 
 	// Node detail, Now: five numbers, each a share of what the node can give.
@@ -16,13 +25,19 @@
 		tick,
 		node,
 		instance
-	}: { client: PrometheusDriver; tick: number; node: string; instance: string | undefined } =
-		$props();
+	}: {
+		client: PrometheusDriver;
+		tick: number;
+		/** Left out while the page has no node yet: the tiles then wait in their loading state. */
+		node: string | undefined;
+		instance: string | undefined;
+	} = $props();
 
 	type Kpis = Record<string, number | undefined> & { model?: string };
 
 	const loader = new Loader<Kpis>(
 		async () => {
+			if (!node) return null;
 			const r = await fetchInstant(client, nodeKpiQueries(node, instance));
 			if (!r) return null;
 			const out: Kpis = {};
@@ -35,6 +50,7 @@
 
 	$effect(() => {
 		void tick;
+		if (!node) return;
 		untrack(() => loader.load());
 	});
 
@@ -50,11 +66,11 @@
 	const fsPct = $derived(pct(fsUsed, k.fsSize));
 	const hasGpu = $derived((k.gpuCards ?? 0) > 0);
 	const perCard = $derived(hasGpu && k.gpuCap ? k.gpuCap / (k.gpuCards ?? 1) : undefined);
-	const model = $derived((k.model ?? '').replace(/^NVIDIA\s+/, ''));
+	const model = $derived(gpuModelName(k.model));
 </script>
 
 {#snippet figure(value: string, unit: string, meter: number | undefined, note: string, tone = '')}
-	<p class="truncate text-[1.75rem] leading-8 tracking-tight {NUM}">
+	<p class={cn('truncate text-[1.75rem] leading-8 tracking-tight', NUM)}>
 		<span class={tone}>{value}</span><span
 			class="ml-1 text-sm tracking-normal text-muted-foreground">{unit}</span
 		>
@@ -99,7 +115,7 @@
 					pressureText(gpuPct)
 				)}
 			{:else}
-				{@render figure('—', '', 0, m.analytics_no_gpus_on_node())}
+				{@render figure(DASH, '', 0, m.analytics_no_gpus_on_node())}
 			{/if}
 		{/snippet}
 	</Tile>
@@ -113,7 +129,7 @@
 			)}
 		{/snippet}
 	</Tile>
-	<Tile label={m.analytics_file_system()} state={instance ? loader.state : 'empty'}>
+	<Tile label={m.analytics_file_system()} state={node && !instance ? 'empty' : loader.state}>
 		{#snippet body()}
 			{@render figure(
 				fmt(fsPct),

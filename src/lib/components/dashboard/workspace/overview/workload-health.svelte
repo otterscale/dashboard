@@ -1,26 +1,28 @@
 <script lang="ts">
 	import { createClient, type Transport } from '@connectrpc/connect';
-	import {
-		type ListRequest,
-		type ListResponse,
-		ResourceService
-	} from '@otterscale/api/resource/v1';
-	import type { PrometheusDriver } from 'prometheus-query';
+	import { ResourceService } from '@otterscale/api/resource/v1';
 	import { getContext, onDestroy, onMount } from 'svelte';
 
 	import { ReloadManager } from '$lib/components/custom/reloader';
-	import { Panel, widgetState } from '$lib/components/dashboard/kit';
+	import {
+		NUM,
+		Panel,
+		Status,
+		TONE_DOT,
+		TONE_TEXT,
+		widgetState
+	} from '$lib/components/dashboard/kit';
+	import { Button } from '$lib/components/ui/button';
 	import { m } from '$lib/messages';
-	import { WorkspaceReleaseLabelSelector } from '$lib/utils/helm-release';
+	import { cn } from '$lib/utils';
 
+	import { listWorkspaceObjects } from '../lib/resources';
 	import {
 		DEPLOYMENT,
 		detailLink,
 		HELM_RELEASE,
 		type LinkTarget,
 		LLM_INFERENCE_SERVICE,
-		POD,
-		type ResourceKind,
 		STATEFUL_SET
 	} from './links';
 	import OverviewLink from './overview-link.svelte';
@@ -29,17 +31,16 @@
 		notReady,
 		summarize,
 		type Workload,
-		type WorkloadKind,
-		type WorkspaceObjects
+		type WorkloadKind
 	} from './workload-status';
 
+	// widget-grid also passes `prometheusDriver` to every tile; this one reads the Resource API
+	// only, so it does not take it.
 	let {
-		prometheusDriver,
 		cluster,
 		namespace,
 		isReloading = $bindable()
 	}: {
-		prometheusDriver: PrometheusDriver;
 		cluster: string;
 		namespace: string;
 		isReloading: boolean;
@@ -55,44 +56,15 @@
 	 */
 	const CAP = 4;
 
-	let workloads = $state<Workload[] | undefined>(undefined);
+	let workloads = $state.raw<Workload[] | undefined>(undefined);
 	let hasError = $state(false);
 	let expanded = $state(false);
-
-	async function listAll(kind: ResourceKind, labelSelector?: string): Promise<unknown[]> {
-		const out: unknown[] = [];
-		let continueToken: string | undefined = undefined;
-		for (;;) {
-			const response: ListResponse = await resourceClient.list({
-				cluster,
-				namespace,
-				group: kind.group,
-				version: kind.version,
-				resource: kind.resource,
-				labelSelector,
-				limit: BigInt(500),
-				continue: continueToken
-			} as ListRequest);
-			out.push(...response.items.map((item) => item.object));
-			continueToken = response.continue || undefined;
-			if (!continueToken) break;
-		}
-		return out;
-	}
 
 	async function fetch() {
 		if (!namespace || !cluster) return;
 		try {
-			const [models, releases, deployments, statefulSets, pods] = await Promise.all([
-				listAll(LLM_INFERENCE_SERVICE),
-				// The workspace's own releases, as the sidebar's Release page lists them.
-				listAll(HELM_RELEASE, WorkspaceReleaseLabelSelector),
-				listAll(DEPLOYMENT),
-				listAll(STATEFUL_SET),
-				listAll(POD)
-			]);
 			workloads = classifyWorkloads(
-				{ models, releases, deployments, statefulSets, pods } as WorkspaceObjects,
+				await listWorkspaceObjects(resourceClient, cluster, namespace),
 				Date.now()
 			);
 			hasError = false;
@@ -115,8 +87,6 @@
 
 	let isLoaded = $state(false);
 	onMount(async () => {
-		// widget-grid passes prometheusDriver to every tile; this widget uses the Resource API only.
-		void prometheusDriver;
 		await fetch();
 		isLoaded = true;
 	});
@@ -149,8 +119,6 @@
 		);
 	}
 
-	const TONE_TEXT = { bad: 'text-destructive', warn: 'text-chart-1', ok: 'text-chart-2' };
-	const TONE_DOT = { bad: 'bg-destructive', warn: 'bg-chart-1', ok: 'bg-chart-2' };
 	const stateTone = (workload: Workload) => (workload.state === 'failing' ? 'bad' : 'warn');
 </script>
 
@@ -163,7 +131,7 @@
 	{#if !namespace}
 		<p class="text-sm text-muted-foreground">{m.workspace_namespace_unresolved()}</p>
 	{:else}
-		<div class="flex flex-1 flex-col slashed-zero tabular-nums">
+		<div class={cn('flex flex-1 flex-col', NUM)}>
 			<!-- One row per kind: its name and how many are ready, the dot in the worst state's colour. -->
 			<ul>
 				{#each summaries as row (row.kind)}
@@ -175,8 +143,9 @@
 							<!-- Nothing of this kind is deployed: not a zero to read, so a word. -->
 							<p class="shrink-0 text-sm text-muted-foreground">{m.dashboard_none()}</p>
 						{:else}
-							<p class="flex shrink-0 items-center gap-1.5 {TONE_TEXT[row.tone]}">
-								<span class="size-2 rounded-full {TONE_DOT[row.tone]}" aria-hidden="true"></span>
+							<p class={cn('flex shrink-0 items-center gap-1.5', TONE_TEXT[row.tone])}>
+								<span class={cn('size-2 rounded-full', TONE_DOT[row.tone])} aria-hidden="true"
+								></span>
 								<span class="text-lg leading-6 tracking-tight"
 									>{m.workspace_workload_ready_ratio({
 										ready: String(row.ready),
@@ -198,9 +167,12 @@
 							<li
 								class="grid min-h-8 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-[0.8125rem]"
 							>
-								<span class="flex min-w-0 items-center gap-2">
-									<span class="size-1.5 shrink-0 rounded-full {TONE_DOT[tone]}" aria-hidden="true"
-									></span>
+								<!-- The dot is the state's colour; the name beside it stays the text colour. -->
+								<Status
+									{tone}
+									variant="dot"
+									class="flex min-w-0 gap-2 text-[0.8125rem] text-foreground"
+								>
 									<OverviewLink
 										target={linkOf(workload)}
 										names={[workload.name]}
@@ -208,22 +180,23 @@
 									>
 										{workload.name}
 									</OverviewLink>
-								</span>
-								<span class="whitespace-nowrap {TONE_TEXT[tone]}">{workload.reason}</span>
+								</Status>
+								<span class={cn('whitespace-nowrap', TONE_TEXT[tone])}>{workload.reason}</span>
 							</li>
 						{/each}
 					</ul>
 					{#if problems.length > CAP}
-						<button
-							type="button"
-							class="mt-1 min-h-8 self-start rounded-sm text-[0.8125rem] font-medium text-muted-foreground underline decoration-border underline-offset-[3px] outline-none hover:text-foreground hover:decoration-current focus-visible:ring-2 focus-visible:ring-ring"
+						<Button
+							variant="link"
+							size="sm"
+							class="mt-1 self-start px-0 text-[0.8125rem] text-muted-foreground underline decoration-border underline-offset-[3px] hover:text-foreground hover:decoration-current"
 							aria-expanded={showAll}
 							onclick={() => (expanded = !showAll)}
 						>
 							{showAll
 								? m.workspace_workload_show_fewer()
 								: m.workspace_workload_show_all({ count: String(problems.length) })}
-						</button>
+						</Button>
 					{/if}
 				</div>
 			{/if}

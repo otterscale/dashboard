@@ -76,7 +76,7 @@
 				<Tooltip.Root>
 					<Tooltip.Trigger
 						class={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}
-						aria-label={title}
+						aria-label="{m.information()}: {title}"
 					>
 						<InfoIcon class="size-4 text-muted-foreground" />
 					</Tooltip.Trigger>
@@ -94,7 +94,7 @@
 				<Skeleton class="mt-2 h-3 w-32" />
 				<Skeleton class="mt-auto h-3 w-full" />
 			{/if}
-		{:else if state === 'empty'}
+		{:else if state === 'empty' || state === 'error'}
 			<p
 				class={cn(
 					'text-muted-foreground',
@@ -102,17 +102,9 @@
 				)}
 			>
 				<span class={cn(!compact && 'block text-[1.75rem] leading-8')} aria-hidden="true">—</span>
-				<span class="text-xs leading-4">{m.no_data_display()}</span>
-			</p>
-		{:else if state === 'error'}
-			<p
-				class={cn(
-					'text-muted-foreground',
-					compact && 'flex items-baseline gap-2 text-[1.75rem] leading-7'
-				)}
-			>
-				<span class={cn(!compact && 'block text-[1.75rem] leading-8')} aria-hidden="true">—</span>
-				<span class="text-xs leading-4">{m.dashboard_couldnt_load()}</span>
+				<span class="text-xs leading-4">
+					{state === 'empty' ? m.no_data_display() : m.dashboard_couldnt_load()}
+				</span>
 			</p>
 		{:else}
 			{@render children()}

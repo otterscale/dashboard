@@ -6,6 +6,11 @@ import { MIB } from '$lib/components/dashboard/kit/format';
  */
 export const OUTSIDE_TOLERANCE_BYTES = 256 * MIB;
 
+/** DCGM's `modelName` without the vendor, which every card on the page shares. */
+export function gpuModelName(model: string | undefined): string {
+	return (model ?? '').replace(/^NVIDIA\s+/, '');
+}
+
 export type CardInput = {
 	uuid: string;
 	/** `nvidia0` */

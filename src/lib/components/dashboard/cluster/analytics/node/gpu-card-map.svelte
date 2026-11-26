@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { fmtGpuGiB } from '$lib/components/dashboard/kit/format';
 	import { m } from '$lib/messages';
+	import { cn } from '$lib/utils';
 
-	import { cardItems, type GpuCard, type GpuMeasure } from '../lib/gpu-cards';
+	import { cardItems, type GpuCard, type GpuMeasure, gpuModelName } from '../lib/gpu-cards';
 	import { squarify } from '../lib/treemap';
 	import type { Group } from '../lib/workspaces';
 	import MapTooltip from './map-tooltip.svelte';
@@ -33,7 +34,7 @@
 		)
 	);
 	const shown = $derived(measure === 'usage' ? card.used : card.allocated);
-	const model = $derived(card.model.replace(/^NVIDIA\s+/, ''));
+	const model = $derived(gpuModelName(card.model));
 
 	// The hovered tile, and the pointer in viewport coordinates for the tooltip to trail.
 	let hover = $state<string | undefined>();
@@ -124,13 +125,13 @@
 				{@const color = item.kind === 'pod' ? groupOf(item.namespace).color : undefined}
 				{#if r.w > 0 && r.h > 0}
 					<div
-						class="absolute flex flex-col overflow-hidden rounded-lg border-2 border-card bg-clip-padding px-2 py-1.5 font-mono text-[0.6875rem] leading-4 {item.kind ===
-						'pod'
-							? ''
-							: 'items-center justify-center text-center'} {item.kind === 'free' ||
-						item.kind === 'unreported'
-							? 'text-muted-foreground ring-1 ring-border ring-inset'
-							: ''} {item.kind === 'outside' ? 'text-destructive' : ''}"
+						class={cn(
+							'absolute flex flex-col overflow-hidden rounded-lg border-2 border-card bg-clip-padding px-2 py-1.5 font-mono text-[0.6875rem] leading-4',
+							item.kind !== 'pod' && 'items-center justify-center text-center',
+							(item.kind === 'free' || item.kind === 'unreported') &&
+								'text-muted-foreground ring-1 ring-border ring-inset',
+							item.kind === 'outside' && 'text-destructive'
+						)}
 						style:left="{r.x}px"
 						style:top="{r.y}px"
 						style:width="{r.w}px"

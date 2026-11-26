@@ -1,4 +1,5 @@
-import type { Tone } from '../../overview/lib/models';
+import { DASH, MIB } from '$lib/components/dashboard/kit/format';
+import type { Tone } from '$lib/components/dashboard/kit/tone';
 
 /**
  * What the Analytics page reads from a model's Pod objects: where each replica runs, what state it
@@ -116,8 +117,8 @@ export function engineVersion(image: string | undefined): string | undefined {
 	return tag;
 }
 
-/** `32768` → `32K`, `131072` → `128K`, `8000` → `8K`, `1000000` → `1M`. */
-export function fmtTokens(value: string | undefined): string | undefined {
+/** A context length as the engine was given it: `32768` → `32K`, `131072` → `128K`, `8000` → `8K`. */
+export function fmtContextTokens(value: string | undefined): string | undefined {
 	const n = Number(value);
 	if (!value || !Number.isFinite(n) || n <= 0) return undefined;
 	if (n >= 1_048_576 && n % 1_048_576 === 0) return `${n / 1_048_576}M`;
@@ -227,8 +228,6 @@ export function shortPod(pod: string): string {
 	return parts.length > 2 ? `…${parts.slice(-2).join('-')}` : pod;
 }
 
-const MIB = 1024 * 1024;
-
 /**
  * A pod's GPU memory: the HAMi allocation (quota) from its annotation, and what is used on its
  * cards. Usage is per card, so it is the pod's own only when the pod is the card's sole HAMi
@@ -252,9 +251,12 @@ export function podGpuMemory(
 	return { quota, used, shared };
 }
 
-/** Bytes as GiB: `44`, `85.1`, `0.6`. */
-export function fmtGiB(bytes: number | undefined): string {
-	if (bytes === undefined || !Number.isFinite(bytes)) return '—';
+/**
+ * Bytes as GiB with a decimal up to 100 GiB: `44`, `85.1`, `0.6`. The kit's `fmtGiB` rounds to
+ * whole numbers from 10 GiB, which hides how close a pod is to its limit.
+ */
+export function fmtPodGiB(bytes: number | undefined): string {
+	if (bytes === undefined || !Number.isFinite(bytes)) return DASH;
 	const gib = bytes / 1024 ** 3;
 	return gib >= 100
 		? gib.toFixed(0)
@@ -299,4 +301,21 @@ export function byNode(pods: PodInfo[]): PodInfo[] {
 			(a.node ?? '').localeCompare(b.node ?? '') ||
 			a.name.localeCompare(b.name)
 	);
+}
+
+/**
+ * Index a shared-scope instant answer by card: `device_uuid` → value. Samples without a card or
+ * a finite value are left out.
+ */
+export function byDeviceUuid(result: { result: unknown[] }): Map<string, number> {
+	const out = new Map<string, number>();
+	for (const s of result.result as {
+		metric: { labels: Record<string, string> };
+		value?: { value: unknown };
+	}[]) {
+		const uuid = s.metric.labels.device_uuid;
+		const v = Number(s.value?.value);
+		if (uuid && Number.isFinite(v)) out.set(uuid, v);
+	}
+	return out;
 }

@@ -1,10 +1,14 @@
-import { type Client, Code, ConnectError } from '@connectrpc/connect';
+import { type Client } from '@connectrpc/connect';
 import type { ResourceService } from '@otterscale/api/resource/v1';
 import type { PrometheusDriver } from 'prometheus-query';
 
+import { ReloadManager } from '$lib/components/custom/reloader';
 import { formatDuration } from '$lib/components/dashboard/kit/format';
 import { m } from '$lib/messages';
 import { fetchCombinedInstantOrNull } from '$lib/prometheus';
+
+import { firstNumber } from './instant';
+import { field, type KubeObject, listObjects, type ListParams, text } from './kube';
 
 // Platform checks (SPEC 3.7): facts about the platform an admin should not have to go looking
 // for. SPEC planned a backend summary API; until it exists they are read here, the way the entry
@@ -25,24 +29,8 @@ export type CheckState = 'ok' | 'warning' | 'critical' | 'none' | 'unknown';
 
 export type PlatformCheck = { id: CheckId; state: CheckState; value: string; detail?: string };
 
-type KubeObject = Record<string, unknown>;
-
 /** A list that came back, a resource type the cluster does not have, or a read that failed. */
 export type Listed = KubeObject[] | 'missing' | 'failed';
-
-function field(object: unknown, ...path: string[]): unknown {
-	let current = object;
-	for (const key of path) {
-		if (typeof current !== 'object' || current === null) return undefined;
-		current = (current as Record<string, unknown>)[key];
-	}
-	return current;
-}
-
-function text(object: unknown, ...path: string[]): string | undefined {
-	const value = field(object, ...path);
-	return typeof value === 'string' && value ? value : undefined;
-}
 
 /** Status of a condition type: 'True', 'False', 'Unknown', or undefined when absent. */
 function condition(object: unknown, type: string): string | undefined {
@@ -281,17 +269,15 @@ export function notificationsCheck(
 	};
 }
 
-type ListParams = { group: string; version: string; resource: string; namespace: string };
-
 export class PlatformChecksSource {
 	/** null until read, and when the Kubernetes API refuses: the card is then not drawn. */
-	checks = $state<PlatformCheck[] | null>(null);
+	checks = $state.raw<PlatformCheck[] | null>(null);
 	loaded = $state(false);
 
 	#client: Client<typeof ResourceService>;
 	#driver: () => PrometheusDriver;
 	#cluster: string;
-	#timer: ReturnType<typeof setInterval> | undefined;
+	#reload: ReloadManager;
 
 	constructor(
 		client: Client<typeof ResourceService>,
@@ -301,25 +287,21 @@ export class PlatformChecksSource {
 		this.#client = client;
 		this.#driver = driver;
 		this.#cluster = cluster;
+		this.#reload = new ReloadManager(() => void this.refresh());
+		this.#reload.interval = 60;
 	}
 
+	/** Read now, then every interval. */
 	start() {
-		void this.refresh();
-		this.#timer ??= setInterval(() => void this.refresh(), 60_000);
+		this.#reload.restart();
 	}
 
 	stop() {
-		clearInterval(this.#timer);
-		this.#timer = undefined;
+		this.#reload.stop();
 	}
 
-	async #list(params: ListParams): Promise<Listed> {
-		try {
-			const response = await this.#client.list({ cluster: this.#cluster, ...params });
-			return response.items.map((item) => (item.object ?? {}) as KubeObject);
-		} catch (error) {
-			return ConnectError.from(error).code === Code.NotFound ? 'missing' : 'failed';
-		}
+	#list(params: ListParams) {
+		return listObjects(this.#client, this.#cluster, params);
 	}
 
 	async refresh() {
@@ -343,23 +325,32 @@ export class PlatformChecksSource {
 				reloaded: 'min(alertmanager_config_last_reload_successful)'
 			})
 		]);
-		// Every OtterScale cluster runs Flux, so an unreadable module list means this user may not
-		// read the platform's objects: SPEC hides the whole card for them.
-		if (releases === 'failed') {
+		// Every OtterScale cluster runs Flux, so a refused module list means this user may not read
+		// the platform's objects: SPEC hides the whole card for them.
+		if (releases === 'denied') {
 			this.checks = null;
 			this.loaded = true;
 			return;
 		}
-		const number = (key: string) => {
-			const value = alertmanager?.[key]?.[0]?.value?.value;
-			return value === undefined ? undefined : Number(value);
-		};
+		// A read that broke (network, timeout) is not a refusal: keep what the last read showed, or
+		// the card would vanish and come back with the next poll. With nothing read yet there is
+		// nothing to keep, and the card stays out until a read answers.
+		if (releases === 'failed') {
+			this.loaded = true;
+			return;
+		}
+		// The other lists only feed their own check, which says it cannot be read.
+		const listed = (result: Awaited<ReturnType<typeof listObjects>>): Listed =>
+			result === 'denied' ? 'failed' : result;
 		const now = Date.now();
 		this.checks = [
 			modulesCheck(releases),
-			backupCheck(schedules, backups, now),
-			certificatesCheck(certificates, now),
-			notificationsCheck(number('integrations'), number('reloaded'))
+			backupCheck(listed(schedules), listed(backups), now),
+			certificatesCheck(listed(certificates), now),
+			notificationsCheck(
+				firstNumber(alertmanager?.integrations),
+				firstNumber(alertmanager?.reloaded)
+			)
 		];
 		this.loaded = true;
 	}

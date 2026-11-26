@@ -1,4 +1,4 @@
-import type { PrometheusDriver, QueryResult } from 'prometheus-query';
+import type { PrometheusDriver } from 'prometheus-query';
 
 import {
 	byLabel,
@@ -9,6 +9,7 @@ import {
 } from '$lib/components/dashboard/kit/fetch';
 import type { SharedMetrics } from '$lib/prometheus';
 
+import { byCard } from '../../lib/format';
 import { type PodNow, type Quota, quotaOf, type Volume } from './model';
 import {
 	podStateQueries,
@@ -92,19 +93,6 @@ export type GpuCards = {
 	tenants: Map<string, number>;
 	util: Map<string, number>;
 };
-
-function byCard(result: QueryResult | undefined): Map<string, number> {
-	const out = new Map<string, number>();
-	for (const s of (result?.result ?? []) as {
-		metric: { labels: Record<string, string> };
-		value?: { value: number };
-	}[]) {
-		const card = s.metric.labels.device_uuid ?? s.metric.labels.UUID;
-		const value = Number(s.value?.value);
-		if (card && Number.isFinite(value)) out.set(card, value);
-	}
-	return out;
-}
 
 /**
  * Per-card GPU numbers for the cards this workspace's pods are booked on, from the server's

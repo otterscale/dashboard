@@ -14,6 +14,7 @@
 	} from '$lib/components/custom/range-picker';
 	import { AutoRefresh, RefreshControl, reloadNow } from '$lib/components/custom/reloader';
 	import { WidgetGrid } from '$lib/components/custom/widget-grid';
+	import { TAB_LIST, TAB_TRIGGER } from '$lib/components/dashboard/kit';
 	import { formatDuration } from '$lib/components/dashboard/kit/format';
 	import * as Tabs from '$lib/components/ui/tabs';
 	import { m } from '$lib/messages';
@@ -116,8 +117,6 @@
 		anchor = Date.now();
 	}
 
-	const TAB_LIST = 'rounded-full';
-	const TAB_TRIGGER = 'rounded-full px-3';
 	// Made while the component is created, on the server too: it only holds where to ask, and asks
 	// nothing until a card loads in the browser. The server then sends the cards' own loading state,
 	// so the page does not change between that first paint and the browser taking over.
@@ -130,11 +129,11 @@
 		}
 	}
 	const prometheusDriver = createDriver();
-	const initialized = true;
+	// The driver is made above, in one pass: there is no "not initialized yet" to wait for.
 	const body = $derived(
 		dashboardBody({
 			hasDriver: prometheusDriver !== null,
-			initialized,
+			initialized: true,
 			cluster,
 			namespace: namespace
 		})
@@ -157,7 +156,7 @@
 
 <!-- `@container`: the grid follows the width of the content area, which the sidebar changes
      by 200px, not the viewport. -->
-<div class="@container space-y-4 pb-6">
+<div class="@container flex flex-col gap-4 pb-6">
 	<div class="min-w-0">
 		<h1 class="text-3xl leading-9 font-[350] tracking-tight">{m.workspace_dashboard_title()}</h1>
 		<!-- Which namespace the numbers are for; the cards explain themselves. -->
@@ -212,11 +211,14 @@
 					{/if}
 				</div>
 			</div>
+			<!-- The tabs keep both panels mounted, so each one's cards are only there while its tab is
+			     open: hidden cards would go on asking every 10 s. -->
 			<Tabs.Content value="overview" class="grid grid-cols-12 gap-2 pt-3 @md:gap-3">
-				<WidgetGrid {cluster} {widgets} {prometheusDriver} bind:isReloading />
+				{#if selectedTab === 'overview'}
+					<WidgetGrid {cluster} {widgets} {prometheusDriver} bind:isReloading />
+				{/if}
 			</Tabs.Content>
 			<Tabs.Content value="analytics" class="pt-3">
-				<!-- The tabs keep both panels mounted; Analytics asks for nothing until it is opened. -->
 				{#if selectedTab === 'analytics'}
 					<AnalyticsDashboard
 						client={prometheusDriver}

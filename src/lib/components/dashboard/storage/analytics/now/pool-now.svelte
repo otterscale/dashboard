@@ -137,7 +137,9 @@
 		label={m.storage_col_full_in()}
 		state={ready}
 		value={pool?.fullIn !== undefined ? fmtFullIn(pool.fullIn) : m.storage_an_not_filling()}
-		tone={pool?.fullIn !== undefined && pool.fullIn < FULL_IN_WARN_DAYS ? 'text-chart-1' : ''}
+		tone={pool?.fullIn !== undefined && pool.fullIn < FULL_IN_WARN_DAYS
+			? 'text-chart-1'
+			: undefined}
 		note={fullInNote}
 	/>
 	<Kpi

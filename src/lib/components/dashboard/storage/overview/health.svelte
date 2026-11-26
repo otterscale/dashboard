@@ -4,7 +4,7 @@
 	import TriangleAlertIcon from '@lucide/svelte/icons/triangle-alert';
 	import type { PrometheusDriver } from 'prometheus-query';
 
-	import { NUM, Panel } from '$lib/components/dashboard/kit';
+	import { Chip, NUM, Panel } from '$lib/components/dashboard/kit';
 	import * as Card from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import * as Tooltip from '$lib/components/ui/tooltip';
@@ -197,17 +197,13 @@
 	>
 		{#snippet badge()}
 			{#if cardState === 'ready'}
-				<span
-					class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-xs text-muted-foreground {NUM}"
-				>
-					{checks.length}
-				</span>
+				<Chip class={cn('min-w-5 px-1.5', NUM)}>{checks.length}</Chip>
 			{/if}
 		{/snippet}
 		{#if cardState === 'loading'}
 			<div class="flex gap-3 py-2.5" aria-hidden="true">
 				<Skeleton class="mt-0.5 size-4 rounded-full" />
-				<div class="flex-1 space-y-1.5">
+				<div class="flex flex-1 flex-col gap-1.5">
 					<Skeleton class="h-4 w-56" />
 					<Skeleton class="h-3 w-full max-w-md" />
 				</div>

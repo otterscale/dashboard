@@ -2,11 +2,12 @@
 	import type { PrometheusDriver } from 'prometheus-query';
 	import { untrack } from 'svelte';
 
-	import { Meter, NUM, Status } from '$lib/components/dashboard/kit';
+	import { Meter, NUM, Status, TONE_TEXT } from '$lib/components/dashboard/kit';
 	import { byLabel, fetchInstant } from '$lib/components/dashboard/kit/fetch';
 	import { Loader } from '$lib/components/dashboard/kit/loader.svelte';
 	import * as Card from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import * as Table from '$lib/components/ui/table';
 	import * as Tooltip from '$lib/components/ui/tooltip';
 	import { m } from '$lib/messages';
 	import type { SharedMetrics } from '$lib/prometheus';
@@ -16,8 +17,9 @@
 	import { CATEGORY_COLORS } from '../lib/chart-style';
 	import type { ModelPods } from '../lib/model-pods';
 	import {
+		byDeviceUuid,
 		byNode,
-		fmtGiB,
+		fmtPodGiB,
 		nodeTags,
 		podGpuMemory,
 		type PodStatusKey,
@@ -56,18 +58,7 @@
 				shared.instant('vgpu-memory-used'),
 				shared.instant('gpu-shared-count')
 			]);
-			const index = (result: typeof used) =>
-				new Map(
-					(
-						result.result as {
-							metric: { labels: Record<string, string> };
-							value?: { value: unknown };
-						}[]
-					)
-						.map((s) => [s.metric.labels.device_uuid, Number(s.value?.value)] as const)
-						.filter(([uuid, v]) => uuid && Number.isFinite(v))
-				);
-			return { gpuUsed: index(used), tenants: index(tenants) };
+			return { gpuUsed: byDeviceUuid(used), tenants: byDeviceUuid(tenants) };
 		} catch (error) {
 			console.warn('GPU memory per pod is unavailable:', error);
 			return empty;
@@ -127,8 +118,12 @@
 	);
 	const n = $derived(loader.data);
 
-	const head = 'px-2 py-2 text-right font-normal whitespace-nowrap';
-	const cell = cn('px-2 text-right whitespace-nowrap', NUM);
+	// The vendored table at this card's density: 32px header, 48px rows, no row hover.
+	const row = 'h-12 hover:bg-transparent';
+	// 33px: the old header's 32px of text and padding plus its rule.
+	const head = 'h-[2.0625rem] font-normal text-muted-foreground';
+	const plain = 'py-0 whitespace-normal';
+	const cell = cn('py-0 text-right', NUM);
 </script>
 
 {#snippet node(full: string)}
@@ -155,7 +150,7 @@
 {/snippet}
 
 {#snippet name(full: string, segments: number, width: string)}
-	{@const [head, tail] = splitTail(full, segments)}
+	{@const [start, tail] = splitTail(full, segments)}
 	<Tooltip.Root>
 		<Tooltip.Trigger>
 			{#snippet child({ props })}
@@ -164,7 +159,7 @@
 					class={cn('flex min-w-0 font-mono text-[0.78rem]', width)}
 					aria-label={full}
 				>
-					<span class="truncate">{head}</span><span class="shrink-0">{tail}</span>
+					<span class="truncate">{start}</span><span class="shrink-0">{tail}</span>
 				</span>
 			{/snippet}
 		</Tooltip.Trigger>
@@ -183,37 +178,48 @@
 			{m.model_analytics_pods_note()}{#if tags.size > 0}&ensp;·&ensp;{placement}{/if}
 		</p>
 	</div>
-	<div class="-mx-1 mt-2 overflow-x-auto px-1">
-		<table class="w-full min-w-[56rem] text-[0.8125rem]">
-			<thead class="text-xs text-muted-foreground">
-				<tr class="border-b">
-					<th class="py-2 pr-2 text-left font-normal">{m.model_analytics_col_pod()}</th>
-					<th class="px-2 py-2 text-left font-normal">{m.node()}</th>
-					<th class="px-2 py-2 text-left font-normal">{m.model_analytics_col_status()}</th>
-					<th class={head}>{m.running()}</th>
-					<th class={head}>{m.waiting()}</th>
-					<th class="px-2 py-2 text-left font-normal">{m.model_analytics_kv_cache()}</th>
-					<th class={head}>{m.model_analytics_col_gen()}</th>
-					<th class={head}>{m.model_analytics_col_memory()}</th>
-					<th class={head}>{m.model_analytics_col_gpu_memory()}</th>
-					<th class="py-2 pl-2 text-right font-normal whitespace-nowrap">
+	<!-- The table scrolls sideways inside the card; its 4px margin keeps a focus ring whole. -->
+	<div class="-mx-1 mt-2">
+		<Table.Root class="mx-1 w-[calc(100%-0.5rem)] min-w-[56rem] text-[0.8125rem]">
+			<Table.Header class="text-xs">
+				<Table.Row class="hover:bg-transparent">
+					<Table.Head class={cn(head, 'pl-0 whitespace-normal')}>
+						{m.model_analytics_col_pod()}
+					</Table.Head>
+					<Table.Head class={cn(head, 'whitespace-normal')}>{m.node()}</Table.Head>
+					<Table.Head class={cn(head, 'whitespace-normal')}>
+						{m.model_analytics_col_status()}
+					</Table.Head>
+					<Table.Head class={cn(head, 'text-right')}>{m.running()}</Table.Head>
+					<Table.Head class={cn(head, 'text-right')}>{m.waiting()}</Table.Head>
+					<Table.Head class={cn(head, 'whitespace-normal')}>
+						{m.model_analytics_kv_cache()}
+					</Table.Head>
+					<Table.Head class={cn(head, 'text-right')}>{m.model_analytics_col_gen()}</Table.Head>
+					<Table.Head class={cn(head, 'text-right')}>{m.model_analytics_col_memory()}</Table.Head>
+					<Table.Head class={cn(head, 'text-right')}>
+						{m.model_analytics_col_gpu_memory()}
+					</Table.Head>
+					<Table.Head class={cn(head, 'pr-0 text-right')}>
 						{m.model_analytics_col_restarts()}
-					</th>
-				</tr>
-			</thead>
-			<tbody>
+					</Table.Head>
+				</Table.Row>
+			</Table.Header>
+			<Table.Body>
 				{#if state === 'loading'}
 					{#each [0, 1] as i (i)}
-						<tr class="h-12 border-b last:border-0">
-							<td class="pr-2" colspan="10"><Skeleton class="h-3 w-full" /></td>
-						</tr>
+						<Table.Row class={row}>
+							<Table.Cell class={cn(plain, 'pr-2 pl-0')} colspan={10}>
+								<Skeleton class="h-3 w-full" />
+							</Table.Cell>
+						</Table.Row>
 					{/each}
 				{:else if state === 'error' || pods.length === 0}
-					<tr class="h-12">
-						<td colspan="10" class="text-xs text-muted-foreground">
+					<Table.Row class={row}>
+						<Table.Cell class={cn(plain, 'px-0 text-xs text-muted-foreground')} colspan={10}>
 							{state === 'error' ? m.dashboard_couldnt_load() : m.no_data_display()}
-						</td>
-					</tr>
+						</Table.Cell>
+					</Table.Row>
 				{:else}
 					{#each pods as pod (pod.name)}
 						{@const running = n?.engine.running?.get(pod.name)}
@@ -224,21 +230,23 @@
 						{@const memLimit = n?.kube.memLimit?.get(pod.name)}
 						{@const restarts = n?.kube.restarts?.get(pod.name)}
 						{@const gpu = podGpuMemory(pod, n?.gpuUsed ?? new Map(), n?.tenants ?? new Map())}
-						<tr class="h-12 border-b last:border-0">
+						<Table.Row class={row}>
 							<!-- Fixed widths: a longer name never squeezes the numbers. It loses its middle,
 							     not the suffix that tells pods apart, and the tooltip shows it whole. -->
-							<td class="py-1.5 pr-2">{@render name(pod.name, 2, 'max-w-[14rem]')}</td>
-							<td class="px-2">
+							<Table.Cell class={cn(plain, 'py-1.5 pr-2 pl-0')}>
+								{@render name(pod.name, 2, 'max-w-[14rem]')}
+							</Table.Cell>
+							<Table.Cell class={plain}>
 								{#if pod.node}{@render node(pod.node)}{:else}{DASH}{/if}
-							</td>
-							<td class="px-2">
+							</Table.Cell>
+							<Table.Cell class={plain}>
 								<Status tone={pod.status.tone} variant="dot" class="text-[0.78rem] font-medium">
 									{statusLabel[pod.status.key]()}
 								</Status>
-							</td>
-							<td class={cell}>{fmtCount(running)}</td>
-							<td class={cn(cell, waitingClass(waiting))}>{fmtCount(waiting)}</td>
-							<td class="px-2">
+							</Table.Cell>
+							<Table.Cell class={cell}>{fmtCount(running)}</Table.Cell>
+							<Table.Cell class={cn(cell, waitingClass(waiting))}>{fmtCount(waiting)}</Table.Cell>
+							<Table.Cell class={plain}>
 								<span class="flex w-28 items-center gap-2">
 									<Meter value={kv} class={kvClass(kv) ?? 'text-foreground'} />
 									<span
@@ -251,25 +259,31 @@
 										{fmtPercent(kv)}
 									</span>
 								</span>
-							</td>
-							<td class={cell}>{fmtRate(gen)}</td>
-							<td class={cell}>
+							</Table.Cell>
+							<Table.Cell class={cell}>{fmtRate(gen)}</Table.Cell>
+							<Table.Cell class={cell}>
 								{memUsed === undefined
 									? DASH
-									: `${fmtGiB(memUsed)} / ${memLimit ? fmtGiB(memLimit) : DASH} GiB`}
-							</td>
-							<td class={cell}>
+									: `${fmtPodGiB(memUsed)} / ${memLimit ? fmtPodGiB(memLimit) : DASH} GiB`}
+							</Table.Cell>
+							<Table.Cell class={cell}>
 								{gpu.quota === undefined
 									? DASH
-									: `${gpu.used === undefined ? DASH : fmtGiB(gpu.used)} / ${fmtGiB(gpu.quota)} GiB`}
-							</td>
-							<td class={cn('pl-2 text-right', NUM, (restarts ?? 0) >= 0.5 && 'text-chart-1')}>
+									: `${gpu.used === undefined ? DASH : fmtPodGiB(gpu.used)} / ${fmtPodGiB(gpu.quota)} GiB`}
+							</Table.Cell>
+							<Table.Cell
+								class={cn(
+									'py-0 pr-0 text-right whitespace-normal',
+									NUM,
+									(restarts ?? 0) >= 0.5 && TONE_TEXT.warn
+								)}
+							>
 								{fmtCount(restarts)}
-							</td>
-						</tr>
+							</Table.Cell>
+						</Table.Row>
 					{/each}
 				{/if}
-			</tbody>
-		</table>
+			</Table.Body>
+		</Table.Root>
 	</div>
 </Card.Root>

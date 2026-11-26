@@ -91,6 +91,12 @@ export function formatDuration(seconds: number): string {
 	return m.duration_days({ count: String(Math.floor(hours / 24)) });
 }
 
+/** A time of day on the 24-hour clock, in the viewer's zone: `09:05`, `00:00` at midnight. */
+export function formatClock(date: Date): string {
+	const two = (n: number) => String(n).padStart(2, '0');
+	return `${two(date.getHours())}:${two(date.getMinutes())}`;
+}
+
 /**
  * Pressure colours on this page (SPEC 2): under 80 % healthy, 80–89 % warning, 90 % and up
  * critical, judged on the whole percent the reader sees.

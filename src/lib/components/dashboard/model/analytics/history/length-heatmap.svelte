@@ -2,6 +2,10 @@
 	import { NUM, Panel, type WidgetState } from '$lib/components/dashboard/kit';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
+	import { getLocale } from '$lib/paraglide/runtime';
+	import { cn } from '$lib/utils';
+
+	import { fmtDecimal as fmt, isLongSpan } from '../lib/history';
 
 	// Requests by token length over time: one row per length bin (longest at the top), one column
 	// per time bucket, one colour whose depth is the count.
@@ -20,12 +24,16 @@
 	const max = $derived(Math.max(0, ...grid.counts.flat()));
 	const rows = $derived(grid.bins.map((label, i) => ({ label, counts: grid.counts[i] })).reverse());
 	const long = $derived(
-		grid.times.length > 1 && grid.times[grid.times.length - 1] - grid.times[0] > 36 * 3600_000
+		grid.times.length > 1 && isLongSpan(grid.times[grid.times.length - 1] - grid.times[0])
 	);
 	const time = (t: number) =>
 		long
-			? new Date(t).toLocaleDateString([], { month: 'short', day: 'numeric' })
-			: new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+			? new Date(t).toLocaleDateString(getLocale(), { month: 'short', day: 'numeric' })
+			: new Date(t).toLocaleTimeString(getLocale(), {
+					hour: '2-digit',
+					minute: '2-digit',
+					hour12: false
+				});
 	const ticks = $derived.by(() => {
 		const n = grid.times.length;
 		if (n === 0) return [];
@@ -39,7 +47,6 @@
 		return `color-mix(in oklab, var(--chart-3) ${pct}%, var(--card))`;
 	}
 	let hover = $state<{ label: string; j: number; count: number } | undefined>(undefined);
-	const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
 </script>
 
 <Panel {title} state={status} class="min-h-[18rem]" bodyClass="pt-2">
@@ -52,18 +59,19 @@
 	{/snippet}
 	<div style:height="{height}px" class="flex flex-col">
 		{#if grid.times.length === 0}
-			<Skeleton class="h-full w-full rounded-lg" />
+			<Skeleton class="size-full rounded-lg" />
 		{:else}
 			<div
-				class="grid min-h-0 flex-1 gap-x-2"
-				style:grid-template-columns="3rem 1fr"
+				class="grid min-h-0 flex-1 grid-cols-[3rem_1fr] gap-x-2"
 				onpointerleave={() => (hover = undefined)}
 				role="img"
 				aria-label={title}
 				style:grid-template-rows="repeat({rows.length}, minmax(0, 1fr))"
 			>
 				{#each rows as row (row.label)}
-					<span class="self-center text-right text-[10px] leading-none text-muted-foreground {NUM}">
+					<span
+						class={cn('self-center text-right text-[10px] leading-none text-muted-foreground', NUM)}
+					>
 						{row.label}
 					</span>
 					<div
@@ -81,7 +89,7 @@
 					</div>
 				{/each}
 			</div>
-			<div class="relative mt-1.5 ml-[3.5rem] h-4 text-[11px] text-muted-foreground {NUM}">
+			<div class={cn('relative mt-1.5 ml-14 h-4 text-[11px] text-muted-foreground', NUM)}>
 				{#each ticks as i (i)}
 					<span
 						class="absolute -translate-x-1/2 first:translate-x-0 last:-translate-x-full"
@@ -93,7 +101,7 @@
 			</div>
 		{/if}
 	</div>
-	<p class="mt-3 min-h-5 text-xs text-muted-foreground {NUM}">
+	<p class={cn('mt-3 min-h-5 text-xs text-muted-foreground', NUM)}>
 		{#if hover}
 			{time(grid.times[hover.j])} · {hover.label} · {m.model_analytics_requests_count({
 				count: fmt(hover.count)

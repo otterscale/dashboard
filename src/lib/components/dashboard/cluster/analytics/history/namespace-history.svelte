@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PrometheusDriver } from 'prometheus-query';
-	import { onMount } from 'svelte';
+	import { untrack } from 'svelte';
 
 	import {
 		fetchInstant,
@@ -10,7 +10,15 @@
 		stepFor,
 		toPoints
 	} from '$lib/components/dashboard/kit/fetch';
-	import { fmt, fmtCores, fmtGiB, fmtPct, GIB, sum } from '$lib/components/dashboard/kit/format';
+	import {
+		DASH,
+		fmt,
+		fmtCores,
+		fmtGiB,
+		fmtPct,
+		GIB,
+		sum
+	} from '$lib/components/dashboard/kit/format';
 	import HistoryChart, {
 		type ChartPoint
 	} from '$lib/components/dashboard/kit/history-chart.svelte';
@@ -29,7 +37,8 @@
 		windowLabel
 	}: {
 		client: PrometheusDriver;
-		namespace: string;
+		/** Left out while the page has no namespace yet: the cards then wait in their loading state. */
+		namespace: string | undefined;
 		start: Date;
 		end: Date;
 		windowLabel: string;
@@ -41,12 +50,14 @@
 		gpu: ChartPoint[];
 		summary: Record<string, { avg?: number; peak?: number }>;
 		restarts?: number;
+		// The three below are undefined when the request for them failed.
 		storageUsed?: number;
-		mounted: number;
-		volumes: number;
+		mounted?: number;
+		volumes?: number;
 	};
 
 	const loader = new Loader<Data>(async () => {
+		if (!namespace) return null;
 		const ns = q(namespace);
 		const [r, now] = await Promise.all([
 			fetchRange(client, namespaceHistoryQueries(namespace), start, end, stepFor(start, end, 90)),
@@ -79,13 +90,19 @@
 			},
 			restarts: now ? Math.round(now.restarts[0]?.value ?? 0) : undefined,
 			storageUsed: now ? sum(now.storage.map((s) => s.value)) : undefined,
-			mounted: now?.storage.length ?? 0,
-			volumes: Math.round(now?.claims[0]?.value ?? 0)
+			mounted: now?.storage.length,
+			volumes: now ? Math.round(now.claims[0]?.value ?? 0) : undefined
 		};
 	});
 
-	onMount(() => {
-		loader.load();
+	// A new window starts from the loading cards; the page remounts this for a new namespace.
+	$effect(() => {
+		void [start.getTime(), end.getTime()];
+		if (!namespace) return;
+		untrack(() => {
+			loader.reset();
+			loader.load();
+		});
 	});
 
 	const s = $derived(loader.data?.summary ?? {});
@@ -103,7 +120,7 @@
 		},
 		{
 			label: m.analytics_gpu_utilization(),
-			value: hasGpu ? fmtPct(s.gpuUtil?.avg) : '—',
+			value: hasGpu ? fmtPct(s.gpuUtil?.avg) : DASH,
 			note: hasGpu
 				? m.analytics_avg_peak({ peak: fmtPct(s.gpuUtil?.peak) })
 				: m.analytics_no_gpu_workloads()
@@ -115,13 +132,15 @@
 		},
 		{
 			label: m.analytics_storage_used(),
-			value: (loader.data?.mounted ?? 0) > 0 ? fmtGiB(loader.data?.storageUsed) : '—',
+			value: (loader.data?.mounted ?? 0) > 0 ? fmtGiB(loader.data?.storageUsed) : DASH,
 			note:
-				(loader.data?.mounted ?? 0) > 0
-					? m.analytics_gib_across_pvcs({ count: String(loader.data?.mounted) })
-					: (loader.data?.volumes ?? 0) > 0
-						? m.analytics_pvcs_none_mounted({ count: String(loader.data?.volumes) })
-						: m.analytics_no_volumes()
+				loader.data?.mounted === undefined
+					? m.dashboard_couldnt_load()
+					: loader.data.mounted > 0
+						? m.analytics_gib_across_pvcs({ count: String(loader.data.mounted) })
+						: (loader.data.volumes ?? 0) > 0
+							? m.analytics_pvcs_none_mounted({ count: String(loader.data.volumes) })
+							: m.analytics_no_volumes()
 		}
 	]);
 	const cores = (v: number) => `${fmtCores(v)} ${m.analytics_unit_cores()}`;
@@ -177,7 +196,7 @@
 
 <RestartsCard
 	{client}
-	scope={{ namespace }}
+	scope={namespace ? { namespace } : undefined}
 	{start}
 	{end}
 	{windowLabel}

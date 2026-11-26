@@ -1,54 +1,9 @@
-import type { Client } from '@connectrpc/connect';
-import { type ListRequest, type ListResponse, ResourceService } from '@otterscale/api/resource/v1';
-
+import { MIB } from '$lib/components/dashboard/kit/format';
 import { parseHamiAllocation } from '$lib/components/dashboard/model/analytics/lib/pods';
-import { WorkspaceReleaseLabelSelector } from '$lib/utils/helm-release';
 
-import {
-	DEPLOYMENT,
-	HELM_RELEASE,
-	LLM_INFERENCE_SERVICE,
-	POD,
-	type ResourceKind,
-	STATEFUL_SET
-} from '../../overview/links';
-import {
-	classifyWorkloadMembers,
-	type WorkloadMembers,
-	type WorkspaceObjects
-} from '../../overview/workload-status';
+import { listWorkspaceObjects, type ResourceClient } from '../../lib/resources';
+import { classifyWorkloadMembers, type WorkloadMembers } from '../../overview/workload-status';
 import type { GpuDevice } from './model';
-
-type ResourceClient = Client<typeof ResourceService>;
-
-async function listAll(
-	client: ResourceClient,
-	cluster: string,
-	namespace: string,
-	kind: ResourceKind,
-	labelSelector?: string
-): Promise<unknown[]> {
-	const out: unknown[] = [];
-	let continueToken: string | undefined = undefined;
-	for (;;) {
-		const response: ListResponse = await client.list({
-			cluster,
-			namespace,
-			group: kind.group,
-			version: kind.version,
-			resource: kind.resource,
-			labelSelector,
-			limit: BigInt(500),
-			continue: continueToken
-		} as ListRequest);
-		out.push(...response.items.map((item) => item.object));
-		continueToken = response.continue || undefined;
-		if (!continueToken) break;
-	}
-	return out;
-}
-
-const MIB = 1024 ** 2;
 
 type AnnotatedPod = {
 	metadata?: { name?: string; annotations?: Record<string, string> };
@@ -85,18 +40,9 @@ export async function listWorkloads(
 	cluster: string,
 	namespace: string
 ): Promise<WorkspaceWorkloads> {
-	const [models, releases, deployments, statefulSets, pods] = await Promise.all([
-		listAll(client, cluster, namespace, LLM_INFERENCE_SERVICE),
-		listAll(client, cluster, namespace, HELM_RELEASE, WorkspaceReleaseLabelSelector),
-		listAll(client, cluster, namespace, DEPLOYMENT),
-		listAll(client, cluster, namespace, STATEFUL_SET),
-		listAll(client, cluster, namespace, POD)
-	]);
+	const objects = await listWorkspaceObjects(client, cluster, namespace);
 	return {
-		workloads: classifyWorkloadMembers(
-			{ models, releases, deployments, statefulSets, pods } as WorkspaceObjects,
-			Date.now()
-		),
-		gpu: gpuAllocations(pods as AnnotatedPod[])
+		workloads: classifyWorkloadMembers(objects, Date.now()),
+		gpu: gpuAllocations(objects.pods as AnnotatedPod[])
 	};
 }

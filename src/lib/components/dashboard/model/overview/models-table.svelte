@@ -1,12 +1,14 @@
 <script lang="ts">
-	import { Meter, NUM, Status, type WidgetState } from '$lib/components/dashboard/kit';
+	import { Meter, NUM, Status, TONE_TEXT, type WidgetState } from '$lib/components/dashboard/kit';
 	import Sparkline from '$lib/components/dashboard/kit/sparkline.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card';
 	import { Skeleton } from '$lib/components/ui/skeleton';
+	import * as Table from '$lib/components/ui/table';
 	import { m } from '$lib/messages';
 	import { cn } from '$lib/utils';
 
+	import { STATE_LABEL } from './lib/labels';
 	import {
 		fmtCount,
 		fmtMillis,
@@ -16,10 +18,8 @@
 		fmtSeconds,
 		kvTone,
 		type ModelRow,
-		type ModelState,
 		modelStatus,
-		TABLE_ROWS,
-		type Tone
+		TABLE_ROWS
 	} from './lib/models';
 
 	// One row per model, worst first; the first ten, then "Show all". The name opens the model in
@@ -47,24 +47,14 @@
 		onopen: (row: ModelRow) => void;
 	} = $props();
 
-	const stateLabel: Record<ModelState, () => string> = {
-		starting: m.model_overview_state_starting,
-		queueing: m.model_overview_state_queueing,
-		idle: m.model_overview_state_idle,
-		serving: m.model_overview_state_serving
-	};
-	const toneText: Record<Tone, string> = {
-		ok: 'text-chart-2',
-		warn: 'text-chart-1',
-		bad: 'text-destructive',
-		muted: 'text-muted-foreground'
-	};
-
 	let showAll = $state(false);
 	const shown = $derived(showAll ? rows : rows.slice(0, TABLE_ROWS));
 
-	const numCell = cn('px-2 text-right', NUM);
-	const head = 'px-2 py-2 text-right font-normal whitespace-nowrap';
+	// The vendored table at this card's density: 32px header, 52px rows, cells that may wrap.
+	const tableRow = 'h-[3.25rem] hover:bg-muted/60';
+	const head = 'h-[2.0625rem] font-normal text-muted-foreground';
+	const plain = 'py-0 whitespace-normal';
+	const numCell = cn(plain, 'text-right', NUM);
 </script>
 
 <Card.Root
@@ -96,8 +86,11 @@
 				<Status tone="bad" icon="x" class="whitespace-normal">{notice}</Status>
 			</p>
 		{/if}
-		<div class="-mx-1 mt-2 overflow-x-auto px-1">
-			<table class="w-full min-w-[1080px] table-fixed border-collapse text-[0.8125rem]">
+		<!-- The table scrolls sideways inside the card; its 4px margin keeps a focus ring whole. -->
+		<div class="-mx-1 mt-2">
+			<Table.Root
+				class="mx-1 w-[calc(100%-0.5rem)] min-w-[1080px] table-fixed border-collapse text-[0.8125rem]"
+			>
 				<colgroup>
 					<col />
 					<col class="w-[150px]" />
@@ -110,90 +103,98 @@
 					<col class="w-[72px]" />
 					<col class="w-[108px]" />
 				</colgroup>
-				<thead class="text-xs text-muted-foreground">
-					<tr class="border-b border-border">
-						<th class="py-2 pr-2 text-left font-normal">{m.model_overview_col_model()}</th>
-						<th class="px-2 py-2 text-left font-normal">{m.model_overview_col_status()}</th>
-						<th class={head}>{m.model_overview_col_rps()}</th>
-						<th class={head}>{m.model_overview_col_gen()}</th>
-						<th class={head}>{m.model_overview_col_ttft()}</th>
-						<th class={head}>{m.model_overview_col_tpot()}</th>
-						<th class={head}>{m.model_overview_col_e2e()}</th>
-						<th class="px-2 py-2 text-left font-normal">{m.model_overview_col_kv()}</th>
-						<th class={head}>{m.model_overview_col_waiting()}</th>
-						<th class={head}>{m.model_overview_col_spark()}</th>
-					</tr>
-				</thead>
-				<tbody>
+				<Table.Header class="text-xs">
+					<Table.Row class="hover:bg-transparent">
+						<Table.Head class={cn(head, 'pl-0 whitespace-normal')}>
+							{m.model_overview_col_model()}
+						</Table.Head>
+						<Table.Head class={cn(head, 'whitespace-normal')}>
+							{m.model_overview_col_status()}
+						</Table.Head>
+						<Table.Head class={cn(head, 'text-right')}>{m.model_overview_col_rps()}</Table.Head>
+						<Table.Head class={cn(head, 'text-right')}>{m.model_overview_col_gen()}</Table.Head>
+						<Table.Head class={cn(head, 'text-right')}>{m.model_overview_col_ttft()}</Table.Head>
+						<Table.Head class={cn(head, 'text-right')}>{m.model_overview_col_tpot()}</Table.Head>
+						<Table.Head class={cn(head, 'text-right')}>{m.model_overview_col_e2e()}</Table.Head>
+						<Table.Head class={cn(head, 'whitespace-normal')}>
+							{m.model_overview_col_kv()}
+						</Table.Head>
+						<Table.Head class={cn(head, 'text-right')}>
+							{m.model_overview_col_waiting()}
+						</Table.Head>
+						<Table.Head class={cn(head, 'text-right')}>{m.model_overview_col_spark()}</Table.Head>
+					</Table.Row>
+				</Table.Header>
+				<Table.Body>
 					{#if view === 'loading'}
 						{#each [0, 1, 2, 3] as i (i)}
-							<tr class="h-[3.25rem] border-b border-border last:border-b-0">
-								<td class="pr-2"><Skeleton class="h-3.5 w-40" /></td>
-								<td class="px-2"><Skeleton class="h-3.5 w-24" /></td>
+							<Table.Row class="h-[3.25rem] hover:bg-transparent">
+								<Table.Cell class={cn(plain, 'pl-0')}><Skeleton class="h-3.5 w-40" /></Table.Cell>
+								<Table.Cell class={plain}><Skeleton class="h-3.5 w-24" /></Table.Cell>
 								{#each [0, 1, 2, 3, 4] as j (j)}
-									<td class="px-2"><Skeleton class="ml-auto h-3.5 w-10" /></td>
+									<Table.Cell class={plain}><Skeleton class="ml-auto h-3.5 w-10" /></Table.Cell>
 								{/each}
-								<td class="px-2"><Skeleton class="h-1.5 w-full" /></td>
-								<td class="px-2"><Skeleton class="ml-auto h-3.5 w-6" /></td>
-								<td class="pl-2"><Skeleton class="h-5 w-full" /></td>
-							</tr>
+								<Table.Cell class={plain}><Skeleton class="h-1.5 w-full" /></Table.Cell>
+								<Table.Cell class={plain}><Skeleton class="ml-auto h-3.5 w-6" /></Table.Cell>
+								<Table.Cell class={cn(plain, 'pr-0')}><Skeleton class="h-5 w-full" /></Table.Cell>
+							</Table.Row>
 						{/each}
 					{:else}
 						{#each shown as row (row.key)}
 							{@const sub = subtitle?.(row)}
 							{@const status = modelStatus(row)}
 							{@const kv = kvTone(row.kv)}
-							<tr
-								class="h-[3.25rem] border-b border-border transition-colors last:border-b-0 hover:bg-muted/60"
-							>
-								<td class="min-w-0 py-1.5 pr-2">
-									<button
-										type="button"
-										class="block max-w-full truncate py-0.5 text-left font-mono text-[0.8125rem] underline decoration-border underline-offset-3 hover:decoration-foreground focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+							<Table.Row class={tableRow}>
+								<Table.Cell class={cn(plain, 'min-w-0 py-1.5 pl-0')}>
+									<!-- A link in the row's own type: the button's height, weight and colour are
+									     put back to the text's. -->
+									<Button
+										variant="link"
+										class="block h-auto max-w-full truncate rounded-sm border-0 px-0 py-0.5 text-left font-mono text-[0.8125rem] font-normal text-foreground underline decoration-border underline-offset-3 hover:decoration-foreground focus-visible:ring-2 focus-visible:ring-ring active:not-aria-[haspopup]:translate-y-0"
 										aria-label={m.model_overview_open_in_analytics({ model: row.name })}
 										onclick={() => onopen(row)}
 									>
 										{row.name}
-									</button>
+									</Button>
 									{#if sub}
 										<p class="truncate text-xs leading-4 text-muted-foreground">{sub}</p>
 									{/if}
-								</td>
-								<td class="px-2">
+								</Table.Cell>
+								<Table.Cell class={plain}>
 									<Status tone={status.tone} variant="dot" class="text-[0.78rem] font-medium">
-										{stateLabel[status.state]()} · {fmtReplicas(row)}
+										{STATE_LABEL[status.state]()} · {fmtReplicas(row)}
 									</Status>
-								</td>
-								<td class={numCell}>{fmtRate(row.rps)}</td>
-								<td class={numCell}>{fmtRate(row.gen)}</td>
-								<td class={numCell}>{fmtSeconds(row.ttft)}</td>
-								<td class={numCell}>{fmtMillis(row.tpot)}</td>
-								<td class={numCell}>{fmtSeconds(row.e2e)}</td>
-								<td class="px-2">
+								</Table.Cell>
+								<Table.Cell class={numCell}>{fmtRate(row.rps)}</Table.Cell>
+								<Table.Cell class={numCell}>{fmtRate(row.gen)}</Table.Cell>
+								<Table.Cell class={numCell}>{fmtSeconds(row.ttft)}</Table.Cell>
+								<Table.Cell class={numCell}>{fmtMillis(row.tpot)}</Table.Cell>
+								<Table.Cell class={numCell}>{fmtSeconds(row.e2e)}</Table.Cell>
+								<Table.Cell class={plain}>
 									<span class="flex items-center gap-2">
-										<Meter value={row.kv} class={kv ? toneText[kv] : 'text-foreground'} />
+										<Meter value={row.kv} class={kv ? TONE_TEXT[kv] : 'text-foreground'} />
 										<span
 											class={cn(
 												'w-9 shrink-0 text-right',
 												NUM,
-												kv ? toneText[kv] : row.kv === undefined && 'text-muted-foreground'
+												kv ? TONE_TEXT[kv] : row.kv === undefined && 'text-muted-foreground'
 											)}
 										>
 											{fmtPercent(row.kv)}
 										</span>
 									</span>
-								</td>
-								<td class={cn(numCell, (row.waiting ?? 0) > 0 && 'text-chart-1')}>
+								</Table.Cell>
+								<Table.Cell class={cn(numCell, (row.waiting ?? 0) > 0 && TONE_TEXT.warn)}>
 									{fmtCount(row.waiting)}
-								</td>
-								<td class="pl-2">
+								</Table.Cell>
+								<Table.Cell class={cn(plain, 'pr-0')}>
 									<Sparkline values={sparks.get(row.key) ?? []} class="h-6" />
-								</td>
-							</tr>
+								</Table.Cell>
+							</Table.Row>
 						{/each}
 					{/if}
-				</tbody>
-			</table>
+				</Table.Body>
+			</Table.Root>
 		</div>
 		{#if view === 'ready' && rows.length > TABLE_ROWS}
 			<div class="flex justify-center pt-2">

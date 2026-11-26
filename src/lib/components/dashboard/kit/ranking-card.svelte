@@ -37,10 +37,12 @@
 <script lang="ts" generics="T extends string = RankMetric">
 	import type { WidgetState } from '$lib/components/dashboard/kit';
 	import { NUM } from '$lib/components/dashboard/kit';
+	import { Button } from '$lib/components/ui/button';
 	import { Skeleton } from '$lib/components/ui/skeleton';
 	import { m } from '$lib/messages';
 	import { cn } from '$lib/utils';
 
+	import Chip from './chip.svelte';
 	import Segmented from './segmented.svelte';
 	import Sparkline from './sparkline.svelte';
 
@@ -146,10 +148,10 @@
 		/>
 	</div>
 
-	<div class="mt-3 text-xs text-muted-foreground {grid} min-h-8">
+	<div class={cn('mt-3 min-h-8 text-xs text-muted-foreground', grid)}>
 		<span>#</span>
 		<span class="truncate">{axisLabel}</span>
-		<span class="flex items-center gap-3 {barHidden}" aria-hidden="true">
+		<span class={cn('flex items-center gap-3', barHidden)} aria-hidden="true">
 			{#if legend}
 				<span class="flex items-center gap-1.5">
 					<span class="h-1.5 w-3.5 rounded-[2px] bg-chart-3"></span>{legend[0]}
@@ -174,10 +176,10 @@
 	{#if status === 'loading'}
 		<ul class="mt-1 flex flex-col gap-1" aria-busy="true">
 			{#each Array.from({ length: 6 }, (_, i) => i) as i (i)}
-				<li class="{grid} h-12">
-					<Skeleton class="h-3 w-3" />
+				<li class={cn(grid, 'h-12')}>
+					<Skeleton class="size-3" />
 					<Skeleton class="h-3 w-32" />
-					<Skeleton class="h-1.5 w-full {barHidden}" />
+					<Skeleton class={cn('h-1.5 w-full', barHidden)} />
 					<Skeleton class="h-3 w-24 justify-self-end" />
 				</li>
 			{/each}
@@ -204,18 +206,12 @@
 							on ? 'bg-accent' : 'hover:bg-accent/60'
 						)}
 					>
-						<span class="text-xs text-muted-foreground {NUM}">{positions[i]}</span>
+						<span class={cn('text-xs text-muted-foreground', NUM)}>{positions[i]}</span>
 						<span class="flex min-w-0 items-center gap-2" title={row.title ?? row.label}>
 							<span class="truncate font-mono text-[0.8125rem]">{row.label}</span>
 							{#each row.chips as chip (chip)}
-								<span
-									class={cn(
-										'shrink-0 rounded-full px-2 py-0.5 text-xs leading-4 text-muted-foreground @max-2xl:hidden',
-										on ? 'bg-card' : 'bg-muted'
-									)}
-								>
-									{chip}
-								</span>
+								<!-- On the picked row the chip takes the card's colour, like the bar's track. -->
+								<Chip class={cn('@max-2xl:hidden', on && 'bg-card')}>{chip}</Chip>
 							{/each}
 						</span>
 						{#if row.note}
@@ -265,7 +261,7 @@
 									></span>
 								{/if}
 							</span>
-							<span class="{valuesGrid} text-[0.8125rem] {NUM}">
+							<span class={cn(valuesGrid, 'text-[0.8125rem]', NUM)}>
 								{#each row.values as value, j (j)}
 									<span class={cn(value.class, valueCols[j])}>{value.text}</span>
 								{/each}
@@ -281,9 +277,9 @@
 			{/each}
 		</ul>
 		{#if limit && rows.length > limit}
-			<button
-				type="button"
-				class="mt-2 inline-flex min-h-9 items-center rounded-md px-3 text-[0.8125rem] font-medium text-chart-2 hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+			<Button
+				variant="link"
+				class="mt-2 px-3 text-[0.8125rem] text-chart-2 underline-offset-auto"
 				aria-expanded={expanded}
 				onclick={() => (expanded = !expanded)}
 			>
@@ -292,7 +288,7 @@
 					: showAllLabel
 						? showAllLabel(String(rows.length))
 						: m.analytics_show_all({ count: String(rows.length) })}
-			</button>
+			</Button>
 		{/if}
 	{/if}
 </section>

@@ -1,3 +1,5 @@
+import { TONE_TEXT } from '$lib/components/dashboard/kit/tone';
+
 import {
 	kvTone,
 	type ModelRow,
@@ -87,14 +89,6 @@ export function rankMax(rows: RankedModel[], tab: RankTab): number {
 	if (tab === 'kv') return 100;
 	return Math.max(0, ...rows.map((r) => rankValue(r, tab) ?? 0));
 }
-
-/** Text colour for a tone; `ok` stays plain in tables, where green would be noise. */
-export const TONE_TEXT: Record<Tone, string> = {
-	ok: 'text-chart-2',
-	warn: 'text-chart-1',
-	bad: 'text-destructive',
-	muted: 'text-muted-foreground'
-};
 
 /** Waiting > 0 is worth a look. */
 export function waitingClass(waiting: number | undefined): string | undefined {

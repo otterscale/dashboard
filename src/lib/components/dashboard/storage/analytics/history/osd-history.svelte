@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PrometheusDriver } from 'prometheus-query';
-	import { onMount } from 'svelte';
+	import { untrack } from 'svelte';
 
 	import type { WidgetState } from '$lib/components/dashboard/kit';
 	import { fetchRange, stats, stepFor, toPoints } from '$lib/components/dashboard/kit/fetch';
@@ -65,8 +65,18 @@
 		},
 		(d) => d.used.length === 0 && d.ops.length === 0
 	);
-	onMount(() => {
-		if (osd !== undefined) void loader.load();
+	// Loads once the OSD is known (the list may still be on its way when a link opens History)
+	// and again for a new window, each time from the loading state.
+	const from = $derived(start.getTime());
+	const to = $derived(end.getTime());
+	$effect(() => {
+		void from;
+		void to;
+		if (osd === undefined) return;
+		untrack(() => {
+			loader.reset();
+			void loader.load();
+		});
 	});
 
 	const state = $derived(osd === undefined ? listState : loader.state);
