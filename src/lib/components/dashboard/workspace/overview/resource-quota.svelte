@@ -292,25 +292,28 @@
 		const memScale = byteScale(s.memory.requests, s.memory.limits, s.memory.hardLimits);
 		const gpuScale = byteScale(s.gpu.requests, s.gpu.hardRequests);
 		const stScale = byteScale(s.storage.requests, s.storage.hardRequests);
-		const gpuRow: Row =
-			(s.gpu.requests ?? 0) > 0
-				? row(
-						m.gpu_memory(),
-						s.gpu,
-						gpuScale,
-						gpuScale.unit,
-						[
-							s.gpu.cards === 1
-								? m.workspace_quota_gpu_on_one()
-								: m.workspace_quota_gpu_on_many({ count: String(s.gpu.cards) }),
-							// A shared card's usage belongs to several workloads and is left out.
-							s.gpu.sharedCards > 0
-								? m.workspace_quota_gpu_shared_excluded({ count: String(s.gpu.sharedCards) })
-								: null
-						]
-							.filter(Boolean)
-							.join(' · ')
-					)
+		const gpuAllocated = (s.gpu.requests ?? 0) > 0;
+		const gpuRow: Row = gpuAllocated
+			? row(
+					m.gpu_memory(),
+					s.gpu,
+					gpuScale,
+					gpuScale.unit,
+					[
+						s.gpu.cards === 1
+							? m.workspace_quota_gpu_on_one()
+							: m.workspace_quota_gpu_on_many({ count: String(s.gpu.cards) }),
+						// A shared card's usage belongs to several workloads and is left out.
+						s.gpu.sharedCards > 0
+							? m.workspace_quota_gpu_shared_excluded({ count: String(s.gpu.sharedCards) })
+							: null
+					]
+						.filter(Boolean)
+						.join(' · ')
+				)
+			: (s.gpu.hardRequests ?? 0) > 0
+				? // A quota with nothing booked against it still shows what the workspace may use.
+					row(m.gpu_memory(), s.gpu, gpuScale, gpuScale.unit, m.workspace_quota_no_gpu())
 				: {
 						label: m.gpu_memory(),
 						value: '—',
@@ -318,7 +321,7 @@
 						soft: 0,
 						solid: 0,
 						bar: false,
-						line: m.workspace_quota_no_gpu()
+						line: `${m.workspace_quota_no_gpu()} · ${m.dashboard_no_quota()}`
 					};
 		return [
 			row(m.cpu(), s.cpu, cores, cores.unit),
